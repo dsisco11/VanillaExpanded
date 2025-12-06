@@ -1,0 +1,28 @@
+[
+  {
+    "op": "addmerge",
+    "path": "/behaviors",
+    "value": [
+      {
+        "name": "CanIgnite"
+      }
+    ],
+    "file": "game:itemtypes/resource/candle.json"
+  },
+  {
+    "op": "addmerge",
+    "path": "/behaviorsByType/*/0",
+    "value": {
+      "name": "CanIgnite"
+    },
+    "file": "game:blocktypes/clay/fired/oillamp.json"
+  },
+  {
+    "op": "addmerge",
+    "path": "/behaviors/0",
+    "value": {
+      "name": "CanIgnite"
+    },
+    "file": "game:blocktypes/metal/lantern.json"
+  }
+]

@@ -1,0 +1,18 @@
+{
+    "$schema": "https://moddbcdn.vintagestory.at/schema/modinfo.latest.json",
+    "type": "Code",
+    "side": "Universal",
+    "modid": "vanillaexpanded",
+    "name": "VanillaExpanded",
+    "authors": [
+        "Sisco++"
+    ],
+    "description": "Aims to add quality-of-life enhancements, missing functionality, and minor bug fixes while remaining true to the vanilla game and with minimal impacts to game balance.",
+    "version": "0.2.0",
+    "dependencies": {
+        "game": "1.21.0"
+    },
+    "requiredOnClient": true,
+    "requiredOnServer": true,
+    "website": "https://github.com/dsisco11/VanillaExpanded"
+}

@@ -1,0 +1,278 @@
+[
+  {
+    "ingredientPattern": "CT",
+    "ingredients": {
+      "C": {
+        "type": "item",
+        "code": "game:chisel-*",
+        "isTool": true
+      },
+      "T": {
+        "type": "item",
+        "code": "game:arrowhead-*",
+        "allowedVariants": [ "copper", "tinbronze", "bismuthbronze", "blackbronze", "gold", "silver", "iron", "steel", "meteoriciron" ],
+        "name": "material"
+      }
+    },
+    "width": 1,
+    "height": 2,
+    "output": {
+      "type": "item",
+      "code": "game:metalbit-{material}",
+      "quantity": 2
+    }
+  },
+  {
+    "ingredientPattern": "CT",
+    "ingredients": {
+      "C": {
+        "type": "item",
+        "code": "game:chisel-*",
+        "isTool": true
+      },
+      "T": {
+        "type": "item",
+        "code": "game:axehead-*",
+        "allowedVariants": [ "copper", "tinbronze", "bismuthbronze", "blackbronze", "gold", "silver", "iron", "steel", "meteoriciron" ],
+        "name": "material"
+      }
+    },
+    "width": 1,
+    "height": 2,
+    "output": {
+      "type": "item",
+      "code": "game:metalbit-{material}",
+      "quantity": 20
+    }
+  },
+  {
+    "ingredientPattern": "CT",
+    "ingredients": {
+      "C": {
+        "type": "item",
+        "code": "game:chisel-*",
+        "isTool": true
+      },
+      "T": {
+        "type": "item",
+        "code": "game:bladehead-*",
+        "allowedVariants": [ "copper", "tinbronze", "bismuthbronze", "blackbronze", "gold", "silver", "iron", "steel", "meteoriciron" ],
+        "name": "material"
+      }
+    },
+    "width": 1,
+    "height": 2,
+    "output": {
+      "type": "item",
+      "code": "game:metalbit-{material}",
+      "quantity": 20
+    }
+  },
+  {
+    "ingredientPattern": "CT",
+    "ingredients": {
+      "C": {
+        "type": "item",
+        "code": "game:chisel-*",
+        "isTool": true
+      },
+      "T": {
+        "type": "item",
+        "code": "game:hammerhead-*",
+        "allowedVariants": [ "copper", "tinbronze", "bismuthbronze", "blackbronze", "gold", "silver", "iron", "steel", "meteoriciron" ],
+        "name": "material"
+      }
+    },
+    "width": 1,
+    "height": 2,
+    "output": {
+      "type": "item",
+      "code": "game:metalbit-{material}",
+      "quantity": 20
+    }
+  },
+  {
+    "ingredientPattern": "CT",
+    "ingredients": {
+      "C": {
+        "type": "item",
+        "code": "game:chisel-*",
+        "isTool": true
+      },
+      "T": {
+        "type": "item",
+        "code": "game:hoehead-*",
+        "allowedVariants": [ "copper", "tinbronze", "bismuthbronze", "blackbronze", "gold", "silver", "iron", "steel", "meteoriciron" ],
+        "name": "material"
+      }
+    },
+    "width": 1,
+    "height": 2,
+    "output": {
+      "type": "item",
+      "code": "game:metalbit-{material}",
+      "quantity": 20
+    }
+  },
+  {
+    "ingredientPattern": "CT",
+    "ingredients": {
+      "C": {
+        "type": "item",
+        "code": "game:chisel-*",
+        "isTool": true
+      },
+      "T": {
+        "type": "item",
+        "code": "game:knifeblade-*",
+        "allowedVariants": [ "copper", "tinbronze", "bismuthbronze", "blackbronze", "gold", "silver", "iron", "steel", "meteoriciron" ],
+        "name": "material"
+      }
+    },
+    "width": 1,
+    "height": 2,
+    "output": {
+      "type": "item",
+      "code": "game:metalbit-{material}",
+      "quantity": 20
+    }
+  },
+  {
+    "ingredientPattern": "CT",
+    "ingredients": {
+      "C": {
+        "type": "item",
+        "code": "game:chisel-*",
+        "isTool": true
+      },
+      "T": {
+        "type": "item",
+        "code": "game:pickaxehead-*",
+        "allowedVariants": [ "copper", "tinbronze", "bismuthbronze", "blackbronze", "gold", "silver", "iron", "steel", "meteoriciron" ],
+        "name": "material"
+      }
+    },
+    "width": 1,
+    "height": 2,
+    "output": {
+      "type": "item",
+      "code": "game:metalbit-{material}",
+      "quantity": 20
+    }
+  },
+  {
+    "ingredientPattern": "CT",
+    "ingredients": {
+      "C": {
+        "type": "item",
+        "code": "game:chisel-*",
+        "isTool": true
+      },
+      "T": {
+        "type": "item",
+        "code": "game:prospectingpickhead-*",
+        "allowedVariants": [ "copper", "tinbronze", "bismuthbronze", "blackbronze", "gold", "silver", "iron", "steel", "meteoriciron" ],
+        "name": "material"
+      }
+    },
+    "width": 1,
+    "height": 2,
+    "output": {
+      "type": "item",
+      "code": "game:metalbit-{material}",
+      "quantity": 20
+    }
+  },
+  {
+    "ingredientPattern": "CT",
+    "ingredients": {
+      "C": {
+        "type": "item",
+        "code": "game:chisel-*",
+        "isTool": true
+      },
+      "T": {
+        "type": "item",
+        "code": "game:sawblade-*",
+        "allowedVariants": [ "copper", "tinbronze", "bismuthbronze", "blackbronze", "gold", "silver", "iron", "steel", "meteoriciron" ],
+        "name": "material"
+      }
+    },
+    "width": 1,
+    "height": 2,
+    "output": {
+      "type": "item",
+      "code": "game:metalbit-{material}",
+      "quantity": 20
+    }
+  },
+  {
+    "ingredientPattern": "CT",
+    "ingredients": {
+      "C": {
+        "type": "item",
+        "code": "game:chisel-*",
+        "isTool": true
+      },
+      "T": {
+        "type": "item",
+        "code": "game:scythehead-*",
+        "allowedVariants": [ "copper", "tinbronze", "bismuthbronze", "blackbronze", "gold", "silver", "iron", "steel", "meteoriciron" ],
+        "name": "material"
+      }
+    },
+    "width": 1,
+    "height": 2,
+    "output": {
+      "type": "item",
+      "code": "game:metalbit-{material}",
+      "quantity": 20
+    }
+  },
+  {
+    "ingredientPattern": "CT",
+    "ingredients": {
+      "C": {
+        "type": "item",
+        "code": "game:chisel-*",
+        "isTool": true
+      },
+      "T": {
+        "type": "item",
+        "code": "game:shovelhead-*",
+        "allowedVariants": [ "copper", "tinbronze", "bismuthbronze", "blackbronze", "gold", "silver", "iron", "steel", "meteoriciron" ],
+        "name": "material"
+      }
+    },
+    "width": 1,
+    "height": 2,
+    "output": {
+      "type": "item",
+      "code": "game:metalbit-{material}",
+      "quantity": 20
+    }
+  },
+  {
+    "ingredientPattern": "CT",
+    "ingredients": {
+      "C": {
+        "type": "item",
+        "code": "game:chisel-*",
+        "isTool": true
+      },
+      "T": {
+        "type": "item",
+        "code": "game:spearhead-*",
+        "allowedVariants": [ "copper", "tinbronze", "bismuthbronze", "blackbronze", "gold", "silver", "iron", "steel", "meteoriciron" ],
+        "name": "material"
+      }
+    },
+    "width": 1,
+    "height": 2,
+    "output": {
+      "type": "item",
+      "code": "game:metalbit-{material}",
+      "quantity": 20
+    }
+  }
+]

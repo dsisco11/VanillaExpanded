@@ -1,0 +1,51 @@
+# Vanilla: Expanded TODO List:
+    ## Bugs:
+        ☐ Lantern can't use "CanIgnite" behavior (server tries to call 'CanIgniteStacks' to construct the handbook list and crashes).
+
+    ## Recipes:
+        ✔ Decraft linen sacks back into string (knife = 3x string, shears = 4x string). @done(25-12-01 10:47)
+        ✔ Decraft leather backpacks back into leather (knife = 50% return, shears = 75% return). @done(25-12-01 10:47)
+        ✔ Decraft wattle gates/fences back into sticks (knife = 50% return, saw = 75% return). @done(25-12-01 10:47)
+        ✔ Saw firewood into sticks (saw = 2x sticks per firewood). @done(25-12-01 10:47)
+        ✔ Cut planks into sticks (knife = 2x sticks, saw[0.5x] = 2x sticks). @done(25-12-01 10:47)
+        ✔ Smelt tool heads back into metal nuggets (100% return). @done(25-12-01 12:39)
+
+    ## Functionality:
+        ✔ Auto stashing items into containers. @done(25-12-01 11:37)
+        ✔ Auto stashing items into crates. @done(25-12-01 15:38)
+        ✔ Lighting fires with lanterns (requires new custom behavior class). @done(25-11-30 06:19)
+        ☐ Lighting fires with candles.
+        ☐ Lighting fires with oil-lamps.
+        ☐ Handbook search results prioritize full-word matches over partial matches.
+        ☐ New "crafting menu" similar to minecraft: shows all craftable items with current inventory, allows searching. (Maybe this can just be added to the handbook?)
+        ☐ New death penalty option: lose *bag* items on death (items in inventory are lost, items on hotbar and equipped armor and weapons are kept).
+        ☐ New death penalty option: lose *unequipped* items on death (items in inventory and hotbar are lost, equipped armor and weapons are kept).
+        ☐ New death penalty option: lose *all* items on death (items in inventory, hotbar, equipped armor & weapons are lost).
+
+    ## Effects:
+        ☐ Unstable blocks have crumbling particles that increase in frequency the more unstable they are.
+        ☐ Blocks with light level 1 have sublte haze/smoke particles (to indicate the edge of lit areas).
+
+# Vanilla: Rebalanced Ideas:
+    ## Recipes:
+        ☐ Candles from animal fat.
+
+    ## Expanded Resin Uses:
+        ☐ All trees drop small amounts of resin when chopped.
+        ☐ Pine trees drop more resin than other trees.
+        ☐ Cooking 4x resin into crude-fuel.
+        ☐ Combine 1x crude-fuel with bowl to make small crude-lamp (last 5 days)(same light level as a lantern).
+        ☐ Combine 4x crude-fuel with cooking-pot to make large crude-lamp (last 20 days)(+2 light level compared to small crude-lamp).
+        ☐ Cooking 2x crude-fuel + fat + string into candle.
+
+    ## Monster Rebalancing:
+        ☐ Monsters cant spawn under roofs.
+        ☐ Increase gear drop rates from monsters (and trading costs for gears) by 500%. this will make fighting monsters feel more rewarding.
+        ☐ Add other items to monster drops (bones, etc) to make them more rewarding to fight.
+
+# Vanilla: Building Extended:
+    ## Functionality:
+        ☐ Add wooden hammer for construction overlay and building.
+
+# Vanilla: Extended Ideas:
+
