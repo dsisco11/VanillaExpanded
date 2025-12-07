@@ -14,7 +14,7 @@ VanillaExpanded is a mod for Vintage Story that aims to add quality-of-life enha
 - If you have items in your inventory which match items already in the container, a brief progress-bar will be shown at the center of the screen.
 - After the progress-bar completes, all matching items from your inventory will be moved into the container.
 
-// TODO: Add screenshots/gif.
+https://github.com/user-attachments/assets/5be8da04-435e-4200-9ecb-41ea837d2a25
 
 ### New Hotkeys
 
