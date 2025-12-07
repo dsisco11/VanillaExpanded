@@ -8,7 +8,7 @@ VanillaExpanded is a mod for Vintage Story that aims to add quality-of-life enha
 
 ### Auto-Stash
 
-**New** You can now bulk transfer matching items from your inventory into storage containers!
+You can now bulk transfer matching items from your inventory into storage containers!
 
 - When interacting with a container, hold the `interact` button (default: right-click).
 - If you have items in your inventory which match items already in the container, a brief progress-bar will be shown at the center of the screen.
