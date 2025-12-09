@@ -1,5 +1,5 @@
 {
   "blockhelp-autostash-container": "[Hold] Deposit similar items.",
-  "ve-hotkey-equiplightsource--offhand": "Equip light source to offhand",
-  "ve-hotkey-equiplightsource--hotbar": "Equip light source to hotbar"
+  "ve-hotkey-equiplightsource-offhand": "Equip light source to offhand",
+  "ve-hotkey-equiplightsource-hotbar": "Equip light source to hotbar"
 }

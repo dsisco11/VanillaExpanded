@@ -48,13 +48,13 @@ public class VanillaExpandedModSystem : ModSystem
 
     public override void StartClientSide(ICoreClientAPI api)
     {
-        api.Input.RegisterHotKey("ve.equipLightSourceToOffhand", Lang.Get("ve-hotkey-equiplightsource--offhand"), GlKeys.F, HotkeyType.InventoryHotkeys);
+        api.Input.RegisterHotKey("ve.equipLightSourceToOffhand", Lang.Get($"{this.Mod.Info.ModID}:ve-hotkey-equiplightsource-offhand"), GlKeys.F, HotkeyType.InventoryHotkeys);
         api.Input.SetHotKeyHandler("ve.equipLightSourceToOffhand", (hotKey) =>
         {
             return EquipLightSource.OnHotKeyPressed(api, hotKey, true);
         });
 
-        api.Input.RegisterHotKey("ve.equipLightSourceToHotbar", Lang.Get("ve-hotkey-equiplightsource--hotbar"), GlKeys.F, HotkeyType.InventoryHotkeys, shiftPressed: true);
+        api.Input.RegisterHotKey("ve.equipLightSourceToHotbar", Lang.Get($"{this.Mod.Info.ModID}:ve-hotkey-equiplightsource-hotbar"), GlKeys.F, HotkeyType.InventoryHotkeys, shiftPressed: true);
         api.Input.SetHotKeyHandler("ve.equipLightSourceToHotbar", (hotKey) =>
         {
             return EquipLightSource.OnHotKeyPressed(api, hotKey, false);

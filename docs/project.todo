@@ -1,6 +1,6 @@
 # Vanilla: Expanded TODO List:
     ## Bugs:
-        ☐ Lantern can't use "CanIgnite" behavior (server tries to call 'CanIgniteStacks' to construct the handbook list and crashes).
+        ✔ Lantern can't use "CanIgnite" behavior (server tries to call 'CanIgniteStacks' to construct the handbook list and crashes). @done(25-12-06 17:05)
 
     ## Recipes:
         ✔ Decraft linen sacks back into string (knife = 3x string, shears = 4x string). @done(25-12-01 10:47)
@@ -43,9 +43,4 @@
         ☐ Increase gear drop rates from monsters (and trading costs for gears) by 500%. this will make fighting monsters feel more rewarding.
         ☐ Add other items to monster drops (bones, etc) to make them more rewarding to fight.
 
-# Vanilla: Building Extended:
-    ## Functionality:
-        ☐ Add wooden hammer for construction overlay and building.
-
-# Vanilla: Extended Ideas:
 
