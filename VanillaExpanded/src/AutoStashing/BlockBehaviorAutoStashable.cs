@@ -3,13 +3,23 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 
+using VanillaExpanded.Network;
+
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
+using Vintagestory.API.MathTools;
 using Vintagestory.GameContent;
 
 namespace VanillaExpanded.AutoStashing;
 
+enum EStashingState
+{
+    None,
+    PreStashGracePeriod,
+    Stashing,
+    PostStashGracePeriod
+}
 /// <summary>
 /// Block behavior for containers that can auto-stash items when the interact key is held
 /// </summary>
@@ -30,13 +40,14 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     /// <summary>
     /// Time in seconds after stashing during which the players interaction remains blocked (to avoid the container closing immediately)
     /// </summary>
-    protected float postStashGracePeriod = 0.5f;
+    protected float postStashGracePeriod = 0.4f;
     protected IProgressBar? progressBar;
     protected AssetLocation stashSoundPath = new("game:sounds/player/poultice-applied");
     /// <summary>
     /// Tracks which players are currently stashing items.
     /// </summary>
-    protected HashSet<string> isStashing = [];
+    //protected HashSet<string> isStashing = [];
+    protected EStashingState stashingState = EStashingState.None;
     #endregion
 
     #region Initialization
@@ -56,6 +67,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     {
         handling = EnumHandling.PassThrough;
 
+        setProgressVisibility(false);
         var stashables = GetStashableItems(byPlayer, world.BlockAccessor.GetBlockEntity<BlockEntityContainer>(blockSel.Position));
         bool hasStashableItems = stashables.Any();
         if (!hasStashableItems)
@@ -75,7 +87,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
                         if (!isActiveHotbarSlotStashable)
                         {
                             handling = EnumHandling.PreventSubsequent;// in the case of crates, this prevents the default storing behavior from occurring.
-                            isStashing.Add(byPlayer.PlayerUID);
+                            stashingState = EStashingState.PreStashGracePeriod;
                         }
                     }
                     break;
@@ -83,7 +95,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             case BlockGenericTypedContainer:
                 {
                     handling = EnumHandling.PreventDefault;
-                    isStashing.Add(byPlayer.PlayerUID);
+                    stashingState = EStashingState.PreStashGracePeriod;
                     break;
                 }
             default:
@@ -96,8 +108,13 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
 
     public override bool OnBlockInteractStep(float secondsUsed, IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel, ref EnumHandling handling)
     {
-        handling = EnumHandling.PreventSubsequent;
+        if (world.Side != EnumAppSide.Client)
+            return true;
 
+        if (stashingState == EStashingState.None)
+            return true; // Not stashing, do nothing.
+
+        handling = EnumHandling.PreventSubsequent;
         // Allow a grace period after stashing to avoid immediate re-closure of the container.
         if (secondsUsed > (stashDelay + postStashGracePeriod))
         {
@@ -108,34 +125,22 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         {
             setProgressVisibility(true);
             setProgressPercentage(secondsUsed / stashDelay);
+            if (stashingState == EStashingState.PreStashGracePeriod)
+            {
+                stashingState = EStashingState.Stashing;
+            }
         }
 
-        if (!isStashing.Contains(byPlayer.PlayerUID))
+        if (stashingState >= EStashingState.PostStashGracePeriod)
         {
             return true;// Return here so we don't keep trying to stash after we've already done it.
         }
 
         if (secondsUsed >= stashDelay)
         {
-            isStashing.Remove(byPlayer.PlayerUID);
+            stashingState = EStashingState.PostStashGracePeriod;
             setProgressVisibility(false);
-            BlockEntity? be = world.BlockAccessor.GetBlockEntity(blockSel.Position);
-            if (be is BlockEntityCrate crateEntity)
-            {
-                bool itemsWereStashed = AutoStashToCrate(world, byPlayer, crateEntity);
-                if (itemsWereStashed)
-                {
-                    handleDidMoveItems(byPlayer, crateEntity);
-                }
-            }
-            else if (be is BlockEntityContainer containerEntity)
-            {
-                bool itemsWereStashed = AutoStashToGenericContainer(world, byPlayer, containerEntity);
-                if (itemsWereStashed)
-                {
-                    handleDidMoveItems(byPlayer, containerEntity);
-                }
-            }
+            TryStashInventory(world, byPlayer, blockSel.Position);
         }
 
         return true;
@@ -143,27 +148,70 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
 
     public override bool OnBlockInteractCancel(float secondsUsed, IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel, ref EnumHandling handling)
     {
-        isStashing.Remove(byPlayer.PlayerUID);
+        stashingState = EStashingState.None;
         setProgressVisibility(false);
         return base.OnBlockInteractCancel(secondsUsed, world, byPlayer, blockSel, ref handling);
     }
 
     public override void OnBlockInteractStop(float secondsUsed, IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel, ref EnumHandling handling)
     {
-        isStashing.Remove(byPlayer.PlayerUID);
+        stashingState = EStashingState.None;
         setProgressVisibility(false);
         handling = EnumHandling.Handled;
     }
     #endregion
 
+    #region Private
+    /// <summary>
+    /// Attempts to stash items from the player's inventory into the specified container at the given block selection.
+    /// </summary>
+    /// <param name="world"></param>
+    /// <param name="byPlayer"></param>
+    /// <param name="blockSel"></param>
+    public void TryStashInventory(in IWorldAccessor world, in IPlayer byPlayer, in BlockPos position)
+    {
+        if (world.Side == EnumAppSide.Client)
+        {
+            VanillaExpandedModSystem.ClientSide.RequestAutoStash(position);
+            handleDidMoveItems(byPlayer);
+            return;
+        }
+        BlockEntity? be = world.BlockAccessor.GetBlockEntity(position);
+        if (be is BlockEntityCrate crateEntity)
+        {
+            bool itemsWereStashed = AutoStashToCrate(world, byPlayer, crateEntity);
+            //if (itemsWereStashed)
+            //{
+            //    handleDidMoveItems(byPlayer);
+            //}
+        }
+        else if (be is BlockEntityContainer containerEntity)
+        {
+            bool itemsWereStashed = AutoStashToGenericContainer(world, byPlayer, containerEntity);
+            //if (itemsWereStashed)
+            //{
+            //    handleDidMoveItems(byPlayer);
+            //}
+        }
+    }
+
     /// <summary>
     /// Handles the event when items have been moved into the container.
     /// </summary>
-    private void handleDidMoveItems(in IPlayer byPlayer, in BlockEntityContainer container)
+    private void handleDidMoveItems(in IPlayer byPlayer)
     {
-        (api as ICoreClientAPI)?.World.Player.TriggerFpAnimation(EnumHandInteract.HeldItemInteract);
-        byPlayer.Entity.World.PlaySoundAt(stashSoundPath, byPlayer.Entity, null, true, 16);
+        IWorldAccessor world = byPlayer.Entity.World;
+        if (world.Side == EnumAppSide.Server)
+        {
+            world.PlaySoundAt(stashSoundPath, byPlayer.Entity, null, false, 16, volume: 1.0f);
+        }
+
+        if (api is ICoreClientAPI client)
+        {
+            client.World.Player.TriggerFpAnimation(EnumHandInteract.HeldItemInteract);
+        }
     }
+    #endregion
 
     #region World Interaction Help
     public override WorldInteraction[] GetPlacedBlockInteractionHelp(IWorldAccessor world, BlockSelection selection, IPlayer forPlayer, ref EnumHandling handling)
@@ -245,7 +293,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     /// <param name="byPlayer"> The player whose inventory/hotbar to check </param>
     /// <param name="container"> The container whose contents to check </param>
     /// <returns> An enumerable of item types (AssetLocations) which are present in both the player's inventory/hotbar and the container. </returns>
-    protected IEnumerable<AssetLocation> GetStashableItems(in IPlayer byPlayer, in BlockEntityContainer container)
+    protected static IEnumerable<AssetLocation> GetStashableItems(in IPlayer byPlayer, in BlockEntityContainer container)
     {
         IPlayerInventoryManager playerInv = byPlayer.InventoryManager;
         IInventory playerBackpack = playerInv.GetOwnInventory(GlobalConstants.backpackInvClassName);
@@ -255,7 +303,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         return playerItemTypes.Intersect(containerItemTypes);
     }
 
-    protected HashSet<AssetLocation> GetDistinctItemTypes(in IInventory inventory)
+    protected static HashSet<AssetLocation> GetDistinctItemTypes(in IInventory inventory)
     {
         return [.. inventory.Where(static slot => !slot.Empty).Select(static slot => slot.Itemstack.Collectible.Code)];
     }
@@ -268,7 +316,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     /// <param name="byPlayer"></param>
     /// <param name="container"></param>
     /// <returns>True if any items were stashed, false otherwise.</returns>
-    public bool AutoStashToGenericContainer(in IWorldAccessor world, in IPlayer byPlayer, in BlockEntityContainer container)
+    public static bool AutoStashToGenericContainer(in IWorldAccessor world, in IPlayer byPlayer, in BlockEntityContainer container)
     {
         if (world.Api.Side == EnumAppSide.Client)
         {
@@ -285,7 +333,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     /// <param name="byPlayer"></param>
     /// <param name="container"></param>
     /// <returns>True if any items were stashed, false otherwise.</returns>
-    public bool AutoStashToCrate(in IWorldAccessor world, in IPlayer byPlayer, in BlockEntityCrate container)
+    public static bool AutoStashToCrate(in IWorldAccessor world, in IPlayer byPlayer, in BlockEntityCrate container)
     {
         if (world.Api.Side == EnumAppSide.Client)
         {
@@ -306,7 +354,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     /// <param name="byPlayer"></param>
     /// <param name="container"></param>
     /// <returns></returns>
-    protected bool StashMatchingItemsToContainer(in IWorldAccessor world, in IPlayer byPlayer, in BlockEntityContainer container, in HashSet<AssetLocation> itemAllowList)
+    protected static bool StashMatchingItemsToContainer(in IWorldAccessor world, in IPlayer byPlayer, in BlockEntityContainer container, in HashSet<AssetLocation> itemAllowList)
     {
         if (itemAllowList.Count == 0)
         {
@@ -317,7 +365,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         IInventory? hotbarInventory = byPlayer.InventoryManager.GetOwnInventory(GlobalConstants.hotBarInvClassName);
         if (backpackInventory is null)
         {
-            api?.Logger.Error($"[{nameof(BlockBehaviorAutoStashable)}][{nameof(StashMatchingItemsToContainer)}] Player inventory not found! (Player: {byPlayer.PlayerName})");
+            world.Api?.Logger.Error($"[{nameof(BlockBehaviorAutoStashable)}][{nameof(StashMatchingItemsToContainer)}] Player inventory not found! (Player: {byPlayer.PlayerName})");
             return false;
         }
 
@@ -335,7 +383,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         return totalStashed > 0;
     }
 
-    private int AutoStashInventoryIntoContainer(in IWorldAccessor world, in IPlayer byPlayer, in HashSet<AssetLocation> itemAllowList, in BlockEntityContainer container, in IInventory inventory)
+    private static int AutoStashInventoryIntoContainer(in IWorldAccessor world, in IPlayer byPlayer, in HashSet<AssetLocation> itemAllowList, in BlockEntityContainer container, in IInventory inventory)
     {
         int totalStashed = 0;
         byPlayer.InventoryManager.OpenInventory(container.Inventory);
@@ -355,7 +403,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         return totalStashed;
     }
 
-    private int DumpItemStackIntoContainer(in IWorldAccessor world, in IPlayer byPlayer, in BlockEntityContainer container, in ItemSlot itemStack)
+    private static int DumpItemStackIntoContainer(in IWorldAccessor world, in IPlayer byPlayer, in BlockEntityContainer container, in ItemSlot itemStack)
     {
         ICoreClientAPI client = world.Api as ICoreClientAPI;
         int totalMoved = 0;
@@ -375,7 +423,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             int acceptedQuantity = moveOp.MovedQuantity;
             totalMoved += acceptedQuantity;
 
-            api?.World.Logger.Audit("{0} Put {1}x{2} into {3} at <{4}>.",
+            world.Api?.World.Logger.Audit("{0} Put {1}x{2} into {3} at <{4}>.",
                 byPlayer.PlayerName,
                 acceptedQuantity,
                 targetSlot.slot.Itemstack?.Collectible.Code,
