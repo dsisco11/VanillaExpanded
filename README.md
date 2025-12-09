@@ -2,7 +2,7 @@
 
 ## Overview
 
-VanillaExpanded is a mod for Vintage Story that aims to add quality-of-life enhancements, missing functionality, and minor bug fixes while remaining true to the vanilla game and with minimal impacts to game balance.
+VanillaExpanded is a mod for VintageStory that aims to add quality-of-life enhancements, missing functionality, and minor bug fixes while remaining true to the vanilla game and with minimal impacts to game balance.
 
 ## Features
 
