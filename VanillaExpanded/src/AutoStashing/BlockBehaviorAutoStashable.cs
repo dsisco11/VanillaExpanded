@@ -357,6 +357,16 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         }
 
         byPlayer.InventoryManager.CloseInventoryAndSync(container.Inventory);
+        if (totalStashed > 0)
+        {
+            container.MarkDirty();
+            world.Api?.World.Logger.Audit("'{0}' auto-stashed {1} items into {2} at <{3}>.",
+                byPlayer.PlayerName,
+                totalStashed,
+                container.InventoryClassName,
+                container.Pos
+            );
+        }
         return totalStashed > 0;
     }
 

@@ -120,6 +120,11 @@ public class EquipLightSource : ModSystem
                     }
                 }
             }
+            else
+            {
+                previousBackpackSlot = null;
+                previousHotbarSlot = null;
+            }
         }
 
         if (sourceSlot is null)
