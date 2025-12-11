@@ -8,7 +8,7 @@
         "Sisco++"
     ],
     "description": "Aims to add quality-of-life enhancements, missing functionality, and minor bug fixes while remaining true to the vanilla game and with minimal impacts to game balance.",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "dependencies": {
         "game": "1.21.0"
     },
