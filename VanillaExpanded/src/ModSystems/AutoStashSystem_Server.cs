@@ -5,7 +5,7 @@ using VanillaExpanded.src.AutoStashing;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 
-namespace VanillaExpanded;
+namespace VanillaExpanded.src.ModSystems;
 
 internal class AutoStashSystem_Server : ModSystem
 {
