@@ -10,9 +10,9 @@ VanillaExpanded is a mod for VintageStory that aims to add quality-of-life enhan
 
 You can now bulk transfer matching items from your inventory into storage containers!
 
-- When interacting with a container, hold the `interact` button (default: right-click).
-- If you have items in your inventory which match items already in the container, a brief progress-bar will be shown at the center of the screen.
-- After the progress-bar completes, all matching items from your inventory will be moved into the container.
+1) When interacting with a container, hold the `interact` button (default: right-click).
+2) If you have items in your inventory which match items already in the container, a brief progress-bar will be shown at the center of the screen.
+3) After the progress-bar completes, all matching items from your inventory will be moved into the container.
 
 https://github.com/user-attachments/assets/5be8da04-435e-4200-9ecb-41ea837d2a25
 
@@ -22,15 +22,19 @@ https://github.com/user-attachments/assets/5be8da04-435e-4200-9ecb-41ea837d2a25
 
 ### Implemented Missing Functionalities
 
-- Ignitable things (firepits, etc) can now be ignited using lanterns and oillamps (_candles pending_).
+- Ignitable things (firepits, etc) can now be ignited using lanterns (_oillamps & candles pending_).
 
 ### New Recipes
+
+_Note: for decrafting recipes_  
+_A low-tier tool (e.g. knife) yields ~50% of the original materials._  
+_A high-tier tool (e.g. saw or shears) yields ~70% of the original materials._  
 
 - Planks & Firewood can be cut into sticks using a knife or saw (saw yields more).
 - Linen & Leather bags can be de-crafted back into their crafting components using a knife or shears (shears yield more).
 - Wattle fences/gates can be de-crafted back into sticks and wattle using a knife or saw (saw yields more).
-- Metal tool-heads can be crafted back into metal ingots using a chisel.
-- Metal arrow-heads can be crafted back into metal ingots using a chisel.
+- Metal tool-heads can be de-crafted back into metal ingots using a chisel.
+- Metal arrow-heads can be de-crafted back into metal ingots using a chisel.
 
 ## License
 
