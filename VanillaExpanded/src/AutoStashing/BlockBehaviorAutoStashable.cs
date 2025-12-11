@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 
-using VanillaExpanded.Network;
-
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -13,7 +11,7 @@ using Vintagestory.GameContent;
 
 namespace VanillaExpanded.AutoStashing;
 
-enum EStashingState
+internal enum EStashingState
 {
     None,
     PreStashGracePeriod,
@@ -66,9 +64,14 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     public override bool OnBlockInteractStart(IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel, ref EnumHandling handling)
     {
         handling = EnumHandling.PassThrough;
+        if (world.Side == EnumAppSide.Server)
+        {
+            return true; // Server does not handle interaction
+        }
 
         setProgressVisibility(false);
-        var stashables = GetStashableItems(byPlayer, world.BlockAccessor.GetBlockEntity<BlockEntityContainer>(blockSel.Position));
+        BlockEntityContainer blockEntity = world.BlockAccessor.GetBlockEntity<BlockEntityContainer>(blockSel.Position);
+        IEnumerable<AssetLocation> stashables = GetStashableItems(byPlayer, blockEntity);
         bool hasStashableItems = stashables.Any();
         if (!hasStashableItems)
         {
@@ -109,10 +112,14 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     public override bool OnBlockInteractStep(float secondsUsed, IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel, ref EnumHandling handling)
     {
         if (world.Side != EnumAppSide.Client)
+        {
             return true;
+        }
 
         if (stashingState == EStashingState.None)
+        {
             return true; // Not stashing, do nothing.
+        }
 
         handling = EnumHandling.PreventSubsequent;
         // Allow a grace period after stashing to avoid immediate re-closure of the container.
@@ -139,8 +146,9 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         if (secondsUsed >= stashDelay)
         {
             stashingState = EStashingState.PostStashGracePeriod;
+            world.Api.ModLoader.GetModSystem<AutoStashSystem_Client>().RequestAutoStash(blockSel.Position);
             setProgressVisibility(false);
-            TryStashInventory(world, byPlayer, blockSel.Position);
+            handleDidMoveItems(byPlayer);
         }
 
         return true;
@@ -165,33 +173,19 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     /// <summary>
     /// Attempts to stash items from the player's inventory into the specified container at the given block selection.
     /// </summary>
-    /// <param name="world"></param>
-    /// <param name="byPlayer"></param>
-    /// <param name="blockSel"></param>
-    public void TryStashInventory(in IWorldAccessor world, in IPlayer byPlayer, in BlockPos position)
+    public void TryStashPlayerInventory(in IWorldAccessor world, in IPlayer byPlayer, in BlockPos position)
     {
         if (world.Side == EnumAppSide.Client)
-        {
-            VanillaExpandedModSystem.ClientSide.RequestAutoStash(position);
-            handleDidMoveItems(byPlayer);
             return;
-        }
+
         BlockEntity? be = world.BlockAccessor.GetBlockEntity(position);
         if (be is BlockEntityCrate crateEntity)
         {
-            bool itemsWereStashed = AutoStashToCrate(world, byPlayer, crateEntity);
-            //if (itemsWereStashed)
-            //{
-            //    handleDidMoveItems(byPlayer);
-            //}
+            AutoStashToCrate(world, byPlayer, crateEntity);
         }
         else if (be is BlockEntityContainer containerEntity)
         {
-            bool itemsWereStashed = AutoStashToGenericContainer(world, byPlayer, containerEntity);
-            //if (itemsWereStashed)
-            //{
-            //    handleDidMoveItems(byPlayer);
-            //}
+            AutoStashToGenericContainer(world, byPlayer, containerEntity);
         }
     }
 
@@ -201,7 +195,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     private void handleDidMoveItems(in IPlayer byPlayer)
     {
         IWorldAccessor world = byPlayer.Entity.World;
-        if (world.Side == EnumAppSide.Server)
+        //if (world.Side == EnumAppSide.Server)
         {
             world.PlaySoundAt(stashSoundPath, byPlayer.Entity, null, false, 16, volume: 1.0f);
         }
@@ -240,13 +234,6 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
                     ];
                 }
         }
-        //return [
-        //    new WorldInteraction()
-        //    {
-        //        ActionLangCode = "vanillaexpanded:blockhelp-autostash-container",
-        //        MouseButton = EnumMouseButton.Right,
-        //    }
-        //];
     }
     #endregion
 
@@ -318,11 +305,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     /// <returns>True if any items were stashed, false otherwise.</returns>
     public static bool AutoStashToGenericContainer(in IWorldAccessor world, in IPlayer byPlayer, in BlockEntityContainer container)
     {
-        if (world.Api.Side == EnumAppSide.Client)
-        {
-            return false;
-        }
-        HashSet<AssetLocation> itemTypesInContainer = [.. container.GetNonEmptyContentStacks().Select(stack => stack.Collectible.Code)];
+        HashSet<AssetLocation> itemTypesInContainer = [.. container.GetNonEmptyContentStacks().Select(static stack => stack.Collectible.Code)];
         return itemTypesInContainer.Count != 0 && StashMatchingItemsToContainer(world, byPlayer, container, itemTypesInContainer);
     }
 
@@ -335,10 +318,6 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     /// <returns>True if any items were stashed, false otherwise.</returns>
     public static bool AutoStashToCrate(in IWorldAccessor world, in IPlayer byPlayer, in BlockEntityCrate container)
     {
-        if (world.Api.Side == EnumAppSide.Client)
-        {
-            return false;
-        }
         AssetLocation? containerAcceptedItem = container.Inventory.FirstNonEmptySlot?.Itemstack?.Collectible?.Code;
         return containerAcceptedItem is not null && StashMatchingItemsToContainer(world, byPlayer, container, [containerAcceptedItem]);
     }
@@ -363,11 +342,8 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         // Now, go through the player's inventory and stash matching items
         IInventory? backpackInventory = byPlayer.InventoryManager.GetOwnInventory(GlobalConstants.backpackInvClassName);
         IInventory? hotbarInventory = byPlayer.InventoryManager.GetOwnInventory(GlobalConstants.hotBarInvClassName);
-        if (backpackInventory is null)
-        {
-            world.Api?.Logger.Error($"[{nameof(BlockBehaviorAutoStashable)}][{nameof(StashMatchingItemsToContainer)}] Player inventory not found! (Player: {byPlayer.PlayerName})");
-            return false;
-        }
+
+        object openPacket = byPlayer.InventoryManager.OpenInventory(container.Inventory);
 
         int totalStashed = 0;
         if (backpackInventory is not null)
@@ -380,13 +356,14 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             totalStashed += AutoStashInventoryIntoContainer(world, byPlayer, itemAllowList, container, hotbarInventory);
         }
 
+        byPlayer.InventoryManager.CloseInventoryAndSync(container.Inventory);
         return totalStashed > 0;
     }
 
     private static int AutoStashInventoryIntoContainer(in IWorldAccessor world, in IPlayer byPlayer, in HashSet<AssetLocation> itemAllowList, in BlockEntityContainer container, in IInventory inventory)
     {
         int totalStashed = 0;
-        byPlayer.InventoryManager.OpenInventory(container.Inventory);
+
         foreach (ItemSlot? itemSlot in inventory)
         {
             if (!itemSlot.Empty && itemAllowList.Contains(itemSlot.Itemstack.Collectible.Code))
@@ -394,18 +371,11 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
                 totalStashed += DumpItemStackIntoContainer(world, byPlayer, container, itemSlot);
             }
         }
-
-        if (totalStashed > 0)
-        {
-            container.MarkDirty();
-        }
-        byPlayer.InventoryManager.CloseInventoryAndSync(container.Inventory);
         return totalStashed;
     }
 
     private static int DumpItemStackIntoContainer(in IWorldAccessor world, in IPlayer byPlayer, in BlockEntityContainer container, in ItemSlot itemStack)
     {
-        ICoreClientAPI client = world.Api as ICoreClientAPI;
         int totalMoved = 0;
         WeightedSlot? targetSlot;
         ItemStackMoveOperation moveOp;
@@ -419,14 +389,14 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
                 break;
             }
 
-            var packet = byPlayer.InventoryManager.TryTransferTo(itemStack, targetSlot.slot, ref moveOp);
+            object? packet = byPlayer.InventoryManager.TryTransferTo(itemStack, targetSlot.slot, ref moveOp);
             int acceptedQuantity = moveOp.MovedQuantity;
             totalMoved += acceptedQuantity;
 
-            world.Api?.World.Logger.Audit("{0} Put {1}x{2} into {3} at <{4}>.",
+            world.Api?.World.Logger.Audit("'{0}' moved {1}x{2} into {3} at <{4}>.",
                 byPlayer.PlayerName,
-                acceptedQuantity,
                 targetSlot.slot.Itemstack?.Collectible.Code,
+                acceptedQuantity,
                 container.InventoryClassName,
                 container.Pos
             );

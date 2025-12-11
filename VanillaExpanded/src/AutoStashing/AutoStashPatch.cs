@@ -16,13 +16,13 @@ public static class AutoStashPatch
     /// <summary>
     /// Find all block types which use BlockBehaviorContainer and amend our BlockBehaviorAutoStashable behavior to them
     /// </summary>
-    public static void AmendContainerBehaviors(ICoreAPI api)
+    public static void AmendContainerBehaviors(in ICoreAPI api)
     {
         foreach (Block block in api.World.Blocks)
         {
-            if (block is null || block.Code is null) continue;
+            if (block?.Code is null) continue;
             // have to add the crate behavior to top of list first, so that it ends up as the 2nd behavior (after our container behavior)
-            if (block.EntityClass == "Crate")
+            if (block.EntityClass == "Crate" && !block.HasBehavior<BehaviorCrateEntityEventBridge>())
             {
                 BehaviorCrateEntityEventBridge behavior = new(block);
 
@@ -34,7 +34,7 @@ public static class AutoStashPatch
             }
 
             // now our container behavior goes before all other behaviors
-            if (block.HasBehavior<BlockBehaviorContainer>())
+            if (block.HasBehavior<BlockBehaviorContainer>() && !block.HasBehavior<BlockBehaviorAutoStashable>())
             {
                 //api.World.Logger.Debug($"[AutoStashPatch] AmendBlockBehaviors Invoked on Block: {block.Code}");
                 BlockBehaviorAutoStashable behavior = new(block);
