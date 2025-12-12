@@ -176,7 +176,9 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     public void TryStashPlayerInventory(in IWorldAccessor world, in IPlayer byPlayer, in BlockPos position)
     {
         if (world.Side == EnumAppSide.Client)
+        {
             return;
+        }
 
         BlockEntity? be = world.BlockAccessor.GetBlockEntity(position);
         if (be is BlockEntityCrate crateEntity)
@@ -214,7 +216,10 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         {
             case "Crate":
                 {
-                    return [
+                    // If the player has no stashable items, do not show the interaction help.
+                    return !HasStashables(world, forPlayer)
+                        ? []
+                        : [
                         new WorldInteraction()
                         {
                             ActionLangCode = "vanillaexpanded:blockhelp-autostash-container",
@@ -225,7 +230,10 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
                 }
             default:
                 {
-                    return [
+                    // If the player has no stashable items, do not show the interaction help.
+                    return !HasStashables(world, forPlayer)
+                        ? []
+                        : [
                         new WorldInteraction()
                         {
                             ActionLangCode = "vanillaexpanded:blockhelp-autostash-container",
@@ -421,6 +429,13 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         }
         while (targetSlot is not null && moveOp.NotMovedQuantity > 0);
         return totalMoved;
+    }
+
+    private bool HasStashables(in IWorldAccessor world, in IPlayer player)
+    {
+        BlockEntityContainer blockEntity = world.BlockAccessor.GetBlockEntity<BlockEntityContainer>(player.CurrentBlockSelection.Position);
+        IEnumerable<AssetLocation> stashables = GetStashableItems(player, blockEntity);
+        return stashables.Any();
     }
     #endregion
 }
