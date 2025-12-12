@@ -45,7 +45,7 @@ internal class DeathPenaltySystem : ModSystem
     public override void Dispose()
     {
         base.Dispose();
-        if (sapi != null)
+        if (sapi is not null)
         {
             sapi.Event.PlayerDeath -= OnPlayerDeath;
         }
@@ -92,29 +92,38 @@ internal class DeathPenaltySystem : ModSystem
         switch (penaltyType)
         {
             case EnumDeathPenalty.Bag:
-                // Drop only backpack/bag items (keep hotbar and equipped)
-                DropInventoryByClassName(invMgr, GlobalConstants.backpackInvClassName);
+                // Destroy only backpack/bag items (keep hotbar and equipped)
+                ClearInventoryByClassName(invMgr, GlobalConstants.backpackInvClassName);
                 break;
 
             case EnumDeathPenalty.Unequipped:
-                // Drop backpack + hotbar (keep equipped armor/weapons)
-                DropInventoryByClassName(invMgr, GlobalConstants.backpackInvClassName);
-                DropInventoryByClassName(invMgr, GlobalConstants.hotBarInvClassName);
+                // Destroy backpack + hotbar (keep equipped armor/weapons)
+                ClearInventoryByClassName(invMgr, GlobalConstants.backpackInvClassName);
+                ClearInventoryByClassName(invMgr, GlobalConstants.hotBarInvClassName);
                 break;
 
             case EnumDeathPenalty.All:
-                // Drop everything including equipped items
-                invMgr.OnDeath();
+                // Destroy everything including equipped items
+                ClearInventoryByClassName(invMgr, GlobalConstants.backpackInvClassName);
+                ClearInventoryByClassName(invMgr, GlobalConstants.hotBarInvClassName);
+                ClearInventoryByClassName(invMgr, GlobalConstants.characterInvClassName);
                 break;
         }
     }
 
-    private void DropInventoryByClassName(IPlayerInventoryManager invMgr, string invClassName)
+    private void ClearInventoryByClassName(IPlayerInventoryManager invMgr, string invClassName)
     {
         var inventory = invMgr.GetOwnInventory(invClassName);
-        if (inventory != null)
+        if (inventory is not null)
         {
-            invMgr.DropAllInventoryItems(inventory);
+            foreach (var slot in inventory)
+            {
+                if (!slot.Empty)
+                {
+                    slot.Itemstack = null;
+                    slot.MarkDirty();
+                }
+            }
         }
     }
     #endregion
@@ -130,12 +139,11 @@ internal class DeathPenaltySystem : ModSystem
                 if (slot.Itemstack.Collectible.Tool == null) continue;
 
                 int maxDura = slot.Itemstack.Collectible.GetMaxDurability(slot.Itemstack);
-                int remaining = slot.Itemstack.Collectible.GetRemainingDurability(slot.Itemstack);
                 int loss = (int)(maxDura * percentage);
-                int newDura = remaining - loss;
-
-                slot.Itemstack.Collectible.SetDurability(slot.Itemstack, newDura);
-                slot.MarkDirty();
+                if (loss > 0)
+                {
+                    slot.Itemstack.Collectible.DamageItem(sapi!.World, player.Entity, slot, loss);
+                }
             }
         }
     }
