@@ -26,15 +26,15 @@ public class SpawnDecalServerSystem : ModSystem
         // Get the network channel
         channel = api.Network.GetChannel(Mod.Info.ModID);
 
-        // Subscribe to player events
-        api.Event.PlayerJoin += OnPlayerJoin;
+        // Subscribe to player events - use PlayerNowPlaying to ensure client is ready to receive packets
+        api.Event.PlayerNowPlaying += OnPlayerNowPlaying;
     }
 
     public override void Dispose()
     {
         if (sapi != null)
         {
-            sapi.Event.PlayerJoin -= OnPlayerJoin;
+            sapi.Event.PlayerNowPlaying -= OnPlayerNowPlaying;
         }
 
         sapi = null;
@@ -62,9 +62,9 @@ public class SpawnDecalServerSystem : ModSystem
     #endregion
 
     #region Event Handlers
-    private void OnPlayerJoin(IServerPlayer player)
+    private void OnPlayerNowPlaying(IServerPlayer player)
     {
-        // Sync current spawn position to the joining player
+        // Sync current spawn position to the joining player once they're fully loaded
         var spawnPos = player.GetSpawnPosition(false);
         if (spawnPos != null)
         {
