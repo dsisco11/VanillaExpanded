@@ -15,7 +15,8 @@ internal class AutoStashSystem_Client : ModSystem
     protected ILogger Logger => api!.Logger;
     #endregion
 
-    #region Overrides
+    #region Hooks
+    public override bool ShouldLoad(EnumAppSide forSide) => forSide == EnumAppSide.Client;
     public override void Dispose()
     {
         base.Dispose();

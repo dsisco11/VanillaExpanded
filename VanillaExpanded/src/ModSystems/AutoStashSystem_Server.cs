@@ -15,6 +15,7 @@ internal class AutoStashSystem_Server : ModSystem
     #endregion
 
     #region Hooks
+    public override bool ShouldLoad(EnumAppSide forSide) => forSide == EnumAppSide.Server;
     public override void Dispose()
     {
         base.Dispose();
