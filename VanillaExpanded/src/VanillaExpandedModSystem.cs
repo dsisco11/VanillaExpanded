@@ -33,7 +33,8 @@ public class VanillaExpandedModSystem : ModSystem
         api.RegisterBlockBehaviorClass(BehaviorCrateEntityEventBridge.RegistryId, typeof(BehaviorCrateEntityEventBridge));
 
         var channel = api.Network.RegisterChannel(Mod.Info.ModID)
-            .RegisterMessageType<Network.Packet_RequestAutoStash>();
+            .RegisterMessageType<Network.Packet_RequestAutoStash>()
+            .RegisterMessageType<Network.Packet_TemporalSpawn>();
 
         if (!Harmony.HasAnyPatches(Mod.Info.ModID))
         {
