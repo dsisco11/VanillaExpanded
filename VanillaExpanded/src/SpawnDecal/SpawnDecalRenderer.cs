@@ -137,6 +137,7 @@ public class SpawnDecalRenderer : IRenderer
 
         // Build model matrix
         modelMatrix.Identity();
+        // TODO: it shouldn't be necessary to calculate the translation compared to the camera pos like this, the gpu transform matrix should already be inverse translated by the camera pos?
         modelMatrix.Translate(
             (float)(spawnPosition.X - camPos.X),
             (float)(spawnPosition.Y - camPos.Y),
