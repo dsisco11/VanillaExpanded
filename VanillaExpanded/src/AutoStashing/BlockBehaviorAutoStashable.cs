@@ -11,13 +11,6 @@ using Vintagestory.GameContent;
 
 namespace VanillaExpanded.AutoStashing;
 
-internal enum EStashingState
-{
-    None,
-    PreStashGracePeriod,
-    Stashing,
-    PostStashGracePeriod
-}
 /// <summary>
 /// Block behavior for containers that can auto-stash items when the interact key is held
 /// </summary>
@@ -71,8 +64,8 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
 
         setProgressVisibility(false);
         BlockEntityContainer blockEntity = world.BlockAccessor.GetBlockEntity<BlockEntityContainer>(blockSel.Position);
-        IEnumerable<AssetLocation> stashables = GetStashableItems(byPlayer, blockEntity);
-        bool hasStashableItems = stashables.Any();
+        HashSet<int> stashables = GetStashableItems(byPlayer, blockEntity);
+        bool hasStashableItems = stashables.Count != 0;
         if (!hasStashableItems)
         {
             return false; // no stashable items, do nothing
@@ -85,7 +78,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
                     // if the player isnt using the ctrl+shift keys, do not start stashing
                     if (byPlayer.Entity.Controls.CtrlKey && byPlayer.Entity.Controls.ShiftKey)
                     {
-                        bool isActiveHotbarSlotStashable = stashables.Contains(byPlayer.InventoryManager.ActiveHotbarSlot?.Itemstack?.Collectible?.Code);
+                        bool isActiveHotbarSlotStashable = byPlayer.InventoryManager.ActiveHotbarSlot?.Itemstack?.Collectible?.Id is not null && stashables.Contains(byPlayer.InventoryManager.ActiveHotbarSlot.Itemstack.Collectible.Id);
                         // Check if the active hotbar item is stashable, if so then we do not auto-stash as we want to allow the crate to handle the interaction as it normally would.
                         if (!isActiveHotbarSlotStashable)
                         {
@@ -217,7 +210,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             case "Crate":
                 {
                     // If the player has no stashable items, do not show the interaction help.
-                    return !HasStashables(world, forPlayer)
+                    return !HasStashables(world, forPlayer, selection)
                         ? []
                         : [
                         new WorldInteraction()
@@ -231,7 +224,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             default:
                 {
                     // If the player has no stashable items, do not show the interaction help.
-                    return !HasStashables(world, forPlayer)
+                    return !HasStashables(world, forPlayer, selection)
                         ? []
                         : [
                         new WorldInteraction()
@@ -288,19 +281,25 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     /// <param name="byPlayer"> The player whose inventory/hotbar to check </param>
     /// <param name="container"> The container whose contents to check </param>
     /// <returns> An enumerable of item types (AssetLocations) which are present in both the player's inventory/hotbar and the container. </returns>
-    protected static IEnumerable<AssetLocation> GetStashableItems(in IPlayer byPlayer, in BlockEntityContainer container)
+    protected static HashSet<int> GetStashableItems(in IPlayer byPlayer, in BlockEntityContainer container)
     {
+        if (container is null)
+        {
+            return [];
+        }
+
         IPlayerInventoryManager playerInv = byPlayer.InventoryManager;
         IInventory playerBackpack = playerInv.GetOwnInventory(GlobalConstants.backpackInvClassName);
         IInventory playerHotbar = playerInv.GetOwnInventory(GlobalConstants.hotBarInvClassName);
-        HashSet<AssetLocation> containerItemTypes = [.. container.GetNonEmptyContentStacks().Select(stack => stack.Collectible.Code)];
-        HashSet<AssetLocation> playerItemTypes = [.. GetDistinctItemTypes(playerBackpack), .. GetDistinctItemTypes(playerHotbar)];
-        return playerItemTypes.Intersect(containerItemTypes);
+        HashSet<int> containerItemTypes = [.. container.GetNonEmptyContentStacks().Where(static stack => stack?.Collectible?.Id is not null).Select(static stack => stack.Collectible.Id)];
+        HashSet<int> playerItemTypes = [.. GetDistinctItemTypes(playerBackpack), .. GetDistinctItemTypes(playerHotbar)];
+        containerItemTypes.IntersectWith(playerItemTypes);
+        return containerItemTypes;
     }
 
-    protected static HashSet<AssetLocation> GetDistinctItemTypes(in IInventory inventory)
+    protected static HashSet<int> GetDistinctItemTypes(in IInventory inventory)
     {
-        return [.. inventory.Where(static slot => !slot.Empty).Select(static slot => slot.Itemstack.Collectible.Code)];
+        return [.. inventory.Where(static slot => !slot.Empty).Where(static slot => slot?.Itemstack?.Collectible?.Id is not null).Select(static slot => slot.Itemstack.Collectible.Id)];
     }
 
     /// <summary>
@@ -431,11 +430,17 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         return totalMoved;
     }
 
-    private bool HasStashables(in IWorldAccessor world, in IPlayer player)
+    private bool HasStashables(in IWorldAccessor world, in IPlayer player, BlockSelection? selection = null)
     {
-        BlockEntityContainer blockEntity = world.BlockAccessor.GetBlockEntity<BlockEntityContainer>(player.CurrentBlockSelection.Position);
-        IEnumerable<AssetLocation> stashables = GetStashableItems(player, blockEntity);
-        return stashables.Any();
+        selection ??= player.CurrentBlockSelection;
+        if (selection is null)
+        {
+            return false;
+        }
+
+        BlockEntityContainer blockEntity = world.BlockAccessor.GetBlockEntity<BlockEntityContainer>(selection.Position);
+        var stashables = GetStashableItems(player, blockEntity);
+        return stashables.Count != 0;
     }
     #endregion
 }
