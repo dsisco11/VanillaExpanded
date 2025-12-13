@@ -20,6 +20,10 @@ https://github.com/user-attachments/assets/5be8da04-435e-4200-9ecb-41ea837d2a25
 
 - Hotkey for quickly swapping a light source into the off-hand (default: `F`) or hotbar (default: `Shift + F`) when available (press again to swap the light source back into its prior slot).
 
+### Quality of Life Additions
+
+- Player respawn point appears as a glowing gear symbol on the ground.
+
 ### Implemented Missing Functionalities
 
 - Ignitable things (firepits, etc) can now be ignited using lanterns (_oillamps & candles pending_).
