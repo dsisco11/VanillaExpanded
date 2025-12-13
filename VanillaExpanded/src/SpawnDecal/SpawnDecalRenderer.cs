@@ -38,7 +38,7 @@ public class SpawnDecalRenderer : IRenderer
     #endregion
 
     #region IRenderer Properties
-    public double RenderOrder => 0.5; // Decal render stage
+    public double RenderOrder => 0.6; // Decal render stage
     public int RenderRange => 100;
     #endregion
 
@@ -154,7 +154,7 @@ public class SpawnDecalRenderer : IRenderer
 
         rapi.GlToggleBlend(true, EnumBlendMode.Overlay);
         rapi.RenderMesh(decalMeshRef);
-        rapi.GlToggleBlend(false);
+        rapi.GlToggleBlend(true, EnumBlendMode.Standard);
 
         shader.Stop();
     }
