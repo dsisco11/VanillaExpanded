@@ -1,3 +1,5 @@
+using System;
+
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
@@ -10,11 +12,14 @@ namespace VanillaExpanded.SpawnDecal;
 public class SpawnDecalRenderer : IRenderer
 {
     #region Constants
-    private const float DECAL_SIZE = 1.5f;
-    private const float FADE_DURATION = 2.0f;
-    private const float PULSE_SPEED = 2.0f;
-    private const float PULSE_MIN_ALPHA = 0.4f;
-    private const float PULSE_MAX_ALPHA = 0.8f;
+    private const float DECAL_SIZE = 0.4f;
+    private const float Z_OFFSET = 0.0001f;
+    private const float FADE_DURATION = 1f / 2f;
+    private const float COLOR_PHASE_DURATION = 1f / 5f;
+    private const float STRENGTH_PHASE_DURATION = 1f / 13f;
+    private const float PULSE_MIN_STRENGTH = 10f;
+    private const float PULSE_MAX_STRENGTH = 80f;
+    private const float PULSE_STRENGTH_RANGE = PULSE_MAX_STRENGTH - PULSE_MIN_STRENGTH;
     #endregion
 
     #region Fields
@@ -22,11 +27,14 @@ public class SpawnDecalRenderer : IRenderer
     private MeshRef? decalMeshRef;
     private int decalTextureId;
     private readonly Matrixf modelMatrix = new();
+    private readonly System.Numerics.Vector4[] PhaseColors = [new(0.28f, 0.8f, 1.0f, 1.0f), new(0.7f, 0.28f, 1.0f, 1.0f)];
 
     private Vec3d? spawnPosition;
     private bool isFading;
     private float fadeAlpha = 1.0f;
-    private float pulseTime;
+    private float colorPhaseTime = 0f;
+    private float strengthPhaseTime = 0f;
+    private Vec4f FinalRenderGlow = new();
     #endregion
 
     #region IRenderer Properties
@@ -47,31 +55,23 @@ public class SpawnDecalRenderer : IRenderer
     private void InitializeMesh()
     {
         // Create a flat quad mesh for the decal (lying on the ground)
-        var meshData = QuadMeshUtil.GetQuad();
-
-        // Transform the quad to lie flat on the ground (rotate around X axis by 90 degrees)
-        // and scale it to desired size
+        var meshData = QuadMeshUtil.GetCustomQuadHorizontal(0.5f, Z_OFFSET, -0.5f, -1f, 1f, 255, 255, 255, 255);
+        // multiply all vertex coords by DECAL_SIZE
+        float[] verticies = meshData.GetXyz();
         for (int i = 0; i < meshData.VerticesCount; i++)
         {
-            int idx = i * 3;
-            // Original quad is in XY plane, we want it in XZ plane
-            float x = meshData.xyz[idx] * DECAL_SIZE;
-            float y = meshData.xyz[idx + 1];
-            float z = meshData.xyz[idx + 2] * DECAL_SIZE;
-
-            // Rotate 90 degrees around X: new_y = -old_z, new_z = old_y
-            meshData.xyz[idx] = x;
-            meshData.xyz[idx + 1] = -z * DECAL_SIZE;
-            meshData.xyz[idx + 2] = y * DECAL_SIZE;
+            verticies[i * 3 + 0] *= DECAL_SIZE;
+            verticies[i * 3 + 1] *= DECAL_SIZE;
+            verticies[i * 3 + 2] *= DECAL_SIZE;
         }
-
+        meshData.SetXyz(verticies);
         decalMeshRef = capi.Render.UploadMesh(meshData);
     }
 
     private void LoadTexture()
     {
         // Use the block breaking overlay texture
-        var textureLoc = new AssetLocation("game", "textures/environment/blockbreakoverlay.png");
+        var textureLoc = new AssetLocation("vanillaexpanded", "textures/respawnpoint.png");
         decalTextureId = capi.Render.GetOrLoadTexture(textureLoc);
     }
     #endregion
@@ -82,7 +82,7 @@ public class SpawnDecalRenderer : IRenderer
     /// </summary>
     public void SetSpawnPosition(Vec3d position)
     {
-        spawnPosition = position.Clone();
+        spawnPosition = position.Clone(); // Slight offset above ground to prevent z-fighting
         isFading = false;
         fadeAlpha = 1.0f;
     }
@@ -92,7 +92,7 @@ public class SpawnDecalRenderer : IRenderer
     /// </summary>
     public void ClearSpawnPosition()
     {
-        if (spawnPosition != null)
+        if (spawnPosition is not null)
         {
             isFading = true;
         }
@@ -102,26 +102,35 @@ public class SpawnDecalRenderer : IRenderer
     #region IRenderer Implementation
     public void OnRenderFrame(float deltaTime, EnumRenderStage stage)
     {
-        if (spawnPosition == null || decalMeshRef == null)
+        if (spawnPosition is null || decalMeshRef is null)
             return;
 
         // Handle fade animation
         if (isFading)
         {
-            fadeAlpha -= deltaTime / FADE_DURATION;
+            fadeAlpha -= deltaTime * FADE_DURATION;
             if (fadeAlpha <= 0)
             {
-                spawnPosition = null;
-                isFading = false;
-                fadeAlpha = 1.0f;
+                RemoveDecal();
                 return;
             }
         }
+        IRenderAPI rapi = capi.Render;
 
         // Calculate pulse effect
-        pulseTime += deltaTime * PULSE_SPEED;
-        float pulseAlpha = GameMath.Lerp(PULSE_MIN_ALPHA, PULSE_MAX_ALPHA, (GameMath.Sin(pulseTime) + 1f) * 0.5f);
-        float finalAlpha = pulseAlpha * fadeAlpha;
+        float colorPulseDelta = deltaTime * COLOR_PHASE_DURATION;
+        float strengthPulseDelta = deltaTime * STRENGTH_PHASE_DURATION;
+        colorPhaseTime = (colorPhaseTime + colorPulseDelta) % 1f;
+        strengthPhaseTime = (strengthPhaseTime + strengthPulseDelta) % 1f;
+        float colorPhase = (float)((Math.Sin(colorPhaseTime * Math.PI * 2) + 1) / 2); // Normalize to [0,1]
+        float strengthPhase = (float)((Math.Sin(strengthPhaseTime * Math.PI * 2) + 1) / 2); // Normalize to [0,1]
+
+        // Lerp the pulse strength
+        float strength = PULSE_MIN_STRENGTH + (PULSE_STRENGTH_RANGE * strengthPhase);
+
+        // Lerp the phase colors to get final glow
+        var finalColor = System.Numerics.Vector4.Lerp(PhaseColors[0], PhaseColors[1], colorPhase);
+        FinalRenderGlow.Set(finalColor);
 
         // Get camera position for relative rendering
         var camPos = capi.World.Player.Entity.CameraPos;
@@ -130,26 +139,22 @@ public class SpawnDecalRenderer : IRenderer
         modelMatrix.Identity();
         modelMatrix.Translate(
             (float)(spawnPosition.X - camPos.X),
-            (float)(spawnPosition.Y - camPos.Y + 0.0001), // Slight offset above ground to prevent z-fighting
+            (float)(spawnPosition.Y - camPos.Y),
             (float)(spawnPosition.Z - camPos.Z)
         );
 
         // Render using standard shader
-        var shader = capi.Render.PreparedStandardShader(
-            (int)spawnPosition.X,
-            (int)spawnPosition.Y,
-            (int)spawnPosition.Z
-        );
-
+        IStandardShaderProgram shader = rapi.PreparedStandardShader(spawnPosition.XInt, spawnPosition.YInt, spawnPosition.ZInt);
         shader.Use();
         shader.Tex2D = decalTextureId;
         shader.ModelMatrix = modelMatrix.Values;
-        shader.RgbaGlowIn = new Vec4f(0.3f, 0.5f, 1.0f, finalAlpha); // Blue-ish glow
-        shader.ExtraGlow = (int)(finalAlpha * 128);
+        shader.RgbaTint = FinalRenderGlow;
+        shader.RgbaGlowIn = FinalRenderGlow;
+        shader.ExtraGlow = (int)strength;
 
-        capi.Render.GlToggleBlend(true);
-        capi.Render.RenderMesh(decalMeshRef);
-        capi.Render.GlToggleBlend(false);
+        rapi.GlToggleBlend(true, EnumBlendMode.Overlay);
+        rapi.RenderMesh(decalMeshRef);
+        rapi.GlToggleBlend(false);
 
         shader.Stop();
     }
@@ -160,6 +165,15 @@ public class SpawnDecalRenderer : IRenderer
     {
         decalMeshRef?.Dispose();
         decalMeshRef = null;
+    }
+    #endregion
+
+    #region Private Methods
+    private void RemoveDecal()
+    {
+        spawnPosition = null;
+        isFading = false;
+        fadeAlpha = 1.0f;
     }
     #endregion
 }

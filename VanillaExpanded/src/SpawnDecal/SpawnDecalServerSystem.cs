@@ -1,5 +1,8 @@
+using System;
+
 using VanillaExpanded.Network;
 
+using Vintagestory;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Server;
@@ -11,9 +14,17 @@ namespace VanillaExpanded.SpawnDecal;
 /// </summary>
 public class SpawnDecalServerSystem : ModSystem
 {
+    #region Singleton Instance
+    public static SpawnDecalServerSystem? Instance { get; private set; }
+    #endregion
+
     #region Fields
     private ICoreServerAPI? sapi;
     private IServerNetworkChannel? channel;
+    #endregion
+
+    #region Accessors
+    public ILogger Logger => sapi?.Logger ?? throw new InvalidOperationException("Server API not initialized.");
     #endregion
 
     #region ModSystem Overrides
@@ -22,6 +33,7 @@ public class SpawnDecalServerSystem : ModSystem
     public override void StartServerSide(ICoreServerAPI api)
     {
         sapi = api;
+        Instance = this;
 
         // Get the network channel
         channel = api.Network.GetChannel(Mod.Info.ModID);
@@ -32,7 +44,7 @@ public class SpawnDecalServerSystem : ModSystem
 
     public override void Dispose()
     {
-        if (sapi != null)
+        if (sapi is not null)
         {
             sapi.Event.PlayerNowPlaying -= OnPlayerNowPlaying;
         }
@@ -47,26 +59,29 @@ public class SpawnDecalServerSystem : ModSystem
     /// <summary>
     /// Called from Harmony patch when a player's spawn position is set.
     /// </summary>
-    public void OnSpawnPositionSet(IServerPlayer player, PlayerSpawnPos pos)
+    public static void OnSpawnPositionSet(IServerPlayer player, PlayerSpawnPos pos)
     {
-        SendSpawnUpdate(player, pos);
+        Instance.Logger.Audit($"Player '{player.PlayerName}' set spawn position to ({pos.x}, {pos.y}, {pos.z})");
+        Instance.SendSpawnUpdate(player, pos);
     }
 
     /// <summary>
     /// Called from Harmony patch when a player's spawn position is cleared.
     /// </summary>
-    public void OnSpawnPositionCleared(IServerPlayer player)
+    public static void OnSpawnPositionCleared(IServerPlayer player)
     {
-        SendSpawnCleared(player);
+        Instance.Logger.Audit($"Player '{player.PlayerName}' cleared spawn position");
+        Instance.SendSpawnCleared(player);
     }
     #endregion
 
     #region Event Handlers
     private void OnPlayerNowPlaying(IServerPlayer player)
     {
+        Logger.Audit($"Player '{player.PlayerName}' is now playing - syncing spawn position");
         // Sync current spawn position to the joining player once they're fully loaded
         var spawnPos = player.GetSpawnPosition(false);
-        if (spawnPos != null)
+        if (spawnPos is not null)
         {
             SendSpawnUpdate(player, spawnPos);
         }

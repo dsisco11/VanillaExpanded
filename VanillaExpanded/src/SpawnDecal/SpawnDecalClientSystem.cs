@@ -25,7 +25,7 @@ public class SpawnDecalClientSystem : ModSystem
 
         // Create and register the renderer
         renderer = new SpawnDecalRenderer(api);
-        api.Event.RegisterRenderer(renderer, EnumRenderStage.Opaque, "spawndecal");
+        api.Event.RegisterRenderer(renderer, EnumRenderStage.OIT, "spawndecal");
 
         // Register network handler
         var channel = api.Network.GetChannel(Mod.Info.ModID);
@@ -36,7 +36,7 @@ public class SpawnDecalClientSystem : ModSystem
     {
         if (renderer != null && capi != null)
         {
-            capi.Event.UnregisterRenderer(renderer, EnumRenderStage.Opaque);
+            capi.Event.UnregisterRenderer(renderer, EnumRenderStage.OIT);
             renderer.Dispose();
             renderer = null;
         }
