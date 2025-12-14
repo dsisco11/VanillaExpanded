@@ -37,8 +37,8 @@ _A high-tier tool (e.g. saw or shears) yields ~70% of the original materials._
 - Planks & Firewood can be cut into sticks using a knife or saw (saw yields more).
 - Linen & Leather bags can be de-crafted back into their crafting components using a knife or shears (shears yield more).
 - Wattle fences/gates can be de-crafted back into sticks and wattle using a knife or saw (saw yields more).
-- Metal tool-heads can be de-crafted back into metal ingots using a chisel.
-- Metal arrow-heads can be de-crafted back into metal ingots using a chisel.
+- Metal tool-heads can be de-crafted back into metal-bits using a chisel.
+- Metal arrow-heads can be de-crafted back into metal-bits using a chisel.
 
 ## License
 
