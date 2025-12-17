@@ -35,7 +35,6 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
     #endregion
 
     #region Properties
-    public override string ToggleKeyCombinationCode => "ve.alloycalculator";
     public override double DrawOrder => 0.2;
     #endregion
 

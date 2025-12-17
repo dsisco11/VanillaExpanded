@@ -3,26 +3,18 @@ using VanillaExpanded.Gui;
 
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
-using Vintagestory.API.Config;
 using Vintagestory.GameContent;
 
 namespace VanillaExpanded.ModSystems;
 
 /// <summary>
-/// Client-side mod system that registers the Alloy Calculator dialog and hotkey.
-/// Also auto-opens the calculator when a firepit/crucible dialog is opened.
+/// Client-side mod system that auto-opens the Alloy Calculator when a crucible dialog is opened.
 /// </summary>
 public sealed class AlloyCalculatorModSystem : ModSystem
 {
-    #region Constants
-    private const string HotkeyCode = "ve.alloycalculator";
-    private const GlKeys DefaultHotkey = GlKeys.K;
-    #endregion
-
     #region Fields
     private ICoreClientAPI? capi;
     private GuiDialogAlloyCalculator? dialog;
-    private bool autoOpened;
     #endregion
 
     #region ModSystem Lifecycle
@@ -31,7 +23,6 @@ public sealed class AlloyCalculatorModSystem : ModSystem
     public override void StartClientSide(ICoreClientAPI api)
     {
         capi = api;
-        RegisterHotkey();
         RegisterFirepitEvents();
     }
 
@@ -70,7 +61,6 @@ public sealed class AlloyCalculatorModSystem : ModSystem
         {
             dialog.SetAlignment(EnumDialogArea.RightMiddle);
             dialog.TryOpen();
-            autoOpened = true;
         }
     }
 
@@ -82,46 +72,10 @@ public sealed class AlloyCalculatorModSystem : ModSystem
         EFirepitKind kind = GetFirepitKind(capi, firepitDialog);
         if (kind != EFirepitKind.Crucible) return;
 
-        if (autoOpened && dialog?.IsOpened() == true)
-        {
-            dialog.TryClose();
-            autoOpened = false;
-        }
-    }
-    #endregion
-
-    #region Hotkey Registration
-    private void RegisterHotkey()
-    {
-        if (capi is null) return;
-
-        capi.Input.RegisterHotKey(
-            HotkeyCode,
-            Lang.Get($"{Mod.Info.ModID}:gui-alloycalculator-title"),
-            DefaultHotkey,
-            HotkeyType.GUIOrOtherControls,
-            altPressed: true
-        );
-
-        capi.Input.SetHotKeyHandler(HotkeyCode, OnHotkeyPressed);
-    }
-
-    private bool OnHotkeyPressed(KeyCombination _)
-    {
-        if (capi is null) return false;
-
-        dialog ??= new GuiDialogAlloyCalculator(capi);
-
         if (dialog.IsOpened())
         {
             dialog.TryClose();
         }
-        else
-        {
-            dialog.TryOpen();
-        }
-
-        return true;
     }
     #endregion
 
