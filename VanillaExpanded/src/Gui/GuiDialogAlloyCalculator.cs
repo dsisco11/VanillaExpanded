@@ -47,8 +47,8 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
     private void LoadAlloys()
     {
         alloys = capi.GetMetalAlloys()
-            .Where(a => a.Enabled && a.Ingredients.Length > 0)
-            .OrderBy(a => GetAlloyDisplayName(a))
+            .Where(static a => a.Enabled && a.Ingredients.Length > 0)
+            .OrderBy(static a => GetAlloyDisplayName(a))
             .ToList();
     }
 
@@ -258,7 +258,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
             if (Math.Abs(difference) < 1) return; // Already at 100%
 
             // Distribute the difference among other sliders proportionally
-            var otherIndices = sliderValues.Keys.Where(i => i != changedIndex).ToList();
+            var otherIndices = sliderValues.Keys.Where(static i => i != changedIndex).ToList();
             if (otherIndices.Count == 0) return;
 
             // Calculate how much each other slider can absorb
