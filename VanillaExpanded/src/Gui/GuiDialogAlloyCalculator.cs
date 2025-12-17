@@ -14,7 +14,7 @@ namespace VanillaExpanded.Gui;
 public sealed class GuiDialogAlloyCalculator : GuiDialog
 {
     #region Constants
-    private const string ModID = "vanillaexpanded";
+    private const string ModId = "vanillaexpanded";
     private const string DialogKey = "alloycalculator";
     private const double DialogWidth = 400;
     private const double SliderWidth = 280;
@@ -89,7 +89,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
             .AddDialogTitleBar(Lang.Get($"{ModId}:gui-alloycalculator-title"), OnTitleBarClose)
             .BeginChildElements(bgBounds);
 
-        var yOffset = 0.0;
+        var yOffset = 30.0; // Offset to account for title bar height
 
         // Alloy selection dropdown
         AddAlloyDropdown(composer, ref yOffset);
@@ -258,7 +258,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
             if (Math.Abs(difference) < 1) return; // Already at 100%
 
             // Distribute the difference among other sliders proportionally
-            var otherIndices = sliderValues.Keys.Where(static i => i != changedIndex).ToList();
+            var otherIndices = sliderValues.Keys.Where(i => i != changedIndex).ToList();
             if (otherIndices.Count == 0) return;
 
             // Calculate how much each other slider can absorb
