@@ -105,7 +105,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         var contentHeight = CalculateContentHeight();
 
         var composer = capi.Gui
-            .CreateCompo(DialogKey, dialogBounds)
+            .CreateCompo(DialogKey + BlockEntityPosition, dialogBounds)
             .AddShadedDialogBG(bgBounds)
             .AddDialogTitleBar(Lang.Get($"{ModId}:gui-alloycalculator-title"), OnTitleBarClose)
             .BeginChildElements(bgBounds);

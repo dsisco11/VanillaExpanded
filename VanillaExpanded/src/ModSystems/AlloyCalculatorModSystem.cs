@@ -1,8 +1,12 @@
+using System.Collections.Generic;
+using System.Linq;
+
 using VanillaExpanded.AlloyCalculator;
 using VanillaExpanded.Gui;
 
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.MathTools;
 using Vintagestory.GameContent;
 
 namespace VanillaExpanded.ModSystems;
@@ -14,7 +18,7 @@ public sealed class AlloyCalculatorModSystem : ModSystem
 {
     #region Fields
     private ICoreClientAPI? capi;
-    private GuiDialogAlloyCalculator? dialog;
+    private readonly Dictionary<BlockPos, GuiDialogAlloyCalculator> openDialogs = [];
     #endregion
 
     #region ModSystem Lifecycle
@@ -29,8 +33,11 @@ public sealed class AlloyCalculatorModSystem : ModSystem
     public override void Dispose()
     {
         UnregisterFirepitEvents();
-        dialog?.Dispose();
-        dialog = null;
+        foreach (var dialog in openDialogs.Values)
+        {
+            dialog.Dispose();
+        }
+        openDialogs.Clear();
         capi = null;
         base.Dispose();
     }
@@ -56,27 +63,35 @@ public sealed class AlloyCalculatorModSystem : ModSystem
         EFirepitKind kind = GetFirepitKind(capi, firepitDialog);
         if (kind != EFirepitKind.Crucible) return;
 
-        // Dispose old dialog if it exists (position may have changed)
-        dialog?.Dispose();
-        dialog = new GuiDialogAlloyCalculator(capi, firepitDialog.BlockEntityPosition);
+        var pos = firepitDialog.BlockEntityPosition;
         
-        if (!dialog.IsOpened())
+        // Check if dialog already exists for this position
+        if (openDialogs.TryGetValue(pos, out var existingDialog) && existingDialog.IsOpened())
         {
-            dialog.TryOpen();
+            return;
+        }
+
+        var dialog = new GuiDialogAlloyCalculator(capi, pos);
+        if (dialog.TryOpen())
+        {
+            openDialogs[pos] = dialog;
         }
     }
 
     private void OnFirepitDialogClosed(GuiDialogBlockEntityFirepit firepitDialog)
     {
         if (capi is null) return;
-        if (dialog is null) return;
 
         EFirepitKind kind = GetFirepitKind(capi, firepitDialog);
         if (kind != EFirepitKind.Crucible) return;
 
-        if (dialog.IsOpened())
+        var pos = firepitDialog.BlockEntityPosition;
+        
+        if (openDialogs.TryGetValue(pos, out var dialog))
         {
             dialog.TryClose();
+            dialog.Dispose();
+            openDialogs.Remove(pos);
         }
     }
     #endregion
