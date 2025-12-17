@@ -26,7 +26,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private const double ControlGap = 20;
     private const int DefaultTargetUnits = 100;
     private const double FloatyXOffset = 1.2; // Offset to the right of the block in immersive mode
-    private const double DialogXOffset = 250; // Offset to position right of firepit dialog in standard mode
+    private const double DialogPadding = 2; // Padding between dialogs
     #endregion
 
     #region Fields
@@ -97,10 +97,20 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         var bgBounds = ElementBounds.Fill.WithFixedPadding(GuiStyle.ElementToDialogPadding);
         bgBounds.BothSizing = ElementSizing.FitToChildren;
 
+        // Find the firepit dialog for this block position
+        var firepitDialog = capi.Gui.OpenedGuis
+            .OfType<GuiDialogBlockEntityFirepit>()
+            .FirstOrDefault(d => d.BlockEntityPosition == BlockEntityPosition);
+
+        // Calculate offset to position right of firepit dialog
+        var firepitWidth = firepitDialog?.SingleComposer?.Bounds.OuterWidth ?? 0;
+        var calculatorWidth = calculatedContentWidth + (GuiStyle.ElementToDialogPadding * 2);
+        var dialogXOffset = (firepitWidth / 2) + (calculatorWidth / 2) + DialogPadding;
+
         // Position to the right of the firepit dialog
         var dialogBounds = ElementStdBounds.AutosizedMainDialog
             .WithAlignment(EnumDialogArea.LeftMiddle)
-            .WithFixedAlignmentOffset(GuiStyle.DialogToScreenPadding + DialogXOffset, 0);
+            .WithFixedAlignmentOffset(GuiStyle.DialogToScreenPadding + dialogXOffset, 0);
 
         // Calculate content height based on selected alloy
         var contentHeight = CalculateContentHeight();
