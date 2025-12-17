@@ -25,7 +25,8 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private const double TargetInputWidth = 70;
     private const double ControlGap = 20;
     private const int DefaultTargetUnits = 100;
-    private const double FloatyXOffset = 1.2; // Offset to the right of the block
+    private const double FloatyXOffset = 1.2; // Offset to the right of the block in immersive mode
+    private const double DialogXOffset = 250; // Offset to position right of firepit dialog in standard mode
     #endregion
 
     #region Fields
@@ -96,10 +97,10 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         var bgBounds = ElementBounds.Fill.WithFixedPadding(GuiStyle.ElementToDialogPadding);
         bgBounds.BothSizing = ElementSizing.FitToChildren;
 
-        // Position to the right of the block in non-immersive mode
+        // Position to the right of the firepit dialog
         var dialogBounds = ElementStdBounds.AutosizedMainDialog
             .WithAlignment(EnumDialogArea.LeftMiddle)
-            .WithFixedAlignmentOffset(GuiStyle.DialogToScreenPadding, 0);
+            .WithFixedAlignmentOffset(GuiStyle.DialogToScreenPadding + DialogXOffset, 0);
 
         // Calculate content height based on selected alloy
         var contentHeight = CalculateContentHeight();
