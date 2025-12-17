@@ -59,6 +59,10 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     public IReadOnlyDictionary<int, ItemStack> CalculatedIngredientStacks => calculatedStacks;
     #endregion
 
+    #region Accessors
+    public double FirepitDialogWidth => firepitDialog?.SingleComposer?.Bounds.OuterWidth ?? 0;
+    #endregion
+
     #region Constructor
     public GuiDialogAlloyCalculator(ICoreClientAPI capi, BlockPos blockPos, GuiDialog firepitDialog) 
         : base(Lang.Get($"{ModId}:gui-alloycalculator-title"), blockPos, capi)
@@ -69,17 +73,12 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     }
     #endregion
 
-    #region Accessors
-    public double FirepitDialogWidth => firepitDialog?.SingleComposer?.Bounds.OuterWidth ?? 0;
-    #endregion
-
     #region Initialization
     private void LoadAlloys()
     {
-        alloys = capi.GetMetalAlloys()
+        alloys = [.. capi.GetMetalAlloys()
             .Where(static a => a.Enabled && a.Ingredients.Length > 0)
-            .OrderBy(static a => GetAlloyDisplayName(a))
-            .ToList();
+            .OrderBy(static a => GetAlloyDisplayName(a))];
 
         // Build handbook stacks cache for filtering
         BuildHandbookStacksCache();
@@ -119,8 +118,8 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
         // Calculate max fuel temperature
         maxFuelTemperature = smeltingFuels
-            .Where(f => f.Collectible.CombustibleProps?.BurnTemperature is not null)
-            .Select(f => f.Collectible.CombustibleProps!.BurnTemperature)
+            .Where(static f => f.Collectible.CombustibleProps?.BurnTemperature is not null)
+            .Select(static f => f.Collectible.CombustibleProps!.BurnTemperature)
             .DefaultIfEmpty(0)
             .Max();
     }
@@ -210,16 +209,15 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             yOffset += 10;
 
             // Add sliders
-            for (var i = 0; i < ingredientCount; i++)
+            foreach (var ingredient in this.Ingredients)
             {
-                var ingredient = selectedAlloy.Ingredients[i];
                 var ingredientName = GetIngredientDisplayName(ingredient);
 
                 var labelBounds = ElementBounds.Fixed(0, yOffset, LabelWidth, RowHeight);
                 var sliderBounds = ElementBounds.Fixed(LabelWidth, yOffset + 4, SliderWidth, 20);
 
-                var sliderKey = $"slider_{i}";
-                var ingredientIndex = i;
+                var sliderKey = $"slider_{ingredient.ResolvedItemstack.Id}";
+                var ingredientIndex = ingredient.ResolvedItemstack.Id;
 
                 composer
                     .AddStaticText(ingredientName, CairoFont.WhiteSmallText(), labelBounds)
@@ -537,7 +535,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         if (capi.Settings.Bool["immersiveMouseMode"])
         {
             SingleComposer.Bounds.absOffsetX = (SingleComposer.Bounds.OuterWidth / 2) + (FirepitDialogWidth / 2) - 5;
-            SingleComposer.Bounds.absOffsetY = 0;// -(SingleComposer.Bounds.OuterHeight / 2);// - TitlebarHeight;
+            SingleComposer.Bounds.absOffsetY = 0;
         }
     }
 
