@@ -101,7 +101,6 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
         if (selectedAlloy is not null)
         {
             AddIngredientSliders(composer, ref yOffset);
-            AddResultsDisplay(composer, ref yOffset);
         }
 
         SingleComposer = composer.EndChildElements().Compose();
@@ -119,9 +118,8 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
         var baseHeight = 120.0; // Title + dropdown + target units
         if (selectedAlloy is not null)
         {
-            baseHeight += selectedAlloy.Ingredients.Length * RowHeight; // Sliders
-            baseHeight += selectedAlloy.Ingredients.Length * 25; // Results
-            baseHeight += 60; // Padding
+            baseHeight += selectedAlloy.Ingredients.Length * RowHeight; // Sliders with inline amounts
+            baseHeight += 40; // Padding
         }
         return baseHeight;
     }
@@ -174,38 +172,22 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
             var maxPercent = (int)Math.Round(ingredient.MaxRatio * 100);
 
             var labelBounds = ElementBounds.Fixed(0, yOffset, LabelWidth, 30);
-            var sliderBounds = ElementBounds.Fixed(LabelWidth + 10, yOffset + 5, SliderWidth, 20);
+            var sliderBounds = ElementBounds.Fixed(LabelWidth + 10, yOffset + 5, SliderWidth - 70, 20);
+            var amountBounds = ElementBounds.Fixed(LabelWidth + SliderWidth - 50, yOffset + 2, 70, 25);
 
             var sliderKey = $"slider_{i}";
+            var amountKey = $"amount_{i}";
             var ingredientIndex = i; // Capture for closure
 
             composer
                 .AddStaticText($"{ingredientName}:", CairoFont.WhiteSmallText(), labelBounds)
-                .AddSlider(value => OnSliderChanged(ingredientIndex, value), sliderBounds, sliderKey);
+                .AddSlider(value => OnSliderChanged(ingredientIndex, value), sliderBounds, sliderKey)
+                .AddDynamicText("", CairoFont.WhiteDetailText(), amountBounds, amountKey);
 
             yOffset += RowHeight;
         }
     }
 
-    private void AddResultsDisplay(GuiComposer composer, ref double yOffset)
-    {
-        if (selectedAlloy is null) return;
-
-        yOffset += 10;
-
-        // Add section header
-        var headerBounds = ElementBounds.Fixed(0, yOffset, DialogWidth - 40, 25);
-        composer.AddStaticText(Lang.Get($"{ModId}:gui-alloycalculator-required"), CairoFont.WhiteSmallText(), headerBounds);
-        yOffset += 25;
-
-        // Add result text for each ingredient
-        for (var i = 0; i < selectedAlloy.Ingredients.Length; i++)
-        {
-            var resultBounds = ElementBounds.Fixed(10, yOffset, DialogWidth - 60, 20);
-            composer.AddDynamicText("", CairoFont.WhiteDetailText(), resultBounds, $"result_{i}");
-            yOffset += 22;
-        }
-    }
     #endregion
 
     #region Slider Logic
@@ -331,13 +313,11 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
 
         for (var i = 0; i < selectedAlloy.Ingredients.Length; i++)
         {
-            var ingredient = selectedAlloy.Ingredients[i];
-            var ingredientName = GetIngredientDisplayName(ingredient);
             var percent = sliderValues.TryGetValue(i, out var val) ? val : 0;
             var units = targetUnits * percent / 100.0;
 
-            var resultText = SingleComposer.GetDynamicText($"result_{i}");
-            resultText?.SetNewText($"{ingredientName}: {units:F1} {Lang.Get($"{ModId}:gui-alloycalculator-units")} ({percent}%)");
+            var amountText = SingleComposer.GetDynamicText($"amount_{i}");
+            amountText?.SetNewText($"{units:F1} u");
         }
     }
     #endregion
