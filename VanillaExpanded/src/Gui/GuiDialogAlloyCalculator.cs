@@ -302,9 +302,10 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
         {
             var percent = sliderValues.TryGetValue(i, out var val) ? val : 0;
             var units = targetUnits * percent / 100.0;
+            var nuggets = units / 5.0; // 1 nugget = 5 units
 
             var amountText = SingleComposer.GetDynamicText($"amount_{i}");
-            amountText?.SetNewText($"{units:F1} u");
+            amountText?.SetNewText($"{nuggets:F1} {Lang.Get($"{ModId}:gui-alloycalculator-nuggets")}");
         }
     }
     #endregion

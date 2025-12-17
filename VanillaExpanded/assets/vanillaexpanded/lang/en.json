@@ -10,5 +10,6 @@
   "gui-alloycalculator-ratios": "Metal Ratios",
   "gui-alloycalculator-required": "Required Amounts",
   "gui-alloycalculator-units": "units",
-  "gui-alloycalculator-total": "Total"
+  "gui-alloycalculator-total": "Total",
+  "gui-alloycalculator-nuggets": "nuggets"
 }
