@@ -17,9 +17,9 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
     private const string ModId = "vanillaexpanded";
     private const string DialogKey = "alloycalculator";
     private const double DialogWidth = 400;
-    private const double SliderWidth = 280;
-    private const double LabelWidth = 100;
-    private const double RowHeight = 40;
+    private const double SliderWidth = 200;
+    private const double LabelWidth = 60;
+    private const double RowHeight = 30;
     private const int DefaultTargetUnits = 100;
     #endregion
 
@@ -161,7 +161,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
 
             var labelBounds = ElementBounds.Fixed(0, yOffset, LabelWidth, 30);
             var sliderBounds = ElementBounds.Fixed(LabelWidth + 10, yOffset + 5, SliderWidth - 70, 20);
-            var amountBounds = ElementBounds.Fixed(LabelWidth + SliderWidth - 50, yOffset + 2, 70, 25);
+            var amountBounds = ElementBounds.Fixed(LabelWidth + SliderWidth - 50, yOffset + 2, 70, 35);
 
             var sliderKey = $"slider_{i}";
             var amountKey = $"amount_{i}";
@@ -308,7 +308,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
             var nuggets = units / 5.0; // 1 nugget = 5 units
 
             var amountText = SingleComposer.GetDynamicText($"amount_{i}");
-            amountText?.SetNewText($"{nuggets:F1} {Lang.Get($"{ModId}:gui-alloycalculator-nuggets")}");
+            amountText?.SetNewText($"{nuggets:F0} {Lang.Get($"{ModId}:gui-alloycalculator-nuggets")}");
         }
     }
     #endregion
