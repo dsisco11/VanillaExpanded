@@ -59,7 +59,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
         var metalName = outputCode.Contains('-') 
             ? outputCode[(outputCode.LastIndexOf('-') + 1)..] 
             : outputCode;
-        return Lang.GetMatching($"item-ingot-{metalName}") ?? metalName;
+        return Lang.GetMatching($"material-{metalName}") ?? metalName;
     }
 
     private static string GetIngredientDisplayName(MetalAlloyIngredient ingredient)
@@ -68,7 +68,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
         var metalName = code.Contains('-') 
             ? code[(code.LastIndexOf('-') + 1)..] 
             : code;
-        return Lang.GetMatching($"item-ingot-{metalName}") ?? metalName;
+        return Lang.GetMatching($"material-{metalName}") ?? metalName;
     }
     #endregion
 
