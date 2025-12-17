@@ -188,6 +188,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             // Create slideshow components for each ingredient
             slideshowComponents.Clear();
             var richTextComponents = new List<RichTextComponentBase>();
+            const int slotPadding = 6;
 
             for (var i = 0; i < ingredientCount; i++)
             {
@@ -199,7 +200,8 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                     var slideshow = new SlideshowItemstackTextComponent(capi, stacks, SlotSize, EnumFloat.Inline)
                     {
                         ShowStackSize = true,
-                        Background = true
+                        Background = true,
+                        PaddingRight = slotPadding
                     };
                     slideshowComponents.Add(slideshow);
                     richTextComponents.Add(slideshow);
@@ -207,7 +209,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             }
 
             // Add richtext element with slideshow components
-            var slotsWidth = ingredientCount * (SlotSize + 4);
+            var slotsWidth = ingredientCount * (SlotSize + slotPadding);
             var slotsXOffset = (contentWidth - slotsWidth) / 2;
             var slotBounds = ElementBounds.Fixed(slotsXOffset, yOffset, slotsWidth, SlotSize + 8);
             composer.AddRichtext(richTextComponents.ToArray(), slotBounds, "ingredientSlots");
