@@ -32,6 +32,14 @@
       <HintPath>$(VINTAGE_STORY)/VintagestoryLib.dll</HintPath>
       <Private>false</Private>
     </Reference>
+	<Reference Include="protobuf-net">
+		<HintPath>$(VINTAGE_STORY)/Lib/protobuf-net.dll</HintPath>
+		<Private>False</Private>
+	</Reference>
+	<Reference Include="cairo-sharp">
+		<HintPath>$(VINTAGE_STORY)/Lib/cairo-sharp.dll</HintPath>
+		<Private>False</Private>
+	</Reference>
   </ItemGroup>
 
 <ItemGroup>
@@ -49,10 +57,6 @@
 <ItemGroup>
   <Folder Include="assets\vanillaexpanded\patches\" />
   <Folder Include="src\InputHandlers\" />
-</ItemGroup>
-
-<ItemGroup>
-  <PackageReference Include="protobuf-net" Version="2.4.9" />
 </ItemGroup>
 
 </Project>

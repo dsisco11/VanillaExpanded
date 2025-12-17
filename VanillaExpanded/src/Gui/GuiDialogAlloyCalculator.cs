@@ -18,7 +18,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
     private const string DialogKey = "alloycalculator";
     private const double DialogWidth = 400;
     private const double SliderWidth = 200;
-    private const double LabelWidth = 60;
+    private const double MinLabelWidth = 40;
     private const double RowHeight = 30;
     private const int DefaultTargetUnits = 100;
     #endregion
@@ -29,6 +29,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
     private readonly Dictionary<int, int> sliderValues = [];
     private int targetUnits = DefaultTargetUnits;
     private bool isAdjustingSliders;
+    private double calculatedLabelWidth = MinLabelWidth;
     #endregion
 
     #region Properties
@@ -75,6 +76,9 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
     #region Dialog Composition
     private void ComposeDialog()
     {
+        // Calculate label width based on longest ingredient name
+        CalculateLabelWidth();
+
         var bgBounds = ElementBounds.Fill.WithFixedPadding(GuiStyle.ElementToDialogPadding);
         bgBounds.BothSizing = ElementSizing.FitToChildren;
 
@@ -114,6 +118,27 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
         }
     }
 
+    private void CalculateLabelWidth()
+    {
+        if (selectedAlloy is null)
+        {
+            calculatedLabelWidth = MinLabelWidth;
+            return;
+        }
+
+        CairoFont font = CairoFont.WhiteSmallText();
+        var maxWidth = MinLabelWidth;
+
+        foreach (var ingredient in selectedAlloy.Ingredients)
+        {
+            var name = GetIngredientDisplayName(ingredient) + ":";
+            var textWidth = font.GetTextExtents(name).Width / RuntimeEnv.GUIScale;
+            maxWidth = Math.Max(maxWidth, textWidth);
+        }
+
+        calculatedLabelWidth = maxWidth + 5; // Add small padding
+    }
+
     private double CalculateContentHeight()
     {
         var baseHeight = 120.0; // Title + dropdown + target units
@@ -150,7 +175,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
         if (selectedAlloy is null) return;
 
         // Add centered divider line spanning full content width
-        var contentWidth = LabelWidth + SliderWidth;
+        var contentWidth = calculatedLabelWidth + SliderWidth;
         var dividerBounds = ElementBounds.Fixed(0, yOffset, contentWidth, 1);
         composer.AddInset(dividerBounds, 1, 0.5f);
         yOffset += 20;
@@ -163,9 +188,9 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
             var minPercent = (int)Math.Round(ingredient.MinRatio * 100);
             var maxPercent = (int)Math.Round(ingredient.MaxRatio * 100);
 
-            var labelBounds = ElementBounds.Fixed(0, yOffset, LabelWidth, 30);
-            var sliderBounds = ElementBounds.Fixed(LabelWidth + 10, yOffset + 5, SliderWidth - 70, 20);
-            var amountBounds = ElementBounds.Fixed(LabelWidth + SliderWidth - 50, yOffset + 2, 70, 35);
+            var labelBounds = ElementBounds.Fixed(0, yOffset, calculatedLabelWidth, 30);
+            var sliderBounds = ElementBounds.Fixed(calculatedLabelWidth + 10, yOffset + 5, SliderWidth - 70, 20);
+            var amountBounds = ElementBounds.Fixed(calculatedLabelWidth + SliderWidth - 50, yOffset + 2, 70, 35);
 
             var sliderKey = $"slider_{i}";
             var amountKey = $"amount_{i}";
