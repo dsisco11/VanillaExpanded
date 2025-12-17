@@ -91,11 +91,8 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
 
         var yOffset = 30.0; // Offset to account for title bar height
 
-        // Alloy selection dropdown
-        AddAlloyDropdown(composer, ref yOffset);
-
-        // Target units input
-        AddTargetUnitsInput(composer, ref yOffset);
+        // Alloy selection dropdown and target units input (inline)
+        AddAlloyAndTargetControls(composer, ref yOffset);
 
         // Ingredient sliders (if an alloy is selected)
         if (selectedAlloy is not null)
@@ -124,10 +121,10 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
         return baseHeight;
     }
 
-    private void AddAlloyDropdown(GuiComposer composer, ref double yOffset)
+    private void AddAlloyAndTargetControls(GuiComposer composer, ref double yOffset)
     {
-        var labelBounds = ElementBounds.Fixed(0, yOffset, LabelWidth, 25);
-        var dropdownBounds = ElementBounds.Fixed(LabelWidth + 10, yOffset, SliderWidth, 25);
+        var dropdownBounds = ElementBounds.Fixed(0, yOffset, DialogWidth - 130, 25);
+        var inputBounds = ElementBounds.Fixed(DialogWidth - 110, yOffset, 70, 25);
 
         var alloyValues = alloys.Select((_, i) => i.ToString()).ToArray();
         var alloyNames = alloys.Select(GetAlloyDisplayName).ToArray();
@@ -136,19 +133,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
         if (selectedIndex < 0) selectedIndex = 0;
 
         composer
-            .AddStaticText(Lang.Get($"{ModId}:gui-alloycalculator-alloy"), CairoFont.WhiteSmallText(), labelBounds)
-            .AddDropDown(alloyValues, alloyNames, selectedIndex, OnAlloySelected, dropdownBounds, "alloyDropdown");
-
-        yOffset += 35;
-    }
-
-    private void AddTargetUnitsInput(GuiComposer composer, ref double yOffset)
-    {
-        var labelBounds = ElementBounds.Fixed(0, yOffset, LabelWidth, 25);
-        var inputBounds = ElementBounds.Fixed(LabelWidth + 10, yOffset, 80, 25);
-
-        composer
-            .AddStaticText(Lang.Get($"{ModId}:gui-alloycalculator-targetunits"), CairoFont.WhiteSmallText(), labelBounds)
+            .AddDropDown(alloyValues, alloyNames, selectedIndex, OnAlloySelected, dropdownBounds, "alloyDropdown")
             .AddNumberInput(inputBounds, OnTargetUnitsChanged, CairoFont.WhiteDetailText(), "targetUnits");
 
         yOffset += 40;
@@ -158,10 +143,11 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
     {
         if (selectedAlloy is null) return;
 
-        // Add section header
-        var headerBounds = ElementBounds.Fixed(0, yOffset, DialogWidth - 40, 25);
-        composer.AddStaticText(Lang.Get($"{ModId}:gui-alloycalculator-ratios"), CairoFont.WhiteSmallText(), headerBounds);
-        yOffset += 30;
+        // Add centered divider line spanning full content width
+        var contentWidth = LabelWidth + SliderWidth;
+        var dividerBounds = ElementBounds.Fixed(0, yOffset, contentWidth, 1);
+        composer.AddInset(dividerBounds, 1, 0.5f);
+        yOffset += 20;
 
         for (var i = 0; i < selectedAlloy.Ingredients.Length; i++)
         {
