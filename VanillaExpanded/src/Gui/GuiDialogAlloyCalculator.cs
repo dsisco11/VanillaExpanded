@@ -17,7 +17,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
     #region Constants
     private const string ModId = "vanillaexpanded";
     private const string DialogKey = "alloycalculator";
-    private const double DialogWidth = 400;
+    private const double DialogWidth = 350;
     private const double SliderWidth = 200;
     private const double MinLabelWidth = 40;
     private const double RowHeight = 30;
@@ -31,11 +31,13 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
     private int targetUnits = DefaultTargetUnits;
     private bool isAdjustingSliders;
     private double calculatedLabelWidth = MinLabelWidth;
+    private double calculatedDropdownWidth = 150;
     private EnumDialogArea dialogAlignment = EnumDialogArea.CenterMiddle;
     #endregion
 
     #region Properties
     public override double DrawOrder => 0.2;
+    public override string ToggleKeyCombinationCode => string.Empty;
     #endregion
 
     #region Public Methods
@@ -62,6 +64,8 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
             .Where(static a => a.Enabled && a.Ingredients.Length > 0)
             .OrderBy(static a => GetAlloyDisplayName(a))
             .ToList();
+
+        CalculateDropdownWidth();
     }
 
     private static string GetAlloyDisplayName(AlloyRecipe alloy)
@@ -150,6 +154,21 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
         calculatedLabelWidth = maxWidth + 5; // Add small padding
     }
 
+    private void CalculateDropdownWidth()
+    {
+        CairoFont font = CairoFont.WhiteSmallText();
+        var maxWidth = 100.0;
+
+        foreach (var alloy in alloys)
+        {
+            var name = GetAlloyDisplayName(alloy);
+            var textWidth = font.GetTextExtents(name).Width / RuntimeEnv.GUIScale;
+            maxWidth = Math.Max(maxWidth, textWidth);
+        }
+
+        calculatedDropdownWidth = maxWidth + 40; // Add padding for dropdown arrow and margins
+    }
+
     private double CalculateContentHeight()
     {
         var baseHeight = 120.0; // Title + dropdown + target units
@@ -163,8 +182,8 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
 
     private void AddAlloyAndTargetControls(GuiComposer composer, ref double yOffset)
     {
-        var dropdownBounds = ElementBounds.Fixed(0, yOffset, DialogWidth - 130, 25);
-        var inputBounds = ElementBounds.Fixed(DialogWidth - 110, yOffset, 70, 25);
+        var dropdownBounds = ElementBounds.Fixed(0, yOffset, calculatedDropdownWidth, 25);
+        var inputBounds = ElementBounds.Fixed(calculatedDropdownWidth + 20, yOffset, 70, 25);
 
         var alloyValues = alloys.Select((_, i) => i.ToString()).ToArray();
         var alloyNames = alloys.Select(GetAlloyDisplayName).ToArray();
