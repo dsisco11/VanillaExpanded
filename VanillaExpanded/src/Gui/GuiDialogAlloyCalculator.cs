@@ -19,14 +19,16 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     #region Constants
     private const string ModId = "vanillaexpanded";
     private const string DialogKey = "alloycalculator";
-    private const double SliderWidth = 200;
-    private const double MinLabelWidth = 40;
-    private const double RowHeight = 30;
-    private const double TargetInputWidth = 70;
-    private const double ControlGap = 20;
+    private const double SliderWidth = 130;
+    private const double LabelWidth = 80;
+    private const double AmountWidth = 60;
+    private const double RowHeight = 28;
+    private const double DropdownWidth = 150;
+    private const double InputWidth = 70;
     private const int DefaultTargetUnits = 100;
     private const double FloatyXOffset = 1.2; // Offset to the right of the block in immersive mode
-    private const double DialogPadding = 2; // Padding between dialogs
+    private const double DialogPadding = 10; // Padding between dialogs
+    private const double TitlebarHeight = 20;
     #endregion
 
     #region Fields
@@ -36,16 +38,13 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private readonly Dictionary<int, int> sliderValues = [];
     private int targetUnits = DefaultTargetUnits;
     private bool isAdjustingSliders;
-    private double calculatedLabelWidth = MinLabelWidth;
-    private double calculatedDropdownWidth = 150;
-    private double calculatedContentWidth = 300;
     #endregion
 
     #region Properties
     public override double DrawOrder => 0.2;
     public override string ToggleKeyCombinationCode => string.Empty;
-    protected override double FloatyDialogPosition => 0.6;
-    protected override double FloatyDialogAlign => 0.75;
+    protected override double FloatyDialogPosition => 0.5;
+    protected override double FloatyDialogAlign => 1.0;
     #endregion
 
     #region Constructor
@@ -58,6 +57,10 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     }
     #endregion
 
+    #region Accessors
+    public double FirepitDialogWidth => firepitDialog?.SingleComposer?.Bounds.OuterWidth ?? 0;
+    #endregion
+
     #region Initialization
     private void LoadAlloys()
     {
@@ -65,8 +68,6 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             .Where(static a => a.Enabled && a.Ingredients.Length > 0)
             .OrderBy(static a => GetAlloyDisplayName(a))
             .ToList();
-
-        CalculateDropdownWidth();
     }
 
     private static string GetAlloyDisplayName(AlloyRecipe alloy)
@@ -92,42 +93,78 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     #region Dialog Composition
     private void ComposeDialog()
     {
-        // Calculate label width based on longest ingredient name
-        CalculateLabelWidth();
-        CalculateContentWidth();
+        // Calculate number of ingredient rows
+        var ingredientCount = selectedAlloy?.Ingredients.Length ?? 0;
 
+        // Define content bounds - this establishes the size of our dialog content
+        // Include space for title bar (25) + controls
+        var contentWidth = LabelWidth + SliderWidth + AmountWidth;
+        var contentHeight = TitlebarHeight + (ingredientCount > 0 ? 20 + (ingredientCount * RowHeight) : 0);
+        var contentBounds = ElementBounds.Fixed(0, 0, contentWidth, contentHeight);
+
+        // Background bounds with padding, sized to fit children
         var bgBounds = ElementBounds.Fill.WithFixedPadding(GuiStyle.ElementToDialogPadding);
         bgBounds.BothSizing = ElementSizing.FitToChildren;
+        bgBounds.WithChildren(contentBounds);
 
         // Calculate offset to position right of firepit dialog
-        var firepitWidth = firepitDialog?.SingleComposer?.Bounds.OuterWidth ?? 0;
-        var calculatorWidth = calculatedContentWidth + (GuiStyle.ElementToDialogPadding);
-        var dialogXOffset = (firepitWidth / 2);// + (calculatorWidth / 2);// + DialogPadding;
+        var firepitWidth = FirepitDialogWidth;
+        var dialogXOffset = (firepitWidth / 2);
 
-        // Position to the right of the firepit dialog
+        // Dialog bounds - positioned to the right of the firepit
         var dialogBounds = ElementStdBounds.AutosizedMainDialog
-            .WithAlignment(EnumDialogArea.LeftMiddle)
+            .WithAlignment(EnumDialogArea.CenterMiddle)
             .WithFixedAlignmentOffset(dialogXOffset, 0);
-        //.WithFixedAlignmentOffset(GuiStyle.DialogToScreenPadding + dialogXOffset, 0);
 
-        // Calculate content height based on selected alloy
-        var contentHeight = CalculateContentHeight();
+        // Build the UI - start below title bar
+        var yOffset = TitlebarHeight;
+
+        // Define element bounds
+        var dropdownBounds = ElementBounds.Fixed(0, yOffset, DropdownWidth, 25);
+        var inputBounds = ElementBounds.Fixed(DropdownWidth + 10, yOffset, InputWidth, 25);
+        yOffset += 30;
+
+        var alloyValues = alloys.Select(static (_, i) => i.ToString()).ToArray();
+        var alloyNames = alloys.Select(GetAlloyDisplayName).ToArray();
+        var selectedIndex = selectedAlloy is not null ? alloys.IndexOf(selectedAlloy) : 0;
+        if (selectedIndex < 0) selectedIndex = 0;
 
         var composer = capi.Gui
             .CreateCompo($"{DialogKey}{BlockEntityPosition}", dialogBounds)
             .AddShadedDialogBG(bgBounds)
             .AddDialogTitleBar(Lang.Get($"{ModId}:gui-alloycalculator-title"), OnTitleBarClose)
-            .BeginChildElements(bgBounds);
+            .BeginChildElements(bgBounds)
+            .AddDropDown(alloyValues, alloyNames, selectedIndex, OnAlloySelected, dropdownBounds, "alloyDropdown")
+            .AddNumberInput(inputBounds, OnTargetUnitsChanged, CairoFont.WhiteDetailText(), "targetUnits");
 
-        var yOffset = 30.0; // Offset to account for title bar height
-
-        // Alloy selection dropdown and target units input (inline)
-        AddAlloyAndTargetControls(composer, ref yOffset);
-
-        // Ingredient sliders (if an alloy is selected)
-        if (selectedAlloy is not null)
+        // Add ingredient sliders if an alloy is selected
+        if (selectedAlloy is not null && ingredientCount > 0)
         {
-            AddIngredientSliders(composer, ref yOffset);
+            // Add divider
+            var dividerBounds = ElementBounds.Fixed(0, yOffset, contentWidth, 1);
+            composer.AddInset(dividerBounds, 1, 0.5f);
+            yOffset += 10;
+
+            for (var i = 0; i < ingredientCount; i++)
+            {
+                var ingredient = selectedAlloy.Ingredients[i];
+                var ingredientName = GetIngredientDisplayName(ingredient);
+
+                var labelBounds = ElementBounds.Fixed(0, yOffset, LabelWidth, RowHeight);
+                var sliderBounds = ElementBounds.Fixed(LabelWidth, yOffset + 2, SliderWidth, 20);
+                var amountBounds = ElementBounds.Fixed(LabelWidth + SliderWidth, yOffset, AmountWidth, RowHeight);
+
+                var sliderKey = $"slider_{i}";
+                var amountKey = $"amount_{i}";
+                var ingredientIndex = i;
+
+                composer
+                    .AddStaticText(ingredientName, CairoFont.WhiteSmallText(), labelBounds)
+                    .AddSlider(value => OnSliderChanged(ingredientIndex, value), sliderBounds, sliderKey)
+                    .AddDynamicText("", CairoFont.WhiteDetailText(), amountBounds, amountKey);
+
+                yOffset += RowHeight;
+            }
         }
 
         SingleComposer = composer.EndChildElements().Compose();
@@ -143,122 +180,6 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             UpdateResultsDisplay();
         }
     }
-
-    private void CalculateLabelWidth()
-    {
-        if (selectedAlloy is null)
-        {
-            calculatedLabelWidth = MinLabelWidth;
-            return;
-        }
-
-        CairoFont font = CairoFont.WhiteSmallText();
-        var maxWidth = MinLabelWidth;
-
-        foreach (var ingredient in selectedAlloy.Ingredients)
-        {
-            var name = GetIngredientDisplayName(ingredient);
-            var textWidth = font.GetTextExtents(name).Width / RuntimeEnv.GUIScale;
-            maxWidth = Math.Max(maxWidth, textWidth);
-        }
-
-        calculatedLabelWidth = maxWidth + 5; // Add small padding
-    }
-
-    private void CalculateDropdownWidth()
-    {
-        CairoFont font = CairoFont.WhiteSmallText();
-        var maxWidth = 100.0;
-
-        foreach (var alloy in alloys)
-        {
-            var name = GetAlloyDisplayName(alloy);
-            var textWidth = font.GetTextExtents(name).Width / RuntimeEnv.GUIScale;
-            maxWidth = Math.Max(maxWidth, textWidth);
-        }
-
-        calculatedDropdownWidth = maxWidth + 40; // Add padding for dropdown arrow and margins
-    }
-
-    private void CalculateContentWidth()
-    {
-        // Top row width: dropdown + gap + input
-        var topRowWidth = calculatedDropdownWidth + ControlGap + TargetInputWidth;
-
-        // Slider row width: label + gap + slider + amount
-        var sliderRowWidth = calculatedLabelWidth + 5 + SliderWidth;
-
-        // Use the wider of the two
-        calculatedContentWidth = Math.Max(topRowWidth, sliderRowWidth);
-    }
-
-    private double CalculateContentHeight()
-    {
-        var baseHeight = 120.0; // Title + dropdown + target units
-        if (selectedAlloy is not null)
-        {
-            baseHeight += selectedAlloy.Ingredients.Length * RowHeight; // Sliders with inline amounts
-            baseHeight += 40; // Padding
-        }
-        return baseHeight;
-    }
-
-    private void AddAlloyAndTargetControls(GuiComposer composer, ref double yOffset)
-    {
-        var dropdownBounds = ElementBounds.Fixed(0, yOffset, calculatedDropdownWidth, 25);
-        var inputBounds = ElementBounds.Fixed(calculatedDropdownWidth + ControlGap, yOffset, TargetInputWidth, 25);
-
-        var alloyValues = alloys.Select((_, i) => i.ToString()).ToArray();
-        var alloyNames = alloys.Select(GetAlloyDisplayName).ToArray();
-
-        var selectedIndex = selectedAlloy is not null ? alloys.IndexOf(selectedAlloy) : 0;
-        if (selectedIndex < 0) selectedIndex = 0;
-
-        composer
-            .AddDropDown(alloyValues, alloyNames, selectedIndex, OnAlloySelected, dropdownBounds, "alloyDropdown")
-            .AddHoverText(Lang.Get($"{ModId}:gui-alloycalculator-alloy-tooltip"), CairoFont.WhiteSmallText(), 200, dropdownBounds.FlatCopy())
-            .AddNumberInput(inputBounds, OnTargetUnitsChanged, CairoFont.WhiteDetailText(), "targetUnits")
-            .AddHoverText(Lang.Get($"{ModId}:gui-alloycalculator-targetunits-tooltip"), CairoFont.WhiteSmallText(), 200, inputBounds.FlatCopy());
-
-        yOffset += 40;
-    }
-
-    private void AddIngredientSliders(GuiComposer composer, ref double yOffset)
-    {
-        if (selectedAlloy is null) return;
-
-        // Add divider line spanning full content width
-        var dividerBounds = ElementBounds.Fixed(0, yOffset, calculatedContentWidth, 1);
-        composer.AddInset(dividerBounds, 1, 0.5f);
-        yOffset += 20;
-
-        for (var i = 0; i < selectedAlloy.Ingredients.Length; i++)
-        {
-            var ingredient = selectedAlloy.Ingredients[i];
-            var ingredientName = GetIngredientDisplayName(ingredient);
-
-            var minPercent = (int)Math.Round(ingredient.MinRatio * 100);
-            var maxPercent = (int)Math.Round(ingredient.MaxRatio * 100);
-
-            var labelBounds = ElementBounds.Fixed(0, yOffset, calculatedLabelWidth, 30);
-            var sliderBounds = ElementBounds.Fixed(calculatedLabelWidth + 5, yOffset, SliderWidth - 70, 20);
-            var amountBounds = ElementBounds.Fixed(calculatedLabelWidth + SliderWidth - 50, yOffset + 2, 70, 35);
-
-            var sliderKey = $"slider_{i}";
-            var amountKey = $"amount_{i}";
-            var ingredientIndex = i; // Capture for closure
-
-            composer
-                .AddStaticText(ingredientName, CairoFont.WhiteSmallText(), labelBounds)
-                .AddSlider(value => OnSliderChanged(ingredientIndex, value), sliderBounds, sliderKey)
-                .AddHoverText(Lang.Get($"{ModId}:gui-alloycalculator-slider-tooltip", minPercent, maxPercent), CairoFont.WhiteSmallText(), 200, sliderBounds.FlatCopy())
-                .AddDynamicText("", CairoFont.WhiteDetailText(), amountBounds, amountKey)
-                .AddHoverText(Lang.Get($"{ModId}:gui-alloycalculator-amount-tooltip", ingredientName.ToLowerInvariant()), CairoFont.WhiteSmallText(), 200, amountBounds.FlatCopy());
-
-            yOffset += RowHeight;
-        }
-    }
-
     #endregion
 
     #region Slider Logic
@@ -436,34 +357,12 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
     public override void OnRenderGUI(float deltaTime)
     {
+        base.OnRenderGUI(deltaTime);
         if (capi.Settings.Bool["immersiveMouseMode"])
         {
-            // Position to the right of the block
-            Vec3d aboveHeadPos = new Vec3d(
-                BlockEntityPosition.X + FloatyXOffset + 0.5, 
-                BlockEntityPosition.Y + FloatyDialogPosition, 
-                BlockEntityPosition.Z + 0.5
-            );
-            Vec3d pos = MatrixToolsd.Project(
-                aboveHeadPos, 
-                capi.Render.PerspectiveProjectionMat, 
-                capi.Render.PerspectiveViewMat, 
-                capi.Render.FrameWidth, 
-                capi.Render.FrameHeight
-            );
-
-            if (pos.Z < 0) return;
-
-            SingleComposer.Bounds.Alignment = EnumDialogArea.None;
-            SingleComposer.Bounds.fixedOffsetX = 0;
-            SingleComposer.Bounds.fixedOffsetY = 0;
-            SingleComposer.Bounds.absFixedX = pos.X - SingleComposer.Bounds.OuterWidth / 2;
-            SingleComposer.Bounds.absFixedY = capi.Render.FrameHeight - pos.Y - SingleComposer.Bounds.OuterHeight * FloatyDialogAlign;
-            SingleComposer.Bounds.absMarginX = 0;
-            SingleComposer.Bounds.absMarginY = 0;
+            SingleComposer.Bounds.absOffsetX = (SingleComposer.Bounds.OuterWidth / 2) + (FirepitDialogWidth / 2) - 5;
+            SingleComposer.Bounds.absOffsetY = -(SingleComposer.Bounds.OuterHeight / 2) - TitlebarHeight;
         }
-
-        base.OnRenderGUI(deltaTime);
     }
 
     public override bool TryOpen()
