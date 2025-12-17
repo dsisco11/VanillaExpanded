@@ -102,6 +102,10 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
 
         SingleComposer = composer.EndChildElements().Compose();
 
+        // Set target units value
+        var targetInput = SingleComposer?.GetNumberInput("targetUnits");
+        targetInput?.SetValue(targetUnits.ToString());
+
         // Initialize slider values after composition
         if (selectedAlloy is not null)
         {
@@ -351,10 +355,6 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
         }
 
         ComposeDialog();
-
-        // Set initial target units value
-        var targetInput = SingleComposer?.GetNumberInput("targetUnits");
-        targetInput?.SetValue(targetUnits.ToString());
     }
 
     public override bool TryOpen()
