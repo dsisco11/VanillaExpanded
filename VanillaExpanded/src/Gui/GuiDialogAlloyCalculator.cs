@@ -134,7 +134,8 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
 
         composer
             .AddDropDown(alloyValues, alloyNames, selectedIndex, OnAlloySelected, dropdownBounds, "alloyDropdown")
-            .AddNumberInput(inputBounds, OnTargetUnitsChanged, CairoFont.WhiteDetailText(), "targetUnits");
+            .AddNumberInput(inputBounds, OnTargetUnitsChanged, CairoFont.WhiteDetailText(), "targetUnits")
+            .AddHoverText(Lang.Get($"{ModId}:gui-alloycalculator-targetunits-tooltip"), CairoFont.WhiteSmallText(), 200, inputBounds.FlatCopy());
 
         yOffset += 40;
     }
