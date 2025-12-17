@@ -56,10 +56,12 @@ public sealed class AlloyCalculatorModSystem : ModSystem
         EFirepitKind kind = GetFirepitKind(capi, firepitDialog);
         if (kind != EFirepitKind.Crucible) return;
 
-        dialog ??= new GuiDialogAlloyCalculator(capi);
+        // Dispose old dialog if it exists (position may have changed)
+        dialog?.Dispose();
+        dialog = new GuiDialogAlloyCalculator(capi, firepitDialog.BlockEntityPosition);
+        
         if (!dialog.IsOpened())
         {
-            dialog.SetAlignment(EnumDialogArea.RightMiddle);
             dialog.TryOpen();
         }
     }

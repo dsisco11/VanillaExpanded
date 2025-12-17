@@ -5,14 +5,16 @@ using System.Linq;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
+using Vintagestory.API.MathTools;
 using Vintagestory.GameContent;
 
 namespace VanillaExpanded.Gui;
 
 /// <summary>
 /// A GUI dialog for calculating alloy metal ratios and required units.
+/// Displays as a floaty dialog attached to the firepit block.
 /// </summary>
-public sealed class GuiDialogAlloyCalculator : GuiDialog
+public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 {
     #region Constants
     private const string ModId = "vanillaexpanded";
@@ -23,6 +25,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
     private const double TargetInputWidth = 70;
     private const double ControlGap = 20;
     private const int DefaultTargetUnits = 100;
+    private const double FloatyXOffset = 1.2; // Offset to the right of the block
     #endregion
 
     #region Fields
@@ -34,27 +37,20 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
     private double calculatedLabelWidth = MinLabelWidth;
     private double calculatedDropdownWidth = 150;
     private double calculatedContentWidth = 300;
-    private EnumDialogArea dialogAlignment = EnumDialogArea.CenterMiddle;
     #endregion
 
     #region Properties
     public override double DrawOrder => 0.2;
     public override string ToggleKeyCombinationCode => string.Empty;
-    #endregion
-
-    #region Public Methods
-    /// <summary>
-    /// Sets the dialog alignment for the next time it's composed.
-    /// </summary>
-    public void SetAlignment(EnumDialogArea alignment)
-    {
-        dialogAlignment = alignment;
-    }
+    protected override double FloatyDialogPosition => 0.6;
+    protected override double FloatyDialogAlign => 0.75;
     #endregion
 
     #region Constructor
-    public GuiDialogAlloyCalculator(ICoreClientAPI capi) : base(capi)
+    public GuiDialogAlloyCalculator(ICoreClientAPI capi, BlockPos blockPos) 
+        : base(Lang.Get($"{ModId}:gui-alloycalculator-title"), blockPos, capi)
     {
+        if (IsDuplicate) return;
         LoadAlloys();
     }
     #endregion
@@ -100,7 +96,10 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
         var bgBounds = ElementBounds.Fill.WithFixedPadding(GuiStyle.ElementToDialogPadding);
         bgBounds.BothSizing = ElementSizing.FitToChildren;
 
-        var dialogBounds = ElementStdBounds.AutosizedMainDialog.WithAlignment(dialogAlignment);
+        // Position to the right of the block in non-immersive mode
+        var dialogBounds = ElementStdBounds.AutosizedMainDialog
+            .WithAlignment(EnumDialogArea.LeftMiddle)
+            .WithFixedAlignmentOffset(GuiStyle.DialogToScreenPadding, 0);
 
         // Calculate content height based on selected alloy
         var contentHeight = CalculateContentHeight();
@@ -424,6 +423,38 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
         }
 
         ComposeDialog();
+    }
+
+    public override void OnRenderGUI(float deltaTime)
+    {
+        if (capi.Settings.Bool["immersiveMouseMode"])
+        {
+            // Position to the right of the block
+            Vec3d aboveHeadPos = new Vec3d(
+                BlockEntityPosition.X + FloatyXOffset + 0.5, 
+                BlockEntityPosition.Y + FloatyDialogPosition, 
+                BlockEntityPosition.Z + 0.5
+            );
+            Vec3d pos = MatrixToolsd.Project(
+                aboveHeadPos, 
+                capi.Render.PerspectiveProjectionMat, 
+                capi.Render.PerspectiveViewMat, 
+                capi.Render.FrameWidth, 
+                capi.Render.FrameHeight
+            );
+
+            if (pos.Z < 0) return;
+
+            SingleComposer.Bounds.Alignment = EnumDialogArea.None;
+            SingleComposer.Bounds.fixedOffsetX = 0;
+            SingleComposer.Bounds.fixedOffsetY = 0;
+            SingleComposer.Bounds.absFixedX = pos.X - SingleComposer.Bounds.OuterWidth / 2;
+            SingleComposer.Bounds.absFixedY = capi.Render.FrameHeight - pos.Y - SingleComposer.Bounds.OuterHeight * FloatyDialogAlign;
+            SingleComposer.Bounds.absMarginX = 0;
+            SingleComposer.Bounds.absMarginY = 0;
+        }
+
+        base.OnRenderGUI(deltaTime);
     }
 
     public override bool TryOpen()
