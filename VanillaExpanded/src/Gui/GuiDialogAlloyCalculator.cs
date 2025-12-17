@@ -26,8 +26,6 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private const double DropdownWidth = 150;
     private const double InputWidth = 70;
     private const int DefaultTargetUnits = 100;
-    private const double FloatyXOffset = 1.2; // Offset to the right of the block in immersive mode
-    private const double DialogPadding = 10; // Padding between dialogs
     private const double TitlebarHeight = 20;
     #endregion
 
@@ -36,6 +34,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private List<AlloyRecipe> alloys = [];
     private AlloyRecipe? selectedAlloy;
     private readonly Dictionary<int, int> sliderValues = [];
+    private readonly Dictionary<int, ItemStack> calculatedStacks = [];
     private int targetUnits = DefaultTargetUnits;
     private bool isAdjustingSliders;
     #endregion
@@ -45,6 +44,12 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     public override string ToggleKeyCombinationCode => string.Empty;
     protected override double FloatyDialogPosition => 0.5;
     protected override double FloatyDialogAlign => 1.0;
+
+    /// <summary>
+    /// Gets the calculated ingredient stacks for the current alloy configuration.
+    /// Key is the ingredient index, value is the ItemStack with the calculated amount.
+    /// </summary>
+    public IReadOnlyDictionary<int, ItemStack> CalculatedIngredientStacks => calculatedStacks;
     #endregion
 
     #region Constructor
@@ -151,8 +156,8 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                 var ingredientName = GetIngredientDisplayName(ingredient);
 
                 var labelBounds = ElementBounds.Fixed(0, yOffset, LabelWidth, RowHeight);
-                var sliderBounds = ElementBounds.Fixed(LabelWidth, yOffset + 2, SliderWidth, 20);
-                var amountBounds = ElementBounds.Fixed(LabelWidth + SliderWidth, yOffset, AmountWidth, RowHeight);
+                var sliderBounds = ElementBounds.Fixed(0, yOffset + 2, SliderWidth, 20).FixedRightOf(labelBounds);
+                var amountBounds = ElementBounds.Fixed(0, yOffset, AmountWidth, RowHeight).FixedRightOf(sliderBounds, 3);
 
                 var sliderKey = $"slider_{i}";
                 var amountKey = $"amount_{i}";
@@ -303,14 +308,25 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     {
         if (selectedAlloy is null || SingleComposer is null) return;
 
+        calculatedStacks.Clear();
+
         for (var i = 0; i < selectedAlloy.Ingredients.Length; i++)
         {
+            var ingredient = selectedAlloy.Ingredients[i];
             var percent = sliderValues.TryGetValue(i, out var val) ? val : 0;
             var units = targetUnits * percent / 100.0;
-            var nuggets = units / 5.0; // 1 nugget = 5 units
+            var nuggets = (int)Math.Ceiling(units / 5.0); // 1 nugget = 5 units, round up
+
+            // Create ItemStack for this ingredient with calculated amount
+            if (ingredient.ResolvedItemstack is not null && nuggets > 0)
+            {
+                var stack = ingredient.ResolvedItemstack.Clone();
+                stack.StackSize = nuggets;
+                calculatedStacks[i] = stack;
+            }
 
             var amountText = SingleComposer.GetDynamicText($"amount_{i}");
-            amountText?.SetNewText($"{nuggets:F0} {Lang.Get($"{ModId}:gui-alloycalculator-nuggets")}");
+            amountText?.SetNewText($"{nuggets} {Lang.Get($"{ModId}:gui-alloycalculator-nuggets")}");
         }
     }
     #endregion
