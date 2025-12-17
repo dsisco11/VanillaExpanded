@@ -71,7 +71,7 @@ public sealed class AlloyCalculatorModSystem : ModSystem
             return;
         }
 
-        var dialog = new GuiDialogAlloyCalculator(capi, pos);
+        var dialog = new GuiDialogAlloyCalculator(capi, pos, firepitDialog);
         if (dialog.TryOpen())
         {
             openDialogs[pos] = dialog;

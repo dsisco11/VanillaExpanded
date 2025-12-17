@@ -30,6 +30,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     #endregion
 
     #region Fields
+    private readonly GuiDialog? firepitDialog;
     private List<AlloyRecipe> alloys = [];
     private AlloyRecipe? selectedAlloy;
     private readonly Dictionary<int, int> sliderValues = [];
@@ -48,10 +49,11 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     #endregion
 
     #region Constructor
-    public GuiDialogAlloyCalculator(ICoreClientAPI capi, BlockPos blockPos) 
+    public GuiDialogAlloyCalculator(ICoreClientAPI capi, BlockPos blockPos, GuiDialog firepitDialog) 
         : base(Lang.Get($"{ModId}:gui-alloycalculator-title"), blockPos, capi)
     {
         if (IsDuplicate) return;
+        this.firepitDialog = firepitDialog;
         LoadAlloys();
     }
     #endregion
@@ -97,26 +99,22 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         var bgBounds = ElementBounds.Fill.WithFixedPadding(GuiStyle.ElementToDialogPadding);
         bgBounds.BothSizing = ElementSizing.FitToChildren;
 
-        // Find the firepit dialog for this block position
-        var firepitDialog = capi.Gui.OpenedGuis
-            .OfType<GuiDialogBlockEntityFirepit>()
-            .FirstOrDefault(d => d.BlockEntityPosition == BlockEntityPosition);
-
         // Calculate offset to position right of firepit dialog
         var firepitWidth = firepitDialog?.SingleComposer?.Bounds.OuterWidth ?? 0;
-        var calculatorWidth = calculatedContentWidth + (GuiStyle.ElementToDialogPadding * 2);
-        var dialogXOffset = (firepitWidth / 2) + (calculatorWidth / 2) + DialogPadding;
+        var calculatorWidth = calculatedContentWidth + (GuiStyle.ElementToDialogPadding);
+        var dialogXOffset = (firepitWidth / 2);// + (calculatorWidth / 2);// + DialogPadding;
 
         // Position to the right of the firepit dialog
         var dialogBounds = ElementStdBounds.AutosizedMainDialog
             .WithAlignment(EnumDialogArea.LeftMiddle)
-            .WithFixedAlignmentOffset(GuiStyle.DialogToScreenPadding + dialogXOffset, 0);
+            .WithFixedAlignmentOffset(dialogXOffset, 0);
+        //.WithFixedAlignmentOffset(GuiStyle.DialogToScreenPadding + dialogXOffset, 0);
 
         // Calculate content height based on selected alloy
         var contentHeight = CalculateContentHeight();
 
         var composer = capi.Gui
-            .CreateCompo(DialogKey + BlockEntityPosition, dialogBounds)
+            .CreateCompo($"{DialogKey}{BlockEntityPosition}", dialogBounds)
             .AddShadedDialogBG(bgBounds)
             .AddDialogTitleBar(Lang.Get($"{ModId}:gui-alloycalculator-title"), OnTitleBarClose)
             .BeginChildElements(bgBounds);
