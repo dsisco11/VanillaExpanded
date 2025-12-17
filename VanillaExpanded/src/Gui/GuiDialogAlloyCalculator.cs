@@ -27,6 +27,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private const double InputWidth = 70;
     private const int DefaultTargetUnits = 100;
     private const double TitlebarHeight = 20;
+    private const double SlotSize = 40;
     #endregion
 
     #region Fields
@@ -37,6 +38,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private readonly Dictionary<int, ItemStack> calculatedStacks = [];
     private int targetUnits = DefaultTargetUnits;
     private bool isAdjustingSliders;
+    private DummyInventory? ingredientInventory;
     #endregion
 
     #region Properties
@@ -102,9 +104,18 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         var ingredientCount = selectedAlloy?.Ingredients.Length ?? 0;
 
         // Define content bounds - this establishes the size of our dialog content
-        // Include space for title bar (25) + controls
-        var contentWidth = LabelWidth + SliderWidth + AmountWidth;
-        var contentHeight = TitlebarHeight + (ingredientCount > 0 ? 20 + (ingredientCount * RowHeight) : 0);
+        // Width: either slider row or slot row, whichever is wider
+        var sliderRowWidth = LabelWidth + SliderWidth + AmountWidth;
+        var slotRowWidth = ingredientCount * SlotSize;
+        var contentWidth = Math.Max(sliderRowWidth, slotRowWidth);
+        
+        // Height: titlebar + dropdown row + sliders + slot row
+        var contentHeight = TitlebarHeight + 30;
+        if (ingredientCount > 0)
+        {
+            contentHeight += 10 + (ingredientCount * RowHeight); // divider + sliders
+            contentHeight += 15 + SlotSize; // gap + slot row
+        }
         var contentBounds = ElementBounds.Fixed(0, 0, contentWidth, contentHeight);
 
         // Background bounds with padding, sized to fit children
@@ -145,19 +156,23 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         // Add ingredient sliders if an alloy is selected
         if (selectedAlloy is not null && ingredientCount > 0)
         {
+            // Create inventory for ingredient display slots
+            ingredientInventory = new DummyInventory(capi, ingredientCount);
+
             // Add divider
             var dividerBounds = ElementBounds.Fixed(0, yOffset, contentWidth, 1);
             composer.AddInset(dividerBounds, 1, 0.5f);
             yOffset += 10;
 
+            // Add sliders with amount labels
             for (var i = 0; i < ingredientCount; i++)
             {
                 var ingredient = selectedAlloy.Ingredients[i];
                 var ingredientName = GetIngredientDisplayName(ingredient);
 
                 var labelBounds = ElementBounds.Fixed(0, yOffset, LabelWidth, RowHeight);
-                var sliderBounds = ElementBounds.Fixed(0, yOffset + 2, SliderWidth, 20).FixedRightOf(labelBounds);
-                var amountBounds = ElementBounds.Fixed(0, yOffset, AmountWidth, RowHeight).FixedRightOf(sliderBounds, 3);
+                var sliderBounds = ElementBounds.Fixed(LabelWidth, yOffset + 4, SliderWidth, 20);
+                var amountBounds = ElementBounds.Fixed(LabelWidth + SliderWidth + 5, yOffset, AmountWidth, RowHeight);
 
                 var sliderKey = $"slider_{i}";
                 var amountKey = $"amount_{i}";
@@ -170,6 +185,19 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
                 yOffset += RowHeight;
             }
+
+            // Add second divider before slots
+            yOffset += 5;
+            var divider2Bounds = ElementBounds.Fixed(0, yOffset, contentWidth, 1);
+            composer.AddInset(divider2Bounds, 1, 0.5f);
+            yOffset += 10;
+
+            // Add item slots in a single row at the bottom
+            var slotsWidth = ingredientCount * SlotSize;
+            var slotsXOffset = (contentWidth - slotsWidth) / 2; // Center the slots
+            var slotBounds = ElementStdBounds.SlotGrid(EnumDialogArea.None, slotsXOffset, yOffset, ingredientCount, 1);
+            var slotIndices = Enumerable.Range(0, ingredientCount).ToArray();
+            composer.AddItemSlotGrid(ingredientInventory, null, ingredientCount, slotIndices, slotBounds, "ingredientSlots");
         }
 
         SingleComposer = composer.EndChildElements().Compose();
@@ -306,7 +334,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     #region Results Calculation
     private void UpdateResultsDisplay()
     {
-        if (selectedAlloy is null || SingleComposer is null) return;
+        if (selectedAlloy is null || SingleComposer is null || ingredientInventory is null) return;
 
         calculatedStacks.Clear();
 
@@ -317,17 +345,53 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             var units = targetUnits * percent / 100.0;
             var nuggets = (int)Math.Ceiling(units / 5.0); // 1 nugget = 5 units, round up
 
-            // Create ItemStack for this ingredient with calculated amount
-            if (ingredient.ResolvedItemstack is not null && nuggets > 0)
+            // Update amount text
+            var amountText = SingleComposer.GetDynamicText($"amount_{i}");
+            amountText?.SetNewText($"x{nuggets}");
+
+            // Create ItemStack for metal bits with calculated amount
+            if (nuggets > 0)
             {
-                var stack = ingredient.ResolvedItemstack.Clone();
-                stack.StackSize = nuggets;
-                calculatedStacks[i] = stack;
+                var stack = GetMetalBitStack(ingredient, nuggets);
+                if (stack is not null)
+                {
+                    calculatedStacks[i] = stack;
+                    ingredientInventory[i].Itemstack = stack;
+                }
+                else
+                {
+                    ingredientInventory[i].Itemstack = null;
+                }
+            }
+            else
+            {
+                ingredientInventory[i].Itemstack = null;
             }
 
-            var amountText = SingleComposer.GetDynamicText($"amount_{i}");
-            amountText?.SetNewText($"{nuggets} {Lang.Get($"{ModId}:gui-alloycalculator-nuggets")}");
+            ingredientInventory[i].MarkDirty();
         }
+    }
+
+    /// <summary>
+    /// Gets a metal bit ItemStack for the given ingredient.
+    /// </summary>
+    private ItemStack? GetMetalBitStack(MetalAlloyIngredient ingredient, int stackSize)
+    {
+        // Extract metal name from ingredient code (e.g., "ingot-copper" -> "copper")
+        var code = ingredient.Code?.Path;
+        if (code is null) return null;
+
+        var metalName = code.Contains('-')
+            ? code[(code.LastIndexOf('-') + 1)..]
+            : code;
+
+        // Get the metal bit item
+        var bitCode = new AssetLocation("game", $"metalbit-{metalName}");
+        var bitItem = capi.World.GetItem(bitCode);
+        
+        if (bitItem is null) return null;
+
+        return new ItemStack(bitItem, stackSize);
     }
     #endregion
 
