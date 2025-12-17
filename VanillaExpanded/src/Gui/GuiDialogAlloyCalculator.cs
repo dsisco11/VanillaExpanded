@@ -21,7 +21,6 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private const string DialogKey = "alloycalculator";
     private const double SliderWidth = 130;
     private const double LabelWidth = 80;
-    private const double AmountWidth = 60;
     private const double RowHeight = 35;
     private const double DropdownWidth = 150;
     private const double InputWidth = 70;
@@ -105,7 +104,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
         // Define content bounds - this establishes the size of our dialog content
         // Width: either slider row or slot row, whichever is wider
-        var sliderRowWidth = LabelWidth + SliderWidth + AmountWidth;
+        var sliderRowWidth = LabelWidth + SliderWidth;
         var slotRowWidth = ingredientCount * SlotSize;
         var contentWidth = Math.Max(sliderRowWidth, slotRowWidth);
         
@@ -164,7 +163,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             composer.AddInset(dividerBounds, 1, 0.5f);
             yOffset += 10;
 
-            // Add sliders with amount labels
+            // Add sliders
             for (var i = 0; i < ingredientCount; i++)
             {
                 var ingredient = selectedAlloy.Ingredients[i];
@@ -172,16 +171,13 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
                 var labelBounds = ElementBounds.Fixed(0, yOffset, LabelWidth, RowHeight);
                 var sliderBounds = ElementBounds.Fixed(LabelWidth, yOffset + 4, SliderWidth, 20);
-                var amountBounds = ElementBounds.Fixed(LabelWidth + SliderWidth + 5, yOffset, AmountWidth, RowHeight);
 
                 var sliderKey = $"slider_{i}";
-                var amountKey = $"amount_{i}";
                 var ingredientIndex = i;
 
                 composer
                     .AddStaticText(ingredientName, CairoFont.WhiteSmallText(), labelBounds)
-                    .AddSlider(value => OnSliderChanged(ingredientIndex, value), sliderBounds, sliderKey)
-                    .AddDynamicText("", CairoFont.WhiteDetailText(), amountBounds, amountKey);
+                    .AddSlider(value => OnSliderChanged(ingredientIndex, value), sliderBounds, sliderKey);
 
                 yOffset += RowHeight;
             }
@@ -344,10 +340,6 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             var percent = sliderValues.TryGetValue(i, out var val) ? val : 0;
             var units = targetUnits * percent / 100.0;
             var nuggets = (int)Math.Ceiling(units / 5.0); // 1 nugget = 5 units, round up
-
-            // Update amount text
-            var amountText = SingleComposer.GetDynamicText($"amount_{i}");
-            amountText?.SetNewText($"x{nuggets}");
 
             // Create ItemStack for metal bits with calculated amount
             if (nuggets > 0)
