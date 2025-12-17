@@ -134,6 +134,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
 
         composer
             .AddDropDown(alloyValues, alloyNames, selectedIndex, OnAlloySelected, dropdownBounds, "alloyDropdown")
+            .AddHoverText(Lang.Get($"{ModId}:gui-alloycalculator-alloy-tooltip"), CairoFont.WhiteSmallText(), 200, dropdownBounds.FlatCopy())
             .AddNumberInput(inputBounds, OnTargetUnitsChanged, CairoFont.WhiteDetailText(), "targetUnits")
             .AddHoverText(Lang.Get($"{ModId}:gui-alloycalculator-targetunits-tooltip"), CairoFont.WhiteSmallText(), 200, inputBounds.FlatCopy());
 
@@ -169,7 +170,9 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
             composer
                 .AddStaticText($"{ingredientName}:", CairoFont.WhiteSmallText(), labelBounds)
                 .AddSlider(value => OnSliderChanged(ingredientIndex, value), sliderBounds, sliderKey)
-                .AddDynamicText("", CairoFont.WhiteDetailText(), amountBounds, amountKey);
+                .AddHoverText(Lang.Get($"{ModId}:gui-alloycalculator-slider-tooltip", minPercent, maxPercent), CairoFont.WhiteSmallText(), 200, sliderBounds.FlatCopy())
+                .AddDynamicText("", CairoFont.WhiteDetailText(), amountBounds, amountKey)
+                .AddHoverText(Lang.Get($"{ModId}:gui-alloycalculator-amount-tooltip", ingredientName.ToLowerInvariant()), CairoFont.WhiteSmallText(), 200, amountBounds.FlatCopy());
 
             yOffset += RowHeight;
         }

@@ -5,8 +5,11 @@
 
   "gui-alloycalculator-title": "Alloy Calculator",
   "gui-alloycalculator-alloy": "Alloy:",
+  "gui-alloycalculator-alloy-tooltip": "Select the alloy you want to create",
   "gui-alloycalculator-targetunits": "Target Units:",
   "gui-alloycalculator-targetunits-tooltip": "Total units of alloy to produce",
+  "gui-alloycalculator-slider-tooltip": "Valid range: {0}% - {1}%",
+  "gui-alloycalculator-amount-tooltip": "Required amount of {0} nuggets",
   "gui-alloycalculator-ratios": "Metal Ratios",
   "gui-alloycalculator-required": "Required Amounts",
   "gui-alloycalculator-units": "units",
