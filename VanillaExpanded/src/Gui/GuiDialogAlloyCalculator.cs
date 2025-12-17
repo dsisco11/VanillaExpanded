@@ -22,7 +22,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private const double SliderWidth = 130;
     private const double LabelWidth = 80;
     private const double AmountWidth = 60;
-    private const double RowHeight = 28;
+    private const double RowHeight = 35;
     private const double DropdownWidth = 150;
     private const double InputWidth = 70;
     private const int DefaultTargetUnits = 100;
