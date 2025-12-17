@@ -131,7 +131,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
 
         foreach (var ingredient in selectedAlloy.Ingredients)
         {
-            var name = GetIngredientDisplayName(ingredient) + ":";
+            var name = GetIngredientDisplayName(ingredient);
             var textWidth = font.GetTextExtents(name).Width / RuntimeEnv.GUIScale;
             maxWidth = Math.Max(maxWidth, textWidth);
         }
@@ -174,9 +174,9 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
     {
         if (selectedAlloy is null) return;
 
-        // Add centered divider line spanning full content width
-        var contentWidth = calculatedLabelWidth + SliderWidth;
-        var dividerBounds = ElementBounds.Fixed(0, yOffset, contentWidth, 1);
+        // Add divider line aligned with dropdown (left) and target units input (right)
+        var dividerWidth = DialogWidth - 40; // Aligns with right edge of target units input
+        var dividerBounds = ElementBounds.Fixed(0, yOffset, dividerWidth, 1);
         composer.AddInset(dividerBounds, 1, 0.5f);
         yOffset += 20;
 
@@ -189,7 +189,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
             var maxPercent = (int)Math.Round(ingredient.MaxRatio * 100);
 
             var labelBounds = ElementBounds.Fixed(0, yOffset, calculatedLabelWidth, 30);
-            var sliderBounds = ElementBounds.Fixed(calculatedLabelWidth + 10, yOffset + 5, SliderWidth - 70, 20);
+            var sliderBounds = ElementBounds.Fixed(calculatedLabelWidth + 5, yOffset, SliderWidth - 70, 20);
             var amountBounds = ElementBounds.Fixed(calculatedLabelWidth + SliderWidth - 50, yOffset + 2, 70, 35);
 
             var sliderKey = $"slider_{i}";
@@ -197,7 +197,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
             var ingredientIndex = i; // Capture for closure
 
             composer
-                .AddStaticText($"{ingredientName}:", CairoFont.WhiteSmallText(), labelBounds)
+                .AddStaticText(ingredientName, CairoFont.WhiteSmallText(), labelBounds)
                 .AddSlider(value => OnSliderChanged(ingredientIndex, value), sliderBounds, sliderKey)
                 .AddHoverText(Lang.Get($"{ModId}:gui-alloycalculator-slider-tooltip", minPercent, maxPercent), CairoFont.WhiteSmallText(), 200, sliderBounds.FlatCopy())
                 .AddDynamicText("", CairoFont.WhiteDetailText(), amountBounds, amountKey)
