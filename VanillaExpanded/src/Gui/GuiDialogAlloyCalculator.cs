@@ -19,7 +19,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     #region Constants
     private const string ModId = "vanillaexpanded";
     private const string DialogKey = "alloycalculator";
-    private const double SliderWidth = 130;
+    private const double SliderWidth = 150;
     private const double LabelWidth = 80;
     private const double RowHeight = 35;
     private const double DropdownWidth = 150;
