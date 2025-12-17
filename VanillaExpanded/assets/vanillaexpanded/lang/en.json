@@ -1,5 +1,20 @@
 {
   "blockhelp-autostash-container": "[Hold] Deposit similar items.",
   "ve-hotkey-equiplightsource-offhand": "Equip light source to offhand",
-  "ve-hotkey-equiplightsource-hotbar": "Equip light source to hotbar"
+  "ve-hotkey-equiplightsource-hotbar": "Equip light source to hotbar",
+
+  "gui-alloycalculator-title": "Alloy Calculator",
+  "gui-alloycalculator-alloy": "Alloy:",
+  "gui-alloycalculator-dropdown-tooltip": "Select the alloy type you want to create",
+  "gui-alloycalculator-targetunits": "Target Units:",
+  "gui-alloycalculator-targetunits-tooltip": "Total metal units to produce",
+  "gui-alloycalculator-slider-tooltip": "{0}: Adjust ratio between {1}% and {2}%",
+  "gui-alloycalculator-itemstack-tooltip": "Required ingredient amount",
+  "gui-alloycalculator-deposit": "Deposit",
+  "gui-alloycalculator-deposit-tooltip": "Transfer required ingredients from your inventory into the crucible",
+  "gui-alloycalculator-ratios": "Metal Ratios",
+  "gui-alloycalculator-required": "Required Amounts",
+  "gui-alloycalculator-units": "units",
+  "gui-alloycalculator-total": "Total",
+  "gui-alloycalculator-nuggets": "nuggets"
 }
