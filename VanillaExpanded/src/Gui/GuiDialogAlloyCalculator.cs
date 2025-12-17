@@ -14,6 +14,7 @@ namespace VanillaExpanded.Gui;
 public sealed class GuiDialogAlloyCalculator : GuiDialog
 {
     #region Constants
+    private const string ModID = "vanillaexpanded";
     private const string DialogKey = "alloycalculator";
     private const double DialogWidth = 400;
     private const double SliderWidth = 280;
@@ -85,7 +86,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
         var composer = capi.Gui
             .CreateCompo(DialogKey, dialogBounds)
             .AddShadedDialogBG(bgBounds)
-            .AddDialogTitleBar(Lang.Get($"vanillaexpanded:gui-alloycalculator-title"), OnTitleBarClose)
+            .AddDialogTitleBar(Lang.Get($"{ModId}:gui-alloycalculator-title"), OnTitleBarClose)
             .BeginChildElements(bgBounds);
 
         var yOffset = 0.0;
@@ -137,7 +138,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
         if (selectedIndex < 0) selectedIndex = 0;
 
         composer
-            .AddStaticText(Lang.Get($"vanillaexpanded:gui-alloycalculator-alloy"), CairoFont.WhiteSmallText(), labelBounds)
+            .AddStaticText(Lang.Get($"{ModId}:gui-alloycalculator-alloy"), CairoFont.WhiteSmallText(), labelBounds)
             .AddDropDown(alloyValues, alloyNames, selectedIndex, OnAlloySelected, dropdownBounds, "alloyDropdown");
 
         yOffset += 35;
@@ -149,7 +150,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
         var inputBounds = ElementBounds.Fixed(LabelWidth + 10, yOffset, 80, 25);
 
         composer
-            .AddStaticText(Lang.Get($"vanillaexpanded:gui-alloycalculator-targetunits"), CairoFont.WhiteSmallText(), labelBounds)
+            .AddStaticText(Lang.Get($"{ModId}:gui-alloycalculator-targetunits"), CairoFont.WhiteSmallText(), labelBounds)
             .AddNumberInput(inputBounds, OnTargetUnitsChanged, CairoFont.WhiteDetailText(), "targetUnits");
 
         yOffset += 40;
@@ -161,7 +162,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
 
         // Add section header
         var headerBounds = ElementBounds.Fixed(0, yOffset, DialogWidth - 40, 25);
-        composer.AddStaticText(Lang.Get($"vanillaexpanded:gui-alloycalculator-ratios"), CairoFont.WhiteSmallText(), headerBounds);
+        composer.AddStaticText(Lang.Get($"{ModId}:gui-alloycalculator-ratios"), CairoFont.WhiteSmallText(), headerBounds);
         yOffset += 30;
 
         for (var i = 0; i < selectedAlloy.Ingredients.Length; i++)
@@ -194,7 +195,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
 
         // Add section header
         var headerBounds = ElementBounds.Fixed(0, yOffset, DialogWidth - 40, 25);
-        composer.AddStaticText(Lang.Get($"vanillaexpanded:gui-alloycalculator-required"), CairoFont.WhiteSmallText(), headerBounds);
+        composer.AddStaticText(Lang.Get($"{ModId}:gui-alloycalculator-required"), CairoFont.WhiteSmallText(), headerBounds);
         yOffset += 25;
 
         // Add result text for each ingredient
@@ -204,11 +205,6 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
             composer.AddDynamicText("", CairoFont.WhiteDetailText(), resultBounds, $"result_{i}");
             yOffset += 22;
         }
-
-        // Total display
-        yOffset += 5;
-        var totalBounds = ElementBounds.Fixed(10, yOffset, DialogWidth - 60, 20);
-        composer.AddDynamicText("", CairoFont.WhiteSmallText(), totalBounds, "totalResult");
     }
     #endregion
 
@@ -333,22 +329,16 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
     {
         if (selectedAlloy is null || SingleComposer is null) return;
 
-        var totalUnits = 0.0;
-
         for (var i = 0; i < selectedAlloy.Ingredients.Length; i++)
         {
             var ingredient = selectedAlloy.Ingredients[i];
             var ingredientName = GetIngredientDisplayName(ingredient);
             var percent = sliderValues.TryGetValue(i, out var val) ? val : 0;
             var units = targetUnits * percent / 100.0;
-            totalUnits += units;
 
             var resultText = SingleComposer.GetDynamicText($"result_{i}");
-            resultText?.SetNewText($"{ingredientName}: {units:F1} {Lang.Get($"vanillaexpanded:gui-alloycalculator-units")} ({percent}%)");
+            resultText?.SetNewText($"{ingredientName}: {units:F1} {Lang.Get($"{ModId}:gui-alloycalculator-units")} ({percent}%)");
         }
-
-        var totalText = SingleComposer.GetDynamicText("totalResult");
-        totalText?.SetNewText($"{Lang.Get($"vanillaexpanded:gui-alloycalculator-total")}: {totalUnits:F1} {Lang.Get($"vanillaexpanded:gui-alloycalculator-units")}");
     }
     #endregion
 
