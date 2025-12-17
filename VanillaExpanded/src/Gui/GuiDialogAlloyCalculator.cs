@@ -38,6 +38,12 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private readonly List<SlideshowItemstackTextComponent> slideshowComponents = [];
     private int targetUnits = DefaultTargetUnits;
     private bool isAdjustingSliders;
+    
+    // Cached handbook data for filtering
+    private ItemStack[]? handbookStacks;
+    private List<ItemStack>? smeltingContainers;
+    private List<ItemStack>? smeltingFuels;
+    private int maxFuelTemperature;
     #endregion
 
     #region Properties
@@ -74,6 +80,49 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             .Where(static a => a.Enabled && a.Ingredients.Length > 0)
             .OrderBy(static a => GetAlloyDisplayName(a))
             .ToList();
+
+        // Build handbook stacks cache for filtering
+        BuildHandbookStacksCache();
+    }
+
+    private void BuildHandbookStacksCache()
+    {
+        var stacks = new List<ItemStack>();
+        smeltingContainers = [];
+        smeltingFuels = [];
+
+        foreach (var obj in capi.World.Collectibles)
+        {
+            var objStacks = obj.GetHandBookStacks(capi);
+            if (objStacks is null) continue;
+
+            foreach (var stack in objStacks)
+            {
+                stacks.Add(stack);
+
+                // Collect smelting containers (crucibles, etc.)
+                if (stack.ItemAttributes?["cookingContainerSlots"].Exists == true)
+                {
+                    smeltingContainers.Add(stack);
+                }
+
+                // Collect fuels
+                var combustProps = stack.Collectible.CombustibleProps;
+                if (combustProps?.BurnDuration is not null || combustProps?.BurnTemperature is not null)
+                {
+                    smeltingFuels.Add(stack);
+                }
+            }
+        }
+
+        handbookStacks = stacks.ToArray();
+
+        // Calculate max fuel temperature
+        maxFuelTemperature = smeltingFuels
+            .Where(f => f.Collectible.CombustibleProps?.BurnTemperature is not null)
+            .Select(f => f.Collectible.CombustibleProps!.BurnTemperature)
+            .DefaultIfEmpty(0)
+            .Max();
     }
 
     private static string GetAlloyDisplayName(AlloyRecipe alloy)
@@ -188,7 +237,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             // Create slideshow components for each ingredient
             slideshowComponents.Clear();
             var richTextComponents = new List<RichTextComponentBase>();
-            const int slotPadding = 6;
+            const int slotPadding = 5;
 
             for (var i = 0; i < ingredientCount; i++)
             {
@@ -381,38 +430,42 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
     /// <summary>
     /// Gets all metal variant stacks (nuggets, ore chunks, etc.) that smelt into the given metal.
+    /// Filters by handbook visibility and smeltability.
     /// </summary>
     private ItemStack[] GetAllMetalVariantStacks(MetalAlloyIngredient ingredient, int stackSize)
     {
-        var stacks = new List<ItemStack>();
-        
         // The ingredient's ResolvedItemstack is the ingot - we need items that smelt into this
         var targetIngot = ingredient.ResolvedItemstack;
-        if (targetIngot is null) return [];
+        if (targetIngot is null || handbookStacks is null) return [];
 
-        // Find all items that smelt into this metal type
-        foreach (var item in capi.World.Items)
-        {
-            if (item?.CombustibleProps?.SmeltedStack?.ResolvedItemstack is null) continue;
-            
-            if (targetIngot.Equals(capi.World, item.CombustibleProps.SmeltedStack.ResolvedItemstack, GlobalConstants.IgnoredStackAttributes))
+        // Filter handbook stacks to find items that smelt into this metal and can be smelted
+        var stacks = handbookStacks
+            .Where(stack => 
+                targetIngot.Equals(capi.World, stack.Collectible.CombustibleProps?.SmeltedStack?.ResolvedItemstack, GlobalConstants.IgnoredStackAttributes)
+                && CanSmelt(stack))
+            .Select(stack => 
             {
-                stacks.Add(new ItemStack(item, stackSize));
-            }
-        }
+                var clone = stack.Clone();
+                clone.StackSize = stackSize;
+                return clone;
+            });
 
-        // Also check blocks (ore blocks)
-        foreach (var block in capi.World.Blocks)
-        {
-            if (block?.CombustibleProps?.SmeltedStack?.ResolvedItemstack is null) continue;
-            
-            if (targetIngot.Equals(capi.World, block.CombustibleProps.SmeltedStack.ResolvedItemstack, GlobalConstants.IgnoredStackAttributes))
-            {
-                stacks.Add(new ItemStack(block, stackSize));
-            }
-        }
+        var filtered = stacks.Where(static stack => stack.Collectible?.FirstCodePart() == "metalbit" || stack.Collectible?.FirstCodePart() == "nugget");
+        return [.. filtered];
+    }
 
-        return stacks.ToArray();
+    /// <summary>
+    /// Checks if an item can be smelted based on fuel temperature and melting point.
+    /// </summary>
+    private bool CanSmelt(ItemStack stack)
+    {
+        var combustProps = stack.Collectible.CombustibleProps;
+        if (combustProps is null) return false;
+        
+        // Check if fuel temperature is high enough to melt this item
+        if (combustProps.MeltingPoint > maxFuelTemperature) return false;
+
+        return true;
     }
 
     /// <summary>
@@ -484,7 +537,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         if (capi.Settings.Bool["immersiveMouseMode"])
         {
             SingleComposer.Bounds.absOffsetX = (SingleComposer.Bounds.OuterWidth / 2) + (FirepitDialogWidth / 2) - 5;
-            SingleComposer.Bounds.absOffsetY = -(SingleComposer.Bounds.OuterHeight / 2) - TitlebarHeight;
+            SingleComposer.Bounds.absOffsetY = 0;// -(SingleComposer.Bounds.OuterHeight / 2);// - TitlebarHeight;
         }
     }
 
