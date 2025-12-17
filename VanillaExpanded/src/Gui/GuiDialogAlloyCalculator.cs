@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 
 using Vintagestory.API.Client;
+using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.GameContent;
 
@@ -30,11 +31,22 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
     private int targetUnits = DefaultTargetUnits;
     private bool isAdjustingSliders;
     private double calculatedLabelWidth = MinLabelWidth;
+    private EnumDialogArea dialogAlignment = EnumDialogArea.CenterMiddle;
     #endregion
 
     #region Properties
     public override string ToggleKeyCombinationCode => "ve.alloycalculator";
     public override double DrawOrder => 0.2;
+    #endregion
+
+    #region Public Methods
+    /// <summary>
+    /// Sets the dialog alignment for the next time it's composed.
+    /// </summary>
+    public void SetAlignment(EnumDialogArea alignment)
+    {
+        dialogAlignment = alignment;
+    }
     #endregion
 
     #region Constructor
@@ -82,7 +94,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialog
         var bgBounds = ElementBounds.Fill.WithFixedPadding(GuiStyle.ElementToDialogPadding);
         bgBounds.BothSizing = ElementSizing.FitToChildren;
 
-        var dialogBounds = ElementStdBounds.AutosizedMainDialog.WithAlignment(EnumDialogArea.CenterMiddle);
+        var dialogBounds = ElementStdBounds.AutosizedMainDialog.WithAlignment(dialogAlignment);
 
         // Calculate content height based on selected alloy
         var contentHeight = CalculateContentHeight();
