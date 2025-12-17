@@ -1,5 +1,13 @@
 {
   "blockhelp-autostash-container": "[Hold] Deposit similar items.",
   "ve-hotkey-equiplightsource-offhand": "Equip light source to offhand",
-  "ve-hotkey-equiplightsource-hotbar": "Equip light source to hotbar"
+  "ve-hotkey-equiplightsource-hotbar": "Equip light source to hotbar",
+
+  "gui-alloycalculator-title": "Alloy Calculator",
+  "gui-alloycalculator-alloy": "Alloy:",
+  "gui-alloycalculator-targetunits": "Target Units:",
+  "gui-alloycalculator-ratios": "Metal Ratios",
+  "gui-alloycalculator-required": "Required Amounts",
+  "gui-alloycalculator-units": "units",
+  "gui-alloycalculator-total": "Total"
 }
