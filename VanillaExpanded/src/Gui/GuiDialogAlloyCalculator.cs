@@ -35,9 +35,9 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private AlloyRecipe? selectedAlloy;
     private readonly Dictionary<int, int> sliderValues = [];
     private readonly Dictionary<int, ItemStack> calculatedStacks = [];
+    private readonly List<SlideshowItemstackTextComponent> slideshowComponents = [];
     private int targetUnits = DefaultTargetUnits;
     private bool isAdjustingSliders;
-    private DummyInventory? ingredientInventory;
     #endregion
 
     #region Properties
@@ -155,9 +155,6 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         // Add ingredient sliders if an alloy is selected
         if (selectedAlloy is not null && ingredientCount > 0)
         {
-            // Create inventory for ingredient display slots
-            ingredientInventory = new DummyInventory(capi, ingredientCount);
-
             // Add divider
             var dividerBounds = ElementBounds.Fixed(0, yOffset, contentWidth, 1);
             composer.AddInset(dividerBounds, 1, 0.5f);
@@ -188,12 +185,32 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             composer.AddInset(divider2Bounds, 1, 0.5f);
             yOffset += 10;
 
-            // Add item slots in a single row at the bottom
-            var slotsWidth = ingredientCount * SlotSize;
-            var slotsXOffset = (contentWidth - slotsWidth) / 2; // Center the slots
-            var slotBounds = ElementStdBounds.SlotGrid(EnumDialogArea.None, slotsXOffset, yOffset, ingredientCount, 1);
-            var slotIndices = Enumerable.Range(0, ingredientCount).ToArray();
-            composer.AddItemSlotGrid(ingredientInventory, null, ingredientCount, slotIndices, slotBounds, "ingredientSlots");
+            // Create slideshow components for each ingredient
+            slideshowComponents.Clear();
+            var richTextComponents = new List<RichTextComponentBase>();
+
+            for (var i = 0; i < ingredientCount; i++)
+            {
+                var ingredient = selectedAlloy.Ingredients[i];
+                var stacks = GetAllMetalVariantStacks(ingredient, 1);
+                
+                if (stacks.Length > 0)
+                {
+                    var slideshow = new SlideshowItemstackTextComponent(capi, stacks, SlotSize, EnumFloat.Inline)
+                    {
+                        ShowStackSize = true,
+                        Background = true
+                    };
+                    slideshowComponents.Add(slideshow);
+                    richTextComponents.Add(slideshow);
+                }
+            }
+
+            // Add richtext element with slideshow components
+            var slotsWidth = ingredientCount * (SlotSize + 4);
+            var slotsXOffset = (contentWidth - slotsWidth) / 2;
+            var slotBounds = ElementBounds.Fixed(slotsXOffset, yOffset, slotsWidth, SlotSize + 8);
+            composer.AddRichtext(richTextComponents.ToArray(), slotBounds, "ingredientSlots");
         }
 
         SingleComposer = composer.EndChildElements().Compose();
@@ -330,7 +347,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     #region Results Calculation
     private void UpdateResultsDisplay()
     {
-        if (selectedAlloy is null || SingleComposer is null || ingredientInventory is null) return;
+        if (selectedAlloy is null || SingleComposer is null) return;
 
         calculatedStacks.Clear();
 
@@ -341,27 +358,59 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             var units = targetUnits * percent / 100.0;
             var nuggets = (int)Math.Ceiling(units / 5.0); // 1 nugget = 5 units, round up
 
-            // Create ItemStack for metal bits with calculated amount
+            // Update slideshow component with new stack size
+            if (i < slideshowComponents.Count)
+            {
+                var stacks = GetAllMetalVariantStacks(ingredient, nuggets);
+                slideshowComponents[i].Itemstacks = stacks;
+            }
+
+            // Store the primary stack (metal bit) for external use
             if (nuggets > 0)
             {
                 var stack = GetMetalBitStack(ingredient, nuggets);
                 if (stack is not null)
                 {
                     calculatedStacks[i] = stack;
-                    ingredientInventory[i].Itemstack = stack;
-                }
-                else
-                {
-                    ingredientInventory[i].Itemstack = null;
                 }
             }
-            else
-            {
-                ingredientInventory[i].Itemstack = null;
-            }
-
-            ingredientInventory[i].MarkDirty();
         }
+    }
+
+    /// <summary>
+    /// Gets all metal variant stacks (nuggets, ore chunks, etc.) that smelt into the given metal.
+    /// </summary>
+    private ItemStack[] GetAllMetalVariantStacks(MetalAlloyIngredient ingredient, int stackSize)
+    {
+        var stacks = new List<ItemStack>();
+        
+        // The ingredient's ResolvedItemstack is the ingot - we need items that smelt into this
+        var targetIngot = ingredient.ResolvedItemstack;
+        if (targetIngot is null) return [];
+
+        // Find all items that smelt into this metal type
+        foreach (var item in capi.World.Items)
+        {
+            if (item?.CombustibleProps?.SmeltedStack?.ResolvedItemstack is null) continue;
+            
+            if (targetIngot.Equals(capi.World, item.CombustibleProps.SmeltedStack.ResolvedItemstack, GlobalConstants.IgnoredStackAttributes))
+            {
+                stacks.Add(new ItemStack(item, stackSize));
+            }
+        }
+
+        // Also check blocks (ore blocks)
+        foreach (var block in capi.World.Blocks)
+        {
+            if (block?.CombustibleProps?.SmeltedStack?.ResolvedItemstack is null) continue;
+            
+            if (targetIngot.Equals(capi.World, block.CombustibleProps.SmeltedStack.ResolvedItemstack, GlobalConstants.IgnoredStackAttributes))
+            {
+                stacks.Add(new ItemStack(block, stackSize));
+            }
+        }
+
+        return stacks.ToArray();
     }
 
     /// <summary>
