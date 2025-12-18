@@ -26,8 +26,8 @@ When opening a firepit with a crucible, an Alloy Calculator dialog automatically
 
 - **Select an alloy** from the dropdown to see its ingredient requirements
 - **Adjust the target units** to specify how much metal you want to produce
-- **Fine-tune ingredient ratios** using the sliders - they automatically stay within valid alloy ranges and normalize to 100%
-- **See required amounts** as item stacks that cycle through valid metal variants (nuggets, bits)
+- **Fine-tune ingredient ratios** using the sliders which automatically stay within valid alloy ranges
+- **See required amounts** as item stacks for easy reference
 - **Deposit button** automatically transfers the required ingredients from your inventory into the crucible, spreading them evenly across slots
 
 The calculator remembers your settings per crucible, so your preferred alloy and ratios are restored when you reopen the dialog (currently not remembered across restarts).
