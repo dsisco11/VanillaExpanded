@@ -184,7 +184,9 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             .AddDialogTitleBar(Lang.Get($"{ModId}:gui-alloycalculator-title"), OnTitleBarClose)
             .BeginChildElements(bgBounds)
             .AddDropDown([.. alloyValues], [.. alloyNames], selectedIndex, OnAlloySelected, dropdownBounds, "alloyDropdown")
-            .AddNumberInput(inputBounds, OnTargetUnitsChanged, CairoFont.WhiteDetailText(), "targetUnits");
+            .AddHoverText(Lang.Get($"{ModId}:gui-alloycalculator-dropdown-tooltip"), CairoFont.WhiteDetailText(), 250, dropdownBounds.FlatCopy(), "dropdownTooltip")
+            .AddNumberInput(inputBounds, OnTargetUnitsChanged, CairoFont.WhiteDetailText(), "targetUnits")
+            .AddHoverText(Lang.Get($"{ModId}:gui-alloycalculator-targetunits-tooltip"), CairoFont.WhiteDetailText(), 250, inputBounds.FlatCopy(), "targetUnitsTooltip");
 
         // Add ingredient sliders if an alloy is selected
         if (selectedAlloy is not null && ingredientCount > 0)
@@ -200,10 +202,14 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                 var sliderBounds = ElementBounds.Fixed(LabelWidth, yOffset + 4, SliderWidth, 20);
 
                 var sliderKey = $"slider_{ingredientIndex}";
+                var minPercent = (int)Math.Round(ingredient.MinRatio * 100);
+                var maxPercent = (int)Math.Round(ingredient.MaxRatio * 100);
+                var sliderTooltip = Lang.Get($"{ModId}:gui-alloycalculator-slider-tooltip", ingredientName, minPercent, maxPercent);
 
                 composer
                     .AddStaticText(ingredientName, CairoFont.WhiteSmallText(), labelBounds)
-                    .AddSlider(value => OnSliderChanged(ingredientIndex, value), sliderBounds, sliderKey);
+                    .AddSlider(value => OnSliderChanged(ingredientIndex, value), sliderBounds, sliderKey)
+                    .AddHoverText(sliderTooltip, CairoFont.WhiteDetailText(), 250, sliderBounds.FlatCopy(), $"sliderTooltip_{ingredientIndex}");
 
                 yOffset += RowHeight;
             }
@@ -230,7 +236,8 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                     {
                         ShowStackSize = true,
                         Background = true,
-                        PaddingRight = slotPadding
+                        PaddingRight = slotPadding,
+                        ExtraTooltipText = "\n" + Lang.Get($"{ModId}:gui-alloycalculator-itemstack-tooltip")
                     };
                     slideshowComponents.Add(slideshow);
                     richTextComponents.Add(slideshow);
