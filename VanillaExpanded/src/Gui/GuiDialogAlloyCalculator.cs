@@ -31,6 +31,20 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private const double ButtonHeight = 25;
     #endregion
 
+    #region Saved State
+    /// <summary>
+    /// Stores saved dialog state per block entity position.
+    /// </summary>
+    private static readonly Dictionary<BlockPos, SavedDialogState> savedStates = [];
+
+    private sealed class SavedDialogState
+    {
+        public int SelectedAlloyIndex { get; set; }
+        public int TargetUnits { get; set; } = DefaultTargetUnits;
+        public Dictionary<int, int> SliderValues { get; set; } = [];
+    }
+    #endregion
+
     #region Fields
     private readonly GuiDialog? firepitDialog;
     private List<AlloyRecipe> alloys = [];
@@ -311,9 +325,23 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
         sliderValues[changedIndex] = newValue;
         NormalizeSliderValues(changedIndex);
+        SaveSliderValues();
         UpdateResultsDisplay();
 
         return true;
+    }
+
+    /// <summary>
+    /// Saves current slider values to the saved state.
+    /// </summary>
+    private void SaveSliderValues()
+    {
+        var state = GetOrCreateSavedState();
+        state.SliderValues.Clear();
+        foreach (var (idx, value) in sliderValues)
+        {
+            state.SliderValues[idx] = value;
+        }
     }
 
     private void NormalizeSliderValues(int changedIndex)
@@ -502,6 +530,10 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
         selectedAlloy = alloys[index];
         selectedIngredients = selectedAlloy.Ingredients.OrderBy(static ing => GetIngredientDisplayName(ing)).ToImmutableArray();
+        
+        // Save selected alloy index
+        GetOrCreateSavedState().SelectedAlloyIndex = index;
+        
         ComposeDialog();
     }
 
@@ -510,6 +542,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         if (int.TryParse(value, out var units) && units > 0)
         {
             targetUnits = units;
+            GetOrCreateSavedState().TargetUnits = units;
             UpdateResultsDisplay();
         }
     }
@@ -797,7 +830,64 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     {
         base.OnGuiOpened();
 
-        OnAlloySelected("0", true);
+        // Restore saved state or use defaults
+        if (savedStates.TryGetValue(BlockEntityPosition, out var state))
+        {
+            targetUnits = state.TargetUnits;
+            OnAlloySelected(state.SelectedAlloyIndex.ToString(), true);
+            
+            // Restore slider values after dialog is composed
+            RestoreSliderValues(state);
+        }
+        else
+        {
+            OnAlloySelected("0", true);
+        }
+    }
+
+    /// <summary>
+    /// Restores slider values from saved state.
+    /// </summary>
+    private void RestoreSliderValues(SavedDialogState state)
+    {
+        if (SingleComposer is null || selectedAlloy is null) return;
+
+        isAdjustingSliders = true;
+        try
+        {
+            foreach (var (idx, value) in state.SliderValues)
+            {
+                if (idx >= selectedIngredients.Length) continue;
+
+                var ingredient = selectedIngredients[idx];
+                var minPercent = (int)Math.Round(ingredient.MinRatio * 100);
+                var maxPercent = (int)Math.Round(ingredient.MaxRatio * 100);
+                var clampedValue = Math.Clamp(value, minPercent, maxPercent);
+
+                sliderValues[idx] = clampedValue;
+                var slider = SingleComposer.GetSlider($"slider_{idx}");
+                slider?.SetValues(clampedValue, minPercent, maxPercent, 1, "%");
+            }
+        }
+        finally
+        {
+            isAdjustingSliders = false;
+        }
+
+        UpdateResultsDisplay();
+    }
+
+    /// <summary>
+    /// Gets or creates a saved state for the current block entity.
+    /// </summary>
+    private SavedDialogState GetOrCreateSavedState()
+    {
+        if (!savedStates.TryGetValue(BlockEntityPosition, out var state))
+        {
+            state = new SavedDialogState();
+            savedStates[BlockEntityPosition] = state;
+        }
+        return state;
     }
 
     public override void OnRenderGUI(float deltaTime)
