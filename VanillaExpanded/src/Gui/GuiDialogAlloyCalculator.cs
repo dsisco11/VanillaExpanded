@@ -84,6 +84,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         BuildHandbookStacksCache();
     }
 
+    // TODO: There has to be a better way to calculate/cache these item-stack variants, ideally we should be capable of leveraging the cache that the handbook already has internally.
     private void BuildHandbookStacksCache()
     {
         var stacks = new List<ItemStack>();
@@ -255,6 +256,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                 }
             }
 
+            // TODO: move away from calculating the horizontal pos like this, we should be able to just use a parent ElementBound & chain child element-bounds together using `.RightOf` & then center the parent bound...
             // Add richtext element with slideshow components
             var slotsWidth = ingredientCount * (SlotSize + slotPadding);
             var slotsXOffset = (contentWidth - slotsWidth) / 2;
@@ -534,6 +536,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         base.OnRenderGUI(deltaTime);
         if (capi.Settings.Bool["immersiveMouseMode"])
         {
+            // Adjust position to account for firepit dialog width in immersive mode (positions the calculator dialog to the right of the firepit dialog)
             SingleComposer.Bounds.absOffsetX = (SingleComposer.Bounds.OuterWidth / 2) + (FirepitDialogWidth / 2) - 5;
             SingleComposer.Bounds.absOffsetY = 0;
         }
