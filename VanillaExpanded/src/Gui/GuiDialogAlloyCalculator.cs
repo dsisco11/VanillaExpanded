@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 
 using Vintagestory.API.Client;
@@ -33,6 +34,9 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private readonly GuiDialog? firepitDialog;
     private List<AlloyRecipe> alloys = [];
     private AlloyRecipe? selectedAlloy;
+    
+    /// <summary> Currently selected ingredients for the chosen alloy. </summary>
+    private ImmutableArray<MetalAlloyIngredient> selectedIngredients = [];
     private readonly Dictionary<int, int> sliderValues = [];
     private readonly Dictionary<int, ItemStack> calculatedStacks = [];
     private readonly List<SlideshowItemstackTextComponent> slideshowComponents = [];
@@ -130,7 +134,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private void ComposeDialog()
     {
         // Calculate number of ingredient rows
-        var ingredientCount = selectedAlloy?.Ingredients.Length ?? 0;
+        var ingredientCount = selectedIngredients.Length;
 
         // Define content bounds - this establishes the size of our dialog content
         // Width: either slider row or slot row, whichever is wider
@@ -193,7 +197,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             // Add sliders
             for (var idx = 0; idx < ingredientCount; idx++)
             {
-                var ingredient = selectedAlloy.Ingredients[idx];
+                var ingredient = selectedIngredients[idx];
                 var ingredientIndex = idx;
                 var ingredientName = GetIngredientDisplayName(ingredient);
 
@@ -269,9 +273,9 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         sliderValues.Clear();
 
         // Initialize each slider to the midpoint of its valid range
-        for (var i = 0; i < selectedAlloy.Ingredients.Length; i++)
+        for (var i = 0; i < selectedIngredients.Length; i++)
         {
-            var ingredient = selectedAlloy.Ingredients[i];
+            var ingredient = selectedIngredients[i];
             var minPercent = (int)Math.Round(ingredient.MinRatio * 100);
             var maxPercent = (int)Math.Round(ingredient.MaxRatio * 100);
             var midPoint = (minPercent + maxPercent) / 2;
@@ -320,7 +324,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
             foreach (var idx in otherIndices)
             {
-                var ingredient = selectedAlloy.Ingredients[idx];
+                var ingredient = selectedIngredients[idx];
                 var minPercent = (int)Math.Round(ingredient.MinRatio * 100);
                 var maxPercent = (int)Math.Round(ingredient.MaxRatio * 100);
                 var currentValue = sliderValues[idx];
@@ -363,7 +367,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                 var slider = SingleComposer.GetSlider($"slider_{idx}");
                 if (slider is not null)
                 {
-                    var ingredient = selectedAlloy.Ingredients[idx];
+                    var ingredient = selectedIngredients[idx];
                     var minPercent = (int)Math.Round(ingredient.MinRatio * 100);
                     var maxPercent = (int)Math.Round(ingredient.MaxRatio * 100);
                     slider.SetValues(sliderValues[idx], minPercent, maxPercent, 1, "%");
@@ -384,9 +388,9 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
         calculatedStacks.Clear();
 
-        for (var i = 0; i < selectedAlloy.Ingredients.Length; i++)
+        for (var i = 0; i < selectedIngredients.Length; i++)
         {
-            var ingredient = selectedAlloy.Ingredients[i];
+            var ingredient = selectedIngredients[i];
             var percent = sliderValues.TryGetValue(i, out var val) ? val : 0;
             var units = targetUnits * percent / 100.0;
             var nuggets = (int)Math.Ceiling(units / 5.0); // 1 nugget = 5 units, round up
@@ -482,6 +486,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         }
 
         selectedAlloy = alloys[index];
+        selectedIngredients = selectedAlloy.Ingredients.ToImmutableArray();
         ComposeDialog();
     }
 
@@ -508,6 +513,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         if (alloys.Count > 0 && selectedAlloy is null)
         {
             selectedAlloy = alloys[0];
+            selectedIngredients = selectedAlloy.Ingredients.ToImmutableArray();
         }
 
         ComposeDialog();
