@@ -28,6 +28,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private const int DefaultTargetUnits = 100;
     private const double TitlebarHeight = 20;
     private const double SlotSize = 40;
+    private const double ButtonHeight = 25;
     #endregion
 
     #region Fields
@@ -142,12 +143,13 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         var slotRowWidth = ingredientCount * SlotSize;
         var contentWidth = Math.Max(sliderRowWidth, slotRowWidth);
         
-        // Height: titlebar + dropdown row + sliders + slot row
+        // Height: titlebar + dropdown row + sliders + slot row + button row
         var contentHeight = TitlebarHeight + 30;
         if (ingredientCount > 0)
         {
             contentHeight += ingredientCount * RowHeight; // sliders
             contentHeight += 15 + SlotSize; // gap + slot row
+            contentHeight += 10 + ButtonHeight; // gap + button
         }
         var contentBounds = ElementBounds.Fixed(0, 0, contentWidth, contentHeight);
 
@@ -251,6 +253,16 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                 .WithParent(contentBounds)
                 .WithAlignment(EnumDialogArea.CenterFixed);
             composer.AddRichtext(richTextComponents.ToArray(), slotBounds, "ingredientSlots");
+
+            // Add deposit button
+            yOffset += (int)SlotSize + 18;
+            var buttonBounds = ElementBounds
+                .Fixed(0, yOffset, 80, ButtonHeight)
+                .WithParent(contentBounds)
+                .WithAlignment(EnumDialogArea.CenterFixed);
+            composer
+                .AddSmallButton(Lang.Get($"{ModId}:gui-alloycalculator-deposit"), OnDepositButtonClicked, buttonBounds, "depositButton")
+                .AddHoverText(Lang.Get($"{ModId}:gui-alloycalculator-deposit-tooltip"), CairoFont.WhiteDetailText(), 250, buttonBounds.FlatCopy(), "depositTooltip");
         }
 
         SingleComposer = composer.EndChildElements().Compose();
@@ -505,6 +517,155 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private void OnTitleBarClose()
     {
         TryClose();
+    }
+
+    private bool OnDepositButtonClicked()
+    {
+        DepositIngredientsIntoCrucible();
+        return true;
+    }
+    #endregion
+
+    #region Deposit Logic
+    /// <summary>
+    /// Deposits the calculated ingredients from player inventory into the crucible.
+    /// </summary>
+    private void DepositIngredientsIntoCrucible()
+    {
+        var firepit = capi.World.BlockAccessor.GetBlockEntity<BlockEntityFirepit>(BlockEntityPosition);
+        if (firepit?.Inventory is not InventorySmelting crucibleInventory) return;
+
+        var player = capi.World.Player;
+        var playerInventory = player.InventoryManager;
+
+        // Crucible cooking slots are indices 3-6
+        const int firstCookingSlot = 3;
+        const int lastCookingSlot = 6;
+
+        foreach (var (ingredientIndex, targetStack) in calculatedStacks)
+        {
+            if (targetStack is null || targetStack.StackSize <= 0) continue;
+
+            var targetIngot = selectedIngredients[ingredientIndex].ResolvedItemstack;
+            if (targetIngot is null) continue;
+
+            // Calculate how many units we need (each nugget = 5 units)
+            var targetUnitsNeeded = targetStack.StackSize * 5;
+
+            // Count how many units are already in the crucible for this metal type
+            var unitsInCrucible = 0;
+            for (var slotIdx = firstCookingSlot; slotIdx <= lastCookingSlot; slotIdx++)
+            {
+                var slot = crucibleInventory[slotIdx];
+                if (slot?.Itemstack is null) continue;
+
+                var smeltedStack = slot.Itemstack.Collectible.CombustibleProps?.SmeltedStack?.ResolvedItemstack;
+                if (smeltedStack is null) continue;
+
+                if (targetIngot.Equals(capi.World, smeltedStack, GlobalConstants.IgnoredStackAttributes))
+                {
+                    // Calculate units based on smelted ratio
+                    var ratio = slot.Itemstack.Collectible.CombustibleProps?.SmeltedRatio ?? 1;
+                    unitsInCrucible += slot.Itemstack.StackSize * 5 / ratio;
+                }
+            }
+
+            // Calculate how many more units we need to deposit
+            var unitsToDeposit = targetUnitsNeeded - unitsInCrucible;
+            if (unitsToDeposit <= 0) continue;
+
+            // Find matching items in player inventory and deposit them
+            DepositMetalFromPlayerInventory(playerInventory, crucibleInventory, targetIngot, unitsToDeposit, firstCookingSlot, lastCookingSlot);
+        }
+    }
+
+    /// <summary>
+    /// Finds and deposits metal items from player inventory into crucible slots.
+    /// </summary>
+    private void DepositMetalFromPlayerInventory(
+        IPlayerInventoryManager playerInventory,
+        InventorySmelting crucibleInventory,
+        ItemStack targetIngot,
+        int unitsToDeposit,
+        int firstCookingSlot,
+        int lastCookingSlot)
+    {
+        var remainingUnits = unitsToDeposit;
+
+        // Search through all player inventories
+        foreach (var inv in playerInventory.Inventories.Values)
+        {
+            if (remainingUnits <= 0) break;
+
+            foreach (var slot in inv)
+            {
+                if (remainingUnits <= 0) break;
+                if (slot?.Itemstack is null) continue;
+
+                // Check if this item smelts into our target metal
+                var smeltedStack = slot.Itemstack.Collectible.CombustibleProps?.SmeltedStack?.ResolvedItemstack;
+                if (smeltedStack is null) continue;
+                if (!targetIngot.Equals(capi.World, smeltedStack, GlobalConstants.IgnoredStackAttributes)) continue;
+
+                var firstCodePart = slot.Itemstack.Collectible.FirstCodePart();
+                if (firstCodePart != "metalbit" && firstCodePart != "nugget") continue;
+
+                var ratio = slot.Itemstack.Collectible.CombustibleProps?.SmeltedRatio ?? 1;
+                var unitsPerItem = 5 / ratio;
+
+                // Calculate how many items we need
+                var itemsNeeded = (int)Math.Ceiling(remainingUnits / (double)unitsPerItem);
+                var itemsToTake = Math.Min(itemsNeeded, slot.Itemstack.StackSize);
+
+                if (itemsToTake <= 0) continue;
+
+                // Try to deposit into crucible
+                var depositedItems = TryDepositIntoCrucible(slot, crucibleInventory, itemsToTake, firstCookingSlot, lastCookingSlot);
+                remainingUnits -= depositedItems * unitsPerItem;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Tries to move items from a source slot into crucible cooking slots.
+    /// </summary>
+    private int TryDepositIntoCrucible(
+        ItemSlot sourceSlot,
+        InventorySmelting crucibleInventory,
+        int maxItems,
+        int firstCookingSlot,
+        int lastCookingSlot)
+    {
+        var totalDeposited = 0;
+        var itemsRemaining = maxItems;
+
+        for (var slotIdx = firstCookingSlot; slotIdx <= lastCookingSlot && itemsRemaining > 0; slotIdx++)
+        {
+            var targetSlot = crucibleInventory[slotIdx];
+            if (targetSlot is null) continue;
+
+            // Check if slot can accept this item
+            if (!targetSlot.Empty && !targetSlot.Itemstack.Equals(capi.World, sourceSlot.Itemstack, GlobalConstants.IgnoredStackAttributes))
+            {
+                continue;
+            }
+
+            var canFit = targetSlot.Empty
+                ? Math.Min(itemsRemaining, sourceSlot.Itemstack.Collectible.MaxStackSize)
+                : Math.Min(itemsRemaining, targetSlot.MaxSlotStackSize - targetSlot.Itemstack.StackSize);
+
+            if (canFit <= 0) continue;
+
+            var movedCount = sourceSlot.TryPutInto(capi.World, targetSlot, canFit);
+            totalDeposited += movedCount;
+            itemsRemaining -= movedCount;
+
+            // Mark slots as dirty to sync
+            sourceSlot.MarkDirty();
+            targetSlot.MarkDirty();
+        }
+
+        return totalDeposited;
     }
     #endregion
 
