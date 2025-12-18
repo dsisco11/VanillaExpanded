@@ -169,8 +169,8 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         var inputBounds = ElementBounds.Fixed(DropdownWidth + 10, yOffset, InputWidth, 25);
         yOffset += 30;
 
-        var alloyValues = alloys.Select(static (_, i) => i.ToString()).ToArray();
-        var alloyNames = alloys.Select(GetAlloyDisplayName).ToArray();
+        var alloyValues = alloys.Select(static (_, i) => i.ToString());
+        var alloyNames = alloys.Select(static (recipe, _) => GetAlloyDisplayName(recipe));
         var selectedIndex = selectedAlloy is not null ? alloys.IndexOf(selectedAlloy) : 0;
         if (selectedIndex < 0) selectedIndex = 0;
 
@@ -179,7 +179,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             .AddShadedDialogBG(bgBounds)
             .AddDialogTitleBar(Lang.Get($"{ModId}:gui-alloycalculator-title"), OnTitleBarClose)
             .BeginChildElements(bgBounds)
-            .AddDropDown(alloyValues, alloyNames, selectedIndex, OnAlloySelected, dropdownBounds, "alloyDropdown")
+            .AddDropDown([.. alloyValues], [.. alloyNames], selectedIndex, OnAlloySelected, dropdownBounds, "alloyDropdown")
             .AddNumberInput(inputBounds, OnTargetUnitsChanged, CairoFont.WhiteDetailText(), "targetUnits");
 
         // Add ingredient sliders if an alloy is selected
@@ -191,15 +191,16 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             yOffset += 10;
 
             // Add sliders
-            foreach (var ingredient in this.Ingredients)
+            for (var idx = 0; idx < ingredientCount; idx++)
             {
+                var ingredient = selectedAlloy.Ingredients[idx];
+                var ingredientIndex = idx;
                 var ingredientName = GetIngredientDisplayName(ingredient);
 
                 var labelBounds = ElementBounds.Fixed(0, yOffset, LabelWidth, RowHeight);
                 var sliderBounds = ElementBounds.Fixed(LabelWidth, yOffset + 4, SliderWidth, 20);
 
-                var sliderKey = $"slider_{ingredient.ResolvedItemstack.Id}";
-                var ingredientIndex = ingredient.ResolvedItemstack.Id;
+                var sliderKey = $"slider_{ingredientIndex}";
 
                 composer
                     .AddStaticText(ingredientName, CairoFont.WhiteSmallText(), labelBounds)
@@ -545,7 +546,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private static string GetMaterialDisplayName(in AssetLocation assetLocation)
     {
         var materialCode = assetLocation.EndVariant();
-        return Lang.GetMatching("material", materialCode) ?? assetLocation.Path;
+        return Lang.GetMatching($"material-{materialCode}") ?? assetLocation.Path;
     }
 
     private static string GetAlloyDisplayName(in AlloyRecipe alloy)
