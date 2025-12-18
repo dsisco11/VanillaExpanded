@@ -7,7 +7,7 @@
   "gui-alloycalculator-alloy": "Alloy:",
   "gui-alloycalculator-dropdown-tooltip": "Select the alloy type you want to create",
   "gui-alloycalculator-targetunits": "Target Units:",
-  "gui-alloycalculator-targetunits-tooltip": "Total metal units to produce (100 units = 1 ingot)",
+  "gui-alloycalculator-targetunits-tooltip": "Total metal units to produce",
   "gui-alloycalculator-slider-tooltip": "{0}: Adjust ratio between {1}% and {2}%",
   "gui-alloycalculator-itemstack-tooltip": "Required ingredient amount",
   "gui-alloycalculator-ratios": "Metal Ratios",
