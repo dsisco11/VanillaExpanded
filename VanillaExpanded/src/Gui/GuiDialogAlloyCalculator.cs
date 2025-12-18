@@ -529,7 +529,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     #region Deposit Logic
     /// <summary>
     /// Deposits the calculated ingredients from player inventory into the crucible.
-    /// First removes unrelated or excess items, then deposits the required amounts.
+    /// First clears the crucible, then deposits ingredients spread evenly across slots.
     /// </summary>
     private void DepositIngredientsIntoCrucible()
     {
@@ -541,102 +541,134 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
         var player = capi.World.Player;
 
-        // Build a map of all valid item codes for all ingredients and their target amounts
-        var ingredientTargets = new Dictionary<AssetLocation, int>();
-        var allValidItemCodes = new HashSet<AssetLocation>();
+        // First: Clear all items from crucible back to player inventory
+        ClearCrucible(player.InventoryManager, cookingSlots);
 
-        foreach (var (ingredientIndex, targetStack) in calculatedStacks)
+        // Build ingredient info: valid codes and target amounts
+        var ingredients = new List<(HashSet<AssetLocation> validCodes, int targetAmount)>();
+        
+        foreach (var (ingredientIndex, targetStack) in calculatedStacks.OrderByDescending(static kvp => kvp.Value?.StackSize ?? 0))
         {
             if (targetStack is null || targetStack.StackSize <= 0) continue;
 
             var ingredient = selectedIngredients[ingredientIndex];
             var validStacks = GetAllMetalVariantStacks(ingredient, 1);
+            var validCodes = validStacks.Select(static s => s.Collectible.Code).ToHashSet();
             
-            foreach (var stack in validStacks)
-            {
-                var code = stack.Collectible.Code;
-                allValidItemCodes.Add(code);
-                // Store the target amount - all variants for same ingredient share the target
-                ingredientTargets[code] = targetStack.StackSize;
-            }
+            ingredients.Add((validCodes, targetStack.StackSize));
         }
 
-        // First pass: Remove unrelated items and track current amounts per ingredient
-        RemoveUnrelatedAndExcessItems(player.InventoryManager, cookingSlots, allValidItemCodes, ingredientTargets);
+        if (ingredients.Count == 0) return;
 
-        // Second pass: Deposit missing amounts for each ingredient
-        foreach (var (ingredientIndex, targetStack) in calculatedStacks)
+        // Calculate slot allocation: distribute slots proportionally by ingredient amount
+        var totalItems = ingredients.Sum(static i => i.targetAmount);
+        var slotAllocations = AllocateSlotsProportionally(ingredients, cookingSlots.Length);
+
+        // Deposit each ingredient into its allocated slots, spread evenly
+        var slotIndex = 0;
+        for (var i = 0; i < ingredients.Count; i++)
         {
-            if (targetStack is null || targetStack.StackSize <= 0) continue;
+            var (validCodes, targetAmount) = ingredients[i];
+            var slotsForIngredient = slotAllocations[i];
+            
+            if (slotsForIngredient == 0) continue;
 
-            var ingredient = selectedIngredients[ingredientIndex];
-            var validStacks = GetAllMetalVariantStacks(ingredient, 1);
-            var validItemCodes = validStacks.Select(static s => s.Collectible.Code).ToHashSet();
+            // Calculate how to spread items across allocated slots
+            var itemsPerSlot = targetAmount / slotsForIngredient;
+            var remainder = targetAmount % slotsForIngredient;
 
-            // Count how many items are already in the crucible for this ingredient
-            var itemsInCrucible = cookingSlots
-                .Where(slot => slot?.Itemstack is not null && validItemCodes.Contains(slot.Itemstack.Collectible.Code))
-                .Sum(static slot => slot.Itemstack.StackSize);
+            var slotTargets = new int[slotsForIngredient];
+            for (var s = 0; s < slotsForIngredient; s++)
+            {
+                slotTargets[s] = itemsPerSlot + (s < remainder ? 1 : 0);
+            }
 
-            // Calculate how many more items we need to deposit
-            var itemsToDeposit = targetStack.StackSize - itemsInCrucible;
-            if (itemsToDeposit <= 0) continue;
-
-            // Find matching items in player inventory and deposit them
-            DepositFromPlayerInventory(player.InventoryManager, cookingSlots, validItemCodes, itemsToDeposit);
+            // Deposit into each allocated slot
+            for (var s = 0; s < slotsForIngredient && slotIndex < cookingSlots.Length; s++, slotIndex++)
+            {
+                var targetSlot = cookingSlots[slotIndex];
+                var targetForThisSlot = slotTargets[s];
+                
+                DepositFromPlayerInventory(player.InventoryManager, targetSlot, validCodes, targetForThisSlot);
+            }
         }
     }
 
     /// <summary>
-    /// Removes items from crucible that are not valid ingredients or exceed target amounts.
+    /// Allocates cooking slots proportionally based on ingredient amounts.
+    /// Larger amounts get more slots, with at least 1 slot per ingredient.
     /// </summary>
-    private void RemoveUnrelatedAndExcessItems(
-        IPlayerInventoryManager playerInventory,
-        ItemSlot[] cookingSlots,
-        HashSet<AssetLocation> allValidItemCodes,
-        Dictionary<AssetLocation, int> ingredientTargets)
+    private static int[] AllocateSlotsProportionally(List<(HashSet<AssetLocation> validCodes, int targetAmount)> ingredients, int totalSlots)
     {
-        // Track how many of each ingredient type we've seen
-        var currentAmounts = new Dictionary<AssetLocation, int>();
+        var allocations = new int[ingredients.Count];
+        
+        if (ingredients.Count == 0) return allocations;
+        
+        // If more ingredients than slots, give 1 slot each until we run out
+        if (ingredients.Count >= totalSlots)
+        {
+            for (var i = 0; i < Math.Min(ingredients.Count, totalSlots); i++)
+            {
+                allocations[i] = 1;
+            }
+            return allocations;
+        }
 
+        // First: guarantee each ingredient gets at least 1 slot
+        for (var i = 0; i < ingredients.Count; i++)
+        {
+            allocations[i] = 1;
+        }
+        
+        var remainingSlots = totalSlots - ingredients.Count;
+        if (remainingSlots <= 0) return allocations;
+
+        // Second: distribute remaining slots proportionally to larger amounts
+        var totalItems = ingredients.Sum(static i => i.targetAmount);
+        
+        for (var i = 0; i < ingredients.Count && remainingSlots > 0; i++)
+        {
+            var proportion = (double)ingredients[i].targetAmount / totalItems;
+            var extraSlots = (int)Math.Round(proportion * remainingSlots);
+            allocations[i] += extraSlots;
+        }
+
+        // Ensure we don't exceed total slots
+        var totalAllocated = allocations.Sum();
+        while (totalAllocated > totalSlots)
+        {
+            for (var i = ingredients.Count - 1; i >= 0 && totalAllocated > totalSlots; i--)
+            {
+                if (allocations[i] > 1)
+                {
+                    allocations[i]--;
+                    totalAllocated--;
+                }
+            }
+        }
+
+        // Distribute any unused slots to largest ingredients
+        while (totalAllocated < totalSlots)
+        {
+            for (var i = 0; i < ingredients.Count && totalAllocated < totalSlots; i++)
+            {
+                allocations[i]++;
+                totalAllocated++;
+            }
+        }
+
+        return allocations;
+    }
+
+    /// <summary>
+    /// Clears all items from crucible cooking slots back to player inventory.
+    /// </summary>
+    private void ClearCrucible(IPlayerInventoryManager playerInventory, ItemSlot[] cookingSlots)
+    {
         foreach (var slot in cookingSlots)
         {
             if (slot?.Itemstack is null) continue;
-
-            var itemCode = slot.Itemstack.Collectible.Code;
-            var stackSize = slot.Itemstack.StackSize;
-
-            // Check if this item is a valid ingredient
-            if (!allValidItemCodes.Contains(itemCode))
-            {
-                // Not a valid ingredient - remove all of it
-                WithdrawFromCrucible(playerInventory, slot, stackSize);
-                continue;
-            }
-
-            // Get the target amount for this ingredient type
-            if (!ingredientTargets.TryGetValue(itemCode, out var targetAmount))
-            {
-                // No target amount found - remove all
-                WithdrawFromCrucible(playerInventory, slot, stackSize);
-                continue;
-            }
-
-            // Calculate how many we already have of this ingredient type
-            currentAmounts.TryGetValue(itemCode, out var alreadyHave);
-            var totalAfterThis = alreadyHave + stackSize;
-
-            if (totalAfterThis > targetAmount)
-            {
-                // We have too many - remove the excess
-                var excess = totalAfterThis - targetAmount;
-                WithdrawFromCrucible(playerInventory, slot, excess);
-                currentAmounts[itemCode] = targetAmount;
-            }
-            else
-            {
-                currentAmounts[itemCode] = totalAfterThis;
-            }
+            WithdrawFromCrucible(playerInventory, slot, slot.Itemstack.StackSize);
         }
     }
 
@@ -691,11 +723,11 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     }
 
     /// <summary>
-    /// Finds and deposits matching items from player inventory into crucible slots.
+    /// Finds and deposits matching items from player inventory into a specific crucible slot.
     /// </summary>
     private void DepositFromPlayerInventory(
         IPlayerInventoryManager playerInventory,
-        ItemSlot[] cookingSlots,
+        ItemSlot targetSlot,
         HashSet<AssetLocation> validItemCodes,
         int itemsToDeposit)
     {
@@ -716,58 +748,47 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                 var itemsToTake = Math.Min(remaining, slot.Itemstack.StackSize);
                 if (itemsToTake <= 0) continue;
 
-                var deposited = TryDepositIntoCrucible(playerInventory, slot, cookingSlots, itemsToTake);
+                var deposited = TryDepositIntoSlot(playerInventory, slot, targetSlot, itemsToTake);
                 remaining -= deposited;
             }
         }
     }
 
     /// <summary>
-    /// Tries to move items from a source slot into crucible cooking slots.
+    /// Tries to move items from a source slot into a specific target slot.
     /// </summary>
-    private int TryDepositIntoCrucible(
+    private int TryDepositIntoSlot(
         IPlayerInventoryManager playerInventory,
         ItemSlot sourceSlot,
-        ItemSlot[] cookingSlots,
+        ItemSlot targetSlot,
         int maxItems)
     {
-        var totalDeposited = 0;
-        var itemsRemaining = maxItems;
+        if (targetSlot is null) return 0;
 
-        foreach (var targetSlot in cookingSlots)
+        // Check if slot can accept this item
+        if (!targetSlot.Empty && !targetSlot.Itemstack.Equals(capi.World, sourceSlot.Itemstack, GlobalConstants.IgnoredStackAttributes))
         {
-            if (itemsRemaining <= 0) break;
-            if (targetSlot is null) continue;
-
-            // Check if slot can accept this item
-            if (!targetSlot.Empty && !targetSlot.Itemstack.Equals(capi.World, sourceSlot.Itemstack, GlobalConstants.IgnoredStackAttributes))
-            {
-                continue;
-            }
-
-            var canFit = targetSlot.Empty
-                ? Math.Min(itemsRemaining, sourceSlot.Itemstack.Collectible.MaxStackSize)
-                : Math.Min(itemsRemaining, targetSlot.MaxSlotStackSize - targetSlot.Itemstack.StackSize);
-
-            if (canFit <= 0) continue;
-
-            // Use TryTransferTo which handles networking
-            var op = new ItemStackMoveOperation(capi.World, EnumMouseButton.Left, 0, EnumMergePriority.AutoMerge, canFit);
-            op.ActingPlayer = capi.World.Player;
-            
-            var packet = playerInventory.TryTransferTo(sourceSlot, targetSlot, ref op);
-            
-            if (packet is not null)
-            {
-                // Send the packet to sync with server
-                capi.Network.SendBlockEntityPacket(BlockEntityPosition.X, BlockEntityPosition.Y, BlockEntityPosition.Z, packet);
-            }
-
-            totalDeposited += op.MovedQuantity;
-            itemsRemaining -= op.MovedQuantity;
+            return 0;
         }
 
-        return totalDeposited;
+        var canFit = targetSlot.Empty
+            ? Math.Min(maxItems, sourceSlot.Itemstack.Collectible.MaxStackSize)
+            : Math.Min(maxItems, targetSlot.MaxSlotStackSize - targetSlot.Itemstack.StackSize);
+
+        if (canFit <= 0) return 0;
+
+        // Use TryTransferTo which handles networking
+        var op = new ItemStackMoveOperation(capi.World, EnumMouseButton.Left, 0, EnumMergePriority.AutoMerge, canFit);
+        op.ActingPlayer = capi.World.Player;
+
+        var packet = playerInventory.TryTransferTo(sourceSlot, targetSlot, ref op);
+
+        if (packet is not null)
+        {
+            capi.Network.SendBlockEntityPacket(BlockEntityPosition.X, BlockEntityPosition.Y, BlockEntityPosition.Z, packet);
+        }
+
+        return op.MovedQuantity;
     }
     #endregion
 
