@@ -18,7 +18,7 @@
         ☐ Lighting fires with oil-lamps.
         ☐ Handbook search results prioritize full-word matches over partial matches.
         ☐ New "crafting menu" similar to minecraft: shows all craftable items with current inventory, allows searching. (Maybe this can just be added to the handbook?)
-        ☐ New "alloy calculator" on the crucible menu: has sliders to adjust percentages of each metal, has button to deposit required materials into crucible.
+        ✔ New "alloy calculator" on the crucible menu: has sliders to adjust percentages of each metal, has button to deposit required materials into crucible. @done(25-12-18 06:46)
 
     ## Death Penalties:
         ☐ New death penalty option: lose *bag* items on death (items in inventory are lost, items on hotbar and equipped armor and weapons are kept).
@@ -27,7 +27,7 @@
         ☐ Tool degradation on death: all tools in inventory and hotbar lose <configurable percent> durability on death.
 
     ## Effects:
-        ☐ Player respawn position indicated by a glowing decal on the ground.
+        ✔ Player respawn position indicated by a glowing decal on the ground. @done(25-12-18 06:46)
         ☐ Unstable blocks have crumbling particles that increase in frequency the more unstable they are.
         ☐ Blocks with light level 1 have sublte haze/smoke particles (to indicate the edge of lit areas).
 
