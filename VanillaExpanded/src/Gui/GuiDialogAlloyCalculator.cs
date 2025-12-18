@@ -225,7 +225,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             // Create slideshow components for each ingredient
             slideshowComponents.Clear();
             var richTextComponents = new List<RichTextComponentBase>();
-            const int slotPadding = 12;
+            const int slotPadding = 5;
 
             for (var i = 0; i < ingredientCount; i++)
             {
@@ -548,12 +548,12 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             
             // Get all valid item codes for this ingredient (already calculated)
             var validStacks = GetAllMetalVariantStacks(ingredient, 1);
-            var validItemCodes = validStacks.Select(s => s.Collectible.Code).ToHashSet();
+            var validItemCodes = validStacks.Select(static s => s.Collectible.Code).ToHashSet();
 
             // Count how many items are already in the crucible for this ingredient
             var itemsInCrucible = cookingSlots
                 .Where(slot => slot?.Itemstack is not null && validItemCodes.Contains(slot.Itemstack.Collectible.Code))
-                .Sum(slot => slot.Itemstack.StackSize);
+                .Sum(static slot => slot.Itemstack.StackSize);
 
             // Calculate how many more items we need to deposit
             var itemsToDeposit = targetStack.StackSize - itemsInCrucible;
@@ -590,7 +590,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                 var itemsToTake = Math.Min(remaining, slot.Itemstack.StackSize);
                 if (itemsToTake <= 0) continue;
 
-                var deposited = TryDepositIntoCrucible(slot, cookingSlots, itemsToTake);
+                var deposited = TryDepositIntoCrucible(playerInventory, slot, cookingSlots, itemsToTake);
                 remaining -= deposited;
             }
         }
@@ -600,6 +600,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     /// Tries to move items from a source slot into crucible cooking slots.
     /// </summary>
     private int TryDepositIntoCrucible(
+        IPlayerInventoryManager playerInventory,
         ItemSlot sourceSlot,
         ItemSlot[] cookingSlots,
         int maxItems)
@@ -624,13 +625,20 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
             if (canFit <= 0) continue;
 
-            var movedCount = sourceSlot.TryPutInto(capi.World, targetSlot, canFit);
-            totalDeposited += movedCount;
-            itemsRemaining -= movedCount;
+            // Use TryTransferTo which handles networking
+            var op = new ItemStackMoveOperation(capi.World, EnumMouseButton.Left, 0, EnumMergePriority.AutoMerge, canFit);
+            op.ActingPlayer = capi.World.Player;
+            
+            var packet = playerInventory.TryTransferTo(sourceSlot, targetSlot, ref op);
+            
+            if (packet is not null)
+            {
+                // Send the packet to sync with server
+                capi.Network.SendBlockEntityPacket(BlockEntityPosition.X, BlockEntityPosition.Y, BlockEntityPosition.Z, packet);
+            }
 
-            // Mark slots as dirty to sync
-            sourceSlot.MarkDirty();
-            targetSlot.MarkDirty();
+            totalDeposited += op.MovedQuantity;
+            itemsRemaining -= op.MovedQuantity;
         }
 
         return totalDeposited;
