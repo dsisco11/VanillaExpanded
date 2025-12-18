@@ -146,7 +146,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         var contentHeight = TitlebarHeight + 30;
         if (ingredientCount > 0)
         {
-            contentHeight += 10 + (ingredientCount * RowHeight); // divider + sliders
+            contentHeight += ingredientCount * RowHeight; // sliders
             contentHeight += 15 + SlotSize; // gap + slot row
         }
         var contentBounds = ElementBounds.Fixed(0, 0, contentWidth, contentHeight);
@@ -189,11 +189,6 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         // Add ingredient sliders if an alloy is selected
         if (selectedAlloy is not null && ingredientCount > 0)
         {
-            // Add divider
-            var dividerBounds = ElementBounds.Fixed(0, yOffset, contentWidth, 1);
-            composer.AddInset(dividerBounds, 1, 0.5f);
-            yOffset += 10;
-
             // Add sliders
             for (var idx = 0; idx < ingredientCount; idx++)
             {
