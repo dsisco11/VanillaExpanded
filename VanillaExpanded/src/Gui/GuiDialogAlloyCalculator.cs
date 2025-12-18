@@ -529,6 +529,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     #region Deposit Logic
     /// <summary>
     /// Deposits the calculated ingredients from player inventory into the crucible.
+    /// First removes unrelated or excess items, then deposits the required amounts.
     /// </summary>
     private void DepositIngredientsIntoCrucible()
     {
@@ -540,13 +541,35 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
         var player = capi.World.Player;
 
+        // Build a map of all valid item codes for all ingredients and their target amounts
+        var ingredientTargets = new Dictionary<AssetLocation, int>();
+        var allValidItemCodes = new HashSet<AssetLocation>();
+
         foreach (var (ingredientIndex, targetStack) in calculatedStacks)
         {
             if (targetStack is null || targetStack.StackSize <= 0) continue;
 
             var ingredient = selectedIngredients[ingredientIndex];
+            var validStacks = GetAllMetalVariantStacks(ingredient, 1);
             
-            // Get all valid item codes for this ingredient (already calculated)
+            foreach (var stack in validStacks)
+            {
+                var code = stack.Collectible.Code;
+                allValidItemCodes.Add(code);
+                // Store the target amount - all variants for same ingredient share the target
+                ingredientTargets[code] = targetStack.StackSize;
+            }
+        }
+
+        // First pass: Remove unrelated items and track current amounts per ingredient
+        RemoveUnrelatedAndExcessItems(player.InventoryManager, cookingSlots, allValidItemCodes, ingredientTargets);
+
+        // Second pass: Deposit missing amounts for each ingredient
+        foreach (var (ingredientIndex, targetStack) in calculatedStacks)
+        {
+            if (targetStack is null || targetStack.StackSize <= 0) continue;
+
+            var ingredient = selectedIngredients[ingredientIndex];
             var validStacks = GetAllMetalVariantStacks(ingredient, 1);
             var validItemCodes = validStacks.Select(static s => s.Collectible.Code).ToHashSet();
 
@@ -561,6 +584,109 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
             // Find matching items in player inventory and deposit them
             DepositFromPlayerInventory(player.InventoryManager, cookingSlots, validItemCodes, itemsToDeposit);
+        }
+    }
+
+    /// <summary>
+    /// Removes items from crucible that are not valid ingredients or exceed target amounts.
+    /// </summary>
+    private void RemoveUnrelatedAndExcessItems(
+        IPlayerInventoryManager playerInventory,
+        ItemSlot[] cookingSlots,
+        HashSet<AssetLocation> allValidItemCodes,
+        Dictionary<AssetLocation, int> ingredientTargets)
+    {
+        // Track how many of each ingredient type we've seen
+        var currentAmounts = new Dictionary<AssetLocation, int>();
+
+        foreach (var slot in cookingSlots)
+        {
+            if (slot?.Itemstack is null) continue;
+
+            var itemCode = slot.Itemstack.Collectible.Code;
+            var stackSize = slot.Itemstack.StackSize;
+
+            // Check if this item is a valid ingredient
+            if (!allValidItemCodes.Contains(itemCode))
+            {
+                // Not a valid ingredient - remove all of it
+                WithdrawFromCrucible(playerInventory, slot, stackSize);
+                continue;
+            }
+
+            // Get the target amount for this ingredient type
+            if (!ingredientTargets.TryGetValue(itemCode, out var targetAmount))
+            {
+                // No target amount found - remove all
+                WithdrawFromCrucible(playerInventory, slot, stackSize);
+                continue;
+            }
+
+            // Calculate how many we already have of this ingredient type
+            currentAmounts.TryGetValue(itemCode, out var alreadyHave);
+            var totalAfterThis = alreadyHave + stackSize;
+
+            if (totalAfterThis > targetAmount)
+            {
+                // We have too many - remove the excess
+                var excess = totalAfterThis - targetAmount;
+                WithdrawFromCrucible(playerInventory, slot, excess);
+                currentAmounts[itemCode] = targetAmount;
+            }
+            else
+            {
+                currentAmounts[itemCode] = totalAfterThis;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Withdraws items from a crucible slot back to player inventory.
+    /// </summary>
+    private void WithdrawFromCrucible(
+        IPlayerInventoryManager playerInventory,
+        ItemSlot sourceSlot,
+        int amount)
+    {
+        if (sourceSlot?.Itemstack is null || amount <= 0) return;
+
+        var remaining = Math.Min(amount, sourceSlot.Itemstack.StackSize);
+
+        // Find a suitable slot in player inventory
+        foreach (var inv in playerInventory.Inventories.Values)
+        {
+            if (remaining <= 0) break;
+
+            foreach (var targetSlot in inv)
+            {
+                if (remaining <= 0) break;
+                if (targetSlot is null) continue;
+
+                // Check if slot can accept this item
+                if (!targetSlot.Empty && !targetSlot.Itemstack.Equals(capi.World, sourceSlot.Itemstack, GlobalConstants.IgnoredStackAttributes))
+                {
+                    continue;
+                }
+
+                var canFit = targetSlot.Empty
+                    ? Math.Min(remaining, sourceSlot.Itemstack.Collectible.MaxStackSize)
+                    : Math.Min(remaining, targetSlot.Itemstack.Collectible.MaxStackSize - targetSlot.Itemstack.StackSize);
+
+                if (canFit <= 0) continue;
+
+                // Use TryTransferTo which handles networking
+                var op = new ItemStackMoveOperation(capi.World, EnumMouseButton.Left, 0, EnumMergePriority.AutoMerge, canFit);
+                op.ActingPlayer = capi.World.Player;
+
+                var packet = playerInventory.TryTransferTo(sourceSlot, targetSlot, ref op);
+
+                if (packet is not null)
+                {
+                    capi.Network.SendBlockEntityPacket(BlockEntityPosition.X, BlockEntityPosition.Y, BlockEntityPosition.Z, packet);
+                }
+
+                remaining -= op.MovedQuantity;
+            }
         }
     }
 
