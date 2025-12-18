@@ -535,11 +535,10 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         var firepit = capi.World.BlockAccessor.GetBlockEntity<BlockEntityFirepit>(BlockEntityPosition);
         if (firepit?.Inventory is not InventorySmelting crucibleInventory) return;
 
-        var player = capi.World.Player;
+        var cookingSlots = crucibleInventory.CookingSlots;
+        if (cookingSlots.Length == 0) return;
 
-        // Crucible cooking slots are indices 3-6
-        const int firstCookingSlot = 3;
-        const int lastCookingSlot = 6;
+        var player = capi.World.Player;
 
         foreach (var (ingredientIndex, targetStack) in calculatedStacks)
         {
@@ -552,24 +551,16 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             var validItemCodes = validStacks.Select(s => s.Collectible.Code).ToHashSet();
 
             // Count how many items are already in the crucible for this ingredient
-            var itemsInCrucible = 0;
-            for (var slotIdx = firstCookingSlot; slotIdx <= lastCookingSlot; slotIdx++)
-            {
-                var slot = crucibleInventory[slotIdx];
-                if (slot?.Itemstack is null) continue;
-
-                if (validItemCodes.Contains(slot.Itemstack.Collectible.Code))
-                {
-                    itemsInCrucible += slot.Itemstack.StackSize;
-                }
-            }
+            var itemsInCrucible = cookingSlots
+                .Where(slot => slot?.Itemstack is not null && validItemCodes.Contains(slot.Itemstack.Collectible.Code))
+                .Sum(slot => slot.Itemstack.StackSize);
 
             // Calculate how many more items we need to deposit
             var itemsToDeposit = targetStack.StackSize - itemsInCrucible;
             if (itemsToDeposit <= 0) continue;
 
             // Find matching items in player inventory and deposit them
-            DepositFromPlayerInventory(player.InventoryManager, crucibleInventory, validItemCodes, itemsToDeposit, firstCookingSlot, lastCookingSlot);
+            DepositFromPlayerInventory(player.InventoryManager, cookingSlots, validItemCodes, itemsToDeposit);
         }
     }
 
@@ -578,11 +569,9 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     /// </summary>
     private void DepositFromPlayerInventory(
         IPlayerInventoryManager playerInventory,
-        InventorySmelting crucibleInventory,
+        ItemSlot[] cookingSlots,
         HashSet<AssetLocation> validItemCodes,
-        int itemsToDeposit,
-        int firstCookingSlot,
-        int lastCookingSlot)
+        int itemsToDeposit)
     {
         var remaining = itemsToDeposit;
 
@@ -601,7 +590,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                 var itemsToTake = Math.Min(remaining, slot.Itemstack.StackSize);
                 if (itemsToTake <= 0) continue;
 
-                var deposited = TryDepositIntoCrucible(slot, crucibleInventory, itemsToTake, firstCookingSlot, lastCookingSlot);
+                var deposited = TryDepositIntoCrucible(slot, cookingSlots, itemsToTake);
                 remaining -= deposited;
             }
         }
@@ -612,17 +601,15 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     /// </summary>
     private int TryDepositIntoCrucible(
         ItemSlot sourceSlot,
-        InventorySmelting crucibleInventory,
-        int maxItems,
-        int firstCookingSlot,
-        int lastCookingSlot)
+        ItemSlot[] cookingSlots,
+        int maxItems)
     {
         var totalDeposited = 0;
         var itemsRemaining = maxItems;
 
-        for (var slotIdx = firstCookingSlot; slotIdx <= lastCookingSlot && itemsRemaining > 0; slotIdx++)
+        foreach (var targetSlot in cookingSlots)
         {
-            var targetSlot = crucibleInventory[slotIdx];
+            if (itemsRemaining <= 0) break;
             if (targetSlot is null) continue;
 
             // Check if slot can accept this item
