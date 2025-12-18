@@ -10,15 +10,27 @@ VanillaExpanded is a mod for VintageStory that aims to add quality-of-life enhan
 
 You can now bulk transfer matching items from your inventory into storage containers!
 
-1) When interacting with a container, hold the `interact` button (default: right-click).
-2) If you have items in your inventory which match items already in the container, a brief progress-bar will be shown at the center of the screen.
-3) After the progress-bar completes, all matching items from your inventory will be moved into the container.
+1. When interacting with a container, hold the `interact` button (default: right-click).
+2. If you have items in your inventory which match items already in the container, a brief progress-bar will be shown at the center of the screen.
+3. After the progress-bar completes, all matching items from your inventory will be moved into the container.
 
-https://github.com/user-attachments/assets/5be8da04-435e-4200-9ecb-41ea837d2a25
+<https://github.com/user-attachments/assets/5be8da04-435e-4200-9ecb-41ea837d2a25>
 
 ### New Hotkeys
 
 - Hotkey for quickly swapping a light source into the off-hand (default: `F`) or hotbar (default: `Shift + F`) when available (press again to swap the light source back into its prior slot).
+
+### Alloy Calculator
+
+When opening a firepit with a crucible, an Alloy Calculator dialog automatically appears alongside the firepit UI. This tool helps you calculate the exact metal ratios needed for creating alloys:
+
+- **Select an alloy** from the dropdown to see its ingredient requirements
+- **Adjust the target units** to specify how much metal you want to produce
+- **Fine-tune ingredient ratios** using the sliders - they automatically stay within valid alloy ranges and normalize to 100%
+- **See required amounts** as item stacks that cycle through valid metal variants (nuggets, bits)
+- **Deposit button** automatically transfers the required ingredients from your inventory into the crucible, spreading them evenly across slots
+
+The calculator remembers your settings per crucible, so your preferred alloy and ratios are restored when you reopen the dialog (currently not remembered across restarts).
 
 ### Quality of Life Additions
 
@@ -32,7 +44,7 @@ https://github.com/user-attachments/assets/5be8da04-435e-4200-9ecb-41ea837d2a25
 
 _Note: for decrafting recipes_  
 _A low-tier tool (e.g. knife) yields ~50% of the original materials._  
-_A high-tier tool (e.g. saw or shears) yields ~70% of the original materials._  
+_A high-tier tool (e.g. saw or shears) yields ~70% of the original materials._
 
 - Planks & Firewood can be cut into sticks using a knife or saw (saw yields more).
 - Linen & Leather bags can be de-crafted back into their crafting components using a knife or shears (shears yield more).
