@@ -486,7 +486,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         }
 
         selectedAlloy = alloys[index];
-        selectedIngredients = selectedAlloy.Ingredients.ToImmutableArray();
+        selectedIngredients = selectedAlloy.Ingredients.OrderBy(static ing => GetIngredientDisplayName(ing)).ToImmutableArray();
         ComposeDialog();
     }
 
@@ -510,13 +510,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     {
         base.OnGuiOpened();
 
-        if (alloys.Count > 0 && selectedAlloy is null)
-        {
-            selectedAlloy = alloys[0];
-            selectedIngredients = selectedAlloy.Ingredients.ToImmutableArray();
-        }
-
-        ComposeDialog();
+        OnAlloySelected("0", true);
     }
 
     public override void OnRenderGUI(float deltaTime)
