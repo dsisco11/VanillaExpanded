@@ -244,11 +244,12 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                 }
             }
 
-            // TODO: move away from calculating the horizontal pos like this, we should be able to just use a parent ElementBound & chain child element-bounds together using `.RightOf` & then center the parent bound...
-            // Add richtext element with slideshow components
+            // Create centered slot bounds - parent to contentBounds for proper alignment
             var slotsWidth = ingredientCount * (SlotSize + slotPadding);
-            var slotsXOffset = (contentWidth - slotsWidth) / 2;
-            var slotBounds = ElementBounds.Fixed(slotsXOffset, yOffset, slotsWidth, SlotSize + 8);
+            var slotBounds = ElementBounds
+                .Fixed(0, yOffset, slotsWidth, SlotSize + 8)
+                .WithParent(contentBounds)
+                .WithAlignment(EnumDialogArea.CenterFixed);
             composer.AddRichtext(richTextComponents.ToArray(), slotBounds, "ingredientSlots");
         }
 
