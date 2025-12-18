@@ -225,7 +225,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             // Create slideshow components for each ingredient
             slideshowComponents.Clear();
             var richTextComponents = new List<RichTextComponentBase>();
-            const int slotPadding = 5;
+            const int slotPadding = 12;
 
             for (var i = 0; i < ingredientCount; i++)
             {
@@ -261,7 +261,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                 .WithParent(contentBounds)
                 .WithAlignment(EnumDialogArea.CenterFixed);
             composer
-                .AddSmallButton(Lang.Get($"{ModId}:gui-alloycalculator-deposit"), OnDepositButtonClicked, buttonBounds, "depositButton")
+                .AddSmallButton(Lang.Get($"{ModId}:gui-alloycalculator-deposit"), OnDepositButtonClicked, buttonBounds, EnumButtonStyle.Normal, "depositButton")
                 .AddHoverText(Lang.Get($"{ModId}:gui-alloycalculator-deposit-tooltip"), CairoFont.WhiteDetailText(), 250, buttonBounds.FlatCopy(), "depositTooltip");
         }
 
@@ -536,7 +536,6 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         if (firepit?.Inventory is not InventorySmelting crucibleInventory) return;
 
         var player = capi.World.Player;
-        var playerInventory = player.InventoryManager;
 
         // Crucible cooking slots are indices 3-6
         const int firstCookingSlot = 3;
@@ -546,82 +545,64 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         {
             if (targetStack is null || targetStack.StackSize <= 0) continue;
 
-            var targetIngot = selectedIngredients[ingredientIndex].ResolvedItemstack;
-            if (targetIngot is null) continue;
+            var ingredient = selectedIngredients[ingredientIndex];
+            
+            // Get all valid item codes for this ingredient (already calculated)
+            var validStacks = GetAllMetalVariantStacks(ingredient, 1);
+            var validItemCodes = validStacks.Select(s => s.Collectible.Code).ToHashSet();
 
-            // Calculate how many units we need (each nugget = 5 units)
-            var targetUnitsNeeded = targetStack.StackSize * 5;
-
-            // Count how many units are already in the crucible for this metal type
-            var unitsInCrucible = 0;
+            // Count how many items are already in the crucible for this ingredient
+            var itemsInCrucible = 0;
             for (var slotIdx = firstCookingSlot; slotIdx <= lastCookingSlot; slotIdx++)
             {
                 var slot = crucibleInventory[slotIdx];
                 if (slot?.Itemstack is null) continue;
 
-                var smeltedStack = slot.Itemstack.Collectible.CombustibleProps?.SmeltedStack?.ResolvedItemstack;
-                if (smeltedStack is null) continue;
-
-                if (targetIngot.Equals(capi.World, smeltedStack, GlobalConstants.IgnoredStackAttributes))
+                if (validItemCodes.Contains(slot.Itemstack.Collectible.Code))
                 {
-                    // Calculate units based on smelted ratio
-                    var ratio = slot.Itemstack.Collectible.CombustibleProps?.SmeltedRatio ?? 1;
-                    unitsInCrucible += slot.Itemstack.StackSize * 5 / ratio;
+                    itemsInCrucible += slot.Itemstack.StackSize;
                 }
             }
 
-            // Calculate how many more units we need to deposit
-            var unitsToDeposit = targetUnitsNeeded - unitsInCrucible;
-            if (unitsToDeposit <= 0) continue;
+            // Calculate how many more items we need to deposit
+            var itemsToDeposit = targetStack.StackSize - itemsInCrucible;
+            if (itemsToDeposit <= 0) continue;
 
             // Find matching items in player inventory and deposit them
-            DepositMetalFromPlayerInventory(playerInventory, crucibleInventory, targetIngot, unitsToDeposit, firstCookingSlot, lastCookingSlot);
+            DepositFromPlayerInventory(player.InventoryManager, crucibleInventory, validItemCodes, itemsToDeposit, firstCookingSlot, lastCookingSlot);
         }
     }
 
     /// <summary>
-    /// Finds and deposits metal items from player inventory into crucible slots.
+    /// Finds and deposits matching items from player inventory into crucible slots.
     /// </summary>
-    private void DepositMetalFromPlayerInventory(
+    private void DepositFromPlayerInventory(
         IPlayerInventoryManager playerInventory,
         InventorySmelting crucibleInventory,
-        ItemStack targetIngot,
-        int unitsToDeposit,
+        HashSet<AssetLocation> validItemCodes,
+        int itemsToDeposit,
         int firstCookingSlot,
         int lastCookingSlot)
     {
-        var remainingUnits = unitsToDeposit;
+        var remaining = itemsToDeposit;
 
-        // Search through all player inventories
         foreach (var inv in playerInventory.Inventories.Values)
         {
-            if (remainingUnits <= 0) break;
+            if (remaining <= 0) break;
 
             foreach (var slot in inv)
             {
-                if (remainingUnits <= 0) break;
+                if (remaining <= 0) break;
                 if (slot?.Itemstack is null) continue;
 
-                // Check if this item smelts into our target metal
-                var smeltedStack = slot.Itemstack.Collectible.CombustibleProps?.SmeltedStack?.ResolvedItemstack;
-                if (smeltedStack is null) continue;
-                if (!targetIngot.Equals(capi.World, smeltedStack, GlobalConstants.IgnoredStackAttributes)) continue;
+                // Check if this item is one of our valid ingredient variants
+                if (!validItemCodes.Contains(slot.Itemstack.Collectible.Code)) continue;
 
-                var firstCodePart = slot.Itemstack.Collectible.FirstCodePart();
-                if (firstCodePart != "metalbit" && firstCodePart != "nugget") continue;
-
-                var ratio = slot.Itemstack.Collectible.CombustibleProps?.SmeltedRatio ?? 1;
-                var unitsPerItem = 5 / ratio;
-
-                // Calculate how many items we need
-                var itemsNeeded = (int)Math.Ceiling(remainingUnits / (double)unitsPerItem);
-                var itemsToTake = Math.Min(itemsNeeded, slot.Itemstack.StackSize);
-
+                var itemsToTake = Math.Min(remaining, slot.Itemstack.StackSize);
                 if (itemsToTake <= 0) continue;
 
-                // Try to deposit into crucible
-                var depositedItems = TryDepositIntoCrucible(slot, crucibleInventory, itemsToTake, firstCookingSlot, lastCookingSlot);
-                remainingUnits -= depositedItems * unitsPerItem;
+                var deposited = TryDepositIntoCrucible(slot, crucibleInventory, itemsToTake, firstCookingSlot, lastCookingSlot);
+                remaining -= deposited;
             }
         }
     }
