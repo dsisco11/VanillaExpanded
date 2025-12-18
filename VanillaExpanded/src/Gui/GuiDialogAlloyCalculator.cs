@@ -124,25 +124,6 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             .DefaultIfEmpty(0)
             .Max();
     }
-
-    private static string GetAlloyDisplayName(AlloyRecipe alloy)
-    {
-        var outputCode = alloy.Output?.Code?.Path ?? "unknown";
-        // Extract metal name from "ingot-bronze" format
-        var metalName = outputCode.Contains('-') 
-            ? outputCode[(outputCode.LastIndexOf('-') + 1)..] 
-            : outputCode;
-        return Lang.GetMatching($"material-{metalName}") ?? metalName;
-    }
-
-    private static string GetIngredientDisplayName(MetalAlloyIngredient ingredient)
-    {
-        var code = ingredient.Code?.Path ?? "unknown";
-        var metalName = code.Contains('-') 
-            ? code[(code.LastIndexOf('-') + 1)..] 
-            : code;
-        return Lang.GetMatching($"material-{metalName}") ?? metalName;
-    }
     #endregion
 
     #region Dialog Composition
@@ -554,6 +535,27 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         }
 
         return base.TryOpen();
+    }
+    #endregion
+
+    #region Utility Methods
+    /// <summary>
+    /// Gets the display name for a material based on its asset location.
+    /// </summary>
+    private static string GetMaterialDisplayName(in AssetLocation assetLocation)
+    {
+        var materialCode = assetLocation.EndVariant();
+        return Lang.GetMatching("material", materialCode) ?? assetLocation.Path;
+    }
+
+    private static string GetAlloyDisplayName(in AlloyRecipe alloy)
+    {
+        return GetMaterialDisplayName(alloy.Output?.Code ?? "unknown");
+    }
+
+    private static string GetIngredientDisplayName(in MetalAlloyIngredient ingredient)
+    {
+        return GetMaterialDisplayName(ingredient?.Code ?? "unknown");
     }
     #endregion
 }
