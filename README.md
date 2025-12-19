@@ -4,6 +4,9 @@
 
 VanillaExpanded is a mod for VintageStory that aims to add quality-of-life enhancements, missing functionality, and minor bug fixes while remaining true to the vanilla game and with minimal impacts to game balance.
 
+![Game Version](https://img.shields.io/badge/Vintage%20Story-1.21.5+-blue)
+![Version](https://img.shields.io/badge/Version-1.2.1-green)
+
 ## Features
 
 ### Auto-Stash

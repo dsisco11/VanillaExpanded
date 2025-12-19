@@ -574,56 +574,73 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
         var player = capi.World.Player;
 
-        // First: Clear all items from crucible back to player inventory
-        ClearCrucible(player.InventoryManager, cookingSlots);
-
-        // Build ingredient info: valid codes and target amounts
-        var ingredients = new List<(HashSet<AssetLocation> validCodes, int targetAmount)>();
-        
-        foreach (var (ingredientIndex, targetStack) in calculatedStacks.OrderByDescending(static kvp => kvp.Value?.StackSize ?? 0))
+        // Open the crucible inventory and notify the server - this is required for TryTransferTo to work
+        // The firepit dialog already opens the inventory, but we need to ensure the server knows we're
+        // interacting with it for the transfer operations to be authorized
+        var openPacket = player.InventoryManager.OpenInventory(crucibleInventory);
+        if (openPacket is not null)
         {
-            if (targetStack is null || targetStack.StackSize <= 0) continue;
-
-            var ingredient = selectedIngredients[ingredientIndex];
-            var validStacks = GetAllMetalVariantStacks(ingredient, 1);
-            var validCodes = validStacks.Select(static s => s.Collectible.Code).ToHashSet();
-            
-            ingredients.Add((validCodes, targetStack.StackSize));
+            capi.Network.SendPacketClient(openPacket);
         }
 
-        if (ingredients.Count == 0) return;
-
-        // Calculate slot allocation: distribute slots proportionally by ingredient amount
-        var totalItems = ingredients.Sum(static i => i.targetAmount);
-        var slotAllocations = AllocateSlotsProportionally(ingredients, cookingSlots.Length);
-
-        // Deposit each ingredient into its allocated slots, spread evenly
-        var slotIndex = 0;
-        for (var i = 0; i < ingredients.Count; i++)
+        try
         {
-            var (validCodes, targetAmount) = ingredients[i];
-            var slotsForIngredient = slotAllocations[i];
+            // First: Clear all items from crucible back to player inventory
+            ClearCrucible(player.InventoryManager, cookingSlots);
+
+            // Build ingredient info: valid codes and target amounts
+            var ingredients = new List<(HashSet<AssetLocation> validCodes, int targetAmount)>();
             
-            if (slotsForIngredient == 0) continue;
-
-            // Calculate how to spread items across allocated slots
-            var itemsPerSlot = targetAmount / slotsForIngredient;
-            var remainder = targetAmount % slotsForIngredient;
-
-            var slotTargets = new int[slotsForIngredient];
-            for (var s = 0; s < slotsForIngredient; s++)
+            foreach (var (ingredientIndex, targetStack) in calculatedStacks.OrderByDescending(static kvp => kvp.Value?.StackSize ?? 0))
             {
-                slotTargets[s] = itemsPerSlot + (s < remainder ? 1 : 0);
-            }
+                if (targetStack is null || targetStack.StackSize <= 0) continue;
 
-            // Deposit into each allocated slot
-            for (var s = 0; s < slotsForIngredient && slotIndex < cookingSlots.Length; s++, slotIndex++)
-            {
-                var targetSlot = cookingSlots[slotIndex];
-                var targetForThisSlot = slotTargets[s];
+                var ingredient = selectedIngredients[ingredientIndex];
+                var validStacks = GetAllMetalVariantStacks(ingredient, 1);
+                var validCodes = validStacks.Select(static s => s.Collectible.Code).ToHashSet();
                 
-                DepositFromPlayerInventory(player.InventoryManager, targetSlot, validCodes, targetForThisSlot);
+                ingredients.Add((validCodes, targetStack.StackSize));
             }
+
+            if (ingredients.Count == 0) return;
+
+            // Calculate slot allocation: distribute slots proportionally by ingredient amount
+            var totalItems = ingredients.Sum(static i => i.targetAmount);
+            var slotAllocations = AllocateSlotsProportionally(ingredients, cookingSlots.Length);
+
+            // Deposit each ingredient into its allocated slots, spread evenly
+            var slotIndex = 0;
+            for (var i = 0; i < ingredients.Count; i++)
+            {
+                var (validCodes, targetAmount) = ingredients[i];
+                var slotsForIngredient = slotAllocations[i];
+                
+                if (slotsForIngredient == 0) continue;
+
+                // Calculate how to spread items across allocated slots
+                var itemsPerSlot = targetAmount / slotsForIngredient;
+                var remainder = targetAmount % slotsForIngredient;
+
+                var slotTargets = new int[slotsForIngredient];
+                for (var s = 0; s < slotsForIngredient; s++)
+                {
+                    slotTargets[s] = itemsPerSlot + (s < remainder ? 1 : 0);
+                }
+
+                // Deposit into each allocated slot
+                for (var s = 0; s < slotsForIngredient && slotIndex < cookingSlots.Length; s++, slotIndex++)
+                {
+                    var targetSlot = cookingSlots[slotIndex];
+                    var targetForThisSlot = slotTargets[s];
+                    
+                    DepositFromPlayerInventory(player.InventoryManager, targetSlot, validCodes, targetForThisSlot);
+                }
+            }
+        }
+        finally
+        {
+            // Close the crucible inventory and sync with server
+            player.InventoryManager.CloseInventoryAndSync(crucibleInventory);
         }
     }
 
@@ -717,42 +734,61 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
         var remaining = Math.Min(amount, sourceSlot.Itemstack.StackSize);
 
-        // Find a suitable slot in player inventory
-        foreach (var inv in playerInventory.Inventories.Values)
+        // Get player's own inventories (backpack and hotbar) - these are the inventories we can withdraw to
+        var backpackInventory = playerInventory.GetOwnInventory(GlobalConstants.backpackInvClassName);
+        var hotbarInventory = playerInventory.GetOwnInventory(GlobalConstants.hotBarInvClassName);
+
+        // Try to place in backpack first, then hotbar
+        remaining = WithdrawToInventory(playerInventory, sourceSlot, backpackInventory, remaining);
+        if (remaining > 0)
+        {
+            remaining = WithdrawToInventory(playerInventory, sourceSlot, hotbarInventory, remaining);
+        }
+    }
+
+    /// <summary>
+    /// Helper method to withdraw items from a source slot to a target inventory.
+    /// </summary>
+    private int WithdrawToInventory(
+        IPlayerInventoryManager playerInventory,
+        ItemSlot sourceSlot,
+        IInventory? targetInventory,
+        int remaining)
+    {
+        if (targetInventory is null || remaining <= 0) return remaining;
+
+        foreach (var targetSlot in targetInventory)
         {
             if (remaining <= 0) break;
+            if (targetSlot is null) continue;
 
-            foreach (var targetSlot in inv)
+            // Check if slot can accept this item
+            if (!targetSlot.Empty && !targetSlot.Itemstack.Equals(capi.World, sourceSlot.Itemstack, GlobalConstants.IgnoredStackAttributes))
             {
-                if (remaining <= 0) break;
-                if (targetSlot is null) continue;
-
-                // Check if slot can accept this item
-                if (!targetSlot.Empty && !targetSlot.Itemstack.Equals(capi.World, sourceSlot.Itemstack, GlobalConstants.IgnoredStackAttributes))
-                {
-                    continue;
-                }
-
-                var canFit = targetSlot.Empty
-                    ? Math.Min(remaining, sourceSlot.Itemstack.Collectible.MaxStackSize)
-                    : Math.Min(remaining, targetSlot.Itemstack.Collectible.MaxStackSize - targetSlot.Itemstack.StackSize);
-
-                if (canFit <= 0) continue;
-
-                // Use TryTransferTo which handles networking
-                var op = new ItemStackMoveOperation(capi.World, EnumMouseButton.Left, 0, EnumMergePriority.AutoMerge, canFit);
-                op.ActingPlayer = capi.World.Player;
-
-                var packet = playerInventory.TryTransferTo(sourceSlot, targetSlot, ref op);
-
-                if (packet is not null)
-                {
-                    capi.Network.SendBlockEntityPacket(BlockEntityPosition.X, BlockEntityPosition.Y, BlockEntityPosition.Z, packet);
-                }
-
-                remaining -= op.MovedQuantity;
+                continue;
             }
+
+            var canFit = targetSlot.Empty
+                ? Math.Min(remaining, sourceSlot.Itemstack.Collectible.MaxStackSize)
+                : Math.Min(remaining, targetSlot.Itemstack.Collectible.MaxStackSize - targetSlot.Itemstack.StackSize);
+
+            if (canFit <= 0) continue;
+
+            // Use TryTransferTo which handles networking
+            var op = new ItemStackMoveOperation(capi.World, EnumMouseButton.Left, 0, EnumMergePriority.AutoMerge, canFit);
+            op.ActingPlayer = capi.World.Player;
+
+            var packet = playerInventory.TryTransferTo(sourceSlot, targetSlot, ref op);
+
+            if (packet is not null)
+            {
+                capi.Network.SendBlockEntityPacket(BlockEntityPosition.X, BlockEntityPosition.Y, BlockEntityPosition.Z, packet);
+            }
+
+            remaining -= op.MovedQuantity;
         }
+
+        return remaining;
     }
 
     /// <summary>
@@ -766,25 +802,46 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     {
         var remaining = itemsToDeposit;
 
-        foreach (var inv in playerInventory.Inventories.Values)
+        // Get player's own inventories (backpack and hotbar) - these are the inventories we can deposit from
+        var backpackInventory = playerInventory.GetOwnInventory(GlobalConstants.backpackInvClassName);
+        var hotbarInventory = playerInventory.GetOwnInventory(GlobalConstants.hotBarInvClassName);
+
+        // Try to deposit from backpack first, then hotbar
+        remaining = DepositFromInventory(playerInventory, backpackInventory, targetSlot, validItemCodes, remaining);
+        if (remaining > 0)
+        {
+            remaining = DepositFromInventory(playerInventory, hotbarInventory, targetSlot, validItemCodes, remaining);
+        }
+    }
+
+    /// <summary>
+    /// Helper method to deposit matching items from a source inventory into a target slot.
+    /// </summary>
+    private int DepositFromInventory(
+        IPlayerInventoryManager playerInventory,
+        IInventory? sourceInventory,
+        ItemSlot targetSlot,
+        HashSet<AssetLocation> validItemCodes,
+        int remaining)
+    {
+        if (sourceInventory is null || remaining <= 0) return remaining;
+
+        foreach (var slot in sourceInventory)
         {
             if (remaining <= 0) break;
+            if (slot?.Itemstack is null) continue;
 
-            foreach (var slot in inv)
-            {
-                if (remaining <= 0) break;
-                if (slot?.Itemstack is null) continue;
+            // Check if this item is one of our valid ingredient variants
+            if (!validItemCodes.Contains(slot.Itemstack.Collectible.Code)) continue;
 
-                // Check if this item is one of our valid ingredient variants
-                if (!validItemCodes.Contains(slot.Itemstack.Collectible.Code)) continue;
+            var itemsToTake = Math.Min(remaining, slot.Itemstack.StackSize);
+            if (itemsToTake <= 0) continue;
 
-                var itemsToTake = Math.Min(remaining, slot.Itemstack.StackSize);
-                if (itemsToTake <= 0) continue;
-
-                var deposited = TryDepositIntoSlot(playerInventory, slot, targetSlot, itemsToTake);
-                remaining -= deposited;
-            }
+            var deposited = TryDepositIntoSlot(playerInventory, slot, targetSlot, itemsToTake);
+            remaining -= deposited;
         }
+
+        return remaining;
     }
 
     /// <summary>

@@ -61,7 +61,7 @@ public sealed class AlloyCalculatorModSystem : ModSystem
         if (capi is null) return;
         
         EFirepitKind kind = GetFirepitKind(capi, firepitDialog);
-        if (kind != EFirepitKind.Crucible) return;
+        if (kind != EFirepitKind.Smelting) return;
 
         var pos = firepitDialog.BlockEntityPosition;
         
@@ -83,7 +83,7 @@ public sealed class AlloyCalculatorModSystem : ModSystem
         if (capi is null) return;
 
         EFirepitKind kind = GetFirepitKind(capi, firepitDialog);
-        if (kind != EFirepitKind.Crucible) return;
+        if (kind != EFirepitKind.Smelting) return;
 
         var pos = firepitDialog.BlockEntityPosition;
         
@@ -106,24 +106,12 @@ public sealed class AlloyCalculatorModSystem : ModSystem
         }
 
         var inputItem = firepit.inputStack?.Collectible;
-        if (inputItem is null)
+        return inputItem switch 
         {
-            return EFirepitKind.None;
-        }
-
-        string itemCode = inputItem.FirstCodePart(0);
-        if (itemCode == "crucible")
-        {
-            return EFirepitKind.Crucible;
-        }
-        else if (itemCode == "claypot")
-        {
-            return EFirepitKind.CookingPot;
-        }
-        else
-        {
-            return EFirepitKind.None;
-        }
+            BlockSmeltingContainer => EFirepitKind.Smelting,
+            BlockCookingContainer => EFirepitKind.Cooking,
+            _ => EFirepitKind.None,
+        };
     }
     #endregion
 }
@@ -131,6 +119,6 @@ public sealed class AlloyCalculatorModSystem : ModSystem
 enum EFirepitKind
 {
     None,
-    Crucible,
-    CookingPot
+    Smelting,
+    Cooking
 }
