@@ -1,6 +1,8 @@
 # Vanilla: Expanded TODO List:
-    ## Bugs:
-        ✔ Lantern can't use "CanIgnite" behavior (server tries to call 'CanIgniteStacks' to construct the handbook list and crashes). @done(25-12-06 17:05)
+    ## Issues:
+        ☐ Fix player respawn decal not disappearing after it expires.
+        ☐ Fix respawn decal looking obnoxious (too colorful).
+        ☐ Add mod config settings for all features and crafting recipes.
 
     ## Recipes:
         ✔ Decraft linen sacks back into string (knife = 3x string, shears = 4x string). @done(25-12-01 10:47)
@@ -29,23 +31,16 @@
     ## Effects:
         ✔ Player respawn position indicated by a glowing decal on the ground. @done(25-12-18 06:46)
         ☐ Unstable blocks have crumbling particles that increase in frequency the more unstable they are.
-        ☐ Blocks with light level 1 have sublte haze/smoke particles (to indicate the edge of lit areas).
+        ☐ Blocks with light level 1 have subtle haze/smoke particles (to indicate the edge of lit areas) (reuse the existing temporal storm ground particle effect).
 
 # Vanilla: Rebalanced Ideas:
+    Note: this is a different mod from Vanilla: Expanded, I'm just keeping the ideas list here for now.
     ## Recipes:
-        ☐ Candles from animal fat.
-
-    ## Expanded Resin Uses:
-        ☐ All trees drop small amounts of resin when chopped.
-        ☐ Pine trees drop more resin than other trees.
-        ☐ Cooking 4x resin into crude-fuel.
-        ☐ Combine 1x crude-fuel with bowl to make small crude-lamp (last 5 days)(same light level as a lantern).
-        ☐ Combine 4x crude-fuel with cooking-pot to make large crude-lamp (last 20 days)(+2 light level compared to small crude-lamp).
-        ☐ Cooking 2x crude-fuel + fat + string into candle.
+        ☐ Candles from animal fat (render fat into tallow -> tallow replaces wax in candle recipe).
 
     ## Monster Rebalancing:
         ☐ Monsters cant spawn under roofs.
         ☐ Increase gear drop rates from monsters (and trading costs for gears) by 500%. this will make fighting monsters feel more rewarding.
-        ☐ Add other items to monster drops (bones, etc) to make them more rewarding to fight.
+        ☐ Add other items to monster drops (bones, scrapmetal, metal parts (uncommon), gems (rare), etc) to make them more rewarding to fight.
 
 
