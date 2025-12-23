@@ -5,6 +5,7 @@ using System.Linq;
 
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
+using Vintagestory.GameContent;
 
 namespace VanillaExpanded;
 internal static class PlayerInventoryManagerExtensions
@@ -60,5 +61,4 @@ internal static class PlayerInventoryManagerExtensions
             .Where(slot => slot?.slot is not null)
             .MaxBy(slot => slot!.weight);
     }
-
 }

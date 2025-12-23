@@ -291,15 +291,10 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         IPlayerInventoryManager playerInv = byPlayer.InventoryManager;
         IInventory playerBackpack = playerInv.GetOwnInventory(GlobalConstants.backpackInvClassName);
         IInventory playerHotbar = playerInv.GetOwnInventory(GlobalConstants.hotBarInvClassName);
-        HashSet<int> containerItemTypes = [.. container.GetNonEmptyContentStacks().Where(static stack => stack?.Collectible?.Id is not null).Select(static stack => stack.Collectible.Id)];
-        HashSet<int> playerItemTypes = [.. GetDistinctItemTypes(playerBackpack), .. GetDistinctItemTypes(playerHotbar)];
+        HashSet<int> containerItemTypes = container.Inventory.GetDistinctItemIds();
+        HashSet<int> playerItemTypes = [.. playerBackpack.GetDistinctItemIds(), .. playerHotbar.GetDistinctItemIds()];
         containerItemTypes.IntersectWith(playerItemTypes);
         return containerItemTypes;
-    }
-
-    protected static HashSet<int> GetDistinctItemTypes(in IInventory inventory)
-    {
-        return [.. inventory.Where(static slot => !slot.Empty).Where(static slot => slot?.Itemstack?.Collectible?.Id is not null).Select(static slot => slot.Itemstack.Collectible.Id)];
     }
 
     /// <summary>
@@ -312,7 +307,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     /// <returns>True if any items were stashed, false otherwise.</returns>
     public static bool AutoStashToGenericContainer(in IWorldAccessor world, in IPlayer byPlayer, in BlockEntityContainer container)
     {
-        HashSet<AssetLocation> itemTypesInContainer = [.. container.GetNonEmptyContentStacks().Select(static stack => stack.Collectible.Code)];
+        HashSet<AssetLocation> itemTypesInContainer = container.Inventory.GetDistinctItemCodes();
         return itemTypesInContainer.Count != 0 && StashMatchingItemsToContainer(world, byPlayer, container, itemTypesInContainer);
     }
 
@@ -340,94 +335,20 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     /// <param name="byPlayer"></param>
     /// <param name="container"></param>
     /// <returns></returns>
-    protected static bool StashMatchingItemsToContainer(in IWorldAccessor world, in IPlayer byPlayer, in BlockEntityContainer container, in HashSet<AssetLocation> itemAllowList)
+    protected static bool StashMatchingItemsToContainer(in IWorldAccessor world, in IPlayer byPlayer, in BlockEntityContainer container, HashSet<AssetLocation> itemAllowList)
     {
         if (itemAllowList.Count == 0)
         {
             return false;
         }
-        // Now, go through the player's inventory and stash matching items
-        IInventory? backpackInventory = byPlayer.InventoryManager.GetOwnInventory(GlobalConstants.backpackInvClassName);
-        IInventory? hotbarInventory = byPlayer.InventoryManager.GetOwnInventory(GlobalConstants.hotBarInvClassName);
 
         object openPacket = byPlayer.InventoryManager.OpenInventory(container.Inventory);
 
-        int totalStashed = 0;
-        if (backpackInventory is not null)
-        {
-            totalStashed += AutoStashInventoryIntoContainer(world, byPlayer, itemAllowList, container, backpackInventory);
-        }
-
-        if (hotbarInventory is not null)
-        {
-            totalStashed += AutoStashInventoryIntoContainer(world, byPlayer, itemAllowList, container, hotbarInventory);
-        }
-
-        byPlayer.InventoryManager.CloseInventoryAndSync(container.Inventory);
-        if (totalStashed > 0)
-        {
-            container.MarkDirty();
-            world.Api?.World.Logger.Audit("'{0}' auto-stashed {1} items into {2} at <{3}>.",
-                byPlayer.PlayerName,
-                totalStashed,
-                container.InventoryClassName,
-                container.Pos
-            );
-        }
+        var bagInventories = byPlayer.InventoryManager.GetBagInventories();
+        // find all items we want to stash from all the players bag inventories
+        var stashWishlist = bagInventories.SelectMany(inv => inv.FindMatchingSlots(itemAllowList)).ToImmutableArray();
+        int totalStashed = byPlayer.DepositItemStacks(world, container.Inventory, stashWishlist);
         return totalStashed > 0;
-    }
-
-    private static int AutoStashInventoryIntoContainer(in IWorldAccessor world, in IPlayer byPlayer, in HashSet<AssetLocation> itemAllowList, in BlockEntityContainer container, in IInventory inventory)
-    {
-        int totalStashed = 0;
-
-        foreach (ItemSlot? itemSlot in inventory)
-        {
-            if (!itemSlot.Empty && itemAllowList.Contains(itemSlot.Itemstack.Collectible.Code))
-            {
-                totalStashed += DumpItemStackIntoContainer(world, byPlayer, container, itemSlot);
-            }
-        }
-        return totalStashed;
-    }
-
-    private static int DumpItemStackIntoContainer(in IWorldAccessor world, in IPlayer byPlayer, in BlockEntityContainer container, in ItemSlot itemStack)
-    {
-        int totalMoved = 0;
-        WeightedSlot? targetSlot;
-        ItemStackMoveOperation moveOp;
-        List<ItemSlot> skipSlots = [];
-        do
-        {
-            moveOp = new(world, EnumMouseButton.Left, EnumModifierKey.SHIFT, EnumMergePriority.AutoMerge, itemStack.StackSize);
-            targetSlot = container.Inventory.GetBestSuitedSlot(itemStack, moveOp, skipSlots);
-            if (targetSlot.slot is null)
-            {
-                break;
-            }
-
-            object? packet = byPlayer.InventoryManager.TryTransferTo(itemStack, targetSlot.slot, ref moveOp);
-            int acceptedQuantity = moveOp.MovedQuantity;
-            totalMoved += acceptedQuantity;
-
-            world.Api?.World.Logger.Audit("'{0}' moved {1}x{2} into {3} at <{4}>.",
-                byPlayer.PlayerName,
-                targetSlot.slot.Itemstack?.Collectible.Code,
-                acceptedQuantity,
-                container.InventoryClassName,
-                container.Pos
-            );
-
-            skipSlots.Add(targetSlot.slot);
-
-            if (packet is not null)
-            {
-                targetSlot.slot.MarkDirty();
-                itemStack.MarkDirty();
-            }
-        }
-        while (targetSlot is not null && moveOp.NotMovedQuantity > 0);
-        return totalMoved;
     }
 
     private bool HasStashables(in IWorldAccessor world, in IPlayer player, BlockSelection? selection = null)
