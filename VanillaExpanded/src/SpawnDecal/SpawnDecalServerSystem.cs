@@ -40,6 +40,7 @@ public class SpawnDecalServerSystem : ModSystem
 
         // Subscribe to player events - use PlayerNowPlaying to ensure client is ready to receive packets
         api.Event.PlayerNowPlaying += OnPlayerNowPlaying;
+        api.Event.PlayerRespawn += Event_PlayerRespawn;
     }
 
     public override void Dispose()
@@ -88,6 +89,21 @@ public class SpawnDecalServerSystem : ModSystem
         else
         {
             SendSpawnCleared(player);
+        }
+    }
+
+    private void Event_PlayerRespawn(IServerPlayer byPlayer)
+    {
+        Logger.Audit($"Player '{byPlayer.PlayerName}' has respawned - syncing spawn position");
+        // Sync current spawn position to the respawning player
+        var spawnPos = byPlayer.GetSpawnPosition(false);
+        if (spawnPos is not null)
+        {
+            SendSpawnUpdate(byPlayer, spawnPos);
+        }
+        else
+        {
+            SendSpawnCleared(byPlayer);
         }
     }
     #endregion

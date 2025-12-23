@@ -8,17 +8,17 @@ namespace VanillaExpanded.SpawnDecal;
 
 /// <summary>
 /// Renders a glowing decal at the player's temporal gear spawn position.
-/// </summary>
+/// </summary> 
 public class SpawnDecalRenderer : IRenderer
 {
     #region Constants
-    private const float DECAL_SIZE = 0.4f;
+    private const float DECAL_SIZE = 0.3f;
     private const float Z_OFFSET = 0.0001f;
     private const float FADE_DURATION = 1f / 2f;
     private const float COLOR_PHASE_DURATION = 1f / 5f;
     private const float STRENGTH_PHASE_DURATION = 1f / 13f;
     private const float PULSE_MIN_STRENGTH = 10f;
-    private const float PULSE_MAX_STRENGTH = 80f;
+    private const float PULSE_MAX_STRENGTH = 20f;
     private const float PULSE_STRENGTH_RANGE = PULSE_MAX_STRENGTH - PULSE_MIN_STRENGTH;
     #endregion
 
@@ -130,6 +130,9 @@ public class SpawnDecalRenderer : IRenderer
 
         // Lerp the phase colors to get final glow
         var finalColor = System.Numerics.Vector4.Lerp(PhaseColors[0], PhaseColors[1], colorPhase);
+        
+        // Apply fade alpha to the final color
+        finalColor.W *= fadeAlpha;
         FinalRenderGlow.Set(finalColor);
 
         // Get camera position for relative rendering
@@ -151,7 +154,7 @@ public class SpawnDecalRenderer : IRenderer
         shader.ModelMatrix = modelMatrix.Values;
         shader.RgbaTint = FinalRenderGlow;
         shader.RgbaGlowIn = FinalRenderGlow;
-        shader.ExtraGlow = (int)strength;
+        shader.ExtraGlow = (int)(strength * fadeAlpha);
 
         rapi.GlToggleBlend(true, EnumBlendMode.Overlay);
         rapi.RenderMesh(decalMeshRef);
