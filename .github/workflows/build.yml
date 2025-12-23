@@ -17,6 +17,8 @@ env:
   DOTNET_VERSION: '8.0.x'
   # Default VintageStory version - update this when targeting a new game version
   VS_VERSION: ${{ inputs.vs_version || '1.21.0' }}
+  # Project name - used for locating modinfo.json
+  PROJECT_NAME: 'VanillaExpanded'
 
 jobs:
   build:
@@ -60,9 +62,9 @@ jobs:
     - name: Get mod info
       id: modinfo
       run: |
-        MOD_ID=$(jq -r '.modid' VanillaExpanded/modinfo.json)
-        MOD_VERSION=$(jq -r '.version' VanillaExpanded/modinfo.json)
-        MOD_NAME=$(jq -r '.name' VanillaExpanded/modinfo.json)
+        MOD_ID=$(jq -r '.modid' ${{ env.PROJECT_NAME }}/modinfo.json)
+        MOD_VERSION=$(jq -r '.version' ${{ env.PROJECT_NAME }}/modinfo.json)
+        MOD_NAME=$(jq -r '.name' ${{ env.PROJECT_NAME }}/modinfo.json)
         echo "mod_id=$MOD_ID" >> $GITHUB_OUTPUT
         echo "mod_version=$MOD_VERSION" >> $GITHUB_OUTPUT
         echo "mod_name=$MOD_NAME" >> $GITHUB_OUTPUT
@@ -87,9 +89,9 @@ jobs:
     - name: Get mod info
       id: modinfo
       run: |
-        MOD_ID=$(jq -r '.modid' VanillaExpanded/modinfo.json)
-        MOD_VERSION=$(jq -r '.version' VanillaExpanded/modinfo.json)
-        MOD_NAME=$(jq -r '.name' VanillaExpanded/modinfo.json)
+        MOD_ID=$(jq -r '.modid' ${{ env.PROJECT_NAME }}/modinfo.json)
+        MOD_VERSION=$(jq -r '.version' ${{ env.PROJECT_NAME }}/modinfo.json)
+        MOD_NAME=$(jq -r '.name' ${{ env.PROJECT_NAME }}/modinfo.json)
         echo "mod_id=$MOD_ID" >> $GITHUB_OUTPUT
         echo "mod_version=$MOD_VERSION" >> $GITHUB_OUTPUT
         echo "mod_name=$MOD_NAME" >> $GITHUB_OUTPUT
