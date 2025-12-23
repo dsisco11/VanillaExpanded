@@ -27,7 +27,7 @@ public class SpawnDecalRenderer : IRenderer
     private MeshRef? decalMeshRef;
     private int decalTextureId;
     private readonly Matrixf modelMatrix = new();
-    private readonly System.Numerics.Vector4[] PhaseColors = [new(0.28f, 0.8f, 1.0f, 1.0f), new(0.7f, 0.28f, 1.0f, 1.0f)];
+    private readonly System.Numerics.Vector4[] PhaseColors = [new(0.55f, 0.85f, 1.0f, 1.0f), new(0.8f, 0.55f, 1.0f, 1.0f)];
 
     private Vec3d? spawnPosition;
     private bool isFading;
