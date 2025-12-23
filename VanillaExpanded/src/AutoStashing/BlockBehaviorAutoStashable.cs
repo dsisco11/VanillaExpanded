@@ -348,6 +348,11 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         // find all items we want to stash from all the players bag inventories
         var stashWishlist = bagInventories.SelectMany(inv => inv.FindMatchingSlots(itemAllowList)).ToImmutableArray();
         int totalStashed = byPlayer.DepositItemStacks(world, container.Inventory, stashWishlist);
+        if (totalStashed > 0)
+        {
+            // mark dirty server-side so the player sees the updated contents.
+            container.MarkDirty();
+        }
         return totalStashed > 0;
     }
 

@@ -38,8 +38,8 @@ internal static class PlayerInventoryManagerExtensions
     {
         foreach (var name in inventoryNames)
         {
-            var inv = invManager.GetInventory(name);
-            if (inv != null)
+            var inv = invManager.GetOwnInventory(name);
+            if (inv is not null)
             {
                 yield return inv;
             }
