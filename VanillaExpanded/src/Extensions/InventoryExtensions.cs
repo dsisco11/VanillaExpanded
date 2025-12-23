@@ -8,6 +8,14 @@ namespace VanillaExpanded;
 internal static class InventoryExtensions
 {
     /// <summary>
+    /// Returns whether the inventory is at max capacity
+    /// </summary>
+    public static bool IsMaxCapacity(this IInventory inventory)
+    {
+        return inventory.All(static slot => !slot.Empty && slot.StackSize >= (slot.Itemstack?.Collectible?.MaxStackSize ?? 0));
+    }
+
+    /// <summary>
     /// Returns a set of all distinct item IDs in the given inventory.
     /// </summary>
     public static HashSet<int> GetDistinctItemIds(this IInventory inventory)

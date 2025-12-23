@@ -71,6 +71,11 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             return false; // no stashable items, do nothing
         }
 
+        if (blockEntity.Inventory.IsMaxCapacity())
+        {
+            return false; // container is full, do nothing
+        }
+
         switch (block)
         {
             case BlockCrate:
@@ -210,7 +215,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             case "Crate":
                 {
                     // If the player has no stashable items, do not show the interaction help.
-                    return !HasStashables(world, forPlayer, selection)
+                    return !ShowAutoStashInteractionHelp(world, forPlayer, selection)
                         ? []
                         : [
                         new WorldInteraction()
@@ -224,7 +229,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             default:
                 {
                     // If the player has no stashable items, do not show the interaction help.
-                    return !HasStashables(world, forPlayer, selection)
+                    return !ShowAutoStashInteractionHelp(world, forPlayer, selection)
                         ? []
                         : [
                         new WorldInteraction()
@@ -288,11 +293,8 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             return [];
         }
 
-        IPlayerInventoryManager playerInv = byPlayer.InventoryManager;
-        IInventory playerBackpack = playerInv.GetOwnInventory(GlobalConstants.backpackInvClassName);
-        IInventory playerHotbar = playerInv.GetOwnInventory(GlobalConstants.hotBarInvClassName);
+        HashSet<int> playerItemTypes = [.. byPlayer.InventoryManager.GetBagInventories().SelectMany(static inv => inv.GetDistinctItemIds())];
         HashSet<int> containerItemTypes = container.Inventory.GetDistinctItemIds();
-        HashSet<int> playerItemTypes = [.. playerBackpack.GetDistinctItemIds(), .. playerHotbar.GetDistinctItemIds()];
         containerItemTypes.IntersectWith(playerItemTypes);
         return containerItemTypes;
     }
@@ -356,7 +358,14 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         return totalStashed > 0;
     }
 
-    private bool HasStashables(in IWorldAccessor world, in IPlayer player, BlockSelection? selection = null)
+    /// <summary>
+    /// Determines whether to show the auto-stash interaction help for the given player at the specified block selection.
+    /// </summary>
+    /// <param name="world"></param>
+    /// <param name="player"></param>
+    /// <param name="selection"></param>
+    /// <returns></returns>
+    private bool ShowAutoStashInteractionHelp(in IWorldAccessor world, in IPlayer player, BlockSelection? selection = null)
     {
         selection ??= player.CurrentBlockSelection;
         if (selection is null)
@@ -366,7 +375,15 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
 
         BlockEntityContainer blockEntity = world.BlockAccessor.GetBlockEntity<BlockEntityContainer>(selection.Position);
         var stashables = GetStashableItems(player, blockEntity);
-        return stashables.Count != 0;
+        // If the player has no stashable items, do not show the interaction help.
+        if (stashables.Count <= 0)
+            return false;
+
+        // If the container is full, do not show the interaction help.
+        if (blockEntity.Inventory.IsMaxCapacity())
+            return false;
+
+        return true;
     }
     #endregion
 }
