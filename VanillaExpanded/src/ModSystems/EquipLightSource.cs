@@ -1,5 +1,10 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
+
+using VanillaExpanded.src.Extensions;
 
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -11,10 +16,8 @@ public class EquipLightSource : ModSystem
 {
     #region Fields
     private ICoreClientAPI? api;
-    /// <summary> Tracks the last hotbar slot that was swapped out for a light source. </summary>
-    internal ItemSlot? previousHotbarSlot = null;
-    /// <summary> Tracks the last backpack slot that was swapped out for a light source. </summary>
-    internal ItemSlot? previousBackpackSlot = null;
+    /// <summary> Tracks the last inventory slot that was swapped out for a light source. </summary>
+    internal ItemSlot? previousSlot = null;
     #endregion
 
     #region Accessors
@@ -60,12 +63,6 @@ public class EquipLightSource : ModSystem
         if (api is null)
             return false;
 
-        ItemSlot? lightSourceSlot = ResolveLightSourceSlot(api!.World.Player, out bool isInLeftHand, out bool isInRightHand);
-        if (lightSourceSlot is null)
-        {// player has no light sources
-            return false;
-        }
-
         // Figure out where we want to move the light source.
         /** Priorities:
          * 1. If light is in left hand and we want to equip to left hand, then move it back to previous slot (if any).
@@ -75,56 +72,49 @@ public class EquipLightSource : ModSystem
          */
 
         ItemSlot desiredHand = useOffhand ? api!.World.Player.Entity.LeftHandItemSlot : api!.World.Player.InventoryManager.ActiveHotbarSlot;
-        ItemSlot? sourceSlot = lightSourceSlot;
+        ItemSlot? sourceSlot = null;
         ItemSlot? targetSlot = null;
 
         // There are 2 scenarios, either we are moving the light into our desired hand, or we are moving it back out of our hand.
-        bool isEquipping = lightSourceSlot != desiredHand;
+        bool isEquipping = !IsLightSource(desiredHand);// lightSourceSlot != desiredHand;
         if (isEquipping)
         {
             targetSlot = desiredHand;
+            // Find best light source to equip
+            ItemSlot? lightSourceSlot = ResolveLightSourceSlot(api!.World.Player, out bool isInLeftHand, out bool isInRightHand);
+            if (lightSourceSlot?.Itemstack is null)
+            {// player has no light sources
+                api.Logger.Debug("[EquipLightSource] no light source found in inventory.");
+                return false;
+            }
+            sourceSlot = lightSourceSlot;
         }
         else
         {// Moving light source back out of hand
-            // check which of our previous slots are still valid (i.e. it could still hold the light source), and nullify the invalid ones
-            if (previousBackpackSlot is not null && !previousBackpackSlot.CanHold(lightSourceSlot))
+            sourceSlot = desiredHand;
+            // First, try and find an empty slot in the backpack/hotbar to move it to.
+            IEnumerable<IInventory> validInventories = api!.World.Player.InventoryManager.GetBagInventories();
+            IEnumerable<WeightedSlot> bestSlots = validInventories.Select(inv => inv.GetBestSuitedSlot(sourceSlot));
+            WeightedSlot? bestOverallSlot = bestSlots.Where(static ws => ws?.slot is not null)
+                                                     .MaxBy(static ws => ws!.weight);
+            if (bestOverallSlot is not null)
             {
-                previousBackpackSlot = null;
-            }
-            if (previousHotbarSlot is not null && !previousHotbarSlot.CanHold(lightSourceSlot))
-            {
-                previousHotbarSlot = null;
-            }
-
-            // Target slot is either the previous backpack/hotbar slot, or we need to find a new slot for it (best available backpack slot or best available hotbar slot).
-            ItemSlot? previousSlot = previousBackpackSlot ?? previousHotbarSlot;
-            targetSlot = previousSlot;// set target slot to previous by default, override with a new value if needed according to additional logic below.
-            if (previousSlot is null)
-            {
-                // find the first available backpack slot or last available hotbar slot
-                IPlayerInventoryManager playerInventory = api!.World.Player.InventoryManager;
-                IInventory? backpack = playerInventory.GetOwnInventory(GlobalConstants.backpackInvClassName);
-                WeightedSlot? bpBestSlot = backpack?.GetBestSuitedSlot(lightSourceSlot);
-                if (bpBestSlot is not null)
-                {
-                    targetSlot = bpBestSlot.slot;
-                    previousBackpackSlot = targetSlot;
-                }
-                else
-                {
-                    IInventory? hotbar = playerInventory.GetOwnInventory(GlobalConstants.hotBarInvClassName);
-                    WeightedSlot? hbBestSlot = hotbar?.GetBestSuitedSlot(lightSourceSlot);
-                    if (hbBestSlot is not null)
-                    {
-                        targetSlot = hbBestSlot.slot;
-                        previousHotbarSlot = targetSlot;
-                    }
-                }
+                // Record this slot as the previous slot for future swaps.
+                targetSlot = previousSlot = bestOverallSlot.slot;
             }
             else
-            {
-                previousBackpackSlot = null;
-                previousHotbarSlot = null;
+            {// No empty slots available, so just move it to the previous slot if it is still valid.
+                if (previousSlot is null)
+                {
+                    api.Logger.Debug("[EquipLightSource] cannot move light source out of hand, no previous slot recorded and no empty slots in inventory.");
+                    return false;
+                }
+                if (!previousSlot.CanHold(sourceSlot))
+                {
+                    api.Logger.Debug("[EquipLightSource] cannot move light source out of hand, previous slot cannot hold light source.");
+                    return false;
+                }
+                targetSlot = previousSlot;
             }
         }
 
@@ -140,13 +130,22 @@ public class EquipLightSource : ModSystem
             return false;
         }
 
+        var player = api.World.Player;
+        Debug.Assert(player.InventoryManager.OpenedInventories.Contains(targetSlot.Inventory), "Target inventory is not opened.");
+        Debug.Assert(player.InventoryManager.OpenedInventories.Contains(sourceSlot.Inventory), "Source inventory is not opened.");
+
         int targetSlotId = targetSlot.Inventory.GetSlotId(targetSlot);
-        var packet = targetSlot.Inventory.TryFlipItems(targetSlotId, sourceSlot);
+        ItemStackMoveOperation op = new(api!.World, EnumMouseButton.Left, EnumModifierKey.SHIFT, EnumMergePriority.AutoMerge, sourceSlot.StackSize);
+        var packet = player.InventoryManager.TryTransferTo(sourceSlot, targetSlot, ref op);
         if (packet is not null)
         {
+            api.Logger.Audit("[EquipLightSource] swapped light source '{0}' into {1} hand.", sourceSlot?.Itemstack?.GetName(), useOffhand ? "left" : "right");
             api.Network.SendPacketClient(packet);
-            targetSlot.MarkDirty();
-            sourceSlot.MarkDirty();
+        }
+        else
+        {
+            api.Logger.Warning("[EquipLightSource] failed to create flip-items packet for swapping light source.");
+            return false;
         }
 
         return true;
@@ -183,70 +182,35 @@ public class EquipLightSource : ModSystem
             }
         }
 
-        // Check other hotbar slots
-        IInventory? hotbar = playerInventory.GetOwnInventory(GlobalConstants.hotBarInvClassName);
-        if (hotbar is not null)
+        // Find brightest light source in inventory
+        IEnumerable<ItemSlot> backpackAndHotbarSlots = GetPlayerBagSlots(player);
+        ItemSlot? brightestSlot = backpackAndHotbarSlots.Where(static slot => !slot.Empty && IsLightSource(slot))
+                                                        .MaxBy(static slot => slot.Itemstack.Collectible.LightHsv[2]);
+        if (!brightestSlot?.Empty ?? false)
         {
-            if (TryFindBrightestLightSource(hotbar, out ItemSlot? brightestHotbarSlot))
-            {
-                return brightestHotbarSlot;
-            }
-        }
-
-        // Check backpack slots last
-        IInventory? backpack = playerInventory.GetOwnInventory(GlobalConstants.backpackInvClassName);
-        if (backpack is not null)
-        {
-            if (TryFindBrightestLightSource(backpack, out ItemSlot? brightestBackpackSlot))
-            {
-                return brightestBackpackSlot;
-            }
+            return brightestSlot;
         }
 
         return null;
     }
-
-    /// <summary>
-    /// Searches the given inventory for the brightest light source item.
-    /// </summary>
-    /// <returns> True if a light source was found; otherwise, false. </returns>
-    protected static bool TryFindBrightestLightSource(in IInventory inventory, [NotNullWhen(true)] out ItemSlot? result)
-    {
-        CollectibleObject? current = null;
-        result = null!;
-        foreach (ItemSlot slot in inventory)
-        {
-            if (slot.Empty) continue;
-            CollectibleObject item = slot.Itemstack.Collectible;
-            int itemLightLevel = item.LightHsv[2];
-            // check the lightHsv value to know if it's a light source
-            if (itemLightLevel <= 0) continue;
-            // if we have no current light source, take the first we find
-            if (current is null)
-            {
-                result = slot;
-                return true;
-            }
-
-            int currentItemLightLevel = current.LightHsv[2];
-            // if the found light source is brighter than the current one, take it
-            if (itemLightLevel > currentItemLightLevel)
-            {
-                result = slot;
-                return true;
-            }
-        }
-        return false;
-    }
     #endregion
 
     #region Private Methods
+
+    private static IEnumerable<ItemSlot> GetPlayerBagSlots(in IClientPlayer player)
+    {
+        IEnumerable<IEnumerable<ItemSlot>> inventories = player.InventoryManager.GetBagInventories();
+        // Flatten the inventories into a single sequence of item slots
+        return inventories.SelectMany(static inv => inv);
+    }
+
     /// <summary>
     /// Determines if the given item slot contains a light source.
     /// </summary>
     private static bool IsLightSource(in ItemSlot? slot)
     {
         if (slot?.Empty ?? true) return false;
+        if (slot?.Itemstack?.Collectible is null) return false;
         CollectibleObject item = slot.Itemstack.Collectible;
         return item.LightHsv[2] > 0;
     }
