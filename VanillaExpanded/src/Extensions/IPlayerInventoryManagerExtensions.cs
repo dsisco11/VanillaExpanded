@@ -4,8 +4,9 @@ using System.Collections.Generic;
 using System.Linq;
 
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 
-namespace VanillaExpanded.src.Extensions;
+namespace VanillaExpanded;
 internal static class PlayerInventoryManagerExtensions
 {
     /// <summary>
@@ -23,9 +24,16 @@ internal static class PlayerInventoryManagerExtensions
     public static IEnumerable<ItemSlot> GetPlayerSlots(this IPlayerInventoryManager invManager) => invManager.InventoriesOrdered.SelectMany(static inv => inv);
 
     /// <summary>
-    /// Gets multiple inventories by name.
+    /// Gets the player's inventories which are "bag-like" and meant for general storage (such as backpack and hotbar).
     /// </summary>
-    public static IEnumerable<IInventory> GetInventories(this IPlayerInventoryManager invManager, IEnumerable<string> inventoryNames)
+    /// <param name="invManager"></param>
+    /// <returns></returns>
+    public static IEnumerable<IInventory> GetBagInventories(this IPlayerInventoryManager invManager) => invManager.GetInventories(GlobalConstants.backpackInvClassName, GlobalConstants.hotBarInvClassName);
+
+    /// <summary>
+    /// Gets multiple inventories by name, skipping any that are not found.
+    /// </summary>
+    public static IEnumerable<IInventory> GetInventories(this IPlayerInventoryManager invManager, params string[] inventoryNames)
     {
         foreach (var name in inventoryNames)
         {
