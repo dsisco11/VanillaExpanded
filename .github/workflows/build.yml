@@ -1,0 +1,126 @@
+name: Build and Package Mod
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      vs_version:
+        description: 'VintageStory version to build against'
+        required: false
+        default: '1.21.0'
+        type: string
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  # Default VintageStory version - update this when targeting a new game version
+  VS_VERSION: ${{ inputs.vs_version || '1.21.0' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Cache VintageStory Server
+      id: cache-vs
+      uses: actions/cache@v4
+      with:
+        path: ~/vs-server
+        key: vs-server-${{ env.VS_VERSION }}
+
+    - name: Download VintageStory Server
+      if: steps.cache-vs.outputs.cache-hit != 'true'
+      run: |
+        mkdir -p ~/vs-server
+        echo "Downloading VintageStory Server v${{ env.VS_VERSION }}..."
+        curl -L -o ~/vs-server.tar.gz "https://cdn.vintagestory.at/gamefiles/stable/vs_server_linux-x64_${{ env.VS_VERSION }}.tar.gz"
+        tar -xzf ~/vs-server.tar.gz -C ~/vs-server --strip-components=0
+        rm ~/vs-server.tar.gz
+        ls -la ~/vs-server
+
+    - name: Set VINTAGE_STORY environment variable
+      run: echo "VINTAGE_STORY=$HOME/vs-server" >> $GITHUB_ENV
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Run CakeBuild (Build and Package)
+      run: dotnet run --project CakeBuild/CakeBuild.csproj
+
+    - name: Get mod info
+      id: modinfo
+      run: |
+        MOD_ID=$(jq -r '.modid' VanillaExpanded/modinfo.json)
+        MOD_VERSION=$(jq -r '.version' VanillaExpanded/modinfo.json)
+        MOD_NAME=$(jq -r '.name' VanillaExpanded/modinfo.json)
+        echo "mod_id=$MOD_ID" >> $GITHUB_OUTPUT
+        echo "mod_version=$MOD_VERSION" >> $GITHUB_OUTPUT
+        echo "mod_name=$MOD_NAME" >> $GITHUB_OUTPUT
+        echo "Built: $MOD_NAME v$MOD_VERSION"
+
+    - name: Upload mod artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ steps.modinfo.outputs.mod_id }}_${{ steps.modinfo.outputs.mod_version }}
+        path: Releases/*.zip
+        retention-days: 30
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Get mod info
+      id: modinfo
+      run: |
+        MOD_ID=$(jq -r '.modid' VanillaExpanded/modinfo.json)
+        MOD_VERSION=$(jq -r '.version' VanillaExpanded/modinfo.json)
+        MOD_NAME=$(jq -r '.name' VanillaExpanded/modinfo.json)
+        echo "mod_id=$MOD_ID" >> $GITHUB_OUTPUT
+        echo "mod_version=$MOD_VERSION" >> $GITHUB_OUTPUT
+        echo "mod_name=$MOD_NAME" >> $GITHUB_OUTPUT
+
+    - name: Download artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ steps.modinfo.outputs.mod_id }}_${{ steps.modinfo.outputs.mod_version }}
+        path: ./release-artifacts
+
+    - name: Check if release exists
+      id: check_release
+      run: |
+        TAG="v${{ steps.modinfo.outputs.mod_version }}"
+        if gh release view "$TAG" &>/dev/null; then
+          echo "exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+        fi
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Create GitHub Release
+      if: steps.check_release.outputs.exists == 'false'
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v${{ steps.modinfo.outputs.mod_version }}
+        name: ${{ steps.modinfo.outputs.mod_name }} v${{ steps.modinfo.outputs.mod_version }}
+        files: ./release-artifacts/*.zip
+        generate_release_notes: true
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
