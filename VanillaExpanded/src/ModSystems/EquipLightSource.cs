@@ -213,7 +213,7 @@ public class EquipLightSource : ModSystem
     protected static bool TryFindBrightestLightSource(in IInventory inventory, [NotNullWhen(true)] out ItemSlot? result)
     {
         CollectibleObject? current = null;
-        result = null!;
+        result = null;
         foreach (ItemSlot slot in inventory)
         {
             if (slot.Empty) continue;
@@ -224,19 +224,20 @@ public class EquipLightSource : ModSystem
             // if we have no current light source, take the first we find
             if (current is null)
             {
+                current = item;
                 result = slot;
-                return true;
+                continue;
             }
 
             int currentItemLightLevel = current.LightHsv[2];
             // if the found light source is brighter than the current one, take it
             if (itemLightLevel > currentItemLightLevel)
             {
+                current = item;
                 result = slot;
-                return true;
             }
         }
-        return false;
+        return result is not null;
     }
     #endregion
 
