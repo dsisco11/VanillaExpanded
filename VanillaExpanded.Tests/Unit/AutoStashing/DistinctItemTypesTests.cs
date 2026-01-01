@@ -1,5 +1,5 @@
 using VanillaExpanded.AutoStashing;
-using VanillaExpanded.Tests.Fakes;
+using VanillaExpanded.Tests.Mocks;
 
 using Vintagestory.API.Common;
 
@@ -8,6 +8,7 @@ namespace VanillaExpanded.Tests.Unit.AutoStashing;
 /// <summary>
 /// Tests for GetDistinctItemTypes method in BlockBehaviorAutoStashable.
 /// </summary>
+[Trait("Category", "Unit")]
 public class DistinctItemTypesTests
 {
     /// <summary>
@@ -18,7 +19,7 @@ public class DistinctItemTypesTests
         var inv = new InventoryGeneric(collectibleIds.Length, "test", "test-1", null!);
         for (int i = 0; i < collectibleIds.Length; i++)
         {
-            var item = new FakeItem(collectibleIds[i]);
+            var item = new MockItem(collectibleIds[i]);
             inv[i].Itemstack = new ItemStack(item);
         }
         return inv;
@@ -32,7 +33,7 @@ public class DistinctItemTypesTests
         var inv = new InventoryGeneric(itemIds.Length + emptySlotCount, "test", "test-1", null!);
         for (int i = 0; i < itemIds.Length; i++)
         {
-            var item = new FakeItem(itemIds[i]);
+            var item = new MockItem(itemIds[i]);
             inv[i].Itemstack = new ItemStack(item);
         }
         // Remaining slots are already empty by default

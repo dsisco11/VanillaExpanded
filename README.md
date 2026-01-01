@@ -55,6 +55,44 @@ _A high-tier tool (e.g. saw or shears) yields ~70% of the original materials._
 - Metal tool-heads can be de-crafted back into metal-bits using a chisel.
 - Metal arrow-heads can be de-crafted back into metal-bits using a chisel.
 
+## Testing
+
+The project includes comprehensive unit and end-to-end tests organized by namespace within `VanillaExpanded.Tests`.
+
+### Test Organization
+
+- **Unit Tests** (`VanillaExpanded.Tests/Unit/`): Fast, isolated tests for individual components
+  - `AutoStashing/`: Tests for item matching, stashable items detection, and timing constants
+  - `EquipLightSource/`: Tests for light source detection logic
+- **E2E Tests** (`VanillaExpanded.Tests/E2E/`): Integration tests for system interactions
+  - `AutoStashing/`: Tests for network packet handling and client-server communication
+
+### Running Tests
+
+```bash
+# Run all tests
+dotnet test
+
+# Run only unit tests (fast feedback)
+dotnet test --filter "Category=Unit"
+
+# Run only E2E tests (integration validation)
+dotnet test --filter "Category=E2E"
+
+# Run tests for a specific feature
+dotnet test --filter "FullyQualifiedName~AutoStashing"
+```
+
+### Mock Infrastructure
+
+The test project includes reusable mock wrappers in `VanillaExpanded.Tests/Mocks/`:
+
+- `MockItem`: Mock collectible items with configurable IDs and light values
+- `MockInventory`: Mock inventory with slot management
+- `MockPlayer`: Mock player with inventory manager setup
+- `MockClientNetworkChannel`: Captures sent packets for verification
+- `MockServerNetworkChannel`: Simulates server-side packet handling
+
 ## License
 
 This project is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International Public License for all users except Anego Studios.

@@ -1,4 +1,4 @@
-using VanillaExpanded.Tests.Fakes;
+using VanillaExpanded.Tests.Mocks;
 
 using Vintagestory.API.Common;
 
@@ -7,6 +7,7 @@ namespace VanillaExpanded.Tests.Unit.EquipLightSource;
 /// <summary>
 /// Tests for the IsLightSource detection methods in EquipLightSource.
 /// </summary>
+[Trait("Category", "Unit")]
 public class LightSourceDetectionTests
 {
     #region IsLightSource(ItemSlot) Tests
@@ -41,7 +42,7 @@ public class LightSourceDetectionTests
     public void IsLightSource_SlotWithNonLightItem_ReturnsFalse()
     {
         // Arrange
-        var item = new FakeItem(id: 1, lightValue: 0);
+        var item = new MockItem(id: 1, lightValue: 0);
         var slot = new DummySlot(new ItemStack(item));
 
         // Act
@@ -55,7 +56,7 @@ public class LightSourceDetectionTests
     public void IsLightSource_SlotWithLightSource_ReturnsTrue()
     {
         // Arrange
-        var item = FakeItem.CreateLightSource(id: 1, brightness: 20);
+        var item = MockItem.CreateLightSource(id: 1, brightness: 20);
         var slot = new DummySlot(new ItemStack(item));
 
         // Act
@@ -72,7 +73,7 @@ public class LightSourceDetectionTests
     public void IsLightSource_SlotWithVariousBrightnessLevels_ReturnsTrue(byte brightness)
     {
         // Arrange
-        var item = FakeItem.CreateLightSource(id: 1, brightness: brightness);
+        var item = MockItem.CreateLightSource(id: 1, brightness: brightness);
         var slot = new DummySlot(new ItemStack(item));
 
         // Act
@@ -103,7 +104,7 @@ public class LightSourceDetectionTests
     public void IsLightSource_NonLightCollectible_ReturnsFalse()
     {
         // Arrange
-        var collectible = FakeItem.CreateNonLightSource(id: 1);
+        var collectible = MockItem.CreateNonLightSource(id: 1);
 
         // Act
         bool result = VanillaExpanded.EquipLightSource.IsLightSource(collectible);
@@ -116,7 +117,7 @@ public class LightSourceDetectionTests
     public void IsLightSource_LightCollectible_ReturnsTrue()
     {
         // Arrange
-        var collectible = FakeItem.CreateLightSource(id: 1, brightness: 20);
+        var collectible = MockItem.CreateLightSource(id: 1, brightness: 20);
 
         // Act
         bool result = VanillaExpanded.EquipLightSource.IsLightSource(collectible);
@@ -132,7 +133,7 @@ public class LightSourceDetectionTests
     public void IsLightSource_CollectibleWithVariousBrightnessLevels_ReturnsTrue(byte brightness)
     {
         // Arrange
-        var collectible = FakeItem.CreateLightSource(id: 1, brightness: brightness);
+        var collectible = MockItem.CreateLightSource(id: 1, brightness: brightness);
 
         // Act
         bool result = VanillaExpanded.EquipLightSource.IsLightSource(collectible);
