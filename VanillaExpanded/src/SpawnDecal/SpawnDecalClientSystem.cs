@@ -17,16 +17,14 @@ public class SpawnDecalClientSystem : ModSystem
     #endregion
 
     #region ModSystem Overrides
-    public override bool ShouldLoad(EnumAppSide forSide) => forSide == EnumAppSide.Client;
+    public override bool ShouldLoad(EnumAppSide forSide)
+    {
+        return forSide == EnumAppSide.Client && VanillaExpandedModSystem.Config.EnableSpawnDecal;
+    }
 
     public override void StartClientSide(ICoreClientAPI api)
     {
         capi = api;
-
-        if (!VanillaExpandedModSystem.Config.EnableSpawnDecal)
-        {
-            return; // Spawn decal feature disabled
-        }
 
         // Create and register the renderer
         renderer = new SpawnDecalRenderer(api);

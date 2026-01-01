@@ -22,7 +22,10 @@ public sealed class AlloyCalculatorModSystem : ModSystem
     #endregion
 
     #region ModSystem Lifecycle
-    public override bool ShouldLoad(EnumAppSide forSide) => forSide == EnumAppSide.Client;
+    public override bool ShouldLoad(EnumAppSide forSide)
+    {
+        return forSide == EnumAppSide.Client && VanillaExpandedModSystem.Config.EnableAlloyCalculator;
+    }
 
     public override void StartClientSide(ICoreClientAPI api)
     {

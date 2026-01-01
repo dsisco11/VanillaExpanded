@@ -25,46 +25,21 @@ public class VanillaExpandedModSystem : ModSystem
     /// The mod configuration. Loaded on startup.
     /// </summary>
     public static VanillaExpandedConfig Config { get; private set; } = new();
+    private static bool configLoaded = false;
     #endregion
 
-    public override void Dispose()
+    /// <summary>
+    /// Ensures the config is loaded. Can be called from other ModSystems' ShouldLoad().
+    /// </summary>
+    public static void EnsureConfigLoaded(ICoreAPI api)
     {
-        base.Dispose();
-        harmony?.UnpatchAll(Mod.Info.ModID);
-    }
-
-    public override double ExecuteOrder()
-    {
-        return 1;// execute after all the blocks JSON defs are loaded, but before they are finalized, so we can inject our own stuff into the JSON defs.
-    }
-
-    public override void Start(ICoreAPI api)
-    {
-        LoadConfig(api);
-
-        api.RegisterCollectibleBehaviorClass(BehaviorIgnitionTool.RegistryId, typeof(BehaviorIgnitionTool));
-        api.RegisterBlockBehaviorClass(BlockBehaviorAutoStashable.RegistryId, typeof(BlockBehaviorAutoStashable));
-        api.RegisterBlockBehaviorClass(BehaviorCrateEntityEventBridge.RegistryId, typeof(BehaviorCrateEntityEventBridge));
-
-        var channel = api.Network.RegisterChannel(Mod.Info.ModID)
-            .RegisterMessageType<Network.Packet_RequestAutoStash>()
-            .RegisterMessageType<Network.Packet_TemporalSpawn>();
-
-        if (!Harmony.HasAnyPatches(Mod.Info.ModID))
-        {
-            harmony = new Harmony(Mod.Info.ModID);
-            harmony.PatchAll();
-        }
-    }
-
-    private void LoadConfig(ICoreAPI api)
-    {
+        if (configLoaded) return;
+        
         try
         {
             var loadedConfig = api.LoadModConfig<VanillaExpandedConfig>(ConfigFileName);
             if (loadedConfig is null)
             {
-                // Create default config and save it immediately
                 Config = new VanillaExpandedConfig();
                 api.StoreModConfig(Config, ConfigFileName);
                 api.Logger.Notification("[VanillaExpanded] Created default configuration file: {0}", ConfigFileName);
@@ -79,11 +54,46 @@ public class VanillaExpandedModSystem : ModSystem
             api.Logger.Error("[VanillaExpanded] Failed to load configuration: {0}", ex.Message);
             Config = new VanillaExpandedConfig();
         }
+        
+        configLoaded = true;
+    }
 
+    public override void Dispose()
+    {
+        base.Dispose();
+        harmony?.UnpatchAll(Mod.Info.ModID);
+    }
+
+    public override double ExecuteOrder()
+    {
+        return 1;// execute after all the blocks JSON defs are loaded, but before they are finalized, so we can inject our own stuff into the JSON defs.
+    }
+
+    public override void StartPre(ICoreAPI api)
+    {
+        EnsureConfigLoaded(api);
+        
         // Suggest ConfigLib if not installed
         if (!api.ModLoader.IsModEnabled("configlib"))
         {
             api.Logger.Notification("[VanillaExpanded] ConfigLib is not installed. Install it for an in-game configuration GUI. Settings can be edited manually in ModConfig/{0}", ConfigFileName);
+        }
+    }
+
+    public override void Start(ICoreAPI api)
+    {
+        api.RegisterCollectibleBehaviorClass(BehaviorIgnitionTool.RegistryId, typeof(BehaviorIgnitionTool));
+        api.RegisterBlockBehaviorClass(BlockBehaviorAutoStashable.RegistryId, typeof(BlockBehaviorAutoStashable));
+        api.RegisterBlockBehaviorClass(BehaviorCrateEntityEventBridge.RegistryId, typeof(BehaviorCrateEntityEventBridge));
+
+        var channel = api.Network.RegisterChannel(Mod.Info.ModID)
+            .RegisterMessageType<Network.Packet_RequestAutoStash>()
+            .RegisterMessageType<Network.Packet_TemporalSpawn>();
+
+        if (!Harmony.HasAnyPatches(Mod.Info.ModID))
+        {
+            harmony = new Harmony(Mod.Info.ModID);
+            harmony.PatchAll();
         }
     }
 
