@@ -244,7 +244,7 @@ public class EquipLightSource : ModSystem
     /// <summary>
     /// Determines if the given item slot contains a light source.
     /// </summary>
-    private static bool IsLightSource(in ItemSlot? slot)
+    internal static bool IsLightSource(in ItemSlot? slot)
     {
         if (slot?.Empty ?? true) return false;
         CollectibleObject item = slot.Itemstack.Collectible;
@@ -254,7 +254,7 @@ public class EquipLightSource : ModSystem
     /// <summary>
     /// Determines if the given collectible object is a light source.
     /// </summary>
-    private static bool IsLightSource(in CollectibleObject? item)
+    internal static bool IsLightSource(in CollectibleObject? item)
     {
         return (item?.LightHsv[2] ?? 0) > 0;
     }

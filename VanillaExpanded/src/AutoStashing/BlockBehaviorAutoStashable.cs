@@ -297,7 +297,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         return containerItemTypes;
     }
 
-    protected static HashSet<int> GetDistinctItemTypes(in IInventory inventory)
+    internal static HashSet<int> GetDistinctItemTypes(in IInventory inventory)
     {
         return [.. inventory.Where(static slot => !slot.Empty).Where(static slot => slot?.Itemstack?.Collectible?.Id is not null).Select(static slot => slot.Itemstack.Collectible.Id)];
     }
