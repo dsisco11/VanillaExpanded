@@ -26,7 +26,10 @@ public class EquipLightSource : ModSystem
     public override void StartClientSide(ICoreClientAPI api)
     {
         this.api = api;
-        RegisterInputHandlers();
+        if (VanillaExpandedModSystem.Config.EnableEquipLightHotkey)
+        {
+            RegisterInputHandlers();
+        }
     }
     #endregion
 

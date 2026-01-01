@@ -19,7 +19,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     #region Constants
     public static string RegistryId => "AutoStashable";
     /// <summary> Time in seconds to wait before stashing items </summary>
-    public const float StashDelaySeconds = 0.5f;
+    public float StashDelaySeconds = VanillaExpandedModSystem.Config?.AutoStashDelay ?? 0.5f;
     /// <summary>
     /// Time in seconds before the auto stash ui appears (to avoid flickering when quickly opening containers)
     /// </summary>
@@ -60,6 +60,11 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     public override bool OnBlockInteractStart(IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel, ref EnumHandling handling)
     {
         handling = EnumHandling.PassThrough;
+        if (!VanillaExpandedModSystem.Config.EnableAutoStash)
+        {
+            return true; // Auto-stash is disabled
+        }
+
         if (world.Side == EnumAppSide.Server)
         {
             return true; // Server does not handle interaction
@@ -119,7 +124,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
 
         handling = EnumHandling.PreventSubsequent;
         // Allow a grace period after stashing to avoid immediate re-closure of the container.
-        if (secondsUsed > (stashDelay + postStashGracePeriod))
+        if (secondsUsed > (StashDelay + postStashGracePeriod))
         {
             return false; // Stop interacting
         }
@@ -127,7 +132,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         if (secondsUsed >= preStashGracePeriod)
         {
             setProgressVisibility(true);
-            setProgressPercentage(secondsUsed / stashDelay);
+            setProgressPercentage(secondsUsed / StashDelay);
             if (stashingState == EStashingState.PreStashGracePeriod)
             {
                 stashingState = EStashingState.Stashing;
@@ -139,7 +144,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             return true;// Return here so we don't keep trying to stash after we've already done it.
         }
 
-        if (secondsUsed >= stashDelay)
+        if (secondsUsed >= StashDelay)
         {
             stashingState = EStashingState.PostStashGracePeriod;
             world.Api.ModLoader.GetModSystem<AutoStashSystem_Client>().RequestAutoStash(blockSel.Position);

@@ -23,6 +23,11 @@ public class SpawnDecalClientSystem : ModSystem
     {
         capi = api;
 
+        if (!VanillaExpandedModSystem.Config.EnableSpawnDecal)
+        {
+            return; // Spawn decal feature disabled
+        }
+
         // Create and register the renderer
         renderer = new SpawnDecalRenderer(api);
         api.Event.RegisterRenderer(renderer, EnumRenderStage.Opaque, "spawndecal");

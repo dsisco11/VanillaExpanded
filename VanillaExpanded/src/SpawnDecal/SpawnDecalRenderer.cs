@@ -12,7 +12,7 @@ namespace VanillaExpanded.SpawnDecal;
 public class SpawnDecalRenderer : IRenderer
 {
     #region Constants
-    private const float DECAL_SIZE = 0.4f;
+    private float DecalSize => VanillaExpandedModSystem.Config.SpawnDecalSize;
     private const float Z_OFFSET = 0.0001f;
     private const float FADE_DURATION = 1f / 2f;
     private const float COLOR_PHASE_DURATION = 1f / 5f;
@@ -56,13 +56,14 @@ public class SpawnDecalRenderer : IRenderer
     {
         // Create a flat quad mesh for the decal (lying on the ground)
         var meshData = QuadMeshUtil.GetCustomQuadHorizontal(0.5f, Z_OFFSET, -0.5f, -1f, 1f, 255, 255, 255, 255);
-        // multiply all vertex coords by DECAL_SIZE
+        // multiply all vertex coords by DecalSize
         float[] verticies = meshData.GetXyz();
+        float decalSize = DecalSize;
         for (int i = 0; i < meshData.VerticesCount; i++)
         {
-            verticies[i * 3 + 0] *= DECAL_SIZE;
-            verticies[i * 3 + 1] *= DECAL_SIZE;
-            verticies[i * 3 + 2] *= DECAL_SIZE;
+            verticies[i * 3 + 0] *= decalSize;
+            verticies[i * 3 + 1] *= decalSize;
+            verticies[i * 3 + 2] *= decalSize;
         }
         meshData.SetXyz(verticies);
         decalMeshRef = capi.Render.UploadMesh(meshData);
