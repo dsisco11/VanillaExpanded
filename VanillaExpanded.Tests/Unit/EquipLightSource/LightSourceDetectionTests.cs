@@ -1,6 +1,4 @@
-using Moq;
-
-using VanillaExpanded.Tests.Mocks;
+using VanillaExpanded.Tests.Fakes;
 
 using Vintagestory.API.Common;
 
@@ -30,10 +28,10 @@ public class LightSourceDetectionTests
     public void IsLightSource_EmptySlot_ReturnsFalse()
     {
         // Arrange
-        var slot = MockItemSlot.CreateEmpty();
+        var slot = new DummySlot();
 
         // Act
-        bool result = VanillaExpanded.EquipLightSource.IsLightSource(slot.Object);
+        bool result = VanillaExpanded.EquipLightSource.IsLightSource(slot);
 
         // Assert
         Assert.False(result);
@@ -43,10 +41,11 @@ public class LightSourceDetectionTests
     public void IsLightSource_SlotWithNonLightItem_ReturnsFalse()
     {
         // Arrange
-        var slot = MockItemSlot.CreateWithItem(collectibleId: 1, lightValue: 0);
+        var item = new FakeItem(id: 1, lightValue: 0);
+        var slot = new DummySlot(new ItemStack(item));
 
         // Act
-        bool result = VanillaExpanded.EquipLightSource.IsLightSource(slot.Object);
+        bool result = VanillaExpanded.EquipLightSource.IsLightSource(slot);
 
         // Assert
         Assert.False(result);
@@ -56,10 +55,11 @@ public class LightSourceDetectionTests
     public void IsLightSource_SlotWithLightSource_ReturnsTrue()
     {
         // Arrange
-        var slot = MockItemSlot.CreateLightSource(collectibleId: 1, brightness: 20);
+        var item = FakeItem.CreateLightSource(id: 1, brightness: 20);
+        var slot = new DummySlot(new ItemStack(item));
 
         // Act
-        bool result = VanillaExpanded.EquipLightSource.IsLightSource(slot.Object);
+        bool result = VanillaExpanded.EquipLightSource.IsLightSource(slot);
 
         // Assert
         Assert.True(result);
@@ -72,10 +72,11 @@ public class LightSourceDetectionTests
     public void IsLightSource_SlotWithVariousBrightnessLevels_ReturnsTrue(byte brightness)
     {
         // Arrange
-        var slot = MockItemSlot.CreateLightSource(collectibleId: 1, brightness: brightness);
+        var item = FakeItem.CreateLightSource(id: 1, brightness: brightness);
+        var slot = new DummySlot(new ItemStack(item));
 
         // Act
-        bool result = VanillaExpanded.EquipLightSource.IsLightSource(slot.Object);
+        bool result = VanillaExpanded.EquipLightSource.IsLightSource(slot);
 
         // Assert
         Assert.True(result);
@@ -102,10 +103,10 @@ public class LightSourceDetectionTests
     public void IsLightSource_NonLightCollectible_ReturnsFalse()
     {
         // Arrange
-        var collectible = MockCollectible.CreateNonLightSource(id: 1);
+        var collectible = FakeItem.CreateNonLightSource(id: 1);
 
         // Act
-        bool result = VanillaExpanded.EquipLightSource.IsLightSource(collectible.Object);
+        bool result = VanillaExpanded.EquipLightSource.IsLightSource(collectible);
 
         // Assert
         Assert.False(result);
@@ -115,10 +116,10 @@ public class LightSourceDetectionTests
     public void IsLightSource_LightCollectible_ReturnsTrue()
     {
         // Arrange
-        var collectible = MockCollectible.CreateLightSource(id: 1, brightness: 20);
+        var collectible = FakeItem.CreateLightSource(id: 1, brightness: 20);
 
         // Act
-        bool result = VanillaExpanded.EquipLightSource.IsLightSource(collectible.Object);
+        bool result = VanillaExpanded.EquipLightSource.IsLightSource(collectible);
 
         // Assert
         Assert.True(result);
@@ -131,10 +132,10 @@ public class LightSourceDetectionTests
     public void IsLightSource_CollectibleWithVariousBrightnessLevels_ReturnsTrue(byte brightness)
     {
         // Arrange
-        var collectible = MockCollectible.CreateLightSource(id: 1, brightness: brightness);
+        var collectible = FakeItem.CreateLightSource(id: 1, brightness: brightness);
 
         // Act
-        bool result = VanillaExpanded.EquipLightSource.IsLightSource(collectible.Object);
+        bool result = VanillaExpanded.EquipLightSource.IsLightSource(collectible);
 
         // Assert
         Assert.True(result);
