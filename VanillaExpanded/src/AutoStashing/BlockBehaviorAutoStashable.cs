@@ -18,20 +18,23 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
 {
     #region Constants
     public static string RegistryId => "AutoStashable";
+    /// <summary> Time in seconds to wait before stashing items </summary>
+    public const float StashDelaySeconds = 0.5f;
+    /// <summary>
+    /// Time in seconds before the auto stash ui appears (to avoid flickering when quickly opening containers)
+    /// </summary>
+    public const float PreStashGracePeriodSeconds = 0.1f;
+    /// <summary>
+    /// Time in seconds after stashing during which the players interaction remains blocked (to avoid the container closing immediately)
+    /// </summary>
+    public const float PostStashGracePeriodSeconds = 0.4f;
     #endregion
 
     #region Fields
     protected ICoreAPI? api;
-    /// <summary> Time in seconds to wait before stashing items </summary>
-    protected float stashDelay = 0.5f;
-    /// <summary>
-    /// Time in seconds before the auto stash ui appears (to avoid flickering when quickly opening containers)
-    /// </summary>
-    protected float preStashGracePeriod = 0.1f;
-    /// <summary>
-    /// Time in seconds after stashing during which the players interaction remains blocked (to avoid the container closing immediately)
-    /// </summary>
-    protected float postStashGracePeriod = 0.4f;
+    protected float stashDelay = StashDelaySeconds;
+    protected float preStashGracePeriod = PreStashGracePeriodSeconds;
+    protected float postStashGracePeriod = PostStashGracePeriodSeconds;
     protected IProgressBar? progressBar;
     protected AssetLocation stashSoundPath = new("game:sounds/player/poultice-applied");
     /// <summary>
@@ -281,7 +284,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     /// <param name="byPlayer"> The player whose inventory/hotbar to check </param>
     /// <param name="container"> The container whose contents to check </param>
     /// <returns> An enumerable of item types (AssetLocations) which are present in both the player's inventory/hotbar and the container. </returns>
-    protected static HashSet<int> GetStashableItems(in IPlayer byPlayer, in BlockEntityContainer container)
+    internal static HashSet<int> GetStashableItems(in IPlayer byPlayer, in BlockEntityContainer container)
     {
         if (container is null)
         {
@@ -297,7 +300,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         return containerItemTypes;
     }
 
-    protected static HashSet<int> GetDistinctItemTypes(in IInventory inventory)
+    internal static HashSet<int> GetDistinctItemTypes(in IInventory inventory)
     {
         return [.. inventory.Where(static slot => !slot.Empty).Where(static slot => slot?.Itemstack?.Collectible?.Id is not null).Select(static slot => slot.Itemstack.Collectible.Id)];
     }

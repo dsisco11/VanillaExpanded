@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 
+using VanillaExpanded.AlloyCalculator;
+
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -605,8 +607,8 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             if (ingredients.Count == 0) return;
 
             // Calculate slot allocation: distribute slots proportionally by ingredient amount
-            var totalItems = ingredients.Sum(static i => i.targetAmount);
-            var slotAllocations = AllocateSlotsProportionally(ingredients, cookingSlots.Length);
+            var ingredientAmounts = ingredients.Select(static i => i.targetAmount).ToList();
+            var slotAllocations = AlloyCalculatorLogic.AllocateSlotsProportionally(ingredientAmounts, cookingSlots.Length);
 
             // Deposit each ingredient into its allocated slots, spread evenly
             var slotIndex = 0;
@@ -642,72 +644,6 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             // Close the crucible inventory and sync with server
             player.InventoryManager.CloseInventoryAndSync(crucibleInventory);
         }
-    }
-
-    /// <summary>
-    /// Allocates cooking slots proportionally based on ingredient amounts.
-    /// Larger amounts get more slots, with at least 1 slot per ingredient.
-    /// </summary>
-    private static int[] AllocateSlotsProportionally(List<(HashSet<AssetLocation> validCodes, int targetAmount)> ingredients, int totalSlots)
-    {
-        var allocations = new int[ingredients.Count];
-        
-        if (ingredients.Count == 0) return allocations;
-        
-        // If more ingredients than slots, give 1 slot each until we run out
-        if (ingredients.Count >= totalSlots)
-        {
-            for (var i = 0; i < Math.Min(ingredients.Count, totalSlots); i++)
-            {
-                allocations[i] = 1;
-            }
-            return allocations;
-        }
-
-        // First: guarantee each ingredient gets at least 1 slot
-        for (var i = 0; i < ingredients.Count; i++)
-        {
-            allocations[i] = 1;
-        }
-        
-        var remainingSlots = totalSlots - ingredients.Count;
-        if (remainingSlots <= 0) return allocations;
-
-        // Second: distribute remaining slots proportionally to larger amounts
-        var totalItems = ingredients.Sum(static i => i.targetAmount);
-        
-        for (var i = 0; i < ingredients.Count && remainingSlots > 0; i++)
-        {
-            var proportion = (double)ingredients[i].targetAmount / totalItems;
-            var extraSlots = (int)Math.Round(proportion * remainingSlots);
-            allocations[i] += extraSlots;
-        }
-
-        // Ensure we don't exceed total slots
-        var totalAllocated = allocations.Sum();
-        while (totalAllocated > totalSlots)
-        {
-            for (var i = ingredients.Count - 1; i >= 0 && totalAllocated > totalSlots; i--)
-            {
-                if (allocations[i] > 1)
-                {
-                    allocations[i]--;
-                    totalAllocated--;
-                }
-            }
-        }
-
-        // Distribute any unused slots to largest ingredients
-        while (totalAllocated < totalSlots)
-        {
-            for (var i = 0; i < ingredients.Count && totalAllocated < totalSlots; i++)
-            {
-                allocations[i]++;
-                totalAllocated++;
-            }
-        }
-
-        return allocations;
     }
 
     /// <summary>
@@ -976,21 +912,15 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     #region Utility Methods
     /// <summary>
     /// Gets the display name for a material based on its asset location.
+    /// Delegates to AlloyCalculatorLogic for testability.
     /// </summary>
     private static string GetMaterialDisplayName(in AssetLocation assetLocation)
-    {
-        var materialCode = assetLocation.EndVariant();
-        return Lang.GetMatching($"material-{materialCode}") ?? assetLocation.Path;
-    }
+        => AlloyCalculatorLogic.GetMaterialDisplayName(assetLocation);
 
     private static string GetAlloyDisplayName(in AlloyRecipe alloy)
-    {
-        return GetMaterialDisplayName(alloy.Output?.Code ?? "unknown");
-    }
+        => AlloyCalculatorLogic.GetAlloyDisplayName(alloy.Output?.Code);
 
     private static string GetIngredientDisplayName(in MetalAlloyIngredient ingredient)
-    {
-        return GetMaterialDisplayName(ingredient?.Code ?? "unknown");
-    }
+        => AlloyCalculatorLogic.GetIngredientDisplayName(ingredient?.Code);
     #endregion
 }
