@@ -15,18 +15,33 @@ public class MockBlockEntityContainer
     public Mock<InventoryGeneric> InventoryMock { get; }
     public InventoryGeneric Inventory { get; }
     public BlockPos Position { get; }
+    public ICoreAPI? Api { get; }
 
     private readonly List<ItemSlot> _slots;
     private readonly TestableBlockEntityContainer _container;
 
-    public MockBlockEntityContainer(int slotCount = 10, BlockPos? position = null)
+    public MockBlockEntityContainer(int slotCount = 10, BlockPos? position = null, ICoreAPI? api = null)
     {
         Position = position ?? new BlockPos(0, 0, 0);
+        Api = api;
         _slots = [];
 
         // Create real inventory with slots
         Inventory = new InventoryGeneric(slotCount, "test", "test-container", null!);
         InventoryMock = new Mock<InventoryGeneric>(slotCount, "test", "test-container", null!) { CallBase = true };
+
+        // Set up API on inventory if provided
+        if (api is not null)
+        {
+            Inventory.Api = api;
+
+            // Set up network util to prevent null references
+            var networkUtilMock = new Mock<IInventoryNetworkUtil>();
+            networkUtilMock
+                .Setup(u => u.GetFlipSlotsPacket(It.IsAny<InventoryBase>(), It.IsAny<int>(), It.IsAny<int>()))
+                .Returns(new object());
+            Inventory.InvNetworkUtil = networkUtilMock.Object;
+        }
 
         for (int i = 0; i < slotCount; i++)
         {
@@ -44,9 +59,9 @@ public class MockBlockEntityContainer
     /// <summary>
     /// Creates a MockBlockEntityContainer with items in specific slots.
     /// </summary>
-    public static MockBlockEntityContainer WithItems(Dictionary<int, MockItem> items, int totalSlots = 10, BlockPos? position = null)
+    public static MockBlockEntityContainer WithItems(Dictionary<int, MockItem> items, int totalSlots = 10, BlockPos? position = null, ICoreAPI? api = null)
     {
-        var container = new MockBlockEntityContainer(totalSlots, position);
+        var container = new MockBlockEntityContainer(totalSlots, position, api);
         foreach (var (slotIndex, item) in items)
         {
             if (slotIndex < totalSlots)
@@ -60,9 +75,9 @@ public class MockBlockEntityContainer
     /// <summary>
     /// Creates a MockBlockEntityContainer with items from an array (fills slots sequentially).
     /// </summary>
-    public static MockBlockEntityContainer WithItems(params MockItem[] items)
+    public static MockBlockEntityContainer WithItems(ICoreAPI? api, params MockItem[] items)
     {
-        var container = new MockBlockEntityContainer(Math.Max(items.Length, 10));
+        var container = new MockBlockEntityContainer(Math.Max(items.Length, 10), api: api);
         for (int i = 0; i < items.Length; i++)
         {
             container.SetItem(i, items[i]);
@@ -71,16 +86,28 @@ public class MockBlockEntityContainer
     }
 
     /// <summary>
+    /// Creates a MockBlockEntityContainer with items from an array (fills slots sequentially).
+    /// Overload without API for backwards compatibility.
+    /// </summary>
+    public static MockBlockEntityContainer WithItems(params MockItem[] items)
+        => WithItems(null, items);
+
+    /// <summary>
     /// Creates an empty MockBlockEntityContainer.
     /// </summary>
-    public static MockBlockEntityContainer Empty(int slotCount = 10, BlockPos? position = null)
-        => new(slotCount, position);
+    public static MockBlockEntityContainer Empty(int slotCount = 10, BlockPos? position = null, ICoreAPI? api = null)
+        => new(slotCount, position, api);
 
     /// <summary>
     /// Sets an item at the specified slot index.
     /// </summary>
     public void SetItem(int slotIndex, MockItem item, int stackSize = 1)
     {
+        // Set API on item if we have one (needed for CollectibleObject.Equals)
+        if (Api is not null)
+        {
+            item.SetApi(Api);
+        }
         Inventory[slotIndex].Itemstack = new ItemStack(item, stackSize);
     }
 
