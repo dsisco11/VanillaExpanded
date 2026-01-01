@@ -60,11 +60,6 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     public override bool OnBlockInteractStart(IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel, ref EnumHandling handling)
     {
         handling = EnumHandling.PassThrough;
-        if (!VanillaExpandedModSystem.Config.EnableAutoStash)
-        {
-            return true; // Auto-stash is disabled
-        }
-
         if (world.Side == EnumAppSide.Server)
         {
             return true; // Server does not handle interaction
