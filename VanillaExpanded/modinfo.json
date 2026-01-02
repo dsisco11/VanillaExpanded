@@ -10,8 +10,7 @@
     "description": "Aims to add quality-of-life enhancements, missing functionality, and minor bug fixes while remaining true to the vanilla game and with minimal impacts to game balance.",
     "version": "0.0.0-dev",
     "dependencies": {
-        "game": "1.21.0",
-        "configlib": ""
+        "game": "1.21.0"
     },
     "requiredOnClient": true,
     "requiredOnServer": true,
