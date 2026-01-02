@@ -3,9 +3,12 @@ using System.Linq;
 
 using HarmonyLib;
 
+using VanillaExpanded.AlloyCalculator;
 using VanillaExpanded.AutoStashing;
 using VanillaExpanded.IgnitionTools;
+using VanillaExpanded.SpawnDecal;
 using VanillaExpanded.src.AutoStashing;
+using VanillaExpanded.src.IgnitionTools;
 
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -62,6 +65,7 @@ public class VanillaExpandedModSystem : ModSystem
     {
         base.Dispose();
         harmony?.UnpatchAll(Mod.Info.ModID);
+        configLoaded = false; // Reset so config reloads on next game start
     }
 
     public override double ExecuteOrder()
@@ -93,13 +97,44 @@ public class VanillaExpandedModSystem : ModSystem
         if (!Harmony.HasAnyPatches(Mod.Info.ModID))
         {
             harmony = new Harmony(Mod.Info.ModID);
-            harmony.PatchAll();
+            ApplySelectivePatches();
+        }
+    }
+
+    /// <summary>
+    /// Applies Harmony patches selectively based on enabled features in config.
+    /// </summary>
+    private void ApplySelectivePatches()
+    {
+        if (harmony is null) return;
+
+        if (Config.EnableAlloyCalculator)
+        {
+            new PatchClassProcessor(harmony, typeof(FirepitGuiPatch)).Patch();
+        }
+
+        if (Config.EnableSpawnDecal)
+        {
+            new PatchClassProcessor(harmony, typeof(ServerPlayerPatches)).Patch();
+        }
+
+        if (Config.EnableAutoStash)
+        {
+            new PatchClassProcessor(harmony, typeof(AutoStashPatch)).Patch();
+        }
+
+        if (Config.EnableIgnitionTools)
+        {
+            new PatchClassProcessor(harmony, typeof(IgnitionSourcesPatch)).Patch();
         }
     }
 
     public override void AssetsFinalize(ICoreAPI api)
     {
-        AutoStashPatch.AmendContainerBehaviors(api);
+        if (Config.EnableAutoStash)
+        {
+            AutoStashPatch.AmendContainerBehaviors(api);
+        }
         DisableRecipesBasedOnConfig(api);
     }
 
