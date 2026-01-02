@@ -276,6 +276,138 @@ public class EquipUnequipBehaviorTests
         Assert.True(result);
     }
 
+    [Fact]
+    public void OnHotKeyPressed_OffhandHoldsLight_BrighterLightInBackpack_UnequipsHeldLight()
+    {
+        // Arrange - Offhand has a dim light source, backpack has a brighter one
+        // DESIRED BEHAVIOR: When pressing the hotkey with a light already in target hand,
+        // the held light should be unequipped and the hand should become EMPTY,
+        // regardless of what other items exist in inventory.
+        var dimHandLight = MockItem.CreateLightSource(id: 1, brightness: 10);
+        var brighterBackpackLight = MockItem.CreateLightSource(id: 2, brightness: 30);
+
+        var fixture = new TestFixture(
+            offhandItem: new ItemStack(dimHandLight),
+            activeHotbarItem: null,
+            backpackItems: [brighterBackpackLight]);
+
+        // Verify initial state: offhand has dim light (10), backpack has brighter light (30)
+        Assert.False(fixture.OffhandInventory[0].Empty);
+        Assert.Equal(10, fixture.OffhandInventory[0].Itemstack.Collectible.LightHsv[2]);
+        Assert.Equal(30, fixture.BackpackInventory[0].Itemstack.Collectible.LightHsv[2]);
+
+        // Act - Press hotkey for offhand when offhand already has a light
+        bool result = fixture.System.OnHotKeyPressed(useOffhand: true);
+
+        // Assert - DESIRED: The light should be unequipped and hand should be EMPTY
+        Assert.True(result, "Hotkey action should return true");
+        Assert.True(fixture.OffhandInventory[0].Empty,
+            "The offhand should be empty after unequipping a light source");
+    }
+
+    [Fact]
+    public void OnHotKeyPressed_ActiveHotbarHoldsLight_BrighterLightInBackpack_UnequipsHeldLight()
+    {
+        // Arrange - Active hotbar has a dim light source, backpack has a brighter one
+        // DESIRED BEHAVIOR: When pressing the hotkey with a light already in target hand,
+        // the held light should be unequipped and the hand should become EMPTY.
+        var dimHandLight = MockItem.CreateLightSource(id: 1, brightness: 15);
+        var brighterBackpackLight = MockItem.CreateLightSource(id: 2, brightness: 25);
+
+        var fixture = new TestFixture(
+            offhandItem: null,
+            activeHotbarItem: new ItemStack(dimHandLight),
+            backpackItems: [brighterBackpackLight]);
+
+        // Verify initial state: hotbar has dim light (15), backpack has brighter light (25)
+        Assert.False(fixture.HotbarInventory[0].Empty);
+        Assert.Equal(15, fixture.HotbarInventory[0].Itemstack.Collectible.LightHsv[2]);
+        Assert.Equal(25, fixture.BackpackInventory[0].Itemstack.Collectible.LightHsv[2]);
+
+        // Act - Press hotkey for hotbar when hotbar already has a light
+        bool result = fixture.System.OnHotKeyPressed(useOffhand: false);
+
+        // Assert - DESIRED: The light should be unequipped and hand should be EMPTY
+        Assert.True(result, "Hotkey action should return true");
+        Assert.True(fixture.HotbarInventory[0].Empty,
+            "The active hotbar slot should be empty after unequipping a light source");
+    }
+
+    [Fact]
+    public void OnHotKeyPressed_OffhandHoldsLight_SameLightInBackpack_UnequipsToEmptyHand()
+    {
+        // Arrange - Offhand has a light source, backpack has another instance of the SAME light type
+        // DESIRED BEHAVIOR: When pressing the hotkey with a light already in target hand,
+        // the held light should be unequipped and the hand should become EMPTY,
+        // even if the same type of light exists in inventory.
+        // BUG SCENARIO: Currently the game merges them into a stack of 2 in hand instead of unequipping.
+
+        // Create mock API for item comparison (needed when items have same ID)
+        var apiMock = new Mock<ICoreClientAPI>();
+        var worldMock = new Mock<IClientWorldAccessor>();
+        apiMock.Setup(a => a.World).Returns(worldMock.Object);
+
+        var handLight = MockItem.CreateLightSource(id: 1, brightness: 20, api: apiMock.Object);
+        var sameBackpackLight = MockItem.CreateLightSource(id: 1, brightness: 20, api: apiMock.Object); // SAME item ID = same item type
+
+        var fixture = new TestFixture(
+            offhandItem: new ItemStack(handLight),
+            activeHotbarItem: null,
+            backpackItems: [sameBackpackLight]);
+
+        // Verify initial state: offhand has 1 light, backpack has 1 of the same light
+        Assert.False(fixture.OffhandInventory[0].Empty);
+        Assert.Equal(1, fixture.OffhandInventory[0].Itemstack.StackSize);
+        Assert.Equal(20, fixture.OffhandInventory[0].Itemstack.Collectible.LightHsv[2]);
+        Assert.Equal(1, fixture.BackpackInventory[0].Itemstack.StackSize);
+
+        // Act - Press hotkey for offhand when offhand already has a light
+        bool result = fixture.System.OnHotKeyPressed(useOffhand: true);
+
+        // Assert - DESIRED: The light should be unequipped and hand should be EMPTY
+        // NOT merged into a stack of 2
+        Assert.True(result, "Hotkey action should return true");
+        Assert.True(fixture.OffhandInventory[0].Empty,
+            "The offhand should be empty after unequipping a light source, not merged into a stack");
+    }
+
+    [Fact]
+    public void OnHotKeyPressed_ActiveHotbarHoldsLight_SameLightInBackpack_UnequipsToEmptyHand()
+    {
+        // Arrange - Active hotbar has a light source, backpack has another instance of the SAME light type
+        // DESIRED BEHAVIOR: When pressing the hotkey with a light already in target hand,
+        // the held light should be unequipped and the hand should become EMPTY.
+        // BUG SCENARIO: Currently the game merges them into a stack of 2 in hand instead of unequipping.
+
+        // Create mock API for item comparison (needed when items have same ID)
+        var apiMock = new Mock<ICoreClientAPI>();
+        var worldMock = new Mock<IClientWorldAccessor>();
+        apiMock.Setup(a => a.World).Returns(worldMock.Object);
+
+        var handLight = MockItem.CreateLightSource(id: 1, brightness: 20, api: apiMock.Object);
+        var sameBackpackLight = MockItem.CreateLightSource(id: 1, brightness: 20, api: apiMock.Object); // SAME item ID = same item type
+
+        var fixture = new TestFixture(
+            offhandItem: null,
+            activeHotbarItem: new ItemStack(handLight),
+            backpackItems: [sameBackpackLight]);
+
+        // Verify initial state: hotbar has 1 light, backpack has 1 of the same light
+        Assert.False(fixture.HotbarInventory[0].Empty);
+        Assert.Equal(1, fixture.HotbarInventory[0].Itemstack.StackSize);
+        Assert.Equal(20, fixture.HotbarInventory[0].Itemstack.Collectible.LightHsv[2]);
+        Assert.Equal(1, fixture.BackpackInventory[0].Itemstack.StackSize);
+
+        // Act - Press hotkey for hotbar when hotbar already has a light
+        bool result = fixture.System.OnHotKeyPressed(useOffhand: false);
+
+        // Assert - DESIRED: The light should be unequipped and hand should be EMPTY
+        // NOT merged into a stack of 2
+        Assert.True(result, "Hotkey action should return true");
+        Assert.True(fixture.HotbarInventory[0].Empty,
+            "The active hotbar slot should be empty after unequipping a light source, not merged into a stack");
+    }
+
     #endregion
 
     #region No Light Source Available Tests
