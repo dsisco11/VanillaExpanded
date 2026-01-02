@@ -5,27 +5,34 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+  release:
+    types: [ published ]
   workflow_dispatch:
     inputs:
       vs_version:
         description: 'VintageStory version to build against'
         required: false
-        default: '1.21.0'
+        default: '1.21.5'
         type: string
 
 env:
   DOTNET_VERSION: '8.0.x'
-  # Default VintageStory version - update this when targeting a new game version
-  VS_VERSION: ${{ inputs.vs_version || '1.21.0' }}
-  # Project name - used for locating modinfo.json
+  VS_VERSION: ${{ inputs.vs_version || '1.21.5' }}
   PROJECT_NAME: 'VanillaExpanded'
 
 jobs:
-  build:
+  # ============================================
+  # Job 1: Build and Test
+  # ============================================
+  build-test:
     runs-on: ubuntu-latest
+    outputs:
+      mod_id: ${{ steps.modinfo.outputs.mod_id }}
+      mod_version: ${{ steps.modinfo.outputs.mod_version }}
+      mod_name: ${{ steps.modinfo.outputs.mod_name }}
     
     steps:
-    - name: Checkout repository
+    - name: Checkout
       uses: actions/checkout@v4
 
     - name: Setup .NET
@@ -33,31 +40,26 @@ jobs:
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
 
-    - name: Cache VintageStory Server
-      id: cache-vs
+    - name: Setup VintageStory Server
+      uses: ./.github/actions/setup-vs-server
+      with:
+        vs-version: ${{ env.VS_VERSION }}
+
+    - name: Cache NuGet packages
       uses: actions/cache@v4
       with:
-        path: ~/vs-server
-        key: vs-server-${{ env.VS_VERSION }}
-
-    - name: Download VintageStory Server
-      if: steps.cache-vs.outputs.cache-hit != 'true'
-      run: |
-        mkdir -p ~/vs-server
-        echo "Downloading VintageStory Server v${{ env.VS_VERSION }}..."
-        curl -L -o ~/vs-server.tar.gz "https://cdn.vintagestory.at/gamefiles/stable/vs_server_linux-x64_${{ env.VS_VERSION }}.tar.gz"
-        tar -xzf ~/vs-server.tar.gz -C ~/vs-server --strip-components=0
-        rm ~/vs-server.tar.gz
-        ls -la ~/vs-server
-
-    - name: Set VINTAGE_STORY environment variable
-      run: echo "VINTAGE_STORY=$HOME/vs-server" >> $GITHUB_ENV
+        path: ~/.nuget/packages
+        key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+        restore-keys: nuget-${{ runner.os }}-
 
     - name: Restore dependencies
       run: dotnet restore
 
-    - name: Run CakeBuild (Build and Package)
-      run: dotnet run --project CakeBuild/CakeBuild.csproj
+    - name: Build
+      run: dotnet build --configuration Release --no-restore
+
+    - name: Test
+      run: dotnet test --configuration Release --no-build --verbosity normal
 
     - name: Get mod info
       id: modinfo
@@ -70,21 +72,60 @@ jobs:
         echo "mod_name=$MOD_NAME" >> $GITHUB_OUTPUT
         echo "Built: $MOD_NAME v$MOD_VERSION"
 
-    - name: Upload mod artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ steps.modinfo.outputs.mod_id }}_${{ steps.modinfo.outputs.mod_version }}
-        path: Releases/*.zip
-        retention-days: 30
-
-  release:
-    needs: build
+  # ============================================
+  # Job 2: Package (Cake Build)
+  # ============================================
+  package:
+    needs: build-test
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    outputs:
+      mod_id: ${{ steps.modinfo.outputs.mod_id }}
+      mod_version: ${{ steps.modinfo.outputs.mod_version }}
+      mod_name: ${{ steps.modinfo.outputs.mod_name }}
+      artifact_name: ${{ steps.modinfo.outputs.artifact_name }}
     
     steps:
-    - name: Checkout repository
+    - name: Checkout
       uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Setup VintageStory Server
+      uses: ./.github/actions/setup-vs-server
+      with:
+        vs-version: ${{ env.VS_VERSION }}
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+        restore-keys: nuget-${{ runner.os }}-
+
+    - name: Update version from release tag
+      if: github.event_name == 'release'
+      run: |
+        # Extract version from tag (strip 'v' prefix)
+        RELEASE_VERSION="${{ github.ref_name }}"
+        RELEASE_VERSION="${RELEASE_VERSION#v}"
+        echo "Updating modinfo.json version to: $RELEASE_VERSION"
+        
+        # Update modinfo.json with new version
+        jq --arg version "$RELEASE_VERSION" '.version = $version' ${{ env.PROJECT_NAME }}/modinfo.json > tmp.json
+        mv tmp.json ${{ env.PROJECT_NAME }}/modinfo.json
+        
+        # Show updated content
+        echo "Updated modinfo.json:"
+        cat ${{ env.PROJECT_NAME }}/modinfo.json
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Run CakeBuild (Package)
+      run: dotnet run --project CakeBuild/CakeBuild.csproj
 
     - name: Get mod info
       id: modinfo
@@ -92,37 +133,41 @@ jobs:
         MOD_ID=$(jq -r '.modid' ${{ env.PROJECT_NAME }}/modinfo.json)
         MOD_VERSION=$(jq -r '.version' ${{ env.PROJECT_NAME }}/modinfo.json)
         MOD_NAME=$(jq -r '.name' ${{ env.PROJECT_NAME }}/modinfo.json)
+        ARTIFACT_NAME="${MOD_ID}_${MOD_VERSION}"
         echo "mod_id=$MOD_ID" >> $GITHUB_OUTPUT
         echo "mod_version=$MOD_VERSION" >> $GITHUB_OUTPUT
         echo "mod_name=$MOD_NAME" >> $GITHUB_OUTPUT
+        echo "artifact_name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
+        echo "Packaged: $MOD_NAME v$MOD_VERSION"
 
+    - name: Upload mod artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ steps.modinfo.outputs.artifact_name }}
+        path: Releases/*.zip
+        retention-days: 30
+
+  # ============================================
+  # Job 3: Release (Attach artifacts to GitHub Release)
+  # ============================================
+  # Note: Version is injected from release tag during package job.
+  # The release tag (vX.Y.Z) is the source of truth for versioning.
+  # modinfo.json in the repo can be updated manually before release or left as-is.
+  release:
+    needs: package
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    
+    steps:
     - name: Download artifact
       uses: actions/download-artifact@v4
       with:
-        name: ${{ steps.modinfo.outputs.mod_id }}_${{ steps.modinfo.outputs.mod_version }}
+        name: ${{ needs.package.outputs.artifact_name }}
         path: ./release-artifacts
 
-    - name: Check if release exists
-      id: check_release
-      run: |
-        TAG="v${{ steps.modinfo.outputs.mod_version }}"
-        if gh release view "$TAG" &>/dev/null; then
-          echo "exists=true" >> $GITHUB_OUTPUT
-        else
-          echo "exists=false" >> $GITHUB_OUTPUT
-        fi
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Create GitHub Release
-      if: steps.check_release.outputs.exists == 'false'
+    - name: Attach artifacts to GitHub Release
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: v${{ steps.modinfo.outputs.mod_version }}
-        name: ${{ steps.modinfo.outputs.mod_name }} v${{ steps.modinfo.outputs.mod_version }}
         files: ./release-artifacts/*.zip
-        generate_release_notes: true
-        draft: false
-        prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

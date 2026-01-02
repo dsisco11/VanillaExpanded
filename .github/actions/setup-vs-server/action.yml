@@ -1,0 +1,33 @@
+name: 'Setup VintageStory Server'
+description: 'Downloads and caches VintageStory server for mod development'
+
+inputs:
+  vs-version:
+    description: 'VintageStory version to download'
+    required: true
+    default: '1.21.5'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Cache VintageStory Server
+      id: cache-vs
+      uses: actions/cache@v4
+      with:
+        path: ~/vs-server
+        key: vs-server-${{ inputs.vs-version }}
+
+    - name: Download VintageStory Server
+      if: steps.cache-vs.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        mkdir -p ~/vs-server
+        echo "Downloading VintageStory Server v${{ inputs.vs-version }}..."
+        curl -L -o ~/vs-server.tar.gz "https://cdn.vintagestory.at/gamefiles/stable/vs_server_linux-x64_${{ inputs.vs-version }}.tar.gz"
+        tar -xzf ~/vs-server.tar.gz -C ~/vs-server --strip-components=0
+        rm ~/vs-server.tar.gz
+        ls -la ~/vs-server
+
+    - name: Set VINTAGE_STORY environment variable
+      shell: bash
+      run: echo "VINTAGE_STORY=$HOME/vs-server" >> $GITHUB_ENV
