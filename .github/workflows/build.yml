@@ -87,6 +87,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Required for semantic-version to access tag history
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
@@ -105,19 +107,43 @@ jobs:
         key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
         restore-keys: nuget-${{ runner.os }}-
 
-    - name: Update version from release tag
-      if: github.event_name == 'release'
+    - name: Compute version from git tags
+      id: version
+      uses: paulhatch/semantic-version@v5.4.0
+      with:
+        tag_prefix: "v"
+        major_pattern: "(MAJOR)"
+        minor_pattern: "(MINOR)"
+        bump_each_commit: false
+
+    - name: Determine mod version
+      id: mod_version
       run: |
-        # Extract version from tag (strip 'v' prefix)
-        RELEASE_VERSION="${{ github.ref_name }}"
-        RELEASE_VERSION="${RELEASE_VERSION#v}"
-        echo "Updating modinfo.json version to: $RELEASE_VERSION"
+        # Base version from semantic-version (next patch after latest tag)
+        BASE="${{ steps.version.outputs.major }}.${{ steps.version.outputs.minor }}.${{ steps.version.outputs.patch }}"
         
-        # Update modinfo.json with new version
-        jq --arg version "$RELEASE_VERSION" '.version = $version' ${{ env.PROJECT_NAME }}/modinfo.json > tmp.json
+        if [[ "${{ github.event_name }}" == "release" ]]; then
+          # For releases, use exact tag version
+          RELEASE_VERSION="${{ github.ref_name }}"
+          COMPUTED_VERSION="${RELEASE_VERSION#v}"
+          echo "Release event: using exact tag version"
+        elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          # For PRs, use -pre suffix
+          COMPUTED_VERSION="${BASE}-pre.${{ github.run_number }}"
+          echo "PR event: using pre-release version"
+        else
+          # For push/workflow_dispatch, use -dev suffix
+          COMPUTED_VERSION="${BASE}-dev.${{ github.run_number }}"
+          echo "Push/dispatch event: using dev version"
+        fi
+        
+        echo "Computed version: $COMPUTED_VERSION"
+        echo "version=$COMPUTED_VERSION" >> $GITHUB_OUTPUT
+
+    - name: Update modinfo.json version
+      run: |
+        jq --arg version "${{ steps.mod_version.outputs.version }}" '.version = $version' ${{ env.PROJECT_NAME }}/modinfo.json > tmp.json
         mv tmp.json ${{ env.PROJECT_NAME }}/modinfo.json
-        
-        # Show updated content
         echo "Updated modinfo.json:"
         cat ${{ env.PROJECT_NAME }}/modinfo.json
 
@@ -150,9 +176,10 @@ jobs:
   # ============================================
   # Job 3: Release (Attach artifacts to GitHub Release)
   # ============================================
-  # Note: Version is injected from release tag during package job.
-  # The release tag (vX.Y.Z) is the source of truth for versioning.
-  # modinfo.json in the repo can be updated manually before release or left as-is.
+  # Note: Version is derived from the latest release tag during package job.
+  # - Release events: exact tag version (e.g., 1.2.3)
+  # - Push/dispatch: incremented patch + dev suffix (e.g., 1.2.4-dev.42)
+  # - Pull requests: incremented patch + pre suffix (e.g., 1.2.4-pre.43)
   release:
     needs: package
     runs-on: ubuntu-latest
