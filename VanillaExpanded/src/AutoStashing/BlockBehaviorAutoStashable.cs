@@ -32,9 +32,6 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
 
     #region Fields
     protected ICoreAPI? api;
-    protected float stashDelay = StashDelaySeconds;
-    protected float preStashGracePeriod = PreStashGracePeriodSeconds;
-    protected float postStashGracePeriod = PostStashGracePeriodSeconds;
     protected IProgressBar? progressBar;
     protected AssetLocation stashSoundPath = new("game:sounds/player/poultice-applied");
     /// <summary>
@@ -124,15 +121,15 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
 
         handling = EnumHandling.PreventSubsequent;
         // Allow a grace period after stashing to avoid immediate re-closure of the container.
-        if (secondsUsed > (StashDelay + postStashGracePeriod))
+        if (secondsUsed > (StashDelaySeconds + PostStashGracePeriodSeconds))
         {
             return false; // Stop interacting
         }
 
-        if (secondsUsed >= preStashGracePeriod)
+        if (secondsUsed >= PreStashGracePeriodSeconds)
         {
             setProgressVisibility(true);
-            setProgressPercentage(secondsUsed / StashDelay);
+            setProgressPercentage(secondsUsed / StashDelaySeconds);
             if (stashingState == EStashingState.PreStashGracePeriod)
             {
                 stashingState = EStashingState.Stashing;
@@ -144,7 +141,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             return true;// Return here so we don't keep trying to stash after we've already done it.
         }
 
-        if (secondsUsed >= StashDelay)
+        if (secondsUsed >= StashDelaySeconds)
         {
             stashingState = EStashingState.PostStashGracePeriod;
             world.Api.ModLoader.GetModSystem<AutoStashSystem_Client>().RequestAutoStash(blockSel.Position);
