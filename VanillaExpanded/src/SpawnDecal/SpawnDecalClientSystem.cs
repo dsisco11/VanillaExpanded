@@ -17,7 +17,10 @@ public class SpawnDecalClientSystem : ModSystem
     #endregion
 
     #region ModSystem Overrides
-    public override bool ShouldLoad(EnumAppSide forSide) => forSide == EnumAppSide.Client;
+    public override bool ShouldLoad(EnumAppSide forSide)
+    {
+        return forSide == EnumAppSide.Client && VanillaExpandedModSystem.Config.EnableSpawnDecal;
+    }
 
     public override void StartClientSide(ICoreClientAPI api)
     {

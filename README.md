@@ -55,6 +55,32 @@ _A high-tier tool (e.g. saw or shears) yields ~70% of the original materials._
 - Metal tool-heads can be de-crafted back into metal-bits using a chisel.
 - Metal arrow-heads can be de-crafted back into metal-bits using a chisel.
 
+## Configuration
+
+VanillaExpanded supports [ConfigLib](https://mods.vintagestory.at/configlib) for in-game configuration. If ConfigLib is installed, a "Mod Settings" button appears in the pause menu where you can toggle features on or off.
+
+Without ConfigLib, settings can be edited manually in `ModConfig/VanillaExpanded.json`.
+
+### Available Settings
+
+| Setting                  | Default | Description                                                    |
+| ------------------------ | ------- | -------------------------------------------------------------- |
+| EnableAutoStash          | true    | Enable auto-stashing items into containers by holding interact |
+| EnableIgnitionTools      | true    | Enable lighting fires using lanterns, candles, and oil lamps   |
+| EnableSpawnDecal         | true    | Show a glowing decal at the player's respawn point             |
+| EnableAlloyCalculator    | true    | Enable the alloy calculator GUI for crucibles                  |
+| EnableEquipLightHotkey   | true    | Enable the hotkey to equip light sources to offhand/hotbar     |
+| EnableBackpackDecraft    | true    | Enable decrafting backpacks into leather                       |
+| EnableLinenSackDecraft   | true    | Enable decrafting linen sacks into flax fibers                 |
+| EnableMetalBitsRecycling | true    | Enable recycling metal tool heads into metal bits              |
+| EnableStickRecipes       | true    | Enable crafting sticks from planks and firewood                |
+| EnableWattleDecraft      | true    | Enable decrafting wattle blocks into sticks                    |
+| AutoStashDelay           | 0.5     | Time in seconds to hold interact before auto-stashing begins   |
+| IgnitionDelay            | 0.5     | Time in seconds to hold interact before igniting a fire        |
+| SpawnDecalSize           | 0.4     | Size of the spawn point decal (0.2 to 1.0)                     |
+
+**Note:** Feature toggles (Enable\*) require a world reload to take effect.
+
 ## Testing
 
 The project includes comprehensive unit and end-to-end tests organized by namespace within `VanillaExpanded.Tests`.

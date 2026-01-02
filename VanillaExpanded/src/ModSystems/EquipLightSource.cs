@@ -22,7 +22,11 @@ public class EquipLightSource : ModSystem
     #endregion
 
     #region Hooks
-    public override bool ShouldLoad(EnumAppSide forSide) => forSide == EnumAppSide.Client;
+    public override bool ShouldLoad(EnumAppSide forSide)
+    {
+        return forSide == EnumAppSide.Client && VanillaExpandedModSystem.Config.EnableEquipLightHotkey;
+    }
+
     public override void StartClientSide(ICoreClientAPI api)
     {
         this.api = api;

@@ -16,7 +16,11 @@ internal class AutoStashSystem_Client : ModSystem
     #endregion
 
     #region Hooks
-    public override bool ShouldLoad(EnumAppSide forSide) => forSide == EnumAppSide.Client;
+    public override bool ShouldLoad(EnumAppSide forSide)
+    {
+        return forSide == EnumAppSide.Client && VanillaExpandedModSystem.Config.EnableAutoStash;
+    }
+
     public override void Dispose()
     {
         base.Dispose();

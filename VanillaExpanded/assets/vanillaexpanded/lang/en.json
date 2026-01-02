@@ -16,5 +16,38 @@
   "gui-alloycalculator-required": "Required Amounts",
   "gui-alloycalculator-units": "units",
   "gui-alloycalculator-total": "Total",
-  "gui-alloycalculator-nuggets": "nuggets"
+  "gui-alloycalculator-nuggets": "nuggets",
+
+  "config-section-features": "Feature Toggles",
+  "config-section-timing": "Timing Settings",
+  "config-section-recipes": "Recipe Toggles",
+
+  "config-enable-auto-stash": "Auto-Stash to Containers",
+  "config-enable-auto-stash-tooltip": "Enable auto-stashing items into containers by holding the interact key.",
+  "config-enable-ignition-tools": "Ignition Tools",
+  "config-enable-ignition-tools-tooltip": "Enable lighting fires using lanterns, candles, and oil lamps.",
+  "config-enable-spawn-decal": "Respawn Point Decal",
+  "config-enable-spawn-decal-tooltip": "Show a glowing decal at the player's respawn point.",
+  "config-enable-alloy-calculator": "Alloy Calculator",
+  "config-enable-alloy-calculator-tooltip": "Enable the alloy calculator GUI for crucibles.",
+  "config-enable-equip-light-hotkey": "Equip Light Source Hotkey",
+  "config-enable-equip-light-hotkey-tooltip": "Enable the hotkey to equip light sources to offhand/hotbar.",
+
+  "config-auto-stash-delay": "Auto-Stash Delay",
+  "config-auto-stash-delay-tooltip": "Time in seconds to hold the interact key before auto-stashing begins.",
+  "config-ignition-delay": "Ignition Delay",
+  "config-ignition-delay-tooltip": "Time in seconds to hold the interact key before igniting a fire.",
+  "config-spawn-decal-size": "Spawn Decal Size",
+  "config-spawn-decal-size-tooltip": "Size of the spawn point decal (0.2 to 1.0).",
+
+  "config-enable-backpack-decraft": "Backpack Decrafting",
+  "config-enable-backpack-decraft-tooltip": "Enable decrafting backpacks into leather using knife or shears.",
+  "config-enable-linensack-decraft": "Linen Sack Decrafting",
+  "config-enable-linensack-decraft-tooltip": "Enable decrafting linen sacks into flax fibers using knife or shears.",
+  "config-enable-metalbits-recycling": "Metal Bits Recycling",
+  "config-enable-metalbits-recycling-tooltip": "Enable recycling metal tool heads into metal bits using a chisel.",
+  "config-enable-stick-recipes": "Stick Crafting",
+  "config-enable-stick-recipes-tooltip": "Enable crafting sticks from planks and firewood.",
+  "config-enable-wattle-decraft": "Wattle Decrafting",
+  "config-enable-wattle-decraft-tooltip": "Enable decrafting wattle blocks into sticks."
 }

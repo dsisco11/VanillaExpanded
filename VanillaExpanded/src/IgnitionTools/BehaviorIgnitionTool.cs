@@ -24,7 +24,7 @@ public class BehaviorIgnitionTool : CollectibleBehavior
     /// <summary> Animation to play when igniting </summary>
     private string? igniteAnimation = null;
     /// <summary> Time in seconds it takes to use the tool </summary>
-    private float ignitionDelay = 0.5f;
+    private float IgnitionDelay => VanillaExpandedModSystem.Config.IgnitionDelay;
     /// <summary> Unique ID for the sound callback </summary>
     private const string SoundId = "ignition_tool_sound";
     #endregion
@@ -49,6 +49,12 @@ public class BehaviorIgnitionTool : CollectibleBehavior
         // set default handling
         handling = EnumHandling.PassThrough;
         handHandling = EnumHandHandling.NotHandled;
+
+        // guard clause - ignition tools disabled
+        if (!VanillaExpandedModSystem.Config.EnableIgnitionTools)
+        {
+            return;
+        }
 
         // guard clause - block selection must be valid
         if (blockSel is null)
@@ -126,7 +132,7 @@ public class BehaviorIgnitionTool : CollectibleBehavior
                     if (byEntity.World is IClientWorldAccessor)
                     {
                         bool cycle = (int)(secondsUsed * 30.0) % 2 == 1;
-                        if (secondsUsed > ignitionDelay && cycle)
+                        if (secondsUsed > IgnitionDelay && cycle)
                         {
                             Random rand = byEntity.World.Rand;
                             const double quarterBlock = 0.125;

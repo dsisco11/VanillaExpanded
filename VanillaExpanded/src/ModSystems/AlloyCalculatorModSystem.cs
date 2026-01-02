@@ -22,7 +22,10 @@ public sealed class AlloyCalculatorModSystem : ModSystem
     #endregion
 
     #region ModSystem Lifecycle
-    public override bool ShouldLoad(EnumAppSide forSide) => forSide == EnumAppSide.Client;
+    public override bool ShouldLoad(EnumAppSide forSide)
+    {
+        return forSide == EnumAppSide.Client && VanillaExpandedModSystem.Config.EnableAlloyCalculator;
+    }
 
     public override void StartClientSide(ICoreClientAPI api)
     {
@@ -59,6 +62,7 @@ public sealed class AlloyCalculatorModSystem : ModSystem
     private void OnFirepitDialogOpened(GuiDialogBlockEntityFirepit firepitDialog)
     {
         if (capi is null) return;
+        if (!VanillaExpandedModSystem.Config.EnableAlloyCalculator) return;
         
         EFirepitKind kind = GetFirepitKind(capi, firepitDialog);
         if (kind != EFirepitKind.Smelting) return;
