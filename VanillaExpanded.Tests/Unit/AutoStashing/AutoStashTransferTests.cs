@@ -184,10 +184,13 @@ public class AutoStashTransferTests
     #region Timing Constants Tests
 
     [Fact]
-    public void StashDelaySeconds_HasExpectedValue()
+    public void StashDelaySeconds_HasExpectedDefaultValue()
     {
-        // Assert
-        Assert.Equal(0.5f, BlockBehaviorAutoStashable.StashDelaySeconds);
+        // Arrange - Create instance to access the instance field
+        var behavior = new BlockBehaviorAutoStashable(null!);
+
+        // Assert - Default value when config is null
+        Assert.Equal(0.5f, behavior.StashDelaySeconds);
     }
 
     [Fact]
@@ -208,7 +211,8 @@ public class AutoStashTransferTests
     public void TotalStashDuration_SumOfDelayAndGracePeriods()
     {
         // Arrange
-        var expectedTotal = BlockBehaviorAutoStashable.StashDelaySeconds + BlockBehaviorAutoStashable.PostStashGracePeriodSeconds;
+        var behavior = new BlockBehaviorAutoStashable(null!);
+        var expectedTotal = behavior.StashDelaySeconds + BlockBehaviorAutoStashable.PostStashGracePeriodSeconds;
 
         // Assert - Total interaction time is stashDelay + postStashGracePeriod
         Assert.Equal(0.9f, expectedTotal);
@@ -217,16 +221,22 @@ public class AutoStashTransferTests
     [Fact]
     public void PreStashGracePeriod_IsLessThanStashDelay()
     {
+        // Arrange
+        var behavior = new BlockBehaviorAutoStashable(null!);
+
         // The pre-stash grace period should always be less than the stash delay
         // to ensure the UI shows before stashing occurs
-        Assert.True(BlockBehaviorAutoStashable.PreStashGracePeriodSeconds < BlockBehaviorAutoStashable.StashDelaySeconds);
+        Assert.True(BlockBehaviorAutoStashable.PreStashGracePeriodSeconds < behavior.StashDelaySeconds);
     }
 
     [Fact]
     public void TimingConstants_ArePositive()
     {
+        // Arrange
+        var behavior = new BlockBehaviorAutoStashable(null!);
+
         // All timing constants should be positive values
-        Assert.True(BlockBehaviorAutoStashable.StashDelaySeconds > 0);
+        Assert.True(behavior.StashDelaySeconds > 0);
         Assert.True(BlockBehaviorAutoStashable.PreStashGracePeriodSeconds > 0);
         Assert.True(BlockBehaviorAutoStashable.PostStashGracePeriodSeconds > 0);
     }
