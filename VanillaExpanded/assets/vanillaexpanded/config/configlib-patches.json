@@ -1,11 +1,11 @@
 {
-  "version": 1,
+  "version": 2,
   "file": "VanillaExpanded.json",
   "settings": {
     "boolean": {
       "ENABLE_AUTO_STASH": {
         "code": "EnableAutoStash",
-        "name": "enable-auto-stash",
+        "name": "EnableAutoStash",
         "ingui": "vanillaexpanded:config-enable-auto-stash",
         "comment": "vanillaexpanded:config-enable-auto-stash-tooltip",
         "default": true,
@@ -13,7 +13,7 @@
       },
       "ENABLE_IGNITION_TOOLS": {
         "code": "EnableIgnitionTools",
-        "name": "enable-ignition-tools",
+        "name": "EnableIgnitionTools",
         "ingui": "vanillaexpanded:config-enable-ignition-tools",
         "comment": "vanillaexpanded:config-enable-ignition-tools-tooltip",
         "default": true,
@@ -21,7 +21,7 @@
       },
       "ENABLE_SPAWN_DECAL": {
         "code": "EnableSpawnDecal",
-        "name": "enable-spawn-decal",
+        "name": "EnableSpawnDecal",
         "ingui": "vanillaexpanded:config-enable-spawn-decal",
         "comment": "vanillaexpanded:config-enable-spawn-decal-tooltip",
         "default": true,
@@ -29,7 +29,7 @@
       },
       "ENABLE_ALLOY_CALCULATOR": {
         "code": "EnableAlloyCalculator",
-        "name": "enable-alloy-calculator",
+        "name": "EnableAlloyCalculator",
         "ingui": "vanillaexpanded:config-enable-alloy-calculator",
         "comment": "vanillaexpanded:config-enable-alloy-calculator-tooltip",
         "default": true,
@@ -37,7 +37,7 @@
       },
       "ENABLE_EQUIP_LIGHT_HOTKEY": {
         "code": "EnableEquipLightHotkey",
-        "name": "enable-equip-light-hotkey",
+        "name": "EnableEquipLightHotkey",
         "ingui": "vanillaexpanded:config-enable-equip-light-hotkey",
         "comment": "vanillaexpanded:config-enable-equip-light-hotkey-tooltip",
         "default": true,
@@ -45,7 +45,7 @@
       },
       "ENABLE_BACKPACK_DECRAFT": {
         "code": "EnableBackpackDecraft",
-        "name": "enable-backpack-decraft",
+        "name": "EnableBackpackDecraft",
         "ingui": "vanillaexpanded:config-enable-backpack-decraft",
         "comment": "vanillaexpanded:config-enable-backpack-decraft-tooltip",
         "default": true,
@@ -53,7 +53,7 @@
       },
       "ENABLE_LINENSACK_DECRAFT": {
         "code": "EnableLinenSackDecraft",
-        "name": "enable-linensack-decraft",
+        "name": "EnableLinenSackDecraft",
         "ingui": "vanillaexpanded:config-enable-linensack-decraft",
         "comment": "vanillaexpanded:config-enable-linensack-decraft-tooltip",
         "default": true,
@@ -61,7 +61,7 @@
       },
       "ENABLE_METALBITS_RECYCLING": {
         "code": "EnableMetalBitsRecycling",
-        "name": "enable-metalbits-recycling",
+        "name": "EnableMetalBitsRecycling",
         "ingui": "vanillaexpanded:config-enable-metalbits-recycling",
         "comment": "vanillaexpanded:config-enable-metalbits-recycling-tooltip",
         "default": true,
@@ -69,7 +69,7 @@
       },
       "ENABLE_STICK_RECIPES": {
         "code": "EnableStickRecipes",
-        "name": "enable-stick-recipes",
+        "name": "EnableStickRecipes",
         "ingui": "vanillaexpanded:config-enable-stick-recipes",
         "comment": "vanillaexpanded:config-enable-stick-recipes-tooltip",
         "default": true,
@@ -77,7 +77,7 @@
       },
       "ENABLE_WATTLE_DECRAFT": {
         "code": "EnableWattleDecraft",
-        "name": "enable-wattle-decraft",
+        "name": "EnableWattleDecraft",
         "ingui": "vanillaexpanded:config-enable-wattle-decraft",
         "comment": "vanillaexpanded:config-enable-wattle-decraft-tooltip",
         "default": true,
@@ -87,7 +87,7 @@
     "float": {
       "AUTO_STASH_DELAY": {
         "code": "AutoStashDelay",
-        "name": "auto-stash-delay",
+        "name": "AutoStashDelay",
         "ingui": "vanillaexpanded:config-auto-stash-delay",
         "comment": "vanillaexpanded:config-auto-stash-delay-tooltip",
         "default": 0.5,
@@ -96,7 +96,7 @@
       },
       "IGNITION_DELAY": {
         "code": "IgnitionDelay",
-        "name": "ignition-delay",
+        "name": "IgnitionDelay",
         "ingui": "vanillaexpanded:config-ignition-delay",
         "comment": "vanillaexpanded:config-ignition-delay-tooltip",
         "default": 0.5,
@@ -105,7 +105,7 @@
       },
       "SPAWN_DECAL_SIZE": {
         "code": "SpawnDecalSize",
-        "name": "spawn-decal-size",
+        "name": "SpawnDecalSize",
         "ingui": "vanillaexpanded:config-spawn-decal-size",
         "comment": "vanillaexpanded:config-spawn-decal-size-tooltip",
         "default": 0.4,
