@@ -62,6 +62,7 @@ public sealed class AlloyCalculatorModSystem : ModSystem
     private void OnFirepitDialogOpened(GuiDialogBlockEntityFirepit firepitDialog)
     {
         if (capi is null) return;
+        if (!VanillaExpandedModSystem.Config.EnableAlloyCalculator) return;
         
         EFirepitKind kind = GetFirepitKind(capi, firepitDialog);
         if (kind != EFirepitKind.Smelting) return;

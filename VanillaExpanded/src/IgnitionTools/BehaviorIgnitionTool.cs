@@ -50,6 +50,12 @@ public class BehaviorIgnitionTool : CollectibleBehavior
         handling = EnumHandling.PassThrough;
         handHandling = EnumHandHandling.NotHandled;
 
+        // guard clause - ignition tools disabled
+        if (!VanillaExpandedModSystem.Config.EnableIgnitionTools)
+        {
+            return;
+        }
+
         // guard clause - block selection must be valid
         if (blockSel is null)
         {
