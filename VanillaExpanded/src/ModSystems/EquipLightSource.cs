@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -100,28 +101,41 @@ public class EquipLightSource : ModSystem
                 previousHotbarSlot = null;
             }
 
-            // Target slot is either the previous backpack/hotbar slot, or we need to find a new slot for it (best available backpack slot or best available hotbar slot).
+            // Target slot is either the previous backpack/hotbar slot, or we need to find a new slot for it.
+            // When unequipping, we want to move to an EMPTY slot first to avoid merging with existing stacks.
             ItemSlot? previousSlot = previousBackpackSlot ?? previousHotbarSlot;
             targetSlot = previousSlot;// set target slot to previous by default, override with a new value if needed according to additional logic below.
             if (previousSlot is null)
             {
-                // find the first available backpack slot or last available hotbar slot
+                // Find the first EMPTY slot in backpack or hotbar (avoid GetBestSuitedSlot which prefers merging)
                 IPlayerInventoryManager playerInventory = api!.World.Player.InventoryManager;
                 IInventory? backpack = playerInventory.GetOwnInventory(GlobalConstants.backpackInvClassName);
-                WeightedSlot? bpBestSlot = backpack?.GetBestSuitedSlot(lightSourceSlot);
-                if (bpBestSlot is not null)
-                {
-                    targetSlot = bpBestSlot.slot;
-                    previousBackpackSlot = targetSlot;
-                }
-                else
+                
+                // First try to find an empty slot that can hold the item
+                targetSlot = FindEmptySlotThatCanHold(backpack, lightSourceSlot);
+                
+                if (targetSlot is null)
                 {
                     IInventory? hotbar = playerInventory.GetOwnInventory(GlobalConstants.hotBarInvClassName);
-                    WeightedSlot? hbBestSlot = hotbar?.GetBestSuitedSlot(lightSourceSlot);
-                    if (hbBestSlot is not null)
+                    targetSlot = FindEmptySlotThatCanHold(hotbar, lightSourceSlot);
+                }
+                
+                // If no empty slots found, fall back to GetBestSuitedSlot (which may merge)
+                if (targetSlot is null)
+                {
+                    WeightedSlot? bpBestSlot = backpack?.GetBestSuitedSlot(lightSourceSlot);
+                    if (bpBestSlot is not null)
                     {
-                        targetSlot = hbBestSlot.slot;
-                        previousHotbarSlot = targetSlot;
+                        targetSlot = bpBestSlot.slot;
+                    }
+                    else
+                    {
+                        IInventory? hotbar = playerInventory.GetOwnInventory(GlobalConstants.hotBarInvClassName);
+                        WeightedSlot? hbBestSlot = hotbar?.GetBestSuitedSlot(lightSourceSlot);
+                        if (hbBestSlot is not null)
+                        {
+                            targetSlot = hbBestSlot.slot;
+                        }
                     }
                 }
             }
@@ -246,6 +260,13 @@ public class EquipLightSource : ModSystem
     #endregion
 
     #region Private Methods
+    /// <summary>
+    /// Finds the first empty slot in the inventory that can hold the item from the source slot.
+    /// </summary>
+    /// <returns>The first empty slot that can hold the item, or null if none found.</returns>
+    private static ItemSlot? FindEmptySlotThatCanHold(IInventory? inventory, ItemSlot sourceSlot)
+        => inventory?.FirstOrDefault(slot => slot.Empty && slot.CanHold(sourceSlot));
+
     /// <summary>
     /// Determines if the given item slot contains a light source.
     /// </summary>
