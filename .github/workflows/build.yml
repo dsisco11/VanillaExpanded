@@ -134,22 +134,17 @@ jobs:
         retention-days: 30
 
   # ============================================
-  # Job 3: Release (GitHub Release + Version Commit)
+  # Job 3: Release (Attach artifacts to GitHub Release)
   # ============================================
+  # Note: Version is injected from release tag during package job.
+  # The release tag (vX.Y.Z) is the source of truth for versioning.
+  # modinfo.json in the repo can be updated manually before release or left as-is.
   release:
     needs: package
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
-    permissions:
-      contents: write
     
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        ref: main
-        fetch-depth: 0
-
     - name: Download artifact
       uses: actions/download-artifact@v4
       with:
@@ -162,29 +157,3 @@ jobs:
         files: ./release-artifacts/*.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Update modinfo.json version and commit to main
-      run: |
-        # Extract version from tag (strip 'v' prefix)
-        RELEASE_VERSION="${{ github.ref_name }}"
-        RELEASE_VERSION="${RELEASE_VERSION#v}"
-        
-        echo "Updating modinfo.json version to: $RELEASE_VERSION"
-        
-        # Update modinfo.json with new version
-        jq --arg version "$RELEASE_VERSION" '.version = $version' ${{ env.PROJECT_NAME }}/modinfo.json > tmp.json
-        mv tmp.json ${{ env.PROJECT_NAME }}/modinfo.json
-        
-        # Configure git
-        git config user.name "github-actions[bot]"
-        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-        
-        # Check if there are changes to commit
-        if git diff --quiet ${{ env.PROJECT_NAME }}/modinfo.json; then
-          echo "No version changes to commit (version already up to date)"
-        else
-          git add ${{ env.PROJECT_NAME }}/modinfo.json
-          git commit -m "chore: bump version to $RELEASE_VERSION [skip ci]"
-          git push origin main
-          echo "Version bump committed to main branch"
-        fi
