@@ -184,6 +184,8 @@ jobs:
     needs: package
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
+    permissions:
+      contents: write  # Required to attach artifacts to the release
     
     steps:
     - name: Download artifact
