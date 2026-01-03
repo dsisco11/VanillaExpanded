@@ -43,18 +43,15 @@ public class WordBoundaryMatcherTests
 
     #endregion
 
-    #region Special Boundary Characters
+    #region Space Boundary Tests
 
     [Theory]
-    [InlineData("Fire-starter", "fire", true)]     // Hyphen boundary
-    [InlineData("Fire_starter", "fire", true)]     // Underscore boundary
-    [InlineData("(Fire) starter", "fire", true)]   // Parentheses boundary
-    [InlineData("[Fire] starter", "fire", true)]   // Bracket boundary
-    [InlineData("\"Fire\" starter", "fire", true)] // Quote boundary
-    [InlineData("Fire, starter", "fire", true)]    // Comma boundary
-    [InlineData("Fire. Starter", "fire", true)]    // Period boundary
-    [InlineData("Fire: Starter", "fire", true)]    // Colon boundary
-    public void ContainsFullWord_SpecialBoundaries_ReturnsTrue(string text, string searchText, bool expected)
+    [InlineData("Fire starter", "fire", true)]     // Space boundary
+    [InlineData("The Fire starter", "fire", true)] // Space boundaries on both sides
+    [InlineData("Fire-starter", "fire", false)]    // Hyphen is not a boundary
+    [InlineData("Fire_starter", "fire", false)]    // Underscore is not a boundary
+    [InlineData("(Fire)", "fire", false)]          // Parentheses are not boundaries
+    public void ContainsFullWord_OnlySpacesAreBoundaries(string text, string searchText, bool expected)
     {
         // Act
         bool result = WordBoundaryMatcher.ContainsFullWord(text.AsSpan(), searchText.AsSpan());
@@ -65,14 +62,14 @@ public class WordBoundaryMatcherTests
 
     #endregion
 
-    #region Number Boundaries
+    #region Adjacent Characters
 
     [Theory]
-    [InlineData("Fire2", "fire", false)]           // Number is not a boundary
+    [InlineData("Fire2", "fire", false)]           // Number adjacent is not a boundary
     [InlineData("2Fire", "fire", false)]           // Number prefix is not a boundary
     [InlineData("Fire 2", "fire", true)]           // Space is a boundary
-    [InlineData("Type2 Fire", "fire", true)]       // Word after alphanumeric
-    public void ContainsFullWord_NumberBoundaries_HandledCorrectly(string text, string searchText, bool expected)
+    [InlineData("Type2 Fire", "fire", true)]       // Space before Fire
+    public void ContainsFullWord_AdjacentCharacters_HandledCorrectly(string text, string searchText, bool expected)
     {
         // Act
         bool result = WordBoundaryMatcher.ContainsFullWord(text.AsSpan(), searchText.AsSpan());

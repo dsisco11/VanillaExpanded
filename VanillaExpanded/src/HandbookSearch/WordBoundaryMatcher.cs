@@ -1,18 +1,12 @@
 using System;
-using System.Buffers;
 
 namespace VanillaExpanded.HandbookSearch;
 
 /// <summary>
-/// High-performance word boundary matching for handbook search prioritization.
-/// Uses .NET 8 SearchValues for efficient character scanning.
+/// Word boundary matching for handbook search prioritization.
 /// </summary>
 internal static class WordBoundaryMatcher
 {
-    /// <summary>
-    /// Characters that are considered word boundaries (non-word characters).
-    /// </summary>
-    private static readonly SearchValues<char> WordBoundaryChars = SearchValues.Create(" \t\n\r-_.,;:!?()[]{}\"'`/\\|@#$%^&*+=<>~");
 
     /// <summary>
     /// Checks if <paramref name="searchText"/> appears as a complete word in <paramref name="text"/>.
@@ -94,15 +88,7 @@ internal static class WordBoundaryMatcher
     }
 
     /// <summary>
-    /// Determines if a character is a word boundary.
+    /// Determines if a character is a word boundary (space).
     /// </summary>
-    private static bool IsWordBoundary(char c)
-    {
-        // Fast path: check against known boundary characters
-        if (WordBoundaryChars.Contains(c))
-            return true;
-
-        // Fallback: any non-letter-or-digit is a boundary
-        return !char.IsLetterOrDigit(c);
-    }
+    private static bool IsWordBoundary(char c) => c == ' ';
 }
