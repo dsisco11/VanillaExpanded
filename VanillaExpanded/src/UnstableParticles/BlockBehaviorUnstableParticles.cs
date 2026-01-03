@@ -20,12 +20,12 @@ internal sealed class BlockBehaviorUnstableParticles : BlockBehavior
     /// <summary>
     /// Minimum instability value (0-1) before particles start spawning.
     /// </summary>
-    private const double MinInstabilityThreshold = 0.2;
+    private const double MinInstabilityThreshold = 0.48;
 
     /// <summary>
     /// Maximum spawn chance per tick at maximum instability.
     /// </summary>
-    private const float MaxSpawnChance = 0.08f;
+    private const float MaxSpawnChance = 0.02f;
 
     /// <summary>
     /// How often to refresh cached instability values (in seconds).
@@ -36,11 +36,6 @@ internal sealed class BlockBehaviorUnstableParticles : BlockBehavior
     /// How long before a cache entry expires and is removed (in seconds).
     /// </summary>
     private const double CacheExpirationTime = 30.0;
-
-    /// <summary>
-    /// How often to run cache cleanup (in ticks, approximately).
-    /// </summary>
-    private const int CacheCleanupInterval = 500;
     #endregion
 
     #region Static Cache
@@ -50,7 +45,6 @@ internal sealed class BlockBehaviorUnstableParticles : BlockBehavior
     /// </summary>
     private static readonly Dictionary<BlockPos, (double instability, long lastCheckMs)> instabilityCache = [];
 
-    private static int cleanupCounter;
     private static readonly object cacheLock = new();
     private static long lastCleanupTimeMs;
     #endregion
@@ -82,21 +76,24 @@ internal sealed class BlockBehaviorUnstableParticles : BlockBehavior
         dustParticles = new SimpleParticleProperties(
             minQuantity: 1,
             maxQuantity: 2,
-            color: ColorUtil.ToRgba(180, 120, 100, 80), // Brownish-gray dust
-            minPos: new Vec3d(),
-            maxPos: new Vec3d(),
-            minVelocity: new Vec3f(-0.05f, -0.15f, -0.05f),
-            maxVelocity: new Vec3f(0.05f, -0.05f, 0.05f),
-            lifeLength: 1.2f,
-            gravityEffect: 0.4f,
-            minSize: 0.05f,
-            maxSize: 0.15f,
-            model: EnumParticleModel.Cube
+            color: ColorUtil.ToRgba(200, 200, 200, 255), // sligntly darker than block colors
+            minPos: new Vec3d(.1, 0, .1),
+            maxPos: new Vec3d(.9, .9, .9),
+            minVelocity: new Vec3f(-0.075f, 0f, -0.075f),
+            maxVelocity: new Vec3f(0.075f, 0f, 0.075f),
+            lifeLength: 2f,
+            gravityEffect: 2f,
+            minSize: 0.3f,
+            maxSize: 0.7f,
+            model: EnumParticleModel.Cube            
         )
         {
             ColorByBlock = block,
-            SizeEvolve = EvolvingNatFloat.create(EnumTransformFunction.LINEARREDUCE, 0.3f),
-            OpacityEvolve = EvolvingNatFloat.create(EnumTransformFunction.LINEARREDUCE, 150)
+            SizeEvolve = EvolvingNatFloat.create(EnumTransformFunction.LINEARREDUCE, 0.5f),
+            //OpacityEvolve = EvolvingNatFloat.create(EnumTransformFunction.LINEARREDUCE, 150),
+            WithTerrainCollision = true,
+            addLifeLength = 0.3f,
+            Bounciness = 0.25f
         };
     }
     #endregion
@@ -104,7 +101,15 @@ internal sealed class BlockBehaviorUnstableParticles : BlockBehavior
     #region Particle Tick Handlers
     public override bool ShouldReceiveClientParticleTicks(IWorldAccessor world, IPlayer byPlayer, BlockPos pos, ref EnumHandling handling)
     {
-        handling = EnumHandling.PassThrough;
+        handling = EnumHandling.Handled;
+        try
+        {
+            CleanupExpiredCache(world.ElapsedMilliseconds);
+        }
+        catch (Exception e)
+        {
+            world.Logger.Error("Error during instability cache cleanup: {0}", e.Message);
+        }
         return true;
     }
 
@@ -124,19 +129,12 @@ internal sealed class BlockBehaviorUnstableParticles : BlockBehavior
 
         // Scale spawn chance based on instability (0.2 to 1.0 maps to 0 to MaxSpawnChance)
         double normalizedInstability = (instability - MinInstabilityThreshold) / (1.0 - MinInstabilityThreshold);
+        double scaledInstability = Math.Pow(normalizedInstability, 2.0); // Non-linear scaling curve so higher instability has more impact
         float spawnChance = (float)(normalizedInstability * MaxSpawnChance);
 
         if (random.NextDouble() < spawnChance)
         {
             SpawnDustParticle(manager, pos);
-        }
-
-        // Periodic cache cleanup
-        cleanupCounter++;
-        if (cleanupCounter >= CacheCleanupInterval)
-        {
-            cleanupCounter = 0;
-            CleanupExpiredCache(currentTimeMs);
         }
     }
 
@@ -148,10 +146,7 @@ internal sealed class BlockBehaviorUnstableParticles : BlockBehavior
         }
 
         // Spawn from random position on bottom face of block
-        double offsetX = random.NextDouble() * 0.8 + 0.1; // 0.1 to 0.9 within block
-        double offsetZ = random.NextDouble() * 0.8 + 0.1;
-
-        dustParticles.MinPos.Set(pos.X + offsetX, pos.Y, pos.Z + offsetZ);
+        dustParticles.MinPos.Set(pos.DownCopy());
         dustParticles.ColorByBlock = block;
 
         manager.Spawn(dustParticles);
@@ -252,7 +247,6 @@ internal sealed class BlockBehaviorUnstableParticles : BlockBehavior
         lock (cacheLock)
         {
             instabilityCache.Clear();
-            cleanupCounter = 0;
         }
     }
     #endregion

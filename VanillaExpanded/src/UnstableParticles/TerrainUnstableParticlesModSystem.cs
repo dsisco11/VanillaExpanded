@@ -7,12 +7,16 @@ namespace VanillaExpanded.UnstableParticles;
 /// Client-side mod system that adds crumbling dust particles to unstable rock blocks.
 /// Fully self-contained - handles behavior registration and application.
 /// </summary>
-internal sealed class UnstableParticlesSystem : ModSystem
+internal sealed class TerrainUnstableParticlesModSystem : ModSystem
 {
     #region ModSystem Lifecycle
     public override bool ShouldLoad(EnumAppSide forSide)
     {
-        return forSide == EnumAppSide.Client && VanillaExpandedModSystem.Config.EnableUnstableParticles;
+        return forSide switch
+        {
+            EnumAppSide.Client => VanillaExpandedModSystem.Config.EnableUnstableParticles,
+            _ => true
+        };
     }
 
     public override void Start(ICoreAPI api)
@@ -63,10 +67,8 @@ internal sealed class UnstableParticlesSystem : ModSystem
                 BlockBehaviorUnstableParticles behavior = new(block);
 
                 // Add behavior to block-behaviors array (prepend)
-                block.BlockBehaviors = [behavior, .. block.BlockBehaviors];
-
-                // Add behavior to collectible-behaviors array (prepend)
-                block.CollectibleBehaviors = [behavior, .. block.CollectibleBehaviors];
+                block.BlockBehaviors = [.. block.BlockBehaviors, behavior];
+                block.CollectibleBehaviors = [.. block.CollectibleBehaviors, behavior];
 
                 amendedCount++;
             }
