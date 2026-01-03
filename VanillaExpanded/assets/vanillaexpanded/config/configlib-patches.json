@@ -43,6 +43,14 @@
         "default": true,
         "weight": 1.4
       },
+      "ENABLE_HANDBOOK_SEARCH_PRIORITIZATION": {
+        "code": "EnableHandbookSearchPrioritization",
+        "name": "EnableHandbookSearchPrioritization",
+        "ingui": "vanillaexpanded:config-enable-handbook-search-prioritization",
+        "comment": "vanillaexpanded:config-enable-handbook-search-prioritization-tooltip",
+        "default": true,
+        "weight": 1.5
+      },
       "ENABLE_BACKPACK_DECRAFT": {
         "code": "EnableBackpackDecraft",
         "name": "EnableBackpackDecraft",
@@ -117,7 +125,7 @@
   },
   "formatting": [
     { "type": "separator", "title": "vanillaexpanded:config-section-features", "weight": 0.5 },
-    { "type": "separator", "title": "vanillaexpanded:config-section-timing", "weight": 1.5 },
+    { "type": "separator", "title": "vanillaexpanded:config-section-timing", "weight": 1.6 },
     { "type": "separator", "title": "vanillaexpanded:config-section-recipes", "weight": 2.5 }
   ]
 }
