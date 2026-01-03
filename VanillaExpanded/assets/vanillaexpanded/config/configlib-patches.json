@@ -82,6 +82,15 @@
         "comment": "vanillaexpanded:config-enable-wattle-decraft-tooltip",
         "default": true,
         "weight": 3.4
+      },
+      "ENABLE_UNSTABLE_PARTICLES": {
+        "code": "EnableUnstableParticles",
+        "name": "EnableUnstableParticles",
+        "ingui": "vanillaexpanded:config-enable-unstable-particles",
+        "comment": "vanillaexpanded:config-enable-unstable-particles-tooltip",
+        "default": true,
+        "weight": 4.0,
+        "clientSide": true
       }
     },
     "float": {
@@ -118,6 +127,7 @@
   "formatting": [
     { "type": "separator", "title": "vanillaexpanded:config-section-features", "weight": 0.5 },
     { "type": "separator", "title": "vanillaexpanded:config-section-timing", "weight": 1.5 },
-    { "type": "separator", "title": "vanillaexpanded:config-section-recipes", "weight": 2.5 }
+    { "type": "separator", "title": "vanillaexpanded:config-section-recipes", "weight": 2.5 },
+    { "type": "separator", "title": "vanillaexpanded:config-section-visual", "weight": 3.5 }
   ]
 }
