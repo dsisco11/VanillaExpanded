@@ -158,6 +158,11 @@ public class SpawnDecalRenderer : IRenderer
         rapi.RenderMesh(decalMeshRef);
         rapi.GlToggleBlend(true, EnumBlendMode.Standard);
 
+        // Reset shader inputs to defaults to prevent affecting subsequent renders
+        shader.RgbaTint = new Vec4f(1, 1, 1, 1);  // White/no tint
+        shader.RgbaGlowIn = new Vec4f(0, 0, 0, 0);  // No glow
+        shader.ExtraGlow = 0;  // No extra glow
+
         shader.Stop();
     }
     #endregion
