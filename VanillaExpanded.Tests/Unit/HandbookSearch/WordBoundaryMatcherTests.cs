@@ -199,4 +199,74 @@ public class WordBoundaryMatcherTests
     }
 
     #endregion
+
+    #region Axe Search Tests
+
+    [Theory]
+    [InlineData("Copper Axe", "axe", true, 1)]         // Full word match at position 1
+    [InlineData("Scrap Axe", "axe", true, 1)]          // Full word match at position 1
+    [InlineData("Waxed Cheese", "axe", false, -1)]     // "axe" inside "Waxed" - not a full word
+    [InlineData("Axe", "axe", true, 0)]                // Exact match at position 0
+    [InlineData("Battle Axe Head", "axe", true, 1)]    // Full word in middle
+    public void AxeSearch_DistinguishesFullWordFromPartial(string text, string searchText, bool expectedFound, int expectedPosition)
+    {
+        // Act
+        bool found = WordBoundaryMatcher.TryGetFullWordPosition(text.AsSpan(), searchText.AsSpan(), out int wordPosition);
+
+        // Assert
+        Assert.Equal(expectedFound, found);
+        Assert.Equal(expectedPosition, wordPosition);
+    }
+
+    /// <summary>
+    /// Tests expected weight bonuses for "axe" search across different item names.
+    /// Simulates what the HandbookSearchPatch would calculate.
+    /// </summary>
+    [Fact]
+    public void AxeSearch_WeightBonusCalculation_FullWordMatchesGetBoost()
+    {
+        // Constants from HandbookSearchPatch
+        const float FullWordBonus = 0.4f;
+        const float MaxPositionBonus = 0.1f;
+        const float PositionPenaltyPerWord = 0.02f;
+
+        var testCases = new[]
+        {
+            ("Copper Axe", "axe", 1.0f),   // Base weight for "title contains"
+            ("Scrap Axe", "axe", 1.0f),    // Base weight for "title contains"
+            ("Waxed Cheese", "axe", 1.0f), // Base weight for "title contains" (partial match)
+            ("Axe", "axe", 1.0f),          // Base weight (would actually be 3.0 exact, but testing contains scenario)
+        };
+
+        var results = new List<(string Title, float OriginalWeight, float BonusApplied, float FinalWeight)>();
+
+        foreach (var (title, searchText, baseWeight) in testCases)
+        {
+            float bonus = 0f;
+
+            if (WordBoundaryMatcher.TryGetFullWordPosition(title.AsSpan(), searchText.AsSpan(), out int wordPosition))
+            {
+                bonus = FullWordBonus + Math.Max(0f, MaxPositionBonus - (wordPosition * PositionPenaltyPerWord));
+            }
+
+            results.Add((title, baseWeight, bonus, baseWeight + bonus));
+        }
+
+        // Copper Axe: full word at position 1 -> bonus = 0.4 + (0.1 - 0.02) = 0.48
+        Assert.Equal(0.48f, results[0].BonusApplied, precision: 2);
+
+        // Scrap Axe: full word at position 1 -> bonus = 0.4 + (0.1 - 0.02) = 0.48
+        Assert.Equal(0.48f, results[1].BonusApplied, precision: 2);
+
+        // Waxed Cheese: "axe" is NOT a full word (inside "Waxed") -> bonus = 0
+        Assert.Equal(0f, results[2].BonusApplied, precision: 2);
+
+        // Verify ranking: Copper Axe and Scrap Axe should rank higher than Waxed Cheese
+        Assert.True(results[0].FinalWeight > results[2].FinalWeight, 
+            $"Copper Axe ({results[0].FinalWeight}) should rank higher than Waxed Cheese ({results[2].FinalWeight})");
+        Assert.True(results[1].FinalWeight > results[2].FinalWeight,
+            $"Scrap Axe ({results[1].FinalWeight}) should rank higher than Waxed Cheese ({results[2].FinalWeight})");
+    }
+
+    #endregion
 }
