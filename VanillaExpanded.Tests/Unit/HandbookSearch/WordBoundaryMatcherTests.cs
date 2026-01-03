@@ -157,4 +157,49 @@ public class WordBoundaryMatcherTests
     }
 
     #endregion
+
+    #region Word Position Tests
+
+    [Theory]
+    [InlineData("Iron Ingot", "iron", 0)]              // First word
+    [InlineData("Copper Iron Ingot", "iron", 1)]       // Second word
+    [InlineData("Raw Copper Iron Ingot", "iron", 2)]   // Third word
+    [InlineData("A B C Iron D", "iron", 3)]            // Fourth word
+    public void TryGetFullWordPosition_ReturnsCorrectWordPosition(string text, string searchText, int expectedPosition)
+    {
+        // Act
+        bool found = WordBoundaryMatcher.TryGetFullWordPosition(text.AsSpan(), searchText.AsSpan(), out int wordPosition);
+
+        // Assert
+        Assert.True(found);
+        Assert.Equal(expectedPosition, wordPosition);
+    }
+
+    [Theory]
+    [InlineData("Ironwood Log", "iron")]               // Partial match, no full word
+    [InlineData("No match here", "iron")]              // Not found at all
+    public void TryGetFullWordPosition_NoFullWord_ReturnsFalse(string text, string searchText)
+    {
+        // Act
+        bool found = WordBoundaryMatcher.TryGetFullWordPosition(text.AsSpan(), searchText.AsSpan(), out int wordPosition);
+
+        // Assert
+        Assert.False(found);
+        Assert.Equal(-1, wordPosition);
+    }
+
+    [Fact]
+    public void TryGetFullWordPosition_MultipleOccurrences_ReturnsFirstFullWordPosition()
+    {
+        // "Ironwood" is partial, "Iron" at position 1 is full word
+        bool found = WordBoundaryMatcher.TryGetFullWordPosition(
+            "Ironwood Iron Ingot".AsSpan(),
+            "iron".AsSpan(),
+            out int wordPosition);
+
+        Assert.True(found);
+        Assert.Equal(1, wordPosition); // "Iron" is the second word (0-indexed = 1)
+    }
+
+    #endregion
 }

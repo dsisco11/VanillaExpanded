@@ -17,7 +17,19 @@ internal static class HandbookSearchPatch
     /// Weight bonus applied when search text matches a complete word in the title.
     /// Applied when the original weight is in the "contains" range (below 2.5).
     /// </summary>
-    private const float FullWordBonus = 0.5f;
+    private const float FullWordBonus = 0.4f;
+
+    /// <summary>
+    /// Additional bonus for matches appearing early in the title.
+    /// Reduced by PositionPenaltyPerWord for each word position.
+    /// </summary>
+    private const float MaxPositionBonus = 0.1f;
+
+    /// <summary>
+    /// Penalty per word position from the start of the title.
+    /// First word (position 0) gets full bonus, each subsequent word loses this amount.
+    /// </summary>
+    private const float PositionPenaltyPerWord = 0.02f;
 
     /// <summary>
     /// Threshold below which we consider the match to be a "contains" match
@@ -56,9 +68,19 @@ internal static class HandbookSearchPatch
         if (string.IsNullOrEmpty(title) || string.IsNullOrEmpty(searchText))
             return;
 
-        if (WordBoundaryMatcher.ContainsFullWord(MemoryExtensions.AsSpan(title), MemoryExtensions.AsSpan(searchText)))
+        if (WordBoundaryMatcher.TryGetFullWordPosition(
+            MemoryExtensions.AsSpan(title),
+            MemoryExtensions.AsSpan(searchText),
+            out int wordPosition))
         {
-            __result += FullWordBonus;
+            // Base bonus for full-word match
+            float bonus = FullWordBonus;
+
+            // Position bonus: earlier words get more boost (clamped to 0 minimum)
+            float positionBonus = Math.Max(0f, MaxPositionBonus - (wordPosition * PositionPenaltyPerWord));
+            bonus += positionBonus;
+
+            __result += bonus;
         }
     }
 }
