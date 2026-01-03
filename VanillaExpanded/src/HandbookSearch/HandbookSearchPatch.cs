@@ -23,7 +23,7 @@ internal static class HandbookSearchPatch
     /// Threshold below which we consider the match to be a "contains" match
     /// (not exact or starts-with) and apply the full-word bonus.
     /// </summary>
-    private const float ContainsMatchThreshold = 2.5f;
+    private const float ContainsMatchThreshold = 2.0f;
 
     /// <summary>
     /// Minimum weight required for us to consider boosting (must have matched something).
