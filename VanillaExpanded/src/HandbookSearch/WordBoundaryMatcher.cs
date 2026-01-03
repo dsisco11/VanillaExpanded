@@ -64,27 +64,11 @@ internal static class WordBoundaryMatcher
 
     /// <summary>
     /// Counts the number of complete words before the given character index.
+    /// Assumes words are separated by single spaces (typical for item names).
     /// </summary>
     private static int CountWordsBefore(ReadOnlySpan<char> text, int charIndex)
     {
-        int wordCount = 0;
-        bool inWord = false;
-
-        for (int i = 0; i < charIndex; i++)
-        {
-            bool isBoundary = IsWordBoundary(text[i]);
-            if (inWord && isBoundary)
-            {
-                wordCount++;
-                inWord = false;
-            }
-            else if (!inWord && !isBoundary)
-            {
-                inWord = true;
-            }
-        }
-
-        return wordCount;
+        return text[..charIndex].Count(' ');
     }
 
     /// <summary>
