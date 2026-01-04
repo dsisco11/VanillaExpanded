@@ -55,13 +55,14 @@ internal static class RadialProgressResources
     {
         lock (lockObj)
         {
-            referenceCount++;
-
+            // If already initialized, just increment reference count
             if (IsInitialized)
             {
+                referenceCount++;
                 return true;
             }
 
+            // Not initialized - set up resources
             capi = api;
 
             try
@@ -80,6 +81,9 @@ internal static class RadialProgressResources
                 // Create the quad mesh (vertices from -1 to 1, UV computed in shader)
                 var quadData = QuadMeshUtil.GetQuad();
                 quadMeshRef = api.Render.UploadMesh(quadData);
+
+                // Only increment reference count after successful initialization
+                referenceCount = 1;
 
                 api.Logger.Debug("[VanillaExpanded] RadialProgressResources initialized successfully.");
                 return true;
@@ -172,24 +176,24 @@ internal static class RadialProgressResources
     }
 
     /// <summary>
-    /// Releases a reference to shared resources. Cleans up when reference count reaches zero.
+    /// Called when a renderer is disposed. Resources are NOT deallocated here;
+    /// they persist until <see cref="ForceCleanup"/> is called by the ModSystem.
     /// </summary>
     public static void Release()
     {
+        // No-op: Resources persist until ModSystem disposal.
+        // Reference counting is only used for debugging/tracking.
         lock (lockObj)
         {
-            referenceCount--;
-
-            if (referenceCount <= 0)
+            if (referenceCount > 0)
             {
-                Cleanup();
-                referenceCount = 0;
+                referenceCount--;
             }
         }
     }
 
     /// <summary>
-    /// Forces immediate cleanup of all resources regardless of reference count.
+    /// Forces immediate cleanup of all resources. Called by ModSystem.Dispose().
     /// </summary>
     public static void ForceCleanup()
     {
