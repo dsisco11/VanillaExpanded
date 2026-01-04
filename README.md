@@ -40,6 +40,10 @@ The calculator remembers your settings per crucible, so your preferred alloy and
 - Player respawn point appears as a glowing gear symbol on the ground.
 - Handbook search prioritizes full-word matches (searching "iron" ranks "Iron Ingot" higher than "Ironwood").
 
+### Visual Effects
+
+- **Unstable Block Particles** — Rock blocks in caves emit crumbling dust particles from their undersides when unstable. Particle frequency increases as blocks become more unstable, providing visual warning of potential cave-ins. Requires cave-ins to be enabled in world settings.
+
 ### Implemented Missing Functionalities
 
 - Ignitable things (firepits, etc) can now be ignited using lanterns (_oillamps & candles pending_).
@@ -64,22 +68,23 @@ Without ConfigLib, settings can be edited manually in `ModConfig/VanillaExpanded
 
 ### Available Settings
 
-| Setting                  | Default | Description                                                    |
-| ------------------------ | ------- | -------------------------------------------------------------- |
-| EnableAutoStash          | true    | Enable auto-stashing items into containers by holding interact |
-| EnableIgnitionTools      | true    | Enable lighting fires using lanterns, candles, and oil lamps   |
-| EnableSpawnDecal         | true    | Show a glowing decal at the player's respawn point             |
-| EnableAlloyCalculator    | true    | Enable the alloy calculator GUI for crucibles                  |
-| EnableEquipLightHotkey   | true    | Enable the hotkey to equip light sources to offhand/hotbar     |
-| EnableHandbookSearchPrioritization | true | Prioritize full-word matches in handbook search results |
-| EnableBackpackDecraft    | true    | Enable decrafting backpacks into leather                       |
-| EnableLinenSackDecraft   | true    | Enable decrafting linen sacks into flax fibers                 |
-| EnableMetalBitsRecycling | true    | Enable recycling metal tool heads into metal bits              |
-| EnableStickRecipes       | true    | Enable crafting sticks from planks and firewood                |
-| EnableWattleDecraft      | true    | Enable decrafting wattle blocks into sticks                    |
-| AutoStashDelay           | 0.5     | Time in seconds to hold interact before auto-stashing begins   |
-| IgnitionDelay            | 0.5     | Time in seconds to hold interact before igniting a fire        |
-| SpawnDecalSize           | 0.4     | Size of the spawn point decal (0.2 to 1.0)                     |
+| Setting                            | Default | Description                                                    |
+| ---------------------------------- | ------- | -------------------------------------------------------------- |
+| EnableAutoStash                    | true    | Enable auto-stashing items into containers by holding interact |
+| EnableIgnitionTools                | true    | Enable lighting fires using lanterns, candles, and oil lamps   |
+| EnableSpawnDecal                   | true    | Show a glowing decal at the player's respawn point             |
+| EnableAlloyCalculator              | true    | Enable the alloy calculator GUI for crucibles                  |
+| EnableEquipLightHotkey             | true    | Enable the hotkey to equip light sources to offhand/hotbar     |
+| EnableUnstableParticles            | true    | Show crumbling particles on unstable rock blocks               |
+| EnableHandbookSearchPrioritization | true    | Prioritize full-word matches in handbook search results        |
+| EnableBackpackDecraft              | true    | Enable decrafting backpacks into leather                       |
+| EnableLinenSackDecraft             | true    | Enable decrafting linen sacks into flax fibers                 |
+| EnableMetalBitsRecycling           | true    | Enable recycling metal tool heads into metal bits              |
+| EnableStickRecipes                 | true    | Enable crafting sticks from planks and firewood                |
+| EnableWattleDecraft                | true    | Enable decrafting wattle blocks into sticks                    |
+| AutoStashDelay                     | 0.5     | Time in seconds to hold interact before auto-stashing begins   |
+| IgnitionDelay                      | 0.5     | Time in seconds to hold interact before igniting a fire        |
+| SpawnDecalSize                     | 0.4     | Size of the spawn point decal (0.2 to 1.0)                     |
 
 **Note:** Feature toggles (Enable\*) require a world reload to take effect.
 
