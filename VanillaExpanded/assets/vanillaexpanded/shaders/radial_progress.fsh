@@ -18,6 +18,7 @@ uniform sampler2D packedTex;
 uniform float progressScalar;   // 0..1
 uniform float outerRadius;      // 0..1 (1 = edge of the inscribed circle)
 uniform float innerRadius;      // 0..1 (0 = center). Full disc: 0.
+uniform vec4 tintColor;         // RGBA tint applied to output
 
 float saturate(float x) { return clamp(x, 0.0, 1.0); }
 
@@ -54,5 +55,5 @@ void main()
 
     float alpha = ringMask * fillMask;
 
-    fragColor = vec4(1.0, 1.0, 1.0, alpha);
+    fragColor = vec4(tintColor.rgb, tintColor.a * alpha);
 }
