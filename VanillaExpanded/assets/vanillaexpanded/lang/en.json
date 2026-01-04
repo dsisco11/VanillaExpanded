@@ -32,6 +32,8 @@
   "config-enable-alloy-calculator-tooltip": "Enable the alloy calculator GUI for crucibles.",
   "config-enable-equip-light-hotkey": "Equip Light Source Hotkey",
   "config-enable-equip-light-hotkey-tooltip": "Enable the hotkey to equip light sources to offhand/hotbar.",
+  "config-enable-handbook-search-prioritization": "Handbook Search Prioritization",
+  "config-enable-handbook-search-prioritization-tooltip": "Prioritize full-word matches in handbook search (e.g., 'iron' ranks 'Iron Ingot' higher than 'Ironwood').",
 
   "config-auto-stash-delay": "Auto-Stash Delay",
   "config-auto-stash-delay-tooltip": "Time in seconds to hold the interact key before auto-stashing begins.",

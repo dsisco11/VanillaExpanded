@@ -38,6 +38,7 @@ The calculator remembers your settings per crucible, so your preferred alloy and
 ### Quality of Life Additions
 
 - Player respawn point appears as a glowing gear symbol on the ground.
+- Handbook search prioritizes full-word matches (searching "iron" ranks "Iron Ingot" higher than "Ironwood").
 
 ### Implemented Missing Functionalities
 
@@ -70,6 +71,7 @@ Without ConfigLib, settings can be edited manually in `ModConfig/VanillaExpanded
 | EnableSpawnDecal         | true    | Show a glowing decal at the player's respawn point             |
 | EnableAlloyCalculator    | true    | Enable the alloy calculator GUI for crucibles                  |
 | EnableEquipLightHotkey   | true    | Enable the hotkey to equip light sources to offhand/hotbar     |
+| EnableHandbookSearchPrioritization | true | Prioritize full-word matches in handbook search results |
 | EnableBackpackDecraft    | true    | Enable decrafting backpacks into leather                       |
 | EnableLinenSackDecraft   | true    | Enable decrafting linen sacks into flax fibers                 |
 | EnableMetalBitsRecycling | true    | Enable recycling metal tool heads into metal bits              |
