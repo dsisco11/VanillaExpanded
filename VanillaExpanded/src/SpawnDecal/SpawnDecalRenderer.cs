@@ -36,11 +36,15 @@ public class SpawnDecalRenderer : IRenderer
     private float colorPhaseTime = 0f;
     private float strengthPhaseTime = 0f;
     private Vec4f FinalRenderGlow = new();
+    /// <summary>
+    /// Used to 'unset' the glow after rendering. (otherwise the glow color state bleeds into other renders)
+    /// </summary>
+    private Vec4f DefaultRenderGlow = new(1, 1, 1, 0);
     #endregion
 
     #region IRenderer Properties
-    public double RenderOrder => 0.6; // Decal render stage
-    public int RenderRange => 100;
+    public double RenderOrder => 0.49f; // Decal render stage
+    public int RenderRange => 32;
     #endregion
 
     #region Constructor
@@ -160,10 +164,8 @@ public class SpawnDecalRenderer : IRenderer
         rapi.GlToggleBlend(true, EnumBlendMode.Standard);
 
         // Reset shader inputs to defaults to prevent affecting subsequent renders
-        shader.RgbaTint = ColorUtil.WhiteArgbVec;  // White/no tint
-        shader.RgbaGlowIn = ColorUtil.BlackArgbVec;  // No glow
+        shader.RgbaGlowIn = DefaultRenderGlow;  // No glow
         shader.ExtraGlow = 0;  // No extra glow
-
         shader.Stop();
     }
     #endregion
