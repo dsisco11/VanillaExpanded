@@ -9,7 +9,7 @@ namespace VanillaExpanded.RadialProgress;
 /// Renders a radial (circular) progress bar using GLSL shaders.
 /// Uses a packed data texture for high-precision angle/radius lookup.
 /// </summary>
-public sealed class RadialProgressBarRenderer : IRenderer
+public sealed class RadialProgressBarRenderer : IRenderer, IRadialProgressBar
 {
     #region Constants
     private const string PackedTextureSamplerName = "packedTex";
