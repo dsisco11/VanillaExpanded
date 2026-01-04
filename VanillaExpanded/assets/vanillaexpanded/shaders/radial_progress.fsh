@@ -41,20 +41,12 @@ void main()
     // In the generated packed texture: A == r clamped to [0,1]
     float r = t.a;
 
-    // ---- Compute geometric radius for proper corner masking ----
-    // The texture clamps r to [0,1], but corners of the quad are at ~1.414
-    // Use actual geometric radius for outer mask to properly discard corners
-    vec2 centered = vUV * 2.0 - 1.0;
-    float geometricRadius = length(centered);
-
     // ---- Anti-alias widths (derivative-based) ----
     float rAA = fwidth(r) + 1e-6;
-    float gAA = fwidth(geometricRadius) + 1e-6;
     float aAA = fwidth(angle01) + 1e-6;
 
     // ---- Ring mask using innerRadius/outerRadius ----
-    // Use geometric radius for outer (handles corners), texture radius for inner (more precise)
-    float outerMask = 1.0 - smoothstep(outerRadius - gAA, outerRadius + gAA, geometricRadius);
+    float outerMask = 1.0 - smoothstep(outerRadius - rAA, outerRadius + rAA, r);
     float innerMask = smoothstep(innerRadius - rAA, innerRadius + rAA, r);
     float ringMask  = outerMask * innerMask;
 
