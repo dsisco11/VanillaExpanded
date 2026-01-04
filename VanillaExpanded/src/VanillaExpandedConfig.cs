@@ -84,5 +84,10 @@ public class VanillaExpandedConfig
     /// Size of the spawn point decal (0.2 to 1.0).
     /// </summary>
     public float SpawnDecalSize { get; set; } = 0.4f;
+
+    /// <summary>
+    /// Show crumbling dust particles on unstable rock blocks (requires cave-ins to be enabled).
+    /// </summary>
+    public bool EnableUnstableParticles { get; set; } = true;
     #endregion
 }
