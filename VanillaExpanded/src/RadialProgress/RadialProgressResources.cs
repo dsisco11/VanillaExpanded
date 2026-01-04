@@ -14,14 +14,12 @@ namespace VanillaExpanded.RadialProgress;
 internal static class RadialProgressResources
 {
     #region Constants
-    private const string TextureAssetPath = "vanillaexpanded:textures/radial_progress_packed.png";
     private const string ShaderName = "radial_progress";
     private const int StartOffsetPrecision = 100; // 0.01 precision for cache key
     #endregion
 
     #region Fields
     private static ICoreClientAPI? capi;
-    private static LoadedTexture? packedTexture;
     private static MeshRef? quadMeshRef;
     private static readonly Dictionary<(int startOffsetKey, bool clockwise), IShaderProgram> shaderCache = new();
     private static int referenceCount;
@@ -30,11 +28,6 @@ internal static class RadialProgressResources
 
     #region Properties
     /// <summary>
-    /// The packed data texture ID for binding to shaders.
-    /// </summary>
-    public static int TextureId => packedTexture?.TextureId ?? 0;
-
-    /// <summary>
     /// The quad mesh reference for rendering.
     /// </summary>
     public static MeshRef? QuadMesh => quadMeshRef;
@@ -42,7 +35,7 @@ internal static class RadialProgressResources
     /// <summary>
     /// Whether resources are currently initialized.
     /// </summary>
-    public static bool IsInitialized => capi is not null && packedTexture is not null && quadMeshRef is not null;
+    public static bool IsInitialized => capi is not null && quadMeshRef is not null;
     #endregion
 
     #region Public Methods
@@ -67,17 +60,6 @@ internal static class RadialProgressResources
 
             try
             {
-                // Load the packed data texture
-                packedTexture = new LoadedTexture(api);
-                api.Render.GetOrLoadTexture(new AssetLocation(TextureAssetPath), ref packedTexture);
-
-                if (packedTexture.TextureId == 0)
-                {
-                    api.Logger.Error("[VanillaExpanded] Failed to load radial progress texture: {0}", TextureAssetPath);
-                    Cleanup();
-                    return false;
-                }
-
                 // Create the quad mesh (vertices from -1 to 1, UV computed in shader)
                 var quadData = QuadMeshUtil.GetQuad();
                 quadMeshRef = api.Render.UploadMesh(quadData);
@@ -276,10 +258,6 @@ internal static class RadialProgressResources
             capi?.Render.DeleteMesh(quadMeshRef);
             quadMeshRef = null;
         }
-
-        // Dispose texture
-        packedTexture?.Dispose();
-        packedTexture = null;
 
         capi = null;
     }

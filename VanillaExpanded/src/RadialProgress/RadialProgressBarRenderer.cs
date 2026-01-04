@@ -7,14 +7,10 @@ namespace VanillaExpanded.RadialProgress;
 
 /// <summary>
 /// Renders a radial (circular) progress bar using GLSL shaders.
-/// Uses a packed data texture for high-precision angle/radius lookup.
+/// All calculations are done geometrically in the fragment shader.
 /// </summary>
 public sealed class RadialProgressBarRenderer : IRenderer, IRadialProgressBar
 {
-    #region Constants
-    private const string PackedTextureSamplerName = "packedTex";
-    #endregion
-
     #region Fields
     private readonly ICoreClientAPI capi;
     private readonly IShaderProgram? shader;
@@ -123,10 +119,6 @@ public sealed class RadialProgressBarRenderer : IRenderer, IRadialProgressBar
         try
         {
             shader.Use();
-
-            // Bind the packed data texture
-            shader.BindTexture2D(PackedTextureSamplerName, RadialProgressResources.TextureId, 0);
-
             // Set uniforms
             shader.Uniform("progressScalar", Progress);
             shader.Uniform("outerRadius", OuterRadius);
