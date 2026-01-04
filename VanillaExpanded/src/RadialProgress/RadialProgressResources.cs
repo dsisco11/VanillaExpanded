@@ -21,7 +21,7 @@ internal static class RadialProgressResources
     #region Fields
     private static ICoreClientAPI? capi;
     private static MeshRef? quadMeshRef;
-    private static readonly Dictionary<(int startOffsetKey, bool clockwise), IShaderProgram> shaderCache = new();
+    private static readonly Dictionary<(int startOffsetKey, bool clockwise), RadialProgressShaderProgram> shaderCache = new();
     private static int referenceCount;
     private static readonly object lockObj = new();
     #endregion
@@ -85,7 +85,7 @@ internal static class RadialProgressResources
     /// <param name="startOffset01">Start angle offset in [0,1] range (0 = +X axis, 0.25 = +Y axis).</param>
     /// <param name="clockwise">True for clockwise fill direction, false for counter-clockwise.</param>
     /// <returns>The shader program, or null if compilation failed.</returns>
-    public static IShaderProgram? GetOrCreateShader(float startOffset01, bool clockwise)
+    public static RadialProgressShaderProgram? GetOrCreateShader(float startOffset01, bool clockwise)
     {
         if (capi is null)
         {
@@ -188,7 +188,7 @@ internal static class RadialProgressResources
     #endregion
 
     #region Private Methods
-    private static IShaderProgram? CompileShader(float startOffset01, bool clockwise, (int, bool) cacheKey)
+    private static RadialProgressShaderProgram? CompileShader(float startOffset01, bool clockwise, (int, bool) cacheKey)
     {
         if (capi is null)
         {
@@ -197,9 +197,9 @@ internal static class RadialProgressResources
 
         try
         {
-            var prog = capi.Shader.NewShaderProgram();
-            prog.VertexShader = capi.Shader.NewShader(EnumShaderType.VertexShader);
-            prog.FragmentShader = capi.Shader.NewShader(EnumShaderType.FragmentShader);
+            var prog = new RadialProgressShaderProgram();
+            prog.VertexShader = (Vintagestory.Client.NoObf.Shader)capi.Shader.NewShader(EnumShaderType.VertexShader);
+            prog.FragmentShader = (Vintagestory.Client.NoObf.Shader)capi.Shader.NewShader(EnumShaderType.FragmentShader);
 
             // Inject #defines for compile-time constants
             string prefixCode = string.Format(

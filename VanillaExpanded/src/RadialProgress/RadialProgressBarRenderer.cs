@@ -13,7 +13,7 @@ public sealed class RadialProgressBarRenderer : IRenderer, IRadialProgressBar
 {
     #region Fields
     private readonly ICoreClientAPI capi;
-    private readonly IShaderProgram? shader;
+    private readonly RadialProgressShaderProgram? shader;
     private readonly Matrixf mvMatrix = new();
     private bool isDisposed;
     #endregion
@@ -119,11 +119,12 @@ public sealed class RadialProgressBarRenderer : IRenderer, IRadialProgressBar
         try
         {
             shader.Use();
-            // Set uniforms
-            shader.Uniform("progressScalar", Progress);
-            shader.Uniform("outerRadius", OuterRadius);
-            shader.Uniform("innerRadius", InnerRadius);
-            shader.Uniform("tintColor", TintColor);
+
+            // Set uniforms via typed property accessors
+            shader.ProgressScalar = Progress;
+            shader.OuterRadius = OuterRadius;
+            shader.InnerRadius = InnerRadius;
+            shader.TintColor = TintColor;
 
             // Build model-view matrix for screen-space positioning
             // QuadMeshUtil.GetQuad() produces vertices in [-1,1] range
@@ -135,8 +136,8 @@ public sealed class RadialProgressBarRenderer : IRenderer, IRadialProgressBar
                 .Translate(0.5f, 0.5f, 0f)
                 .Scale(0.5f, 0.5f, 0f);
 
-            shader.UniformMatrix("projectionMatrix", capi.Render.CurrentProjectionMatrix);
-            shader.UniformMatrix("modelViewMatrix", mvMatrix.Values);
+            shader.ProjectionMatrix = capi.Render.CurrentProjectionMatrix;
+            shader.ModelViewMatrix = mvMatrix.Values;
 
             // Render the quad
             capi.Render.RenderMesh(quadMesh);
