@@ -82,8 +82,10 @@ public class BehaviorIgnitionTool : CollectibleBehavior
             case EnumIgniteState.Ignitable:
                 {
                     // Success, we are beginning the ignition process.
+                    // Use Handled (not PreventDefault) to signal to the game engine
+                    // that this interaction is fully handled and block interaction should be skipped.
                     handling = EnumHandling.PreventDefault;
-                    handHandling = EnumHandHandling.PreventDefault;
+                    handHandling = EnumHandHandling.Handled;
                     if (igniteAnimation is not null)
                     {
                         byEntity.AnimManager.StartAnimation(igniteAnimation);
@@ -92,7 +94,7 @@ public class BehaviorIgnitionTool : CollectibleBehavior
                 }
             case EnumIgniteState.NotIgnitablePreventDefault:
                 {
-                    handHandling = EnumHandHandling.PreventDefault;
+                    handHandling = EnumHandHandling.Handled;
                     break;
                 }
             default:
