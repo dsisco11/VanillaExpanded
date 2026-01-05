@@ -103,11 +103,11 @@ public sealed class ModSystemRadialProgressBar : ModSystem
             return null;
         }
 
-        // Set default screen position (centered)
+        // Set default screen position (centered on crosshair)
         float size = 64f;
         renderer.SetRect(
             (capi.Render.FrameWidth - size) / 2f,
-            (capi.Render.FrameHeight - size) / 2f + 40f, // Slightly below center
+            (capi.Render.FrameHeight - size) / 2f,
             size,
             size
         );
