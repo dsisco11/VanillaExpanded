@@ -142,36 +142,6 @@ public class VanillaExpandedModSystem : ModSystem
             AutoStashPatch.AmendContainerBehaviors(api);
         }
         DisableRecipesBasedOnConfig(api);
-        FixIgnitionToolPriority(api);
-    }
-
-    /// <summary>
-    /// Sets HeldPriorityInteract=true on blocks with CanIgnite behavior.
-    /// This ensures the held item's OnHeldInteractStart runs before the block's OnBlockInteractStart
-    /// when sneaking, allowing the ignition behavior to prevent block interactions like the bloomery's
-    /// item insertion from consuming the click.
-    /// </summary>
-    private void FixIgnitionToolPriority(ICoreAPI api)
-    {
-        if (!Config.EnableIgnitionTools) return;
-
-        int fixedCount = 0;
-        foreach (var block in api.World.Blocks)
-        {
-            if (block is null) continue;
-            
-            bool hasCanIgnite = block.CollectibleBehaviors?.Any(b => b.GetType().Name == "BlockBehaviorCanIgnite") == true;
-            if (hasCanIgnite && !block.HeldPriorityInteract)
-            {
-                block.HeldPriorityInteract = true;
-                fixedCount++;
-            }
-        }
-        
-        if (fixedCount > 0)
-        {
-            api.Logger.Notification($"[VanillaExpanded] Set HeldPriorityInteract=true on {fixedCount} blocks with CanIgnite behavior");
-        }
     }
 
     private void DisableRecipesBasedOnConfig(ICoreAPI api)
