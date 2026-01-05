@@ -28,7 +28,7 @@ public sealed class IgnitionToolsModSystem : ModSystem
 
     public override void AssetsFinalize(ICoreAPI api)
     {
-        AddCanIgniteBehaviorToOilLamps(api);
+        AddCanIgniteBehaviors(api);
         FixIgnitionToolPriority(api);
     }
     #endregion
@@ -44,16 +44,19 @@ public sealed class IgnitionToolsModSystem : ModSystem
     /// <summary>
     /// Adds the CanIgnite behavior to oil lamps so they can ignite blocks like firepits and bloomeries.
     /// </summary>
-    private void AddCanIgniteBehaviorToOilLamps(ICoreAPI api)
+    private void AddCanIgniteBehaviors(ICoreAPI api)
     {
         int addedCount = 0;
         foreach (var block in api.World.Blocks)
         {
-            if (!IsIgnitionTool(block?.Code?.GetName())) 
+            if (block is null) 
+                continue;
+
+            if (!IsIgnitionTool(block.Code?.FirstCodePart())) 
                 continue;
 
             // Skip if already has CanIgnite
-            bool hasCanIgnite = block.BlockBehaviors?.Any(b => b is BlockBehaviorCanIgnite) == true;
+            bool hasCanIgnite = block.BlockBehaviors?.Any(static b => b is BlockBehaviorCanIgnite) == true;
             if (hasCanIgnite) 
                 continue;
 
@@ -86,7 +89,7 @@ public sealed class IgnitionToolsModSystem : ModSystem
         {
             if (block is null) continue;
 
-            bool hasCanIgnite = block.CollectibleBehaviors?.Any(b => b.GetType().Name == "BlockBehaviorCanIgnite") == true;
+            bool hasCanIgnite = block.CollectibleBehaviors?.Any(static b => b is BlockBehaviorCanIgnite) == true;
             if (hasCanIgnite && !block.HeldPriorityInteract)
             {
                 block.HeldPriorityInteract = true;
