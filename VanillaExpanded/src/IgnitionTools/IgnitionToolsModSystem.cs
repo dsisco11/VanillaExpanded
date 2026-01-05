@@ -1,6 +1,9 @@
+using System;
 using System.Linq;
 
 using Vintagestory.API.Common;
+using Vintagestory.API.Util;
+using Vintagestory.GameContent;
 
 namespace VanillaExpanded.IgnitionTools;
 
@@ -25,7 +28,38 @@ public sealed class IgnitionToolsModSystem : ModSystem
 
     public override void AssetsFinalize(ICoreAPI api)
     {
+        AddCanIgniteBehaviorToOilLamps(api);
         FixIgnitionToolPriority(api);
+    }
+    #endregion
+
+    #region CanIgnite Behavior
+    /// <summary>
+    /// Adds the CanIgnite behavior to oil lamps so they can ignite blocks like firepits and bloomeries.
+    /// </summary>
+    private void AddCanIgniteBehaviorToOilLamps(ICoreAPI api)
+    {
+        int addedCount = 0;
+        foreach (var block in api.World.Blocks)
+        {
+            if (block?.Code?.GetName().AsSpan().Equals("oillamp", StringComparison.OrdinalIgnoreCase) != true) continue;
+
+            // Skip if already has CanIgnite
+            bool hasCanIgnite = block.BlockBehaviors?.Any(b => b is BlockBehaviorCanIgnite) == true;
+            if (hasCanIgnite) continue;
+
+            // Add the behavior to both arrays
+            var behavior = new BlockBehaviorCanIgnite(block);
+            behavior.OnLoaded(api);
+            block.BlockBehaviors = [.. block.BlockBehaviors ?? [], behavior];
+            block.CollectibleBehaviors = [.. block.CollectibleBehaviors ?? [], behavior];
+            addedCount++;
+        }
+
+        if (addedCount > 0)
+        {
+            api.Logger.Notification($"[VanillaExpanded] Added CanIgnite behavior to {addedCount} oil lamp blocks");
+        }
     }
     #endregion
 
