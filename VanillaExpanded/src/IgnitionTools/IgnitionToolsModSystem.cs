@@ -34,6 +34,13 @@ public sealed class IgnitionToolsModSystem : ModSystem
     #endregion
 
     #region CanIgnite Behavior
+    private static bool IsIgnitionTool(ReadOnlySpan<char> code) => code.Length switch
+    {
+        6 => code.SequenceEqual("candle"),
+        7 => code.SequenceEqual("lantern") || code.SequenceEqual("oillamp"),
+        _ => false
+    };
+    
     /// <summary>
     /// Adds the CanIgnite behavior to oil lamps so they can ignite blocks like firepits and bloomeries.
     /// </summary>
@@ -42,11 +49,13 @@ public sealed class IgnitionToolsModSystem : ModSystem
         int addedCount = 0;
         foreach (var block in api.World.Blocks)
         {
-            if (block?.Code?.GetName().AsSpan().Equals("oillamp", StringComparison.OrdinalIgnoreCase) != true) continue;
+            if (!IsIgnitionTool(block?.Code?.GetName())) 
+                continue;
 
             // Skip if already has CanIgnite
             bool hasCanIgnite = block.BlockBehaviors?.Any(b => b is BlockBehaviorCanIgnite) == true;
-            if (hasCanIgnite) continue;
+            if (hasCanIgnite) 
+                continue;
 
             // Add the behavior to both arrays
             var behavior = new BlockBehaviorCanIgnite(block);
