@@ -9,6 +9,8 @@ using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.GameContent;
 
+using VanillaExpanded.RadialProgress;
+
 namespace VanillaExpanded.AutoStashing;
 
 /// <summary>
@@ -32,7 +34,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
 
     #region Fields
     protected ICoreAPI? api;
-    protected IProgressBar? progressBar;
+    protected IRadialProgressBar? progressBar;
     protected AssetLocation stashSoundPath = new("game:sounds/player/poultice-applied");
     /// <summary>
     /// Tracks which players are currently stashing items.
@@ -250,18 +252,17 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         {
             return;
         }
-        // TODO: Would like to get a better progress bar, e.g. a more visually appealing circular one.
-        ModSystemProgressBar progressBarSystem = api.ModLoader.GetModSystem<ModSystemProgressBar>();
+        ModSystemRadialProgressBar? progressBarSystem = api.ModLoader.GetModSystem<ModSystemRadialProgressBar>();
         switch (desiredVisibility)
         {
             case true when progressBar is null:
                 {
-                    progressBar = progressBarSystem?.AddProgressbar();
+                    progressBar = progressBarSystem?.AddProgressBar();
                     break;
                 }
             case false when progressBar is not null:
                 {
-                    progressBarSystem?.RemoveProgressbar(progressBar);
+                    progressBarSystem?.RemoveProgressBar(progressBar);
                     progressBar = null;
                     break;
                 }
