@@ -2,7 +2,7 @@
 
 layout(location = 0) in vec3 vertex;
 
-out vec2 vUV;
+out vec2 vPos;
 
 uniform mat4 projectionMatrix;
 uniform mat4 modelViewMatrix;
@@ -10,6 +10,6 @@ uniform mat4 modelViewMatrix;
 void main()
 {
     gl_Position = projectionMatrix * modelViewMatrix * vec4(vertex, 1.0);
-    // Map vertex xy from [-1,1] to UV [0,1]
-    vUV = (vertex.xy + 1.0) * 0.5;
+    // Pass vertex xy directly (already in [-1,1] range)
+    vPos = vertex.xy;
 }

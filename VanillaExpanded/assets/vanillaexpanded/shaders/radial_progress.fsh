@@ -9,7 +9,7 @@
     #define CLOCKWISE 0        // 0 = CCW, 1 = CW
 #endif
 
-in vec2 vUV;      // 0..1
+in vec2 vPos;     // [-1,1] quad coordinates
 out vec4 fragColor;
 
 uniform float progressScalar;   // 0..1
@@ -17,7 +17,6 @@ uniform float outerRadius;      // 0..1 (1 = inscribed circle edge)
 uniform float innerRadius;      // 0..1
 uniform vec4  tintColor;        // RGBA
 
-const float PI  = 3.14159265358979323846;
 const float TAU = 6.28318530717958647692;
 
 /*
@@ -28,12 +27,12 @@ const float TAU = 6.28318530717958647692;
 */
 void main()
 {
-    // Centered coordinates; r normalized so r=1 at inscribed circle edge
-    vec2 p = vUV - vec2(0.5);
-    float r = length(p) * 2.0; // 0..~1.414 (corners), but we use radii in 0..1
+    // vPos is already centered at origin, range [-1,1]
+    // r=1 at inscribed circle edge
+    float r = length(vPos);
 
     // Angle in [0,1): 0 at +X, increases CCW
-    float angle01 = atan(p.y, p.x) / TAU + 0.5;
+    float angle01 = atan(vPos.y, vPos.x) / TAU + 0.5;
     angle01 = fract(angle01 - float(START_OFFSET));
 #if CLOCKWISE
     angle01 = 1.0 - angle01;
