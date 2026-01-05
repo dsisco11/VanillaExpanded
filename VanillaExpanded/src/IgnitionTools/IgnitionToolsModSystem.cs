@@ -26,10 +26,17 @@ public sealed class IgnitionToolsModSystem : ModSystem
         return 1.0;
     }
 
+    public override void Start(ICoreAPI api)
+    {
+        base.Start(api);
+        api.RegisterBlockBehaviorClass(BlockBehaviorIgnitionTool.RegistryId, typeof(BlockBehaviorIgnitionTool));
+        api.RegisterCollectibleBehaviorClass(CollectibleBehaviorIgnitionTool.RegistryId, typeof(CollectibleBehaviorIgnitionTool));
+    }
+
     public override void AssetsFinalize(ICoreAPI api)
     {
-        AddCanIgniteBehaviors(api);
-        FixIgnitionToolPriority(api);
+        AddCanIgniteBehaviorToBlocks(api);
+        AddCanIgniteBehaviorToItems(api);
     }
     #endregion
 
@@ -40,66 +47,66 @@ public sealed class IgnitionToolsModSystem : ModSystem
         7 => code.SequenceEqual("lantern") || code.SequenceEqual("oillamp"),
         _ => false
     };
-    
+
     /// <summary>
-    /// Adds the CanIgnite behavior to oil lamps so they can ignite blocks like firepits and bloomeries.
+    /// Adds the CanIgnite behavior to blocks (lanterns, oil lamps) so they can ignite other blocks.
     /// </summary>
-    private void AddCanIgniteBehaviors(ICoreAPI api)
+    private void AddCanIgniteBehaviorToBlocks(ICoreAPI api)
     {
         int addedCount = 0;
-        foreach (var block in api.World.Blocks)
+        var targetBlocks = api.World.Blocks.Where(static b => b is not null && IsIgnitionTool(b.Code?.FirstCodePart()));
+        foreach (var block in targetBlocks)
         {
-            if (block is null) 
-                continue;
-
-            if (!IsIgnitionTool(block.Code?.FirstCodePart())) 
-                continue;
-
             // Skip if already has CanIgnite
-            bool hasCanIgnite = block.BlockBehaviors?.Any(static b => b is BlockBehaviorCanIgnite) == true;
-            if (hasCanIgnite) 
+            bool hasCanIgnite = block.BlockBehaviors?.Any(static b => b is BlockBehaviorIgnitionTool) == true;
+            if (hasCanIgnite)
                 continue;
 
             // Add the behavior to both arrays
-            var behavior = new BlockBehaviorCanIgnite(block);
+            var behavior = new BlockBehaviorIgnitionTool(block);
             behavior.OnLoaded(api);
-            block.BlockBehaviors = [.. block.BlockBehaviors ?? [], behavior];
-            block.CollectibleBehaviors = [.. block.CollectibleBehaviors ?? [], behavior];
+            block.BlockBehaviors = [behavior, .. block.BlockBehaviors ?? []];
+            block.CollectibleBehaviors = [behavior, .. block.CollectibleBehaviors ?? []];
+            // remove the default CanIgnite behavior if it exists
+            //block.BlockBehaviors = block.BlockBehaviors?.Where(static b => b is not BlockBehaviorCanIgnite).ToArray();
+            //block.CollectibleBehaviors = block.CollectibleBehaviors?.Where(static b => b is not BlockBehaviorCanIgnite).ToArray();
             addedCount++;
         }
 
         if (addedCount > 0)
         {
-            api.Logger.Notification($"[VanillaExpanded] Added CanIgnite behavior to {addedCount} oil lamp blocks");
+            api.Logger.Notification($"[VanillaExpanded] Added CanIgnite behavior to {addedCount} blocks");
         }
     }
-    #endregion
 
-    #region Priority Fix
     /// <summary>
-    /// Sets HeldPriorityInteract=true on blocks with CanIgnite behavior.
+    /// Adds the CollectibleBehaviorCanIgnite to items (candles) so they can ignite other blocks.
+    /// Also Sets HeldPriorityInteract=true on blocks with CanIgnite behavior.
     /// This ensures the held item's OnHeldInteractStart runs before the block's OnBlockInteractStart
     /// when sneaking, allowing the ignition behavior to prevent block interactions like the bloomery's
     /// item insertion from consuming the click.
     /// </summary>
-    private void FixIgnitionToolPriority(ICoreAPI api)
+    private void AddCanIgniteBehaviorToItems(ICoreAPI api)
     {
-        int fixedCount = 0;
-        foreach (var block in api.World.Blocks)
+        int addedCount = 0;
+        var targetItems = api.World.Items.Where(static i => i is not null && IsIgnitionTool(i.Code?.FirstCodePart()));
+        foreach (var item in targetItems)
         {
-            if (block is null) continue;
+            // Skip if already has CanIgnite
+            bool hasCanIgnite = item.CollectibleBehaviors?.Any(static b => b is CollectibleBehaviorIgnitionTool) == true;
+            if (hasCanIgnite)
+                continue;
 
-            bool hasCanIgnite = block.CollectibleBehaviors?.Any(static b => b is BlockBehaviorCanIgnite) == true;
-            if (hasCanIgnite && !block.HeldPriorityInteract)
-            {
-                block.HeldPriorityInteract = true;
-                fixedCount++;
-            }
+            // Add the behavior
+            var behavior = new CollectibleBehaviorIgnitionTool(item);
+            behavior.OnLoaded(api);
+            item.CollectibleBehaviors = [behavior, .. item.CollectibleBehaviors ?? []];
+            addedCount++;
         }
 
-        if (fixedCount > 0)
+        if (addedCount > 0)
         {
-            api.Logger.Notification($"[VanillaExpanded] Set HeldPriorityInteract=true on {fixedCount} blocks with CanIgnite behavior");
+            api.Logger.Notification($"[VanillaExpanded] Added CanIgnite behavior to {addedCount}");
         }
     }
     #endregion
