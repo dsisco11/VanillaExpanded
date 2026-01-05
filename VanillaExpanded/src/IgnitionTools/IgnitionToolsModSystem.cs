@@ -68,8 +68,8 @@ public sealed class IgnitionToolsModSystem : ModSystem
             block.BlockBehaviors = [behavior, .. block.BlockBehaviors ?? []];
             block.CollectibleBehaviors = [behavior, .. block.CollectibleBehaviors ?? []];
             // remove the default CanIgnite behavior if it exists
-            //block.BlockBehaviors = block.BlockBehaviors?.Where(static b => b is not BlockBehaviorCanIgnite).ToArray();
-            //block.CollectibleBehaviors = block.CollectibleBehaviors?.Where(static b => b is not BlockBehaviorCanIgnite).ToArray();
+            block.BlockBehaviors = block.BlockBehaviors?.Where(static b => b is not BlockBehaviorCanIgnite).ToArray();
+            block.CollectibleBehaviors = block.CollectibleBehaviors?.Where(static b => b is not BlockBehaviorCanIgnite).ToArray();
             addedCount++;
         }
 
@@ -81,10 +81,6 @@ public sealed class IgnitionToolsModSystem : ModSystem
 
     /// <summary>
     /// Adds the CollectibleBehaviorCanIgnite to items (candles) so they can ignite other blocks.
-    /// Also Sets HeldPriorityInteract=true on blocks with CanIgnite behavior.
-    /// This ensures the held item's OnHeldInteractStart runs before the block's OnBlockInteractStart
-    /// when sneaking, allowing the ignition behavior to prevent block interactions like the bloomery's
-    /// item insertion from consuming the click.
     /// </summary>
     private void AddCanIgniteBehaviorToItems(ICoreAPI api)
     {
