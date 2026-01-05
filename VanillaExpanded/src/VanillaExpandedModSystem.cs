@@ -5,6 +5,7 @@ using HarmonyLib;
 using VanillaExpanded.AlloyCalculator;
 using VanillaExpanded.AutoStashing;
 using VanillaExpanded.HandbookSearch;
+using VanillaExpanded.IgnitionTools;
 using VanillaExpanded.SpawnDecal;
 using VanillaExpanded.src.AutoStashing;
 using VanillaExpanded.src.IgnitionTools;
@@ -123,6 +124,7 @@ public class VanillaExpandedModSystem : ModSystem
 
         if (Config.EnableIgnitionTools)
         {
+            new PatchClassProcessor(harmony, typeof(ItemCandlePatch)).Patch();
             new PatchClassProcessor(harmony, typeof(IgnitionSourcesPatch)).Patch();
         }
 
