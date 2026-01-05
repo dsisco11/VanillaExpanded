@@ -1,12 +1,10 @@
 ﻿using System;
-using System.Linq;
 
 using HarmonyLib;
 
 using VanillaExpanded.AlloyCalculator;
 using VanillaExpanded.AutoStashing;
 using VanillaExpanded.HandbookSearch;
-using VanillaExpanded.IgnitionTools;
 using VanillaExpanded.SpawnDecal;
 using VanillaExpanded.src.AutoStashing;
 using VanillaExpanded.src.IgnitionTools;
@@ -87,7 +85,6 @@ public class VanillaExpandedModSystem : ModSystem
 
     public override void Start(ICoreAPI api)
     {
-        api.RegisterCollectibleBehaviorClass(BehaviorIgnitionTool.RegistryId, typeof(BehaviorIgnitionTool));
         api.RegisterBlockBehaviorClass(BlockBehaviorAutoStashable.RegistryId, typeof(BlockBehaviorAutoStashable));
         api.RegisterBlockBehaviorClass(BehaviorCrateEntityEventBridge.RegistryId, typeof(BehaviorCrateEntityEventBridge));
 
