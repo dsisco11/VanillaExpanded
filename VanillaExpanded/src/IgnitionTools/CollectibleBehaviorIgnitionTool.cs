@@ -17,8 +17,14 @@ public sealed class CollectibleBehaviorIgnitionTool : CollectibleBehavior
     #endregion
 
     #region Initialization
-    public CollectibleBehaviorIgnitionTool(CollectibleObject collObj) : base(collObj)
+    public CollectibleBehaviorIgnitionTool(CollectibleObject item) : base(item)
     {
+        /*
+         * Set HeldPriorityInteract=true on the block.
+         * This ensures the held item's OnHeldInteractStart runs before the block's OnBlockInteractStart
+         * when sneaking, allowing the ignition behavior to prevent block interactions like the bloomery's item insertion from consuming the click.
+         */
+        item.HeldPriorityInteract = true;
     }
 
     public override void OnLoaded(ICoreAPI api)
