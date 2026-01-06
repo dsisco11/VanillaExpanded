@@ -45,6 +45,18 @@ public static class AutoStashPatch
                 // add behavior to collectible-behaviors array
                 block.CollectibleBehaviors = [behavior, .. block.CollectibleBehaviors];
             }
+
+            // Add auto-stash behavior to bloomeries (they don't use BlockBehaviorContainer)
+            if (block is BlockBloomery && !block.HasBehavior<BlockBehaviorAutoStashable>())
+            {
+                BlockBehaviorAutoStashable behavior = new(block);
+
+                // add behavior to block-behaviors array
+                block.BlockBehaviors = [behavior, .. block.BlockBehaviors];
+
+                // add behavior to collectible-behaviors array
+                block.CollectibleBehaviors = [behavior, .. block.CollectibleBehaviors];
+            }
         }
     }
 
