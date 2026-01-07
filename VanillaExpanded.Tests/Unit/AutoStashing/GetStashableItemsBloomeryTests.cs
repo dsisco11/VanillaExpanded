@@ -104,7 +104,8 @@ public class GetStashableItemsBloomeryTests
         var fuel = MockItem.CreateBloomeryFuel(1);
         var player = new MockPlayer()
             .WithBackpack(MockInventory.WithItems(fuel))
-            .WithHotbar(MockInventory.Empty());
+            .WithHotbar(MockInventory.Empty())
+            .WithActiveHotbarItem(fuel); // Active hotbar must be addable when bloomery is empty
         var bloomery = MockBlockEntityBloomery.Empty();
 
         // Act
@@ -126,7 +127,8 @@ public class GetStashableItemsBloomeryTests
         var fuel = MockItem.CreateBloomeryFuel(1);
         var player = new MockPlayer()
             .WithBackpack(MockInventory.WithItems(fuel))
-            .WithHotbar(MockInventory.Empty());
+            .WithHotbar(MockInventory.Empty())
+            .WithActiveHotbarItem(fuel); // Active hotbar must be addable when bloomery is empty
         var bloomery = MockBlockEntityBloomery.Empty();
 
         // Act
@@ -145,7 +147,8 @@ public class GetStashableItemsBloomeryTests
         var fuel2 = MockItem.CreateBloomeryFuel(1); // Same ID
         var player = new MockPlayer()
             .WithBackpack(MockInventory.WithItems(fuel1, fuel2))
-            .WithHotbar(MockInventory.Empty());
+            .WithHotbar(MockInventory.Empty())
+            .WithActiveHotbarItem(fuel1); // Active hotbar must be addable when bloomery is empty
         var bloomery = MockBlockEntityBloomery.Empty();
 
         // Act
@@ -206,7 +209,8 @@ public class GetStashableItemsBloomeryTests
         var ore = MockItem.CreateBloomeryOre(2);
         var player = new MockPlayer()
             .WithBackpack(MockInventory.WithItems(ore))
-            .WithHotbar(MockInventory.Empty());
+            .WithHotbar(MockInventory.Empty())
+            .WithActiveHotbarItem(ore); // Active hotbar must be addable when bloomery is empty
         var bloomery = MockBlockEntityBloomery.Empty();
 
         // Act
@@ -268,7 +272,8 @@ public class GetStashableItemsBloomeryTests
         var ore = MockItem.CreateBloomeryOre(2);
         var player = new MockPlayer()
             .WithBackpack(MockInventory.WithItems(fuel, ore))
-            .WithHotbar(MockInventory.Empty());
+            .WithHotbar(MockInventory.Empty())
+            .WithActiveHotbarItem(fuel); // Active hotbar must be addable when bloomery is empty
         var bloomery = MockBlockEntityBloomery.Empty();
 
         // Act
@@ -288,7 +293,8 @@ public class GetStashableItemsBloomeryTests
         var ore = MockItem.CreateBloomeryOre(2);
         var player = new MockPlayer()
             .WithBackpack(MockInventory.WithItems(fuel))
-            .WithHotbar(MockInventory.WithItems(ore));
+            .WithHotbar(MockInventory.WithItems(ore))
+            .WithActiveHotbarItem(ore); // Active hotbar must be addable when bloomery is empty
         var bloomery = MockBlockEntityBloomery.Empty();
 
         // Act
@@ -348,7 +354,8 @@ public class GetStashableItemsBloomeryTests
         var ore = MockItem.CreateBloomeryOre(4);
         var player = new MockPlayer()
             .WithBackpack(MockInventory.WithItems(fuel, nonCombustible, lowTemp, ore))
-            .WithHotbar(MockInventory.Empty());
+            .WithHotbar(MockInventory.Empty())
+            .WithActiveHotbarItem(fuel); // Active hotbar must be addable when bloomery is empty
         var bloomery = MockBlockEntityBloomery.Empty();
 
         // Act

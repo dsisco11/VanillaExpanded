@@ -222,6 +222,12 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     #region World Interaction Help
     public override WorldInteraction[] GetPlacedBlockInteractionHelp(IWorldAccessor world, BlockSelection selection, IPlayer forPlayer, ref EnumHandling handling)
     {
+        // Don't show interaction help if auto-stash is disabled
+        if (!VanillaExpandedModSystem.Config.EnableAutoStash)
+        {
+            return [];
+        }
+
         switch (block.EntityClass)
         {
             case "Crate":
@@ -253,6 +259,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
                 }
         }
     }
+
     #endregion
 
     #region UI Management
@@ -329,7 +336,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
 
     /// <summary>
     /// Gets item types which can be stashed into a bloomery.
-    /// Returns empty set if bloomery is burning or has items in output slot.
+    /// Returns empty set if bloomery is burning, has items in output slot, or slots are empty and active hotbar can't be added.
     /// </summary>
     private static HashSet<int> GetStashableItemsForBloomery(in IPlayer byPlayer, in BlockEntityBloomery bloomery)
     {
@@ -341,6 +348,17 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         // Bloomery state validation: cannot add items while burning or if output slot has items
         InventoryGeneric? bloomeryInv = BloomeryAccessor.GetInventory(bloomery);
         if (bloomery.IsBurning || bloomeryInv is null || !bloomeryInv[2].Empty)
+        {
+            return [];
+        }
+
+        // Bloomery slot validation: fuel or ore slot must have items, OR active hotbar item must be addable
+        bool fuelSlotHasItems = !bloomeryInv[0].Empty;
+        bool oreSlotHasItems = !bloomeryInv[1].Empty;
+        ItemStack? activeStack = byPlayer.InventoryManager.ActiveHotbarSlot?.Itemstack;
+        bool activeHotbarCanBeAdded = activeStack is not null && bloomery.CanAdd(activeStack);
+
+        if (!fuelSlotHasItems && !oreSlotHasItems && !activeHotbarCanBeAdded)
         {
             return [];
         }
