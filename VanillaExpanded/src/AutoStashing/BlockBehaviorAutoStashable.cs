@@ -431,7 +431,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
 
     /// <summary>
     /// Automatically stashes items from the player's inventory into the specified bloomery.
-    /// Stashes valid fuel to slot 0 and valid ore to slot 1.
+    /// Stashes valid fuel to slot 0 and valid ore to slot 1, respecting bloomery capacity limits.
     /// </summary>
     /// <param name="world"></param>
     /// <param name="byPlayer"></param>
@@ -445,14 +445,151 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             return false;
         }
 
-        return AutoStashToInventory(
-            world,
-            byPlayer,
-            bloomeryInv,
-            bloomery.Pos,
-            "bloomery",
-            stack => bloomery.CanAdd(stack),
-            GetBloomeryPreferredSlot);
+        IInventory? backpackInventory = byPlayer.InventoryManager.GetOwnInventory(GlobalConstants.backpackInvClassName);
+        IInventory? hotbarInventory = byPlayer.InventoryManager.GetOwnInventory(GlobalConstants.hotBarInvClassName);
+
+        int totalStashed = 0;
+
+        if (backpackInventory is not null)
+        {
+            totalStashed += AutoStashInventoryIntoBloomery(world, byPlayer, bloomery, bloomeryInv, backpackInventory);
+        }
+
+        if (hotbarInventory is not null)
+        {
+            totalStashed += AutoStashInventoryIntoBloomery(world, byPlayer, bloomery, bloomeryInv, hotbarInventory);
+        }
+
+        if (totalStashed > 0)
+        {
+            // Mark the block entity dirty to update visuals and sync to clients
+            bloomery.MarkDirty(true);
+
+            world.Api?.World.Logger.Audit("'{0}' auto-stashed {1} items into bloomery at <{2}>.",
+                byPlayer.PlayerName,
+                totalStashed,
+                bloomery.Pos
+            );
+        }
+
+        return totalStashed > 0;
+    }
+
+    /// <summary>
+    /// Stashes items from a source inventory into a bloomery, respecting capacity limits.
+    /// </summary>
+    private static int AutoStashInventoryIntoBloomery(
+        IWorldAccessor world,
+        IPlayer byPlayer,
+        BlockEntityBloomery bloomery,
+        InventoryGeneric bloomeryInv,
+        IInventory sourceInventory)
+    {
+        int totalStashed = 0;
+
+        // Process ore first (slot 1), then fuel (slot 0)
+        // This ensures fuel capacity calculation is based on actual ore amount
+        totalStashed += StashItemsToBloomerySlot(world, byPlayer, bloomery, bloomeryInv, sourceInventory, targetSlotIndex: 1); // Ore
+        totalStashed += StashItemsToBloomerySlot(world, byPlayer, bloomery, bloomeryInv, sourceInventory, targetSlotIndex: 0); // Fuel
+
+        return totalStashed;
+    }
+
+    /// <summary>
+    /// Stashes items from source inventory into a specific bloomery slot.
+    /// </summary>
+    private static int StashItemsToBloomerySlot(
+        IWorldAccessor world,
+        IPlayer byPlayer,
+        BlockEntityBloomery bloomery,
+        InventoryGeneric bloomeryInv,
+        IInventory sourceInventory,
+        int targetSlotIndex)
+    {
+        int totalStashed = 0;
+
+        foreach (ItemSlot sourceSlot in sourceInventory)
+        {
+            if (sourceSlot.Empty)
+            {
+                continue;
+            }
+
+            // Check if bloomery can accept this item type at all
+            if (!bloomery.CanAdd(sourceSlot.Itemstack))
+            {
+                continue;
+            }
+
+            int? slotIndex = GetBloomeryPreferredSlot(sourceSlot.Itemstack);
+            if (!slotIndex.HasValue || slotIndex.Value != targetSlotIndex)
+            {
+                continue;
+            }
+
+            ItemSlot targetSlot = bloomeryInv[slotIndex.Value];
+            int maxCanAdd = GetBloomeryMaxCanAdd(bloomery, bloomeryInv, sourceSlot.Itemstack, slotIndex.Value);
+
+            if (maxCanAdd <= 0)
+            {
+                continue;
+            }
+
+            int quantityToMove = Math.Min(sourceSlot.StackSize, maxCanAdd);
+            int moved = sourceSlot.TryPutInto(world, targetSlot, quantityToMove);
+
+            if (moved > 0)
+            {
+                totalStashed += moved;
+                world.Api?.World.Logger.Audit("'{0}' moved {1}x{2} into bloomery at <{3}>.",
+                    byPlayer.PlayerName,
+                    moved,
+                    targetSlot.Itemstack?.Collectible.Code,
+                    bloomery.Pos
+                );
+            }
+        }
+
+        return totalStashed;
+    }
+
+    /// <summary>
+    /// Gets the maximum number of items that can be added to a bloomery slot.
+    /// </summary>
+    private static int GetBloomeryMaxCanAdd(BlockEntityBloomery bloomery, InventoryGeneric bloomeryInv, ItemStack stack, int slotIndex)
+    {
+        const int FuelCapacity = 6;
+
+        if (slotIndex == 0) // Fuel slot
+        {
+            // Fuel max is based on ore content: maxRequired = ceil(oreSize / ore2FuelRatio)
+            int oreSize = bloomeryInv[1].StackSize;
+            int ore2FuelRatio = GetOre2FuelRatio(bloomeryInv[1].Itemstack);
+            int maxRequired = oreSize > 0 ? (int)Math.Ceiling((float)oreSize / ore2FuelRatio) : FuelCapacity;
+            return Math.Max(0, maxRequired - bloomeryInv[0].StackSize);
+        }
+        else if (slotIndex == 1) // Ore slot
+        {
+            int ore2FuelRatio = GetOre2FuelRatio(stack);
+            int oreCapacity = ore2FuelRatio * FuelCapacity;
+            return Math.Max(0, oreCapacity - bloomeryInv[1].StackSize);
+        }
+
+        return 0;
+    }
+
+    /// <summary>
+    /// Gets the Ore2FuelRatio for the given ore stack.
+    /// </summary>
+    private static int GetOre2FuelRatio(ItemStack? oreStack)
+    {
+        if (oreStack?.Collectible?.CombustibleProps is not CombustibleProperties combustProps)
+        {
+            return 1;
+        }
+
+        int ratio = combustProps.SmeltedRatio;
+        return oreStack.ItemAttributes?["bloomeryFuelRatio"].AsInt(ratio) ?? ratio;
     }
 
     /// <summary>
