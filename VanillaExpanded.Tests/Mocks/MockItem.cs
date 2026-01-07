@@ -49,4 +49,58 @@ public class MockItem : Item
     {
         return new MockItem(id, 0, api);
     }
+
+    /// <summary>
+    /// Creates a mock item that is valid bloomery fuel (charcoal-like).
+    /// Fuel requires BurnTemperature >= 1200 and BurnDuration > 30.
+    /// </summary>
+    public static MockItem CreateBloomeryFuel(int id, ICoreAPI? api = null)
+    {
+        var item = new MockItem(id, 0, api);
+        item.CombustibleProps = new CombustibleProperties
+        {
+            BurnTemperature = 1300, // Above 1200 threshold
+            BurnDuration = 60,      // Above 30 threshold
+        };
+        return item;
+    }
+
+    /// <summary>
+    /// Creates a mock item that is valid bloomery ore (iron ore-like).
+    /// Ore requires SmeltedStack != null and MeltingPoint between 1000-1500.
+    /// </summary>
+    public static MockItem CreateBloomeryOre(int id, int smeltedRatio = 1, ICoreAPI? api = null)
+    {
+        var item = new MockItem(id, 0, api);
+        item.CombustibleProps = new CombustibleProperties
+        {
+            MeltingPoint = 1200,    // Between 1000 (MinTemp) and 1500 (MaxTemp)
+            SmeltedRatio = smeltedRatio,
+            SmeltedStack = new JsonItemStack { Type = EnumItemClass.Item, Code = new AssetLocation("game:ironbloom") }
+        };
+        return item;
+    }
+
+    /// <summary>
+    /// Creates a mock item that is NOT valid for bloomery (no combustible properties).
+    /// </summary>
+    public static MockItem CreateNonCombustible(int id, ICoreAPI? api = null)
+    {
+        return new MockItem(id, 0, api);
+    }
+
+    /// <summary>
+    /// Creates a mock item with combustible properties that don't meet bloomery requirements.
+    /// (e.g., cooking item with low melting point)
+    /// </summary>
+    public static MockItem CreateLowTempCombustible(int id, ICoreAPI? api = null)
+    {
+        var item = new MockItem(id, 0, api);
+        item.CombustibleProps = new CombustibleProperties
+        {
+            MeltingPoint = 200,     // Too low for bloomery (needs >= 1000)
+            SmeltedStack = new JsonItemStack { Type = EnumItemClass.Item, Code = new AssetLocation("game:cookedfood") }
+        };
+        return item;
+    }
 }

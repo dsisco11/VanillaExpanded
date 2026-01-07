@@ -42,6 +42,10 @@
       <HintPath>$(VINTAGE_STORY)/VintagestoryLib.dll</HintPath>
       <Private>true</Private>
     </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(VINTAGE_STORY)/Lib/0Harmony.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
   </ItemGroup>
 
 </Project>
