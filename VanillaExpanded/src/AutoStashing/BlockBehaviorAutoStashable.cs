@@ -244,6 +244,24 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
                         }
                     ];
                 }
+            case "Bloomery":
+                {
+                    // If the player has no stashable items, do not show the interaction help.
+                    ItemStack[]? stashableStacks = GetStashableItemStacks(world, forPlayer, selection);
+                    if (stashableStacks is null || stashableStacks.Length == 0)
+                    {
+                        return [];
+                    }
+
+                    return [
+                        new WorldInteraction()
+                        {
+                            ActionLangCode = "vanillaexpanded:blockhelp-autostash-bloomery",
+                            MouseButton = EnumMouseButton.Right,
+                            Itemstacks = stashableStacks,
+                        }
+                    ];
+                }
             default:
                 {
                     // If the player has no stashable items, do not show the interaction help.
@@ -258,6 +276,51 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
                     ];
                 }
         }
+    }
+
+    /// <summary>
+    /// Gets the actual ItemStack objects that can be stashed, for display in interaction help.
+    /// </summary>
+    private static ItemStack[]? GetStashableItemStacks(IWorldAccessor world, IPlayer player, BlockSelection? selection)
+    {
+        if (selection is null)
+        {
+            return null;
+        }
+
+        BlockEntity? blockEntity = world.BlockAccessor.GetBlockEntity(selection.Position);
+        if (blockEntity is not BlockEntityBloomery bloomery)
+        {
+            return null;
+        }
+
+        HashSet<int> stashableIds = GetStashableItems(player, blockEntity);
+        if (stashableIds.Count == 0)
+        {
+            return null;
+        }
+
+        IPlayerInventoryManager playerInv = player.InventoryManager;
+        IInventory playerBackpack = playerInv.GetOwnInventory(GlobalConstants.backpackInvClassName);
+        IInventory playerHotbar = playerInv.GetOwnInventory(GlobalConstants.hotBarInvClassName);
+
+        // Collect unique item stacks by collectible ID
+        Dictionary<int, ItemStack> uniqueStacks = [];
+        foreach (ItemSlot slot in playerBackpack.Concat(playerHotbar))
+        {
+            if (slot.Empty || slot.Itemstack?.Collectible?.Id is null)
+            {
+                continue;
+            }
+
+            int id = slot.Itemstack.Collectible.Id;
+            if (stashableIds.Contains(id) && !uniqueStacks.ContainsKey(id))
+            {
+                uniqueStacks[id] = slot.Itemstack.Clone();
+            }
+        }
+
+        return [.. uniqueStacks.Values];
     }
 
     #endregion
