@@ -1,7 +1,8 @@
-﻿using HarmonyLib;
-
+﻿using System;
 using System.Collections.Generic;
 using System.Reflection.Emit;
+
+using HarmonyLib;
 
 using VanillaExpanded.AutoStashing;
 
@@ -60,29 +61,65 @@ public static class AutoStashPatch
         }
     }
 
-    [HarmonyTranspiler]
-    [HarmonyPatch(typeof(BlockCrate), "OnBlockInteractStart")]
-    public static IEnumerable<CodeInstruction> BlockCrate_OnBlockInteractStart(IEnumerable<CodeInstruction> instructions, ILGenerator generator)
+    /// <summary>
+    /// Reverse patch to call Block.OnBlockInteractStart directly, bypassing BlockBloomery's override.
+    /// </summary>
+    [HarmonyReversePatch]
+    [HarmonyPatch(typeof(Block), nameof(Block.OnBlockInteractStart))]
+    public static bool BaseOnBlockInteractStart(Block instance, IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel)
     {
-        // Without ILGenerator, the CodeMatcher will not be able to create labels
-        var codeMatcher = new CodeMatcher(instructions, generator);
+        // Stub - Harmony replaces this with the original Block.OnBlockInteractStart implementation
+        throw new NotImplementedException("Harmony reverse patch stub");
+    }
 
-        // find label0, which is the beginning of the call to "base.OnBlockInteractStart".
-        // then remove all instruction prior to it.
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(BlockCrate), nameof(BlockCrate.OnBlockInteractStart))]
+    public static bool BlockCrate_OnBlockInteractStart(
+        BlockCrate __instance,
+        IWorldAccessor world,
+        IPlayer byPlayer,
+        BlockSelection blockSel,
+        ref bool __result)
+    {        
+        // Call base.OnBlockInteractStart via reverse patch to invoke behaviors
+        bool baseResult = BaseOnBlockInteractStart(__instance, world, byPlayer, blockSel);
 
-        // find the call to the base OnBlockInteractStart method
-        var methodCall = codeMatcher.MatchStartForward(
-                CodeMatch.Calls(() => default(Block).OnBlockInteractStart)
-            )
-            .ThrowIfInvalid("Could not find call to base.OnBlockInteractStart")
-            .Advance(-1); // back up to the instruction prior to the method call
+        // If base returned true, a behavior handled it - skip the original method
+        if (baseResult)
+        {
+            __result = true;
+            return false;
+        }
 
-        // At this point, the CodeMatcher is positioned at the first instruction of the base.OnBlockInteractStart call.
-        // backup 4 instructions to include the ldarg instructions for the method parameters,
-        codeMatcher.Advance(-4);
+        // No behaviors handled it, let the original method run
+        return true;
+    }
 
-        // erase everything before this point, effectively removing the entire method body.
-        codeMatcher.RemoveInstructionsInRange(0, codeMatcher.Pos);
-        return codeMatcher.Instructions();
+    /// <summary>
+    /// Prefix patch for BlockBloomery.OnBlockInteractStart.
+    /// The vanilla method doesn't call base.OnBlockInteractStart(), which means behaviors are never invoked.
+    /// This prefix calls the base method first and skips the original if behaviors handled the interaction.
+    /// </summary>
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(BlockBloomery), nameof(BlockBloomery.OnBlockInteractStart))]
+    public static bool BlockBloomery_OnBlockInteractStart_Prefix(
+        BlockBloomery __instance,
+        IWorldAccessor world,
+        IPlayer byPlayer,
+        BlockSelection blockSel,
+        ref bool __result)
+    {
+        // Call base.OnBlockInteractStart via reverse patch to invoke behaviors
+        bool baseResult = BaseOnBlockInteractStart(__instance, world, byPlayer, blockSel);
+
+        // If base returned true, a behavior handled it - skip the original method
+        if (baseResult)
+        {
+            __result = true;
+            return false;
+        }
+
+        // No behaviors handled it, let the original method run
+        return true;
     }
 }
