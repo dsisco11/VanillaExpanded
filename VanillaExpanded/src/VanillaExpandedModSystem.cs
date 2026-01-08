@@ -17,10 +17,6 @@ namespace VanillaExpanded;
 
 public class VanillaExpandedModSystem : ModSystem
 {
-    #region Constants
-    public const string ConfigFileName = "VanillaExpanded.json";
-    #endregion
-
     #region Fields
     internal Harmony? harmony;
 
@@ -40,12 +36,12 @@ public class VanillaExpandedModSystem : ModSystem
         
         try
         {
-            var loadedConfig = api.LoadModConfig<VanillaExpandedConfig>(ConfigFileName);
+            var loadedConfig = api.LoadModConfig<VanillaExpandedConfig>(Constants.ConfigFileName);
             if (loadedConfig is null)
             {
                 Config = new VanillaExpandedConfig();
-                api.StoreModConfig(Config, ConfigFileName);
-                api.Logger.Notification("[VanillaExpanded] Created default configuration file: {0}", ConfigFileName);
+                api.StoreModConfig(Config, Constants.ConfigFileName);
+                api.Logger.Notification("[VanillaExpanded] Created default configuration file: {0}", Constants.ConfigFileName);
             }
             else
             {
@@ -80,7 +76,7 @@ public class VanillaExpandedModSystem : ModSystem
         // Suggest ConfigLib if not installed
         if (!api.ModLoader.IsModEnabled("configlib"))
         {
-            api.Logger.Notification("[VanillaExpanded] ConfigLib is not installed. Install it for an in-game configuration GUI. Settings can be edited manually in ModConfig/{0}", ConfigFileName);
+            api.Logger.Notification("[VanillaExpanded] ConfigLib is not installed. Install it for an in-game configuration GUI. Settings can be edited manually in ModConfig/{0}", Constants.ConfigFileName);
         }
     }
 
@@ -163,7 +159,7 @@ public class VanillaExpandedModSystem : ModSystem
             string recipePath = recipe.Name.Path;
 
             // Check if recipe belongs to VanillaExpanded and should be disabled
-            if (recipe.Name.Domain != "vanillaexpanded")
+            if (recipe.Name.Domain != Constants.ModId)
             {
                 continue;
             }

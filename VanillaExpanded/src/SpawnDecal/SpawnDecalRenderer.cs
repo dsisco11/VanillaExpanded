@@ -77,7 +77,7 @@ public class SpawnDecalRenderer : IRenderer
     private void LoadTexture()
     {
         // Use the block breaking overlay texture
-        var textureLoc = new AssetLocation("vanillaexpanded", "textures/respawnpoint.png");
+        var textureLoc = new AssetLocation(Constants.ModId, "textures/respawnpoint.png");
         decalTextureId = capi.Render.GetOrLoadTexture(textureLoc);
     }
     #endregion
