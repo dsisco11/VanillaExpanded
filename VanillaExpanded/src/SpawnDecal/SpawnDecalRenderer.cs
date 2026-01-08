@@ -39,7 +39,7 @@ public class SpawnDecalRenderer : IRenderer
     /// <summary>
     /// Used to 'unset' the glow after rendering. (otherwise the glow color state bleeds into other renders)
     /// </summary>
-    private Vec4f DefaultRenderGlow = new(1, 1, 1, 0);
+    private Vec4f DefaultRenderGlow = ColorUtilEx.TransparentWhiteRgbaVec;
     #endregion
 
     #region IRenderer Properties
