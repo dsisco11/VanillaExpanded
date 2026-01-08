@@ -43,7 +43,7 @@ public class SpawnDecalRenderer : IRenderer
     #endregion
 
     #region IRenderer Properties
-    public double RenderOrder => 0.49f; // Decal render stage
+    public double RenderOrder => 0.7f; // Decal render stage
     public int RenderRange => 32;
     #endregion
 
