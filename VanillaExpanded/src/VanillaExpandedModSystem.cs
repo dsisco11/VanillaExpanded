@@ -107,10 +107,9 @@ public class VanillaExpandedModSystem : ModSystem
     /// </summary>
     private static void ApplySelectivePatches(Harmony harmony)
     {
-        if (Config.EnableAlloyCalculator)
-        {
-            new PatchClassProcessor(harmony, typeof(FirepitGuiPatch)).Patch();
-        }
+        // Always patch the firepit GUI open/close hooks. The feature itself is gated at runtime,
+        // and we avoid patch/unpatch during a running session.
+        new PatchClassProcessor(harmony, typeof(FirepitGuiPatch)).Patch();
 
         if (Config.EnableSpawnDecal)
         {
