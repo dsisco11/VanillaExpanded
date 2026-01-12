@@ -7,6 +7,8 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 
 namespace VanillaExpanded;
+
+using VanillaExpanded.ModSystems;
 internal record struct SlotId(string InvClassName, int SlotIndex);
 public class EquipLightSource : ModSystem
 {
@@ -25,7 +27,7 @@ public class EquipLightSource : ModSystem
     #region Hooks
     public override bool ShouldLoad(EnumAppSide forSide)
     {
-        return forSide == EnumAppSide.Client && VanillaExpandedModSystem.Config.EnableEquipLightHotkey;
+        return forSide == EnumAppSide.Client;
     }
 
     public override void StartClientSide(ICoreClientAPI api)
@@ -52,11 +54,13 @@ public class EquipLightSource : ModSystem
 
     private bool HandleKeyBind_EquipLightSourceToOffhand(KeyCombination t1)
     {
+        if (!VanillaExpandedModSystem.Config.EnableEquipLightHotkey) return false;
         return OnHotKeyPressed(true);
     }
 
     private bool HandleKeyBind_EquipLightSourceToHotbar(KeyCombination t1)
     {
+        if (!VanillaExpandedModSystem.Config.EnableEquipLightHotkey) return false;
         return OnHotKeyPressed(false);
     }
 

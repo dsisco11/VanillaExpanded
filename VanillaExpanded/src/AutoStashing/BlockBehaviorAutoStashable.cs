@@ -21,7 +21,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     #region Constants
     public static string RegistryId => "AutoStashable";
     /// <summary> Time in seconds to wait before stashing items </summary>
-    public float StashDelaySeconds = VanillaExpandedModSystem.Config?.AutoStashDelay ?? 0.5f;
+    public float StashDelaySeconds => VanillaExpandedModSystem.Config?.AutoStashDelay ?? 0.5f;
     /// <summary>
     /// Time in seconds before the auto stash ui appears (to avoid flickering when quickly opening containers)
     /// </summary>

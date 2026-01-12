@@ -3,6 +3,7 @@ using System.Linq;
 
 using VanillaExpanded.AlloyCalculator;
 using VanillaExpanded.Gui;
+using VanillaExpanded.ModSystems;
 
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -14,7 +15,7 @@ namespace VanillaExpanded.ModSystems;
 /// <summary>
 /// Client-side mod system that auto-opens the Alloy Calculator when a crucible dialog is opened.
 /// </summary>
-public sealed class AlloyCalculatorModSystem : ModSystem
+public sealed class AlloyCalculatorModSystem : ModSystem, ILiveConfigurable
 {
     #region Fields
     private ICoreClientAPI? capi;
@@ -24,13 +25,33 @@ public sealed class AlloyCalculatorModSystem : ModSystem
     #region ModSystem Lifecycle
     public override bool ShouldLoad(EnumAppSide forSide)
     {
-        return forSide == EnumAppSide.Client && VanillaExpandedModSystem.Config.EnableAlloyCalculator;
+        return forSide == EnumAppSide.Client;
     }
 
     public override void StartClientSide(ICoreClientAPI api)
     {
         capi = api;
+
+        if (VanillaExpandedModSystem.Config.EnableAlloyCalculator && VanillaExpandedModSystem.Config.DisableAlloyCalculatorPatch)
+        {
+            api.Logger.Warning("[VanillaExpanded] Alloy Calculator is enabled but its Harmony patch is disabled (DisableAlloyCalculatorPatch=true). The calculator will not auto-open.");
+        }
+
         RegisterFirepitEvents();
+    }
+
+    public void OnConfigReloaded(ICoreAPI api)
+    {
+        if (capi is null) return;
+        if (VanillaExpandedModSystem.Config.EnableAlloyCalculator) return;
+
+        // Feature was disabled while running: close any currently open dialogs.
+        foreach (var dialog in openDialogs.Values)
+        {
+            dialog.TryClose();
+            dialog.Dispose();
+        }
+        openDialogs.Clear();
     }
 
     public override void Dispose()
@@ -63,6 +84,7 @@ public sealed class AlloyCalculatorModSystem : ModSystem
     {
         if (capi is null) return;
         if (!VanillaExpandedModSystem.Config.EnableAlloyCalculator) return;
+        if (VanillaExpandedModSystem.Config.DisableAlloyCalculatorPatch) return;
         
         EFirepitKind kind = GetFirepitKind(capi, firepitDialog);
         if (kind != EFirepitKind.Smelting) return;

@@ -10,7 +10,6 @@ using VanillaExpanded.SpawnDecal;
 using VanillaExpanded.src.AutoStashing;
 using VanillaExpanded.src.IgnitionTools;
 
-using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 
 namespace VanillaExpanded;
@@ -18,8 +17,6 @@ namespace VanillaExpanded;
 public class VanillaExpandedModSystem : ModSystem
 {
     #region Fields
-    internal Harmony? harmony;
-
     /// <summary>
     /// The mod configuration. Loaded on startup.
     /// </summary>
@@ -60,7 +57,7 @@ public class VanillaExpandedModSystem : ModSystem
     public override void Dispose()
     {
         base.Dispose();
-        harmony?.UnpatchAll(Mod.Info.ModID);
+        new Harmony(Constants.ModId).UnpatchAll(Constants.ModId);
         configLoaded = false; // Reset so config reloads on next game start
     }
 
@@ -80,6 +77,19 @@ public class VanillaExpandedModSystem : ModSystem
         }
     }
 
+    internal static void PersistConfigAndNotifyReloadRequired(ICoreAPI api, string source)
+    {
+        // ConfigLib updates our config object instance via reflection.
+        // We persist to our normal ModConfig file, but we can't safely hot-apply
+        // Harmony patches or recipe enable/disable without a reload.
+        api.StoreModConfig(Config, Constants.ConfigFileName);
+
+        api.Logger.Notification(
+            "[VanillaExpanded] Configuration updated via {0}. Changes will apply after re-entering the world (and may require a restart).",
+            source
+        );
+    }
+
     public override void Start(ICoreAPI api)
     {
         api.RegisterBlockBehaviorClass(BlockBehaviorAutoStashable.RegistryId, typeof(BlockBehaviorAutoStashable));
@@ -89,21 +99,17 @@ public class VanillaExpandedModSystem : ModSystem
             .RegisterMessageType<Network.Packet_RequestAutoStash>()
             .RegisterMessageType<Network.Packet_TemporalSpawn>();
 
-        if (!Harmony.HasAnyPatches(Mod.Info.ModID))
-        {
-            harmony = new Harmony(Mod.Info.ModID);
-            ApplySelectivePatches();
-        }
+        EnsureHarmonyPatched();
     }
 
     /// <summary>
     /// Applies Harmony patches selectively based on enabled features in config.
     /// </summary>
-    private void ApplySelectivePatches()
+    private static void ApplySelectivePatches(Harmony harmony)
     {
-        if (harmony is null) return;
-
-        if (Config.EnableAlloyCalculator)
+        // Patch the firepit GUI open/close hooks unless explicitly disabled.
+        // Users can disable this as a safety valve if it ever breaks or conflicts.
+        if (!Config.DisableAlloyCalculatorPatch)
         {
             new PatchClassProcessor(harmony, typeof(FirepitGuiPatch)).Patch();
         }
@@ -136,10 +142,28 @@ public class VanillaExpandedModSystem : ModSystem
         {
             AutoStashPatch.AmendContainerBehaviors(api);
         }
-        DisableRecipesBasedOnConfig(api);
+        UpdateRecipesBasedOnConfig(api, logChanges: false);
     }
 
-    private void DisableRecipesBasedOnConfig(ICoreAPI api)
+    private static void EnsureHarmonyPatched()
+    {
+        if (Harmony.HasAnyPatches(Constants.ModId))
+        {
+            return;
+        }
+
+        var harmony = new Harmony(Constants.ModId);
+        ApplySelectivePatches(harmony);
+    }
+
+    private static void ReapplyHarmonyPatches()
+    {
+        new Harmony(Constants.ModId).UnpatchAll(Constants.ModId);
+        var harmony = new Harmony(Constants.ModId);
+        ApplySelectivePatches(harmony);
+    }
+
+    private static void UpdateRecipesBasedOnConfig(ICoreAPI api, bool logChanges)
     {
         if (api.Side != EnumAppSide.Server)
         {
@@ -148,6 +172,7 @@ public class VanillaExpandedModSystem : ModSystem
 
         var recipes = api.World.GridRecipes;
         int disabledCount = 0;
+        int enabledCount = 0;
 
         foreach (var recipe in recipes)
         {
@@ -174,16 +199,25 @@ public class VanillaExpandedModSystem : ModSystem
                 _ => false
             };
 
-            if (shouldDisable)
+            bool enable = !shouldDisable;
+            if (recipe.Enabled != enable)
             {
-                recipe.Enabled = false;
-                disabledCount++;
+                recipe.Enabled = enable;
+                if (enable) enabledCount++;
+                else disabledCount++;
             }
         }
+
+        if (!logChanges) return;
 
         if (disabledCount > 0)
         {
             api.Logger.Notification("[VanillaExpanded] Disabled {0} recipes based on configuration.", disabledCount);
+        }
+
+        if (enabledCount > 0)
+        {
+            api.Logger.Notification("[VanillaExpanded] Enabled {0} recipes based on configuration.", enabledCount);
         }
     }
 }

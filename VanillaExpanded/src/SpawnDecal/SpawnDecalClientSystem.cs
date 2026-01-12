@@ -1,3 +1,5 @@
+using System;
+
 using VanillaExpanded.Network;
 
 using Vintagestory.API.Client;
@@ -6,46 +8,48 @@ using Vintagestory.API.MathTools;
 
 namespace VanillaExpanded.SpawnDecal;
 
+using VanillaExpanded.ModSystems;
+
 /// <summary>
 /// Client-side mod system for managing the spawn decal renderer.
 /// </summary>
-public class SpawnDecalClientSystem : ModSystem
+public class SpawnDecalClientSystem : ModSystem, ILiveConfigurable
 {
     #region Fields
     private ICoreClientAPI? capi;
     private SpawnDecalRenderer? renderer;
+    private float? lastDecalSize;
     #endregion
 
     #region ModSystem Overrides
     public override bool ShouldLoad(EnumAppSide forSide)
     {
-        return forSide == EnumAppSide.Client && VanillaExpandedModSystem.Config.EnableSpawnDecal;
+        return forSide == EnumAppSide.Client;
     }
 
     public override void StartClientSide(ICoreClientAPI api)
     {
         capi = api;
 
-        // Create and register the renderer
-        renderer = new SpawnDecalRenderer(api);
-        api.Event.RegisterRenderer(renderer, EnumRenderStage.OIT, "spawndecal");
-
         // Register network handler
         var channel = api.Network.GetChannel(Mod.Info.ModID);
         channel?.SetMessageHandler<Packet_TemporalSpawn>(OnTemporalSpawnPacket);
+
+        ApplyConfig(api);
     }
 
     public override void Dispose()
     {
-        if (renderer != null && capi != null)
-        {
-            capi.Event.UnregisterRenderer(renderer, EnumRenderStage.OIT);
-            renderer.Dispose();
-            renderer = null;
-        }
+        DisposeRenderer();
 
         capi = null;
         base.Dispose();
+    }
+
+    public void OnConfigReloaded(ICoreAPI api)
+    {
+        if (api is not ICoreClientAPI clientApi) return;
+        ApplyConfig(clientApi);
     }
     #endregion
 
@@ -67,9 +71,47 @@ public class SpawnDecalClientSystem : ModSystem
     }
     #endregion
 
+    #region Live Reload
+    private void ApplyConfig(ICoreClientAPI api)
+    {
+        if (!VanillaExpandedModSystem.Config.EnableSpawnDecal)
+        {
+            DisposeRenderer();
+            return;
+        }
+
+        if (renderer is null)
+        {
+            renderer = new SpawnDecalRenderer(api);
+            api.Event.RegisterRenderer(renderer, EnumRenderStage.OIT, "spawndecal");
+            lastDecalSize = VanillaExpandedModSystem.Config.SpawnDecalSize;
+            return;
+        }
+
+        float currentSize = VanillaExpandedModSystem.Config.SpawnDecalSize;
+        if (lastDecalSize is null || Math.Abs(lastDecalSize.Value - currentSize) > 0.0001f)
+        {
+            renderer.ReloadMesh();
+            lastDecalSize = currentSize;
+        }
+    }
+
+    private void DisposeRenderer()
+    {
+        if (renderer is null || capi is null) return;
+
+        capi.Event.UnregisterRenderer(renderer, EnumRenderStage.OIT);
+        renderer.Dispose();
+        renderer = null;
+        lastDecalSize = null;
+    }
+    #endregion
+
     #region Network Handlers
     private void OnTemporalSpawnPacket(Packet_TemporalSpawn packet)
     {
+        if (!VanillaExpandedModSystem.Config.EnableSpawnDecal) return;
+
         if (packet.HasSpawn)
         {
             SetSpawnPosition(new Vec3d(packet.X, packet.Y, packet.Z));

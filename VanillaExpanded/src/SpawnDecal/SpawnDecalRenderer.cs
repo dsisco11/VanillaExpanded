@@ -59,6 +59,8 @@ public class SpawnDecalRenderer : IRenderer
     #region Initialization
     private void InitializeMesh()
     {
+        decalMeshRef?.Dispose();
+
         // Create a flat quad mesh for the decal (lying on the ground)
         var meshData = QuadMeshUtil.GetCustomQuadHorizontal(0.5f, Z_OFFSET, -0.5f, -1f, 1f, 255, 255, 255, 255);
         // multiply all vertex coords by DecalSize
@@ -72,6 +74,11 @@ public class SpawnDecalRenderer : IRenderer
         }
         meshData.SetXyz(verticies);
         decalMeshRef = capi.Render.UploadMesh(meshData);
+    }
+
+    public void ReloadMesh()
+    {
+        InitializeMesh();
     }
 
     private void LoadTexture()
