@@ -1,8 +1,6 @@
 # Vanilla: Expanded TODO List:
     ## Issues:
-        ☐ Fix player respawn decal not disappearing after it expires.
         ☐ Fix respawn decal looking obnoxious (too colorful).
-        ☐ Add mod config settings for all features and crafting recipes.
 
     ## Recipes:
         ✔ Decraft linen sacks back into string (knife = 3x string, shears = 4x string). @done(25-12-01 10:47)
@@ -13,14 +11,8 @@
         ✔ Smelt tool heads back into metal nuggets (100% return). @done(25-12-01 12:39)
 
     ## Functionality:
-        ✔ Auto stashing items into containers. @done(25-12-01 11:37)
-        ✔ Auto stashing items into crates. @done(25-12-01 15:38)
-        ✔ Lighting fires with lanterns (requires new custom behavior class). @done(25-11-30 06:19)
         ☐ Lighting fires with candles.
-        ☐ Lighting fires with oil-lamps.
-        ☐ Handbook search results prioritize full-word matches over partial matches.
         ☐ New "crafting menu" similar to minecraft: shows all craftable items with current inventory, allows searching. (Maybe this can just be added to the handbook?)
-        ✔ New "alloy calculator" on the crucible menu: has sliders to adjust percentages of each metal, has button to deposit required materials into crucible. @done(25-12-18 06:46)
 
     ## Death Penalties:
         ☐ New death penalty option: lose *bag* items on death (items in inventory are lost, items on hotbar and equipped armor and weapons are kept).
@@ -29,8 +21,6 @@
         ☐ Tool degradation on death: all tools in inventory and hotbar lose <configurable percent> durability on death.
 
     ## Effects:
-        ✔ Player respawn position indicated by a glowing decal on the ground. @done(25-12-18 06:46)
-        ☐ Unstable blocks have crumbling particles that increase in frequency the more unstable they are.
         ☐ Blocks with light level 1 have subtle haze/smoke particles (to indicate the edge of lit areas) (reuse the existing temporal storm ground particle effect).
 
 # Vanilla: Rebalanced Ideas:
