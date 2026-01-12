@@ -6,7 +6,7 @@ namespace VanillaExpanded;
 internal static class Constants
 {
     /// <summary>
-    /// The mod ID used for asset locations and network channels.
+    /// The mod ID used for asset locations, network channels, and Harmony patching.
     /// </summary>
     public const string ModId = "vanillaexpanded";
 

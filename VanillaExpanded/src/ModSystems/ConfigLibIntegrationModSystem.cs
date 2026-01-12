@@ -2,6 +2,8 @@ using System;
 using System.Linq;
 using System.Reflection;
 
+using VanillaExpanded;
+
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 

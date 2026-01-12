@@ -10,7 +10,6 @@ using VanillaExpanded.SpawnDecal;
 using VanillaExpanded.src.AutoStashing;
 using VanillaExpanded.src.IgnitionTools;
 
-using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 
 namespace VanillaExpanded;
@@ -18,9 +17,6 @@ namespace VanillaExpanded;
 public class VanillaExpandedModSystem : ModSystem
 {
     #region Fields
-    internal Harmony? harmony;
-    private static VanillaExpandedModSystem? instance;
-
     /// <summary>
     /// The mod configuration. Loaded on startup.
     /// </summary>
@@ -61,9 +57,8 @@ public class VanillaExpandedModSystem : ModSystem
     public override void Dispose()
     {
         base.Dispose();
-        harmony?.UnpatchAll(Mod.Info.ModID);
+        new Harmony(Constants.ModId).UnpatchAll(Constants.ModId);
         configLoaded = false; // Reset so config reloads on next game start
-        instance = null;
     }
 
     public override double ExecuteOrder()
@@ -73,7 +68,6 @@ public class VanillaExpandedModSystem : ModSystem
 
     public override void StartPre(ICoreAPI api)
     {
-        instance ??= this;
         EnsureConfigLoaded(api);
         
         // Suggest ConfigLib if not installed
@@ -87,7 +81,7 @@ public class VanillaExpandedModSystem : ModSystem
     {
         EnsureConfigLoaded(api);
 
-        instance?.ReapplyHarmonyPatches();
+        ReapplyHarmonyPatches();
 
         if (Config.EnableAutoStash)
         {
@@ -106,20 +100,14 @@ public class VanillaExpandedModSystem : ModSystem
             .RegisterMessageType<Network.Packet_RequestAutoStash>()
             .RegisterMessageType<Network.Packet_TemporalSpawn>();
 
-        if (!Harmony.HasAnyPatches(Mod.Info.ModID))
-        {
-            harmony = new Harmony(Mod.Info.ModID);
-            ApplySelectivePatches();
-        }
+        EnsureHarmonyPatched();
     }
 
     /// <summary>
     /// Applies Harmony patches selectively based on enabled features in config.
     /// </summary>
-    private void ApplySelectivePatches()
+    private static void ApplySelectivePatches(Harmony harmony)
     {
-        if (harmony is null) return;
-
         if (Config.EnableAlloyCalculator)
         {
             new PatchClassProcessor(harmony, typeof(FirepitGuiPatch)).Patch();
@@ -156,15 +144,22 @@ public class VanillaExpandedModSystem : ModSystem
         UpdateRecipesBasedOnConfig(api, logChanges: false);
     }
 
-    private void ReapplyHarmonyPatches()
+    private static void EnsureHarmonyPatched()
     {
-        if (harmony is null)
+        if (Harmony.HasAnyPatches(Constants.ModId))
         {
-            harmony = new Harmony(Mod.Info.ModID);
+            return;
         }
 
-        harmony.UnpatchAll(Mod.Info.ModID);
-        ApplySelectivePatches();
+        var harmony = new Harmony(Constants.ModId);
+        ApplySelectivePatches(harmony);
+    }
+
+    private static void ReapplyHarmonyPatches()
+    {
+        new Harmony(Constants.ModId).UnpatchAll(Constants.ModId);
+        var harmony = new Harmony(Constants.ModId);
+        ApplySelectivePatches(harmony);
     }
 
     private static void UpdateRecipesBasedOnConfig(ICoreAPI api, bool logChanges)
