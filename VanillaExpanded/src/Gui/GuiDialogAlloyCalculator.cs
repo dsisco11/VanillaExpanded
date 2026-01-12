@@ -20,7 +20,6 @@ namespace VanillaExpanded.Gui;
 public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 {
     #region Constants
-    private const string ModId = "vanillaexpanded";
     private const string DialogKey = "alloycalculator";
     private const double SliderWidth = 150;
     private const double LabelWidth = 80;
@@ -86,7 +85,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
     #region Constructor
     public GuiDialogAlloyCalculator(ICoreClientAPI capi, BlockPos blockPos, GuiDialog firepitDialog) 
-        : base(Lang.Get($"{ModId}:gui-alloycalculator-title"), blockPos, capi)
+        : base(Lang.Get($"{Constants.ModId}:gui-alloycalculator-title"), blockPos, capi)
     {
         if (IsDuplicate) return;
         this.firepitDialog = firepitDialog;
@@ -199,12 +198,12 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         var composer = capi.Gui
             .CreateCompo($"{DialogKey}{BlockEntityPosition}", dialogBounds)
             .AddShadedDialogBG(bgBounds)
-            .AddDialogTitleBar(Lang.Get($"{ModId}:gui-alloycalculator-title"), OnTitleBarClose)
+            .AddDialogTitleBar(Lang.Get($"{Constants.ModId}:gui-alloycalculator-title"), OnTitleBarClose)
             .BeginChildElements(bgBounds)
             .AddDropDown([.. alloyValues], [.. alloyNames], selectedIndex, OnAlloySelected, dropdownBounds, "alloyDropdown")
-            .AddHoverText(Lang.Get($"{ModId}:gui-alloycalculator-dropdown-tooltip"), CairoFont.WhiteDetailText(), 250, dropdownBounds.FlatCopy(), "dropdownTooltip")
+            .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-dropdown-tooltip"), CairoFont.WhiteDetailText(), 250, dropdownBounds.FlatCopy(), "dropdownTooltip")
             .AddNumberInput(inputBounds, OnTargetUnitsChanged, CairoFont.WhiteDetailText(), "targetUnits")
-            .AddHoverText(Lang.Get($"{ModId}:gui-alloycalculator-targetunits-tooltip"), CairoFont.WhiteDetailText(), 250, inputBounds.FlatCopy(), "targetUnitsTooltip");
+            .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-targetunits-tooltip"), CairoFont.WhiteDetailText(), 250, inputBounds.FlatCopy(), "targetUnitsTooltip");
 
         // Add ingredient sliders if an alloy is selected
         if (selectedAlloy is not null && ingredientCount > 0)
@@ -222,7 +221,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                 var sliderKey = $"slider_{ingredientIndex}";
                 var minPercent = (int)Math.Round(ingredient.MinRatio * 100);
                 var maxPercent = (int)Math.Round(ingredient.MaxRatio * 100);
-                var sliderTooltip = Lang.Get($"{ModId}:gui-alloycalculator-slider-tooltip", ingredientName, minPercent, maxPercent);
+                var sliderTooltip = Lang.Get($"{Constants.ModId}:gui-alloycalculator-slider-tooltip", ingredientName, minPercent, maxPercent);
 
                 composer
                     .AddStaticText(ingredientName, CairoFont.WhiteSmallText(), labelBounds)
@@ -255,7 +254,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                         ShowStackSize = true,
                         Background = true,
                         PaddingRight = slotPadding,
-                        ExtraTooltipText = "\n" + Lang.Get($"{ModId}:gui-alloycalculator-itemstack-tooltip")
+                        ExtraTooltipText = "\n" + Lang.Get($"{Constants.ModId}:gui-alloycalculator-itemstack-tooltip")
                     };
                     slideshowComponents.Add(slideshow);
                     richTextComponents.Add(slideshow);
@@ -277,8 +276,8 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                 .WithParent(contentBounds)
                 .WithAlignment(EnumDialogArea.CenterFixed);
             composer
-                .AddSmallButton(Lang.Get($"{ModId}:gui-alloycalculator-deposit"), OnDepositButtonClicked, buttonBounds, EnumButtonStyle.Normal, "depositButton")
-                .AddHoverText(Lang.Get($"{ModId}:gui-alloycalculator-deposit-tooltip"), CairoFont.WhiteDetailText(), 250, buttonBounds.FlatCopy(), "depositTooltip");
+                .AddSmallButton(Lang.Get($"{Constants.ModId}:gui-alloycalculator-deposit"), OnDepositButtonClicked, buttonBounds, EnumButtonStyle.Normal, "depositButton")
+                .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-deposit-tooltip"), CairoFont.WhiteDetailText(), 250, buttonBounds.FlatCopy(), "depositTooltip");
         }
 
         SingleComposer = composer.EndChildElements().Compose();

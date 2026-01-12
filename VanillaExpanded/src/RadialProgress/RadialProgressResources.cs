@@ -212,7 +212,7 @@ internal static class RadialProgressResources
             prog.FragmentShader.PrefixCode = prefixCode;
 
             // Use domain for asset loading
-            prog.AssetDomain = "vanillaexpanded";
+            prog.AssetDomain = Constants.ModId;
 
             // Register as file shader (loads from assets/vanillaexpanded/shaders/)
             capi.Shader.RegisterFileShaderProgram(ShaderName, prog);

@@ -39,11 +39,11 @@ public class SpawnDecalRenderer : IRenderer
     /// <summary>
     /// Used to 'unset' the glow after rendering. (otherwise the glow color state bleeds into other renders)
     /// </summary>
-    private Vec4f DefaultRenderGlow = new(1, 1, 1, 0);
+    private Vec4f DefaultRenderGlow = ColorUtilEx.TransparentWhiteRgbaVec;
     #endregion
 
     #region IRenderer Properties
-    public double RenderOrder => 0.49f; // Decal render stage
+    public double RenderOrder => 0.7f; // Decal render stage
     public int RenderRange => 32;
     #endregion
 
@@ -77,7 +77,7 @@ public class SpawnDecalRenderer : IRenderer
     private void LoadTexture()
     {
         // Use the block breaking overlay texture
-        var textureLoc = new AssetLocation("vanillaexpanded", "textures/respawnpoint.png");
+        var textureLoc = new AssetLocation(Constants.ModId, "textures/respawnpoint.png");
         decalTextureId = capi.Render.GetOrLoadTexture(textureLoc);
     }
     #endregion
@@ -163,7 +163,8 @@ public class SpawnDecalRenderer : IRenderer
         rapi.RenderMesh(decalMeshRef);
         rapi.GlToggleBlend(true, EnumBlendMode.Standard);
 
-        // Reset shader inputs to defaults to prevent affecting subsequent renders
+        // Reset shader inputs to defaults to prevent affecting subsequent renders (e.g., particles)
+        shader.RgbaTint = ColorUtil.WhiteArgbVec;  // Reset tint to white
         shader.RgbaGlowIn = DefaultRenderGlow;  // No glow
         shader.ExtraGlow = 0;  // No extra glow
         shader.Stop();
