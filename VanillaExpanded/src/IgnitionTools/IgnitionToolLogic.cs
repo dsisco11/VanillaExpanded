@@ -26,7 +26,7 @@ internal sealed class IgnitionToolLogic
     /// <summary> Animation to play when igniting </summary>
     private readonly string? igniteAnimation = null;
     /// <summary> Time in seconds it takes to use the tool </summary>
-    private float IgnitionDelay => 5f; // VanillaExpandedModSystem.Config.IgnitionDelay;
+    private float IgnitionDelay => VanillaExpandedModSystem.Config.IgnitionDelay;
     #endregion
 
     #region Initialization
