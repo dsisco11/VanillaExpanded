@@ -36,9 +36,7 @@ internal sealed class ConfigLibIntegrationModSystem : ModSystem
     {
         if (api is null) return;
 
-        // For managed configs, ConfigLib already updated our config object instance.
-        // Apply any changes that can be applied live (recipes, (re)patching, etc.).
-        VanillaExpandedModSystem.ApplyLiveConfig(api);
+        VanillaExpandedModSystem.PersistConfigAndNotifyReloadRequired(api, source: "ConfigLib");
     }
 
     private void TryRegisterConfigWithConfigLib()
@@ -74,10 +72,16 @@ internal sealed class ConfigLibIntegrationModSystem : ModSystem
             Action onSyncedFromServer = () =>
             {
                 if (api is null) return;
-                VanillaExpandedModSystem.ApplyLiveConfig(api);
+                VanillaExpandedModSystem.PersistConfigAndNotifyReloadRequired(api, source: "ConfigLib (server sync)");
             };
 
-            object?[] args = BuildArgs(method, onSyncedFromServer);
+            Action onConfigSaved = () =>
+            {
+                if (api is null) return;
+                VanillaExpandedModSystem.PersistConfigAndNotifyReloadRequired(api, source: "ConfigLib");
+            };
+
+            object?[] args = BuildArgs(method, onSyncedFromServer, onConfigSaved);
             method.Invoke(configLib, args);
             registered = true;
         }
@@ -87,7 +91,7 @@ internal sealed class ConfigLibIntegrationModSystem : ModSystem
         }
     }
 
-    private static object?[] BuildArgs(MethodInfo method, Action onSyncedFromServer)
+    private static object?[] BuildArgs(MethodInfo method, Action onSyncedFromServer, Action onConfigSaved)
     {
         ParameterInfo[] parameters = method.GetParameters();
         object?[] args = new object?[parameters.Length];
@@ -100,7 +104,7 @@ internal sealed class ConfigLibIntegrationModSystem : ModSystem
         if (parameters.Length >= 3) args[2] = Constants.ConfigFileName;
         if (parameters.Length >= 4) args[3] = onSyncedFromServer;
         if (parameters.Length >= 5) args[4] = null;
-        if (parameters.Length >= 6) args[5] = null;
+        if (parameters.Length >= 6) args[5] = onConfigSaved;
 
         return args;
     }

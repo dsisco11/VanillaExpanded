@@ -77,18 +77,17 @@ public class VanillaExpandedModSystem : ModSystem
         }
     }
 
-    internal static void ApplyLiveConfig(ICoreAPI api)
+    internal static void PersistConfigAndNotifyReloadRequired(ICoreAPI api, string source)
     {
-        EnsureConfigLoaded(api);
+        // ConfigLib updates our config object instance via reflection.
+        // We persist to our normal ModConfig file, but we can't safely hot-apply
+        // Harmony patches or recipe enable/disable without a reload.
+        api.StoreModConfig(Config, Constants.ConfigFileName);
 
-        ReapplyHarmonyPatches();
-
-        if (Config.EnableAutoStash)
-        {
-            AutoStashPatch.AmendContainerBehaviors(api);
-        }
-
-        UpdateRecipesBasedOnConfig(api, logChanges: true);
+        api.Logger.Notification(
+            "[VanillaExpanded] Configuration updated via {0}. Changes will apply after re-entering the world (and may require a restart).",
+            source
+        );
     }
 
     public override void Start(ICoreAPI api)
