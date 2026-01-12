@@ -19,6 +19,7 @@ public class VanillaExpandedModSystem : ModSystem
 {
     #region Fields
     internal Harmony? harmony;
+    private static VanillaExpandedModSystem? instance;
 
     /// <summary>
     /// The mod configuration. Loaded on startup.
@@ -62,6 +63,7 @@ public class VanillaExpandedModSystem : ModSystem
         base.Dispose();
         harmony?.UnpatchAll(Mod.Info.ModID);
         configLoaded = false; // Reset so config reloads on next game start
+        instance = null;
     }
 
     public override double ExecuteOrder()
@@ -71,6 +73,7 @@ public class VanillaExpandedModSystem : ModSystem
 
     public override void StartPre(ICoreAPI api)
     {
+        instance ??= this;
         EnsureConfigLoaded(api);
         
         // Suggest ConfigLib if not installed
@@ -78,6 +81,20 @@ public class VanillaExpandedModSystem : ModSystem
         {
             api.Logger.Notification("[VanillaExpanded] ConfigLib is not installed. Install it for an in-game configuration GUI. Settings can be edited manually in ModConfig/{0}", Constants.ConfigFileName);
         }
+    }
+
+    internal static void ApplyLiveConfig(ICoreAPI api)
+    {
+        EnsureConfigLoaded(api);
+
+        instance?.ReapplyHarmonyPatches();
+
+        if (Config.EnableAutoStash)
+        {
+            AutoStashPatch.AmendContainerBehaviors(api);
+        }
+
+        UpdateRecipesBasedOnConfig(api, logChanges: true);
     }
 
     public override void Start(ICoreAPI api)
@@ -136,10 +153,21 @@ public class VanillaExpandedModSystem : ModSystem
         {
             AutoStashPatch.AmendContainerBehaviors(api);
         }
-        DisableRecipesBasedOnConfig(api);
+        UpdateRecipesBasedOnConfig(api, logChanges: false);
     }
 
-    private void DisableRecipesBasedOnConfig(ICoreAPI api)
+    private void ReapplyHarmonyPatches()
+    {
+        if (harmony is null)
+        {
+            harmony = new Harmony(Mod.Info.ModID);
+        }
+
+        harmony.UnpatchAll(Mod.Info.ModID);
+        ApplySelectivePatches();
+    }
+
+    private static void UpdateRecipesBasedOnConfig(ICoreAPI api, bool logChanges)
     {
         if (api.Side != EnumAppSide.Server)
         {
@@ -148,6 +176,7 @@ public class VanillaExpandedModSystem : ModSystem
 
         var recipes = api.World.GridRecipes;
         int disabledCount = 0;
+        int enabledCount = 0;
 
         foreach (var recipe in recipes)
         {
@@ -174,16 +203,25 @@ public class VanillaExpandedModSystem : ModSystem
                 _ => false
             };
 
-            if (shouldDisable)
+            bool enable = !shouldDisable;
+            if (recipe.Enabled != enable)
             {
-                recipe.Enabled = false;
-                disabledCount++;
+                recipe.Enabled = enable;
+                if (enable) enabledCount++;
+                else disabledCount++;
             }
         }
+
+        if (!logChanges) return;
 
         if (disabledCount > 0)
         {
             api.Logger.Notification("[VanillaExpanded] Disabled {0} recipes based on configuration.", disabledCount);
+        }
+
+        if (enabledCount > 0)
+        {
+            api.Logger.Notification("[VanillaExpanded] Enabled {0} recipes based on configuration.", enabledCount);
         }
     }
 }
