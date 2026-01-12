@@ -1,3 +1,5 @@
+using System;
+
 namespace VanillaExpanded;
 
 /// <summary>
@@ -27,6 +29,13 @@ public class VanillaExpandedConfig
     /// Enable the alloy calculator GUI for crucibles.
     /// </summary>
     public bool EnableAlloyCalculator { get; set; } = true;
+
+    /// <summary>
+    /// Explicitly disables the Harmony patch used to detect firepit GUI open/close events for the alloy calculator.
+    /// Enable this only if it conflicts with other mods or breaks after a game update.
+    /// Note: Changing this typically requires a restart to take effect.
+    /// </summary>
+    public bool DisableAlloyCalculatorPatch { get; set; } = false;
 
     /// <summary>
     /// Enable the hotkey to equip light sources to offhand/hotbar.

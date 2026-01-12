@@ -31,6 +31,12 @@ public sealed class AlloyCalculatorModSystem : ModSystem, ILiveConfigurable
     public override void StartClientSide(ICoreClientAPI api)
     {
         capi = api;
+
+        if (VanillaExpandedModSystem.Config.EnableAlloyCalculator && VanillaExpandedModSystem.Config.DisableAlloyCalculatorPatch)
+        {
+            api.Logger.Warning("[VanillaExpanded] Alloy Calculator is enabled but its Harmony patch is disabled (DisableAlloyCalculatorPatch=true). The calculator will not auto-open.");
+        }
+
         RegisterFirepitEvents();
     }
 
@@ -78,6 +84,7 @@ public sealed class AlloyCalculatorModSystem : ModSystem, ILiveConfigurable
     {
         if (capi is null) return;
         if (!VanillaExpandedModSystem.Config.EnableAlloyCalculator) return;
+        if (VanillaExpandedModSystem.Config.DisableAlloyCalculatorPatch) return;
         
         EFirepitKind kind = GetFirepitKind(capi, firepitDialog);
         if (kind != EFirepitKind.Smelting) return;
