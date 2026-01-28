@@ -54,7 +54,5 @@
   "config-enable-wattle-decraft": "Wattle Decrafting",
   "config-enable-wattle-decraft-tooltip": "Enable decrafting wattle blocks into sticks.",
 
-  "config-section-visual": "Visual Settings",
-  "config-enable-unstable-particles": "Unstable Block Particles",
-  "config-enable-unstable-particles-tooltip": "Show crumbling dust particles falling from unstable rock blocks. Particles spawn more frequently as blocks become less stable. Requires cave-ins to be enabled."
+  "config-section-visual": "Visual Settings"
 }
