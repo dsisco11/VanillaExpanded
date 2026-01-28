@@ -40,10 +40,6 @@ The calculator remembers your settings per crucible, so your preferred alloy and
 - Player respawn point appears as a glowing gear symbol on the ground.
 - Handbook search prioritizes full-word matches (searching "iron" ranks "Iron Ingot" higher than "Ironwood").
 
-### Visual Effects
-
-- **Unstable Block Particles** — Rock blocks in caves emit crumbling dust particles from their undersides when unstable. Particle frequency increases as blocks become more unstable, providing visual warning of potential cave-ins. Requires cave-ins to be enabled in world settings.
-
 ### Implemented Missing Functionalities
 
 - Ignitable things (firepits, etc) can now be ignited using lanterns (_oillamps & candles pending_).
@@ -75,7 +71,6 @@ Without ConfigLib, settings can be edited manually in `ModConfig/VanillaExpanded
 | EnableSpawnDecal                   | true    | Show a glowing decal at the player's respawn point             |
 | EnableAlloyCalculator              | true    | Enable the alloy calculator GUI for crucibles                  |
 | EnableEquipLightHotkey             | true    | Enable the hotkey to equip light sources to offhand/hotbar     |
-| EnableUnstableParticles            | true    | Show crumbling particles on unstable rock blocks               |
 | EnableHandbookSearchPrioritization | true    | Prioritize full-word matches in handbook search results        |
 | EnableBackpackDecraft              | true    | Enable decrafting backpacks into leather                       |
 | EnableLinenSackDecraft             | true    | Enable decrafting linen sacks into flax fibers                 |
