@@ -236,7 +236,7 @@ public class SpawnDecalRenderer : IRenderer
             // ignored
         }
         #else
-        return true;
+        return;
         #endif
     }
     #endregion
