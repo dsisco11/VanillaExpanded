@@ -19,6 +19,7 @@ env:
   DOTNET_VERSION: '8.0.x'
   VS_VERSION: ${{ inputs.vs_version || '1.21.5' }}
   PROJECT_NAME: 'VanillaExpanded'
+  DOTNET_MULTILEVEL_LOOKUP: '0'
 
 jobs:
   # ============================================
@@ -40,8 +41,8 @@ jobs:
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
 
-    - name: Setup VintageStory Server
-      uses: ./.github/actions/setup-vs-server
+    - name: Setup VintageStory Client
+      uses: ./.github/actions/setup-vs-client
       with:
         vs-version: ${{ env.VS_VERSION }}
 
@@ -95,8 +96,8 @@ jobs:
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
 
-    - name: Setup VintageStory Server
-      uses: ./.github/actions/setup-vs-server
+    - name: Setup VintageStory Client
+      uses: ./.github/actions/setup-vs-client
       with:
         vs-version: ${{ env.VS_VERSION }}
 

@@ -219,6 +219,8 @@ public class SpawnDecalRenderer : IRenderer
         {
             return false;
         }
+        #else
+        return true;
         #endif
     }
 
@@ -233,6 +235,8 @@ public class SpawnDecalRenderer : IRenderer
         {
             // ignored
         }
+        #else
+        return;
         #endif
     }
     #endregion

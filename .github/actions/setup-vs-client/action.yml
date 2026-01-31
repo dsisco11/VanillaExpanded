@@ -1,0 +1,50 @@
+name: 'Setup VintageStory Client'
+description: 'Downloads and caches VintageStory client for mod development (includes OpenTK DLLs)'
+
+inputs:
+  vs-version:
+    description: 'VintageStory version to download'
+    required: true
+    default: '1.21.5'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Cache VintageStory Client
+      id: cache-vs
+      uses: actions/cache@v4
+      with:
+        path: ~/vs-client
+        key: vs-client-${{ inputs.vs-version }}
+
+    - name: Download VintageStory Client
+      if: steps.cache-vs.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        mkdir -p ~/vs-client
+        echo "Downloading VintageStory Client v${{ inputs.vs-version }}..."
+        curl -L -o ~/vs-client.tar.gz "https://cdn.vintagestory.at/gamefiles/stable/vs_client_linux-x64_${{ inputs.vs-version }}.tar.gz"
+        tar -xzf ~/vs-client.tar.gz -C ~/vs-client --strip-components=0
+        rm ~/vs-client.tar.gz
+        ls -la ~/vs-client
+
+    - name: Locate VintageStory root
+      id: vsroot
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        # Vintage Story root should contain VintagestoryAPI.dll.
+        VSAPI_PATH=$(find "$HOME/vs-client" -type f -name 'VintagestoryAPI.dll' -print -quit || true)
+        if [[ -z "$VSAPI_PATH" ]]; then
+          echo "VintagestoryAPI.dll not found under $HOME/vs-client"
+          exit 1
+        fi
+
+        VS_ROOT=$(dirname "$VSAPI_PATH")
+        echo "Detected VINTAGE_STORY root: $VS_ROOT"
+        echo "vs_root=$VS_ROOT" >> "$GITHUB_OUTPUT"
+
+    - name: Set VINTAGE_STORY environment variable
+      shell: bash
+      run: echo "VINTAGE_STORY=${{ steps.vsroot.outputs.vs_root }}" >> $GITHUB_ENV
