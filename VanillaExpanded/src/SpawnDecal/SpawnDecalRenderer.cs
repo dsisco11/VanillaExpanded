@@ -1,5 +1,7 @@
 using System;
 
+using OpenTK.Graphics.OpenGL4;
+
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
@@ -12,6 +14,25 @@ namespace VanillaExpanded.SpawnDecal;
 /// </summary>
 public class SpawnDecalRenderer : IRenderer
 {
+    #region GL State
+    private const int OitAccumulationColorAttachmentIndex = 0;
+
+    private static void RestoreOitBuf0BlendState()
+    {
+        // In Vintage Story's OIT pass, buf0 is the accumulation target and expects additive blending.
+        GL.BlendEquation(OitAccumulationColorAttachmentIndex, BlendEquationMode.FuncAdd);
+        GL.BlendFuncSeparate(OitAccumulationColorAttachmentIndex, BlendingFactorSrc.One, BlendingFactorDest.One, BlendingFactorSrc.One, BlendingFactorDest.One);
+    }
+
+    private static void ApplyDecalBuf0BlendState()
+    {
+        // Only touch buf0. Do not modify other MRT targets.
+        // Standard alpha blending for the decal texture.
+        GL.BlendEquation(OitAccumulationColorAttachmentIndex, BlendEquationMode.FuncAdd);
+        GL.BlendFuncSeparate(OitAccumulationColorAttachmentIndex, BlendingFactorSrc.SrcAlpha, BlendingFactorDest.OneMinusSrcAlpha, BlendingFactorSrc.One, BlendingFactorDest.One);
+    }
+    #endregion
+
     #region Constants
     private float DecalSize => VanillaExpandedModSystem.Config.SpawnDecalSize;
     private const float Z_OFFSET = 0.0001f;
@@ -51,6 +72,7 @@ public class SpawnDecalRenderer : IRenderer
     public SpawnDecalRenderer(ICoreClientAPI capi)
     {
         this.capi = capi;
+        capi.Event.RegisterRenderer(this, EnumRenderStage.OIT, "spawndecal");
         InitializeMesh();
         LoadTexture();
     }
@@ -157,24 +179,61 @@ public class SpawnDecalRenderer : IRenderer
             (float)(spawnPosition.Z - camPos.Z)
         );
 
-        // Render using standard shader
-        IStandardShaderProgram shader = rapi.PreparedStandardShader(spawnPosition.XInt, spawnPosition.YInt, spawnPosition.ZInt);
-        shader.Use();
-        shader.Tex2D = decalTextureId;
-        shader.ModelMatrix = modelMatrix.Values;
-        shader.RgbaTint = FinalRenderGlow;
-        shader.RgbaGlowIn = FinalRenderGlow;
-        shader.ExtraGlow = (int)strength;
+        bool debugGroupPushed = TryPushGlDebugGroup("VanillaExpanded: SpawnDecalRenderer");
+        try
+        {
+            // Render using standard shader
+            IStandardShaderProgram shader = rapi.PreparedStandardShader(spawnPosition.XInt, spawnPosition.YInt, spawnPosition.ZInt);
+            shader.Use();
+            shader.Tex2D = decalTextureId;
+            shader.ModelMatrix = modelMatrix.Values;
+            shader.RgbaTint = FinalRenderGlow;
+            shader.RgbaGlowIn = FinalRenderGlow;
+            shader.ExtraGlow = (int)strength;
 
-        rapi.GlToggleBlend(true, EnumBlendMode.Overlay);
-        rapi.RenderMesh(decalMeshRef);
-        rapi.GlToggleBlend(true, EnumBlendMode.Standard);
+            ApplyDecalBuf0BlendState();
+            rapi.RenderMesh(decalMeshRef);
 
-        // Reset shader inputs to defaults to prevent affecting subsequent renders (e.g., particles)
-        shader.RgbaTint = ColorUtil.WhiteArgbVec;  // Reset tint to white
-        shader.RgbaGlowIn = DefaultRenderGlow;  // No glow
-        shader.ExtraGlow = 0;  // No extra glow
-        shader.Stop();
+            // Reset shader inputs to defaults to prevent affecting subsequent renders (e.g., particles)
+            shader.RgbaTint = ColorUtil.WhiteArgbVec;  // Reset tint to white
+            shader.RgbaGlowIn = DefaultRenderGlow;  // No glow
+            shader.ExtraGlow = 0;  // No extra glow
+            shader.Stop();
+        }
+        finally
+        {
+            RestoreOitBuf0BlendState();
+            if (debugGroupPushed) TryPopGlDebugGroup();
+        }
+    }
+
+    private static bool TryPushGlDebugGroup(string message)
+    {
+        #if DEBUG
+        try
+        {
+            GL.PushDebugGroup(DebugSourceExternal.DebugSourceApplication, 0, message.Length, message);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+        #endif
+    }
+
+    private static void TryPopGlDebugGroup()
+    {
+        #if DEBUG
+        try
+        {
+            GL.PopDebugGroup();
+        }
+        catch
+        {
+            // ignored
+        }
+        #endif
     }
     #endregion
 

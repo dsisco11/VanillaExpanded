@@ -1,0 +1,5 @@
+{
+    // Path to RenderDoc installation (used by "Launch Client (RenderDoc)" debug config)
+    // Adjust this path to match your RenderDoc installation location
+    "vanillaExpanded.renderdocPath": "C:/Program Files/RenderDoc"
+}

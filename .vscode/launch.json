@@ -29,6 +29,28 @@
             "stopAtEntry": false
         },
         {
+            "name": "Launch Client (RenderDoc)",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "${config:vanillaExpanded.renderdocPath}/renderdoccmd.exe",
+            // "preLaunchTask": "build + tail (RenderDoc)",
+            // "postDebugTask": "stop + scan: VintageStory client-debug.log",
+            "args": [
+                "capture",
+                "--wait-for-exit",
+                "${env:VINTAGE_STORY}/Vintagestory.exe",
+                "--tracelog",
+                "--addModPath",
+                "${workspaceFolder}/VanillaExpanded/bin/Debug/Mods",
+                "--addOrigin",
+                "${workspaceFolder}/VanillaExpanded/assets"
+            ],
+            "cwd": "${env:VINTAGE_STORY}",
+            "console": "internalConsole",
+            "internalConsoleOptions": "neverOpen",
+            "stopAtEntry": false
+        },
+        {
             "name": "Launch Server",
             "type": "coreclr",
             "request": "launch",
