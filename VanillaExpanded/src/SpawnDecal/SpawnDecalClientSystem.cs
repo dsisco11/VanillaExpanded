@@ -83,7 +83,6 @@ public class SpawnDecalClientSystem : ModSystem, ILiveConfigurable
         if (renderer is null)
         {
             renderer = new SpawnDecalRenderer(api);
-            api.Event.RegisterRenderer(renderer, EnumRenderStage.OIT, "spawndecal");
             lastDecalSize = VanillaExpandedModSystem.Config.SpawnDecalSize;
             return;
         }
