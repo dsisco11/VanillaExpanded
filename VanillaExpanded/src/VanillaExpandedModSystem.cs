@@ -4,7 +4,6 @@ using HarmonyLib;
 
 using VanillaExpanded.AlloyCalculator;
 using VanillaExpanded.AutoStashing;
-using VanillaExpanded.HandbookSearch;
 using VanillaExpanded.IgnitionTools;
 using VanillaExpanded.SpawnDecal;
 using VanillaExpanded.src.AutoStashing;
@@ -130,10 +129,6 @@ public class VanillaExpandedModSystem : ModSystem
             new PatchClassProcessor(harmony, typeof(IgnitionSourcesPatch)).Patch();
         }
 
-        if (Config.EnableHandbookSearchPrioritization)
-        {
-            new PatchClassProcessor(harmony, typeof(HandbookSearchPatch)).Patch();
-        }
     }
 
     public override void AssetsFinalize(ICoreAPI api)
@@ -174,17 +169,18 @@ public class VanillaExpandedModSystem : ModSystem
         int disabledCount = 0;
         int enabledCount = 0;
 
-        foreach (var recipe in recipes)
+        foreach (GridRecipe recipe in recipes)
         {
-            if (recipe.Name is null)
+            var recipeCode = recipe.Name;
+            if (recipeCode is null)
             {
                 continue;
             }
 
-            string recipePath = recipe.Name.Path;
+            string recipePath = recipeCode.Path;
 
             // Check if recipe belongs to VanillaExpanded and should be disabled
-            if (recipe.Name.Domain != Constants.ModId)
+            if (recipeCode.Domain != Constants.ModId)
             {
                 continue;
             }
