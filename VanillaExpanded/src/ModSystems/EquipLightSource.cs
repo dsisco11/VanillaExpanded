@@ -67,9 +67,25 @@ public class EquipLightSource : ModSystem
     internal bool OnHotKeyPressed(bool useOffhand)
     {
         if (api is null)
+        {
             return false;
+        }
 
-        ItemSlot? lightSourceSlot = ResolveLightSourceSlot(api!.World.Player, out bool isInLeftHand, out bool isInRightHand);
+        IClientPlayer player = api.World.Player;
+        return OnHotKeyPressed(player.InventoryManager, player.Entity.LeftHandItemSlot, useOffhand);
+    }
+
+    /// <summary>
+    /// Equips or unequips a light source using the player's inventory and offhand slot.
+    /// </summary>
+    internal bool OnHotKeyPressed(IPlayerInventoryManager playerInventory, ItemSlot offhandSlot, bool useOffhand)
+    {
+        if (api is null)
+        {
+            return false;
+        }
+
+        ItemSlot? lightSourceSlot = ResolveLightSourceSlot(playerInventory, offhandSlot, out bool isInLeftHand, out bool isInRightHand);
         if (lightSourceSlot is null)
         {// player has no light sources
             return false;
@@ -83,7 +99,7 @@ public class EquipLightSource : ModSystem
          * 4. Otherwise, find the best light source in hotbar/backpack and equip it to the desired hand.
          */
 
-        ItemSlot desiredHand = useOffhand ? api!.World.Player.Entity.LeftHandItemSlot : api!.World.Player.InventoryManager.ActiveHotbarSlot;
+        ItemSlot desiredHand = useOffhand ? offhandSlot : playerInventory.ActiveHotbarSlot;
         ItemSlot? sourceSlot = lightSourceSlot;
         ItemSlot? targetSlot = null;
 
@@ -112,7 +128,6 @@ public class EquipLightSource : ModSystem
             if (previousSlot is null)
             {
                 // Find the first EMPTY slot in backpack or hotbar (avoid GetBestSuitedSlot which prefers merging)
-                IPlayerInventoryManager playerInventory = api!.World.Player.InventoryManager;
                 IInventory? backpack = playerInventory.GetOwnInventory(GlobalConstants.backpackInvClassName);
                 
                 // First try to find an empty slot that can hold the item
@@ -177,14 +192,16 @@ public class EquipLightSource : ModSystem
     /// <summary>
     /// Resolves the most relevant light source item for the player according to a list of priorities.
     /// </summary>
-    protected static ItemSlot? ResolveLightSourceSlot(in IClientPlayer player, out bool isInLeftHand, out bool isInRightHand)
+    protected static ItemSlot? ResolveLightSourceSlot(
+        IPlayerInventoryManager playerInventory,
+        ItemSlot offhandSlot,
+        out bool isInLeftHand,
+        out bool isInRightHand)
     {
-        IPlayerInventoryManager playerInventory = player.InventoryManager;
         isInLeftHand = false;
         isInRightHand = false;
 
         // Check offhand slot first
-        ItemSlot offhandSlot = player.Entity.LeftHandItemSlot;
         if (!offhandSlot.Empty)
         {
             if (IsLightSource(offhandSlot))

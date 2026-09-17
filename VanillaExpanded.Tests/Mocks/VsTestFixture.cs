@@ -89,16 +89,6 @@ public class VsTestFixture
     #region Player Infrastructure
 
     /// <summary>
-    /// Player mock (IPlayer for server, IClientPlayer for client).
-    /// </summary>
-    public Mock<IPlayer> PlayerMock { get; }
-
-    /// <summary>
-    /// Client player mock (only in client mode).
-    /// </summary>
-    public Mock<IClientPlayer>? ClientPlayerMock { get; }
-
-    /// <summary>
     /// Player's inventory manager mock.
     /// </summary>
     public Mock<IPlayerInventoryManager> InventoryManagerMock { get; }
@@ -135,15 +125,9 @@ public class VsTestFixture
     public IWorldAccessor World => WorldMock.Object;
 
     /// <summary>
-    /// Gets the IPlayer object.
+    /// Gets the configured player's inventory manager.
     /// </summary>
-    public IPlayer Player => PlayerMock.Object;
-
-    /// <summary>
-    /// Gets the IClientPlayer object (throws if not in client mode).
-    /// </summary>
-    public IClientPlayer ClientPlayer => ClientPlayerMock?.Object
-        ?? throw new InvalidOperationException("ClientPlayer is only available in Client mode. Use VsTestFixture.Client().");
+    public IPlayerInventoryManager Player => InventoryManagerMock.Object;
 
     #endregion
 
@@ -174,12 +158,9 @@ public class VsTestFixture
             ClientApiMock = new Mock<ICoreClientAPI>();
             ClientWorldMock = new Mock<IClientWorldAccessor>();
             ClientNetworkMock = new Mock<IClientNetworkAPI>();
-            ClientPlayerMock = new Mock<IClientPlayer>();
-
             // Setup as ICoreAPI too
             ApiMock = ClientApiMock.As<ICoreAPI>();
             WorldMock = ClientWorldMock.As<IWorldAccessor>();
-            PlayerMock = ClientPlayerMock.As<IPlayer>();
 
             // Wire up client API
             ClientApiMock.Setup(a => a.World).Returns(ClientWorldMock.Object);
@@ -188,7 +169,6 @@ public class VsTestFixture
             ClientApiMock.Setup(a => a.Side).Returns(EnumAppSide.Client);
 
             // Wire up client world
-            ClientWorldMock.Setup(w => w.Player).Returns(ClientPlayerMock.Object);
             ClientWorldMock.Setup(w => w.Side).Returns(EnumAppSide.Client);
             ClientWorldMock.Setup(w => w.Logger).Returns(LoggerMock.Object);
         }
@@ -200,7 +180,6 @@ public class VsTestFixture
             // Setup as ICoreAPI too
             ApiMock = ServerApiMock.As<ICoreAPI>();
             WorldMock = ServerWorldMock.As<IWorldAccessor>();
-            PlayerMock = new Mock<IPlayer>();
 
             // Wire up server API
             ServerApiMock.Setup(a => a.World).Returns(ServerWorldMock.Object);
@@ -280,15 +259,6 @@ public class VsTestFixture
                 return new object(); // Return dummy packet
             });
 
-        // Wire up player
-        PlayerMock.Setup(p => p.Entity).Returns(EntityMock.Object);
-        PlayerMock.Setup(p => p.InventoryManager).Returns(InventoryManagerMock.Object);
-
-        if (side == EnumAppSide.Client)
-        {
-            ClientPlayerMock!.Setup(p => p.Entity).Returns(EntityMock.Object);
-            ClientPlayerMock.Setup(p => p.InventoryManager).Returns(InventoryManagerMock.Object);
-        }
     }
 
     #endregion
