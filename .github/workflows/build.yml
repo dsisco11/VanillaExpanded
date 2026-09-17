@@ -12,12 +12,12 @@ on:
       vs_version:
         description: 'VintageStory version to build against'
         required: false
-        default: '1.21.5'
+        default: '1.22.7'
         type: string
 
 env:
-  DOTNET_VERSION: '8.0.x'
-  VS_VERSION: ${{ inputs.vs_version || '1.21.5' }}
+  DOTNET_VERSION: '10.0.x'
+  VS_VERSION: ${{ inputs.vs_version || '1.22.7' }}
   PROJECT_NAME: 'VanillaExpanded'
   DOTNET_MULTILEVEL_LOOKUP: '0'
 

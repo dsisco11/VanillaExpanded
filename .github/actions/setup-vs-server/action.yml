@@ -5,7 +5,7 @@ inputs:
   vs-version:
     description: 'VintageStory version to download'
     required: true
-    default: '1.21.5'
+    default: '1.22.7'
 
 runs:
   using: 'composite'
