@@ -42,7 +42,7 @@ public class EquipUnequipBehaviorTests
         fixture.WithBackpackItems(dimLight, brightLight);
 
         // Act
-        bool result = system.OnHotKeyPressed(useOffhand: true);
+        bool result = system.OnHotKeyPressed(fixture.InventoryManagerMock.Object, fixture.OffhandInventory[0], useOffhand: true);
 
         // Assert - Should return true and equip brightest light to offhand
         Assert.True(result);
@@ -59,7 +59,7 @@ public class EquipUnequipBehaviorTests
         fixture.WithBackpackItems(brightLight);
 
         // Act
-        bool result = system.OnHotKeyPressed(useOffhand: false);
+        bool result = system.OnHotKeyPressed(fixture.InventoryManagerMock.Object, fixture.OffhandInventory[0], useOffhand: false);
 
         // Assert - Should equip to active hotbar slot
         Assert.True(result);
@@ -83,7 +83,7 @@ public class EquipUnequipBehaviorTests
             .WithBackpackItems(lightSource);
 
         // Act
-        bool result = system.OnHotKeyPressed(useOffhand: true);
+        bool result = system.OnHotKeyPressed(fixture.InventoryManagerMock.Object, fixture.OffhandInventory[0], useOffhand: true);
 
         // Assert - Light source should be in offhand, non-light item in backpack
         Assert.True(result);
@@ -103,7 +103,7 @@ public class EquipUnequipBehaviorTests
             .WithBackpackItems(lightSource);
 
         // Act
-        bool result = system.OnHotKeyPressed(useOffhand: false);
+        bool result = system.OnHotKeyPressed(fixture.InventoryManagerMock.Object, fixture.OffhandInventory[0], useOffhand: false);
 
         // Assert
         Assert.True(result);
@@ -126,7 +126,7 @@ public class EquipUnequipBehaviorTests
             .WithBackpackItems(dimmerLight);
 
         // Act - Press hotkey for offhand when offhand already has brightest light
-        bool result = system.OnHotKeyPressed(useOffhand: true);
+        bool result = system.OnHotKeyPressed(fixture.InventoryManagerMock.Object, fixture.OffhandInventory[0], useOffhand: true);
 
         // Assert - Should unequip the light from offhand
         Assert.True(result);
@@ -143,7 +143,7 @@ public class EquipUnequipBehaviorTests
         fixture.WithActiveHotbarItem(lightSource);
 
         // Act - Press hotkey for hotbar when active hotbar already has light
-        bool result = system.OnHotKeyPressed(useOffhand: false);
+        bool result = system.OnHotKeyPressed(fixture.InventoryManagerMock.Object, fixture.OffhandInventory[0], useOffhand: false);
 
         // Assert - Should return true (unequip attempted)
         Assert.True(result);
@@ -161,7 +161,7 @@ public class EquipUnequipBehaviorTests
             .WithBackpackItems(sameLight);
 
         // Act
-        bool result = system.OnHotKeyPressed(useOffhand: true);
+        bool result = system.OnHotKeyPressed(fixture.InventoryManagerMock.Object, fixture.OffhandInventory[0], useOffhand: true);
 
         // Assert - Should trigger unequip since hand already has light (equal brightness)
         Assert.True(result);
@@ -187,7 +187,7 @@ public class EquipUnequipBehaviorTests
         Assert.Equal(30, fixture.BackpackInventory[0].Itemstack.Collectible.LightHsv[2]);
 
         // Act - Press hotkey for offhand when offhand already has a light
-        bool result = system.OnHotKeyPressed(useOffhand: true);
+        bool result = system.OnHotKeyPressed(fixture.InventoryManagerMock.Object, fixture.OffhandInventory[0], useOffhand: true);
 
         // Assert - DESIRED: The light should be unequipped and hand should be EMPTY
         Assert.True(result, "Hotkey action should return true");
@@ -214,7 +214,7 @@ public class EquipUnequipBehaviorTests
         Assert.Equal(25, fixture.BackpackInventory[0].Itemstack.Collectible.LightHsv[2]);
 
         // Act - Press hotkey for hotbar when hotbar already has a light
-        bool result = system.OnHotKeyPressed(useOffhand: false);
+        bool result = system.OnHotKeyPressed(fixture.InventoryManagerMock.Object, fixture.OffhandInventory[0], useOffhand: false);
 
         // Assert - DESIRED: The light should be unequipped and hand should be EMPTY
         Assert.True(result, "Hotkey action should return true");
@@ -244,7 +244,7 @@ public class EquipUnequipBehaviorTests
         Assert.Equal(1, fixture.BackpackInventory[0].Itemstack.StackSize);
 
         // Act - Press hotkey for offhand when offhand already has a light
-        bool result = system.OnHotKeyPressed(useOffhand: true);
+        bool result = system.OnHotKeyPressed(fixture.InventoryManagerMock.Object, fixture.OffhandInventory[0], useOffhand: true);
 
         // Assert - DESIRED: The light should be unequipped and hand should be EMPTY
         // NOT merged into a stack of 2
@@ -274,7 +274,7 @@ public class EquipUnequipBehaviorTests
         Assert.Equal(1, fixture.BackpackInventory[0].Itemstack.StackSize);
 
         // Act - Press hotkey for hotbar when hotbar already has a light
-        bool result = system.OnHotKeyPressed(useOffhand: false);
+        bool result = system.OnHotKeyPressed(fixture.InventoryManagerMock.Object, fixture.OffhandInventory[0], useOffhand: false);
 
         // Assert - DESIRED: The light should be unequipped and hand should be EMPTY
         // NOT merged into a stack of 2
@@ -298,7 +298,7 @@ public class EquipUnequipBehaviorTests
             .WithHotbarItems(fixture.CreateNonLightSource(id: 3));
 
         // Act
-        bool result = system.OnHotKeyPressed(useOffhand: true);
+        bool result = system.OnHotKeyPressed(fixture.InventoryManagerMock.Object, fixture.OffhandInventory[0], useOffhand: true);
 
         // Assert - Should return false (no light sources to equip)
         Assert.False(result);
@@ -311,7 +311,7 @@ public class EquipUnequipBehaviorTests
         var (fixture, system) = CreateFixture();
 
         // Act
-        bool result = system.OnHotKeyPressed(useOffhand: true);
+        bool result = system.OnHotKeyPressed(fixture.InventoryManagerMock.Object, fixture.OffhandInventory[0], useOffhand: true);
 
         // Assert
         Assert.False(result);
@@ -324,7 +324,7 @@ public class EquipUnequipBehaviorTests
         var (fixture, system) = CreateFixture();
 
         // Act & Assert - Should not throw any exceptions
-        var exception = Record.Exception(() => system.OnHotKeyPressed(useOffhand: false));
+        var exception = Record.Exception(() => system.OnHotKeyPressed(fixture.InventoryManagerMock.Object, fixture.OffhandInventory[0], useOffhand: false));
         Assert.Null(exception);
     }
 
@@ -344,7 +344,7 @@ public class EquipUnequipBehaviorTests
             .WithBackpackItems(brighterBackpackLight);
 
         // Act - Press hotkey for offhand
-        bool result = system.OnHotKeyPressed(useOffhand: true);
+        bool result = system.OnHotKeyPressed(fixture.InventoryManagerMock.Object, fixture.OffhandInventory[0], useOffhand: true);
 
         // Assert - Should process (offhand light detected) and swap/unequip
         Assert.True(result);
@@ -362,7 +362,7 @@ public class EquipUnequipBehaviorTests
             .WithBackpackItems(brighterBackpackLight);
 
         // Act - Press hotkey for hotbar
-        bool result = system.OnHotKeyPressed(useOffhand: false);
+        bool result = system.OnHotKeyPressed(fixture.InventoryManagerMock.Object, fixture.OffhandInventory[0], useOffhand: false);
 
         // Assert - Should detect active hotbar light first and swap
         Assert.True(result);
@@ -379,7 +379,7 @@ public class EquipUnequipBehaviorTests
         fixture.WithBackpackItems(dimLight, mediumLight, brightLight);
 
         // Act
-        bool result = system.OnHotKeyPressed(useOffhand: true);
+        bool result = system.OnHotKeyPressed(fixture.InventoryManagerMock.Object, fixture.OffhandInventory[0], useOffhand: true);
 
         // Assert - Should equip the brightest (30)
         Assert.True(result);

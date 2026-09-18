@@ -43,14 +43,6 @@
         "default": true,
         "weight": 1.4
       },
-      "ENABLE_HANDBOOK_SEARCH_PRIORITIZATION": {
-        "code": "EnableHandbookSearchPrioritization",
-        "name": "EnableHandbookSearchPrioritization",
-        "ingui": "vanillaexpanded:config-enable-handbook-search-prioritization",
-        "comment": "vanillaexpanded:config-enable-handbook-search-prioritization-tooltip",
-        "default": true,
-        "weight": 1.5
-      },
       "ENABLE_BACKPACK_DECRAFT": {
         "code": "EnableBackpackDecraft",
         "name": "EnableBackpackDecraft",

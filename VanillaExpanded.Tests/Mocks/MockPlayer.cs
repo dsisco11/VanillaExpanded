@@ -6,12 +6,14 @@ using Vintagestory.API.Config;
 namespace VanillaExpanded.Tests.Mocks;
 
 /// <summary>
-/// A mock wrapper for IPlayer that encapsulates Moq setup for unit testing.
+/// A mock wrapper for a player's inventory manager that encapsulates inventory setup for unit testing.
 /// </summary>
 public class MockPlayer
 {
-    public Mock<IPlayer> Mock { get; }
-    public IPlayer Object => Mock.Object;
+    /// <summary>
+    /// Gets the configured inventory manager.
+    /// </summary>
+    public IPlayerInventoryManager Object => InventoryManagerMock.Object;
 
     public Mock<IPlayerInventoryManager> InventoryManagerMock { get; }
 
@@ -21,7 +23,6 @@ public class MockPlayer
 
     public MockPlayer()
     {
-        Mock = new Mock<IPlayer>();
         InventoryManagerMock = new Mock<IPlayerInventoryManager>();
 
         SetupInventoryManager();
@@ -98,27 +99,8 @@ public class MockPlayer
         return this;
     }
 
-    /// <summary>
-    /// Sets the player name.
-    /// </summary>
-    public MockPlayer WithName(string name)
-    {
-        Mock.Setup(p => p.PlayerName).Returns(name);
-        return this;
-    }
-
-    /// <summary>
-    /// Sets the player UID.
-    /// </summary>
-    public MockPlayer WithUid(string uid)
-    {
-        Mock.Setup(p => p.PlayerUID).Returns(uid);
-        return this;
-    }
-
     private void SetupInventoryManager()
     {
-        Mock.Setup(p => p.InventoryManager).Returns(InventoryManagerMock.Object);
         UpdateInventorySetup();
     }
 

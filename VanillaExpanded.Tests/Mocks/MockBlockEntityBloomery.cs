@@ -17,6 +17,8 @@ public class TestableBlockEntityBloomery : BlockEntityBloomery
 
     public TestableBlockEntityBloomery(BlockPos? position = null, ICoreAPI? api = null)
     {
+        api ??= CreateTestApi();
+
         // Create our own inventory (the base class creates one but we can't easily access it)
         _testInventory = new InventoryGeneric(3, "bloomery-1", null, null);
 
@@ -25,18 +27,15 @@ public class TestableBlockEntityBloomery : BlockEntityBloomery
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         field?.SetValue(this, _testInventory);
 
-        // Set Api on the block entity (needed for CanAdd stack comparison)
-        if (api is not null)
-        {
-            Api = api;
-            _testInventory.Api = api;
+        // CanAdd resolves combustible properties through the block entity API.
+        Api = api;
+        _testInventory.Api = api;
 
-            var networkUtilMock = new Mock<IInventoryNetworkUtil>();
-            networkUtilMock
-                .Setup(u => u.GetFlipSlotsPacket(It.IsAny<InventoryBase>(), It.IsAny<int>(), It.IsAny<int>()))
-                .Returns(new object());
-            _testInventory.InvNetworkUtil = networkUtilMock.Object;
-        }
+        var networkUtilMock = new Mock<IInventoryNetworkUtil>();
+        networkUtilMock
+            .Setup(u => u.GetFlipSlotsPacket(It.IsAny<InventoryBase>(), It.IsAny<int>(), It.IsAny<int>()))
+            .Returns(new object());
+        _testInventory.InvNetworkUtil = networkUtilMock.Object;
 
         // Set position
         if (position is not null)
@@ -75,6 +74,17 @@ public class TestableBlockEntityBloomery : BlockEntityBloomery
     /// Gets the output slot (slot 2).
     /// </summary>
     public ItemSlot OutSlot => _testInventory[2];
+
+    /// <summary>
+    /// Creates the minimum API context required by BlockEntityBloomery.CanAdd.
+    /// </summary>
+    private static ICoreAPI CreateTestApi()
+    {
+        var worldMock = new Mock<IWorldAccessor>();
+        var apiMock = new Mock<ICoreAPI>();
+        apiMock.Setup(api => api.World).Returns(worldMock.Object);
+        return apiMock.Object;
+    }
 }
 
 /// <summary>

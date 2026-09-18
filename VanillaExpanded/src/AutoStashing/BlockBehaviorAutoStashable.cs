@@ -71,7 +71,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
 
         setProgressVisibility(false);
         BlockEntity? blockEntity = world.BlockAccessor.GetBlockEntity(blockSel.Position);
-        HashSet<int> stashables = GetStashableItems(byPlayer, blockEntity);
+        HashSet<int> stashables = GetStashableItems(byPlayer.InventoryManager, blockEntity);
         bool hasStashableItems = stashables.Count != 0;
         if (!hasStashableItems)
         {
@@ -154,7 +154,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             stashingState = EStashingState.PostStashGracePeriod;
             world.Api.ModLoader.GetModSystem<AutoStashSystem_Client>().RequestAutoStash(blockSel.Position);
             setProgressVisibility(false);
-            handleDidMoveItems(byPlayer);
+            handleDidMoveItems(byPlayer.Entity);
         }
 
         return true;
@@ -189,27 +189,27 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         BlockEntity? be = world.BlockAccessor.GetBlockEntity(position);
         if (be is BlockEntityCrate crateEntity)
         {
-            AutoStashToCrate(world, byPlayer, crateEntity);
+            AutoStashToCrate(world, byPlayer.InventoryManager, crateEntity, byPlayer.PlayerName);
         }
         else if (be is BlockEntityBloomery bloomeryEntity)
         {
-            AutoStashToBloomery(world, byPlayer, bloomeryEntity);
+            AutoStashToBloomery(world, byPlayer.InventoryManager, bloomeryEntity, byPlayer.PlayerName);
         }
         else if (be is BlockEntityContainer containerEntity)
         {
-            AutoStashToGenericContainer(world, byPlayer, containerEntity);
+            AutoStashToGenericContainer(world, byPlayer.InventoryManager, containerEntity, byPlayer.PlayerName);
         }
     }
 
     /// <summary>
     /// Handles the event when items have been moved into the container.
     /// </summary>
-    private void handleDidMoveItems(in IPlayer byPlayer)
+    private void handleDidMoveItems(EntityPlayer playerEntity)
     {
-        IWorldAccessor world = byPlayer.Entity.World;
+        IWorldAccessor world = playerEntity.World;
         //if (world.Side == EnumAppSide.Server)
         {
-            world.PlaySoundAt(stashSoundPath, byPlayer.Entity, null, false, 16, volume: 1.0f);
+            world.PlaySoundAt(stashSoundPath, playerEntity, null, false, 16, volume: 1.0f);
         }
 
         if (api is ICoreClientAPI client)
@@ -221,6 +221,15 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
 
     #region World Interaction Help
     public override WorldInteraction[] GetPlacedBlockInteractionHelp(IWorldAccessor world, BlockSelection selection, IPlayer forPlayer, ref EnumHandling handling)
+        => GetPlacedBlockInteractionHelp(world, selection, forPlayer.InventoryManager, ref handling);
+    /// <summary>
+    /// Gets interaction help from the inventory data required to determine stashable items.
+    /// </summary>
+    internal WorldInteraction[] GetPlacedBlockInteractionHelp(
+        IWorldAccessor world,
+        BlockSelection selection,
+        IPlayerInventoryManager playerInventory,
+        ref EnumHandling handling)
     {
         // Don't show interaction help if auto-stash is disabled
         if (!VanillaExpandedModSystem.Config.EnableAutoStash)
@@ -233,7 +242,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             case "Crate":
                 {
                     // If the player has no stashable items, do not show the interaction help.
-                    return !HasStashables(world, forPlayer, selection)
+                    return !HasStashables(world, playerInventory, selection)
                         ? []
                         : [
                         new WorldInteraction()
@@ -247,7 +256,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             case "Bloomery":
                 {
                     // If the player has no stashable items, do not show the interaction help.
-                    ItemStack[]? stashableStacks = GetStashableItemStacks(world, forPlayer, selection);
+                    ItemStack[]? stashableStacks = GetStashableItemStacks(world, playerInventory, selection);
                     if (stashableStacks is null || stashableStacks.Length == 0)
                     {
                         return [];
@@ -265,7 +274,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             default:
                 {
                     // If the player has no stashable items, do not show the interaction help.
-                    return !HasStashables(world, forPlayer, selection)
+                    return !HasStashables(world, playerInventory, selection)
                         ? []
                         : [
                         new WorldInteraction()
@@ -281,7 +290,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     /// <summary>
     /// Gets the actual ItemStack objects that can be stashed, for display in interaction help.
     /// </summary>
-    private static ItemStack[]? GetStashableItemStacks(IWorldAccessor world, IPlayer player, BlockSelection? selection)
+    private static ItemStack[]? GetStashableItemStacks(IWorldAccessor world, IPlayerInventoryManager playerInventory, BlockSelection? selection)
     {
         if (selection is null)
         {
@@ -294,13 +303,13 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             return null;
         }
 
-        HashSet<int> stashableIds = GetStashableItems(player, blockEntity);
+        HashSet<int> stashableIds = GetStashableItems(playerInventory, blockEntity);
         if (stashableIds.Count == 0)
         {
             return null;
         }
 
-        IPlayerInventoryManager playerInv = player.InventoryManager;
+        IPlayerInventoryManager playerInv = playerInventory;
         IInventory playerBackpack = playerInv.GetOwnInventory(GlobalConstants.backpackInvClassName);
         IInventory playerHotbar = playerInv.GetOwnInventory(GlobalConstants.hotBarInvClassName);
 
@@ -365,15 +374,15 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     /// Gets the item types which are present in both the player's inventory/hotbar AND can be stashed into the specified block entity.
     /// Handles both containers and bloomeries, including state validation (e.g., bloomery not burning, output empty).
     /// </summary>
-    /// <param name="byPlayer"> The player whose inventory/hotbar to check </param>
+    /// <param name="playerInventory"> The inventory/hotbar to check </param>
     /// <param name="blockEntity"> The block entity to check (container or bloomery) </param>
     /// <returns> A set of collectible IDs which can be stashed from the player into the block entity. </returns>
-    internal static HashSet<int> GetStashableItems(in IPlayer byPlayer, in BlockEntity? blockEntity)
+    internal static HashSet<int> GetStashableItems(IPlayerInventoryManager playerInventory, BlockEntity? blockEntity)
     {
         return blockEntity switch
         {
-            BlockEntityBloomery bloomery => GetStashableItemsForBloomery(byPlayer, bloomery),
-            BlockEntityContainer container => GetStashableItemsForContainer(byPlayer, container),
+            BlockEntityBloomery bloomery => GetStashableItemsForBloomery(playerInventory, bloomery),
+            BlockEntityContainer container => GetStashableItemsForContainer(playerInventory, container),
             _ => []
         };
     }
@@ -381,14 +390,14 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     /// <summary>
     /// Gets item types which are present in both the player's inventory/hotbar AND the specified container.
     /// </summary>
-    private static HashSet<int> GetStashableItemsForContainer(in IPlayer byPlayer, in BlockEntityContainer container)
+    private static HashSet<int> GetStashableItemsForContainer(IPlayerInventoryManager playerInventory, BlockEntityContainer container)
     {
         if (container is null)
         {
             return [];
         }
 
-        IPlayerInventoryManager playerInv = byPlayer.InventoryManager;
+        IPlayerInventoryManager playerInv = playerInventory;
         IInventory playerBackpack = playerInv.GetOwnInventory(GlobalConstants.backpackInvClassName);
         IInventory playerHotbar = playerInv.GetOwnInventory(GlobalConstants.hotBarInvClassName);
         HashSet<int> containerItemTypes = [.. container.GetNonEmptyContentStacks().Where(static stack => stack?.Collectible?.Id is not null).Select(static stack => stack.Collectible.Id)];
@@ -401,7 +410,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     /// Gets item types which can be stashed into a bloomery.
     /// Returns empty set if bloomery is burning, has items in output slot, or slots are empty and active hotbar can't be added.
     /// </summary>
-    private static HashSet<int> GetStashableItemsForBloomery(in IPlayer byPlayer, in BlockEntityBloomery bloomery)
+    private static HashSet<int> GetStashableItemsForBloomery(IPlayerInventoryManager playerInventory, BlockEntityBloomery bloomery)
     {
         if (bloomery is null)
         {
@@ -418,7 +427,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         // Bloomery slot validation: fuel or ore slot must have items, OR active hotbar item must be addable
         bool fuelSlotHasItems = !bloomeryInv[0].Empty;
         bool oreSlotHasItems = !bloomeryInv[1].Empty;
-        ItemStack? activeStack = byPlayer.InventoryManager.ActiveHotbarSlot?.Itemstack;
+        ItemStack? activeStack = playerInventory.ActiveHotbarSlot?.Itemstack;
         bool activeHotbarCanBeAdded = activeStack is not null && bloomery.CanAdd(activeStack);
 
         if (!fuelSlotHasItems && !oreSlotHasItems && !activeHotbarCanBeAdded)
@@ -426,7 +435,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             return [];
         }
 
-        IPlayerInventoryManager playerInv = byPlayer.InventoryManager;
+        IPlayerInventoryManager playerInv = playerInventory;
         IInventory playerBackpack = playerInv.GetOwnInventory(GlobalConstants.backpackInvClassName);
         IInventory playerHotbar = playerInv.GetOwnInventory(GlobalConstants.hotBarInvClassName);
 
@@ -458,15 +467,21 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     /// The item-types which are already present in the container are the ones which will be stashed.
     /// </summary>
     /// <param name="world"></param>
-    /// <param name="byPlayer"></param>
+    /// <param name="playerInventory"></param>
+    /// <param name="playerName"></param>
     /// <param name="container"></param>
     /// <returns>True if any items were stashed, false otherwise.</returns>
-    public static bool AutoStashToGenericContainer(in IWorldAccessor world, in IPlayer byPlayer, in BlockEntityContainer container)
+    public static bool AutoStashToGenericContainer(
+        in IWorldAccessor world,
+        IPlayerInventoryManager playerInventory,
+        in BlockEntityContainer container,
+        string playerName = "")
     {
         HashSet<AssetLocation> itemTypesInContainer = [.. container.GetNonEmptyContentStacks().Select(static stack => stack.Collectible.Code)];
         return itemTypesInContainer.Count != 0 && AutoStashToInventory(
             world,
-            byPlayer,
+            playerInventory,
+            playerName,
             container.Inventory,
             container.Pos,
             container.InventoryClassName,
@@ -477,15 +492,21 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     /// Automatically stashes items from the player's inventory into the specified crate container.
     /// </summary>
     /// <param name="world"></param>
-    /// <param name="byPlayer"></param>
+    /// <param name="playerInventory"></param>
+    /// <param name="playerName"></param>
     /// <param name="container"></param>
     /// <returns>True if any items were stashed, false otherwise.</returns>
-    public static bool AutoStashToCrate(in IWorldAccessor world, in IPlayer byPlayer, in BlockEntityCrate container)
+    public static bool AutoStashToCrate(
+        in IWorldAccessor world,
+        IPlayerInventoryManager playerInventory,
+        in BlockEntityCrate container,
+        string playerName = "")
     {
         AssetLocation? containerAcceptedItem = container.Inventory.FirstNonEmptySlot?.Itemstack?.Collectible?.Code;
         return containerAcceptedItem is not null && AutoStashToInventory(
             world,
-            byPlayer,
+            playerInventory,
+            playerName,
             container.Inventory,
             container.Pos,
             container.InventoryClassName,
@@ -497,10 +518,15 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     /// Stashes valid fuel to slot 0 and valid ore to slot 1, respecting bloomery capacity limits.
     /// </summary>
     /// <param name="world"></param>
-    /// <param name="byPlayer"></param>
+    /// <param name="playerInventory"></param>
+    /// <param name="playerName"></param>
     /// <param name="bloomery"></param>
     /// <returns>True if any items were stashed, false otherwise.</returns>
-    public static bool AutoStashToBloomery(IWorldAccessor world, IPlayer byPlayer, BlockEntityBloomery bloomery)
+    public static bool AutoStashToBloomery(
+        IWorldAccessor world,
+        IPlayerInventoryManager playerInventory,
+        BlockEntityBloomery bloomery,
+        string playerName = "")
     {
         InventoryGeneric? bloomeryInv = BloomeryAccessor.GetInventory(bloomery);
         if (bloomeryInv is null || bloomery.IsBurning || !bloomeryInv[2].Empty)
@@ -508,19 +534,19 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             return false;
         }
 
-        IInventory? backpackInventory = byPlayer.InventoryManager.GetOwnInventory(GlobalConstants.backpackInvClassName);
-        IInventory? hotbarInventory = byPlayer.InventoryManager.GetOwnInventory(GlobalConstants.hotBarInvClassName);
+        IInventory? backpackInventory = playerInventory.GetOwnInventory(GlobalConstants.backpackInvClassName);
+        IInventory? hotbarInventory = playerInventory.GetOwnInventory(GlobalConstants.hotBarInvClassName);
 
         int totalStashed = 0;
 
         if (backpackInventory is not null)
         {
-            totalStashed += AutoStashInventoryIntoBloomery(world, byPlayer, bloomery, bloomeryInv, backpackInventory);
+            totalStashed += AutoStashInventoryIntoBloomery(world, playerName, bloomery, bloomeryInv, backpackInventory);
         }
 
         if (hotbarInventory is not null)
         {
-            totalStashed += AutoStashInventoryIntoBloomery(world, byPlayer, bloomery, bloomeryInv, hotbarInventory);
+            totalStashed += AutoStashInventoryIntoBloomery(world, playerName, bloomery, bloomeryInv, hotbarInventory);
         }
 
         if (totalStashed > 0)
@@ -529,7 +555,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             bloomery.MarkDirty(true);
 
             world.Api?.World.Logger.Audit("'{0}' auto-stashed {1} items into bloomery at <{2}>.",
-                byPlayer.PlayerName,
+                playerName,
                 totalStashed,
                 bloomery.Pos
             );
@@ -543,7 +569,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     /// </summary>
     private static int AutoStashInventoryIntoBloomery(
         IWorldAccessor world,
-        IPlayer byPlayer,
+        string playerName,
         BlockEntityBloomery bloomery,
         InventoryGeneric bloomeryInv,
         IInventory sourceInventory)
@@ -552,8 +578,8 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
 
         // Process ore first (slot 1), then fuel (slot 0)
         // This ensures fuel capacity calculation is based on actual ore amount
-        totalStashed += StashItemsToBloomerySlot(world, byPlayer, bloomery, bloomeryInv, sourceInventory, targetSlotIndex: 1); // Ore
-        totalStashed += StashItemsToBloomerySlot(world, byPlayer, bloomery, bloomeryInv, sourceInventory, targetSlotIndex: 0); // Fuel
+        totalStashed += StashItemsToBloomerySlot(world, playerName, bloomery, bloomeryInv, sourceInventory, targetSlotIndex: 1); // Ore
+        totalStashed += StashItemsToBloomerySlot(world, playerName, bloomery, bloomeryInv, sourceInventory, targetSlotIndex: 0); // Fuel
 
         return totalStashed;
     }
@@ -563,7 +589,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     /// </summary>
     private static int StashItemsToBloomerySlot(
         IWorldAccessor world,
-        IPlayer byPlayer,
+        string playerName,
         BlockEntityBloomery bloomery,
         InventoryGeneric bloomeryInv,
         IInventory sourceInventory,
@@ -605,7 +631,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             {
                 totalStashed += moved;
                 world.Api?.World.Logger.Audit("'{0}' moved {1}x{2} into bloomery at <{3}>.",
-                    byPlayer.PlayerName,
+                    playerName,
                     moved,
                     targetSlot.Itemstack?.Collectible.Code,
                     bloomery.Pos
@@ -692,7 +718,8 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     /// Uses a predicate to determine which items can be stashed, and optionally a slot selector for targeted stashing.
     /// </summary>
     /// <param name="world">The world accessor.</param>
-    /// <param name="byPlayer">The player whose inventory to stash from.</param>
+    /// <param name="playerInventory">The inventory manager whose slots are stashed.</param>
+    /// <param name="playerName">The player name used for audit logging.</param>
     /// <param name="targetInventory">The inventory to stash items into.</param>
     /// <param name="targetPos">The position of the target block entity (for logging).</param>
     /// <param name="targetName">The name of the target (for logging).</param>
@@ -701,34 +728,35 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     /// <returns>True if any items were stashed, false otherwise.</returns>
     protected static bool AutoStashToInventory(
         in IWorldAccessor world,
-        in IPlayer byPlayer,
+        IPlayerInventoryManager playerInventory,
+        string playerName,
         in IInventory targetInventory,
         in BlockPos targetPos,
         in string targetName,
         System.Func<ItemStack, bool> canAccept,
         System.Func<ItemStack, int?>? getPreferredSlot = null)
     {
-        IInventory? backpackInventory = byPlayer.InventoryManager.GetOwnInventory(GlobalConstants.backpackInvClassName);
-        IInventory? hotbarInventory = byPlayer.InventoryManager.GetOwnInventory(GlobalConstants.hotBarInvClassName);
+        IInventory? backpackInventory = playerInventory.GetOwnInventory(GlobalConstants.backpackInvClassName);
+        IInventory? hotbarInventory = playerInventory.GetOwnInventory(GlobalConstants.hotBarInvClassName);
 
-        _ = byPlayer.InventoryManager.OpenInventory(targetInventory);
+        _ = playerInventory.OpenInventory(targetInventory);
 
         int totalStashed = 0;
         if (backpackInventory is not null)
         {
-            totalStashed += AutoStashInventoryIntoInventory(world, byPlayer, targetInventory, targetPos, targetName, backpackInventory, canAccept, getPreferredSlot);
+            totalStashed += AutoStashInventoryIntoInventory(world, playerInventory, playerName, targetInventory, targetPos, targetName, backpackInventory, canAccept, getPreferredSlot);
         }
 
         if (hotbarInventory is not null)
         {
-            totalStashed += AutoStashInventoryIntoInventory(world, byPlayer, targetInventory, targetPos, targetName, hotbarInventory, canAccept, getPreferredSlot);
+            totalStashed += AutoStashInventoryIntoInventory(world, playerInventory, playerName, targetInventory, targetPos, targetName, hotbarInventory, canAccept, getPreferredSlot);
         }
 
-        byPlayer.InventoryManager.CloseInventoryAndSync(targetInventory);
+        playerInventory.CloseInventoryAndSync(targetInventory);
         if (totalStashed > 0)
         {
             world.Api?.World.Logger.Audit("'{0}' auto-stashed {1} items into {2} at <{3}>.",
-                byPlayer.PlayerName,
+                playerName,
                 totalStashed,
                 targetName,
                 targetPos
@@ -739,7 +767,8 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
 
     private static int AutoStashInventoryIntoInventory(
         in IWorldAccessor world,
-        in IPlayer byPlayer,
+        IPlayerInventoryManager playerInventory,
+        string playerName,
         in IInventory targetInventory,
         in BlockPos targetPos,
         in string targetName,
@@ -756,14 +785,15 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
                 continue;
             }
 
-            totalStashed += TransferItemToInventory(world, byPlayer, targetInventory, targetPos, targetName, itemSlot, getPreferredSlot);
+            totalStashed += TransferItemToInventory(world, playerInventory, playerName, targetInventory, targetPos, targetName, itemSlot, getPreferredSlot);
         }
         return totalStashed;
     }
 
     private static int TransferItemToInventory(
         in IWorldAccessor world,
-        in IPlayer byPlayer,
+        IPlayerInventoryManager playerInventory,
+        string playerName,
         in IInventory targetInventory,
         in BlockPos targetPos,
         in string targetName,
@@ -805,14 +835,14 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             }
 
             ItemStackMoveOperation moveOp = new(world, EnumMouseButton.Left, EnumModifierKey.SHIFT, EnumMergePriority.AutoMerge, sourceSlot.StackSize);
-            object? packet = byPlayer.InventoryManager.TryTransferTo(sourceSlot, targetSlot, ref moveOp);
+            object? packet = playerInventory.TryTransferTo(sourceSlot, targetSlot, ref moveOp);
             int movedQuantity = moveOp.MovedQuantity;
             totalMoved += movedQuantity;
 
             if (movedQuantity > 0)
             {
                 world.Api?.World.Logger.Audit("'{0}' moved {1}x{2} into {3} at <{4}>.",
-                    byPlayer.PlayerName,
+                    playerName,
                     movedQuantity,
                     targetSlot.Itemstack?.Collectible.Code,
                     targetName,
@@ -836,16 +866,10 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         return totalMoved;
     }
 
-    private bool HasStashables(in IWorldAccessor world, in IPlayer player, BlockSelection? selection = null)
+    private bool HasStashables(in IWorldAccessor world, IPlayerInventoryManager playerInventory, BlockSelection selection)
     {
-        selection ??= player.CurrentBlockSelection;
-        if (selection is null)
-        {
-            return false;
-        }
-
         BlockEntity? blockEntity = world.BlockAccessor.GetBlockEntity(selection.Position);
-        HashSet<int> stashables = GetStashableItems(player, blockEntity);
+        HashSet<int> stashables = GetStashableItems(playerInventory, blockEntity);
         return stashables.Count != 0;
     }
     #endregion

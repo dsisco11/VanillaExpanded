@@ -42,11 +42,6 @@ public class VanillaExpandedConfig
     /// </summary>
     public bool EnableEquipLightHotkey { get; set; } = true;
 
-    /// <summary>
-    /// Prioritize full-word matches in handbook search results.
-    /// When enabled, searching "iron" will rank "Iron Ingot" higher than "Ironwood Log".
-    /// </summary>
-    public bool EnableHandbookSearchPrioritization { get; set; } = true;
     #endregion
 
     #region Recipe Toggles
