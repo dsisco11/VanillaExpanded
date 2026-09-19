@@ -156,6 +156,34 @@ public class AutoStashTransferTests
     }
 
     [Fact]
+    public void GetStashableItems_FullMatchingContainer_ReturnsEmptySet()
+    {
+        // Arrange - The container has the matching item type but no remaining stack space.
+        var sharedItem = MockItem.CreateNonLightSource(id: 1);
+        sharedItem.Code = new AssetLocation("game", "shared-item");
+        sharedItem.MaxStackSize = 1;
+
+        var fixture = CreateFixture(
+            backpackItems: [sharedItem]);
+        var container = MockBlockEntityContainer.WithItems(
+            new Dictionary<int, MockItem> { { 0, sharedItem } },
+            totalSlots: 1,
+            api: fixture.Api);
+        container.Inventory[0].Itemstack!.StackSize = sharedItem.MaxStackSize;
+
+        // Act
+        HashSet<int> result = BlockBehaviorAutoStashable.GetStashableItems(
+            fixture.Player,
+            container.Object);
+
+        // Assert
+        Assert.Empty(result);
+        fixture.InventoryManagerMock.Verify(
+            inventoryManager => inventoryManager.OpenInventory(container.Inventory),
+            Times.Never);
+    }
+
+    [Fact]
     public void AutoStashToGenericContainer_PlayerInventoryEmpty_ReturnsFalse()
     {
         // Arrange - Container has items, player inventories are empty

@@ -241,17 +241,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         {
             case "Crate":
                 {
-                    // If the player has no stashable items, do not show the interaction help.
-                    return !HasStashables(world, playerInventory, selection)
-                        ? []
-                        : [
-                        new WorldInteraction()
-                        {
-                            ActionLangCode = "vanillaexpanded:blockhelp-autostash-container",
-                            MouseButton = EnumMouseButton.Right,
-                            HotKeyCodes = ["ctrl", "shift"],
-                        }
-                    ];
+                    return GetContainerInteractionHelp(world, selection, playerInventory, ["ctrl", "shift"]);
                 }
             case "Bloomery":
                 {
@@ -273,18 +263,33 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
                 }
             default:
                 {
-                    // If the player has no stashable items, do not show the interaction help.
-                    return !HasStashables(world, playerInventory, selection)
-                        ? []
-                        : [
-                        new WorldInteraction()
-                        {
-                            ActionLangCode = "vanillaexpanded:blockhelp-autostash-container",
-                            MouseButton = EnumMouseButton.Right,
-                        }
-                    ];
+                    return GetContainerInteractionHelp(world, selection, playerInventory);
                 }
         }
+    }
+
+    private WorldInteraction[] GetContainerInteractionHelp(
+        IWorldAccessor world,
+        BlockSelection selection,
+        IPlayerInventoryManager playerInventory,
+        string[]? hotKeyCodes = null)
+    {
+        string? actionLangCode = HasStashables(world, playerInventory, selection)
+            ? "vanillaexpanded:blockhelp-autostash-container"
+            : HasContainerStashCandidates(world, playerInventory, selection)
+                ? "vanillaexpanded:blockhelp-autostash-full"
+                : null;
+
+        return actionLangCode is null
+            ? []
+            : [
+                new WorldInteraction()
+                {
+                    ActionLangCode = actionLangCode,
+                    MouseButton = EnumMouseButton.Right,
+                    HotKeyCodes = hotKeyCodes,
+                }
+            ];
     }
 
     /// <summary>
@@ -391,7 +396,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     /// <summary>
     /// Gets item types which are present in both the player's inventory/hotbar AND the specified container.
     /// </summary>
-    private static HashSet<int> GetStashableItemsForContainer(IPlayerInventoryManager playerInventory, BlockEntityContainer container)
+    private static HashSet<int> GetStashableItemsForContainer(IPlayerInventoryManager playerInventory, BlockEntityContainer container, bool requireCapacity = true)
     {
         if (container is null)
         {
@@ -404,7 +409,28 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         HashSet<int> containerItemTypes = [.. container.GetNonEmptyContentStacks().Where(static stack => stack?.Collectible?.Id is not null).Select(static stack => stack.Collectible.Id)];
         HashSet<int> playerItemTypes = [.. GetDistinctItemTypes(playerBackpack), .. GetDistinctItemTypes(playerHotbar)];
         containerItemTypes.IntersectWith(playerItemTypes);
-        return containerItemTypes;
+
+        if (!requireCapacity || containerItemTypes.Count == 0)
+        {
+            return containerItemTypes;
+        }
+
+        HashSet<int> stashableIds = [];
+
+        foreach (ItemSlot sourceSlot in playerBackpack.Concat(playerHotbar))
+        {
+            if (sourceSlot.Empty || sourceSlot.Itemstack?.Collectible?.Id is not int collectibleId || !containerItemTypes.Contains(collectibleId))
+            {
+                continue;
+            }
+
+            if (container.Inventory.Any(targetSlot => CanAcceptForAutoStash(targetSlot, sourceSlot)))
+            {
+                stashableIds.Add(collectibleId);
+            }
+        }
+
+        return stashableIds;
     }
 
     /// <summary>
@@ -449,7 +475,10 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
                 continue;
             }
 
-            if (bloomery.CanAdd(slot.Itemstack))
+            int? targetSlotIndex = GetBloomeryPreferredSlot(slot.Itemstack);
+            if (bloomery.CanAdd(slot.Itemstack)
+                && targetSlotIndex.HasValue
+                && GetBloomeryMaxCanAdd(bloomery, bloomeryInv, slot.Itemstack, targetSlotIndex.Value) > 0)
             {
                 stashableIds.Add(slot.Itemstack.Collectible.Id);
             }
@@ -756,6 +785,12 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         IInventory? backpackInventory = playerInventory.GetOwnInventory(GlobalConstants.backpackInvClassName);
         IInventory? hotbarInventory = playerInventory.GetOwnInventory(GlobalConstants.hotBarInvClassName);
 
+        if (!CanStashAnyItems(backpackInventory, targetInventory, canAccept, getPreferredSlot)
+            && !CanStashAnyItems(hotbarInventory, targetInventory, canAccept, getPreferredSlot))
+        {
+            return false;
+        }
+
         _ = playerInventory.OpenInventory(targetInventory);
 
         int totalStashed = 0;
@@ -882,11 +917,69 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         return totalMoved;
     }
 
+    private static bool CanStashAnyItems(
+        IInventory? sourceInventory,
+        IInventory targetInventory,
+        System.Func<ItemStack, bool> canAccept,
+        System.Func<ItemStack, int?>? getPreferredSlot)
+    {
+        if (sourceInventory is null)
+        {
+            return false;
+        }
+
+        foreach (ItemSlot sourceSlot in sourceInventory)
+        {
+            if (sourceSlot.Empty || !canAccept(sourceSlot.Itemstack))
+            {
+                continue;
+            }
+
+            if (getPreferredSlot?.Invoke(sourceSlot.Itemstack) is int preferredSlotIndex
+                && preferredSlotIndex >= 0
+                && preferredSlotIndex < targetInventory.Count)
+            {
+                if (targetInventory[preferredSlotIndex] is ItemSlot preferredSlot
+                    && CanAcceptForAutoStash(preferredSlot, sourceSlot))
+                {
+                    return true;
+                }
+
+                continue;
+            }
+
+            if (targetInventory.Any(targetSlot => CanAcceptForAutoStash(targetSlot, sourceSlot)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool CanAcceptForAutoStash(ItemSlot targetSlot, ItemSlot sourceSlot)
+    {
+        if (targetSlot.Empty)
+        {
+            return targetSlot.CanHold(sourceSlot);
+        }
+
+        return targetSlot.Itemstack?.Collectible?.Id == sourceSlot.Itemstack?.Collectible?.Id
+            && targetSlot.StackSize < targetSlot.Itemstack.Collectible.MaxStackSize;
+    }
+
     private bool HasStashables(in IWorldAccessor world, IPlayerInventoryManager playerInventory, BlockSelection selection)
     {
         BlockEntity? blockEntity = world.BlockAccessor.GetBlockEntity(selection.Position);
         HashSet<int> stashables = GetStashableItems(playerInventory, blockEntity);
         return stashables.Count != 0;
+    }
+
+    private bool HasContainerStashCandidates(in IWorldAccessor world, IPlayerInventoryManager playerInventory, BlockSelection selection)
+    {
+        BlockEntity? blockEntity = world.BlockAccessor.GetBlockEntity(selection.Position);
+        return blockEntity is BlockEntityContainer container
+            && GetStashableItemsForContainer(playerInventory, container, requireCapacity: false).Count != 0;
     }
     #endregion
 }
