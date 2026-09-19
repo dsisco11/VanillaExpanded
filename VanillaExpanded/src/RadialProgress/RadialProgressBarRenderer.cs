@@ -12,10 +12,16 @@ namespace VanillaExpanded.RadialProgress;
 public sealed class RadialProgressBarRenderer : IRenderer, IRadialProgressBar
 {
     #region Fields
+    private const float TextTopPaddingPx = 4f;
+
     private readonly ICoreClientAPI capi;
     private readonly RadialProgressShaderProgram? shader;
     private readonly Matrixf mvMatrix = new();
     private bool isDisposed;
+
+    private CairoFont? textFont;
+    private LoadedTexture? textTexture;
+    private string? renderedText;
     #endregion
 
     #region Properties
@@ -64,8 +70,14 @@ public sealed class RadialProgressBarRenderer : IRenderer, IRadialProgressBar
     /// </summary>
     public bool Enabled { get; set; } = true;
 
-    /// <inheritdoc />
-    public double RenderOrder => 0.9;
+    /// <summary>
+    /// Optional text label rendered centered below the ring. Set to null or empty to hide it.
+    /// </summary>
+    public string? Text { get; set; }
+
+    // Ortho stage: Gui manager draws at 1.0, crosshair/cursor at 1.02.
+    // Topmost sits between them (above dialogs/HUD); non-topmost sits below the Gui manager (behind dialogs/HUD).
+    public double RenderOrder { get; }
 
     /// <inheritdoc />
     public int RenderRange => 10;
@@ -78,10 +90,12 @@ public sealed class RadialProgressBarRenderer : IRenderer, IRadialProgressBar
     /// <param name="api">The client API.</param>
     /// <param name="startOffset01">Start angle offset in [0,1] range (0 = +X/right, 0.25 = +Y/top, etc.).</param>
     /// <param name="clockwise">True for clockwise fill direction.</param>
+    /// <param name="rendersTopmost">Whether to draw above all base game UI/dialogs instead of behind it.</param>
     /// <exception cref="InvalidOperationException">Thrown if resources fail to initialize.</exception>
-    public RadialProgressBarRenderer(ICoreClientAPI api, float startOffset01 = 0.25f, bool clockwise = true)
+    public RadialProgressBarRenderer(ICoreClientAPI api, float startOffset01 = 0.25f, bool clockwise = true, bool rendersTopmost = true)
     {
         capi = api ?? throw new ArgumentNullException(nameof(api));
+        RenderOrder = rendersTopmost ? 1.01 : 0.9;
 
         if (!RadialProgressResources.Initialize(api))
         {
@@ -116,37 +130,97 @@ public sealed class RadialProgressBarRenderer : IRenderer, IRadialProgressBar
         var prevShader = capi.Render.CurrentActiveShader;
         prevShader?.Stop();
 
+        // Ignore leftover world depth values and alpha-blend on top of whatever GUI was already drawn.
+        capi.Render.GLDisableDepthTest();
+        capi.Render.GlToggleBlend(true);
+
         try
         {
-            shader.Use();
+            try
+            {
+                shader.Use();
 
-            // Set uniforms via typed property accessors
-            shader.ProgressScalar = Progress;
-            shader.OuterRadius = OuterRadius;
-            shader.InnerRadius = InnerRadius;
-            shader.TintColor = TintColor;
+                // Set uniforms via typed property accessors
+                shader.ProgressScalar = Progress;
+                shader.OuterRadius = OuterRadius;
+                shader.InnerRadius = InnerRadius;
+                shader.TintColor = TintColor;
 
-            // Build model-view matrix for screen-space positioning
-            // QuadMeshUtil.GetQuad() produces vertices in [-1,1] range
-            // We need to transform to screen coordinates
-            mvMatrix
-                .Set(capi.Render.CurrentModelviewMatrix)
-                .Translate(ScreenX, ScreenY, 50f)
-                .Scale(Width, Height, 0f)
-                .Translate(0.5f, 0.5f, 0f)
-                .Scale(0.5f, 0.5f, 0f);
+                // Build model-view matrix for screen-space positioning
+                // QuadMeshUtil.GetQuad() produces vertices in [-1,1] range
+                // We need to transform to screen coordinates
+                mvMatrix
+                    .Set(capi.Render.CurrentModelviewMatrix)
+                    .Translate(ScreenX, ScreenY, 50f)
+                    .Scale(Width, Height, 0f)
+                    .Translate(0.5f, 0.5f, 0f)
+                    .Scale(0.5f, 0.5f, 0f);
 
-            shader.ProjectionMatrix = capi.Render.CurrentProjectionMatrix;
-            shader.ModelViewMatrix = mvMatrix.Values;
+                shader.ProjectionMatrix = capi.Render.CurrentProjectionMatrix;
+                shader.ModelViewMatrix = mvMatrix.Values;
 
-            // Render the quad
-            capi.Render.RenderMesh(quadMesh);
+                // Render the quad
+                capi.Render.RenderMesh(quadMesh);
+            }
+            finally
+            {
+                shader.Stop();
+            }
+
+            DrawText();
         }
         finally
         {
-            shader.Stop();
+            capi.Render.GLEnableDepthTest();
             prevShader?.Use();
         }
+    }
+
+    private void DrawText()
+    {
+        EnsureTextTexture();
+        if (textTexture is null)
+        {
+            return;
+        }
+
+        float textX = ScreenX + (Width - textTexture.Width) / 2f;
+        float textY = ScreenY + Height + TextTopPaddingPx;
+
+        // Render2DLoadedTexture requires the engine's own Gui shader to be active.
+        var guiShader = capi.Render.GetEngineShader(EnumShaderProgram.Gui);
+        guiShader.Use();
+        try
+        {
+            capi.Render.Render2DLoadedTexture(textTexture, textX, textY, 50f);
+        }
+        finally
+        {
+            guiShader.Stop();
+        }
+    }
+
+    private void EnsureTextTexture()
+    {
+        if (renderedText == Text)
+        {
+            return;
+        }
+
+        renderedText = Text;
+        textTexture?.Dispose();
+        textTexture = null;
+
+        if (string.IsNullOrEmpty(Text))
+        {
+            return;
+        }
+
+        textFont ??= CairoFont.WhiteSmallText().WithStroke([0, 0, 0, 0.6], 1.5);
+        var textExtents = textFont.GetTextExtents(Text);
+        int textureWidth = (int)Math.Ceiling(textExtents.Width) + 4;
+        int textureHeight = (int)Math.Ceiling(textFont.GetFontExtents().Height) + 4;
+        textTexture = capi.Gui.TextTexture.GenTextTexture(Text, textFont, textureWidth, textureHeight, null, EnumTextOrientation.Center);
     }
 
     /// <inheritdoc />
@@ -158,6 +232,8 @@ public sealed class RadialProgressBarRenderer : IRenderer, IRadialProgressBar
         }
 
         isDisposed = true;
+        textTexture?.Dispose();
+        textFont?.Dispose();
         RadialProgressResources.Release();
     }
     #endregion

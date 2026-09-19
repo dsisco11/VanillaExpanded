@@ -95,7 +95,8 @@ public sealed class ModSystemRadialProgressBar : ModSystem
         RadialProgressBarRenderer renderer;
         try
         {
-            renderer = new RadialProgressBarRenderer(capi, startOffset01, clockwise);
+            bool rendersTopmost = VanillaExpandedModSystem.Config?.AutoStashGuiRendersTopmost ?? true;
+            renderer = new RadialProgressBarRenderer(capi, startOffset01, clockwise, rendersTopmost);
         }
         catch (InvalidOperationException ex)
         {
