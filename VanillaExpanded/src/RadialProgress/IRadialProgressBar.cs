@@ -24,4 +24,9 @@ public interface IRadialProgressBar
     /// Whether this progress bar is currently enabled and rendering.
     /// </summary>
     bool Enabled { get; set; }
+
+    /// <summary>
+    /// Optional text label rendered centered below the ring. Set to null or empty to hide it.
+    /// </summary>
+    string? Text { get; set; }
 }

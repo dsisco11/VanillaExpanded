@@ -365,6 +365,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             return;
         }
         progressBar.Progress = Math.Clamp(progress, 0f, 1f);
+        progressBar.Text = "AutoStashing";
     }
     #endregion
 
