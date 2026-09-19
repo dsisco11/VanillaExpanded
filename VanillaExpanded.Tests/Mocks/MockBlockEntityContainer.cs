@@ -18,7 +18,7 @@ public class MockBlockEntityContainer
     public ICoreAPI? Api { get; }
 
     private readonly List<ItemSlot> _slots;
-    private readonly TestableBlockEntityContainer _container;
+    public Mock<BlockEntityContainer> BlockEntityMock { get; }
 
     public MockBlockEntityContainer(int slotCount = 10, BlockPos? position = null, ICoreAPI? api = null)
     {
@@ -48,13 +48,16 @@ public class MockBlockEntityContainer
             _slots.Add(Inventory[i]);
         }
 
-        _container = new TestableBlockEntityContainer(Inventory, Position);
+        BlockEntityMock = new Mock<BlockEntityContainer> { CallBase = true };
+        BlockEntityMock.SetupGet(blockEntity => blockEntity.Inventory).Returns(Inventory);
+        BlockEntityMock.SetupGet(blockEntity => blockEntity.InventoryClassName).Returns("test-container");
+        BlockEntityMock.Object.Pos = Position;
     }
 
     /// <summary>
     /// Gets the BlockEntityContainer instance for use in tests.
     /// </summary>
-    public BlockEntityContainer Object => _container;
+    public BlockEntityContainer Object => BlockEntityMock.Object;
 
     /// <summary>
     /// Creates a MockBlockEntityContainer with items in specific slots.
@@ -135,23 +138,5 @@ public class MockBlockEntityContainer
     /// <summary>
     /// Gets all non-empty item stacks in the container.
     /// </summary>
-    public ItemStack[] GetNonEmptyStacks() => _container.GetNonEmptyContentStacks();
-
-    /// <summary>
-    /// A testable concrete implementation of BlockEntityContainer.
-    /// </summary>
-    private class TestableBlockEntityContainer : BlockEntityContainer
-    {
-        private readonly InventoryGeneric _inventory;
-        private readonly string _inventoryClassName = "test-container";
-
-        public TestableBlockEntityContainer(InventoryGeneric inventory, BlockPos pos)
-        {
-            _inventory = inventory;
-            Pos = pos;
-        }
-
-        public override InventoryBase Inventory => _inventory;
-        public override string InventoryClassName => _inventoryClassName;
-    }
+    public ItemStack[] GetNonEmptyStacks() => Object.GetNonEmptyContentStacks();
 }

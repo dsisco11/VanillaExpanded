@@ -479,7 +479,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         string playerName = "")
     {
         HashSet<AssetLocation> itemTypesInContainer = [.. container.GetNonEmptyContentStacks().Select(static stack => stack.Collectible.Code)];
-        return itemTypesInContainer.Count != 0 && AutoStashToInventory(
+        bool itemsStashed = itemTypesInContainer.Count != 0 && AutoStashToInventory(
             world,
             playerInventory,
             playerName,
@@ -487,6 +487,14 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             container.Pos,
             container.InventoryClassName,
             stack => itemTypesInContainer.Contains(stack.Collectible.Code));
+
+        if (itemsStashed)
+        {
+            // Mark dirty server-side so the player sees the updated contents.
+            container.MarkDirty();
+        }
+
+        return itemsStashed;
     }
 
     /// <summary>
@@ -504,7 +512,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         string playerName = "")
     {
         AssetLocation? containerAcceptedItem = container.Inventory.FirstNonEmptySlot?.Itemstack?.Collectible?.Code;
-        return containerAcceptedItem is not null && AutoStashToInventory(
+        bool itemsStashed = containerAcceptedItem is not null && AutoStashToInventory(
             world,
             playerInventory,
             playerName,
@@ -512,6 +520,14 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             container.Pos,
             container.InventoryClassName,
             stack => stack.Collectible.Code.Equals(containerAcceptedItem));
+
+        if (itemsStashed)
+        {
+            // Mark dirty server-side so the player sees the updated contents.
+            container.MarkDirty();
+        }
+
+        return itemsStashed;
     }
 
     /// <summary>
@@ -753,7 +769,6 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             totalStashed += AutoStashInventoryIntoInventory(world, playerInventory, playerName, targetInventory, targetPos, targetName, hotbarInventory, canAccept, getPreferredSlot);
         }
 
-        playerInventory.CloseInventoryAndSync(targetInventory);
         if (totalStashed > 0)
         {
             world.Api?.World.Logger.Audit("'{0}' auto-stashed {1} items into {2} at <{3}>.",

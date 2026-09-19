@@ -203,6 +203,12 @@ public class AutoStashTransferTests
         Assert.True(result);
         // Player's backpack should be empty after stash
         Assert.True(fixture.BackpackInventory[0].Empty);
+        container.BlockEntityMock.Verify(
+            blockEntity => blockEntity.MarkDirty(false, null!),
+            Times.Once);
+        fixture.InventoryManagerMock.Verify(
+            inventoryManager => inventoryManager.CloseInventoryAndSync(container.Inventory),
+            Times.Never);
     }
 
     [Fact]
@@ -400,6 +406,9 @@ public class AutoStashTransferTests
         // Assert
         Assert.True(result);
         Assert.True(fixture.BackpackInventory[0].Empty);
+        crate.BlockEntityMock.Verify(
+            blockEntity => blockEntity.MarkDirty(false, null!),
+            Times.Once);
     }
 
     [Fact]

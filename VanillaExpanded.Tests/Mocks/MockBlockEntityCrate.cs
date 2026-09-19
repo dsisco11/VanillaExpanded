@@ -16,7 +16,7 @@ public class MockBlockEntityCrate
     public BlockPos Position { get; }
     public ICoreAPI? Api { get; }
 
-    private readonly TestableBlockEntityCrate _crate;
+    public Mock<BlockEntityCrate> BlockEntityMock { get; }
 
     public MockBlockEntityCrate(int slotCount = 16, BlockPos? position = null, ICoreAPI? api = null)
     {
@@ -39,13 +39,15 @@ public class MockBlockEntityCrate
             Inventory.InvNetworkUtil = networkUtilMock.Object;
         }
 
-        _crate = new TestableBlockEntityCrate(Inventory, Position);
+        BlockEntityMock = new Mock<BlockEntityCrate> { CallBase = true };
+        BlockEntityMock.SetupGet(blockEntity => blockEntity.Inventory).Returns(Inventory);
+        BlockEntityMock.Object.Pos = Position;
     }
 
     /// <summary>
     /// Gets the BlockEntityCrate instance for use in tests.
     /// </summary>
-    public BlockEntityCrate Object => _crate;
+    public BlockEntityCrate Object => BlockEntityMock.Object;
 
     /// <summary>
     /// Creates an empty MockBlockEntityCrate.
@@ -118,7 +120,7 @@ public class MockBlockEntityCrate
     /// <summary>
     /// Gets all non-empty item stacks in the crate.
     /// </summary>
-    public ItemStack[] GetNonEmptyStacks() => _crate.GetNonEmptyContentStacks();
+    public ItemStack[] GetNonEmptyStacks() => Object.GetNonEmptyContentStacks();
 
     /// <summary>
     /// Gets the total quantity of items across all slots.
@@ -139,20 +141,4 @@ public class MockBlockEntityCrate
         }
     }
 
-    /// <summary>
-    /// A testable concrete implementation of BlockEntityCrate.
-    /// Overrides the Inventory property to use our injected inventory.
-    /// </summary>
-    private class TestableBlockEntityCrate : BlockEntityCrate
-    {
-        private readonly InventoryGeneric _inventory;
-
-        public TestableBlockEntityCrate(InventoryGeneric inventory, BlockPos pos)
-        {
-            _inventory = inventory;
-            Pos = pos;
-        }
-
-        public override InventoryBase Inventory => _inventory;
-    }
 }
