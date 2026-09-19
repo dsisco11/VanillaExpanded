@@ -88,5 +88,10 @@ public class VanillaExpandedConfig
     /// Size of the spawn point decal (0.2 to 1.0).
     /// </summary>
     public float SpawnDecalSize { get; set; } = 0.4f;
+
+    /// <summary>
+    /// Render the auto-stash progress bar above all other base game UI (dialogs, HUD, etc.) instead of behind it.
+    /// </summary>
+    public bool AutoStashGuiRendersTopmost { get; set; } = true;
     #endregion
 }

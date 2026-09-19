@@ -64,8 +64,9 @@ public sealed class RadialProgressBarRenderer : IRenderer, IRadialProgressBar
     /// </summary>
     public bool Enabled { get; set; } = true;
 
-    /// <inheritdoc />
-    public double RenderOrder => 0.9;
+    // Ortho stage: Gui manager draws at 1.0, crosshair/cursor at 1.02.
+    // Topmost sits between them (above dialogs/HUD); non-topmost sits below the Gui manager (behind dialogs/HUD).
+    public double RenderOrder { get; }
 
     /// <inheritdoc />
     public int RenderRange => 10;
@@ -78,10 +79,12 @@ public sealed class RadialProgressBarRenderer : IRenderer, IRadialProgressBar
     /// <param name="api">The client API.</param>
     /// <param name="startOffset01">Start angle offset in [0,1] range (0 = +X/right, 0.25 = +Y/top, etc.).</param>
     /// <param name="clockwise">True for clockwise fill direction.</param>
+    /// <param name="rendersTopmost">Whether to draw above all base game UI/dialogs instead of behind it.</param>
     /// <exception cref="InvalidOperationException">Thrown if resources fail to initialize.</exception>
-    public RadialProgressBarRenderer(ICoreClientAPI api, float startOffset01 = 0.25f, bool clockwise = true)
+    public RadialProgressBarRenderer(ICoreClientAPI api, float startOffset01 = 0.25f, bool clockwise = true, bool rendersTopmost = true)
     {
         capi = api ?? throw new ArgumentNullException(nameof(api));
+        RenderOrder = rendersTopmost ? 1.01 : 0.9;
 
         if (!RadialProgressResources.Initialize(api))
         {
@@ -116,6 +119,10 @@ public sealed class RadialProgressBarRenderer : IRenderer, IRadialProgressBar
         var prevShader = capi.Render.CurrentActiveShader;
         prevShader?.Stop();
 
+        // Ignore leftover world depth values and alpha-blend on top of whatever GUI was already drawn.
+        capi.Render.GLDisableDepthTest();
+        capi.Render.GlToggleBlend(true);
+
         try
         {
             shader.Use();
@@ -145,6 +152,7 @@ public sealed class RadialProgressBarRenderer : IRenderer, IRadialProgressBar
         finally
         {
             shader.Stop();
+            capi.Render.GLEnableDepthTest();
             prevShader?.Use();
         }
     }
