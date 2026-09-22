@@ -240,7 +240,7 @@ public class AutoStashTransferTests
     }
 
     [Fact]
-    public void AutoStashToGenericContainer_TransferThrows_ClosesInventory()
+    public void AutoStashToGenericContainer_DoesNotUseClientTransferApi()
     {
         // Arrange
         var sharedItem = MockItem.CreateNonLightSource(id: 1);
@@ -255,16 +255,23 @@ public class AutoStashTransferTests
                 It.IsAny<ItemSlot>(),
                 It.IsAny<ItemSlot>(),
                 ref It.Ref<ItemStackMoveOperation>.IsAny))
-            .Throws(new InvalidOperationException("Transfer failed."));
+            .Throws(new InvalidOperationException("Client transfer API must not be used server-side."));
 
         // Act
-        Assert.Throws<InvalidOperationException>(() =>
-            BlockBehaviorAutoStashable.AutoStashToGenericContainer(
-                fixture.World,
-                fixture.Player,
-                container.Object));
+        bool result = BlockBehaviorAutoStashable.AutoStashToGenericContainer(
+            fixture.World,
+            fixture.Player,
+            container.Object);
 
         // Assert
+        Assert.True(result);
+        Assert.True(fixture.BackpackInventory[0].Empty);
+        fixture.InventoryManagerMock.Verify(
+            inventoryManager => inventoryManager.TryTransferTo(
+                It.IsAny<ItemSlot>(),
+                It.IsAny<ItemSlot>(),
+                ref It.Ref<ItemStackMoveOperation>.IsAny),
+            Times.Never);
         fixture.InventoryManagerMock.Verify(
             inventoryManager => inventoryManager.CloseInventoryAndSync(container.Inventory),
             Times.Once);
@@ -384,47 +391,6 @@ public class AutoStashTransferTests
         Assert.Equal(64, container.Inventory[1].StackSize);
         Assert.Equal(6, container.Inventory[2].StackSize);
         Assert.True(fixture.BackpackInventory[0].Empty);
-    }
-
-    [Fact]
-    public void AutoStashToGenericContainer_TransferMovesNothing_StopsAndClosesInventory()
-    {
-        // Arrange
-        var sharedItem = MockItem.CreateNonLightSource(id: 1);
-        sharedItem.Code = new AssetLocation("game", "shared-item");
-
-        var fixture = CreateFixture(
-            backpackItems: [sharedItem]);
-        var container = MockBlockEntityContainer.WithItems(fixture.Api, sharedItem);
-
-        fixture.InventoryManagerMock
-            .Setup(inventoryManager => inventoryManager.TryTransferTo(
-                It.IsAny<ItemSlot>(),
-                It.IsAny<ItemSlot>(),
-                ref It.Ref<ItemStackMoveOperation>.IsAny))
-            .Returns((ItemSlot source, ItemSlot target, ref ItemStackMoveOperation operation) =>
-            {
-                operation.MovedQuantity = 0;
-                return (object)null!;
-            });
-
-        // Act
-        bool result = BlockBehaviorAutoStashable.AutoStashToGenericContainer(
-            fixture.World,
-            fixture.Player,
-            container.Object);
-
-        // Assert
-        Assert.False(result);
-        fixture.InventoryManagerMock.Verify(
-            inventoryManager => inventoryManager.TryTransferTo(
-                It.IsAny<ItemSlot>(),
-                It.IsAny<ItemSlot>(),
-                ref It.Ref<ItemStackMoveOperation>.IsAny),
-            Times.Once);
-        fixture.InventoryManagerMock.Verify(
-            inventoryManager => inventoryManager.CloseInventoryAndSync(container.Inventory),
-            Times.Once);
     }
 
     [Fact]
