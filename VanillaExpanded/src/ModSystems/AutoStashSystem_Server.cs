@@ -29,7 +29,7 @@ internal class AutoStashSystem_Server : ModSystem
     public override void StartServerSide(ICoreServerAPI api)
     {
         this.api = api;
-        channel = api.Network.GetChannel(Mod.Info.ModID);
+        channel = api.Network.GetChannel(Constants.ModId);
         channel.SetMessageHandler<Packet_RequestAutoStash>(ProcessAutoStashRequest);
     }
     #endregion
@@ -37,7 +37,22 @@ internal class AutoStashSystem_Server : ModSystem
     #region Network Handlers
     private void ProcessAutoStashRequest(IServerPlayer fromPlayer, Packet_RequestAutoStash packet)
     {
+        if (packet.position is null)
+        {
+            api!.Logger.Warning("[AutoStash] Ignoring request with no target position.");
+            return;
+        }
+
         api!.Logger.Audit("[AutoStash] Processing auto-stash request from client '{0}' (uid: {1})", fromPlayer.PlayerName, fromPlayer.PlayerUID);
+
+    #pragma warning disable CS0618 // Vintage Story marks this for a planned 1.23 signature change.
+        var permissions = new BlockEntity.CachedAccessPerms(api.World, packet.position, fromPlayer);
+    #pragma warning restore CS0618
+        if (!permissions.IsInteractingPlayerAllowedTo(EnumBlockAccessFlags.Use, true, "auto-stash container"))
+        {
+            return;
+        }
+
         // find the block at the requested position
         var block = api!.World.BlockAccessor.GetBlock(packet.position);
         // get the "AutoStashable" behavior for the block

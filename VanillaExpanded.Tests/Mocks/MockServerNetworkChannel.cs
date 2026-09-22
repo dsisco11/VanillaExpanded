@@ -150,4 +150,12 @@ public class MockServerNetworkChannel : IServerNetworkChannel
     {
         return _broadcastPackets.Any(p => p.Packet is T);
     }
+
+    /// <summary>
+    /// Checks whether a handler was registered for the specified message type.
+    /// </summary>
+    public bool HasMessageHandler<T>()
+    {
+        return _messageHandlers.ContainsKey(typeof(T));
+    }
 }
