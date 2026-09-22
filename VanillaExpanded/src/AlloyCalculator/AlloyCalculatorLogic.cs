@@ -22,6 +22,42 @@ internal static class AlloyCalculatorLogic
         return option.Ingredients.Length > 1;
     }
 
+    internal static MetalDepositOption? FindOptionForContents(
+        IReadOnlyList<ItemStack> contents,
+        IReadOnlyList<MetalDepositOption> options,
+        IReadOnlyList<AlloyRecipe> recipes)
+    {
+        if (contents.Count == 0) return null;
+
+        ItemStack[] stacks = [.. contents];
+        AlloyRecipe? matchingRecipe = recipes.FirstOrDefault(recipe =>
+            recipe.Enabled
+            && recipe.Ingredients.Length > 0
+            && recipe.Matches(stacks));
+        if (matchingRecipe?.Output?.Code is not null)
+        {
+            return options.FirstOrDefault(option => option.OutputCode.Equals(matchingRecipe.Output.Code));
+        }
+
+        HashSet<AssetLocation> smeltedOutputs = contents
+            .Select(static stack => stack.Collectible
+                .GetCombustibleProperties(null, stack, null)?
+                .SmeltedStack?
+                .ResolvedItemstack?
+                .Collectible?
+                .Code)
+            .Where(static code => code is not null)
+            .Cast<AssetLocation>()
+            .ToHashSet();
+
+        if (smeltedOutputs.Count != 1) return null;
+
+        AssetLocation outputCode = smeltedOutputs.Single();
+        return options.FirstOrDefault(option =>
+            option.Ingredients.Length == 1
+            && option.OutputCode.Equals(outputCode));
+    }
+
     internal static MetalDepositOption FromAlloyRecipe(AlloyRecipe recipe)
     {
         return new MetalDepositOption(

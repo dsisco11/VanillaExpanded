@@ -711,6 +711,13 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         depositSystem = capi.ModLoader.GetModSystem<AlloyDepositSystem>();
         depositSystem.DepositCompleted += OnDepositCompleted;
 
+        MetalDepositOption? detectedOption = DetectOptionFromCrucible();
+        if (detectedOption is not null)
+        {
+            OnAlloySelected(depositOptions.IndexOf(detectedOption).ToString(), true);
+            return;
+        }
+
         // Restore saved state or use defaults
         if (savedStates.TryGetValue(BlockEntityPosition, out var state))
         {
@@ -724,6 +731,22 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         {
             OnAlloySelected("0", true);
         }
+    }
+
+    private MetalDepositOption? DetectOptionFromCrucible()
+    {
+        BlockEntityFirepit? firepit = capi.World.BlockAccessor
+            .GetBlockEntity<BlockEntityFirepit>(BlockEntityPosition);
+        if (firepit?.Inventory is not InventorySmelting inventory) return null;
+
+        ItemStack[] contents = [.. inventory.CookingSlots
+            .Where(static slot => !slot.Empty)
+            .Select(static slot => slot.Itemstack)
+            .OfType<ItemStack>()];
+        return AlloyCalculatorLogic.FindOptionForContents(
+            contents,
+            depositOptions,
+            capi.GetMetalAlloys());
     }
 
     public override void OnGuiClosed()

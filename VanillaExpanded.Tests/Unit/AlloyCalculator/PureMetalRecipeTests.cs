@@ -123,6 +123,90 @@ public class MetalDepositOptionTests
         Assert.True(AlloyCalculatorLogic.ShouldShowRatioControls(option));
     }
 
+    [Fact]
+    public void FindOptionForContents_MatchingAlloy_ReturnsAlloyOption()
+    {
+        MockItem copperIngot = CreateItem(1, "ingot-copper");
+        MockItem tinIngot = CreateItem(2, "ingot-tin");
+        MockItem bronzeIngot = CreateItem(3, "ingot-bronze");
+        MockItem copperBits = CreateSmeltable(4, "metalbit-copper", copperIngot);
+        MockItem tinBits = CreateSmeltable(5, "metalbit-tin", tinIngot);
+        AlloyRecipe recipe = CreateAlloyRecipe(copperIngot, tinIngot, bronzeIngot);
+        MetalDepositOption option = AlloyCalculatorLogic.FromAlloyRecipe(recipe);
+
+        MetalDepositOption? result = AlloyCalculatorLogic.FindOptionForContents(
+            [new ItemStack(copperBits, 9), new ItemStack(tinBits, 1)],
+            [option],
+            [recipe]);
+
+        Assert.Same(option, result);
+    }
+
+    [Fact]
+    public void FindOptionForContents_InvalidAlloyRatio_ReturnsNull()
+    {
+        MockItem copperIngot = CreateItem(1, "ingot-copper");
+        MockItem tinIngot = CreateItem(2, "ingot-tin");
+        MockItem bronzeIngot = CreateItem(3, "ingot-bronze");
+        MockItem copperBits = CreateSmeltable(4, "metalbit-copper", copperIngot);
+        MockItem tinBits = CreateSmeltable(5, "metalbit-tin", tinIngot);
+        AlloyRecipe recipe = CreateAlloyRecipe(copperIngot, tinIngot, bronzeIngot);
+        MetalDepositOption option = AlloyCalculatorLogic.FromAlloyRecipe(recipe);
+
+        MetalDepositOption? result = AlloyCalculatorLogic.FindOptionForContents(
+            [new ItemStack(copperBits, 5), new ItemStack(tinBits, 5)],
+            [option],
+            [recipe]);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void FindOptionForContents_PureMetalVariants_ReturnsPureMetalOption()
+    {
+        MockItem copperIngot = CreateItem(1, "ingot-copper");
+        MockItem copperBits = CreateSmeltable(2, "metalbit-copper", copperIngot);
+        MockItem copperNuggets = CreateSmeltable(3, "nugget-copper", copperIngot);
+        MetalDepositOption option = AlloyCalculatorLogic.CreatePureMetalOption(new ItemStack(copperIngot));
+
+        MetalDepositOption? result = AlloyCalculatorLogic.FindOptionForContents(
+            [new ItemStack(copperBits, 2), new ItemStack(copperNuggets, 3)],
+            [option],
+            []);
+
+        Assert.Same(option, result);
+    }
+
+    private static AlloyRecipe CreateAlloyRecipe(MockItem copper, MockItem tin, MockItem output)
+    {
+        return new AlloyRecipe
+        {
+            Enabled = true,
+            Output = new JsonItemStack
+            {
+                Code = output.Code,
+                ResolvedItemstack = new ItemStack(output)
+            },
+            Ingredients =
+            [
+                new MetalAlloyIngredient
+                {
+                    Code = copper.Code,
+                    ResolvedItemstack = new ItemStack(copper),
+                    MinRatio = 0.88f,
+                    MaxRatio = 0.92f
+                },
+                new MetalAlloyIngredient
+                {
+                    Code = tin.Code,
+                    ResolvedItemstack = new ItemStack(tin),
+                    MinRatio = 0.08f,
+                    MaxRatio = 0.12f
+                }
+            ]
+        };
+    }
+
     private static MockItem CreateItem(int id, string path)
     {
         var item = MockItem.CreateNonLightSource(id);
