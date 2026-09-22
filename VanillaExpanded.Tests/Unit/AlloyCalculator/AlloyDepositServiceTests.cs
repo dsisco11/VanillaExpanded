@@ -50,6 +50,56 @@ public class AlloyDepositServiceTests
     }
 
     [Fact]
+    public void Execute_ReturningCookingStack_PrefersMatchingPlayerStack()
+    {
+        // Arrange
+        TestContext context = CreateContext(copperCount: 9, tinCount: 1);
+        context.Fixture.WithBackpackSlot(2, context.CopperSource, 5);
+        context.Inventory.CookingSlots[0].Itemstack = new ItemStack(context.CopperSource, 2);
+
+        // Act
+        AlloyDepositResultCode result = AlloyDepositService.Execute(
+            context.Fixture.World,
+            context.Fixture.Player,
+            context.Firepit,
+            context.Request,
+            [context.Recipe]);
+
+        // Assert
+        Assert.Equal(AlloyDepositResultCode.Success, result);
+        ItemSlot firstReturnTarget = context.Fixture.InventoryManagerMock.Invocations
+            .Select(static invocation => invocation.Arguments)
+            .Where(arguments => arguments.Count >= 2)
+            .Where(arguments => arguments[0] is ItemSlot source && source.Inventory == context.Inventory)
+            .Select(arguments => Assert.IsAssignableFrom<ItemSlot>(arguments[1]))
+            .First();
+        Assert.Same(context.Fixture.BackpackInventory, firstReturnTarget.Inventory);
+        Assert.Equal(context.CopperSource.Code, firstReturnTarget.Itemstack?.Collectible.Code);
+        Assert.Equal(7, firstReturnTarget.StackSize);
+    }
+
+    [Fact]
+    public void Execute_TakingIngredients_UsesSmallestMatchingStackFirst()
+    {
+        // Arrange
+        TestContext context = CreateContext(copperCount: 12, tinCount: 1);
+        context.Fixture.WithBackpackSlot(2, context.CopperSource, 3);
+
+        // Act
+        AlloyDepositResultCode result = AlloyDepositService.Execute(
+            context.Fixture.World,
+            context.Fixture.Player,
+            context.Firepit,
+            context.Request,
+            [context.Recipe]);
+
+        // Assert
+        Assert.Equal(AlloyDepositResultCode.Success, result);
+        Assert.Equal(6, context.Fixture.BackpackInventory[0].StackSize);
+        Assert.True(context.Fixture.BackpackInventory[2].Empty);
+    }
+
+    [Fact]
     public void Execute_IngredientMissing_RestoresAllSlots()
     {
         // Arrange

@@ -199,10 +199,15 @@ internal static class AlloyDepositService
         ItemSlot source,
         IReadOnlyList<ItemSlot> targets)
     {
+        ItemSlot[] orderedTargets = [
+            .. targets.Where(static target => !target.Empty),
+            .. targets.Where(static target => target.Empty)
+        ];
+
         while (!source.Empty)
         {
             int before = source.StackSize;
-            foreach (ItemSlot target in targets)
+            foreach (ItemSlot target in orderedTargets)
             {
                 if (!target.CanTakeFrom(source)) continue;
 
@@ -229,11 +234,14 @@ internal static class AlloyDepositService
         int amount)
     {
         int remaining = amount;
-        foreach (ItemSlot sourceSlot in sourceSlots)
+        IEnumerable<ItemSlot> eligibleSources = sourceSlots
+            .Where(sourceSlot => !sourceSlot.Empty
+                && SmeltsInto(world, sourceSlot.Itemstack, ingredient.ResolvedStack))
+            .OrderBy(static sourceSlot => sourceSlot.StackSize);
+
+        foreach (ItemSlot sourceSlot in eligibleSources)
         {
             if (remaining <= 0) break;
-            if (sourceSlot.Empty || !SmeltsInto(world, sourceSlot.Itemstack, ingredient.ResolvedStack)) continue;
-
             remaining -= Move(world, playerInventory, sourceSlot, targetSlot, remaining);
         }
 
