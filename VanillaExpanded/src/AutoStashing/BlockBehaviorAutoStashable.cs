@@ -899,6 +899,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     {
         int totalMoved = 0;
         List<ItemSlot> skipSlots = [];
+        List<ItemSlot> directMergeSlots = [];
         foreach (ItemSlot targetSlot in targetInventory)
         {
             if (!CanAcceptForAutoStash(targetSlot, sourceSlot))
@@ -915,6 +916,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         while (!sourceSlot.Empty)
         {
             ItemSlot? targetSlot = null;
+            EnumMergePriority mergePriority = EnumMergePriority.AutoMerge;
 
             // If a preferred slot function is provided, try to use it
             if (getPreferredSlot is not null)
@@ -938,6 +940,13 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
                 targetSlot = bestSlot.slot;
             }
 
+            if (targetSlot is null && directMergeSlots.Count > 0)
+            {
+                targetSlot = directMergeSlots[0];
+                directMergeSlots.RemoveAt(0);
+                mergePriority = EnumMergePriority.DirectMerge;
+            }
+
             if (targetSlot is null)
             {
                 world.Logger.Debug(
@@ -949,15 +958,18 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
 
             int targetSlotIndex = targetInventory.GetSlotId(targetSlot);
             int requestedQuantity = sourceSlot.StackSize;
-            int movedQuantity = sourceSlot.TryPutInto(world, targetSlot, requestedQuantity);
+            ItemStackMoveOperation moveOperation = new(world, EnumMouseButton.Left, EnumModifierKey.SHIFT, mergePriority, requestedQuantity);
+            int movedQuantity = sourceSlot.TryPutInto(targetSlot, ref moveOperation);
             totalMoved += movedQuantity;
 
             world.Logger.Debug(
-                "[VanillaExpanded][AutoStash] Transfer targetSlot={0}, requested={1}, moved={2}, notMoved={3}, sourceAfter={4}, targetAfter={5}.",
+                "[VanillaExpanded][AutoStash] Transfer targetSlot={0}, priority={1}, requested={2}, moved={3}, notMoved={4}, requiredPriority={5}, sourceAfter={6}, targetAfter={7}.",
                 targetSlotIndex,
+                mergePriority,
                 requestedQuantity,
                 movedQuantity,
                 requestedQuantity - movedQuantity,
+                moveOperation.RequiredPriority?.ToString() ?? "none",
                 DescribeSlot(sourceSlot),
                 DescribeSlot(targetSlot));
 
@@ -986,9 +998,18 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
 
             if (movedQuantity == 0)
             {
+                if (!targetSlot.Empty
+                    && moveOperation.RequiredPriority == EnumMergePriority.DirectMerge
+                    && targetSlot.CanTakeFrom(sourceSlot, EnumMergePriority.DirectMerge))
+                {
+                    directMergeSlots.Add(targetSlot);
+                }
+
                 world.Logger.Debug(
-                    "[VanillaExpanded][AutoStash] Target slot {0} rejected transfer; trying another target.",
-                    targetSlotIndex);
+                    "[VanillaExpanded][AutoStash] Target slot {0} rejected {1}; trying another normal target before direct-merge fallback={2}.",
+                    targetSlotIndex,
+                    mergePriority,
+                    directMergeSlots.Count > 0);
             }
         }
         return totalMoved;
