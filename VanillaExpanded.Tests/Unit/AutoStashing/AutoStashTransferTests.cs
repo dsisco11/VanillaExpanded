@@ -236,7 +236,38 @@ public class AutoStashTransferTests
             Times.Once);
         fixture.InventoryManagerMock.Verify(
             inventoryManager => inventoryManager.CloseInventoryAndSync(container.Inventory),
-            Times.Never);
+            Times.Once);
+    }
+
+    [Fact]
+    public void AutoStashToGenericContainer_TransferThrows_ClosesInventory()
+    {
+        // Arrange
+        var sharedItem = MockItem.CreateNonLightSource(id: 1);
+        sharedItem.Code = new AssetLocation("game", "shared-item");
+
+        var fixture = CreateFixture(
+            backpackItems: [sharedItem]);
+        var container = MockBlockEntityContainer.WithItems(fixture.Api, sharedItem);
+
+        fixture.InventoryManagerMock
+            .Setup(inventoryManager => inventoryManager.TryTransferTo(
+                It.IsAny<ItemSlot>(),
+                It.IsAny<ItemSlot>(),
+                ref It.Ref<ItemStackMoveOperation>.IsAny))
+            .Throws(new InvalidOperationException("Transfer failed."));
+
+        // Act
+        Assert.Throws<InvalidOperationException>(() =>
+            BlockBehaviorAutoStashable.AutoStashToGenericContainer(
+                fixture.World,
+                fixture.Player,
+                container.Object));
+
+        // Assert
+        fixture.InventoryManagerMock.Verify(
+            inventoryManager => inventoryManager.CloseInventoryAndSync(container.Inventory),
+            Times.Once);
     }
 
     [Fact]
@@ -291,6 +322,77 @@ public class AutoStashTransferTests
         Assert.True(result);
         Assert.True(fixture.BackpackInventory[0].Empty);
         Assert.True(fixture.HotbarInventory[0].Empty);
+    }
+
+    [Fact]
+    public void AutoStashToGenericContainer_FirstSlotPartiallyFull_UsesAdditionalSlot()
+    {
+        // Arrange
+        var sharedItem = MockItem.CreateNonLightSource(id: 1);
+        sharedItem.Code = new AssetLocation("game", "shared-item");
+        sharedItem.MaxStackSize = 64;
+
+        var fixture = CreateFixture();
+        fixture.WithBackpackSlot(0, sharedItem, stackSize: 10);
+
+        var container = MockBlockEntityContainer.WithItems(
+            new Dictionary<int, MockItem> { { 0, sharedItem } },
+            totalSlots: 2,
+            api: fixture.Api);
+        container.Inventory[0].Itemstack!.StackSize = 63;
+
+        // Act
+        bool result = BlockBehaviorAutoStashable.AutoStashToGenericContainer(
+            fixture.World,
+            fixture.Player,
+            container.Object);
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(64, container.Inventory[0].StackSize);
+        Assert.Equal(9, container.Inventory[1].StackSize);
+        Assert.True(fixture.BackpackInventory[0].Empty);
+    }
+
+    [Fact]
+    public void AutoStashToGenericContainer_TransferMovesNothing_StopsAndClosesInventory()
+    {
+        // Arrange
+        var sharedItem = MockItem.CreateNonLightSource(id: 1);
+        sharedItem.Code = new AssetLocation("game", "shared-item");
+
+        var fixture = CreateFixture(
+            backpackItems: [sharedItem]);
+        var container = MockBlockEntityContainer.WithItems(fixture.Api, sharedItem);
+
+        fixture.InventoryManagerMock
+            .Setup(inventoryManager => inventoryManager.TryTransferTo(
+                It.IsAny<ItemSlot>(),
+                It.IsAny<ItemSlot>(),
+                ref It.Ref<ItemStackMoveOperation>.IsAny))
+            .Returns((ItemSlot source, ItemSlot target, ref ItemStackMoveOperation operation) =>
+            {
+                operation.MovedQuantity = 0;
+                return (object)null!;
+            });
+
+        // Act
+        bool result = BlockBehaviorAutoStashable.AutoStashToGenericContainer(
+            fixture.World,
+            fixture.Player,
+            container.Object);
+
+        // Assert
+        Assert.False(result);
+        fixture.InventoryManagerMock.Verify(
+            inventoryManager => inventoryManager.TryTransferTo(
+                It.IsAny<ItemSlot>(),
+                It.IsAny<ItemSlot>(),
+                ref It.Ref<ItemStackMoveOperation>.IsAny),
+            Times.Once);
+        fixture.InventoryManagerMock.Verify(
+            inventoryManager => inventoryManager.CloseInventoryAndSync(container.Inventory),
+            Times.Once);
     }
 
     [Fact]
@@ -467,6 +569,82 @@ public class AutoStashTransferTests
         Assert.True(result);
         Assert.True(fixture.BackpackInventory[0].Empty); // Matching stashed
         Assert.False(fixture.BackpackInventory[1].Empty); // Non-matching remains
+    }
+
+    #endregion
+
+    #region Bloomery Transfer Tests
+
+    [Fact]
+    public void AutoStashToBloomery_EmptyFuelSlot_MovesUpToFuelCapacity()
+    {
+        // Arrange
+        var fuel = MockItem.CreateBloomeryFuel(id: 1);
+        var fixture = CreateFixture();
+        fixture.WithBackpackSlot(0, fuel, stackSize: 10);
+        var blockAccessor = new Mock<IBlockAccessor>();
+        fixture.WorldMock.Setup(world => world.BlockAccessor).Returns(blockAccessor.Object);
+        var bloomery = MockBlockEntityBloomery.Empty(new BlockPos(0), fixture.Api);
+
+        // Act
+        bool result = BlockBehaviorAutoStashable.AutoStashToBloomery(
+            fixture.World,
+            fixture.Player,
+            bloomery.Object);
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(6, bloomery.FuelSlot.StackSize);
+        Assert.Equal(4, fixture.BackpackInventory[0].StackSize);
+    }
+
+    [Fact]
+    public void AutoStashToBloomery_OreWithRatioTwo_MovesTwelveItems()
+    {
+        // Arrange
+        var ore = MockItem.CreateBloomeryOre(id: 2, smeltedRatio: 2);
+        var fixture = CreateFixture();
+        fixture.WithBackpackSlot(0, ore, stackSize: 20);
+        var blockAccessor = new Mock<IBlockAccessor>();
+        fixture.WorldMock.Setup(world => world.BlockAccessor).Returns(blockAccessor.Object);
+        var bloomery = MockBlockEntityBloomery.Empty(new BlockPos(0), fixture.Api);
+
+        // Act
+        bool result = BlockBehaviorAutoStashable.AutoStashToBloomery(
+            fixture.World,
+            fixture.Player,
+            bloomery.Object);
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(12, bloomery.OreSlot.StackSize);
+        Assert.Equal(8, fixture.BackpackInventory[0].StackSize);
+    }
+
+    [Fact]
+    public void AutoStashToBloomery_ExistingOreHasZeroRatio_UsesMinimumRatio()
+    {
+        // Arrange
+        var ore = MockItem.CreateBloomeryOre(id: 2, smeltedRatio: 0);
+        var fuel = MockItem.CreateBloomeryFuel(id: 1);
+        var fixture = CreateFixture();
+        fixture.WithBackpackSlot(0, fuel, stackSize: 10);
+        var blockAccessor = new Mock<IBlockAccessor>();
+        fixture.WorldMock.Setup(world => world.BlockAccessor).Returns(blockAccessor.Object);
+        var bloomery = MockBlockEntityBloomery
+            .Empty(new BlockPos(0), fixture.Api)
+            .WithOre(ore, stackSize: 6);
+
+        // Act
+        bool result = BlockBehaviorAutoStashable.AutoStashToBloomery(
+            fixture.World,
+            fixture.Player,
+            bloomery.Object);
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(6, bloomery.FuelSlot.StackSize);
+        Assert.Equal(4, fixture.BackpackInventory[0].StackSize);
     }
 
     #endregion
