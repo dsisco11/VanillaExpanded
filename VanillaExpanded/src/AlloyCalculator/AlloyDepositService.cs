@@ -47,9 +47,12 @@ internal static class AlloyDepositService
             return AlloyDepositResultCode.InventoryClosed;
         }
 
-        AlloyRecipe? recipe = recipes.FirstOrDefault(recipe =>
+        AlloyRecipe? registeredRecipe = recipes.FirstOrDefault(recipe =>
             recipe.Enabled
             && recipe.Output?.Code?.ToString() == request.AlloyCode);
+        MetalDepositOption? option = registeredRecipe is null
+            ? TryCreatePureMetalOption(world, request)
+            : AlloyCalculatorLogic.FromAlloyRecipe(registeredRecipe);
 
         IInventory? backpack = playerInventory.GetOwnInventory(GlobalConstants.backpackInvClassName);
         IInventory? hotbar = playerInventory.GetOwnInventory(GlobalConstants.hotBarInvClassName);
@@ -64,7 +67,7 @@ internal static class AlloyDepositService
             return AlloyDepositResultCode.InvalidRequest;
         }
 
-        if (recipe is null || !TryBuildPlan(recipe, request, cookingSlots.Length, out List<SlotTarget> targets))
+        if (option is null || !TryBuildPlan(option, request, cookingSlots.Length, out List<SlotTarget> targets))
         {
             return AlloyDepositResultCode.InvalidRecipe;
         }
@@ -102,12 +105,6 @@ internal static class AlloyDepositService
                 }
             }
 
-            if (!recipe.Matches(cookingSlots.Select(static slot => slot.Itemstack).ToArray()))
-            {
-                Restore(snapshot);
-                return AlloyDepositResultCode.InvalidRecipe;
-            }
-
             foreach (ItemSlot slot in allSlots)
             {
                 slot.MarkDirty();
@@ -124,16 +121,15 @@ internal static class AlloyDepositService
     }
 
     private static bool TryBuildPlan(
-        AlloyRecipe recipe,
+        MetalDepositOption option,
         Packet_RequestAlloyDeposit request,
         int cookingSlotCount,
         out List<SlotTarget> targets)
     {
         targets = [];
-        var ingredientsByCode = recipe.Ingredients
-            .Where(static ingredient => ingredient.Code is not null && ingredient.ResolvedItemstack is not null)
+        var ingredientsByCode = option.Ingredients
             .ToDictionary(static ingredient => ingredient.Code.ToString(), StringComparer.Ordinal);
-        if (ingredientsByCode.Count != recipe.Ingredients.Length)
+        if (ingredientsByCode.Count != option.Ingredients.Length)
         {
             return false;
         }
@@ -148,7 +144,7 @@ internal static class AlloyDepositService
                 || slotIndex >= cookingSlotCount
                 || !usedSlots.Add(slotIndex)
                 || string.IsNullOrWhiteSpace(code)
-                || !ingredientsByCode.TryGetValue(code, out MetalAlloyIngredient? ingredient))
+                || !ingredientsByCode.TryGetValue(code, out MetalDepositIngredient? ingredient))
             {
                 return false;
             }
@@ -157,30 +153,44 @@ internal static class AlloyDepositService
             targets.Add(new SlotTarget(slotIndex, ingredient, request.SlotAmounts[index]));
         }
 
-        foreach (MetalAlloyIngredient ingredient in recipe.Ingredients)
+        foreach (MetalDepositIngredient ingredient in option.Ingredients)
         {
-            string code = ingredient.Code?.ToString() ?? string.Empty;
-            if (code.Length == 0 || !requestedAmounts.TryGetValue(code, out int amount) || ingredient.ResolvedItemstack is null)
+            if (!requestedAmounts.ContainsKey(ingredient.Code.ToString()))
             {
                 return false;
             }
         }
 
-        if (requestedAmounts.Count != recipe.Ingredients.Length)
+        if (requestedAmounts.Count != option.Ingredients.Length)
         {
             return false;
         }
 
-        ItemStack[] requestedStacks = recipe.Ingredients
-            .Select(ingredient =>
-            {
-                ItemStack stack = ingredient.ResolvedItemstack!.Clone();
-                stack.StackSize = requestedAmounts[ingredient.Code.ToString()];
-                return stack;
-            })
-            .ToArray();
+        long totalAmount = requestedAmounts.Values.Sum(static amount => (long)amount);
+        return totalAmount > 0 && option.Ingredients.All(ingredient =>
+        {
+            double ratio = requestedAmounts[ingredient.Code.ToString()] / (double)totalAmount;
+            int scaledRatio = (int)Math.Round(ratio * 10_000);
+            int scaledMinimum = (int)Math.Round(ingredient.MinRatio * 10_000);
+            int scaledMaximum = (int)Math.Round(ingredient.MaxRatio * 10_000);
+            return scaledRatio >= scaledMinimum && scaledRatio <= scaledMaximum;
+        });
+    }
 
-        return recipe.Matches(requestedStacks, false);
+    private static MetalDepositOption? TryCreatePureMetalOption(
+        IWorldAccessor world,
+        Packet_RequestAlloyDeposit request)
+    {
+        if (request.SlotIngredientCodes.Length == 0
+            || request.SlotIngredientCodes.Any(code => code != request.AlloyCode))
+        {
+            return null;
+        }
+
+        Item? output = world.GetItem(new AssetLocation(request.AlloyCode));
+        return output is null
+            ? null
+            : AlloyCalculatorLogic.CreatePureMetalOption(new ItemStack(output));
     }
 
     private static bool MoveEntireStack(
@@ -215,15 +225,14 @@ internal static class AlloyDepositService
         IPlayerInventoryManager playerInventory,
         IReadOnlyList<ItemSlot> sourceSlots,
         ItemSlot targetSlot,
-        MetalAlloyIngredient ingredient,
+        MetalDepositIngredient ingredient,
         int amount)
     {
         int remaining = amount;
         foreach (ItemSlot sourceSlot in sourceSlots)
         {
             if (remaining <= 0) break;
-            if (sourceSlot.Empty || ingredient.ResolvedItemstack is null
-                || !SmeltsInto(world, sourceSlot.Itemstack, ingredient.ResolvedItemstack)) continue;
+            if (sourceSlot.Empty || !SmeltsInto(world, sourceSlot.Itemstack, ingredient.ResolvedStack)) continue;
 
             remaining -= Move(world, playerInventory, sourceSlot, targetSlot, remaining);
         }
@@ -268,6 +277,6 @@ internal static class AlloyDepositService
         }
     }
 
-    private sealed record SlotTarget(int SlotIndex, MetalAlloyIngredient Ingredient, int Amount);
+    private sealed record SlotTarget(int SlotIndex, MetalDepositIngredient Ingredient, int Amount);
     private sealed record SlotSnapshot(ItemSlot Slot, ItemStack? Stack);
 }

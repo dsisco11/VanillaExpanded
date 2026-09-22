@@ -50,11 +50,11 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
     #region Fields
     private readonly GuiDialog? firepitDialog;
-    private List<AlloyRecipe> alloys = [];
-    private AlloyRecipe? selectedAlloy;
+    private List<MetalDepositOption> depositOptions = [];
+    private MetalDepositOption? selectedOption;
     
     /// <summary> Currently selected ingredients for the chosen alloy. </summary>
-    private ImmutableArray<MetalAlloyIngredient> selectedIngredients = [];
+    private ImmutableArray<MetalDepositIngredient> selectedIngredients = [];
     private readonly Dictionary<int, int> sliderValues = [];
     private readonly Dictionary<int, ItemStack> calculatedStacks = [];
     private readonly List<SlideshowItemstackTextComponent> slideshowComponents = [];
@@ -100,12 +100,19 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     #region Initialization
     private void LoadAlloys()
     {
-        alloys = [.. capi.GetMetalAlloys()
-            .Where(static a => a.Enabled && a.Ingredients.Length > 0)
-            .OrderBy(static a => GetAlloyDisplayName(a))];
-
-        // Build handbook stacks cache for filtering
         BuildHandbookStacksCache();
+
+        depositOptions = [.. capi.GetMetalAlloys()
+            .Where(static alloy => alloy.Enabled && alloy.Ingredients.Length > 0)
+            .Select(AlloyCalculatorLogic.FromAlloyRecipe)];
+        depositOptions.AddRange(AlloyCalculatorLogic.CreatePureMetalOptions(
+            handbookStacks ?? [],
+            depositOptions,
+            maxFuelTemperature));
+        depositOptions.Sort(static (left, right) => string.Compare(
+            GetDepositOptionDisplayName(left),
+            GetDepositOptionDisplayName(right),
+            StringComparison.CurrentCulture));
     }
 
     // TODO: There has to be a better way to calculate/cache these item-stack variants, ideally we should be capable of leveraging the cache that the handbook already has internally.
@@ -194,9 +201,9 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         var inputBounds = ElementBounds.Fixed(DropdownWidth + 10, yOffset, InputWidth, 25);
         yOffset += 30;
 
-        var alloyValues = alloys.Select(static (_, i) => i.ToString());
-        var alloyNames = alloys.Select(static (recipe, _) => GetAlloyDisplayName(recipe));
-        var selectedIndex = selectedAlloy is not null ? alloys.IndexOf(selectedAlloy) : 0;
+        var alloyValues = depositOptions.Select(static (_, i) => i.ToString());
+        var alloyNames = depositOptions.Select(static (option, _) => GetDepositOptionDisplayName(option));
+        var selectedIndex = selectedOption is not null ? depositOptions.IndexOf(selectedOption) : 0;
         if (selectedIndex < 0) selectedIndex = 0;
 
         var composer = capi.Gui
@@ -210,7 +217,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-targetunits-tooltip"), CairoFont.WhiteDetailText(), 250, inputBounds.FlatCopy(), "targetUnitsTooltip");
 
         // Add ingredient sliders if an alloy is selected
-        if (selectedAlloy is not null && ingredientCount > 0)
+        if (selectedOption is not null && ingredientCount > 0)
         {
             // Add sliders
             for (var idx = 0; idx < ingredientCount; idx++)
@@ -248,7 +255,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
             for (var i = 0; i < ingredientCount; i++)
             {
-                var ingredient = selectedAlloy.Ingredients[i];
+                var ingredient = selectedIngredients[i];
                 var stacks = GetAllMetalVariantStacks(ingredient, 1);
                 
                 if (stacks.Length > 0)
@@ -291,7 +298,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         targetInput?.SetValue(targetUnits.ToString());
 
         // Initialize slider values after composition
-        if (selectedAlloy is not null)
+        if (selectedOption is not null)
         {
             InitializeSliderValues();
             UpdateResultsDisplay();
@@ -302,7 +309,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     #region Slider Logic
     private void InitializeSliderValues()
     {
-        if (selectedAlloy is null || SingleComposer is null) return;
+        if (selectedOption is null || SingleComposer is null) return;
 
         sliderValues.Clear();
 
@@ -326,7 +333,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
     private bool OnSliderChanged(int changedIndex, int newValue)
     {
-        if (isAdjustingSliders || selectedAlloy is null) return true;
+        if (isAdjustingSliders || selectedOption is null) return true;
 
         sliderValues[changedIndex] = newValue;
         NormalizeSliderValues(changedIndex);
@@ -351,7 +358,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
     private void NormalizeSliderValues(int changedIndex)
     {
-        if (selectedAlloy is null || SingleComposer is null) return;
+        if (selectedOption is null || SingleComposer is null) return;
 
         isAdjustingSliders = true;
 
@@ -432,7 +439,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     #region Results Calculation
     private void UpdateResultsDisplay()
     {
-        if (selectedAlloy is null || SingleComposer is null) return;
+        if (selectedOption is null || SingleComposer is null) return;
 
         calculatedStacks.Clear();
 
@@ -466,11 +473,11 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     /// Gets all metal variant stacks (nuggets, ore chunks, etc.) that smelt into the given metal.
     /// Filters by handbook visibility and smeltability.
     /// </summary>
-    private ItemStack[] GetAllMetalVariantStacks(MetalAlloyIngredient ingredient, int stackSize)
+    private ItemStack[] GetAllMetalVariantStacks(MetalDepositIngredient ingredient, int stackSize)
     {
         // The ingredient's ResolvedItemstack is the ingot - we need items that smelt into this
-        var targetIngot = ingredient.ResolvedItemstack;
-        if (targetIngot is null || handbookStacks is null) return [];
+        ItemStack targetIngot = ingredient.ResolvedStack;
+        if (handbookStacks is null) return [];
 
         // Filter handbook stacks to find items that smelt into this metal and can be smelted
         var stacks = handbookStacks
@@ -505,11 +512,10 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     /// <summary>
     /// Gets a metal bit ItemStack for the given ingredient.
     /// </summary>
-    private ItemStack? GetMetalBitStack(MetalAlloyIngredient ingredient, int stackSize)
+    private ItemStack? GetMetalBitStack(MetalDepositIngredient ingredient, int stackSize)
     {
         // Extract metal name from ingredient code (e.g., "ingot-copper" -> "copper")
-        var code = ingredient.Code?.Path;
-        if (code is null) return null;
+        string code = ingredient.Code.Path;
 
         var metalName = code.Contains('-')
             ? code[(code.LastIndexOf('-') + 1)..]
@@ -528,13 +534,13 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     #region Event Handlers
     private void OnAlloySelected(string code, bool selected)
     {
-        if (!int.TryParse(code, out var index) || index < 0 || index >= alloys.Count)
+        if (!int.TryParse(code, out var index) || index < 0 || index >= depositOptions.Count)
         {
             return;
         }
 
-        selectedAlloy = alloys[index];
-        selectedIngredients = selectedAlloy.Ingredients.OrderBy(static ing => GetIngredientDisplayName(ing)).ToImmutableArray();
+        selectedOption = depositOptions[index];
+        selectedIngredients = selectedOption.Ingredients.OrderBy(static ingredient => GetIngredientDisplayName(ingredient)).ToImmutableArray();
         
         // Save selected alloy index
         GetOrCreateSavedState().SelectedAlloyIndex = index;
@@ -570,7 +576,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     /// </summary>
     private void DepositIngredientsIntoCrucible()
     {
-        if (pendingDepositRequestId is not null || selectedAlloy?.Output?.Code is null) return;
+        if (pendingDepositRequestId is not null || selectedOption is null) return;
         BlockEntityFirepit? firepit = capi.World.BlockAccessor
             .GetBlockEntity<BlockEntityFirepit>(BlockEntityPosition);
         if (firepit?.Inventory is not InventorySmelting inventory || inventory.CookingSlots.Length == 0) return;
@@ -579,8 +585,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         for (int index = 0; index < selectedIngredients.Length; index++)
         {
             if (!calculatedStacks.TryGetValue(index, out ItemStack? targetStack)
-                || targetStack.StackSize <= 0
-                || selectedIngredients[index].Code is null)
+                || targetStack.StackSize <= 0)
             {
                 return;
             }
@@ -620,7 +625,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         {
             RequestId = requestId,
             Position = BlockEntityPosition.Copy(),
-            AlloyCode = selectedAlloy.Output.Code.ToString(),
+            AlloyCode = selectedOption.OutputCode.ToString(),
             SlotIndices = [.. slotIndices],
             SlotIngredientCodes = [.. slotIngredientCodes],
             SlotAmounts = [.. slotAmounts]
@@ -707,7 +712,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     /// </summary>
     private void RestoreSliderValues(SavedDialogState state)
     {
-        if (SingleComposer is null || selectedAlloy is null) return;
+        if (SingleComposer is null || selectedOption is null) return;
 
         isAdjustingSliders = true;
         try
@@ -760,10 +765,10 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
     public override bool TryOpen()
     {
-        if (alloys.Count == 0)
+        if (depositOptions.Count == 0)
         {
             LoadAlloys();
-            if (alloys.Count == 0)
+            if (depositOptions.Count == 0)
             {
                 return false; // No alloys available
             }
@@ -781,10 +786,10 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private static string GetMaterialDisplayName(in AssetLocation assetLocation)
         => AlloyCalculatorLogic.GetMaterialDisplayName(assetLocation);
 
-    private static string GetAlloyDisplayName(in AlloyRecipe alloy)
-        => AlloyCalculatorLogic.GetAlloyDisplayName(alloy.Output?.Code);
+    private static string GetDepositOptionDisplayName(in MetalDepositOption option)
+        => AlloyCalculatorLogic.GetAlloyDisplayName(option.OutputCode);
 
-    private static string GetIngredientDisplayName(in MetalAlloyIngredient ingredient)
-        => AlloyCalculatorLogic.GetIngredientDisplayName(ingredient?.Code);
+    private static string GetIngredientDisplayName(in MetalDepositIngredient ingredient)
+        => AlloyCalculatorLogic.GetIngredientDisplayName(ingredient.Code);
     #endregion
 }

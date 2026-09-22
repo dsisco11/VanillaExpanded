@@ -140,6 +140,34 @@ public class AlloyDepositServiceTests
         Assert.Equal(AlloyDepositResultCode.InvalidRecipe, result);
     }
 
+    [Fact]
+    public void Execute_PureMetalWithoutRegisteredRecipe_DepositsSuccessfully()
+    {
+        // Arrange
+        TestContext context = CreateContext(copperCount: 4, tinCount: 0);
+        string copperCode = context.Recipe.Ingredients[0].Code.ToString();
+        context.Request.AlloyCode = copperCode;
+        context.Request.SlotIndices = [0];
+        context.Request.SlotIngredientCodes = [copperCode];
+        context.Request.SlotAmounts = [4];
+        context.Fixture.WorldMock
+            .Setup(world => world.GetItem(It.Is<AssetLocation>(code => code.ToString() == copperCode)))
+            .Returns(context.Recipe.Ingredients[0].ResolvedItemstack!.Item);
+
+        // Act
+        AlloyDepositResultCode result = AlloyDepositService.Execute(
+            context.Fixture.World,
+            context.Fixture.Player,
+            context.Firepit,
+            context.Request,
+            []);
+
+        // Assert
+        Assert.Equal(AlloyDepositResultCode.Success, result);
+        Assert.Equal(4, context.Inventory.CookingSlots[0].StackSize);
+        Assert.All(context.Inventory.CookingSlots.Skip(1), static slot => Assert.True(slot.Empty));
+    }
+
     private static TestContext CreateContext(int copperCount, int tinCount)
     {
         var fixture = VsTestFixture.Server();

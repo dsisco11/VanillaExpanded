@@ -1,0 +1,73 @@
+using VanillaExpanded.AlloyCalculator;
+using VanillaExpanded.Tests.Mocks;
+
+using Vintagestory.API.Common;
+using Vintagestory.GameContent;
+
+namespace VanillaExpanded.Tests.Unit.AlloyCalculator;
+
+[Trait("Category", "Unit")]
+public class MetalDepositOptionTests
+{
+    [Fact]
+    public void CreatePureMetalOptions_MetalBit_AddsSingleIngredientOption()
+    {
+        // Arrange
+        MockItem copperIngot = CreateItem(1, "ingot-copper");
+        MockItem copperBits = CreateSmeltable(2, "metalbit-copper", copperIngot);
+
+        // Act
+        MetalDepositOption option = Assert.Single(AlloyCalculatorLogic.CreatePureMetalOptions(
+            [new ItemStack(copperBits)],
+            [],
+            maxFuelTemperature: 1300));
+
+        // Assert
+        Assert.Equal(copperIngot.Code, option.OutputCode);
+        MetalDepositIngredient ingredient = Assert.Single(option.Ingredients);
+        Assert.Equal(copperIngot.Code, ingredient.Code);
+        Assert.Equal(1, ingredient.MinRatio);
+        Assert.Equal(1, ingredient.MaxRatio);
+    }
+
+    [Fact]
+    public void CreatePureMetalOptions_RegisteredOutput_DoesNotAddDuplicate()
+    {
+        // Arrange
+        MockItem copperIngot = CreateItem(1, "ingot-copper");
+        MockItem copperBits = CreateSmeltable(2, "metalbit-copper", copperIngot);
+        MetalDepositOption registered = AlloyCalculatorLogic.CreatePureMetalOption(new ItemStack(copperIngot));
+
+        // Act
+        List<MetalDepositOption> options = AlloyCalculatorLogic.CreatePureMetalOptions(
+            [new ItemStack(copperBits)],
+            [registered],
+            maxFuelTemperature: 1300);
+
+        // Assert
+        Assert.Empty(options);
+    }
+
+    private static MockItem CreateItem(int id, string path)
+    {
+        var item = MockItem.CreateNonLightSource(id);
+        item.Code = new AssetLocation("game", path);
+        return item;
+    }
+
+    private static MockItem CreateSmeltable(int id, string path, MockItem ingot)
+    {
+        MockItem item = CreateItem(id, path);
+        item.CombustibleProps = new CombustibleProperties
+        {
+            MeltingPoint = 1000,
+            SmeltedRatio = 1,
+            SmeltedStack = new JsonItemStack
+            {
+                Code = ingot.Code,
+                ResolvedItemstack = new ItemStack(ingot)
+            }
+        };
+        return item;
+    }
+}

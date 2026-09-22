@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
+using Vintagestory.GameContent;
 
 namespace VanillaExpanded.AlloyCalculator;
 
@@ -13,6 +15,66 @@ namespace VanillaExpanded.AlloyCalculator;
 /// </summary>
 internal static class AlloyCalculatorLogic
 {
+    #region Deposit Options
+
+    internal static MetalDepositOption FromAlloyRecipe(AlloyRecipe recipe)
+    {
+        return new MetalDepositOption(
+            recipe.Output.Code,
+            [.. recipe.Ingredients.Select(static ingredient => new MetalDepositIngredient(
+                ingredient.Code,
+                ingredient.ResolvedItemstack!,
+                ingredient.MinRatio,
+                ingredient.MaxRatio))]);
+    }
+
+    internal static List<MetalDepositOption> CreatePureMetalOptions(
+        IEnumerable<ItemStack> sourceStacks,
+        IEnumerable<MetalDepositOption> registeredOptions,
+        int maxFuelTemperature)
+    {
+        HashSet<string> existingOutputs = registeredOptions
+            .Select(static option => option.OutputCode.ToString())
+            .ToHashSet(StringComparer.Ordinal);
+        var pureMetals = new Dictionary<string, MetalDepositOption>(StringComparer.Ordinal);
+
+        foreach (ItemStack sourceStack in sourceStacks)
+        {
+            string? sourceType = sourceStack.Collectible?.FirstCodePart();
+            CombustibleProperties? properties = sourceStack.Collectible?.CombustibleProps;
+            ItemStack? smeltedStack = properties?.SmeltedStack?.ResolvedItemstack;
+            string? outputCode = smeltedStack?.Collectible?.Code?.ToString();
+
+            if (sourceType is not ("metalbit" or "nugget")
+                || properties!.MeltingPoint > maxFuelTemperature
+                || outputCode is null
+                || existingOutputs.Contains(outputCode)
+                || pureMetals.ContainsKey(outputCode))
+            {
+                continue;
+            }
+
+            pureMetals[outputCode] = CreatePureMetalOption(smeltedStack!);
+        }
+
+        return [.. pureMetals.Values];
+    }
+
+    internal static MetalDepositOption CreatePureMetalOption(ItemStack outputStack)
+    {
+        ItemStack resolvedStack = outputStack.Clone();
+        resolvedStack.StackSize = 1;
+        return new MetalDepositOption(
+            resolvedStack.Collectible.Code,
+            ImmutableArray.Create(new MetalDepositIngredient(
+                resolvedStack.Collectible.Code,
+                resolvedStack,
+                1,
+                1)));
+    }
+
+    #endregion
+
     #region Slot Allocation
 
     /// <summary>
