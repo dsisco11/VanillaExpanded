@@ -96,6 +96,8 @@ public class VanillaExpandedModSystem : ModSystem
 
         var channel = api.Network.RegisterChannel(Mod.Info.ModID)
             .RegisterMessageType<Network.Packet_RequestAutoStash>()
+            .RegisterMessageType<Network.Packet_RequestAlloyDeposit>()
+            .RegisterMessageType<Network.Packet_AlloyDepositResult>()
             .RegisterMessageType<Network.Packet_TemporalSpawn>();
 
         EnsureHarmonyPatched();
