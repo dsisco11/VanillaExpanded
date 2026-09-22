@@ -192,6 +192,7 @@ public class VsTestFixture
         }
 
         // Common world setup
+        ApiMock.Setup(api => api.World).Returns(WorldMock.Object);
         WorldMock.Setup(w => w.Side).Returns(side);
         WorldMock.Setup(w => w.Logger).Returns(LoggerMock.Object);
 

@@ -724,7 +724,8 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         }
 
         int ratio = combustProps.SmeltedRatio;
-        return oreStack.ItemAttributes?["bloomeryFuelRatio"].AsInt(ratio) ?? ratio;
+        int configuredRatio = oreStack.ItemAttributes?["bloomeryFuelRatio"].AsInt(ratio) ?? ratio;
+        return Math.Max(1, configuredRatio);
     }
 
     /// <summary>
