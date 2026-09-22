@@ -785,9 +785,10 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     {
         IInventory? backpackInventory = playerInventory.GetOwnInventory(GlobalConstants.backpackInvClassName);
         IInventory? hotbarInventory = playerInventory.GetOwnInventory(GlobalConstants.hotBarInvClassName);
+        bool canStashBackpack = CanStashAnyItems(backpackInventory, targetInventory, canAccept, getPreferredSlot);
+        bool canStashHotbar = CanStashAnyItems(hotbarInventory, targetInventory, canAccept, getPreferredSlot);
 
-        if (!CanStashAnyItems(backpackInventory, targetInventory, canAccept, getPreferredSlot)
-            && !CanStashAnyItems(hotbarInventory, targetInventory, canAccept, getPreferredSlot))
+        if (!canStashBackpack && !canStashHotbar)
         {
             return false;
         }
@@ -839,7 +840,12 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
 
         foreach (ItemSlot? itemSlot in sourceInventory)
         {
-            if (itemSlot.Empty || !canAccept(itemSlot.Itemstack))
+            if (itemSlot.Empty)
+            {
+                continue;
+            }
+
+            if (!canAccept(itemSlot.Itemstack))
             {
                 continue;
             }
@@ -861,10 +867,19 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     {
         int totalMoved = 0;
         List<ItemSlot> skipSlots = [];
+        List<ItemSlot> directMergeSlots = [];
+        foreach (ItemSlot targetSlot in targetInventory)
+        {
+            if (!CanAcceptForAutoStash(targetSlot, sourceSlot))
+            {
+                skipSlots.Add(targetSlot);
+            }
+        }
 
         while (!sourceSlot.Empty)
         {
             ItemSlot? targetSlot = null;
+            EnumMergePriority mergePriority = EnumMergePriority.AutoMerge;
 
             // If a preferred slot function is provided, try to use it
             if (getPreferredSlot is not null)
@@ -888,14 +903,21 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
                 targetSlot = bestSlot.slot;
             }
 
+            if (targetSlot is null && directMergeSlots.Count > 0)
+            {
+                targetSlot = directMergeSlots[0];
+                directMergeSlots.RemoveAt(0);
+                mergePriority = EnumMergePriority.DirectMerge;
+            }
+
             if (targetSlot is null)
             {
                 break;
             }
 
-            ItemStackMoveOperation moveOp = new(world, EnumMouseButton.Left, EnumModifierKey.SHIFT, EnumMergePriority.AutoMerge, sourceSlot.StackSize);
-            object? packet = playerInventory.TryTransferTo(sourceSlot, targetSlot, ref moveOp);
-            int movedQuantity = moveOp.MovedQuantity;
+            int requestedQuantity = sourceSlot.StackSize;
+            ItemStackMoveOperation moveOperation = new(world, EnumMouseButton.Left, EnumModifierKey.SHIFT, mergePriority, requestedQuantity);
+            int movedQuantity = sourceSlot.TryPutInto(targetSlot, ref moveOperation);
             totalMoved += movedQuantity;
 
             if (movedQuantity > 0)
@@ -911,15 +933,20 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
 
             skipSlots.Add(targetSlot);
 
-            if (packet is not null)
-            {
-                targetSlot.MarkDirty();
-                sourceSlot.MarkDirty();
-            }
-
-            if (moveOp.NotMovedQuantity == 0 || movedQuantity == 0)
+            int notMovedQuantity = requestedQuantity - movedQuantity;
+            if (notMovedQuantity == 0)
             {
                 break;
+            }
+
+            if (movedQuantity == 0)
+            {
+                if (!targetSlot.Empty
+                    && moveOperation.RequiredPriority == EnumMergePriority.DirectMerge
+                    && targetSlot.CanTakeFrom(sourceSlot, EnumMergePriority.DirectMerge))
+                {
+                    directMergeSlots.Add(targetSlot);
+                }
             }
         }
         return totalMoved;
@@ -967,13 +994,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
 
     private static bool CanAcceptForAutoStash(ItemSlot targetSlot, ItemSlot sourceSlot)
     {
-        if (targetSlot.Empty)
-        {
-            return targetSlot.CanHold(sourceSlot);
-        }
-
-        return targetSlot.Itemstack?.Collectible?.Id == sourceSlot.Itemstack?.Collectible?.Id
-            && targetSlot.StackSize < targetSlot.Itemstack.Collectible.MaxStackSize;
+        return targetSlot.CanTakeFrom(sourceSlot, EnumMergePriority.AutoMerge);
     }
 
     private bool HasStashables(in IWorldAccessor world, IPlayerInventoryManager playerInventory, BlockSelection selection)

@@ -240,7 +240,7 @@ public class AutoStashTransferTests
     }
 
     [Fact]
-    public void AutoStashToGenericContainer_TransferThrows_ClosesInventory()
+    public void AutoStashToGenericContainer_DoesNotUseClientTransferApi()
     {
         // Arrange
         var sharedItem = MockItem.CreateNonLightSource(id: 1);
@@ -255,16 +255,23 @@ public class AutoStashTransferTests
                 It.IsAny<ItemSlot>(),
                 It.IsAny<ItemSlot>(),
                 ref It.Ref<ItemStackMoveOperation>.IsAny))
-            .Throws(new InvalidOperationException("Transfer failed."));
+            .Throws(new InvalidOperationException("Client transfer API must not be used server-side."));
 
         // Act
-        Assert.Throws<InvalidOperationException>(() =>
-            BlockBehaviorAutoStashable.AutoStashToGenericContainer(
-                fixture.World,
-                fixture.Player,
-                container.Object));
+        bool result = BlockBehaviorAutoStashable.AutoStashToGenericContainer(
+            fixture.World,
+            fixture.Player,
+            container.Object);
 
         // Assert
+        Assert.True(result);
+        Assert.True(fixture.BackpackInventory[0].Empty);
+        fixture.InventoryManagerMock.Verify(
+            inventoryManager => inventoryManager.TryTransferTo(
+                It.IsAny<ItemSlot>(),
+                It.IsAny<ItemSlot>(),
+                ref It.Ref<ItemStackMoveOperation>.IsAny),
+            Times.Never);
         fixture.InventoryManagerMock.Verify(
             inventoryManager => inventoryManager.CloseInventoryAndSync(container.Inventory),
             Times.Once);
@@ -355,26 +362,22 @@ public class AutoStashTransferTests
     }
 
     [Fact]
-    public void AutoStashToGenericContainer_TransferMovesNothing_StopsAndClosesInventory()
+    public void AutoStashToGenericContainer_FirstMatchingSlotFull_UsesAvailableMatchingSlot()
     {
         // Arrange
         var sharedItem = MockItem.CreateNonLightSource(id: 1);
         sharedItem.Code = new AssetLocation("game", "shared-item");
+        sharedItem.MaxStackSize = 64;
 
-        var fixture = CreateFixture(
-            backpackItems: [sharedItem]);
-        var container = MockBlockEntityContainer.WithItems(fixture.Api, sharedItem);
+        var fixture = CreateFixture();
+        fixture.WithBackpackSlot(0, sharedItem, stackSize: 10);
 
-        fixture.InventoryManagerMock
-            .Setup(inventoryManager => inventoryManager.TryTransferTo(
-                It.IsAny<ItemSlot>(),
-                It.IsAny<ItemSlot>(),
-                ref It.Ref<ItemStackMoveOperation>.IsAny))
-            .Returns((ItemSlot source, ItemSlot target, ref ItemStackMoveOperation operation) =>
-            {
-                operation.MovedQuantity = 0;
-                return (object)null!;
-            });
+        var container = MockBlockEntityContainer.WithItems(
+            new Dictionary<int, MockItem> { { 0, sharedItem }, { 1, sharedItem } },
+            totalSlots: 3,
+            api: fixture.Api);
+        container.Inventory[0].Itemstack!.StackSize = 64;
+        container.Inventory[1].Itemstack!.StackSize = 60;
 
         // Act
         bool result = BlockBehaviorAutoStashable.AutoStashToGenericContainer(
@@ -383,16 +386,11 @@ public class AutoStashTransferTests
             container.Object);
 
         // Assert
-        Assert.False(result);
-        fixture.InventoryManagerMock.Verify(
-            inventoryManager => inventoryManager.TryTransferTo(
-                It.IsAny<ItemSlot>(),
-                It.IsAny<ItemSlot>(),
-                ref It.Ref<ItemStackMoveOperation>.IsAny),
-            Times.Once);
-        fixture.InventoryManagerMock.Verify(
-            inventoryManager => inventoryManager.CloseInventoryAndSync(container.Inventory),
-            Times.Once);
+        Assert.True(result);
+        Assert.Equal(64, container.Inventory[0].StackSize);
+        Assert.Equal(64, container.Inventory[1].StackSize);
+        Assert.Equal(6, container.Inventory[2].StackSize);
+        Assert.True(fixture.BackpackInventory[0].Empty);
     }
 
     [Fact]

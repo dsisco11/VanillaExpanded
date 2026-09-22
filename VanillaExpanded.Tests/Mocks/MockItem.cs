@@ -1,3 +1,5 @@
+using Moq;
+
 using Vintagestory.API.Common;
 
 namespace VanillaExpanded.Tests.Mocks;
@@ -8,6 +10,7 @@ namespace VanillaExpanded.Tests.Mocks;
 /// </summary>
 public class MockItem : Item
 {
+    private static readonly ICoreAPI DefaultApi = CreateDefaultApi();
     private readonly int _id;
 
     public MockItem(int id, byte lightValue = 0, ICoreAPI? api = null)
@@ -16,14 +19,18 @@ public class MockItem : Item
         ItemId = id;
         LightHsv = new byte[] { 0, 0, lightValue };
 
-        // Set the API if provided (needed for CollectibleObject.Equals to work)
-        if (api is not null)
-        {
-            this.api = api;
-        }
+        this.api = api ?? DefaultApi;
     }
 
     public override int Id => _id;
+
+    private static ICoreAPI CreateDefaultApi()
+    {
+        var world = new Mock<IWorldAccessor>();
+        var api = new Mock<ICoreAPI>();
+        api.Setup(value => value.World).Returns(world.Object);
+        return api.Object;
+    }
 
     /// <summary>
     /// Sets the API on this MockItem.
