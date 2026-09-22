@@ -75,8 +75,11 @@ internal static class AlloyDepositService
         List<ItemSlot> playerSlots = [.. backpack, .. hotbar];
         List<ItemSlot> allSlots = [.. playerSlots, .. cookingSlots];
         List<SlotSnapshot> snapshot = allSlots
-            .Distinct()
-            .Select(static slot => new SlotSnapshot(slot, slot.Itemstack?.Clone()))
+            .Select(static slot => new SlotSnapshot(
+                slot.Inventory,
+                slot.Inventory.GetSlotId(slot),
+                slot.Itemstack?.Clone()))
+            .DistinctBy(static item => (item.Inventory, item.SlotIndex))
             .ToList();
 
         try
@@ -105,10 +108,7 @@ internal static class AlloyDepositService
                 }
             }
 
-            foreach (ItemSlot slot in allSlots)
-            {
-                slot.MarkDirty();
-            }
+            MarkDirty(snapshot);
 
             firepit.MarkDirty(true);
             return AlloyDepositResultCode.Success;
@@ -272,11 +272,22 @@ internal static class AlloyDepositService
     {
         foreach (SlotSnapshot item in snapshot)
         {
-            item.Slot.Itemstack = item.Stack?.Clone();
-            item.Slot.MarkDirty();
+            ItemSlot? currentSlot = item.Inventory[item.SlotIndex];
+            if (currentSlot is null) continue;
+
+            currentSlot.Itemstack = item.Stack?.Clone();
+            item.Inventory.MarkSlotDirty(item.SlotIndex);
+        }
+    }
+
+    private static void MarkDirty(IEnumerable<SlotSnapshot> snapshot)
+    {
+        foreach (SlotSnapshot item in snapshot)
+        {
+            item.Inventory.MarkSlotDirty(item.SlotIndex);
         }
     }
 
     private sealed record SlotTarget(int SlotIndex, MetalDepositIngredient Ingredient, int Amount);
-    private sealed record SlotSnapshot(ItemSlot Slot, ItemStack? Stack);
+    private sealed record SlotSnapshot(IInventory Inventory, int SlotIndex, ItemStack? Stack);
 }

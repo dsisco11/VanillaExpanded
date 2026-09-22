@@ -77,6 +77,75 @@ public class AlloyDepositServiceTests
     }
 
     [Fact]
+    public void Execute_TransferReplacesPlayerSlot_RollbackUsesCurrentInventorySlot()
+    {
+        // Arrange
+        TestContext context = CreateContext(copperCount: 9, tinCount: 0);
+        context.Inventory.CookingSlots[0].Itemstack = new ItemStack(context.CopperSource, 2);
+        ItemStack?[] beforePlayer = context.Fixture.BackpackInventory
+            .Select(static slot => slot.Itemstack?.Clone())
+            .ToArray();
+        ItemStack?[] beforeCooking = context.Inventory.CookingSlots
+            .Select(static slot => slot.Itemstack?.Clone())
+            .ToArray();
+        bool replacedSlot = false;
+
+        context.Fixture.InventoryManagerMock
+            .Setup(manager => manager.TryTransferTo(
+                It.IsAny<ItemSlot>(),
+                It.IsAny<ItemSlot>(),
+                ref It.Ref<ItemStackMoveOperation>.IsAny))
+            .Returns((ItemSlot source, ItemSlot target, ref ItemStackMoveOperation operation) =>
+            {
+                if (!replacedSlot && target.Inventory == context.Fixture.BackpackInventory)
+                {
+                    int targetIndex = target.Inventory.GetSlotId(target);
+                    var replacement = new ItemSlotSurvival(context.Fixture.BackpackInventory)
+                    {
+                        Itemstack = target.Itemstack
+                    };
+                    context.Fixture.BackpackInventory[targetIndex] = replacement;
+                    target = replacement;
+                    replacedSlot = true;
+                }
+
+                if (source.Empty || (!target.Empty && target.Itemstack?.Collectible.Code != source.Itemstack?.Collectible.Code))
+                {
+                    operation.MovedQuantity = 0;
+                    return null;
+                }
+
+                int moved = Math.Min(operation.RequestedQuantity, source.StackSize);
+                if (target.Empty)
+                {
+                    target.Itemstack = source.TakeOut(moved);
+                }
+                else
+                {
+                    target.Itemstack!.StackSize += moved;
+                    source.TakeOut(moved);
+                }
+
+                operation.MovedQuantity = moved;
+                return new object();
+            });
+
+        // Act
+        AlloyDepositResultCode result = AlloyDepositService.Execute(
+            context.Fixture.World,
+            context.Fixture.Player,
+            context.Firepit,
+            context.Request,
+            [context.Recipe]);
+
+        // Assert
+        Assert.True(replacedSlot);
+        Assert.Equal(AlloyDepositResultCode.InsufficientItems, result);
+        AssertStacksEqual(beforePlayer, context.Fixture.BackpackInventory.Select(static slot => slot.Itemstack).ToArray());
+        AssertStacksEqual(beforeCooking, context.Inventory.CookingSlots.Select(static slot => slot.Itemstack).ToArray());
+    }
+
+    [Fact]
     public void Execute_InvalidRatio_DoesNotMutateInventory()
     {
         // Arrange
