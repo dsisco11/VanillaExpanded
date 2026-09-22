@@ -29,7 +29,7 @@ internal static class AlloyCalculatorLogic
     }
 
     internal static List<MetalDepositOption> CreatePureMetalOptions(
-        IEnumerable<ItemStack> sourceStacks,
+        IEnumerable<ItemStack?> sourceStacks,
         IEnumerable<MetalDepositOption> registeredOptions,
         int maxFuelTemperature)
     {
@@ -38,15 +38,19 @@ internal static class AlloyCalculatorLogic
             .ToHashSet(StringComparer.Ordinal);
         var pureMetals = new Dictionary<string, MetalDepositOption>(StringComparer.Ordinal);
 
-        foreach (ItemStack sourceStack in sourceStacks)
+        foreach (ItemStack? sourceStack in sourceStacks)
         {
+            if (sourceStack?.Collectible is null) continue;
+
             string? sourceType = sourceStack.Collectible?.FirstCodePart();
             CombustibleProperties? properties = sourceStack.Collectible?.CombustibleProps;
             ItemStack? smeltedStack = properties?.SmeltedStack?.ResolvedItemstack;
             string? outputCode = smeltedStack?.Collectible?.Code?.ToString();
 
             if (sourceType is not ("metalbit" or "nugget")
-                || properties!.MeltingPoint > maxFuelTemperature
+                || properties is null
+                || properties.MeltingPoint > maxFuelTemperature
+                || smeltedStack?.Collectible?.Code is null
                 || outputCode is null
                 || existingOutputs.Contains(outputCode)
                 || pureMetals.ContainsKey(outputCode))
@@ -54,7 +58,7 @@ internal static class AlloyCalculatorLogic
                 continue;
             }
 
-            pureMetals[outputCode] = CreatePureMetalOption(smeltedStack!);
+            pureMetals[outputCode] = CreatePureMetalOption(smeltedStack);
         }
 
         return [.. pureMetals.Values];

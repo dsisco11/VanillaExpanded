@@ -48,6 +48,57 @@ public class MetalDepositOptionTests
         Assert.Empty(options);
     }
 
+    [Fact]
+    public void CreatePureMetalOptions_MetalBitWithoutCombustibleProperties_SkipsEntry()
+    {
+        // Arrange
+        MockItem incompleteMetalBit = CreateItem(1, "metalbit-incomplete");
+
+        // Act
+        List<MetalDepositOption> options = AlloyCalculatorLogic.CreatePureMetalOptions(
+            [new ItemStack(incompleteMetalBit)],
+            [],
+            maxFuelTemperature: 1300);
+
+        // Assert
+        Assert.Empty(options);
+    }
+
+    [Fact]
+    public void CreatePureMetalOptions_UnresolvedSmeltedStack_SkipsEntry()
+    {
+        // Arrange
+        MockItem incompleteMetalBit = CreateItem(1, "metalbit-incomplete");
+        incompleteMetalBit.CombustibleProps = new CombustibleProperties
+        {
+            MeltingPoint = 1000,
+            SmeltedStack = new JsonItemStack
+            {
+                Code = new AssetLocation("game", "ingot-incomplete")
+            }
+        };
+
+        // Act
+        List<MetalDepositOption> options = AlloyCalculatorLogic.CreatePureMetalOptions(
+            [new ItemStack(incompleteMetalBit)],
+            [],
+            maxFuelTemperature: 1300);
+
+        // Assert
+        Assert.Empty(options);
+    }
+
+    [Fact]
+    public void CreatePureMetalOptions_NullHandbookEntry_SkipsEntry()
+    {
+        List<MetalDepositOption> options = AlloyCalculatorLogic.CreatePureMetalOptions(
+            [null],
+            [],
+            maxFuelTemperature: 1300);
+
+        Assert.Empty(options);
+    }
+
     private static MockItem CreateItem(int id, string path)
     {
         var item = MockItem.CreateNonLightSource(id);
