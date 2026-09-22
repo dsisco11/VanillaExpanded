@@ -73,15 +73,8 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         BlockEntity? blockEntity = world.BlockAccessor.GetBlockEntity(blockSel.Position);
         HashSet<int> stashables = GetStashableItems(byPlayer.InventoryManager, blockEntity);
         bool hasStashableItems = stashables.Count != 0;
-        world.Logger.Debug(
-            "[VanillaExpanded][AutoStash] Client interaction block={0}, entity={1}, position=<{2}>, stashableIds=[{3}].",
-            block.Code,
-            blockEntity?.GetType().Name ?? "null",
-            blockSel.Position,
-            string.Join(",", stashables));
         if (!hasStashableItems)
         {
-            world.Logger.Debug("[VanillaExpanded][AutoStash] Client stopped interaction: no stashable item IDs found.");
             return false; // no stashable items, do nothing
         }
 
@@ -159,10 +152,6 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         if (secondsUsed >= StashDelaySeconds)
         {
             stashingState = EStashingState.PostStashGracePeriod;
-            world.Logger.Debug(
-                "[VanillaExpanded][AutoStash] Client sending stash request for position <{0}> after {1:0.000}s.",
-                blockSel.Position,
-                secondsUsed);
             world.Api.ModLoader.GetModSystem<AutoStashSystem_Client>().RequestAutoStash(blockSel.Position);
             setProgressVisibility(false);
             handleDidMoveItems(byPlayer.Entity);
@@ -799,18 +788,8 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         bool canStashBackpack = CanStashAnyItems(backpackInventory, targetInventory, canAccept, getPreferredSlot);
         bool canStashHotbar = CanStashAnyItems(hotbarInventory, targetInventory, canAccept, getPreferredSlot);
 
-        world.Logger.Debug(
-            "[VanillaExpanded][AutoStash] Attempt player={0}, target={1} at <{2}>, slots={3}, backpackCandidate={4}, hotbarCandidate={5}.",
-            playerName,
-            targetName,
-            targetPos,
-            targetInventory.Count,
-            canStashBackpack,
-            canStashHotbar);
-
         if (!canStashBackpack && !canStashHotbar)
         {
-            world.Logger.Debug("[VanillaExpanded][AutoStash] Stopped before opening target: no source stack has an accepting target slot.");
             return false;
         }
 
@@ -868,19 +847,8 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
 
             if (!canAccept(itemSlot.Itemstack))
             {
-                world.Logger.Debug(
-                    "[VanillaExpanded][AutoStash] Ignored source inventory={0}, slot={1}, stack={2}: item type is not present or accepted by target.",
-                    sourceInventory.InventoryID,
-                    sourceInventory.GetSlotId(itemSlot),
-                    DescribeSlot(itemSlot));
                 continue;
             }
-
-            world.Logger.Debug(
-                "[VanillaExpanded][AutoStash] Processing source inventory={0}, slot={1}, stack={2}.",
-                sourceInventory.InventoryID,
-                sourceInventory.GetSlotId(itemSlot),
-                DescribeSlot(itemSlot));
 
             totalStashed += TransferItemToInventory(world, playerInventory, playerName, targetInventory, targetPos, targetName, itemSlot, getPreferredSlot);
         }
@@ -907,11 +875,6 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
                 skipSlots.Add(targetSlot);
             }
         }
-
-        world.Logger.Debug(
-            "[VanillaExpanded][AutoStash] Target slots for source {0}: {1}.",
-            DescribeSlot(sourceSlot),
-            DescribeTargetSlots(targetInventory, sourceSlot));
 
         while (!sourceSlot.Empty)
         {
@@ -949,29 +912,13 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
 
             if (targetSlot is null)
             {
-                world.Logger.Debug(
-                    "[VanillaExpanded][AutoStash] Stopped source {0}: no target selected after skipping slots [{1}].",
-                    DescribeSlot(sourceSlot),
-                    DescribeSlotIds(targetInventory, skipSlots));
                 break;
             }
 
-            int targetSlotIndex = targetInventory.GetSlotId(targetSlot);
             int requestedQuantity = sourceSlot.StackSize;
             ItemStackMoveOperation moveOperation = new(world, EnumMouseButton.Left, EnumModifierKey.SHIFT, mergePriority, requestedQuantity);
             int movedQuantity = sourceSlot.TryPutInto(targetSlot, ref moveOperation);
             totalMoved += movedQuantity;
-
-            world.Logger.Debug(
-                "[VanillaExpanded][AutoStash] Transfer targetSlot={0}, priority={1}, requested={2}, moved={3}, notMoved={4}, requiredPriority={5}, sourceAfter={6}, targetAfter={7}.",
-                targetSlotIndex,
-                mergePriority,
-                requestedQuantity,
-                movedQuantity,
-                requestedQuantity - movedQuantity,
-                moveOperation.RequiredPriority?.ToString() ?? "none",
-                DescribeSlot(sourceSlot),
-                DescribeSlot(targetSlot));
 
             if (movedQuantity > 0)
             {
@@ -989,10 +936,6 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             int notMovedQuantity = requestedQuantity - movedQuantity;
             if (notMovedQuantity == 0)
             {
-                world.Logger.Debug(
-                    "[VanillaExpanded][AutoStash] Completed transfer loop: notMoved={0}, moved={1}.",
-                    notMovedQuantity,
-                    movedQuantity);
                 break;
             }
 
@@ -1004,47 +947,9 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
                 {
                     directMergeSlots.Add(targetSlot);
                 }
-
-                world.Logger.Debug(
-                    "[VanillaExpanded][AutoStash] Target slot {0} rejected {1}; trying another normal target before direct-merge fallback={2}.",
-                    targetSlotIndex,
-                    mergePriority,
-                    directMergeSlots.Count > 0);
             }
         }
         return totalMoved;
-    }
-
-    private static string DescribeTargetSlots(IInventory targetInventory, ItemSlot sourceSlot)
-    {
-        List<string> descriptions = [];
-        foreach (ItemSlot targetSlot in targetInventory)
-        {
-            descriptions.Add($"{targetInventory.GetSlotId(targetSlot)}=[{DescribeSlot(targetSlot)}; accept={CanAcceptForAutoStash(targetSlot, sourceSlot)}]");
-        }
-
-        return string.Join(", ", descriptions);
-    }
-
-    private static string DescribeSlotIds(IInventory targetInventory, List<ItemSlot> slots)
-    {
-        List<int> slotIds = [];
-        foreach (ItemSlot slot in slots)
-        {
-            slotIds.Add(targetInventory.GetSlotId(slot));
-        }
-
-        return string.Join(",", slotIds);
-    }
-
-    private static string DescribeSlot(ItemSlot slot)
-    {
-        if (slot.Empty)
-        {
-            return "empty";
-        }
-
-        return $"{slot.Itemstack?.Collectible?.Code} id={slot.Itemstack?.Collectible?.Id} qty={slot.StackSize} max={slot.Itemstack?.Collectible?.MaxStackSize}";
     }
 
     private static bool CanStashAnyItems(
