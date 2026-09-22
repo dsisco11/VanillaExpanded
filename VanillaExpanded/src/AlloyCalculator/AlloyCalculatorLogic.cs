@@ -17,6 +17,11 @@ internal static class AlloyCalculatorLogic
 {
     #region Deposit Options
 
+    internal static bool ShouldShowRatioControls(MetalDepositOption option)
+    {
+        return option.Ingredients.Length > 1;
+    }
+
     internal static MetalDepositOption FromAlloyRecipe(AlloyRecipe recipe)
     {
         return new MetalDepositOption(

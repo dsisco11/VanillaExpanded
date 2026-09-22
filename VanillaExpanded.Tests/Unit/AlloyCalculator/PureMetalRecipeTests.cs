@@ -99,6 +99,30 @@ public class MetalDepositOptionTests
         Assert.Empty(options);
     }
 
+    [Fact]
+    public void ShouldShowRatioControls_SingleMetal_ReturnsFalse()
+    {
+        MockItem copperIngot = CreateItem(1, "ingot-copper");
+        MetalDepositOption option = AlloyCalculatorLogic.CreatePureMetalOption(new ItemStack(copperIngot));
+
+        Assert.False(AlloyCalculatorLogic.ShouldShowRatioControls(option));
+    }
+
+    [Fact]
+    public void ShouldShowRatioControls_MultipleMetals_ReturnsTrue()
+    {
+        MockItem copperIngot = CreateItem(1, "ingot-copper");
+        MockItem tinIngot = CreateItem(2, "ingot-tin");
+        var option = new MetalDepositOption(
+            new AssetLocation("game", "ingot-bronze"),
+            [
+                new MetalDepositIngredient(copperIngot.Code, new ItemStack(copperIngot), 0.88f, 0.92f),
+                new MetalDepositIngredient(tinIngot.Code, new ItemStack(tinIngot), 0.08f, 0.12f)
+            ]);
+
+        Assert.True(AlloyCalculatorLogic.ShouldShowRatioControls(option));
+    }
+
     private static MockItem CreateItem(int id, string path)
     {
         var item = MockItem.CreateNonLightSource(id);

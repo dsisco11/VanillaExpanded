@@ -162,18 +162,24 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     {
         // Calculate number of ingredient rows
         var ingredientCount = selectedIngredients.Length;
+        bool showRatioControls = selectedOption is not null
+            && AlloyCalculatorLogic.ShouldShowRatioControls(selectedOption);
 
         // Define content bounds - this establishes the size of our dialog content
         // Width: either slider row or slot row, whichever is wider
-        var sliderRowWidth = LabelWidth + SliderWidth;
+        var sliderRowWidth = showRatioControls ? LabelWidth + SliderWidth : 0;
         var slotRowWidth = ingredientCount * SlotSize;
-        var contentWidth = Math.Max(sliderRowWidth, slotRowWidth);
+        var controlsWidth = DropdownWidth + 10 + InputWidth;
+        var contentWidth = Math.Max(controlsWidth, Math.Max(sliderRowWidth, slotRowWidth));
         
         // Height: titlebar + dropdown row + sliders + slot row + button row
         var contentHeight = TitlebarHeight + 30;
         if (ingredientCount > 0)
         {
-            contentHeight += ingredientCount * RowHeight; // sliders
+            if (showRatioControls)
+            {
+                contentHeight += ingredientCount * RowHeight;
+            }
             contentHeight += 15 + SlotSize; // gap + slot row
             contentHeight += 10 + ButtonHeight; // gap + button
         }
@@ -219,27 +225,38 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         // Add ingredient sliders if an alloy is selected
         if (selectedOption is not null && ingredientCount > 0)
         {
-            // Add sliders
-            for (var idx = 0; idx < ingredientCount; idx++)
+            if (showRatioControls)
             {
-                var ingredient = selectedIngredients[idx];
-                var ingredientIndex = idx;
-                var ingredientName = GetIngredientDisplayName(ingredient);
+                for (var idx = 0; idx < ingredientCount; idx++)
+                {
+                    var ingredient = selectedIngredients[idx];
+                    var ingredientIndex = idx;
+                    var ingredientName = GetIngredientDisplayName(ingredient);
 
-                var labelBounds = ElementBounds.Fixed(0, yOffset, LabelWidth, RowHeight);
-                var sliderBounds = ElementBounds.Fixed(LabelWidth, yOffset + 4, SliderWidth, 20);
+                    var labelBounds = ElementBounds
+                        .Fixed(0, yOffset, LabelWidth, RowHeight)
+                        .WithParent(contentBounds);
+                    var sliderBounds = ElementBounds
+                        .Fixed(LabelWidth, yOffset + 4, SliderWidth, 20)
+                        .WithParent(contentBounds);
 
-                var sliderKey = $"slider_{ingredientIndex}";
-                var minPercent = (int)Math.Round(ingredient.MinRatio * 100);
-                var maxPercent = (int)Math.Round(ingredient.MaxRatio * 100);
-                var sliderTooltip = Lang.Get($"{Constants.ModId}:gui-alloycalculator-slider-tooltip", ingredientName, minPercent, maxPercent);
+                    var sliderKey = $"slider_{ingredientIndex}";
+                    var minPercent = (int)Math.Round(ingredient.MinRatio * 100);
+                    var maxPercent = (int)Math.Round(ingredient.MaxRatio * 100);
+                    var sliderTooltip = Lang.Get($"{Constants.ModId}:gui-alloycalculator-slider-tooltip", ingredientName, minPercent, maxPercent);
 
-                composer
-                    .AddStaticText(ingredientName, CairoFont.WhiteSmallText(), labelBounds)
-                    .AddSlider(value => OnSliderChanged(ingredientIndex, value), sliderBounds, sliderKey)
-                    .AddHoverText(sliderTooltip, CairoFont.WhiteDetailText(), 250, sliderBounds.FlatCopy(), $"sliderTooltip_{ingredientIndex}");
+                    composer
+                        .AddStaticText(ingredientName, CairoFont.WhiteSmallText(), labelBounds)
+                        .AddSlider(value => OnSliderChanged(ingredientIndex, value), sliderBounds, sliderKey)
+                        .AddHoverText(
+                            sliderTooltip,
+                            CairoFont.WhiteDetailText(),
+                            250,
+                            sliderBounds.FlatCopy().WithParent(contentBounds),
+                            $"sliderTooltip_{ingredientIndex}");
 
-                yOffset += RowHeight;
+                    yOffset += RowHeight;
+                }
             }
 
             // Add second divider before slots
