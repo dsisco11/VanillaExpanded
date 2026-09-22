@@ -31,7 +31,7 @@ internal class AutoStashSystem_Client : ModSystem
     public override void StartClientSide(ICoreClientAPI api)
     {
         this.api = api;
-        channel = api.Network.GetChannel(Mod.Info.ModID);
+        channel = api.Network.GetChannel(Constants.ModId);
     }
     #endregion
 
