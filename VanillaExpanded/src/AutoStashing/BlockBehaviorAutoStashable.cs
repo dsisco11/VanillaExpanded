@@ -794,17 +794,22 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         _ = playerInventory.OpenInventory(targetInventory);
 
         int totalStashed = 0;
-        if (backpackInventory is not null)
+        try
         {
-            totalStashed += AutoStashInventoryIntoInventory(world, playerInventory, playerName, targetInventory, targetPos, targetName, backpackInventory, canAccept, getPreferredSlot);
-        }
+            if (backpackInventory is not null)
+            {
+                totalStashed += AutoStashInventoryIntoInventory(world, playerInventory, playerName, targetInventory, targetPos, targetName, backpackInventory, canAccept, getPreferredSlot);
+            }
 
-        if (hotbarInventory is not null)
+            if (hotbarInventory is not null)
+            {
+                totalStashed += AutoStashInventoryIntoInventory(world, playerInventory, playerName, targetInventory, targetPos, targetName, hotbarInventory, canAccept, getPreferredSlot);
+            }
+        }
+        finally
         {
-            totalStashed += AutoStashInventoryIntoInventory(world, playerInventory, playerName, targetInventory, targetPos, targetName, hotbarInventory, canAccept, getPreferredSlot);
+            playerInventory.CloseInventoryAndSync(targetInventory);
         }
-
-        playerInventory.CloseInventoryAndSync(targetInventory);
 
         if (totalStashed > 0)
         {
