@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
+using Vintagestory.GameContent;
 
 namespace VanillaExpanded.AlloyCalculator;
 
@@ -13,6 +15,111 @@ namespace VanillaExpanded.AlloyCalculator;
 /// </summary>
 internal static class AlloyCalculatorLogic
 {
+    #region Deposit Options
+
+    internal static bool ShouldShowRatioControls(MetalDepositOption option)
+    {
+        return option.Ingredients.Length > 1;
+    }
+
+    internal static MetalDepositOption? FindOptionForContents(
+        IReadOnlyList<ItemStack> contents,
+        IReadOnlyList<MetalDepositOption> options,
+        IReadOnlyList<AlloyRecipe> recipes)
+    {
+        if (contents.Count == 0) return null;
+
+        ItemStack[] stacks = [.. contents];
+        AlloyRecipe? matchingRecipe = recipes.FirstOrDefault(recipe =>
+            recipe.Enabled
+            && recipe.Ingredients.Length > 0
+            && recipe.Matches(stacks));
+        if (matchingRecipe?.Output?.Code is not null)
+        {
+            return options.FirstOrDefault(option => option.OutputCode.Equals(matchingRecipe.Output.Code));
+        }
+
+        HashSet<AssetLocation> smeltedOutputs = contents
+            .Select(static stack => stack.Collectible
+                .GetCombustibleProperties(null, stack, null)?
+                .SmeltedStack?
+                .ResolvedItemstack?
+                .Collectible?
+                .Code)
+            .Where(static code => code is not null)
+            .Cast<AssetLocation>()
+            .ToHashSet();
+
+        if (smeltedOutputs.Count != 1) return null;
+
+        AssetLocation outputCode = smeltedOutputs.Single();
+        return options.FirstOrDefault(option =>
+            option.Ingredients.Length == 1
+            && option.OutputCode.Equals(outputCode));
+    }
+
+    internal static MetalDepositOption FromAlloyRecipe(AlloyRecipe recipe)
+    {
+        return new MetalDepositOption(
+            recipe.Output.Code,
+            [.. recipe.Ingredients.Select(static ingredient => new MetalDepositIngredient(
+                ingredient.Code,
+                ingredient.ResolvedItemstack!,
+                ingredient.MinRatio,
+                ingredient.MaxRatio))]);
+    }
+
+    internal static List<MetalDepositOption> CreatePureMetalOptions(
+        IEnumerable<ItemStack?> sourceStacks,
+        IEnumerable<MetalDepositOption> registeredOptions,
+        int maxFuelTemperature)
+    {
+        HashSet<string> existingOutputs = registeredOptions
+            .Select(static option => option.OutputCode.ToString())
+            .ToHashSet(StringComparer.Ordinal);
+        var pureMetals = new Dictionary<string, MetalDepositOption>(StringComparer.Ordinal);
+
+        foreach (ItemStack? sourceStack in sourceStacks)
+        {
+            if (sourceStack?.Collectible is null) continue;
+
+            string? sourceType = sourceStack.Collectible?.FirstCodePart();
+            CombustibleProperties? properties = sourceStack.Collectible?.CombustibleProps;
+            ItemStack? smeltedStack = properties?.SmeltedStack?.ResolvedItemstack;
+            string? outputCode = smeltedStack?.Collectible?.Code?.ToString();
+
+            if (sourceType is not ("metalbit" or "nugget")
+                || properties is null
+                || properties.MeltingPoint > maxFuelTemperature
+                || smeltedStack?.Collectible?.Code is null
+                || outputCode is null
+                || existingOutputs.Contains(outputCode)
+                || pureMetals.ContainsKey(outputCode))
+            {
+                continue;
+            }
+
+            pureMetals[outputCode] = CreatePureMetalOption(smeltedStack);
+        }
+
+        return [.. pureMetals.Values];
+    }
+
+    internal static MetalDepositOption CreatePureMetalOption(ItemStack outputStack)
+    {
+        ItemStack resolvedStack = outputStack.Clone();
+        resolvedStack.StackSize = 1;
+        return new MetalDepositOption(
+            resolvedStack.Collectible.Code,
+            ImmutableArray.Create(new MetalDepositIngredient(
+                resolvedStack.Collectible.Code,
+                resolvedStack,
+                1,
+                1)));
+    }
+
+    #endregion
+
     #region Slot Allocation
 
     /// <summary>

@@ -4,6 +4,8 @@ using System.Collections.Immutable;
 using System.Linq;
 
 using VanillaExpanded.AlloyCalculator;
+using VanillaExpanded.ModSystems;
+using VanillaExpanded.Network;
 
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -48,11 +50,11 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
     #region Fields
     private readonly GuiDialog? firepitDialog;
-    private List<AlloyRecipe> alloys = [];
-    private AlloyRecipe? selectedAlloy;
+    private List<MetalDepositOption> depositOptions = [];
+    private MetalDepositOption? selectedOption;
     
     /// <summary> Currently selected ingredients for the chosen alloy. </summary>
-    private ImmutableArray<MetalAlloyIngredient> selectedIngredients = [];
+    private ImmutableArray<MetalDepositIngredient> selectedIngredients = [];
     private readonly Dictionary<int, int> sliderValues = [];
     private readonly Dictionary<int, ItemStack> calculatedStacks = [];
     private readonly List<SlideshowItemstackTextComponent> slideshowComponents = [];
@@ -64,6 +66,8 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private List<ItemStack>? smeltingContainers;
     private List<ItemStack>? smeltingFuels;
     private int maxFuelTemperature;
+    private AlloyDepositSystem? depositSystem;
+    private string? pendingDepositRequestId;
     #endregion
 
     #region Properties
@@ -96,12 +100,19 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     #region Initialization
     private void LoadAlloys()
     {
-        alloys = [.. capi.GetMetalAlloys()
-            .Where(static a => a.Enabled && a.Ingredients.Length > 0)
-            .OrderBy(static a => GetAlloyDisplayName(a))];
-
-        // Build handbook stacks cache for filtering
         BuildHandbookStacksCache();
+
+        depositOptions = [.. capi.GetMetalAlloys()
+            .Where(static alloy => alloy.Enabled && alloy.Ingredients.Length > 0)
+            .Select(AlloyCalculatorLogic.FromAlloyRecipe)];
+        depositOptions.AddRange(AlloyCalculatorLogic.CreatePureMetalOptions(
+            handbookStacks ?? [],
+            depositOptions,
+            maxFuelTemperature));
+        depositOptions.Sort(static (left, right) => string.Compare(
+            GetDepositOptionDisplayName(left),
+            GetDepositOptionDisplayName(right),
+            StringComparison.CurrentCulture));
     }
 
     // TODO: There has to be a better way to calculate/cache these item-stack variants, ideally we should be capable of leveraging the cache that the handbook already has internally.
@@ -151,18 +162,24 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     {
         // Calculate number of ingredient rows
         var ingredientCount = selectedIngredients.Length;
+        bool showRatioControls = selectedOption is not null
+            && AlloyCalculatorLogic.ShouldShowRatioControls(selectedOption);
 
         // Define content bounds - this establishes the size of our dialog content
         // Width: either slider row or slot row, whichever is wider
-        var sliderRowWidth = LabelWidth + SliderWidth;
+        var sliderRowWidth = showRatioControls ? LabelWidth + SliderWidth : 0;
         var slotRowWidth = ingredientCount * SlotSize;
-        var contentWidth = Math.Max(sliderRowWidth, slotRowWidth);
+        var controlsWidth = DropdownWidth + 10 + InputWidth;
+        var contentWidth = Math.Max(controlsWidth, Math.Max(sliderRowWidth, slotRowWidth));
         
         // Height: titlebar + dropdown row + sliders + slot row + button row
         var contentHeight = TitlebarHeight + 30;
         if (ingredientCount > 0)
         {
-            contentHeight += ingredientCount * RowHeight; // sliders
+            if (showRatioControls)
+            {
+                contentHeight += ingredientCount * RowHeight;
+            }
             contentHeight += 15 + SlotSize; // gap + slot row
             contentHeight += 10 + ButtonHeight; // gap + button
         }
@@ -190,9 +207,14 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         var inputBounds = ElementBounds.Fixed(DropdownWidth + 10, yOffset, InputWidth, 25);
         yOffset += 30;
 
-        var alloyValues = alloys.Select(static (_, i) => i.ToString());
-        var alloyNames = alloys.Select(static (recipe, _) => GetAlloyDisplayName(recipe));
-        var selectedIndex = selectedAlloy is not null ? alloys.IndexOf(selectedAlloy) : 0;
+        var alloyValues = depositOptions.Select(static (_, i) => i.ToString());
+        var alloyNames = depositOptions.Select(static (option, _) => GetDepositOptionDisplayName(option));
+        var alloyIcons = depositOptions.Select(option =>
+        {
+            Item? outputItem = capi.World.GetItem(option.OutputCode);
+            return outputItem is null ? null : new ItemStack(outputItem);
+        });
+        var selectedIndex = selectedOption is not null ? depositOptions.IndexOf(selectedOption) : 0;
         if (selectedIndex < 0) selectedIndex = 0;
 
         var composer = capi.Gui
@@ -200,35 +222,54 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             .AddShadedDialogBG(bgBounds)
             .AddDialogTitleBar(Lang.Get($"{Constants.ModId}:gui-alloycalculator-title"), OnTitleBarClose)
             .BeginChildElements(bgBounds)
-            .AddDropDown([.. alloyValues], [.. alloyNames], selectedIndex, OnAlloySelected, dropdownBounds, "alloyDropdown")
+            .AddInteractiveElement(new GuiElementItemStackDropDown(
+                capi,
+                [.. alloyValues],
+                [.. alloyNames],
+                [.. alloyIcons],
+                selectedIndex,
+                OnAlloySelected,
+                dropdownBounds,
+                CairoFont.WhiteSmallText()), "alloyDropdown")
             .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-dropdown-tooltip"), CairoFont.WhiteDetailText(), 250, dropdownBounds.FlatCopy(), "dropdownTooltip")
             .AddNumberInput(inputBounds, OnTargetUnitsChanged, CairoFont.WhiteDetailText(), "targetUnits")
             .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-targetunits-tooltip"), CairoFont.WhiteDetailText(), 250, inputBounds.FlatCopy(), "targetUnitsTooltip");
 
         // Add ingredient sliders if an alloy is selected
-        if (selectedAlloy is not null && ingredientCount > 0)
+        if (selectedOption is not null && ingredientCount > 0)
         {
-            // Add sliders
-            for (var idx = 0; idx < ingredientCount; idx++)
+            if (showRatioControls)
             {
-                var ingredient = selectedIngredients[idx];
-                var ingredientIndex = idx;
-                var ingredientName = GetIngredientDisplayName(ingredient);
+                for (var idx = 0; idx < ingredientCount; idx++)
+                {
+                    var ingredient = selectedIngredients[idx];
+                    var ingredientIndex = idx;
+                    var ingredientName = GetIngredientDisplayName(ingredient);
 
-                var labelBounds = ElementBounds.Fixed(0, yOffset, LabelWidth, RowHeight);
-                var sliderBounds = ElementBounds.Fixed(LabelWidth, yOffset + 4, SliderWidth, 20);
+                    var labelBounds = ElementBounds
+                        .Fixed(0, yOffset, LabelWidth, RowHeight)
+                        .WithParent(contentBounds);
+                    var sliderBounds = ElementBounds
+                        .Fixed(LabelWidth, yOffset + 4, SliderWidth, 20)
+                        .WithParent(contentBounds);
 
-                var sliderKey = $"slider_{ingredientIndex}";
-                var minPercent = (int)Math.Round(ingredient.MinRatio * 100);
-                var maxPercent = (int)Math.Round(ingredient.MaxRatio * 100);
-                var sliderTooltip = Lang.Get($"{Constants.ModId}:gui-alloycalculator-slider-tooltip", ingredientName, minPercent, maxPercent);
+                    var sliderKey = $"slider_{ingredientIndex}";
+                    var minPercent = (int)Math.Round(ingredient.MinRatio * 100);
+                    var maxPercent = (int)Math.Round(ingredient.MaxRatio * 100);
+                    var sliderTooltip = Lang.Get($"{Constants.ModId}:gui-alloycalculator-slider-tooltip", ingredientName, minPercent, maxPercent);
 
-                composer
-                    .AddStaticText(ingredientName, CairoFont.WhiteSmallText(), labelBounds)
-                    .AddSlider(value => OnSliderChanged(ingredientIndex, value), sliderBounds, sliderKey)
-                    .AddHoverText(sliderTooltip, CairoFont.WhiteDetailText(), 250, sliderBounds.FlatCopy(), $"sliderTooltip_{ingredientIndex}");
+                    composer
+                        .AddStaticText(ingredientName, CairoFont.WhiteSmallText(), labelBounds)
+                        .AddSlider(value => OnSliderChanged(ingredientIndex, value), sliderBounds, sliderKey)
+                        .AddHoverText(
+                            sliderTooltip,
+                            CairoFont.WhiteDetailText(),
+                            250,
+                            sliderBounds.FlatCopy().WithParent(contentBounds),
+                            $"sliderTooltip_{ingredientIndex}");
 
-                yOffset += RowHeight;
+                    yOffset += RowHeight;
+                }
             }
 
             // Add second divider before slots
@@ -244,7 +285,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
             for (var i = 0; i < ingredientCount; i++)
             {
-                var ingredient = selectedAlloy.Ingredients[i];
+                var ingredient = selectedIngredients[i];
                 var stacks = GetAllMetalVariantStacks(ingredient, 1);
                 
                 if (stacks.Length > 0)
@@ -287,7 +328,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         targetInput?.SetValue(targetUnits.ToString());
 
         // Initialize slider values after composition
-        if (selectedAlloy is not null)
+        if (selectedOption is not null)
         {
             InitializeSliderValues();
             UpdateResultsDisplay();
@@ -298,7 +339,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     #region Slider Logic
     private void InitializeSliderValues()
     {
-        if (selectedAlloy is null || SingleComposer is null) return;
+        if (selectedOption is null || SingleComposer is null) return;
 
         sliderValues.Clear();
 
@@ -322,7 +363,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
     private bool OnSliderChanged(int changedIndex, int newValue)
     {
-        if (isAdjustingSliders || selectedAlloy is null) return true;
+        if (isAdjustingSliders || selectedOption is null) return true;
 
         sliderValues[changedIndex] = newValue;
         NormalizeSliderValues(changedIndex);
@@ -347,7 +388,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
     private void NormalizeSliderValues(int changedIndex)
     {
-        if (selectedAlloy is null || SingleComposer is null) return;
+        if (selectedOption is null || SingleComposer is null) return;
 
         isAdjustingSliders = true;
 
@@ -428,7 +469,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     #region Results Calculation
     private void UpdateResultsDisplay()
     {
-        if (selectedAlloy is null || SingleComposer is null) return;
+        if (selectedOption is null || SingleComposer is null) return;
 
         calculatedStacks.Clear();
 
@@ -462,11 +503,11 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     /// Gets all metal variant stacks (nuggets, ore chunks, etc.) that smelt into the given metal.
     /// Filters by handbook visibility and smeltability.
     /// </summary>
-    private ItemStack[] GetAllMetalVariantStacks(MetalAlloyIngredient ingredient, int stackSize)
+    private ItemStack[] GetAllMetalVariantStacks(MetalDepositIngredient ingredient, int stackSize)
     {
         // The ingredient's ResolvedItemstack is the ingot - we need items that smelt into this
-        var targetIngot = ingredient.ResolvedItemstack;
-        if (targetIngot is null || handbookStacks is null) return [];
+        ItemStack targetIngot = ingredient.ResolvedStack;
+        if (handbookStacks is null) return [];
 
         // Filter handbook stacks to find items that smelt into this metal and can be smelted
         var stacks = handbookStacks
@@ -501,11 +542,10 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     /// <summary>
     /// Gets a metal bit ItemStack for the given ingredient.
     /// </summary>
-    private ItemStack? GetMetalBitStack(MetalAlloyIngredient ingredient, int stackSize)
+    private ItemStack? GetMetalBitStack(MetalDepositIngredient ingredient, int stackSize)
     {
         // Extract metal name from ingredient code (e.g., "ingot-copper" -> "copper")
-        var code = ingredient.Code?.Path;
-        if (code is null) return null;
+        string code = ingredient.Code.Path;
 
         var metalName = code.Contains('-')
             ? code[(code.LastIndexOf('-') + 1)..]
@@ -524,13 +564,13 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     #region Event Handlers
     private void OnAlloySelected(string code, bool selected)
     {
-        if (!int.TryParse(code, out var index) || index < 0 || index >= alloys.Count)
+        if (!int.TryParse(code, out var index) || index < 0 || index >= depositOptions.Count)
         {
             return;
         }
 
-        selectedAlloy = alloys[index];
-        selectedIngredients = selectedAlloy.Ingredients.OrderBy(static ing => GetIngredientDisplayName(ing)).ToImmutableArray();
+        selectedOption = depositOptions[index];
+        selectedIngredients = selectedOption.Ingredients.OrderBy(static ingredient => GetIngredientDisplayName(ingredient)).ToImmutableArray();
         
         // Save selected alloy index
         GetOrCreateSavedState().SelectedAlloyIndex = index;
@@ -562,258 +602,104 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
     #region Deposit Logic
     /// <summary>
-    /// Deposits the calculated ingredients from player inventory into the crucible.
-    /// First clears the crucible, then deposits ingredients spread evenly across slots.
+    /// Requests an atomic, server-authoritative deposit of the calculated ingredients.
     /// </summary>
     private void DepositIngredientsIntoCrucible()
     {
-        var firepit = capi.World.BlockAccessor.GetBlockEntity<BlockEntityFirepit>(BlockEntityPosition);
-        if (firepit?.Inventory is not InventorySmelting crucibleInventory) return;
+        if (pendingDepositRequestId is not null || selectedOption is null) return;
+        BlockEntityFirepit? firepit = capi.World.BlockAccessor
+            .GetBlockEntity<BlockEntityFirepit>(BlockEntityPosition);
+        if (firepit?.Inventory is not InventorySmelting inventory || inventory.CookingSlots.Length == 0) return;
 
-        var cookingSlots = crucibleInventory.CookingSlots;
-        if (cookingSlots.Length == 0) return;
-
-        var player = capi.World.Player;
-
-        // Open the crucible inventory and notify the server - this is required for TryTransferTo to work
-        // The firepit dialog already opens the inventory, but we need to ensure the server knows we're
-        // interacting with it for the transfer operations to be authorized
-        var openPacket = player.InventoryManager.OpenInventory(crucibleInventory);
-        if (openPacket is not null)
+        var ingredients = new List<(string Code, int Amount)>();
+        for (int index = 0; index < selectedIngredients.Length; index++)
         {
-            capi.Network.SendPacketClient(openPacket);
-        }
-
-        try
-        {
-            // First: Clear all items from crucible back to player inventory
-            ClearCrucible(player.InventoryManager, cookingSlots);
-
-            // Build ingredient info: valid codes and target amounts
-            var ingredients = new List<(HashSet<AssetLocation> validCodes, int targetAmount)>();
-            
-            foreach (var (ingredientIndex, targetStack) in calculatedStacks.OrderByDescending(static kvp => kvp.Value?.StackSize ?? 0))
+            if (!calculatedStacks.TryGetValue(index, out ItemStack? targetStack)
+                || targetStack.StackSize <= 0)
             {
-                if (targetStack is null || targetStack.StackSize <= 0) continue;
-
-                var ingredient = selectedIngredients[ingredientIndex];
-                var validStacks = GetAllMetalVariantStacks(ingredient, 1);
-                var validCodes = validStacks.Select(static s => s.Collectible.Code).ToHashSet();
-                
-                ingredients.Add((validCodes, targetStack.StackSize));
+                return;
             }
 
-            if (ingredients.Count == 0) return;
+            ingredients.Add((selectedIngredients[index].Code.ToString(), targetStack.StackSize));
+        }
 
-            // Calculate slot allocation: distribute slots proportionally by ingredient amount
-            var ingredientAmounts = ingredients.Select(static i => i.targetAmount).ToList();
-            var slotAllocations = AlloyCalculatorLogic.AllocateSlotsProportionally(ingredientAmounts, cookingSlots.Length);
+        ingredients.Sort(static (left, right) => right.Amount.CompareTo(left.Amount));
+        int[] allocations = AlloyCalculatorLogic.AllocateSlotsProportionally(
+            ingredients.Select(static ingredient => ingredient.Amount).ToArray(),
+            inventory.CookingSlots.Length);
+        var slotIndices = new List<int>();
+        var slotIngredientCodes = new List<string>();
+        var slotAmounts = new List<int>();
+        int slotIndex = 0;
 
-            // Deposit each ingredient into its allocated slots, spread evenly
-            var slotIndex = 0;
-            for (var i = 0; i < ingredients.Count; i++)
+        for (int ingredientIndex = 0; ingredientIndex < ingredients.Count; ingredientIndex++)
+        {
+            (string code, int amount) = ingredients[ingredientIndex];
+            int allocatedSlots = allocations[ingredientIndex];
+            int itemsPerSlot = amount / allocatedSlots;
+            int remainder = amount % allocatedSlots;
+
+            for (int offset = 0; offset < allocatedSlots; offset++, slotIndex++)
             {
-                var (validCodes, targetAmount) = ingredients[i];
-                var slotsForIngredient = slotAllocations[i];
-                
-                if (slotsForIngredient == 0) continue;
+                int slotAmount = itemsPerSlot + (offset < remainder ? 1 : 0);
+                if (slotAmount <= 0) continue;
 
-                // Calculate how to spread items across allocated slots
-                var itemsPerSlot = targetAmount / slotsForIngredient;
-                var remainder = targetAmount % slotsForIngredient;
-
-                var slotTargets = new int[slotsForIngredient];
-                for (var s = 0; s < slotsForIngredient; s++)
-                {
-                    slotTargets[s] = itemsPerSlot + (s < remainder ? 1 : 0);
-                }
-
-                // Deposit into each allocated slot
-                for (var s = 0; s < slotsForIngredient && slotIndex < cookingSlots.Length; s++, slotIndex++)
-                {
-                    var targetSlot = cookingSlots[slotIndex];
-                    var targetForThisSlot = slotTargets[s];
-                    
-                    DepositFromPlayerInventory(player.InventoryManager, targetSlot, validCodes, targetForThisSlot);
-                }
+                slotIndices.Add(slotIndex);
+                slotIngredientCodes.Add(code);
+                slotAmounts.Add(slotAmount);
             }
         }
-        finally
+
+        string requestId = Guid.NewGuid().ToString("N");
+        var request = new Packet_RequestAlloyDeposit
         {
-            // Close the crucible inventory and sync with server
-            player.InventoryManager.CloseInventoryAndSync(crucibleInventory);
-        }
+            RequestId = requestId,
+            Position = BlockEntityPosition.Copy(),
+            AlloyCode = selectedOption.OutputCode.ToString(),
+            SlotIndices = [.. slotIndices],
+            SlotIngredientCodes = [.. slotIngredientCodes],
+            SlotAmounts = [.. slotAmounts]
+        };
+
+        depositSystem ??= capi.ModLoader.GetModSystem<AlloyDepositSystem>();
+        if (depositSystem?.RequestDeposit(request) != true) return;
+
+        pendingDepositRequestId = requestId;
+        SetDepositButtonEnabled(false);
     }
 
-    /// <summary>
-    /// Clears all items from crucible cooking slots back to player inventory.
-    /// </summary>
-    private void ClearCrucible(IPlayerInventoryManager playerInventory, ItemSlot[] cookingSlots)
+    private void OnDepositCompleted(Packet_AlloyDepositResult result)
     {
-        foreach (var slot in cookingSlots)
+        if (result.RequestId != pendingDepositRequestId) return;
+
+        pendingDepositRequestId = null;
+        SetDepositButtonEnabled(true);
+
+        if (result.ResultCode != AlloyDepositResultCode.Success)
         {
-            if (slot?.Itemstack is null) continue;
-            WithdrawFromCrucible(playerInventory, slot, slot.Itemstack.StackSize);
-        }
-    }
-
-    /// <summary>
-    /// Withdraws items from a crucible slot back to player inventory.
-    /// </summary>
-    private void WithdrawFromCrucible(
-        IPlayerInventoryManager playerInventory,
-        ItemSlot sourceSlot,
-        int amount)
-    {
-        if (sourceSlot?.Itemstack is null || amount <= 0) return;
-
-        var remaining = Math.Min(amount, sourceSlot.Itemstack.StackSize);
-
-        // Get player's own inventories (backpack and hotbar) - these are the inventories we can withdraw to
-        var backpackInventory = playerInventory.GetOwnInventory(GlobalConstants.backpackInvClassName);
-        var hotbarInventory = playerInventory.GetOwnInventory(GlobalConstants.hotBarInvClassName);
-
-        // Try to place in backpack first, then hotbar
-        remaining = WithdrawToInventory(playerInventory, sourceSlot, backpackInventory, remaining);
-        if (remaining > 0)
-        {
-            remaining = WithdrawToInventory(playerInventory, sourceSlot, hotbarInventory, remaining);
-        }
-    }
-
-    /// <summary>
-    /// Helper method to withdraw items from a source slot to a target inventory.
-    /// </summary>
-    private int WithdrawToInventory(
-        IPlayerInventoryManager playerInventory,
-        ItemSlot sourceSlot,
-        IInventory? targetInventory,
-        int remaining)
-    {
-        if (targetInventory is null || remaining <= 0) return remaining;
-
-        foreach (var targetSlot in targetInventory)
-        {
-            if (remaining <= 0) break;
-            if (targetSlot is null) continue;
-
-            // Check if slot can accept this item
-            if (!targetSlot.Empty && !targetSlot.Itemstack.Equals(capi.World, sourceSlot.Itemstack, GlobalConstants.IgnoredStackAttributes))
+            string resultKey = result.ResultCode switch
             {
-                continue;
-            }
-
-            var canFit = targetSlot.Empty
-                ? Math.Min(remaining, sourceSlot.Itemstack.Collectible.MaxStackSize)
-                : Math.Min(remaining, targetSlot.Itemstack.Collectible.MaxStackSize - targetSlot.Itemstack.StackSize);
-
-            if (canFit <= 0) continue;
-
-            // Use TryTransferTo which handles networking
-            var op = new ItemStackMoveOperation(capi.World, EnumMouseButton.Left, 0, EnumMergePriority.AutoMerge, canFit);
-            op.ActingPlayer = capi.World.Player;
-
-            var packet = playerInventory.TryTransferTo(sourceSlot, targetSlot, ref op);
-
-            if (packet is not null)
-            {
-                capi.Network.SendBlockEntityPacket(BlockEntityPosition.X, BlockEntityPosition.Y, BlockEntityPosition.Z, packet);
-            }
-
-            remaining -= op.MovedQuantity;
-        }
-
-        return remaining;
-    }
-
-    /// <summary>
-    /// Finds and deposits matching items from player inventory into a specific crucible slot.
-    /// </summary>
-    private void DepositFromPlayerInventory(
-        IPlayerInventoryManager playerInventory,
-        ItemSlot targetSlot,
-        HashSet<AssetLocation> validItemCodes,
-        int itemsToDeposit)
-    {
-        var remaining = itemsToDeposit;
-
-        // Get player's own inventories (backpack and hotbar) - these are the inventories we can deposit from
-        var backpackInventory = playerInventory.GetOwnInventory(GlobalConstants.backpackInvClassName);
-        var hotbarInventory = playerInventory.GetOwnInventory(GlobalConstants.hotBarInvClassName);
-
-        // Try to deposit from backpack first, then hotbar
-        remaining = DepositFromInventory(playerInventory, backpackInventory, targetSlot, validItemCodes, remaining);
-        if (remaining > 0)
-        {
-            remaining = DepositFromInventory(playerInventory, hotbarInventory, targetSlot, validItemCodes, remaining);
+                AlloyDepositResultCode.InventoryClosed => "inventory-closed",
+                AlloyDepositResultCode.InvalidRecipe => "invalid-recipe",
+                AlloyDepositResultCode.InsufficientItems => "insufficient-items",
+                AlloyDepositResultCode.InsufficientSpace => "insufficient-space",
+                AlloyDepositResultCode.TransferFailed => "transfer-failed",
+                _ => "invalid-request"
+            };
+            capi.TriggerIngameError(
+                this,
+                $"alloy-deposit-{resultKey}",
+                Lang.Get($"{Constants.ModId}:gui-alloycalculator-deposit-{resultKey}"));
         }
     }
 
-    /// <summary>
-    /// Helper method to deposit matching items from a source inventory into a target slot.
-    /// </summary>
-    private int DepositFromInventory(
-        IPlayerInventoryManager playerInventory,
-        IInventory? sourceInventory,
-        ItemSlot targetSlot,
-        HashSet<AssetLocation> validItemCodes,
-        int remaining)
+    private void SetDepositButtonEnabled(bool enabled)
     {
-        if (sourceInventory is null || remaining <= 0) return remaining;
-
-        foreach (var slot in sourceInventory)
+        GuiElementTextButton? button = SingleComposer?.GetButton("depositButton");
+        if (button is not null)
         {
-            if (remaining <= 0) break;
-            if (slot?.Itemstack is null) continue;
-
-            // Check if this item is one of our valid ingredient variants
-            if (!validItemCodes.Contains(slot.Itemstack.Collectible.Code)) continue;
-
-            var itemsToTake = Math.Min(remaining, slot.Itemstack.StackSize);
-            if (itemsToTake <= 0) continue;
-
-            var deposited = TryDepositIntoSlot(playerInventory, slot, targetSlot, itemsToTake);
-            remaining -= deposited;
+            button.Enabled = enabled;
         }
-
-        return remaining;
-    }
-
-    /// <summary>
-    /// Tries to move items from a source slot into a specific target slot.
-    /// </summary>
-    private int TryDepositIntoSlot(
-        IPlayerInventoryManager playerInventory,
-        ItemSlot sourceSlot,
-        ItemSlot targetSlot,
-        int maxItems)
-    {
-        if (targetSlot is null) return 0;
-
-        // Check if slot can accept this item
-        if (!targetSlot.Empty && !targetSlot.Itemstack.Equals(capi.World, sourceSlot.Itemstack, GlobalConstants.IgnoredStackAttributes))
-        {
-            return 0;
-        }
-
-        var canFit = targetSlot.Empty
-            ? Math.Min(maxItems, sourceSlot.Itemstack.Collectible.MaxStackSize)
-            : Math.Min(maxItems, targetSlot.MaxSlotStackSize - targetSlot.Itemstack.StackSize);
-
-        if (canFit <= 0) return 0;
-
-        // Use TryTransferTo which handles networking
-        var op = new ItemStackMoveOperation(capi.World, EnumMouseButton.Left, 0, EnumMergePriority.AutoMerge, canFit);
-        op.ActingPlayer = capi.World.Player;
-
-        var packet = playerInventory.TryTransferTo(sourceSlot, targetSlot, ref op);
-
-        if (packet is not null)
-        {
-            capi.Network.SendBlockEntityPacket(BlockEntityPosition.X, BlockEntityPosition.Y, BlockEntityPosition.Z, packet);
-        }
-
-        return op.MovedQuantity;
     }
     #endregion
 
@@ -821,6 +707,16 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     public override void OnGuiOpened()
     {
         base.OnGuiOpened();
+
+        depositSystem = capi.ModLoader.GetModSystem<AlloyDepositSystem>();
+        depositSystem.DepositCompleted += OnDepositCompleted;
+
+        MetalDepositOption? detectedOption = DetectOptionFromCrucible();
+        if (detectedOption is not null)
+        {
+            OnAlloySelected(depositOptions.IndexOf(detectedOption).ToString(), true);
+            return;
+        }
 
         // Restore saved state or use defaults
         if (savedStates.TryGetValue(BlockEntityPosition, out var state))
@@ -837,12 +733,39 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         }
     }
 
+    private MetalDepositOption? DetectOptionFromCrucible()
+    {
+        BlockEntityFirepit? firepit = capi.World.BlockAccessor
+            .GetBlockEntity<BlockEntityFirepit>(BlockEntityPosition);
+        if (firepit?.Inventory is not InventorySmelting inventory) return null;
+
+        ItemStack[] contents = [.. inventory.CookingSlots
+            .Where(static slot => !slot.Empty)
+            .Select(static slot => slot.Itemstack)
+            .OfType<ItemStack>()];
+        return AlloyCalculatorLogic.FindOptionForContents(
+            contents,
+            depositOptions,
+            capi.GetMetalAlloys());
+    }
+
+    public override void OnGuiClosed()
+    {
+        if (depositSystem is not null)
+        {
+            depositSystem.DepositCompleted -= OnDepositCompleted;
+        }
+
+        pendingDepositRequestId = null;
+        capi.Gui.PlaySound(CloseSound);
+    }
+
     /// <summary>
     /// Restores slider values from saved state.
     /// </summary>
     private void RestoreSliderValues(SavedDialogState state)
     {
-        if (SingleComposer is null || selectedAlloy is null) return;
+        if (SingleComposer is null || selectedOption is null) return;
 
         isAdjustingSliders = true;
         try
@@ -895,10 +818,10 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
     public override bool TryOpen()
     {
-        if (alloys.Count == 0)
+        if (depositOptions.Count == 0)
         {
             LoadAlloys();
-            if (alloys.Count == 0)
+            if (depositOptions.Count == 0)
             {
                 return false; // No alloys available
             }
@@ -916,10 +839,10 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private static string GetMaterialDisplayName(in AssetLocation assetLocation)
         => AlloyCalculatorLogic.GetMaterialDisplayName(assetLocation);
 
-    private static string GetAlloyDisplayName(in AlloyRecipe alloy)
-        => AlloyCalculatorLogic.GetAlloyDisplayName(alloy.Output?.Code);
+    private static string GetDepositOptionDisplayName(in MetalDepositOption option)
+        => AlloyCalculatorLogic.GetAlloyDisplayName(option.OutputCode);
 
-    private static string GetIngredientDisplayName(in MetalAlloyIngredient ingredient)
-        => AlloyCalculatorLogic.GetIngredientDisplayName(ingredient?.Code);
+    private static string GetIngredientDisplayName(in MetalDepositIngredient ingredient)
+        => AlloyCalculatorLogic.GetIngredientDisplayName(ingredient.Code);
     #endregion
 }
