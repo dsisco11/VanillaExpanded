@@ -236,7 +236,7 @@ public class AutoStashTransferTests
             Times.Once);
         fixture.InventoryManagerMock.Verify(
             inventoryManager => inventoryManager.CloseInventoryAndSync(container.Inventory),
-            Times.Never);
+            Times.Once);
     }
 
     [Fact]

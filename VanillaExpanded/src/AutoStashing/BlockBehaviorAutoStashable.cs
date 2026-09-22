@@ -804,6 +804,8 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             totalStashed += AutoStashInventoryIntoInventory(world, playerInventory, playerName, targetInventory, targetPos, targetName, hotbarInventory, canAccept, getPreferredSlot);
         }
 
+        playerInventory.CloseInventoryAndSync(targetInventory);
+
         if (totalStashed > 0)
         {
             world.Api?.World.Logger.Audit("'{0}' auto-stashed {1} items into {2} at <{3}>.",
