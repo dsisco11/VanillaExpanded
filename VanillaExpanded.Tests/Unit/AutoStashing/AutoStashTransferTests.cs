@@ -355,6 +355,38 @@ public class AutoStashTransferTests
     }
 
     [Fact]
+    public void AutoStashToGenericContainer_FirstMatchingSlotFull_UsesAvailableMatchingSlot()
+    {
+        // Arrange
+        var sharedItem = MockItem.CreateNonLightSource(id: 1);
+        sharedItem.Code = new AssetLocation("game", "shared-item");
+        sharedItem.MaxStackSize = 64;
+
+        var fixture = CreateFixture();
+        fixture.WithBackpackSlot(0, sharedItem, stackSize: 10);
+
+        var container = MockBlockEntityContainer.WithItems(
+            new Dictionary<int, MockItem> { { 0, sharedItem }, { 1, sharedItem } },
+            totalSlots: 3,
+            api: fixture.Api);
+        container.Inventory[0].Itemstack!.StackSize = 64;
+        container.Inventory[1].Itemstack!.StackSize = 60;
+
+        // Act
+        bool result = BlockBehaviorAutoStashable.AutoStashToGenericContainer(
+            fixture.World,
+            fixture.Player,
+            container.Object);
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(64, container.Inventory[0].StackSize);
+        Assert.Equal(64, container.Inventory[1].StackSize);
+        Assert.Equal(6, container.Inventory[2].StackSize);
+        Assert.True(fixture.BackpackInventory[0].Empty);
+    }
+
+    [Fact]
     public void AutoStashToGenericContainer_TransferMovesNothing_StopsAndClosesInventory()
     {
         // Arrange

@@ -861,6 +861,13 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     {
         int totalMoved = 0;
         List<ItemSlot> skipSlots = [];
+        foreach (ItemSlot targetSlot in targetInventory)
+        {
+            if (!CanAcceptForAutoStash(targetSlot, sourceSlot))
+            {
+                skipSlots.Add(targetSlot);
+            }
+        }
 
         while (!sourceSlot.Empty)
         {
