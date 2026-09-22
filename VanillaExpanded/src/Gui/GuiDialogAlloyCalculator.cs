@@ -209,6 +209,11 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
         var alloyValues = depositOptions.Select(static (_, i) => i.ToString());
         var alloyNames = depositOptions.Select(static (option, _) => GetDepositOptionDisplayName(option));
+        var alloyIcons = depositOptions.Select(option =>
+        {
+            Item? outputItem = capi.World.GetItem(option.OutputCode);
+            return outputItem is null ? null : new ItemStack(outputItem);
+        });
         var selectedIndex = selectedOption is not null ? depositOptions.IndexOf(selectedOption) : 0;
         if (selectedIndex < 0) selectedIndex = 0;
 
@@ -217,7 +222,15 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             .AddShadedDialogBG(bgBounds)
             .AddDialogTitleBar(Lang.Get($"{Constants.ModId}:gui-alloycalculator-title"), OnTitleBarClose)
             .BeginChildElements(bgBounds)
-            .AddDropDown([.. alloyValues], [.. alloyNames], selectedIndex, OnAlloySelected, dropdownBounds, "alloyDropdown")
+            .AddInteractiveElement(new GuiElementItemStackDropDown(
+                capi,
+                [.. alloyValues],
+                [.. alloyNames],
+                [.. alloyIcons],
+                selectedIndex,
+                OnAlloySelected,
+                dropdownBounds,
+                CairoFont.WhiteSmallText()), "alloyDropdown")
             .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-dropdown-tooltip"), CairoFont.WhiteDetailText(), 250, dropdownBounds.FlatCopy(), "dropdownTooltip")
             .AddNumberInput(inputBounds, OnTargetUnitsChanged, CairoFont.WhiteDetailText(), "targetUnits")
             .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-targetunits-tooltip"), CairoFont.WhiteDetailText(), 250, inputBounds.FlatCopy(), "targetUnitsTooltip");
