@@ -1,6 +1,6 @@
 # Quick-Tool Radial Menu Proposal
 
-Status: Proposed
+Status: Approved
 
 ## Purpose
 
