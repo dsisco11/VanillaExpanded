@@ -23,7 +23,7 @@ Exclude favorites, nested menus, external-container tools, reconnect persistence
 
 Approval establishes the feature scope; the proposal still explicitly lists the following policy decisions. Resolve and record them before their dependent implementation. Use the proposal's suggested behavior as the starting point, not as an already verified API capability.
 
-☐ D1: Confirm tier, then remaining absolute durability, then stable inventory/slot order as candidate ranking; define unsupported or incomparable metadata handling.
+☐ D1: Confirm highest tier as the primary criterion, followed by the confirmed preference for lowest remaining absolute durability, then stable inventory/slot order; define unsupported or incomparable metadata handling. Lower-durability usable tools must be preferred within the same tier so tools closest to breaking are used up first.
 ☐ D2: Define eligible player-owned inventories and supported tool categories, including modded metadata. Exclude opened external containers.
 ☐ D3: Confirm chained selections preserve the item held before the first selection.
 ☐ D4: Confirm manual hotbar selection or held-item replacement ends the session.
@@ -88,7 +88,7 @@ Outcome: Quick-tool entries reflect current best candidates while retaining stab
 ☐ Refresh pending invalidation before opening; update visible candidate content/enabled state without moving wedges.
 ☐ Revalidate cached candidate identity, availability, and destination before any equipment request. Never trust a stale slot reference.
 ☐ Unsubscribe from replaced inventories and on disable/world exit; discard stale references and rebuild for the current player when enabled.
-☐ Verify best-candidate changes, deterministic ties, unsupported metadata, empty inventories, excluded containers, durability changes, notification batching, stale entries, and inventory replacement.
+☐ Verify best-candidate changes, deterministic ties, unsupported metadata, empty inventories, excluded containers, durability changes, notification batching, stale entries, and inventory replacement. Include a regression case proving that a usable tool with lower remaining absolute durability beats a higher-durability tool of the same tier, with deterministic ties and unusable/broken tools excluded.
 ☐ Verify identical wedge positions across reopenings, acquisition/removal, inventory reorder, ranking changes, and shuffled category registration.
 
 Completion criteria:

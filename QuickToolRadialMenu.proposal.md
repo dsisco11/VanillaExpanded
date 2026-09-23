@@ -58,10 +58,10 @@ Cache one candidate per category, including the information needed to render the
 Proposed ranking within a category:
 
 1. Highest tool tier.
-2. Greatest remaining absolute durability.
+2. Lowest remaining absolute durability among usable tools of the same tier, so tools closest to breaking are used up first.
 3. A deterministic inventory and slot ordering to resolve ties.
 
-Ranking is a policy choice requiring confirmation before implementation. Unsupported or incomparable modded tool metadata needs a documented fallback; avoid inventing equivalence between unrelated categories.
+The preference for lower remaining durability is confirmed. Tier precedence remains the proposed primary ranking criterion and requires confirmation before implementation. Unsupported or incomparable modded tool metadata needs a documented fallback; avoid inventing equivalence between unrelated categories.
 
 Build the cache when the feature becomes available. Inventory changes invalidate relevant candidate data. Coalesce notifications produced by one inventory operation into a single refresh after the operation completes. A full scan of eligible inventory is an acceptable initial implementation if its cost is small; incremental indexing is not required by this proposal.
 
@@ -128,7 +128,7 @@ The initial feature covers tool-category selection, the reusable radial interact
 
 ## Decisions to Confirm
 
-- Whether tier followed by remaining absolute durability is the desired definition of best.
+- Whether highest tool tier remains the primary ranking criterion. Within the same tier, lower remaining absolute durability is preferred; that direction is confirmed.
 - Which player inventories and tool categories are eligible, including treatment of modded tools.
 - Whether chained selections restore the original held item as proposed.
 - Whether manual hotbar selection ends the restoration session as proposed.
@@ -141,7 +141,7 @@ The initial feature covers tool-category selection, the reusable radial interact
 - Holding the configured key opens the menu; releasing without a click changes no equipment.
 - A selection click commits once, closes the menu, and does not also interact with the world.
 - The center circle consistently represents unequip/restore.
-- Each eligible category exposes its highest-ranked candidate under the chosen policy.
+- Each eligible category exposes its highest-ranked candidate under the chosen policy. Among usable tools of the same tier, the tool with the lowest remaining absolute durability wins; equal durability uses the deterministic inventory/slot tie-breaker.
 - Inventory and ranking-relevant changes refresh cached results without a per-frame inventory scan.
 - Each category retains the same wedge across menu openings, inventory reorderings, tool acquisition or removal, and best-candidate changes. Unavailable categories retain disabled wedges; the remaining wedges never compact or redistribute. The same supported category set and layout configuration produce identical positions regardless of registration or inventory enumeration order.
 - Selecting tool B while holding item A, then selecting unequip, returns B to its original location and restores A when the arrangement remains valid.
