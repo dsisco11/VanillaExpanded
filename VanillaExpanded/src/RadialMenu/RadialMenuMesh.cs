@@ -11,7 +11,7 @@ internal static class RadialMenuMesh
     public static MeshData Build(RadialMenuLayout layout, double supportedRadiusPixels)
     {
         if (supportedRadiusPixels <= 0) throw new ArgumentOutOfRangeException(nameof(supportedRadiusPixels));
-        double wedgeRadians = layout.StepDegrees * Math.PI / 180d;
+        double wedgeRadians = layout.WedgeIds.Count == 0 ? 0 : layout.StepDegrees * Math.PI / 180d;
         double tolerance = Math.Min(0.5d / (supportedRadiusPixels * layout.OuterRadius), 0.25d);
         double segmentAngle = 2d * Math.Acos(1d - tolerance);
         int segments = Math.Max(1, (int)Math.Ceiling(wedgeRadians / segmentAngle));

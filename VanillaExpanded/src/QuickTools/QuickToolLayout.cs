@@ -5,7 +5,7 @@ using Vintagestory.API.Common;
 
 namespace VanillaExpanded.QuickTools;
 
-/// <summary>Owns the versioned, inventory-independent order of quick-tool entries.</summary>
+/// <summary>Owns the inventory-independent ordering of supported quick-tool identifiers.</summary>
 public static class QuickToolLayout
 {
     /// <summary>Gets the stable identifier for the light selection provider.</summary>
@@ -29,11 +29,21 @@ public static class QuickToolLayout
     private static readonly HashSet<EnumTool> Supported = [.. Categories];
 
     #region Public API
-    /// <summary>Gets the 34 stable outer identifiers in clockwise order from screen up.</summary>
+    /// <summary>Gets supported identifiers in their clockwise menu order.</summary>
     public static IReadOnlyList<string> WedgeIds => Ids;
 
-    /// <summary>Creates the fixed geometry supplied to the reusable menu.</summary>
-    public static RadialMenuLayout CreateLayout() => new(Ids, RestoreId, 0.18, 0.24, 1, 0, true);
+    /// <summary>Creates geometry for the currently available identifiers in canonical order.</summary>
+    public static RadialMenuLayout CreateLayout(IReadOnlyList<string> availableIds)
+    {
+        ArgumentNullException.ThrowIfNull(availableIds);
+        var supported = new HashSet<string>(Ids, StringComparer.Ordinal);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (string id in availableIds)
+        {
+            if (!supported.Contains(id) || !seen.Add(id)) throw new ArgumentException("Expected distinct supported identifiers.", nameof(availableIds));
+        }
+        return new RadialMenuLayout(availableIds, RestoreId, 0.18, 0.24, 1, 0, true);
+    }
 
     /// <summary>Returns an identifier only for a category in the explicit supported set.</summary>
     public static string? GetToolId(EnumTool category) => Supported.Contains(category) ? $"tool:{category}" : null;

@@ -45,7 +45,7 @@ public sealed class RadialMenuSystem : ModSystem, IRadialMenu
     #endregion
 
     #region Public API
-    /// <summary>Opens caller-supplied generic entries at fixed positions for one interaction.</summary>
+    /// <summary>Opens caller-supplied generic entries at the supplied circular positions.</summary>
     public bool Open(RadialMenuLayout layout, IEnumerable<RadialMenuEntry> entries, Action<string> selected, Action cancelled)
     {
         ArgumentNullException.ThrowIfNull(selected);
@@ -66,6 +66,9 @@ public sealed class RadialMenuSystem : ModSystem, IRadialMenu
 
     /// <summary>Refreshes entry content without moving wedges or uploading geometry.</summary>
     public void UpdateEntries(IEnumerable<RadialMenuEntry> entries) => dialog?.UpdateEntries(entries);
+
+    /// <summary>Updates the open interaction when its available entry set changes.</summary>
+    public void UpdateLayout(RadialMenuLayout layout, IEnumerable<RadialMenuEntry> entries) => dialog?.UpdateLayout(layout, entries);
 
     /// <summary>Cancels an open menu on release, focus loss, feature disablement, or world exit.</summary>
     public void Cancel() => dialog?.Cancel();

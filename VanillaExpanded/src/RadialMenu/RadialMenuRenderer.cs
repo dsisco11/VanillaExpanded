@@ -130,7 +130,7 @@ internal sealed class RadialMenuRenderer : IDisposable
                 shader.Uniform("centerRadius", (float)layout.CenterRadius);
                 shader.Uniform("innerRadius", (float)layout.InnerRadius);
                 shader.Uniform("outerRadius", (float)layout.OuterRadius);
-                shader.Uniform("separatorFraction", (float)(layout.SeparatorDegrees / layout.StepDegrees));
+                shader.Uniform("separatorFraction", layout.WedgeIds.Count == 0 ? 0 : (float)(layout.SeparatorDegrees / layout.StepDegrees));
                 shader.Uniform("animationTime", animationTime);
                 matrix.Set(capi.Render.CurrentModelviewMatrix).Translate(centerX, centerY, 50).Scale(radiusPixels, radiusPixels, 1);
                 ((IShaderProgram)shader).UniformMatrix("projectionMatrix", capi.Render.CurrentProjectionMatrix);

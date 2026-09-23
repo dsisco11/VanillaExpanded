@@ -23,8 +23,9 @@ public sealed class QuickToolCandidateTests
             Assert.Equal(QuickToolLayout.WedgeIds[i], QuickToolLayout.GetToolId(Enum.Parse<EnumTool>(categories[i])));
         }
         Assert.Equal(QuickToolLayout.LightId, QuickToolLayout.WedgeIds[33]);
-        Assert.Equal(QuickToolLayout.WedgeIds, QuickToolLayout.CreateLayout().WedgeIds);
-        Assert.Equal("unequip", QuickToolLayout.CreateLayout().CenterId);
+        var available = new[] { "tool:Knife", QuickToolLayout.LightId };
+        Assert.Equal(available, QuickToolLayout.CreateLayout(available).WedgeIds);
+        Assert.Equal("unequip", QuickToolLayout.CreateLayout([]).CenterId);
         Assert.Null(QuickToolLayout.GetToolId((EnumTool)500));
     }
     #endregion
@@ -210,7 +211,7 @@ public sealed class QuickToolCandidateTests
         cache.Bind(f.Manager.Object, f.Offhand);
         Assert.Null(cache.GetCached("tool:500"));
         Assert.Single(diagnostics, message => message.Contains("500"));
-        Assert.Equal(34, cache.CreateEntries(false).Count - 1);
+        Assert.Single(cache.CreateEntries(false));
     }
 
     /// <summary>Changed quantity and hand identity cannot reuse an earlier displayed hint.</summary>
@@ -228,17 +229,17 @@ public sealed class QuickToolCandidateTests
         displayed.Stack.StackSize = 1;
         Assert.False(cache.Revalidate("tool:Axe", displayed, f.Hotbar[2], out _));
     }
-    /// <summary>Empty inventories keep all outer wedges disabled and candidate reorder never moves them.</summary>
+    /// <summary>Only current candidates are presented, preserving provider order across reorderings.</summary>
     [Fact]
-    public void Cache_EmptyAndReorderedInventoriesKeepWedgePositions()
+    public void Cache_EmptyAndReorderedInventoriesPresentOnlyCandidates()
     {
         var f = new Fixture();
         using var cache = new QuickToolCandidateCache();
         cache.Bind(f.Manager.Object, f.Offhand);
         var empty = cache.CreateEntries(false);
-        Assert.Equal(35, empty.Count);
-        Assert.All(empty, entry => Assert.False(entry.Enabled));
-        string[] ids = empty.Select(entry => entry.Id).ToArray();
+        Assert.Single(empty);
+        Assert.Equal("unequip", empty[0].Id);
+        Assert.False(empty[0].Enabled);
 
         f.Put(f.Hotbar[1], 1, EnumTool.Knife, 2, 8);
         f.Put(f.Hotbar[2], 2, EnumTool.Knife, 2, 8);
@@ -249,7 +250,7 @@ public sealed class QuickToolCandidateTests
         cache.Invalidate();
         cache.RefreshPending();
         Assert.Same(f.Hotbar[1], cache.GetCached("tool:Knife")?.Slot);
-        Assert.Equal(ids, cache.CreateEntries(false).Select(entry => entry.Id));
+        Assert.Equal(new[] { "tool:Knife", "unequip" }, cache.CreateEntries(false).Select(entry => entry.Id));
     }
     #endregion
 

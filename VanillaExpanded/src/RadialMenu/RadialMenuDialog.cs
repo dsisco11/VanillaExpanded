@@ -184,6 +184,15 @@ internal sealed class RadialMenuDialog : GuiDialog
     /// <summary>Changes labels, icons, and availability while retaining the fixed wedge mesh.</summary>
     public void UpdateEntries(IEnumerable<RadialMenuEntry> entries) => interaction?.UpdateEntries(entries);
 
+    /// <summary>Changes an open layout and its entries without releasing the dialog's input capture.</summary>
+    public void UpdateLayout(RadialMenuLayout nextLayout, IEnumerable<RadialMenuEntry> entries)
+    {
+        if (interaction?.IsOpen != true) return;
+        interaction.UpdateLayout(nextLayout, entries);
+        layout = nextLayout;
+        renderer.PrepareLayout(nextLayout);
+    }
+
     /// <summary>Cancels the current interaction and restores normal GUI input ownership.</summary>
     public void Cancel()
     {

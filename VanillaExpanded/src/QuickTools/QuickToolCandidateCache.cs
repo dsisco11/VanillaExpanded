@@ -200,7 +200,7 @@ public sealed class QuickToolCandidateCache : IDisposable
         return true;
     }
 
-    /// <summary>Creates fixed menu content, leaving the center disabled until the equipment owner supplies session state.</summary>
+    /// <summary>Creates content only for available candidates, plus the center restoration action.</summary>
     public IReadOnlyList<RadialMenuEntry> CreateEntries(bool canRestore)
     {
         RefreshPending();
@@ -208,8 +208,8 @@ public sealed class QuickToolCandidateCache : IDisposable
         foreach (string id in QuickToolLayout.WedgeIds)
         {
             QuickToolCandidate? candidate = GetCached(id);
-            entries.Add(new RadialMenuEntry(id, candidate?.Stack.GetName() ?? string.Empty, candidate is not null,
-                candidate is null ? null : new QuickToolItemIcon(candidate.Stack)));
+            if (candidate is not null)
+                entries.Add(new RadialMenuEntry(id, candidate.Stack.GetName(), true, new QuickToolItemIcon(candidate.Stack)));
         }
         entries.Add(new RadialMenuEntry(QuickToolLayout.RestoreId, "Unequip", canRestore));
         return entries;

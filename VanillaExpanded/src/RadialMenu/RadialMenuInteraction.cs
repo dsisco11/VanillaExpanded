@@ -7,7 +7,7 @@ namespace VanillaExpanded.RadialMenu;
 public sealed class RadialMenuInteraction
 {
     #region State
-    private readonly RadialMenuLayout layout;
+    private RadialMenuLayout layout;
     private readonly Dictionary<string, RadialMenuEntry> entries = new(StringComparer.Ordinal);
     private bool isOpen;
     private bool isFinished;
@@ -43,14 +43,26 @@ public sealed class RadialMenuInteraction
         }
 
         // Every fixed wedge and the center keep a visible entry even when unavailable.
-        if (replacement.Count != layout.WedgeIds.Count + 1 || !replacement.ContainsKey(layout.CenterId)) throw new ArgumentException("Content must cover the complete fixed layout.", nameof(newEntries));
+        if (replacement.Count != layout.WedgeIds.Count + 1 || !replacement.ContainsKey(layout.CenterId)) throw new ArgumentException("Content must cover the complete layout.", nameof(newEntries));
         foreach (string id in layout.WedgeIds)
         {
-            if (!replacement.ContainsKey(id)) throw new ArgumentException("Content must cover the complete fixed layout.", nameof(newEntries));
+            if (!replacement.ContainsKey(id)) throw new ArgumentException("Content must cover the complete layout.", nameof(newEntries));
         }
 
         entries.Clear();
         foreach (var pair in replacement) entries.Add(pair.Key, pair.Value);
+    }
+
+    /// <summary>Replaces the current geometry and content as one interaction update.</summary>
+    public void UpdateLayout(RadialMenuLayout nextLayout, IEnumerable<RadialMenuEntry> newEntries)
+    {
+        ArgumentNullException.ThrowIfNull(nextLayout);
+        var replacement = new RadialMenuInteraction(nextLayout, newEntries);
+        layout = nextLayout;
+        entries.Clear();
+        foreach (string id in nextLayout.WedgeIds) entries.Add(id, replacement.GetEntry(id));
+        entries.Add(nextLayout.CenterId, replacement.GetEntry(nextLayout.CenterId));
+        HoveredId = null;
     }
 
     /// <summary>Gets content by its stable identifier.</summary>

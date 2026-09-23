@@ -12,6 +12,8 @@ public interface IRadialMenu
     bool Open(RadialMenuLayout layout, IEnumerable<RadialMenuEntry> entries, Action<string> selected, Action cancelled);
     /// <summary>Updates content without changing layout.</summary>
     void UpdateEntries(IEnumerable<RadialMenuEntry> entries);
+    /// <summary>Replaces geometry and content together when the caller's available set changes.</summary>
+    void UpdateLayout(RadialMenuLayout layout, IEnumerable<RadialMenuEntry> entries);
     /// <summary>Cancels the current dialog and releases its input.</summary>
     void Cancel();
 }

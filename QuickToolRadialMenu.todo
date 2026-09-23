@@ -1,11 +1,11 @@
 # Quick-Tool Radial Menu Implementation TODO
 
 Source proposal: [QuickToolRadialMenu.proposal.md](QuickToolRadialMenu.proposal.md)
-Status: Phases 2-5 and the shared-selector investigation are complete at their stated source/integration boundaries (2026-09-23). Phase 5 wires the hold menu, cached entries, local equipment results, localization and lifecycle, with retained traceability, second review and completion audit. Earlier missing evidence records are identified explicitly below. Phase 6 runtime acceptance remains unstarted.
+Status: Phases 2-5 and the shared-selector investigation are complete at their stated source/integration boundaries (2026-09-23). A later user-directed amendment makes outer wedges follow available entries; earlier fixed-position evidence is historical. Phase 6 runtime acceptance remains unstarted.
 
 ## Goal and scope
 
-Deliver separate reusable radial-menu and quick-tool functionality systems. Holding the key opens the menu; clicking equips the best tool in a category; the center restores previous equipment. Tool-category and virtual-entry positions remain fixed across inventory changes and menu openings. Include a Light source virtual entry using shared existing selection logic. Use client-owned restoration and the game's native inventory flip packets; reconcile interrupted sequences without loss, duplication, or false success.
+Deliver separate reusable radial-menu and quick-tool functionality systems. Holding the key opens the menu; clicking equips the best tool in a category; the center restores previous equipment. The outer ring has one wedge for each available entry, in canonical provider order. Include a Light source virtual entry using shared existing selection logic. Use client-owned restoration and the game's native inventory flip packets; reconcile interrupted sequences without loss, duplication, or false success.
 
 Exclude favorites, nested menus, external-container tools, reconnect persistence, arbitrary inventory undo, and unrelated light-source feature changes. A behavior-preserving shared selector extraction for the virtual Light source entry is in scope. Full inventory scans on invalidation are allowed; incremental indexing is not required. No per-frame inventory scanning.
 
@@ -31,7 +31,7 @@ The [implementation contract](docs/quick-tool/ImplementationContract.md) records
 ✔ D4: Confirm manual hotbar selection or held-item replacement ends the session.
 ✔ D5: Choose whether an unusable original return slot permits another eligible empty slot or requires unchanged-inventory failure.
 ✔ D6: Confirm center disabled without a valid session, or explicitly revise scope for manually equipped tools before implementing that extension.
-✔ D7: Define the exact category-to-wedge table, starting angle, direction, and deterministic modded-category extension policy. Disabled wedges for unavailable categories are already required, not an open decision.
+✔ D7: Define the supported provider order, starting angle, direction, and deterministic modded-category extension policy. The later amendment omits unavailable categories from the ring.
 
 ## Phase 1: Resolve policy and prove inventory integration contracts
 
@@ -68,13 +68,13 @@ The earlier completion audit covers the original tool-only contract. The request
 Dependencies: Phase 1 input and ownership contracts.
 Outcome: Generic entries can be displayed and selected without any tool or inventory dependency.
 
-✔ Define menu entries with stable identifiers, labels, icons, enabled state, supplied fixed positions, and a center entry; expose selection/cancellation reporting. Accept tool-category and virtual entries identically without requiring EnumTool in the reusable menu API.
+✔ Define menu entries with stable identifiers, labels, icons, enabled state, supplied positions, and a center entry; expose selection/cancellation reporting. Accept tool-category and virtual entries identically without requiring EnumTool in the reusable menu API.
 ✔ Implement cached mesh rendering and CPU hit detection with a fixed starting angle/direction supplied through the agreed layout contract.
     ✔ Generate and upload one combined mesh for all wedges and the center, with constant per-triangle entry identifiers; draw the background in one call.
     ✔ Cache geometry across frames and reopenings. Rebuild only for geometric layout changes or required resource recreation; use transforms for position and uniform scale.
-    ✔ Retain unavailable categories in the mesh. Hover, selection, enabled state, animation, and candidate changes update shader/entry data without rebuilding or re-uploading geometry.
+    ✔ Historical fixed mesh behavior. The later amendment rebuilds geometry when availability changes the wedge count; hover, selection, animation and candidate-item changes alone update state/content.
     ✔ Implement shader-driven colors, highlighting, disabled appearance, animation, and edge effects using mesh entry identifiers rather than full-quad per-fragment angular classification.
-    ✔ Define arc tessellation tolerance across supported GUI scales and supply antialiasing edge data. Retessellate only when a scale change exceeds the supported tolerance, preserving category positions.
+    ✔ Define arc tessellation tolerance across supported GUI scales and supply antialiasing edge data. Retessellate when scale exceeds tolerance or available wedge count changes.
     ✔ Render icons and cached text separately through existing game APIs; maintain a generic icon contract without quick-tool policy in the radial-menu system.
     ✔ Match CPU hit testing to rendering coordinates, radii, angular layout, direction, and separator/boundary behavior; send the hovered identifier to the shader without GPU readback.
     ✔ Own shader reload, mesh disposal/recreation, and render-state restoration within the radial-menu system; use radial-progress rendering conventions where applicable.
@@ -95,15 +95,15 @@ Implementation retained in commit `7d66d77`. The previously linked review files 
 ## Phase 3: Deterministic category layout and candidate cache
 
 Dependencies: Phase 1 D1, D2, D7 and inventory events, plus virtual-entry selector prerequisites; Phase 2 entry contract.
-Outcome: Quick-tool entries reflect current best candidates while retaining stable positions.
+Outcome: Quick-tool entries reflect current best candidates in deterministic provider order. Available entries now share the outer ring equally.
 
 ✔ Implement the canonical category-to-wedge mapping owned by quick-tools and supplied to the menu.
     ✔ Build identical layouts for the same supported set/configuration regardless of registration or inventory enumeration order.
-    ✔ Retain disabled wedges for missing tools; never compact, rotate, or resize because of inventory changes.
-    ✔ Apply the modded-category policy using stable category identifiers. Discovering an item cannot insert a wedge dynamically.
+    ✔ Historical fixed-position implementation; superseded by the available-entry amendment below.
+    ✔ Apply the modded-category policy using stable category identifiers. An available supported category now adds a wedge under the later amendment.
     ✔ Permit structural rebuild only for supported-category-set or explicit configuration changes, deferred until the menu is closed.
 ✔ Introduce a small stable entry/provider contract for tool categories and virtual selections, with cached real-slot candidates; keep semantic selection outside radial-menu rendering.
-✔ Add `virtual:light-source` at fixed index 33 after tool indices 0-32 (34 outer entries total); retain its disabled wedge when absent. This explicit supported-set amendment changes the planned layout once; inventory changes never change positions.
+✔ Add `virtual:light-source` after tool categories in the supported provider order. Its wedge is now present only while an eligible candidate exists, under the later amendment.
 ✔ Extract/reuse the existing light-source selector as one shared side-independent owner consumed by EquipLightSource and the virtual provider. Preserve offhand, active-hand, brightest-hotbar, brightest-backpack priority, positive LightHsv[2] recognition, and stable equal-brightness ties; do not apply tool-tier/durability ranking to this provider.
 ✔ Include offhand-source observation and active-hotbar changes in virtual candidate invalidation, with no per-frame inventory scan; verify current selector inputs again on selection.
 ✔ Add focused selection parity coverage for lanterns/torches/oil lamps or representative light collectibles, no light, held/offhand preference, equal brightness, brighter backpack versus dimmer hotbar, and legacy hotkey behavior after extraction.
@@ -114,7 +114,7 @@ Outcome: Quick-tool entries reflect current best candidates while retaining stab
 ✔ Revalidate cached candidate identity, availability, and destination before any equipment operation. Never trust a stale slot reference.
 ✔ Unsubscribe from replaced inventories and on disable/world exit; discard stale references and rebuild for the current player when enabled.
 ✔ Verify best-candidate changes, deterministic ties, unsupported metadata, empty inventories, excluded containers, durability changes, notification batching, stale entries, and inventory replacement. Include a regression case proving that a usable tool with lower remaining absolute durability beats a higher-durability tool of the same tier, with deterministic ties and unusable/broken tools excluded.
-✔ Verify identical wedge positions across reopenings, acquisition/removal, inventory reorder, ranking changes, and shuffled category registration.
+✔ Historical fixed-position verification; superseded for acquisition/removal by the available-entry amendment. Provider order remains deterministic.
 
 Completion criteria:
 ✔ Chosen ranking and eligibility policies are covered by focused tests.
@@ -162,19 +162,21 @@ Outcome: The feature is usable through its configured keybind with reusable menu
 
 ✔ Extend the existing QuickToolSystem and QuickToolClientOperations from Phase 4 with menu/cache/keybind integration. Reuse their equipment and lifecycle ownership; do not register a second equipment owner. Wire feature enablement and cleanup using existing conventions.
 ✔ Register and localize the keybind; hold opens, release without click cancels, click selects once and closes, and continued hold cannot reopen until release/repress.
-✔ Supply cached entries with the resolved items' game-localized names (including Light), leaving unavailable wedges unlabeled, and canonical geometry to the radial-menu system; route selected identifiers through current candidate validation and equipment execution.
+✔ Supply cached available entries with the resolved items' game-localized names (including Light), and geometry with the matching wedge count to the radial-menu system; route selected identifiers through current candidate validation and equipment execution.
 ✔ Keep the center labeled Unequip and explain restoration where applicable. Call QuickToolClientOperations.ValidateRestoration once when preparing menu-open availability under D6; HasSession alone does not establish a valid reference or return route. Use Restore on click for fresh validation, and handle changes since opening. Never scan inventory every render frame.
 ✔ Localize and display the Light source entry using its resolved item's icon and availability; keep provider-specific policy out of radial-menu code.
 ✔ Handle the return value of Select/Restore for localized rejected, interrupted, or session-invalidated feedback, including calls that return before LocalResult fires. Avoid duplicate feedback if also subscribing to LocalResult. LocallyApplied describes the local operation, not server confirmation. Guard synchronous reentrancy and prevent gameplay click-through; do not add pending-server-result UI.
 ✔ Separate menu lifetime from equipment lifetime. Ordinary menu close, release/cancel, and focus loss release input and UI resources while preserving an intact equipment session across openings. Manual active-hotbar change, feature disablement, player/world replacement, and disposal clear the session; menu-open/action validation handles invalid stack references. Candidate-cache subscriptions follow feature/player lifetime.
-✔ Add integration verification for input-to-selection-to-local result, stale open-menu candidates, changes between menu-open validation and click, disabled center/categories, immediate reopen-and-select without callbacks/ticks, and synchronous reentrancy. Verify menu close/cancel/focus loss preserve restoration, while equipment lifecycle events clear it.
+✔ Add integration verification for input-to-selection-to-local result, stale open-menu candidates, changes between menu-open validation and click, disabled center and omitted unavailable categories, immediate reopen-and-select without callbacks/ticks, and synchronous reentrancy. Verify menu close/cancel/focus loss preserve restoration, while equipment lifecycle events clear it.
 ✔ Review source layout, dependency direction, documentation comments, region organization, and absence of unnecessary wrapper methods.
 
 Completion criteria:
 ✔ Both functionality systems are independently owned; radial-menu code has no quick-tool dependency.
 ✔ End-to-end integration satisfies the approved interaction sequence and preserves existing equip-light behavior.
 
-Completion evidence: [traceability](docs/quick-tool/Phase5Traceability.md), [second review](docs/quick-tool/Phase5SecondReview.md), and [independent completion audit](docs/quick-tool/Phase5CompletionAudit.md). Production build passed; 136 focused tests passed. Live acceptance remains in Phase 6.
+Completion evidence from the earlier menu integration was not retained in this checkout. Current source, regression coverage, and the [available-entry amendment](docs/quick-tool/AvailableEntryLayout.md) document the present behavior. Live acceptance remains in Phase 6.
+
+Available-entry amendment (2026-09-23): Build the ring from currently available cached candidates in canonical provider order. Preserve the center independently; support zero outer wedges. Rebuild geometry and hit targets on candidate addition/removal, including while open; reuse geometry when only the candidate item or IDs change at the same wedge count. Revalidate the displayed ItemStack on selection. The earlier fixed-position checks above document the superseded design, not current acceptance.
 
 ## Phase 6: Runtime acceptance and delivery evidence
 
@@ -185,7 +187,7 @@ Outcome: Evidence supports the feature's behavior in the actual game and support
 ☐ Use the repository's package workflow if required for loading the mod; verify menu/localization assets are included. Do not publish or deploy as part of this plan.
 ☐ Verify live interaction: hold, mouse direction, center/wedge click, cancel, continued hold, camera suppression, no world click-through, focus loss, and cleanup.
 ☐ Verify smooth arcs and separators, highlight/disabled appearance, icon/text composition, input alignment across supported GUI scales, and shader reload/resource cleanup. These are visual and correctness checks, not performance tests.
-☐ Verify fixed category locations through repeated openings, inventory rearrangement, acquisition/removal, candidate upgrades, and missing-tool disabled wedges.
+☐ Verify that only available entries have wedges, ordered deterministically across repeated openings, inventory rearrangement and candidate upgrades; acquisition/removal changes count and hit targets during open interaction and on reopening.
 ☐ Verify A-to-B-to-unequip, empty-hand restoration, and A-to-B-to-C-to-unequip with actual slot contents before/after, including mixed tool/light selections and supported offhand-source restoration.
 ☐ Verify restoration across separate menu openings, ordinary close/cancel/focus loss, and selections separated by normal gameplay. Move the original ItemStack to another eligible slot before restoring; verify current-location lookup and unrelated-item preservation. Verify reference loss between menu open and click produces local unavailable feedback without substitution.
 ☐ Verify conflict cases: manual hotbar change, moved/removed/broken items, unavailable return slots, no valid fallback, and feature/world lifecycle changes.
@@ -200,10 +202,10 @@ Completion criteria:
 ## Proposal coverage and final acceptance
 
 - Functional requirements and system responsibilities: Phases 1-5.
-- Interaction and deterministic positions: Phases 2, 3, 5, 6.
+- Interaction and deterministic available-entry order: Phases 2, 3, 5, 6 and the later amendment.
 - Approved cached-mesh rendering, shader effects, and rendering lifecycle: Phases 2 and 6; no performance-testing gate.
 - Candidate discovery, ranking, cache and invalidation: Phases 1, 3, 6.
-- Virtual Light source entry, shared selector parity, fixed placement, client provider revalidation, and offhand-source restoration: phase 1 amendment and Phases 2-6.
+- Virtual Light source entry, shared selector parity, placement after available tools, client provider revalidation, and offhand-source restoration: phase 1 amendment and Phases 2-6.
 - Equipment, restoration, external inventory changes: Phases 1, 4-6.
 - Native inventory authority, failure handling, and client operation gating: Phases 1, 4-6.
 - Decisions to confirm: D1-D7, resolved before dependent implementation.

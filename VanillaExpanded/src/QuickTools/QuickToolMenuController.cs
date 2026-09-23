@@ -21,7 +21,7 @@ internal sealed class QuickToolMenuController : IDisposable
     private readonly System.Func<string, string> text;
     private readonly Action<string> feedback;
     private readonly System.Func<object?> playerIdentity;
-    private readonly RadialMenuLayout layout = QuickToolLayout.CreateLayout();
+    private RadialMenuLayout? layout;
     private readonly Dictionary<string, QuickToolCandidate?> displayed = new(StringComparer.Ordinal);
     private IPlayerInventoryManager? manager;
     private ItemSlot? offhand;
@@ -76,7 +76,7 @@ internal sealed class QuickToolMenuController : IDisposable
         restoreAvailable = equipment.ValidateRestoration();
         IReadOnlyList<RadialMenuEntry> entries = SnapshotEntries();
         State = QuickToolMenuState.OpenHeld;
-        if (!menu.Open(layout, entries, OnSelected, OnCancelled))
+        if (!menu.Open(layout!, entries, OnSelected, OnCancelled))
         {
             State = QuickToolMenuState.ClosedAwaitRelease;
             displayed.Clear();
@@ -149,28 +149,38 @@ internal sealed class QuickToolMenuController : IDisposable
         return true;
     }
 
-    /// <summary>Builds localized fixed entries and remembers exactly which candidate each visible icon represents.</summary>
+    /// <summary>Builds one wedge per available item and remembers the candidates visible under those wedges.</summary>
     private IReadOnlyList<RadialMenuEntry> SnapshotEntries()
     {
-        var entries = new List<RadialMenuEntry>(layout.WedgeIds.Count + 1);
+        var entries = new List<RadialMenuEntry>(QuickToolLayout.WedgeIds.Count + 1);
+        var availableIds = new List<string>(QuickToolLayout.WedgeIds.Count);
         displayed.Clear();
         foreach (string id in QuickToolLayout.WedgeIds)
         {
             QuickToolCandidate? candidate = cache.GetCached(id);
+            if (candidate is null) continue;
+            availableIds.Add(id);
             displayed.Add(id, candidate);
-            string label = candidate?.Stack.GetName() ?? string.Empty;
-            entries.Add(new RadialMenuEntry(id, label, candidate is not null,
-                candidate is null ? null : new QuickToolItemIcon(candidate.Stack)));
+            entries.Add(new RadialMenuEntry(id, candidate.Stack.GetName(), true,
+                new QuickToolItemIcon(candidate.Stack)));
         }
+        layout = QuickToolLayout.CreateLayout(availableIds);
         entries.Add(new RadialMenuEntry(QuickToolLayout.RestoreId, text("quicktool-unequip"), restoreAvailable,
             description: text("quicktool-restore-description")));
         return entries;
     }
 
-    /// <summary>Publishes cache changes while retaining layout and the menu-open restoration availability snapshot.</summary>
+    /// <summary>Resizes the open ring when candidate availability changes, retaining its center snapshot.</summary>
     private void OnCandidatesRefreshed()
     {
-        if (State == QuickToolMenuState.OpenHeld) menu.UpdateEntries(SnapshotEntries());
+        if (State != QuickToolMenuState.OpenHeld) return;
+        RadialMenuLayout previous = layout!;
+        IReadOnlyList<RadialMenuEntry> entries = SnapshotEntries();
+        bool sameIds = previous.WedgeIds.Count == layout!.WedgeIds.Count;
+        for (int i = 0; sameIds && i < previous.WedgeIds.Count; i++)
+            sameIds = previous.WedgeIds[i] == layout.WedgeIds[i];
+        if (sameIds) menu.UpdateEntries(entries);
+        else menu.UpdateLayout(layout, entries);
     }
 
     /// <summary>Executes the selected local action once and reports its return value, including early failures.</summary>

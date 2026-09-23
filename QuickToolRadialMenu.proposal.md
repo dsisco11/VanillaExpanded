@@ -1,6 +1,6 @@
 # Quick-Tool Radial Menu Proposal
 
-Status: Revised for action-time ItemStack reference lookup and native inventory swaps (2026-09-23). Equipment and menu integration with local verification are complete; runtime acceptance remains in the plan.
+Status: Revised for action-time ItemStack reference lookup, native inventory swaps, and available-entry wedge construction (2026-09-23). Runtime acceptance remains in the plan.
 
 ## Purpose
 
@@ -26,7 +26,7 @@ This document specifies approved intended behavior. The [implementation contract
 
 The radial-menu system owns rendering, pointer interaction, highlighting, opening and closing, and selection reporting. It accepts a description of menu entries, including stable identifiers, labels, icons, enabled states, and a center entry.
 
-It has no knowledge of tool ranking, inventory locations, item movement, or equipment restoration. It reports a selected entry identifier to the caller. Quick-tool outer entries display the resolved item's game-localized name, including the Light entry, rather than category labels. Unavailable wedges retain their positions but have no item name. Its public composition entry point remains thin; menu interaction and lifetime belong to the menu's owning module.
+It has no knowledge of tool ranking, inventory locations, item movement, or equipment restoration. It reports a selected entry identifier to the caller. Quick-tool outer entries display the resolved item's game-localized name, including the Light entry. Unavailable candidates have no wedge. Its public composition entry point remains thin; menu interaction and lifetime belong to the menu's owning module.
 
 ### Quick-Tool Functionality
 
@@ -48,15 +48,15 @@ After a selection, keep the menu closed until the player releases and presses th
 
 The center is labeled Unequip, with explanatory text indicating restoration of the previous item when applicable. Disable it when no supported unequip operation is available. A flip rejected before any movement leaves the inventory unchanged and provides brief feedback. A later failure in a multi-flip sequence must report interruption and reconcile the actual contents; it must never claim the original inventory remained unchanged.
 
-Assign each supported tool category a fixed wedge in a canonical layout with a defined starting angle and direction. Preserve those positions across menu openings and inventory changes, independently of inventory enumeration order, tool acquisition order, candidate ranking, or current tool availability. Keep unavailable categories visible as disabled wedges. Replacing the best candidate updates the same wedge; inventory changes never rotate, compact, or resize the layout.
+Build one outer wedge per available cached entry. Order those entries by the canonical category table, with Light after tool categories, starting at screen up and proceeding clockwise. Available entries divide the ring equally. Acquisition or removal adds or removes a wedge and can move other entries; replacing a category's best item without changing availability updates its existing wedge. If no outer candidate is available, show only the center Unequip action, disabled when restoration is unavailable. A cache refresh that changes availability also updates the open menu's geometry and hit targets without closing it.
 
 ## Rendering
 
 Use cached wedge geometry with shader-driven appearance. Generate and upload one combined mesh containing all category wedges and the center circle, with an entry identifier per vertex that remains constant across each triangle. Draw the background in one call; render icons and text separately using existing game rendering APIs.
 
-Generate geometry when first needed and reuse it across frames and menu openings. Rebuild only for geometric layout changes, such as supported wedge count, angular spacing, or relative radii, or when resource recreation is necessary. Position and uniform scale use transforms. Hover, selection, enabled state, animation, and candidate/icon changes do not rebuild or re-upload geometry. Unavailable categories retain their fixed disabled wedges.
+Generate geometry when first needed and reuse it across frames and menu openings while the geometric layout is unchanged. Rebuild when the available wedge count changes, when relative radii/layout change, or when resource recreation is necessary. A different available set with the same count can reuse geometry while replacing entry identifiers and text. Position and uniform scale use transforms. Hover, selection, enabled state, animation, and candidate/icon changes alone do not rebuild or re-upload geometry.
 
-The shader uses supplied entry identifiers and state parameters for colors, highlighting, disabled appearance, animation, and edge effects. Wedge membership comes from the mesh rather than per-fragment angular classification over a full quad. Tessellate arcs to a defined screen-space visual tolerance across supported GUI scales and provide edge data for smooth antialiasing. Retessellation is permitted if a scale change exceeds the cached tessellation's supported tolerance, without changing category positions.
+The shader uses supplied entry identifiers and state parameters for colors, highlighting, disabled appearance, animation, and edge effects. Wedge membership comes from the mesh rather than per-fragment angular classification over a full quad. Tessellate arcs to a defined screen-space visual tolerance across supported GUI scales and provide edge data for smooth antialiasing. Retessellation is permitted if scale exceeds cached tolerance or availability changes wedge count.
 
 Perform pointer hit testing on the CPU using the same center, radii, angular layout, direction, and coordinate conversion as rendering. Define separator and boundary behavior consistently so selection matches the visible target. Supply the resolved hovered identifier to the shader; GPU readback is unnecessary.
 
@@ -92,9 +92,9 @@ The initial virtual entry is Light source, covering lanterns, torches, oil lamps
 
 Preserve the current selector policy: offhand light first, active-hand light next, then the brightest light in the hotbar, then the brightest in the backpack. Light recognition and brightness currently use `Collectible.LightHsv[2] > 0`; equal brightness retains the first slot in the inventory's stable slot order. This is the existing feature's priority policy, not a global brightest-item search. Tool-tier and worn-first durability ranking applies to tool-category entries, not to the light-source provider. Do not introduce new fuel, durability, or brightness rules for the existing light hotkeys as part of this addition.
 
-Give Light source a fixed wedge after the tool-category entries. Keep it visible but disabled when there is no supported candidate. Cache and refresh its candidate with the other entries, including changes to held/offhand items, active-hotbar selection, and light-selection inputs. Switching the displayed light never changes its wedge or rebuilds the menu mesh. Future virtual entries can supply their own selection policy through the same small entry/provider contract; no public plugin framework or additional special entries are required now.
+Place Light after available tool-category entries when it has a supported candidate. Omit its wedge when no candidate exists. Cache and refresh its candidate with the other entries, including changes to held/offhand items, active-hotbar selection, and light-selection inputs. Changing only the displayed light item keeps the current geometry; adding or removing Light changes the wedge count. Future virtual entries can supply their own selection policy through the same small entry/provider contract; no public plugin framework or additional special entries are required now.
 
-Selecting a virtual entry uses the same client-owned equipment, restoration, and chained-selection rules as selecting a tool. Offhand is an eligible source for the light-source entry specifically, preserving the existing resolver's preference; ordinary tool-category eligibility is unchanged. Recheck the resolver and each native swap's source and destination restrictions before sending it. If the resolved candidate cannot participate in a supported sequence, disable or reject with feedback before the first swap. Selecting a light already held is a no-op; switching tool to light or light to tool still restores the original item on Unequip. Different entries may resolve to the same stack; keep both fixed entries and apply the same already-held/identity checks.
+Selecting a virtual entry uses the same client-owned equipment, restoration, and chained-selection rules as selecting a tool. Offhand is an eligible source for the light-source entry specifically, preserving the existing resolver's preference; ordinary tool-category eligibility is unchanged. Recheck the resolver and each native swap's source and destination restrictions before sending it. If the resolved candidate cannot participate in a supported sequence, disable or reject with feedback before the first swap. Selecting a light already held is a no-op; switching tool to light or light to tool still restores the original item on Unequip. Different entries may resolve to the same stack; keep both available entries and apply the same already-held/identity checks.
 
 The [virtual-entry implementation contract](docs/quick-tool/VirtualEntryContract.md) records the shared selector boundary and offhand movement constraints, with installed-API evidence and explicit implementation verification limits.
 
@@ -157,7 +157,7 @@ The initial feature covers tool-category and virtual light-source selection, the
 
 ## Resolved Implementation Decisions
 
-The [implementation contract](docs/quick-tool/ImplementationContract.md#resolved-decisions) resolves D1-D7: highest-tier then worn-first ranking; eligible own hotbar/backpack content; restoration across chained selections; manual hand changes ending the session; compatible empty-slot fallback; center disabled without a session; and the explicit stable category mapping. The contract also records modded-item compatibility, authority, and synchronization boundaries. Its canonical category table is independent of the player's inventory; unavailable categories retain disabled wedges. Only supported-category-set or explicit layout changes may rebuild layout geometry, never while the menu is open.
+The [implementation contract](docs/quick-tool/ImplementationContract.md#resolved-decisions) resolves D1-D7: highest-tier then worn-first ranking; eligible own hotbar/backpack content; restoration across chained selections; manual hand changes ending the session; compatible empty-slot fallback; center disabled without a session; and canonical ordering of supported categories. The contract also records modded-item compatibility, authority, and synchronization boundaries. Available candidates determine the wedge count, including during an open interaction.
 
 ## Acceptance Criteria
 
@@ -166,15 +166,15 @@ The [implementation contract](docs/quick-tool/ImplementationContract.md#resolved
 - The center circle consistently represents unequip/restore.
 - Each eligible category exposes its highest-ranked candidate under the chosen policy. Among usable tools of the same tier, the tool with the lowest remaining absolute durability wins; equal durability uses the deterministic inventory/slot tie-breaker.
 - Inventory and ranking-relevant changes refresh cached results without a per-frame inventory scan.
-- Each category retains the same wedge across menu openings, inventory reorderings, tool acquisition or removal, and best-candidate changes. Unavailable categories retain disabled wedges; the remaining wedges never compact or redistribute. The same supported category set and layout configuration produce identical positions regardless of registration or inventory enumeration order.
+- The ring contains exactly one wedge per available entry, in canonical order, plus the separate center action. Inventory reorderings and candidate upgrades that preserve the available set keep positions. Acquisition/removal redistributes wedges deterministically, including while the menu is open.
 - Selecting tool B while holding item A, then selecting unequip, returns B to its original location and restores A when the arrangement remains valid.
 - Selecting B then C then unequip restores A and returns both tools to their original slots when possible.
 - Moving the original `ItemStack` to another eligible slot does not prevent restoration; lookup finds its current location. Missing or replaced references end restoration safely. Immediate successive actions require no server response or slot callback, and inventory events continue refreshing the candidate cache independently.
 - Initially empty hands, already-held candidates, duplicate tools, restricted slots, moved items, full inventories, broken tools, and rejected operations have deterministic behavior without item loss or duplication.
 - The radial-menu system can present non-tool entries without depending on quick-tool inventory logic.
-- Light source occupies a fixed disabled-or-enabled wedge, resolves through shared existing light-selection logic, and refreshes when inventory or hand-priority inputs change.
+- Light source occupies a wedge after available tools when its shared selector finds a supported candidate and disappears when unavailable.
 - Tool/light chains preserve original-item restoration; the same-stack, offhand-source restrictions, no-candidate, and stale-candidate cases cannot duplicate or lose items. Existing equip-light hotkey behavior is preserved.
-- Cached combined wedge/center geometry is reused across frames and reopenings; state and candidate changes update appearance without mesh rebuilds or uploads.
+- Cached combined wedge/center geometry is reused while wedge count and scale tolerance remain valid. Adding/removing available entries rebuilds geometry and hit targets; candidate-item changes at the same count update appearance without mesh uploads.
 - Circular edges remain smooth at supported GUI scales, CPU hit testing agrees with visible targets, and shader/resource reload and disposal preserve correct rendering.
 - Input ownership, subscriptions, cached references, and transient restoration state are cleaned up at the appropriate lifecycle boundaries.
 

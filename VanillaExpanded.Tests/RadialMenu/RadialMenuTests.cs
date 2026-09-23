@@ -67,9 +67,9 @@ public sealed class RadialMenuTests
         return (mesh.xyz[b] - mesh.xyz[a]) * (mesh.xyz[c + 1] - mesh.xyz[a + 1])
             - (mesh.xyz[b + 1] - mesh.xyz[a + 1]) * (mesh.xyz[c] - mesh.xyz[a]);
     }
-    /// <summary>Checks every fixed wedge stays selectable at the contracted thirty-four-entry density.</summary>
+    /// <summary>Checks the maximum supported outer-entry density retains selectable wedge centers.</summary>
     [Fact]
-    public void ThirtyFourFixedWedgesKeepTheirOwnCenters()
+    public void ThirtyFourAvailableWedgesKeepTheirOwnCenters()
     {
         string[] ids = [.. Enumerable.Range(0, 34).Select(index => $"entry:{index}")];
         var layout = new RadialMenuLayout(ids, "center", 0.18, 0.26, 1);
@@ -140,6 +140,35 @@ public sealed class RadialMenuTests
         Assert.True(menu.SelectHovered());
         Assert.Equal("unequip", selected);
         Assert.Equal("unequip", menu.SelectedId);
+    }
+
+    /// <summary>An empty outer ring keeps the center selectable and has valid center-only mesh geometry.</summary>
+    [Fact]
+    public void CenterOnlyLayoutHasNoOuterHitTarget()
+    {
+        var layout = new RadialMenuLayout([], "unequip", 0.2, 0.3, 1);
+        var menu = new RadialMenuInteraction(layout, [new("unequip", "Unequip", true)]);
+        Assert.Null(layout.HitTest(0, -60, 0, 0, 100));
+        Assert.Equal("unequip", layout.HitTest(0, 0, 0, 0, 100));
+        Assert.True(RadialMenuMesh.Build(layout, 300).VerticesCount > 0);
+        menu.Open();
+        menu.MovePointer(0, 0, 0, 0, 100);
+        Assert.True(menu.SelectHovered());
+    }
+
+    /// <summary>Changing the available set replaces hit targets while preserving the open interaction.</summary>
+    [Fact]
+    public void OpenInteractionCanReplaceWedgeLayout()
+    {
+        var first = new RadialMenuLayout(["a", "b"], "center", 0.2, 0.3, 1);
+        var next = new RadialMenuLayout(["b"], "center", 0.2, 0.3, 1);
+        var menu = new RadialMenuInteraction(first, [new("a", "A", true), new("b", "B", true), new("center", "Center", true)]);
+        menu.Open();
+        menu.UpdateLayout(next, [new("b", "B", true), new("center", "Center", true)]);
+        Assert.True(menu.IsOpen);
+        menu.MovePointer(0, -60, 0, 0, 100);
+        Assert.Equal("b", menu.HoveredId);
+        Assert.True(menu.SelectHovered());
     }
     /// <summary>Checks cancellation reports once and never selects an entry.</summary>
     [Fact]

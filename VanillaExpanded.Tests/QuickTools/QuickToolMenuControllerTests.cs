@@ -20,15 +20,13 @@ public sealed class QuickToolMenuControllerTests
         ItemStack original = f.Put(0, 1);
         ItemStack pick = f.Put(1, 2, EnumTool.Pickaxe);
         f.Open();
-        Assert.Equal(34, f.Menu.Layout!.WedgeIds.Count);
+        Assert.Equal(new[] { "tool:Pickaxe" }, f.Menu.Layout!.WedgeIds);
         Assert.Equal("localized:quicktool-unequip", f.Entry("unequip").Label);
         Assert.Equal("localized:quicktool-restore-description", f.Entry("unequip").Description);
         Assert.False(f.Entry("unequip").Enabled);
-        Assert.False(f.Entry("tool:Axe").Enabled);
-        Assert.Empty(f.Entry("tool:Axe").Label);
+        Assert.DoesNotContain("tool:Axe", f.Menu.Layout.WedgeIds);
         Assert.Equal("game-item-name:2", f.Entry("tool:Pickaxe").Label);
         Assert.False(f.Menu.Click("unequip"));
-        Assert.False(f.Menu.Click("tool:Axe"));
         Assert.True(f.Menu.Click("tool:Pickaxe"));
         Assert.False(f.Menu.Click("tool:Pickaxe"));
         Assert.False(f.Menu.IsOpen);
@@ -66,9 +64,9 @@ public sealed class QuickToolMenuControllerTests
         Assert.Equal(4, f.Packets.Count);
     }
 
-    /// <summary>Polling held input never scans collectible metadata; notified cache changes update content in place.</summary>
+    /// <summary>Polling never scans collectible metadata; a notified candidate removal resizes the open ring.</summary>
     [Fact]
-    public void CacheRefresh_UpdatesOpenContentWithoutChangingLayout()
+    public void CacheRefresh_ResizesOpenLayoutWithoutInputRelease()
     {
         using var f = new Fixture();
         ItemStack light = f.Put(1, 2);
@@ -84,9 +82,30 @@ public sealed class QuickToolMenuControllerTests
         f.Hotbar[1].Itemstack = null;
         f.Hotbar[1].MarkDirty();
         f.Cache.RefreshPending();
-        Assert.False(f.Entry(QuickToolLayout.LightId).Enabled);
-        Assert.Same(layout, f.Menu.Layout);
+        Assert.Empty(f.Menu.Layout!.WedgeIds);
+        Assert.NotSame(layout, f.Menu.Layout);
+        Assert.Equal(1, f.Menu.LayoutUpdateCount);
+        Assert.True(f.Menu.IsOpen);
         Assert.Equal(1, f.Menu.OpenCount);
+    }
+
+    /// <summary>A newly available item adds one wedge in provider order and can be selected before release.</summary>
+    [Fact]
+    public void CacheRefresh_AddsSelectableWedgeWhileOpen()
+    {
+        using var f = new Fixture();
+        f.Put(0, 1);
+        f.Put(1, 2, EnumTool.Pickaxe);
+        f.Open();
+        Assert.Equal(new[] { "tool:Pickaxe" }, f.Menu.Layout!.WedgeIds);
+        f.Put(2, 3, EnumTool.Knife);
+        f.Hotbar[2].MarkDirty();
+        f.Cache.RefreshPending();
+        Assert.Equal(new[] { "tool:Knife", "tool:Pickaxe" }, f.Menu.Layout!.WedgeIds);
+        Assert.Equal(1, f.Menu.LayoutUpdateCount);
+        Assert.True(f.Menu.Click("tool:Knife"));
+        Assert.Equal(3, Assert.IsType<ItemStack>(f.Hotbar[0].Itemstack).Id);
+        Assert.Single(f.Packets);
     }
 
     /// <summary>A stale visible candidate is rejected instead of substituting the new winner under the pointer.</summary>
@@ -299,7 +318,7 @@ public sealed class QuickToolMenuControllerTests
     {
         using var f = new Fixture();
         f.EquipPick();
-        ItemStack original = f.Hotbar[1].Itemstack;
+        ItemStack original = Assert.IsType<ItemStack>(f.Hotbar[1].Itemstack);
         f.Open();
         f.Backpack[0].Itemstack = original;
         f.Hotbar[1].Itemstack = null;
@@ -442,6 +461,7 @@ public sealed class QuickToolMenuControllerTests
         internal RadialMenuInteraction? Interaction;
         internal RadialMenuLayout? Layout;
         internal int OpenCount;
+        internal int LayoutUpdateCount;
         /// <inheritdoc />
         public bool IsOpen => Interaction?.IsOpen == true;
         /// <inheritdoc />
@@ -457,6 +477,13 @@ public sealed class QuickToolMenuControllerTests
         }
         /// <inheritdoc />
         public void UpdateEntries(IEnumerable<RadialMenuEntry> entries) => Interaction!.UpdateEntries(entries);
+        /// <inheritdoc />
+        public void UpdateLayout(RadialMenuLayout layout, IEnumerable<RadialMenuEntry> entries)
+        {
+            Interaction!.UpdateLayout(layout, entries);
+            Layout = layout;
+            LayoutUpdateCount++;
+        }
         /// <inheritdoc />
         public void Cancel() => Interaction?.Cancel();
         /// <summary>Clicks the real center or wedge center through shared hit testing.</summary>
