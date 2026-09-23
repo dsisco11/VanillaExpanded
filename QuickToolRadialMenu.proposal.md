@@ -49,6 +49,20 @@ The center is labeled Unequip, with explanatory text indicating restoration of t
 
 Assign each supported tool category a fixed wedge in a canonical layout with a defined starting angle and direction. Preserve those positions across menu openings and inventory changes, independently of inventory enumeration order, tool acquisition order, candidate ranking, or current tool availability. Keep unavailable categories visible as disabled wedges. Replacing the best candidate updates the same wedge; inventory changes never rotate, compact, or resize the layout.
 
+## Rendering
+
+Use cached wedge geometry with shader-driven appearance. Generate and upload one combined mesh containing all category wedges and the center circle, with an entry identifier per vertex that remains constant across each triangle. Draw the background in one call; render icons and text separately using existing game rendering APIs.
+
+Generate geometry when first needed and reuse it across frames and menu openings. Rebuild only for geometric layout changes, such as supported wedge count, angular spacing, or relative radii, or when resource recreation is necessary. Position and uniform scale use transforms. Hover, selection, enabled state, animation, and candidate/icon changes do not rebuild or re-upload geometry. Unavailable categories retain their fixed disabled wedges.
+
+The shader uses supplied entry identifiers and state parameters for colors, highlighting, disabled appearance, animation, and edge effects. Wedge membership comes from the mesh rather than per-fragment angular classification over a full quad. Tessellate arcs to a defined screen-space visual tolerance across supported GUI scales and provide edge data for smooth antialiasing. Retessellation is permitted if a scale change exceeds the cached tessellation's supported tolerance, without changing category positions.
+
+Perform pointer hit testing on the CPU using the same center, radii, angular layout, direction, and coordinate conversion as rendering. Define separator and boundary behavior consistently so selection matches the visible target. Supply the resolved hovered identifier to the shader; GPU readback is unnecessary.
+
+The radial-menu system owns its renderer, geometry, shader, and resource lifecycle. Follow existing radial-progress rendering conventions where applicable while retaining separate menu-specific responsibilities. Handle shader reload, mesh disposal/recreation, and render-state restoration around icon and text drawing.
+
+This rendering approach is approved without performance testing or comparative benchmarks. Correctness, visual quality, input alignment, and resource-lifecycle verification remain required; no measured performance advantage is claimed.
+
 ## Candidate Discovery and Cache
 
 Scan eligible player-owned inventory locations and classify usable tools using the game's authoritative tool-category metadata where available. Container inventories merely opened by the player are excluded. The precise eligible inventory types must be established during integration.
@@ -148,6 +162,8 @@ The initial feature covers tool-category selection, the reusable radial interact
 - If chained restoration is accepted, selecting B then C then unequip restores A and returns both tools to their original slots when possible.
 - Initially empty hands, already-held candidates, duplicate tools, restricted slots, moved items, full inventories, broken tools, and rejected operations have deterministic behavior without item loss or duplication.
 - The radial-menu system can present non-tool entries without depending on quick-tool inventory logic.
+- Cached combined wedge/center geometry is reused across frames and reopenings; state and candidate changes update appearance without mesh rebuilds or uploads.
+- Circular edges remain smooth at supported GUI scales, CPU hit testing agrees with visible targets, and shader/resource reload and disposal preserve correct rendering.
 - Input ownership, subscriptions, cached references, and transient restoration state are cleaned up at the appropriate lifecycle boundaries.
 
 ## Implementation Investigation

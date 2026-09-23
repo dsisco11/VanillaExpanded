@@ -11,6 +11,8 @@ Exclude favorites, nested menus, external-container tools, reconnect persistence
 
 ## Source evidence and implementation constraints
 
+- Approved rendering: cached combined wedge/center mesh with shader-driven appearance, separate game-rendered icons/text, and CPU hit testing. Performance testing and comparative benchmarks are not required; retain correctness, visual, input, and resource-lifecycle checks without claiming measured speedups.
+
 - Existing integration reference: `VanillaExpanded/src/ModSystems/EquipLightSource.cs` registers client inventory hotkeys and sends packets returned by `Inventory.TryFlipItems`. Its reusable callback accepts an inventory manager and slot rather than requiring a mock player.
 - Adjacent API source: `../vsapi/Common/Inventory/InventoryBase.cs` implements `TryFlipItems` by attempting a local slot flip and then producing a packet. This establishes neither server acceptance nor atomic multi-slot transactions. Do not copy this sequence as proof of safe chained restoration.
 - API investigation starting points: `IInventory.SlotModified`, `CollectibleObject.GetToolTier(ItemSlot)`, `GetRemainingDurability(ItemStack)`, and `IClientEventAPI.KeyDown/KeyUp`. Verify behavior against the installed assemblies referenced by the project, not just the adjacent source checkout.
@@ -60,7 +62,15 @@ Dependencies: Phase 1 input and ownership contracts.
 Outcome: Generic entries can be displayed and selected without any tool or inventory dependency.
 
 ☐ Define menu entries with stable identifiers, labels, icons, enabled state, supplied fixed positions, and a center entry; expose selection/cancellation reporting.
-☐ Implement rendering and hit detection with a fixed starting angle/direction supplied through the agreed layout contract.
+☐ Implement cached mesh rendering and CPU hit detection with a fixed starting angle/direction supplied through the agreed layout contract.
+    ☐ Generate and upload one combined mesh for all wedges and the center, with constant per-triangle entry identifiers; draw the background in one call.
+    ☐ Cache geometry across frames and reopenings. Rebuild only for geometric layout changes or required resource recreation; use transforms for position and uniform scale.
+    ☐ Retain unavailable categories in the mesh. Hover, selection, enabled state, animation, and candidate changes update shader/entry data without rebuilding or re-uploading geometry.
+    ☐ Implement shader-driven colors, highlighting, disabled appearance, animation, and edge effects using mesh entry identifiers rather than full-quad per-fragment angular classification.
+    ☐ Define arc tessellation tolerance across supported GUI scales and supply antialiasing edge data. Retessellate only when a scale change exceeds the supported tolerance, preserving category positions.
+    ☐ Render icons and cached text separately through existing game APIs; maintain a generic icon contract without quick-tool policy in the radial-menu system.
+    ☐ Match CPU hit testing to rendering coordinates, radii, angular layout, direction, and separator/boundary behavior; send the hovered identifier to the shader without GPU readback.
+    ☐ Own shader reload, mesh disposal/recreation, and render-state restoration within the radial-menu system; use radial-progress rendering conventions where applicable.
 ☐ Preserve supplied wedge geometry when entry content or availability changes. Disabled entries remain visible and cannot be selected.
 ☐ Implement pointer highlighting, center selection, and open/close lifetime with input capture and restoration.
 ☐ Provide the caller interaction hooks needed for hold-to-open, release-to-cancel, click-to-commit, and suppression of repeated opening until release.
@@ -70,6 +80,7 @@ Outcome: Generic entries can be displayed and selected without any tool or inven
 Completion criteria:
 ☐ Menu logic has no tool ranking, inventory movement, or restoration dependency.
 ☐ Entry updates preserve geometry and selection identity; every exit path restores input ownership.
+☐ Focused correctness checks demonstrate geometry reuse for state/candidate changes and reopenings, permitted rebuilds for geometry changes, and consistent center/wedge boundary selection. No timing measurements or comparative benchmarks are required.
 ☐ Focused automated evidence covers logic; actual camera/click/focus behavior remains an explicit live-runtime check in Phase 6.
 
 ## Phase 3: Deterministic category layout and candidate cache
@@ -147,6 +158,7 @@ Outcome: Evidence supports the feature's behavior in the actual game and support
 ☐ Delegate focused tests and required repository build/check commands to subagents; record commands, versions, results, and remaining failures. Broaden only where required or justified by integration changes.
 ☐ Use the repository's package workflow if required for loading the mod; verify menu/localization assets are included. Do not publish or deploy as part of this plan.
 ☐ Verify live interaction: hold, mouse direction, center/wedge click, cancel, continued hold, camera suppression, no world click-through, focus loss, and cleanup.
+☐ Verify smooth arcs and separators, highlight/disabled appearance, icon/text composition, input alignment across supported GUI scales, and shader reload/resource cleanup. These are visual and correctness checks, not performance tests.
 ☐ Verify fixed category locations through repeated openings, inventory rearrangement, acquisition/removal, candidate upgrades, and missing-tool disabled wedges.
 ☐ Verify A-to-B-to-unequip, empty-hand restoration, and accepted A-to-B-to-C-to-unequip with actual slot contents before/after.
 ☐ Verify conflict cases: manual hotbar change, moved/removed/broken items, unavailable return slots, no valid fallback, and feature/world lifecycle changes.
@@ -162,6 +174,7 @@ Completion criteria:
 
 - Functional requirements and system responsibilities: Phases 1-5.
 - Interaction and deterministic positions: Phases 2, 3, 5, 6.
+- Approved cached-mesh rendering, shader effects, and rendering lifecycle: Phases 2 and 6; no performance-testing gate.
 - Candidate discovery, ranking, cache and invalidation: Phases 1, 3, 6.
 - Equipment, restoration, external inventory changes: Phases 1, 4-6.
 - Authority, failure handling and request serialization: Phases 1, 4-6.
