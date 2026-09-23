@@ -1,7 +1,7 @@
 # Quick-Tool Radial Menu Implementation TODO
 
 Source proposal: [QuickToolRadialMenu.proposal.md](QuickToolRadialMenu.proposal.md)
-Status: Phases 1-2, including the virtual-entry amendment, complete (2026-09-23). Phases 3-6 remain unstarted.
+Status: Phases 1-3, including the virtual-entry amendment, complete (2026-09-23). Phases 4-6 remain unstarted.
 
 ## Goal and scope
 
@@ -97,31 +97,33 @@ Completion evidence: [traceability](docs/quick-tool/Phase2Traceability.md), [sec
 Dependencies: Phase 1 D1, D2, D7 and inventory events, plus virtual-entry selector prerequisites; Phase 2 entry contract.
 Outcome: Quick-tool entries reflect current best candidates while retaining stable positions.
 
-☐ Implement the canonical category-to-wedge mapping owned by quick-tools and supplied to the menu.
-    ☐ Build identical layouts for the same supported set/configuration regardless of registration or inventory enumeration order.
-    ☐ Retain disabled wedges for missing tools; never compact, rotate, or resize because of inventory changes.
-    ☐ Apply the modded-category policy using stable category identifiers. Discovering an item cannot insert a wedge dynamically.
-    ☐ Permit structural rebuild only for supported-category-set or explicit configuration changes, deferred until the menu is closed.
-☐ Introduce a small stable entry/provider contract for tool categories and virtual selections, with cached real-slot candidates; keep semantic selection outside radial-menu rendering.
-☐ Add `virtual:light-source` at fixed index 33 after tool indices 0-32 (34 outer entries total); retain its disabled wedge when absent. This explicit supported-set amendment changes the planned layout once; inventory changes never change positions.
-☐ Extract/reuse the existing light-source selector as one shared side-independent owner consumed by EquipLightSource and the virtual provider. Preserve offhand, active-hand, brightest-hotbar, brightest-backpack priority, positive LightHsv[2] recognition, and stable equal-brightness ties; do not apply tool-tier/durability ranking to this provider.
-☐ Include offhand-source observation and active-hotbar changes in virtual candidate invalidation, with no per-frame inventory scan; verify current selector inputs again on selection.
-☐ Add focused selection parity coverage for lanterns/torches/oil lamps or representative light collectibles, no light, held/offhand preference, equal brightness, brighter backpack versus dimmer hotbar, and legacy hotkey behavior after extraction.
-☐ Implement eligible inventory discovery, authoritative category classification, usability filtering, ranking, and deterministic tie-breaking.
-☐ Cache the winning candidate per category with rendering data and a resolvable location hint, not an assumed reservation.
-☐ Build the initial cache; subscribe to inventory/ranking changes and coalesce notifications from an operation into one refresh after completion.
-☐ Refresh pending invalidation before opening; update visible candidate content/enabled state without moving wedges.
-☐ Revalidate cached candidate identity, availability, and destination before any equipment request. Never trust a stale slot reference.
-☐ Unsubscribe from replaced inventories and on disable/world exit; discard stale references and rebuild for the current player when enabled.
-☐ Verify best-candidate changes, deterministic ties, unsupported metadata, empty inventories, excluded containers, durability changes, notification batching, stale entries, and inventory replacement. Include a regression case proving that a usable tool with lower remaining absolute durability beats a higher-durability tool of the same tier, with deterministic ties and unusable/broken tools excluded.
-☐ Verify identical wedge positions across reopenings, acquisition/removal, inventory reorder, ranking changes, and shuffled category registration.
+✔ Implement the canonical category-to-wedge mapping owned by quick-tools and supplied to the menu.
+    ✔ Build identical layouts for the same supported set/configuration regardless of registration or inventory enumeration order.
+    ✔ Retain disabled wedges for missing tools; never compact, rotate, or resize because of inventory changes.
+    ✔ Apply the modded-category policy using stable category identifiers. Discovering an item cannot insert a wedge dynamically.
+    ✔ Permit structural rebuild only for supported-category-set or explicit configuration changes, deferred until the menu is closed.
+✔ Introduce a small stable entry/provider contract for tool categories and virtual selections, with cached real-slot candidates; keep semantic selection outside radial-menu rendering.
+✔ Add `virtual:light-source` at fixed index 33 after tool indices 0-32 (34 outer entries total); retain its disabled wedge when absent. This explicit supported-set amendment changes the planned layout once; inventory changes never change positions.
+✔ Extract/reuse the existing light-source selector as one shared side-independent owner consumed by EquipLightSource and the virtual provider. Preserve offhand, active-hand, brightest-hotbar, brightest-backpack priority, positive LightHsv[2] recognition, and stable equal-brightness ties; do not apply tool-tier/durability ranking to this provider.
+✔ Include offhand-source observation and active-hotbar changes in virtual candidate invalidation, with no per-frame inventory scan; verify current selector inputs again on selection.
+✔ Add focused selection parity coverage for lanterns/torches/oil lamps or representative light collectibles, no light, held/offhand preference, equal brightness, brighter backpack versus dimmer hotbar, and legacy hotkey behavior after extraction.
+✔ Implement eligible inventory discovery, authoritative category classification, usability filtering, ranking, and deterministic tie-breaking.
+✔ Cache the winning candidate per category with rendering data and a resolvable location hint, not an assumed reservation.
+✔ Build the initial cache; subscribe to inventory/ranking changes and coalesce notifications from an operation into one refresh after completion.
+✔ Refresh pending invalidation before opening; update visible candidate content/enabled state without moving wedges.
+✔ Revalidate cached candidate identity, availability, and destination before any equipment request. Never trust a stale slot reference.
+✔ Unsubscribe from replaced inventories and on disable/world exit; discard stale references and rebuild for the current player when enabled.
+✔ Verify best-candidate changes, deterministic ties, unsupported metadata, empty inventories, excluded containers, durability changes, notification batching, stale entries, and inventory replacement. Include a regression case proving that a usable tool with lower remaining absolute durability beats a higher-durability tool of the same tier, with deterministic ties and unusable/broken tools excluded.
+✔ Verify identical wedge positions across reopenings, acquisition/removal, inventory reorder, ranking changes, and shuffled category registration.
 
 Completion criteria:
-☐ Chosen ranking and eligibility policies are covered by focused tests.
-☐ Cache invalidation covers every ranking input without a per-frame inventory scan.
-☐ Layout stability is demonstrated independently from candidate-selection determinism.
+✔ Chosen ranking and eligibility policies are covered by focused tests.
+✔ Cache invalidation covers every ranking input without a per-frame inventory scan.
+✔ Layout stability is demonstrated independently from candidate-selection determinism.
 
 During selector extraction, strengthen existing brightest-source tests to assert the exact winning slot/item, including a brightest candidate at the end, and remove stale test commentary. The independent amendment audit identified these as part of the planned parity coverage.
+
+Completion evidence: [traceability](docs/quick-tool/Phase3Traceability.md), [second review](docs/quick-tool/Phase3SecondReview.md), and [independent audit](docs/quick-tool/Phase3CompletionAudit.md).
 
 ## Phase 4: Safe equipment and restoration
 
