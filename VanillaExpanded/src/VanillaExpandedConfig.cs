@@ -42,6 +42,9 @@ public class VanillaExpandedConfig
     /// </summary>
     public bool EnableEquipLightHotkey { get; set; } = true;
 
+    /// <summary>Enables client-owned temporary quick-tool selections through native inventory flips.</summary>
+    public bool EnableQuickTools { get; set; } = true;
+
     #endregion
 
     #region Recipe Toggles

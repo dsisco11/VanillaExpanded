@@ -1,5 +1,7 @@
 # Installed inventory contract evidence
 
+Revision note (2026-09-23): The direct-assignment and custom server-adapter recommendations below document the earlier design investigation. The user's later client-owned decision supersedes those recommendations. Installed API facts, including native `TryFlipItems` behavior and possible decoded client stack replacement, remain evidence for the revised [movement contract](ImplementationContract.md#client-owned-native-movement-contract). This historical fixture does not validate an atomic native multi-flip sequence.
+
 Verified 2026-09-23 using PowerShell 7.6.6, .NET SDK 10.0.401, and the project's installed `G:/Vintagestory` assembly location. Both API and library report 1.22.7.0. See [raw results](installed-api-probe.txt) for SHA256 hashes, exact signatures, and installed IL call offsets; rerun with `pwsh -File docs/quick-tool/VerifyInstalledInventoryContract.ps1`.
 
 ## Evidence and limitations

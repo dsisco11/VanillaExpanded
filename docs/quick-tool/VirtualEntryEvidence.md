@@ -1,5 +1,7 @@
 # Virtual-entry offhand contract evidence
 
+Revision note (2026-09-23): The server-owned assignment and publication recommendations below belong to the earlier movement design. The revised [client-owned contract](ImplementationContract.md#client-owned-native-movement-contract) uses ordinary native flip packets for Light and tools. Installed offhand identity, storage restrictions, and selector facts remain applicable; the historical fixture does not prove a native multi-flip transaction.
+
 Verified against installed API/library 1.22.7.0 on 2026-09-23 using PowerShell 7.6.6. Run `pwsh -File docs/quick-tool/VerifyVirtualEntryContract.ps1`; [retained output](virtual-entry-probe.txt) includes assembly hashes, six passing scenario groups, and installed IL. This extends [the original inventory evidence](InventoryContractEvidence.md); it is an isolated contract fixture, not production equipment implementation or live multiplayer acceptance.
 
 ## Slot identity, restrictions, and authority

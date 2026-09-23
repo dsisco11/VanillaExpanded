@@ -10,7 +10,7 @@ public sealed record QuickToolCandidate(string EntryId, IInventory Inventory, in
     public int StackSize { get; } = Stack.StackSize;
 
     #region Validation
-    /// <summary>Checks slot topology, stack identity, eligibility and current provider choice before a request.</summary>
+    /// <summary>Checks slot topology, stack identity, eligibility and current provider choice before movement.</summary>
     public bool Matches(QuickToolCandidate? current) => current is not null
         && string.Equals(EntryId, current.EntryId, StringComparison.Ordinal)
         && ReferenceEquals(Inventory, current.Inventory)

@@ -1,6 +1,6 @@
 # Quick-Tool Radial Menu Proposal
 
-Status: Approved
+Status: Revised for action-time ItemStack reference lookup and native inventory swaps (2026-09-23). Equipment implementation and local verification are complete; menu integration and runtime acceptance remain in the plan.
 
 ## Purpose
 
@@ -46,7 +46,7 @@ Dependencies run from the quick-tool integration toward the reusable radial-menu
 
 After a selection, keep the menu closed until the player releases and presses the key again. Consume the selection click so it cannot also trigger a world interaction. Restore normal input ownership on every close path, including cancellation, loss of focus, feature disablement, and world exit.
 
-The center is labeled Unequip, with explanatory text indicating restoration of the previous item when applicable. Disable it when no supported unequip operation is available. A rejected selection leaves the inventory unchanged and provides brief feedback. An operation committed before a later notification or synchronization failure is reported as committed and requiring reconciliation, never as an unchanged rejection.
+The center is labeled Unequip, with explanatory text indicating restoration of the previous item when applicable. Disable it when no supported unequip operation is available. A flip rejected before any movement leaves the inventory unchanged and provides brief feedback. A later failure in a multi-flip sequence must report interruption and reconcile the actual contents; it must never claim the original inventory remained unchanged.
 
 Assign each supported tool category a fixed wedge in a canonical layout with a defined starting angle and direction. Preserve those positions across menu openings and inventory changes, independently of inventory enumeration order, tool acquisition order, candidate ranking, or current tool availability. Keep unavailable categories visible as disabled wedges. Replacing the best candidate updates the same wedge; inventory changes never rotate, compact, or resize the layout.
 
@@ -94,7 +94,7 @@ Preserve the current selector policy: offhand light first, active-hand light nex
 
 Give Light source a fixed wedge after the tool-category entries. Keep it visible but disabled when there is no supported candidate. Cache and refresh its candidate with the other entries, including changes to held/offhand items, active-hotbar selection, and light-selection inputs. Switching the displayed light never changes its wedge or rebuilds the menu mesh. Future virtual entries can supply their own selection policy through the same small entry/provider contract; no public plugin framework or additional special entries are required now.
 
-Selecting a virtual entry uses the same server revalidation, active-hand equipment, original-item restoration, and chained-selection rules as selecting a tool. Offhand is an eligible source for the light-source entry specifically, preserving the existing resolver's preference; ordinary tool-category eligibility is unchanged. Verify offhand slot restrictions and the complete displaced-item/return arrangement before mutation. If the resolved candidate cannot participate in a valid supported arrangement, disable or reject with feedback without moving items. Selecting a light already held is a no-op; switching tool to light or light to tool still restores the original item on Unequip. Different entries may resolve to the same stack; keep both fixed entries and apply the same already-held/identity checks.
+Selecting a virtual entry uses the same client-owned equipment, restoration, and chained-selection rules as selecting a tool. Offhand is an eligible source for the light-source entry specifically, preserving the existing resolver's preference; ordinary tool-category eligibility is unchanged. Recheck the resolver and each native swap's source and destination restrictions before sending it. If the resolved candidate cannot participate in a supported sequence, disable or reject with feedback before the first swap. Selecting a light already held is a no-op; switching tool to light or light to tool still restores the original item on Unequip. Different entries may resolve to the same stack; keep both fixed entries and apply the same already-held/identity checks.
 
 The [virtual-entry implementation contract](docs/quick-tool/VirtualEntryContract.md) records the shared selector boundary and offhand movement constraints, with installed-API evidence and explicit implementation verification limits.
 
@@ -102,9 +102,9 @@ The [virtual-entry implementation contract](docs/quick-tool/VirtualEntryContract
 
 ### Temporary Equipment Session
 
-A successful quick-tool selection starts a temporary equipment session when none exists. Record the original hand slot, the original held item if any, the selected tool, its original inventory location, and the expected current location of the displaced item.
+A successful local quick-tool selection starts a client-owned temporary equipment session when none exists. Retain the original `ItemStack` reference (or initially-empty-hand state), the current quick-tool's `ItemStack` reference, the original active hotbar position, and the quick-tool's preferred home address. Whole-stack quantities and the selected entry remain validation metadata. The home address identifies a return destination; it does not identify an item. Do not retain an expected displaced-item slot.
 
-Track item identity using capabilities supported by the game's inventory model; an item code alone is insufficient when several identical tools exist. Verify stack identity, movement tracking, and synchronization behavior before choosing a concrete representation. Records describe expected contents and do not reserve inventory slots.
+Before a switch or restoration, search the current eligible player inventory for the tracked `ItemStack` objects using reference identity. Resolve source slots from those searches, then validate the active hand, quantities, item usability, and destinations. Each required reference must occur exactly once. If it is missing, replaced, or ambiguous, end the session without moving anything; never substitute an equal-looking stack. Native synchronization can replace an `ItemStack` object even when its contents look unchanged; restoration then becomes unavailable when next validated. No persistent item ID or serialized-content rebinding is introduced. Records do not reserve inventory slots.
 
 A tool already held should be a no-op selection and must not create an artificial restoration record.
 
@@ -121,35 +121,35 @@ Example:
 | Select axe | Axe | Pickaxe | Item A |
 | Select unequip | Item A | Pickaxe | Axe |
 
-When switching tools, return the current quick-tool to its original location and move the displaced original item to the newly selected tool's source location. Validate the complete movement plan first, including slot restrictions. Commit using supported inventory operations without exposing item loss, duplication, or an unrecoverable partial result. The implementation contract specifies a server-owned, prevalidated whole-stack assignment followed by native persistence and synchronization; repeated client flip packets do not provide this boundary.
+When switching tools, return the current quick-tool to its original location and move the displaced original item to the newly selected tool's source location. The client performs the required native flips in sequence, using `TryFlipItems` and sending each returned inventory packet as the existing light shortcut does. The ordinary A/B/C example takes two flips during the B-to-C selection; selections themselves may be minutes apart. Precheck the intended arrangement and each next flip against current slots. If a local flip or validation fails after an earlier flip succeeds, retain the resulting inventory, stop the sequence, invalidate uncertain restoration history, and report interruption. Server validation of each packet happens separately; subsequent updates are handled by the game and the next action's reference lookup. Never describe a multi-flip sequence as atomic or roll back over player or server changes.
 
 ### Unequip
 
 For an intact session, return the active quick-tool to its recorded original slot and restore the displaced item to the recorded hand slot. If the hand was initially empty, return the tool and leave that hand slot empty.
 
-If the original tool slot is no longer usable, use the first compatible empty eligible slot in deterministic hotbar-then-backpack order. Preserve unrelated items. If no complete valid restoration is possible, leave the inventory unchanged and explain why the action could not complete. Never drop or delete an item to make restoration succeed.
+If the original tool slot is no longer usable, use the first compatible empty eligible slot in deterministic hotbar-then-backpack order. Preserve unrelated items. If no valid route is available before the first flip, leave the inventory unchanged and explain why the action could not complete. If an intervening change interrupts a started sequence, preserve the actual contents and report that restoration is unavailable. Never drop or delete an item to make restoration succeed.
 
-Validate all involved items and slots again before committing. Clear restoration state only after confirmed success or an explicit session invalidation. A failed operation must not falsely report successful equipment or restoration.
+Find the tracked stacks at their current locations before starting and validate the resulting slots before each native flip. The current quick-tool must still occupy the recorded active hand; otherwise end the session to preserve manual equipment intent. After the local sequence, verify the actual contents and update the session references and return destination. A local failure or interruption must report its actual outcome; later inventory notifications do not establish an accepted/rejected state for the session.
 
 ## Inventory Changes During a Session
 
-Distinguish changes caused by the quick-tool operation from external inventory changes. Internal notifications update the cache without prematurely invalidating the session.
+Inventory notifications invalidate and refresh the candidate cache. Equipment sessions do not subscribe to slot changes to track movement or infer server rejection. Resolve and validate tracked stack references when opening the menu to determine restoration availability, and again before an equipment action. Do not scan inventory every frame.
 
 Handling for external changes:
 
 - Unrelated inventory changes refresh candidates and preserve the session.
-- A manual change of active hotbar slot or replacement of the held item ends the session, preventing a later restore from overriding the player's new intent.
-- Movement of a recorded item preserves the session only if its identity and new location can be established reliably; otherwise invalidate restoration.
-- Consumption, removal, breakage, or replacement of an involved item requires revalidation. Do not substitute an identical-looking item without a supported identity contract.
+- A manual change of active hotbar slot immediately ends the session. Detect replacement of the held item during the next menu-open or action validation, preventing restoration from overriding the player's new intent.
+- Moving the original stack elsewhere in eligible inventory preserves restoration: the next lookup finds the same object at its new location. Moving the current quick-tool out of the recorded active hand ends the session when validated.
+- Consumption, removal, breakage, splitting, merging, or object replacement is checked during the next validation. A missing reference, changed whole-stack quantity, or unusable item ends restoration without substitution.
 - World exit, player replacement, or feature disablement clears transient restoration state.
 
 Invalidating a session does not move items automatically. An unequip action without a valid session is disabled. General unequipping of manually equipped tools is outside the initial scope.
 
 ## Authority and Failure Handling
 
-Resolve the existing authoritative path for inventory movement before implementation. In multiplayer, client-side menu and cache state must not be treated as authority to mutate inventory. Revalidate on the authoritative side wherever required by the game's architecture.
+Use the game's native inventory flip packet for each client-initiated swap. The client owns quick-tool intent and transient restoration history; the server's ordinary inventory handler validates and applies each flip. The client must not send arbitrary item contents or assume its predicted local flip was accepted when native synchronization disagrees. No quick-tool-specific server request, session, or result packet is required.
 
-Avoid overlapping equipment requests. While an operation awaits confirmation, prevent another selection from acting on unconfirmed restoration state. Update the session from the accepted result and rebuild affected cached candidates. Rejected operations retain or invalidate prior state according to the actual resulting inventory, never an assumed successful swap.
+Guard against reentrant equipment calls only while the synchronous local flip sequence runs. When it finishes, the next action may run immediately after fresh reference lookup and validation. Do not wait for server packets, slot callbacks, a pending-result window, or a timeout. Native accepted updates and rejected-request corrections are applied by the game; their effect is considered during the next lookup without deriving a per-request accepted/rejected state. Rebuild affected cached candidates after inventory updates. A locally rejected or interrupted flip retains or invalidates prior history according to actual resulting contents.
 
 ## Scope Boundaries
 
@@ -169,6 +169,7 @@ The [implementation contract](docs/quick-tool/ImplementationContract.md#resolved
 - Each category retains the same wedge across menu openings, inventory reorderings, tool acquisition or removal, and best-candidate changes. Unavailable categories retain disabled wedges; the remaining wedges never compact or redistribute. The same supported category set and layout configuration produce identical positions regardless of registration or inventory enumeration order.
 - Selecting tool B while holding item A, then selecting unequip, returns B to its original location and restores A when the arrangement remains valid.
 - Selecting B then C then unequip restores A and returns both tools to their original slots when possible.
+- Moving the original `ItemStack` to another eligible slot does not prevent restoration; lookup finds its current location. Missing or replaced references end restoration safely. Immediate successive actions require no server response or slot callback, and inventory events continue refreshing the candidate cache independently.
 - Initially empty hands, already-held candidates, duplicate tools, restricted slots, moved items, full inventories, broken tools, and rejected operations have deterministic behavior without item loss or duplication.
 - The radial-menu system can present non-tool entries without depending on quick-tool inventory logic.
 - Light source occupies a fixed disabled-or-enabled wedge, resolves through shared existing light-selection logic, and refreshes when inventory or hand-priority inputs change.
@@ -179,4 +180,4 @@ The [implementation contract](docs/quick-tool/ImplementationContract.md#resolved
 
 ## Implementation Evidence
 
-The implementation contract and linked installed-API evidence record functionality registration, input/GUI ownership, inventory/durability observation, tool classification, authority, and item identity. Its isolated movement fixture demonstrates the underlying commit boundary. Production eligibility, live GUI behavior, native persistence execution, and multiplayer reconciliation still require the implementation checklist verification; they are not implied by the investigation.
+The implementation contract and linked installed-API evidence record functionality registration, input/GUI ownership, inventory/durability observation, tool classification, authority, and item identity. The earlier server-assignment fixture is historical evidence for installed slot behavior, not proof that sequential native flips are atomic. Production eligibility, live GUI behavior, native persistence execution, and multiplayer reconciliation still require the implementation checklist verification.

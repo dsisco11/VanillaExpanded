@@ -1,11 +1,11 @@
 # Quick-Tool Radial Menu Implementation TODO
 
 Source proposal: [QuickToolRadialMenu.proposal.md](QuickToolRadialMenu.proposal.md)
-Status: Phases 1-3, including the virtual-entry amendment, complete (2026-09-23). Phases 4-6 remain unstarted.
+Status: Phases 2-4 and the shared-selector investigation are complete at their stated verification boundaries (2026-09-23). Phase 4 implements action-time ItemStack reference lookup, with a fresh second review and independent completion audit. Earlier server-owned and callback-driven equipment conclusions are superseded. Phases 5-6 remain unstarted; live multiplayer acceptance remains in Phase 6.
 
 ## Goal and scope
 
-Deliver separate reusable radial-menu and quick-tool functionality systems. Holding the key opens the menu; clicking equips the best tool in a category; the center restores previous equipment. Tool-category and virtual-entry positions remain fixed across inventory changes and menu openings. Include a Light source virtual entry using shared existing selection logic. Use supported authoritative inventory operations without item loss, duplication, or unhandled partial restoration.
+Deliver separate reusable radial-menu and quick-tool functionality systems. Holding the key opens the menu; clicking equips the best tool in a category; the center restores previous equipment. Tool-category and virtual-entry positions remain fixed across inventory changes and menu openings. Include a Light source virtual entry using shared existing selection logic. Use client-owned restoration and the game's native inventory flip packets; reconcile interrupted sequences without loss, duplication, or false success.
 
 Exclude favorites, nested menus, external-container tools, reconnect persistence, arbitrary inventory undo, and unrelated light-source feature changes. A behavior-preserving shared selector extraction for the virtual Light source entry is in scope. Full inventory scans on invalidation are allowed; incremental indexing is not required. No per-frame inventory scanning.
 
@@ -14,7 +14,7 @@ Exclude favorites, nested menus, external-container tools, reconnect persistence
 - Approved rendering: cached combined wedge/center mesh with shader-driven appearance, separate game-rendered icons/text, and CPU hit testing. Performance testing and comparative benchmarks are not required; retain correctness, visual, input, and resource-lifecycle checks without claiming measured speedups.
 
 - Existing integration reference: `VanillaExpanded/src/ModSystems/EquipLightSource.cs` registers client inventory hotkeys and sends packets returned by `Inventory.TryFlipItems`. Its reusable callback accepts an inventory manager and slot rather than requiring a mock player.
-- Adjacent API source: `../vsapi/Common/Inventory/InventoryBase.cs` implements `TryFlipItems` by attempting a local slot flip and then producing a packet. This establishes neither server acceptance nor atomic multi-slot transactions. Do not copy this sequence as proof of safe chained restoration.
+- Adjacent API source: `../vsapi/Common/Inventory/InventoryBase.cs` implements `TryFlipItems` by attempting a local slot flip and then producing a packet. The revised implementation deliberately uses this native path one flip at a time. It does not establish server acceptance or atomicity across flips; test interruption and synchronization explicitly.
 - API investigation starting points: `IInventory.SlotModified`, `CollectibleObject.GetToolTier(ItemSlot)`, `GetRemainingDurability(ItemStack)`, and `IClientEventAPI.KeyDown/KeyUp`. Verify behavior against the installed assemblies referenced by the project, not just the adjacent source checkout.
 - Existing GUI examples live under `VanillaExpanded/src/Gui`; tests use xUnit in `VanillaExpanded.Tests`. Resolve actual build/package wrappers before validation.
 - Keep composition roots thin. Proposed domain directories are `VanillaExpanded/src/QuickTools` and `VanillaExpanded/src/RadialMenu`; finalize names after checking repository conventions. Separate candidate selection, restoration, and integration responsibilities without creating extra independent functionality systems or trivial semantic wrappers.
@@ -43,24 +43,24 @@ Outcome: A concrete implementation contract and safe inventory movement design a
 ✔ Trace key press, held state, release, repeat, pointer capture, click consumption, focus loss, and active-slot change events using current API contracts.
 ✔ Establish inventory enumeration and subscription lifecycle, including inventories added/replaced after startup and durability/ranking changes without slot replacement.
 ✔ Establish an item identity contract for duplicate tools, moved stacks, consumed/broken items, and network replacement of client stack objects. Item code alone is insufficient.
-✔ Design authoritative equipment execution and result reconciliation.
-    ✔ Trace client prediction, server validation, accepted/rejected results, and when notifications fire.
+✔ Investigate the original server-owned execution and result design; its authority choice was later superseded by the client-owned revision below.
+    ✔ Trace client prediction, server validation, accepted/rejected results, and when notifications fire for the original investigation.
     ✔ Describe all intermediate states of A-to-B, B-to-C, and unequip, including restricted/full inventories.
-    ✔ Establish a supported way to validate and commit the complete movement plan without an unrecoverable partial result. Prechecking a series of independent swaps is not sufficient evidence of atomicity.
-    ✔ Identify whether existing APIs suffice or a narrowly scoped authoritative request/result adapter is necessary. Record the exact server/client boundary before adding any protocol.
-    ✔ Specify how rejection or interruption leaves inventory unchanged and how authoritative reconciliation corrects prediction. If the required guarantee cannot be met, resolve that constraint before equipment implementation.
+    ✔ Establish the installed direct-assignment primitive for the original design; this is historical evidence and does not establish atomic native multi-flip behavior.
+    ✔ Record the original request/result boundary; the client-owned revision removes that adapter in favor of native flip packets.
+    ✔ Record the original rejection contract; the revised design permits a safe, explicitly reported partial sequence when a later native flip fails.
 ✔ Define the module/interface ownership map and focused validation cases, retaining narrow testable inventory/slot seams.
 
 Completion criteria:
 ✔ Every open decision has a recorded resolution before dependent work starts.
 ✔ Installed API evidence identifies input, event, identity, authority, and completion hooks; uncertain behavior is explicitly tracked.
-✔ The complete chained-restoration movement contract is demonstrated with focused API investigation or an isolated validation fixture before Phase 4. Retain useful verification; remove any disposable investigation scaffolding.
+✔ The original direct-assignment movement contract was demonstrated by an isolated fixture. That evidence does not validate the revised native sequence; its separate verification is included in Phase 4 below.
 
 ### Virtual-entry amendment: prerequisites complete
 
 The earlier completion audit covers the original tool-only contract. The requested virtual-entry addition is specified in Proposal / Virtual Entries and the implementation contract addendum; the incremental investigation is recorded in [VirtualEntryContract.md](docs/quick-tool/VirtualEntryContract.md), with [installed evidence](docs/quick-tool/VirtualEntryEvidence.md) and a passing [independent amendment audit](docs/quick-tool/VirtualEntryCompletionAudit.md). The original audit remains historical evidence for its original scope.
 
-✔ Confirm the side-independent shared light-selector extraction seam and source eligibility on client/server, preserving legacy priority and equal-brightness behavior without duplicating logic.
+✔ Confirm the side-independent shared light-selector extraction seam and source eligibility, preserving legacy priority and equal-brightness behavior without duplicating logic.
 ✔ Verify offhand-source validation, persistence, identity, and restoration constraints for virtual selections; update the movement contract and review the amendment before dependent equipment implementation.
 
 ## Phase 2: Reusable radial-menu functionality
@@ -111,7 +111,7 @@ Outcome: Quick-tool entries reflect current best candidates while retaining stab
 ✔ Cache the winning candidate per category with rendering data and a resolvable location hint, not an assumed reservation.
 ✔ Build the initial cache; subscribe to inventory/ranking changes and coalesce notifications from an operation into one refresh after completion.
 ✔ Refresh pending invalidation before opening; update visible candidate content/enabled state without moving wedges.
-✔ Revalidate cached candidate identity, availability, and destination before any equipment request. Never trust a stale slot reference.
+✔ Revalidate cached candidate identity, availability, and destination before any equipment operation. Never trust a stale slot reference.
 ✔ Unsubscribe from replaced inventories and on disable/world exit; discard stale references and rebuild for the current player when enabled.
 ✔ Verify best-candidate changes, deterministic ties, unsupported metadata, empty inventories, excluded containers, durability changes, notification batching, stale entries, and inventory replacement. Include a regression case proving that a usable tool with lower remaining absolute durability beats a higher-durability tool of the same tier, with deterministic ties and unusable/broken tools excluded.
 ✔ Verify identical wedge positions across reopenings, acquisition/removal, inventory reorder, ranking changes, and shuffled category registration.
@@ -125,31 +125,35 @@ During selector extraction, strengthen existing brightest-source tests to assert
 
 Completion evidence: [traceability](docs/quick-tool/Phase3Traceability.md), [second review](docs/quick-tool/Phase3SecondReview.md), and [independent audit](docs/quick-tool/Phase3CompletionAudit.md).
 
-## Phase 4: Safe equipment and restoration
+## Phase 4: Client-owned equipment and restoration
 
-Dependencies: Phase 1 completed authority/identity contract and D3-D6, including the virtual offhand-source amendment; Phase 3 candidate resolution.
-Outcome: Validated quick-tool selections and restoration operate safely through the established inventory authority path.
+Dependencies: revised client native-movement contract and D3-D6, including the virtual offhand-source amendment; Phase 3 candidate resolution.
+Outcome: Client-owned quick-tool history resolves tracked ItemStack references at action time and uses the game's supported inventory flips. Implementation and focused local verification satisfy this revised contract.
 
-☐ Implement transient session state: original hand slot/item, current quick-tool, its original location, and displaced item's expected current location.
-☐ Equip a selected tool or virtual-entry candidate into the active hand using a validated complete movement plan. Already-held selections are no-ops and create no artificial session.
-☐ Revalidate known stable entry identifiers and invoke their authoritative candidate provider server-side; reject unknown entries. Reuse the same restoration/commit path for lights, including validated offhand sources. Verify tool-to-light-to-tool chains, restoring A, aliases resolving to one stack, and incompatible offhand destinations without mutation.
-☐ Implement chained selection according to resolved D3: return B home while equipping C and carry original A forward for later restoration; do not replace A with B in restoration history.
-☐ Implement center restoration, including initially empty hands and the D5 occupied-slot fallback. Preserve unrelated items; never drop/delete to make room.
-☐ Serialize operations while confirmation is pending; distinguish internal inventory notifications from external edits.
-☐ Update session state only from accepted results. Rejection or failure must not claim success, lose the prior valid session, or leave unreconciled partial movement.
-☐ Handle session lifetime explicitly.
-    ☐ Preserve sessions for unrelated inventory changes.
-    ☐ Apply D4 to manual hotbar/held-item changes.
-    ☐ Track moved recorded items only with reliable identity; otherwise invalidate restoration without moving items.
-    ☐ Revalidate consumed, removed, broken, or replaced items; never substitute another identical-looking tool.
-    ☐ Clear transient state on world exit, player replacement, and feature disablement.
-☐ Verify item conservation, exact locations, original-item identity, and session state for A-to-B-to-unequip and the resolved chained behavior.
-☐ Cover empty hand, already-held tool, duplicates, restricted slots, full inventory, changed return slot, moved/consumed/broken items, overlapping requests, and rejected/interrupted operations at the authoritative boundary.
+✔ Reduce transient session state to original ItemStack reference or empty-hand state, current quick-tool ItemStack reference, original active hotbar position, and preferred home address. Retain quantity/entry validation metadata; remove the expected displaced-item slot. The home address is only a return destination. Keep server inventory authority in the native flip handler.
+✔ Resolve each tracked ItemStack reference exactly once in the current eligible inventory before switch/restore and before presenting restoration availability on menu open. Do not trust cached source slots or match by item ID/serialized contents. Recheck resolved slots before each flip; missing or ambiguous references invalidate the session without movement.
+✔ Equip a selected tool or virtual-entry candidate through `TryFlipItems` and send exactly the returned native packet. Already-held selections are no-ops and create no artificial session.
+✔ Rerun the known entry provider client-side immediately before selection; reject unknown or stale entries. Use the same native-flip route for Light, including the physical offhand. Verify tool-to-light-to-tool chains, restoring A, aliases resolving to one stack, and incompatible offhand destinations.
+✔ Implement chained selection according to D3 with sequential flips: return B home, then equip C while carrying original A forward. Recheck each next flip and stop on interruption; never claim the series is atomic.
+✔ Implement center restoration, including initially empty hands and D5 occupied-home fallback. Preserve unrelated items and never drop/delete to make room. If no valid route exists before the first flip, reject unchanged.
+✔ Simplify QuickToolClientOperations to lifecycle, current player context, and synchronous reentrancy handling. Remove equipment slot-change subscriptions, deferred reconciliation flags, and callback/response/timeout gates. Candidate-cache inventory subscriptions remain owned by the cache.
+✔ Validate the actual local result immediately after each flip and update session state after the sequence. Permit the next action immediately with fresh lookup. Do not classify later inventory updates as request acceptance/rejection. Preserve existing interruption behavior without speculative rollback.
+✔ Handle session lifetime explicitly under action-time validation.
+    ✔ Unrelated inventory changes affect the candidate cache without driving session reconciliation.
+    ✔ Apply D4: clear immediately on manual active-hotbar change; detect held-stack replacement or movement out of that hand at menu-open/action validation.
+    ✔ Find moved original stacks by reference at their current eligible location. Validate the preferred home independently and apply D5 when unavailable.
+    ✔ Revalidate consumed, removed, broken, split/merged, replaced, or ambiguously duplicated references at action time. Native object replacement ends restoration even if contents match; do not infer why it occurred.
+    ✔ Clear transient state on world exit, player replacement, and feature disablement.
+✔ Verify exact native packet order, item conservation, final locations, original-item continuity, and session state for A-to-B-to-unequip and A-to-B-to-C-to-unequip after this revision.
+✔ Cover empty hand, already-held tool, aliases, duplicates, restricted slots, full inventory, changed home, moved original/current stacks, consumed/broken/replaced stacks, failed first flip, and interrupted later flip. Include movement without a slot callback, successive actions without server updates or ticks, callback-independent session state, and later object replacement discovered by the next lookup. Preserve candidate-cache event coverage.
+✔ Update traceability, perform a second review, and repeat the independent completion audit against the revised proposal and linked contracts before completing reopened tasks.
 
 Completion criteria:
-☐ Successful restoration matches the approved examples; failure preserves inventory under the established authority contract.
-☐ Tests demonstrate no loss, duplication, unintended identical-item substitution, or false success.
-☐ Local unit evidence is kept distinct from multiplayer acceptance evidence still required in Phase 6.
+✔ Successful restoration matches the approved examples using current reference lookup; preflight rejection leaves inventory unchanged, and an interrupted sequence reports its actual partial state.
+✔ Tests demonstrate no loss, duplication, unintended identical-item substitution, or false success under the revised client/native-flip boundary. Equipment operations have no pending server-result or slot-callback state.
+✔ Local fixture evidence is kept distinct from native multiplayer acceptance still required in Phase 6. Phase 4 does not claim live server acceptance or synchronization proof.
+
+Completion evidence for this revision: [traceability](docs/quick-tool/Phase4Traceability.md), [second review](docs/quick-tool/Phase4SecondReview.md), and [independent audit](docs/quick-tool/Phase4CompletionAudit.md).
 
 ## Phase 5: Quick-tool integration and user feedback
 
@@ -159,11 +163,11 @@ Outcome: The feature is usable through its configured keybind with reusable menu
 ☐ Add thin quick-tool functionality registration and lifecycle wiring using existing repository conventions; wire feature enablement and cleanup without unrelated configuration redesign.
 ☐ Register and localize the keybind; hold opens, release without click cancels, click selects once and closes, and continued hold cannot reopen until release/repress.
 ☐ Supply cached entries and canonical geometry to the radial-menu system; route selected identifiers through current candidate validation and equipment execution.
-☐ Keep the center labeled Unequip, explain restoration where applicable, and disable it when no supported action is possible under D6.
+☐ Keep the center labeled Unequip, explain restoration where applicable, and validate tracked references on menu open to determine availability under D6. Revalidate on click; never scan inventory every render frame.
 ☐ Localize and display the Light source entry using its resolved item's icon and availability; keep provider-specific policy out of radial-menu code.
-☐ Provide brief localized failure feedback and prevent gameplay click-through. Pending operations must not accept another equipment selection.
+☐ Provide brief localized local-failure/session-unavailable feedback and prevent gameplay click-through. Guard reentrant local sequences; do not add pending-server-result UI or infer server rejection from inventory changes.
 ☐ Ensure disablement, focus loss, player/world changes, and menu close clean up input, subscriptions, cached references, and transient session state consistently.
-☐ Add integration verification for input-to-selection-to-inventory results, stale open-menu candidates, disabled center/categories, request gating, and lifecycle cleanup.
+☐ Add integration verification for input-to-selection-to-native inventory results, stale open-menu candidates, disabled center/categories, operation gating, and lifecycle cleanup.
 ☐ Review source layout, dependency direction, documentation comments, region organization, and absence of unnecessary wrapper methods.
 
 Completion criteria:
@@ -182,7 +186,7 @@ Outcome: Evidence supports the feature's behavior in the actual game and support
 ☐ Verify fixed category locations through repeated openings, inventory rearrangement, acquisition/removal, candidate upgrades, and missing-tool disabled wedges.
 ☐ Verify A-to-B-to-unequip, empty-hand restoration, and A-to-B-to-C-to-unequip with actual slot contents before/after, including mixed tool/light selections and supported offhand-source restoration.
 ☐ Verify conflict cases: manual hotbar change, moved/removed/broken items, unavailable return slots, no valid fallback, and feature/world lifecycle changes.
-☐ Verify multiplayer authority and reconciliation with rejected/stale requests and pending-operation input. Document any runtime scenario not executed; do not treat unit tests as equivalent evidence.
+☐ Verify native multiplayer accepted updates and rejected-request corrections, immediate successive local actions, and subsequent reference lookup after synchronization. Record whether accepted updates replace tracked ItemStack objects and how often this ends restoration. Do not infer a per-request result from slot changes. Document unexecuted scenarios; unit tests do not establish live acceptance.
 ☐ Document user controls, stable category locations, ranking, restoration behavior, fallback, and limitations using existing project documentation conventions.
 ☐ Perform a second completion review against the proposal and record evidence by source, unit, integration, package, and live-runtime boundary. Remove disposable scaffolding; retain meaningful regression coverage.
 
@@ -196,9 +200,9 @@ Completion criteria:
 - Interaction and deterministic positions: Phases 2, 3, 5, 6.
 - Approved cached-mesh rendering, shader effects, and rendering lifecycle: Phases 2 and 6; no performance-testing gate.
 - Candidate discovery, ranking, cache and invalidation: Phases 1, 3, 6.
-- Virtual Light source entry, shared selector parity, fixed placement, provider-aware authority, and offhand-source restoration: phase 1 amendment and Phases 2-6.
+- Virtual Light source entry, shared selector parity, fixed placement, client provider revalidation, and offhand-source restoration: phase 1 amendment and Phases 2-6.
 - Equipment, restoration, external inventory changes: Phases 1, 4-6.
-- Authority, failure handling and request serialization: Phases 1, 4-6.
+- Native inventory authority, failure handling, and client operation gating: Phases 1, 4-6.
 - Decisions to confirm: D1-D7, resolved before dependent implementation.
 - Scope boundaries: Goal and scope; no unrelated refactor or speculative extensions.
 

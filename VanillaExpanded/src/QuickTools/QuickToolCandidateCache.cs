@@ -182,7 +182,7 @@ public sealed class QuickToolCandidateCache : IDisposable
     /// <summary>Gets the last refreshed winner for a fixed entry.</summary>
     public QuickToolCandidate? GetCached(string entryId) => winners.TryGetValue(entryId, out QuickToolCandidate? candidate) ? candidate : null;
 
-    /// <summary>Rechecks the displayed candidate and current owned hand before any equipment request.</summary>
+    /// <summary>Rechecks the displayed candidate and current owned hand before equipment movement.</summary>
     public bool Revalidate(string entryId, QuickToolCandidate displayed, ItemSlot expectedHand, out QuickToolCandidate? current)
     {
         current = null;
