@@ -6,12 +6,13 @@ Status: Approved
 
 Provide a quick way to equip the best available tool from each tool category, then restore the item the player was previously holding. The player holds the assigned keybind to open a radial menu, moves the mouse toward an option, and clicks to select it. The center circle provides an unequip/restore action.
 
-This document specifies intended behavior. Repository integration points and inventory API capabilities have not yet been verified.
+This document specifies approved intended behavior. The [implementation contract](docs/quick-tool/ImplementationContract.md) records the resolved policies, integration investigation, and evidence boundaries; it does not imply that the feature is implemented.
 
 ## Functional Requirements
 
 - Implement the radial menu and quick-tool feature as separate functionality systems.
 - Present one best available tool per supported tool category from the player's eligible inventory.
+- Support virtual item-selection entries, initially Light source, reusing the existing equip-light-source selector.
 - Precompute and cache available options, updating them when the player's inventory changes.
 - Equip a selected tool into the player's active hand slot.
 - Place the unequip option in the center circle.
@@ -45,7 +46,7 @@ Dependencies run from the quick-tool integration toward the reusable radial-menu
 
 After a selection, keep the menu closed until the player releases and presses the key again. Consume the selection click so it cannot also trigger a world interaction. Restore normal input ownership on every close path, including cancellation, loss of focus, feature disablement, and world exit.
 
-The center is labeled Unequip, with explanatory text indicating restoration of the previous item when applicable. Disable it when no supported unequip operation is available. A failed selection leaves the inventory unchanged and provides brief feedback.
+The center is labeled Unequip, with explanatory text indicating restoration of the previous item when applicable. Disable it when no supported unequip operation is available. A rejected selection leaves the inventory unchanged and provides brief feedback. An operation committed before a later notification or synchronization failure is reported as committed and requiring reconciliation, never as an unchanged rejection.
 
 Assign each supported tool category a fixed wedge in a canonical layout with a defined starting angle and direction. Preserve those positions across menu openings and inventory changes, independently of inventory enumeration order, tool acquisition order, candidate ranking, or current tool availability. Keep unavailable categories visible as disabled wedges. Replacing the best candidate updates the same wedge; inventory changes never rotate, compact, or resize the layout.
 
@@ -65,23 +66,37 @@ This rendering approach is approved without performance testing or comparative b
 
 ## Candidate Discovery and Cache
 
-Scan eligible player-owned inventory locations and classify usable tools using the game's authoritative tool-category metadata where available. Container inventories merely opened by the player are excluded. The precise eligible inventory types must be established during integration.
+Scan eligible player-owned inventory locations and classify usable tools using the game's authoritative tool-category metadata where available. Container inventories merely opened by the player are excluded. Eligible types and slot exclusions are defined in the implementation contract.
 
 Cache one candidate per category, including the information needed to render the entry and resolve its current inventory location. Treat cached locations as hints that require validation before an equipment operation.
 
-Proposed ranking within a category:
+Ranking within a category:
 
 1. Highest tool tier.
 2. Lowest remaining absolute durability among usable tools of the same tier, so tools closest to breaking are used up first.
 3. A deterministic inventory and slot ordering to resolve ties.
 
-The preference for lower remaining durability is confirmed. Tier precedence remains the proposed primary ranking criterion and requires confirmation before implementation. Unsupported or incomparable modded tool metadata needs a documented fallback; avoid inventing equivalence between unrelated categories.
+Highest tier remains primary; lower remaining durability is preferred within the same tier. The implementation contract defines non-wearing, broken, unsupported, and incomparable tool metadata handling without inventing equivalence between unrelated categories.
 
 Build the cache when the feature becomes available. Inventory changes invalidate relevant candidate data. Coalesce notifications produced by one inventory operation into a single refresh after the operation completes. A full scan of eligible inventory is an acceptable initial implementation if its cost is small; incremental indexing is not required by this proposal.
 
 Durability and other ranking-relevant changes must also invalidate the cache. Verify whether the available inventory events cover these changes. Unsubscribe and discard references on world exit or feature disablement.
 
 Opening the menu uses the cached options, refreshing pending invalidation first. Selecting an option revalidates the candidate and destination against current inventory state.
+
+## Virtual Entries
+
+Support virtual entries alongside tool categories. A virtual entry represents a semantic item selection, such as Light source, without requiring an EnumTool category. It resolves to a real existing inventory stack; it neither creates items nor defines a separate equipment mechanism. Use distinct stable identifiers, for example `tool:Pickaxe` and `virtual:light-source`, rather than fabricated enum values. The reusable radial-menu system receives ordinary entries and remains unaware of how their candidates were selected.
+
+The initial virtual entry is Light source, covering lanterns, torches, oil lamps, and other items recognized by the existing equip-light-source feature. Reuse the selection logic in `VanillaExpanded/src/ModSystems/EquipLightSource.cs`: `ResolveLightSourceSlot`, `TryFindBrightestLightSource`, and `IsLightSource`. If access requires extraction, move that logic into one shared, side-independent light-source selector used by both features; do not duplicate it or invoke the existing hotkey's swapping behavior.
+
+Preserve the current selector policy: offhand light first, active-hand light next, then the brightest light in the hotbar, then the brightest in the backpack. Light recognition and brightness currently use `Collectible.LightHsv[2] > 0`; equal brightness retains the first slot in the inventory's stable slot order. This is the existing feature's priority policy, not a global brightest-item search. Tool-tier and worn-first durability ranking applies to tool-category entries, not to the light-source provider. Do not introduce new fuel, durability, or brightness rules for the existing light hotkeys as part of this addition.
+
+Give Light source a fixed wedge after the tool-category entries. Keep it visible but disabled when there is no supported candidate. Cache and refresh its candidate with the other entries, including changes to held/offhand items, active-hotbar selection, and light-selection inputs. Switching the displayed light never changes its wedge or rebuilds the menu mesh. Future virtual entries can supply their own selection policy through the same small entry/provider contract; no public plugin framework or additional special entries are required now.
+
+Selecting a virtual entry uses the same server revalidation, active-hand equipment, original-item restoration, and chained-selection rules as selecting a tool. Offhand is an eligible source for the light-source entry specifically, preserving the existing resolver's preference; ordinary tool-category eligibility is unchanged. Verify offhand slot restrictions and the complete displaced-item/return arrangement before mutation. If the resolved candidate cannot participate in a valid supported arrangement, disable or reject with feedback without moving items. Selecting a light already held is a no-op; switching tool to light or light to tool still restores the original item on Unequip. Different entries may resolve to the same stack; keep both fixed entries and apply the same already-held/identity checks.
+
+The [virtual-entry implementation contract](docs/quick-tool/VirtualEntryContract.md) records the shared selector boundary and offhand movement constraints, with installed-API evidence and explicit implementation verification limits.
 
 ## Equipment and Restoration
 
@@ -95,7 +110,7 @@ A tool already held should be a no-op selection and must not create an artificia
 
 ### Switching Between Quick-Tools
 
-The proposed behavior preserves the item held before the first quick-tool selection across subsequent selections. Unequip restores that original item, rather than the most recently used tool. This extends the requested single-swap behavior and remains a design decision to confirm.
+Preserve the item held before the first quick-tool selection across subsequent selections. Unequip restores that original item, rather than the most recently used tool, following the chained-selection example below.
 
 Example:
 
@@ -106,13 +121,13 @@ Example:
 | Select axe | Axe | Pickaxe | Item A |
 | Select unequip | Item A | Pickaxe | Axe |
 
-When switching tools, return the current quick-tool to its original location and move the displaced original item to the newly selected tool's source location. Validate the complete movement plan first, including slot restrictions. Commit using supported inventory operations without exposing item loss, duplication, or an unrecoverable partial result. Whether the inventory API can support this transaction directly must be verified.
+When switching tools, return the current quick-tool to its original location and move the displaced original item to the newly selected tool's source location. Validate the complete movement plan first, including slot restrictions. Commit using supported inventory operations without exposing item loss, duplication, or an unrecoverable partial result. The implementation contract specifies a server-owned, prevalidated whole-stack assignment followed by native persistence and synchronization; repeated client flip packets do not provide this boundary.
 
 ### Unequip
 
 For an intact session, return the active quick-tool to its recorded original slot and restore the displaced item to the recorded hand slot. If the hand was initially empty, return the tool and leave that hand slot empty.
 
-If the original tool slot is no longer usable, the proposed fallback is another eligible slot that can accept the tool. Preserve unrelated items. If no complete valid restoration is possible, leave the inventory unchanged and explain why the action could not complete. Never drop or delete an item to make restoration succeed.
+If the original tool slot is no longer usable, use the first compatible empty eligible slot in deterministic hotbar-then-backpack order. Preserve unrelated items. If no complete valid restoration is possible, leave the inventory unchanged and explain why the action could not complete. Never drop or delete an item to make restoration succeed.
 
 Validate all involved items and slots again before committing. Clear restoration state only after confirmed success or an explicit session invalidation. A failed operation must not falsely report successful equipment or restoration.
 
@@ -120,7 +135,7 @@ Validate all involved items and slots again before committing. Clear restoration
 
 Distinguish changes caused by the quick-tool operation from external inventory changes. Internal notifications update the cache without prematurely invalidating the session.
 
-Proposed handling for external changes:
+Handling for external changes:
 
 - Unrelated inventory changes refresh candidates and preserve the session.
 - A manual change of active hotbar slot or replacement of the held item ends the session, preventing a later restore from overriding the player's new intent.
@@ -128,7 +143,7 @@ Proposed handling for external changes:
 - Consumption, removal, breakage, or replacement of an involved item requires revalidation. Do not substitute an identical-looking item without a supported identity contract.
 - World exit, player replacement, or feature disablement clears transient restoration state.
 
-Invalidating a session does not move items automatically. An unequip action without a valid session is disabled under the initial proposal. General unequipping of manually equipped tools is an open scope decision.
+Invalidating a session does not move items automatically. An unequip action without a valid session is disabled. General unequipping of manually equipped tools is outside the initial scope.
 
 ## Authority and Failure Handling
 
@@ -138,17 +153,11 @@ Avoid overlapping equipment requests. While an operation awaits confirmation, pr
 
 ## Scope Boundaries
 
-The initial feature covers tool-category selection, the reusable radial interaction, inventory-driven candidate caching, and reversible temporary equipment. It does not require custom player favorites, nested radial menus, tools from external containers, persistent restoration across reconnects, or an undo history of arbitrary inventory actions.
+The initial feature covers tool-category and virtual light-source selection, the reusable radial interaction, inventory-driven candidate caching, and reversible temporary equipment. It does not require custom player favorites, nested radial menus, tools from external containers, persistent restoration across reconnects, or an undo history of arbitrary inventory actions.
 
-## Decisions to Confirm
+## Resolved Implementation Decisions
 
-- Whether highest tool tier remains the primary ranking criterion. Within the same tier, lower remaining absolute durability is preferred; that direction is confirmed.
-- Which player inventories and tool categories are eligible, including treatment of modded tools.
-- Whether chained selections restore the original held item as proposed.
-- Whether manual hotbar selection ends the restoration session as proposed.
-- Whether occupied-slot fallback should use any valid empty player inventory slot or fail unless the original arrangement can be restored.
-- Whether the center action should support manually equipped tools when no restoration session exists.
-- The canonical category-to-wedge mapping, starting angle, direction, and deterministic layout-extension policy for modded categories. Unavailable categories retain disabled wedges. The quick-tool system supplies category positions and the radial-menu system preserves them. Only changes to the supported category set or explicit layout configuration may rebuild the layout, never while the menu is open.
+The [implementation contract](docs/quick-tool/ImplementationContract.md#resolved-decisions) resolves D1-D7: highest-tier then worn-first ranking; eligible own hotbar/backpack content; restoration across chained selections; manual hand changes ending the session; compatible empty-slot fallback; center disabled without a session; and the explicit stable category mapping. The contract also records modded-item compatibility, authority, and synchronization boundaries. Its canonical category table is independent of the player's inventory; unavailable categories retain disabled wedges. Only supported-category-set or explicit layout changes may rebuild layout geometry, never while the menu is open.
 
 ## Acceptance Criteria
 
@@ -159,13 +168,15 @@ The initial feature covers tool-category selection, the reusable radial interact
 - Inventory and ranking-relevant changes refresh cached results without a per-frame inventory scan.
 - Each category retains the same wedge across menu openings, inventory reorderings, tool acquisition or removal, and best-candidate changes. Unavailable categories retain disabled wedges; the remaining wedges never compact or redistribute. The same supported category set and layout configuration produce identical positions regardless of registration or inventory enumeration order.
 - Selecting tool B while holding item A, then selecting unequip, returns B to its original location and restores A when the arrangement remains valid.
-- If chained restoration is accepted, selecting B then C then unequip restores A and returns both tools to their original slots when possible.
+- Selecting B then C then unequip restores A and returns both tools to their original slots when possible.
 - Initially empty hands, already-held candidates, duplicate tools, restricted slots, moved items, full inventories, broken tools, and rejected operations have deterministic behavior without item loss or duplication.
 - The radial-menu system can present non-tool entries without depending on quick-tool inventory logic.
+- Light source occupies a fixed disabled-or-enabled wedge, resolves through shared existing light-selection logic, and refreshes when inventory or hand-priority inputs change.
+- Tool/light chains preserve original-item restoration; the same-stack, offhand-source restrictions, no-candidate, and stale-candidate cases cannot duplicate or lose items. Existing equip-light hotkey behavior is preserved.
 - Cached combined wedge/center geometry is reused across frames and reopenings; state and candidate changes update appearance without mesh rebuilds or uploads.
 - Circular edges remain smooth at supported GUI scales, CPU hit testing agrees with visible targets, and shader/resource reload and disposal preserve correct rendering.
 - Input ownership, subscriptions, cached references, and transient restoration state are cleaned up at the appropriate lifecycle boundaries.
 
-## Implementation Investigation
+## Implementation Evidence
 
-Before preparing an implementation plan, identify the repository's functionality registration and keybind conventions, reusable GUI/input facilities, inventory-change and durability notifications, tool classification and ranking metadata, authoritative swap operations, and item identity capabilities. Validate the multi-slot restoration contract against those APIs before committing to a concrete movement algorithm.
+The implementation contract and linked installed-API evidence record functionality registration, input/GUI ownership, inventory/durability observation, tool classification, authority, and item identity. Its isolated movement fixture demonstrates the underlying commit boundary. Production eligibility, live GUI behavior, native persistence execution, and multiplayer reconciliation still require the implementation checklist verification; they are not implied by the investigation.

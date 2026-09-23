@@ -1,0 +1,469 @@
+Assembly: VintagestoryAPI, Version=1.22.7.0, Culture=neutral, PublicKeyToken=null
+SHA256: 034283E7E9D98EAE45EE63005576FD89BADC3C995B531CC4C3FE46F3EB2D3296
+Vintagestory.API.Common.IInventoryNetworkUtil
+System.Object GetFlipSlotsPacket(Vintagestory.API.Common.IInventory, Int32, Int32)
+Void SendInventoryRollback(Vintagestory.API.Server.IServerPlayer, Int32, System.ReadOnlySpan`1[System.Byte])
+Boolean get_PauseInventoryUpdates()
+Void set_PauseInventoryUpdates(Boolean)
+Boolean PauseInventoryUpdates
+Vintagestory.API.Client.GuiDialog
+Boolean get_Focused()
+Void OnLevelFinalize()
+Boolean TryOpen()
+Boolean TryOpen(Boolean)
+Boolean TryClose()
+Void UnFocus()
+Void OnKeyDown(Vintagestory.API.Client.KeyEvent)
+Void OnKeyUp(Vintagestory.API.Client.KeyEvent)
+Void OnMouseDown(Vintagestory.API.Client.MouseEvent)
+Void OnMouseUp(Vintagestory.API.Client.MouseEvent)
+Boolean get_PrefersUngrabbedMouse()
+Boolean get_DisableMouseGrab()
+Boolean CaptureAllInputs()
+Boolean CaptureRawMouse()
+Boolean Focused
+Boolean PrefersUngrabbedMouse
+Boolean DisableMouseGrab
+Vintagestory.API.Client.IInputAPI
+Boolean[] get_KeyboardKeyStateRaw()
+Boolean[] get_KeyboardKeyState()
+Vintagestory.API.Client.HotKey GetHotKeyByCode(System.String)
+Boolean IsHotKeyPressed(System.String)
+Boolean IsHotKeyPressed(Vintagestory.API.Client.HotKey)
+Boolean[] KeyboardKeyStateRaw
+Boolean[] KeyboardKeyState
+Vintagestory.API.Client.IClientEventAPI
+Void add_PlayerDeath(Vintagestory.API.Client.PlayerEventDelegate)
+Void remove_PlayerDeath(Vintagestory.API.Client.PlayerEventDelegate)
+Void add_PlayerEntitySpawn(Vintagestory.API.Client.PlayerEventDelegate)
+Void remove_PlayerEntitySpawn(Vintagestory.API.Client.PlayerEventDelegate)
+Void add_PauseResume(Vintagestory.API.Client.OnGamePauseResume)
+Void remove_PauseResume(Vintagestory.API.Client.OnGamePauseResume)
+Void add_LeaveWorld(System.Action)
+Void remove_LeaveWorld(System.Action)
+Void add_BeforeActiveSlotChanged(Vintagestory.API.Common.Func`2[Vintagestory.API.Common.ActiveSlotChangeEventArgs,Vintagestory.API.Common.EnumHandling])
+Void remove_BeforeActiveSlotChanged(Vintagestory.API.Common.Func`2[Vintagestory.API.Common.ActiveSlotChangeEventArgs,Vintagestory.API.Common.EnumHandling])
+Void add_AfterActiveSlotChanged(System.Action`1[Vintagestory.API.Common.ActiveSlotChangeEventArgs])
+Void remove_AfterActiveSlotChanged(System.Action`1[Vintagestory.API.Common.ActiveSlotChangeEventArgs])
+Void add_LevelFinalize(System.Action)
+Void remove_LevelFinalize(System.Action)
+Vintagestory.API.Client.PlayerEventDelegate PlayerDeath
+Vintagestory.API.Client.PlayerEventDelegate PlayerEntitySpawn
+Vintagestory.API.Client.OnGamePauseResume PauseResume
+System.Action LeaveWorld
+Vintagestory.API.Common.Func`2[Vintagestory.API.Common.ActiveSlotChangeEventArgs,Vintagestory.API.Common.EnumHandling] BeforeActiveSlotChanged
+System.Action`1[Vintagestory.API.Common.ActiveSlotChangeEventArgs] AfterActiveSlotChanged
+System.Action LevelFinalize
+Vintagestory.API.Common.IEventAPI
+Void EnqueueMainThreadTask(System.Action, System.String)
+Vintagestory.API.Server.IServerNetworkChannel
+Vintagestory.API.Server.IServerNetworkChannel SetMessageHandler[T](Vintagestory.API.Server.NetworkClientMessageHandler`1[T])
+Void SendPacket[T](T, Vintagestory.API.Server.IServerPlayer[])
+Void SendPacket[T](T, Byte[], Vintagestory.API.Server.IServerPlayer[])
+Vintagestory.API.Server.IServerPlayer
+Void BroadcastPlayerData(Boolean)
+Vintagestory.API.Common.IPlayerInventoryManager
+Void BroadcastHotbarSlot()
+Vintagestory.API.Common.InventoryBase
+System.Object TryFlipItems(Int32, Vintagestory.API.Common.ItemSlot)
+Boolean TryFlipItemStack(Vintagestory.API.Common.IPlayer, System.String[], Int32[], Int64[])
+Vintagestory.API.Server.IServerEventAPI
+Void add_PlayerRespawn(Vintagestory.API.Common.PlayerDelegate)
+Void remove_PlayerRespawn(Vintagestory.API.Common.PlayerDelegate)
+Void add_PlayerDisconnect(Vintagestory.API.Common.PlayerDelegate)
+Void remove_PlayerDisconnect(Vintagestory.API.Common.PlayerDelegate)
+Void add_PlayerDeath(Vintagestory.API.Common.PlayerDeathDelegate)
+Void remove_PlayerDeath(Vintagestory.API.Common.PlayerDeathDelegate)
+Void add_BeforeActiveSlotChanged(Vintagestory.API.Common.Func`3[Vintagestory.API.Server.IServerPlayer,Vintagestory.API.Common.ActiveSlotChangeEventArgs,Vintagestory.API.Common.EnumHandling])
+Void remove_BeforeActiveSlotChanged(Vintagestory.API.Common.Func`3[Vintagestory.API.Server.IServerPlayer,Vintagestory.API.Common.ActiveSlotChangeEventArgs,Vintagestory.API.Common.EnumHandling])
+Void add_AfterActiveSlotChanged(System.Action`2[Vintagestory.API.Server.IServerPlayer,Vintagestory.API.Common.ActiveSlotChangeEventArgs])
+Void remove_AfterActiveSlotChanged(System.Action`2[Vintagestory.API.Server.IServerPlayer,Vintagestory.API.Common.ActiveSlotChangeEventArgs])
+Vintagestory.API.Common.PlayerDelegate PlayerRespawn
+Vintagestory.API.Common.PlayerDelegate PlayerDisconnect
+Vintagestory.API.Common.PlayerDeathDelegate PlayerDeath
+Vintagestory.API.Common.Func`3[Vintagestory.API.Server.IServerPlayer,Vintagestory.API.Common.ActiveSlotChangeEventArgs,Vintagestory.API.Common.EnumHandling] BeforeActiveSlotChanged
+System.Action`2[Vintagestory.API.Server.IServerPlayer,Vintagestory.API.Common.ActiveSlotChangeEventArgs] AfterActiveSlotChanged
+Itemstack setter IL: 02037D251200042A
+PASS: rejection unchanged; reference-conserving three-slot permutation; observers see complete state; notification failure is postcommit.
+PASS: A-to-B-to-A two-slot session restores both exact references.
+PASS: A-to-B-to-C-to-A chained session restores all three exact references.
+PASS: stale identical-looking source reference rejects without mutation.
+PASS: initially empty hand equips and restores without inventing an item.
+LIMIT: detached slots; no eligibility validator, world callbacks, live server, or network synchronization tested.
+Library: VintagestoryLib, Version=1.22.7.0, Culture=neutral, PublicKeyToken=null
+Library SHA256: E08F22B493B92FEAF0AAEB79D22437EA0F7EFC38AA7F72A04A47F98BC0E40DF0
+Vintagestory.Client.ScreenManager
+Public=True Static=True Vintagestory.Client.NoObf.ClientPlatformAbstract Vintagestory.Client.ScreenManager::Platform
+Vintagestory.Client.NoObf.ClientPlatformAbstract
+Visibility=Public, Virtual, HideBySig, VtableLayoutMask, Abstract, SpecialName System.Boolean Vintagestory.Client.NoObf.ClientPlatformAbstract::get_IsFocused()
+Vintagestory.Common.InventoryPlayerBackpacks
+Visibility=Family, Virtual, HideBySig Vintagestory.API.Common.ItemSlot Vintagestory.Common.InventoryPlayerBackpacks::NewSlot(System.Int32)
+Visibility=Public, Virtual, HideBySig System.Void Vintagestory.Common.InventoryPlayerBackpacks::OnItemSlotModified(Vintagestory.API.Common.ItemSlot)
+IL_0014: callvirt System.Void Vintagestory.API.Common.BagInventory::SaveSlotIntoBag(Vintagestory.API.Common.ItemSlotBagContent)
+IL_0027: callvirt System.Void Vintagestory.API.Common.BagInventory::ReloadBagInventory(Vintagestory.API.Common.InventoryBase,Vintagestory.API.Common.ItemSlot[])
+IL_0032: callvirt Vintagestory.API.Common.EnumAppSide Vintagestory.API.Common.ICoreAPI::get_Side()
+IL_0040: callvirt Vintagestory.API.Common.IWorldAccessor Vintagestory.API.Common.ICoreAPI::get_World()
+IL_004b: callvirt Vintagestory.API.Common.IPlayer Vintagestory.API.Common.IWorldAccessor::PlayerByUid(System.String)
+IL_005b: callvirt System.Void Vintagestory.API.Server.IServerPlayer::BroadcastPlayerData(System.Boolean)
+Vintagestory.Common.InventoryNetworkUtil
+Visibility=Private, HideBySig System.Void Vintagestory.Common.InventoryNetworkUtil::handleFlipItemstacksPacket(Vintagestory.API.Common.IPlayer,Packet_Client)
+IL_005a: callvirt System.Boolean Vintagestory.Common.InventoryNetworkUtil::SendDirtyInventoryContents(Vintagestory.API.Common.IPlayer,System.String,System.Int64)
+IL_0069: callvirt System.Boolean Vintagestory.Common.InventoryNetworkUtil::SendDirtyInventoryContents(Vintagestory.API.Common.IPlayer,System.String,System.Int64)
+IL_0072: callvirt Vintagestory.API.Common.IPlayerInventoryManager Vintagestory.API.Common.IPlayer::get_InventoryManager()
+IL_007a: callvirt Vintagestory.API.Common.IInventory Vintagestory.API.Common.IPlayerInventoryManager::GetInventory(System.String)
+IL_0087: callvirt Vintagestory.API.Common.IPlayerInventoryManager Vintagestory.API.Common.IPlayer::get_InventoryManager()
+IL_008f: callvirt Vintagestory.API.Common.IInventory Vintagestory.API.Common.IPlayerInventoryManager::GetInventory(System.String)
+IL_00b6: callvirt System.Void Vintagestory.Common.ITabbedInventory::SetTab(System.Int32)
+IL_00d6: callvirt System.Void Vintagestory.Common.ITabbedInventory::SetTab(System.Int32)
+IL_00e5: callvirt System.Boolean Vintagestory.API.Common.InventoryBase::TryFlipItemStack(Vintagestory.API.Common.IPlayer,System.String[],System.Int32[],System.Int64[])
+IL_00f0: callvirt System.Void Vintagestory.Common.InventoryNetworkUtil::NotifyPlayersItemstackMoved(Vintagestory.API.Common.IPlayer,System.String[],System.Int32[])
+IL_00fa: callvirt System.Void Vintagestory.Common.InventoryNetworkUtil::RevertPlayerItemstackMove(Vintagestory.API.Common.IPlayer,System.String[],System.Int32[])
+Visibility=Family, Virtual, HideBySig, VtableLayoutMask System.Boolean Vintagestory.Common.InventoryNetworkUtil::SendDirtyInventoryContents(Vintagestory.API.Common.IPlayer,System.String,System.Int64)
+IL_0001: callvirt Vintagestory.API.Common.IPlayerInventoryManager Vintagestory.API.Common.IPlayer::get_InventoryManager()
+IL_0007: callvirt Vintagestory.API.Common.IInventory Vintagestory.API.Common.IPlayerInventoryManager::GetInventory(System.String)
+IL_0023: callvirt System.Void Vintagestory.Common.InventoryNetworkUtil::SendInventoryContents(Vintagestory.API.Common.IPlayer,System.String)
+Visibility=Family, Virtual, HideBySig, VtableLayoutMask System.Void Vintagestory.Common.InventoryNetworkUtil::SendInventoryContents(Vintagestory.API.Common.IPlayer,System.String)
+IL_0001: callvirt Vintagestory.API.Common.IPlayerInventoryManager Vintagestory.API.Common.IPlayer::get_InventoryManager()
+IL_0007: callvirt Vintagestory.API.Common.IInventory Vintagestory.API.Common.IPlayerInventoryManager::GetInventory(System.String)
+IL_0022: callvirt Packet_InventoryContents Vintagestory.Common.InventoryNetworkUtil::ToPacket(Vintagestory.API.Common.IPlayer)
+IL_003e: call Vintagestory.API.Common.ICoreAPI Vintagestory.Common.InventoryNetworkUtil::get_Api()
+IL_0048: callvirt Vintagestory.API.Server.IServerNetworkAPI Vintagestory.API.Server.ICoreServerAPI::get_Network()
+IL_005d: callvirt System.Void Vintagestory.API.Server.IServerNetworkAPI::SendArbitraryPacket(System.Object,Vintagestory.API.Server.IServerPlayer[])
+Visibility=Public, Virtual, HideBySig, VtableLayoutMask Packet_InventoryContents Vintagestory.Common.InventoryNetworkUtil::ToPacket(Vintagestory.API.Common.IPlayer)
+IL_0007: callvirt System.Int32 Vintagestory.API.Common.IPlayer::get_ClientId()
+IL_0018: callvirt System.String Vintagestory.API.Common.InventoryBase::get_InventoryID()
+IL_0029: callvirt System.String Vintagestory.API.Common.InventoryBase::get_ClassName()
+IL_0034: callvirt Packet_ItemStack[] Vintagestory.Common.InventoryNetworkUtil::CreatePacketItemStacks()
+IL_0042: callvirt System.Void Packet_InventoryContents::SetItemstacks(Packet_ItemStack[],System.Int32,System.Int32)
+Visibility=Private, HideBySig System.Boolean Vintagestory.Common.InventoryNetworkUtil::UpdateSlotStack(Vintagestory.API.Common.ItemSlot,Vintagestory.API.Common.ItemStack)
+IL_0001: callvirt Vintagestory.API.Common.ItemStack Vintagestory.API.Common.ItemSlot::get_Itemstack()
+IL_000c: callvirt Vintagestory.API.Common.ItemStack Vintagestory.API.Common.ItemSlot::get_Itemstack()
+IL_0011: callvirt Vintagestory.API.Common.CollectibleObject Vintagestory.API.Common.ItemStack::get_Collectible()
+IL_0017: callvirt Vintagestory.API.Common.CollectibleObject Vintagestory.API.Common.ItemStack::get_Collectible()
+IL_0020: callvirt Vintagestory.API.Common.ItemStack Vintagestory.API.Common.ItemSlot::get_Itemstack()
+IL_002c: call Vintagestory.API.Datastructures.ITreeAttribute Vintagestory.API.Common.ItemStack::get_TempAttributes()
+IL_0031: callvirt System.Void Vintagestory.API.Common.ItemStack::set_TempAttributes(Vintagestory.API.Datastructures.ITreeAttribute)
+IL_003b: callvirt Vintagestory.API.Common.ItemStack Vintagestory.API.Common.ItemSlot::get_Itemstack()
+IL_004a: call Vintagestory.API.Common.ICoreAPI Vintagestory.Common.InventoryNetworkUtil::get_Api()
+IL_004f: callvirt Vintagestory.API.Common.IWorldAccessor Vintagestory.API.Common.ICoreAPI::get_World()
+IL_0055: callvirt Vintagestory.API.Common.ItemStack Vintagestory.API.Common.ItemSlot::get_Itemstack()
+IL_005f: callvirt System.Boolean Vintagestory.API.Common.ItemStack::Equals(Vintagestory.API.Common.IWorldAccessor,Vintagestory.API.Common.ItemStack,System.String[])
+IL_006f: callvirt System.Void Vintagestory.API.Common.ItemSlot::set_Itemstack(Vintagestory.API.Common.ItemStack)
+Vintagestory.Server.ServerPlayer
+Visibility=Public, Virtual, HideBySig, VtableLayoutMask System.Void Vintagestory.Server.ServerPlayer::BroadcastPlayerData(System.Boolean)
+IL_0009: callvirt System.Void Vintagestory.Server.ServerMain::BroadcastPlayerData(Vintagestory.API.Server.IServerPlayer,System.Boolean,System.Boolean)
+Vintagestory.Server.ServerMain
+Visibility=Public, HideBySig System.Void Vintagestory.Server.ServerMain::BroadcastHotbarSlot(Vintagestory.API.Server.IServerPlayer,System.Boolean)
+IL_0003: call !!0[] System.Array::Empty<Vintagestory.API.Server.IServerPlayer>()
+IL_0016: callvirt Vintagestory.API.Common.IPlayerInventoryManager Vintagestory.API.Common.IPlayer::get_InventoryManager()
+IL_0022: callvirt Vintagestory.API.Common.ItemSlot Vintagestory.API.Common.IPlayerInventoryManager::get_ActiveHotbarSlot()
+IL_002a: callvirt Vintagestory.API.Common.IPlayerInventoryManager Vintagestory.API.Common.IPlayer::get_InventoryManager()
+IL_003b: callvirt System.Void Vintagestory.API.Common.LoggerBase::Error(System.String)
+IL_004b: callvirt System.Void Vintagestory.API.Common.LoggerBase::Error(System.String)
+IL_0052: callvirt Vintagestory.API.Common.IPlayerInventoryManager Vintagestory.API.Common.IPlayer::get_InventoryManager()
+IL_0057: callvirt Vintagestory.API.Common.ItemSlot Vintagestory.API.Common.IPlayerInventoryManager::get_ActiveHotbarSlot()
+IL_005c: callvirt Vintagestory.API.Common.ItemStack Vintagestory.API.Common.ItemSlot::get_Itemstack()
+IL_0063: callvirt Vintagestory.API.Common.EntityPlayer Vintagestory.API.Common.IPlayer::get_Entity()
+IL_006f: callvirt Vintagestory.API.Common.ItemSlot Vintagestory.API.Common.EntityAgent::get_LeftHandItemSlot()
+IL_007b: call Vintagestory.API.Common.ItemStack Vintagestory.API.Common.ItemSlot::get_Itemstack()
+IL_008f: callvirt System.Int32 Vintagestory.API.Common.IPlayer::get_ClientId()
+IL_009b: callvirt Vintagestory.API.Common.IPlayerInventoryManager Vintagestory.API.Common.IPlayer::get_InventoryManager()
+IL_00a0: callvirt System.Int32 Vintagestory.API.Common.IPlayerInventoryManager::get_ActiveHotbarSlotNumber()
+IL_00af: call Packet_ItemStack Vintagestory.Common.StackConverter::ToPacket(Vintagestory.API.Common.ItemStack)
+IL_00c1: call Packet_ItemStack Vintagestory.Common.StackConverter::ToPacket(Vintagestory.API.Common.ItemStack)
+IL_00dc: call System.Void Vintagestory.Server.ServerMain::BroadcastPacket(Packet_Server,Vintagestory.API.Server.IServerPlayer[])
+Visibility=Public, HideBySig System.Void Vintagestory.Server.ServerMain::BroadcastPlayerData(Vintagestory.API.Server.IServerPlayer,System.Boolean,System.Boolean)
+IL_0001: callvirt Vintagestory.API.Common.IWorldPlayerData Vintagestory.API.Common.IPlayer::get_WorldData()
+IL_000e: callvirt Packet_Server Vintagestory.Server.ServerWorldPlayerData::ToPacket(Vintagestory.API.Server.IServerPlayer,System.Boolean,System.Boolean)
+IL_0015: callvirt Vintagestory.API.Common.IWorldPlayerData Vintagestory.API.Common.IPlayer::get_WorldData()
+IL_0020: callvirt Packet_Server Vintagestory.Server.ServerWorldPlayerData::ToPacketForOtherPlayers(Vintagestory.API.Server.IServerPlayer)
+IL_0029: call System.Void Vintagestory.Server.ServerMain::SendPacket(Vintagestory.API.Server.IServerPlayer,Packet_Server)
+IL_003a: call System.Void Vintagestory.Server.ServerMain::BroadcastPacket(Packet_Server,Vintagestory.API.Server.IServerPlayer[])
+Vintagestory.Server.ServerWorldPlayerData
+Visibility=Public, HideBySig Packet_Server Vintagestory.Server.ServerWorldPlayerData::ToPacket(Vintagestory.API.Server.IServerPlayer,System.Boolean,System.Boolean)
+IL_0002: callvirt Vintagestory.API.Common.Entities.FuzzyEntityPos Vintagestory.API.Server.IServerPlayer::GetSpawnPosition(System.Boolean)
+IL_001d: callvirt System.Int32 Vintagestory.API.Common.IPlayer::get_ClientId()
+IL_004b: call System.Int32 Vintagestory.Common.CollectibleNet::SerializeFloat(System.Single)
+IL_006b: call System.Int32 Vintagestory.Common.CollectibleNet::SerializeFloat(System.Single)
+IL_00b3: callvirt Vintagestory.API.Common.IPlayerInventoryManager Vintagestory.API.Common.IPlayer::get_InventoryManager()
+IL_00b8: callvirt System.Int32 Vintagestory.API.Common.IPlayerInventoryManager::get_ActiveHotbarSlotNumber()
+IL_00c9: callvirt System.Collections.Generic.List`1<Vintagestory.API.Common.Entitlement> Vintagestory.API.Common.IPlayer::get_Entitlements()
+IL_00ed: call System.Collections.Generic.IEnumerable`1<!!1> System.Linq.Enumerable::Select<Vintagestory.API.Common.Entitlement,System.String>(System.Collections.Generic.IEnumerable`1<!!0>,System.Func`2<!!0,!!1>)
+IL_00f2: call !!0[] System.Linq.Enumerable::ToArray<System.String>(System.Collections.Generic.IEnumerable`1<!!0>)
+IL_00f7: call System.String System.String::Join(System.String,System.String[])
+IL_011e: callvirt System.Int32 Vintagestory.API.Common.Entities.EntityPos::get_XInt()
+IL_012a: callvirt System.Int32 Vintagestory.API.Common.Entities.EntityPos::get_YInt()
+IL_0136: callvirt System.Int32 Vintagestory.API.Common.Entities.EntityPos::get_ZInt()
+IL_0150: callvirt System.String[] Vintagestory.API.Common.IPlayer::get_Privileges()
+IL_0155: callvirt System.Void Packet_PlayerData::SetPrivileges(System.String[])
+IL_0161: callvirt Vintagestory.API.Common.IPlayerRole Vintagestory.API.Common.IPlayer::get_Role()
+IL_0166: callvirt System.String Vintagestory.API.Common.IPlayerRole::get_Code()
+IL_017f: callvirt System.Collections.Generic.IEnumerable`1<!1> Vintagestory.API.Datastructures.OrderedDictionary`2<System.String,Vintagestory.API.Common.InventoryBase>::get_ValuesOrdered()
+IL_0184: callvirt System.Collections.Generic.IEnumerator`1<!0> System.Collections.Generic.IEnumerable`1<Vintagestory.API.Common.InventoryBase>::GetEnumerator()
+IL_018d: callvirt !0 System.Collections.Generic.IEnumerator`1<Vintagestory.API.Common.InventoryBase>::get_Current()
+IL_01ab: callvirt Packet_InventoryContents Vintagestory.Common.InventoryNetworkUtil::ToPacket(Vintagestory.API.Common.IPlayer)
+IL_01b0: callvirt System.Void System.Collections.Generic.List`1<Packet_InventoryContents>::Add(!0)
+IL_01b6: callvirt System.Boolean System.Collections.IEnumerator::MoveNext()
+IL_01c3: callvirt System.Void System.IDisposable::Dispose()
+IL_01d0: callvirt !0[] System.Collections.Generic.List`1<Packet_InventoryContents>::ToArray()
+IL_01d5: callvirt System.Void Packet_PlayerData::SetInventoryContents(Packet_InventoryContents[])
+Vintagestory.Server.ServerPlayerInventoryManager
+Visibility=Public, Virtual, HideBySig System.Void Vintagestory.Server.ServerPlayerInventoryManager::BroadcastHotbarSlot()
+IL_0012: callvirt System.Void Vintagestory.Server.ServerMain::BroadcastHotbarSlot(Vintagestory.API.Server.IServerPlayer,System.Boolean)
+Vintagestory.Common.InventoryPlayerHotbar
+Visibility=Public, Virtual, HideBySig System.Void Vintagestory.Common.InventoryPlayerHotbar::OnItemSlotModified(Vintagestory.API.Common.ItemSlot)
+IL_0002: call System.Void Vintagestory.API.Common.InventoryBase::OnItemSlotModified(Vintagestory.API.Common.ItemSlot)
+IL_0009: callvirt System.Void Vintagestory.Common.InventoryPlayerHotbar::updateSlotStatMods(Vintagestory.API.Common.ItemSlot)
+Visibility=Family, Virtual, HideBySig Vintagestory.API.Common.ItemSlot Vintagestory.Common.InventoryPlayerHotbar::NewSlot(System.Int32)
+IL_002b: call System.String System.Int32::ToString()
+Int32 GetMaxDurability(Vintagestory.API.Common.ItemStack)
+Int32 GetRemainingDurability(Vintagestory.API.Common.ItemStack)
+System.Nullable`1[Vintagestory.API.Common.EnumTool] GetTool(Vintagestory.API.Common.ItemSlot)
+Int32 GetToolTier(Vintagestory.API.Common.ItemSlot)
+EnumTool: Knife, Pickaxe, Axe, Sword, Shovel, Hammer, Spear, Bow, Shears, Sickle, Hoe, Saw, Chisel, Scythe, Sling, Wrench, Probe, Meter, Drill, Firearm, Crossbow, Javelin, Pike, Shield, Club, Mace, Warhammer, Poleaxe, Halberd, Polearm, Staff, Tongs, Crowbar
+GlKeys.Unknown=0
+System.Void Vintagestory.API.Common.InventoryBase::OnItemSlotModified(Vintagestory.API.Common.ItemSlot)
+IL_0000: ret
+System.Void Vintagestory.API.Common.InventoryBase::DidModifyItemSlot(Vintagestory.API.Common.ItemSlot,Vintagestory.API.Common.ItemStack)
+IL_0000: ldarg.0
+IL_0001: ldarg.1
+IL_0002: callvirt System.Int32 Vintagestory.API.Common.InventoryBase::GetSlotId(Vintagestory.API.Common.ItemSlot)
+IL_0007: stloc.0
+IL_0008: ldloc.0
+IL_0009: ldc.i4.0
+IL_000a: bge.s IL_0022
+IL_000c: ldstr "Supplied slot is not part of this inventory ({0})!"
+IL_0011: ldarg.0
+IL_0012: call System.String Vintagestory.API.Common.InventoryBase::get_InventoryID()
+IL_0017: call System.String System.String::Format(System.String,System.Object)
+IL_001c: newobj System.Void System.ArgumentException::.ctor(System.String)
+IL_0021: throw
+IL_0022: ldarg.0
+IL_0023: ldloc.0
+IL_0024: callvirt System.Void Vintagestory.API.Common.InventoryBase::MarkSlotDirty(System.Int32)
+IL_0029: ldarg.0
+IL_002a: ldarg.1
+IL_002b: callvirt System.Void Vintagestory.API.Common.InventoryBase::OnItemSlotModified(Vintagestory.API.Common.ItemSlot)
+IL_0030: ldarg.0
+IL_0031: ldfld System.Action`1<System.Int32> Vintagestory.API.Common.InventoryBase::SlotModified
+IL_0036: dup
+IL_0037: brtrue.s IL_003c
+IL_0039: pop
+IL_003a: br.s IL_0042
+IL_003c: ldloc.0
+IL_003d: callvirt System.Void System.Action`1<System.Int32>::Invoke(!0)
+IL_0042: ldarg.1
+IL_0043: callvirt Vintagestory.API.Common.ItemStack Vintagestory.API.Common.ItemSlot::get_Itemstack()
+IL_0048: dup
+IL_0049: brtrue.s IL_004d
+IL_004b: pop
+IL_004c: ret
+IL_004d: call Vintagestory.API.Common.CollectibleObject Vintagestory.API.Common.ItemStack::get_Collectible()
+IL_0052: dup
+IL_0053: brtrue.s IL_0057
+IL_0055: pop
+IL_0056: ret
+IL_0057: ldarg.0
+IL_0058: ldfld Vintagestory.API.Common.ICoreAPI Vintagestory.API.Common.InventoryBase::Api
+IL_005d: callvirt Vintagestory.API.Common.IWorldAccessor Vintagestory.API.Common.ICoreAPI::get_World()
+IL_0062: ldarg.1
+IL_0063: ldarg.2
+IL_0064: callvirt System.Void Vintagestory.API.Common.CollectibleObject::OnModifiedInInventorySlot(Vintagestory.API.Common.IWorldAccessor,Vintagestory.API.Common.ItemSlot,Vintagestory.API.Common.ItemStack)
+IL_0069: ret
+System.Void Vintagestory.API.Common.InventoryBase::MarkSlotDirty(System.Int32)
+IL_0000: ldarg.1
+IL_0001: ldc.i4.0
+IL_0002: bge.s IL_000f
+IL_0004: ldstr "Negative slotid?!"
+IL_0009: newobj System.Void System.Exception::.ctor(System.String)
+IL_000e: throw
+IL_000f: ldarg.0
+IL_0010: ldfld System.Collections.Generic.HashSet`1<System.Int32> Vintagestory.API.Common.InventoryBase::dirtySlots
+IL_0015: ldarg.1
+IL_0016: callvirt System.Boolean System.Collections.Generic.HashSet`1<System.Int32>::Add(!0)
+IL_001b: pop
+IL_001c: ret
+System.Boolean Vintagestory.API.Common.ItemSlot::TryFlipWith(Vintagestory.API.Common.ItemSlot)
+IL_0000: ldarg.1
+IL_0001: callvirt System.Int32 Vintagestory.API.Common.ItemSlot::get_StackSize()
+IL_0006: ldarg.0
+IL_0007: callvirt System.Int32 Vintagestory.API.Common.ItemSlot::get_MaxSlotStackSize()
+IL_000c: ble.s IL_0010
+IL_000e: ldc.i4.0
+IL_000f: ret
+IL_0010: ldarg.1
+IL_0011: callvirt System.Boolean Vintagestory.API.Common.ItemSlot::get_Empty()
+IL_0016: brtrue.s IL_0021
+IL_0018: ldarg.0
+IL_0019: ldarg.1
+IL_001a: callvirt System.Boolean Vintagestory.API.Common.ItemSlot::CanHold(Vintagestory.API.Common.ItemSlot)
+IL_001f: br.s IL_0022
+IL_0021: ldc.i4.1
+IL_0022: brfalse.s IL_0037
+IL_0024: ldarg.0
+IL_0025: callvirt System.Boolean Vintagestory.API.Common.ItemSlot::get_Empty()
+IL_002a: brtrue.s IL_0034
+IL_002c: ldarg.0
+IL_002d: callvirt System.Boolean Vintagestory.API.Common.ItemSlot::CanTake()
+IL_0032: br.s IL_0038
+IL_0034: ldc.i4.1
+IL_0035: br.s IL_0038
+IL_0037: ldc.i4.0
+IL_0038: ldarg.0
+IL_0039: callvirt System.Boolean Vintagestory.API.Common.ItemSlot::get_Empty()
+IL_003e: brtrue.s IL_0049
+IL_0040: ldarg.1
+IL_0041: ldarg.0
+IL_0042: callvirt System.Boolean Vintagestory.API.Common.ItemSlot::CanHold(Vintagestory.API.Common.ItemSlot)
+IL_0047: br.s IL_004a
+IL_0049: ldc.i4.1
+IL_004a: brfalse.s IL_005f
+IL_004c: ldarg.1
+IL_004d: callvirt System.Boolean Vintagestory.API.Common.ItemSlot::get_Empty()
+IL_0052: brtrue.s IL_005c
+IL_0054: ldarg.1
+IL_0055: callvirt System.Boolean Vintagestory.API.Common.ItemSlot::CanTake()
+IL_005a: br.s IL_0060
+IL_005c: ldc.i4.1
+IL_005d: br.s IL_0060
+IL_005f: ldc.i4.0
+IL_0060: stloc.0
+IL_0061: ldloc.0
+IL_0062: and
+IL_0063: brfalse.s IL_0086
+IL_0065: ldarg.1
+IL_0066: ldarg.0
+IL_0067: callvirt System.Void Vintagestory.API.Common.ItemSlot::FlipWith(Vintagestory.API.Common.ItemSlot)
+IL_006c: ldarg.1
+IL_006d: ldarg.0
+IL_006e: ldfld Vintagestory.API.Common.ItemStack Vintagestory.API.Common.ItemSlot::itemstack
+IL_0073: callvirt System.Void Vintagestory.API.Common.ItemSlot::OnItemSlotModified(Vintagestory.API.Common.ItemStack)
+IL_0078: ldarg.0
+IL_0079: ldarg.1
+IL_007a: ldfld Vintagestory.API.Common.ItemStack Vintagestory.API.Common.ItemSlot::itemstack
+IL_007f: callvirt System.Void Vintagestory.API.Common.ItemSlot::OnItemSlotModified(Vintagestory.API.Common.ItemStack)
+IL_0084: ldc.i4.1
+IL_0085: ret
+IL_0086: ldc.i4.0
+IL_0087: ret
+System.Void Vintagestory.API.Common.ItemSlot::OnItemSlotModified(Vintagestory.API.Common.ItemStack)
+IL_0000: ldarg.0
+IL_0001: ldfld Vintagestory.API.Common.InventoryBase Vintagestory.API.Common.ItemSlot::inventory
+IL_0006: brfalse.s IL_004b
+IL_0008: ldarg.0
+IL_0009: ldfld Vintagestory.API.Common.InventoryBase Vintagestory.API.Common.ItemSlot::inventory
+IL_000e: ldarg.0
+IL_000f: ldarg.1
+IL_0010: callvirt System.Void Vintagestory.API.Common.InventoryBase::DidModifyItemSlot(Vintagestory.API.Common.ItemSlot,Vintagestory.API.Common.ItemStack)
+IL_0015: ldarg.0
+IL_0016: ldfld Vintagestory.API.Common.ItemStack Vintagestory.API.Common.ItemSlot::itemstack
+IL_001b: dup
+IL_001c: brtrue.s IL_0022
+IL_001e: pop
+IL_001f: ldnull
+IL_0020: br.s IL_0027
+IL_0022: call Vintagestory.API.Common.CollectibleObject Vintagestory.API.Common.ItemStack::get_Collectible()
+IL_0027: brfalse.s IL_004b
+IL_0029: ldarg.0
+IL_002a: ldfld Vintagestory.API.Common.ItemStack Vintagestory.API.Common.ItemSlot::itemstack
+IL_002f: callvirt Vintagestory.API.Common.CollectibleObject Vintagestory.API.Common.ItemStack::get_Collectible()
+IL_0034: ldarg.0
+IL_0035: ldfld Vintagestory.API.Common.InventoryBase Vintagestory.API.Common.ItemSlot::inventory
+IL_003a: ldfld Vintagestory.API.Common.ICoreAPI Vintagestory.API.Common.InventoryBase::Api
+IL_003f: callvirt Vintagestory.API.Common.IWorldAccessor Vintagestory.API.Common.ICoreAPI::get_World()
+IL_0044: ldarg.0
+IL_0045: callvirt Vintagestory.API.Common.TransitionState[] Vintagestory.API.Common.CollectibleObject::UpdateAndGetTransitionStates(Vintagestory.API.Common.IWorldAccessor,Vintagestory.API.Common.ItemSlot)
+IL_004a: pop
+IL_004b: ret
+Packet_Server Vintagestory.Server.ServerWorldPlayerData::ToPacket(Vintagestory.API.Server.IServerPlayer,System.Boolean,System.Boolean)
+IL_0000: ldarg.1
+IL_0001: ldc.i4.0
+IL_0002: callvirt Vintagestory.API.Common.Entities.FuzzyEntityPos Vintagestory.API.Server.IServerPlayer::GetSpawnPosition(System.Boolean)
+IL_0007: stloc.0
+IL_0008: newobj System.Void Packet_Server::.ctor()
+IL_000d: dup
+IL_000e: ldc.i4.s 41
+IL_0010: stfld System.Int32 Packet_Server::Id
+IL_0015: dup
+IL_0016: newobj System.Void Packet_PlayerData::.ctor()
+IL_001b: dup
+IL_001c: ldarg.1
+IL_001d: callvirt System.Int32 Vintagestory.API.Common.IPlayer::get_ClientId()
+IL_0022: stfld System.Int32 Packet_PlayerData::ClientId
+IL_0027: dup
+IL_0028: ldarg.0
+IL_0029: ldfld Vintagestory.API.Common.EntityPlayer Vintagestory.Server.ServerWorldPlayerData::Entityplayer
+IL_002e: ldfld System.Int64 Vintagestory.API.Common.Entities.Entity::EntityId
+IL_0033: stfld System.Int64 Packet_PlayerData::EntityId
+IL_0038: dup
+IL_0039: ldarg.0
+IL_003a: ldfld Vintagestory.API.Common.EnumGameMode Vintagestory.Server.ServerWorldPlayerData::GameMode
+IL_003f: stfld System.Int32 Packet_PlayerData::GameMode
+IL_0170: ldarg.2
+IL_0171: brfalse.s IL_01da
+IL_0173: newobj System.Void System.Collections.Generic.List`1<Packet_InventoryContents>::.ctor()
+IL_0178: stloc.2
+IL_0179: ldarg.0
+IL_017a: ldfld Vintagestory.API.Datastructures.OrderedDictionary`2<System.String,Vintagestory.API.Common.InventoryBase> Vintagestory.Server.ServerWorldPlayerData::inventories
+IL_017f: callvirt System.Collections.Generic.IEnumerable`1<!1> Vintagestory.API.Datastructures.OrderedDictionary`2<System.String,Vintagestory.API.Common.InventoryBase>::get_ValuesOrdered()
+IL_0184: callvirt System.Collections.Generic.IEnumerator`1<!0> System.Collections.Generic.IEnumerable`1<Vintagestory.API.Common.InventoryBase>::GetEnumerator()
+IL_0189: stloc.3
+IL_018a: br.s IL_01b5
+IL_018c: ldloc.3
+IL_018d: callvirt !0 System.Collections.Generic.IEnumerator`1<Vintagestory.API.Common.InventoryBase>::get_Current()
+IL_0192: stloc.s V_4
+IL_0194: ldloc.s V_4
+IL_0196: isinst Vintagestory.API.Common.InventoryBasePlayer
+IL_019b: brfalse.s IL_01b5
+IL_019d: ldloc.2
+IL_019e: ldloc.s V_4
+IL_01a0: ldfld Vintagestory.API.Common.IInventoryNetworkUtil Vintagestory.API.Common.InventoryBase::InvNetworkUtil
+IL_01a5: isinst Vintagestory.Common.InventoryNetworkUtil
+IL_01aa: ldarg.1
+IL_01ab: callvirt Packet_InventoryContents Vintagestory.Common.InventoryNetworkUtil::ToPacket(Vintagestory.API.Common.IPlayer)
+IL_01b0: callvirt System.Void System.Collections.Generic.List`1<Packet_InventoryContents>::Add(!0)
+IL_01b5: ldloc.3
+IL_01b6: callvirt System.Boolean System.Collections.IEnumerator::MoveNext()
+IL_01bb: brtrue.s IL_018c
+IL_01bd: leave.s IL_01c9
+IL_01bf: ldloc.3
+IL_01c0: brfalse.s IL_01c8
+IL_01c2: ldloc.3
+IL_01c3: callvirt System.Void System.IDisposable::Dispose()
+IL_01c8: endfinally
+IL_01c9: ldloc.1
+IL_01ca: ldfld Packet_PlayerData Packet_Server::PlayerData
+IL_01cf: ldloc.2
+IL_01d0: callvirt !0[] System.Collections.Generic.List`1<Packet_InventoryContents>::ToArray()
+IL_01d5: callvirt System.Void Packet_PlayerData::SetInventoryContents(Packet_InventoryContents[])
+IL_01da: ldloc.1
+IL_01db: ret
+Vintagestory.API.Common.ItemSlot Vintagestory.Common.InventoryPlayerHotbar::NewSlot(System.Int32)
+IL_0000: ldarg.1
+IL_0001: ldc.i4.s 10
+IL_0003: beq.s IL_000c
+IL_0005: ldarg.1
+IL_0006: ldc.i4.s 11
+IL_0008: beq.s IL_0015
+IL_000a: br.s IL_001e
+IL_000c: ldarg.0
+IL_000d: newobj System.Void Vintagestory.API.Common.ItemSlotSkill::.ctor(Vintagestory.API.Common.InventoryBase)
+IL_0012: stloc.0
+IL_0013: br.s IL_0036
+IL_0015: ldarg.0
+IL_0016: newobj System.Void Vintagestory.API.Common.ItemSlotOffhand::.ctor(Vintagestory.API.Common.InventoryBase)
+IL_001b: stloc.0
+IL_001c: br.s IL_0036
+IL_001e: ldarg.0
+IL_001f: newobj System.Void Vintagestory.API.Common.ItemSlotSurvival::.ctor(Vintagestory.API.Common.InventoryBase)
+IL_0024: dup
+IL_0025: ldc.i4.1
+IL_0026: ldarg.1
+IL_0027: add
+IL_0028: stloc.1
+IL_0029: ldloca.s V_1
+IL_002b: call System.String System.Int32::ToString()
+IL_0030: stfld System.String Vintagestory.API.Common.ItemSlot::BackgroundIcon
+IL_0035: stloc.0
+IL_0036: ldloc.0
+IL_0037: ret
