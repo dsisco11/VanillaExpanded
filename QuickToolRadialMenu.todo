@@ -1,7 +1,7 @@
 # Quick-Tool Radial Menu Implementation TODO
 
 Source proposal: [QuickToolRadialMenu.proposal.md](QuickToolRadialMenu.proposal.md)
-Status: Phase 1, including the virtual-entry amendment, complete (2026-09-23). Phases 2-6 remain unstarted.
+Status: Phases 1-2, including the virtual-entry amendment, complete (2026-09-23). Phases 3-6 remain unstarted.
 
 ## Goal and scope
 
@@ -68,27 +68,29 @@ The earlier completion audit covers the original tool-only contract. The request
 Dependencies: Phase 1 input and ownership contracts.
 Outcome: Generic entries can be displayed and selected without any tool or inventory dependency.
 
-☐ Define menu entries with stable identifiers, labels, icons, enabled state, supplied fixed positions, and a center entry; expose selection/cancellation reporting. Accept tool-category and virtual entries identically without requiring EnumTool in the reusable menu API.
-☐ Implement cached mesh rendering and CPU hit detection with a fixed starting angle/direction supplied through the agreed layout contract.
-    ☐ Generate and upload one combined mesh for all wedges and the center, with constant per-triangle entry identifiers; draw the background in one call.
-    ☐ Cache geometry across frames and reopenings. Rebuild only for geometric layout changes or required resource recreation; use transforms for position and uniform scale.
-    ☐ Retain unavailable categories in the mesh. Hover, selection, enabled state, animation, and candidate changes update shader/entry data without rebuilding or re-uploading geometry.
-    ☐ Implement shader-driven colors, highlighting, disabled appearance, animation, and edge effects using mesh entry identifiers rather than full-quad per-fragment angular classification.
-    ☐ Define arc tessellation tolerance across supported GUI scales and supply antialiasing edge data. Retessellate only when a scale change exceeds the supported tolerance, preserving category positions.
-    ☐ Render icons and cached text separately through existing game APIs; maintain a generic icon contract without quick-tool policy in the radial-menu system.
-    ☐ Match CPU hit testing to rendering coordinates, radii, angular layout, direction, and separator/boundary behavior; send the hovered identifier to the shader without GPU readback.
-    ☐ Own shader reload, mesh disposal/recreation, and render-state restoration within the radial-menu system; use radial-progress rendering conventions where applicable.
-☐ Preserve supplied wedge geometry when entry content or availability changes. Disabled entries remain visible and cannot be selected.
-☐ Implement pointer highlighting, center selection, and open/close lifetime with input capture and restoration.
-☐ Provide the caller interaction hooks needed for hold-to-open, release-to-cancel, click-to-commit, and suppression of repeated opening until release.
-☐ Consume the selection click and release input ownership on cancellation, focus loss, feature disablement, and world exit.
-☐ Verify boundary/center hit detection, disabled entries, exactly-once selection, cancellation without selection, and cleanup; demonstrate generic non-tool entries in focused verification rather than shipping a separate sample feature.
+✔ Define menu entries with stable identifiers, labels, icons, enabled state, supplied fixed positions, and a center entry; expose selection/cancellation reporting. Accept tool-category and virtual entries identically without requiring EnumTool in the reusable menu API.
+✔ Implement cached mesh rendering and CPU hit detection with a fixed starting angle/direction supplied through the agreed layout contract.
+    ✔ Generate and upload one combined mesh for all wedges and the center, with constant per-triangle entry identifiers; draw the background in one call.
+    ✔ Cache geometry across frames and reopenings. Rebuild only for geometric layout changes or required resource recreation; use transforms for position and uniform scale.
+    ✔ Retain unavailable categories in the mesh. Hover, selection, enabled state, animation, and candidate changes update shader/entry data without rebuilding or re-uploading geometry.
+    ✔ Implement shader-driven colors, highlighting, disabled appearance, animation, and edge effects using mesh entry identifiers rather than full-quad per-fragment angular classification.
+    ✔ Define arc tessellation tolerance across supported GUI scales and supply antialiasing edge data. Retessellate only when a scale change exceeds the supported tolerance, preserving category positions.
+    ✔ Render icons and cached text separately through existing game APIs; maintain a generic icon contract without quick-tool policy in the radial-menu system.
+    ✔ Match CPU hit testing to rendering coordinates, radii, angular layout, direction, and separator/boundary behavior; send the hovered identifier to the shader without GPU readback.
+    ✔ Own shader reload, mesh disposal/recreation, and render-state restoration within the radial-menu system; use radial-progress rendering conventions where applicable.
+✔ Preserve supplied wedge geometry when entry content or availability changes. Disabled entries remain visible and cannot be selected.
+✔ Implement pointer highlighting, center selection, and open/close lifetime with input capture and restoration.
+✔ Provide the caller interaction hooks needed for hold-to-open, release-to-cancel, click-to-commit, and suppression of repeated opening until release.
+✔ Consume the selection click and release input ownership on cancellation, focus loss, feature disablement, and world exit.
+✔ Verify boundary/center hit detection, disabled entries, exactly-once selection, cancellation without selection, and cleanup; demonstrate generic non-tool entries in focused verification rather than shipping a separate sample feature.
 
 Completion criteria:
-☐ Menu logic has no tool ranking, inventory movement, or restoration dependency.
-☐ Entry updates preserve geometry and selection identity; every exit path restores input ownership.
-☐ Focused correctness checks demonstrate geometry reuse for state/candidate changes and reopenings, permitted rebuilds for geometry changes, and consistent center/wedge boundary selection. No timing measurements or comparative benchmarks are required.
-☐ Focused automated evidence covers logic; actual camera/click/focus behavior remains an explicit live-runtime check in Phase 6.
+✔ Menu logic has no tool ranking, inventory movement, or restoration dependency.
+✔ Entry updates preserve geometry and selection identity; every exit path restores input ownership.
+✔ Focused correctness checks demonstrate geometry reuse for state/candidate changes and reopenings, permitted rebuilds for geometry changes, and consistent center/wedge boundary selection. No timing measurements or comparative benchmarks are required.
+✔ Focused automated evidence covers logic; actual camera/click/focus behavior remains an explicit live-runtime check in Phase 6.
+
+Completion evidence: [traceability](docs/quick-tool/Phase2Traceability.md), [second review](docs/quick-tool/Phase2SecondReview.md), and [independent audit](docs/quick-tool/Phase2CompletionAudit.md).
 
 ## Phase 3: Deterministic category layout and candidate cache
 
