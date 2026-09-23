@@ -208,7 +208,7 @@ public sealed class QuickToolCandidateCache : IDisposable
         foreach (string id in QuickToolLayout.WedgeIds)
         {
             QuickToolCandidate? candidate = GetCached(id);
-            entries.Add(new RadialMenuEntry(id, id == QuickToolLayout.LightId ? "Light source" : id[5..], candidate is not null,
+            entries.Add(new RadialMenuEntry(id, candidate?.Stack.GetName() ?? string.Empty, candidate is not null,
                 candidate is null ? null : new QuickToolItemIcon(candidate.Stack)));
         }
         entries.Add(new RadialMenuEntry(QuickToolLayout.RestoreId, "Unequip", canRestore));

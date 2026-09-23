@@ -1,6 +1,6 @@
 # Quick-Tool Radial Menu Proposal
 
-Status: Revised for action-time ItemStack reference lookup and native inventory swaps (2026-09-23). Equipment implementation and local verification are complete; menu integration and runtime acceptance remain in the plan.
+Status: Revised for action-time ItemStack reference lookup and native inventory swaps (2026-09-23). Equipment and menu integration with local verification are complete; runtime acceptance remains in the plan.
 
 ## Purpose
 
@@ -26,7 +26,7 @@ This document specifies approved intended behavior. The [implementation contract
 
 The radial-menu system owns rendering, pointer interaction, highlighting, opening and closing, and selection reporting. It accepts a description of menu entries, including stable identifiers, labels, icons, enabled states, and a center entry.
 
-It has no knowledge of tool ranking, inventory locations, item movement, or equipment restoration. It reports a selected entry identifier to the caller. Its public composition entry point remains thin; menu interaction and lifetime belong to the menu's owning module.
+It has no knowledge of tool ranking, inventory locations, item movement, or equipment restoration. It reports a selected entry identifier to the caller. Quick-tool outer entries display the resolved item's game-localized name, including the Light entry, rather than category labels. Unavailable wedges retain their positions but have no item name. Its public composition entry point remains thin; menu interaction and lifetime belong to the menu's owning module.
 
 ### Quick-Tool Functionality
 

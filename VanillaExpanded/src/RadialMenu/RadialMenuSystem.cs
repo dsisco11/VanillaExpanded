@@ -6,7 +6,7 @@ using Vintagestory.API.Common;
 namespace VanillaExpanded.RadialMenu;
 
 /// <summary>Exposes the reusable client menu while its dialog owns interaction and graphics lifetime.</summary>
-public sealed class RadialMenuSystem : ModSystem
+public sealed class RadialMenuSystem : ModSystem, IRadialMenu
 {
     #region Lifecycle
     private ICoreClientAPI? capi;

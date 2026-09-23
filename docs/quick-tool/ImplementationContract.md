@@ -4,7 +4,7 @@ Planning decision and API investigation record, 2026-09-23.
 
 Authority: [approved proposal](../../QuickToolRadialMenu.proposal.md), [implementation checklist](../../QuickToolRadialMenu.todo), and the user's subsequent lower-durability and cached-mesh rendering decisions. This record resolves implementation choices under that approval; it does not claim that the feature is implemented. No performance testing is required.
 
-Review status: The action-time ItemStack reference lookup revision (2026-09-23) supersedes both the original server-owned design and the later callback-driven client session design. Phase 4 implementation and local verification are complete; see [current traceability](Phase4Traceability.md) and [completion audit](Phase4CompletionAudit.md). Candidate, layout, input, and installed primitive evidence remain applicable. Real multiplayer behavior remains unverified.
+Review status: The action-time ItemStack reference lookup revision (2026-09-23) supersedes both the original server-owned design and the later callback-driven client session design. Phase 4 implementation is retained in commit `e0389e6`. Its previously linked review files are absent from this checkout; [current dependency verification](Phase5Traceability.md#prior-evidence-references) records that evidence boundary. Phase 5 menu integration is locally verified; see [traceability](Phase5Traceability.md) and [completion audit](Phase5CompletionAudit.md). Candidate, layout, input, and installed primitive evidence remain applicable. Real multiplayer behavior remains unverified.
 
 ## Evidence boundaries
 
@@ -54,7 +54,7 @@ Add a feature enable flag following `VanillaExpandedConfig` conventions and cons
 
 Initialize local inventory state on `LevelFinalize` and local `PlayerEntitySpawn`; check `PlayerReadyFired` and the presence of the local inventory manager before opening. Ignore spawn/despawn events for other players. On local replacement/despawn/death, close and discard old references. Use `LeaveWorld` and disposal as idempotent cleanup boundaries. Restoration history is client-local and never survives a world or player-context change.
 
-Localization belongs in `VanillaExpanded/assets/vanillaexpanded/lang/en.json`: keybind display name, Unequip/restore explanation, category labels, session-unavailable and local-failure messages. Do not add pending-server-result UI. Use `Lang.Get` with the mod domain. Preserve the existing light-source shortcuts and behavior.
+Localization belongs in `VanillaExpanded/assets/vanillaexpanded/lang/en.json`: keybind display name, Unequip/restore explanation, session-unavailable and local-failure messages. Do not add pending-server-result UI. Use `Lang.Get` with the mod domain for feature text. Outer entries display their resolved ItemStack.GetName() through the game item-name/localization path, including Light. Unavailable entries keep their fixed disabled wedges without an item label. Do not add category-name translations. Preserve the existing light-source shortcuts and behavior.
 
 ## Input contract
 
@@ -163,7 +163,7 @@ All rows inherit the complete approved proposal and the selected checklist secti
 | Sequential failure contract | Proposal Switching, Unequip, and Authority; ItemSlot/InventoryBase native flip behavior | Precheck route, recheck each flip, preserve actual partial state, no invented rollback | Current interruption, changed-source, and lifecycle-clear fixtures pass; historical direct-assignment evidence is superseded |
 | Ownership and verification cases | Proposal System Responsibilities/Rendering/Acceptance; `../../VanillaExpanded/src/RadialProgress/` renderer/resources/system; local GUI examples; `../../VanillaExpanded.Tests/VanillaExpanded.Tests.csproj`; `../../README.md` Testing; `../../build.ps1`, `../../CakeBuild/Program.cs` | Thin owners, cached mesh/shader effects, narrow seams, meaningful verification, no performance gate | Ownership map and verification matrix; existing build/test wrappers read, not run by parent |
 
-The earlier [second review](SecondReview.md) and [completion audit](CompletionAudit.md) apply to the original investigation. The revised implementation is reviewed in [Phase4SecondReview.md](Phase4SecondReview.md) and [Phase4CompletionAudit.md](Phase4CompletionAudit.md). Native multiplayer evidence remains required.
+The earlier [second review](SecondReview.md) and [completion audit](CompletionAudit.md) apply to the original investigation. The earlier links to Phase 4 review records did not resolve in the retained checkout. Current integration and dependency verification are recorded in [Phase5Traceability.md](Phase5Traceability.md), with new review records retained alongside it. Native multiplayer evidence remains required.
 ## Virtual-entry amendment
 
 The requested Light source entry extends the original audited scope. [Proposal / Virtual Entries](../../QuickToolRadialMenu.proposal.md#virtual-entries) governs this amendment; completed incremental investigation and outstanding implementation tasks are recorded in the checklist. CompletionAudit.md and its installed inventory probe remain evidence for the original contract only, not proof of offhand-source restoration or shared-selector extraction.

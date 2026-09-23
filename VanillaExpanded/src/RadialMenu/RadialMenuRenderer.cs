@@ -14,8 +14,8 @@ internal sealed class RadialMenuRenderer : IDisposable
     private const string ShaderName = "radial_menu";
     private readonly ICoreClientAPI capi;
     private readonly Matrixf matrix = new();
-    private readonly Dictionary<string, LoadedTexture> labels = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, string> renderedLabels = new(StringComparer.Ordinal);
+    private readonly Dictionary<(string Id, bool Description), LoadedTexture> labels = new();
+    private readonly Dictionary<(string Id, bool Description), string> renderedLabels = new();
     private readonly CairoFont labelFont = CairoFont.WhiteSmallText().WithStroke([0, 0, 0, 0.65], 1.5);
     private RadialMenuLayout? meshLayout;
     private MeshRef? mesh;
@@ -43,9 +43,9 @@ internal sealed class RadialMenuRenderer : IDisposable
     public void PrepareLayout(RadialMenuLayout layout)
     {
         var retainedIds = new HashSet<string>(layout.WedgeIds, StringComparer.Ordinal) { layout.CenterId };
-        foreach (string id in new List<string>(renderedLabels.Keys))
+        foreach (var id in new List<(string Id, bool Description)>(renderedLabels.Keys))
         {
-            if (retainedIds.Contains(id)) continue;
+            if (retainedIds.Contains(id.Id) && (!id.Description || id.Id == layout.CenterId)) continue;
             if (labels.Remove(id, out LoadedTexture? texture)) texture.Dispose();
             renderedLabels.Remove(id);
         }
@@ -192,7 +192,10 @@ internal sealed class RadialMenuRenderer : IDisposable
                 (double x, double y) = layout.GetWedgeCenter(i, centerX, centerY, radiusPixels, midRadius);
                 DrawEntry(entry, x, y, radiusPixels * 0.12f);
             }
-            DrawEntry(interaction.GetEntry(layout.CenterId), centerX, centerY, radiusPixels * 0.2f);
+            RadialMenuEntry center = interaction.GetEntry(layout.CenterId);
+            DrawEntry(center, centerX, centerY, radiusPixels * 0.2f);
+            double footerY = Math.Min(centerY + radiusPixels + 12, capi.Render.FrameHeight - labelFont.GetFontExtents().Height - 8);
+            DrawLabel((center.Id, true), center.Description ?? string.Empty, centerX, footerY);
         }
         finally
         {
@@ -204,22 +207,27 @@ internal sealed class RadialMenuRenderer : IDisposable
     private void DrawEntry(RadialMenuEntry entry, double x, double y, float iconSize)
     {
         entry.Icon?.Render(capi, x, y, iconSize, entry.Enabled);
+        DrawLabel((entry.Id, false), entry.Label, x, y + iconSize / 2f);
+    }
 
-        if (!renderedLabels.TryGetValue(entry.Id, out string? previous) || previous != entry.Label)
+    /// <summary>Caches changed text independently of icons and menu geometry.</summary>
+    private void DrawLabel((string Id, bool Description) id, string text, double x, double y)
+    {
+        if (!renderedLabels.TryGetValue(id, out string? previous) || previous != text)
         {
-            if (labels.Remove(entry.Id, out LoadedTexture? old)) old.Dispose();
-            renderedLabels[entry.Id] = entry.Label;
-            if (!string.IsNullOrEmpty(entry.Label))
+            if (labels.Remove(id, out LoadedTexture? old)) old.Dispose();
+            renderedLabels[id] = text;
+            if (!string.IsNullOrEmpty(text))
             {
-                var extents = labelFont.GetTextExtents(entry.Label);
-                labels[entry.Id] = capi.Gui.TextTexture.GenTextTexture(entry.Label, labelFont, (int)Math.Ceiling(extents.Width) + 4, (int)Math.Ceiling(labelFont.GetFontExtents().Height) + 4, null, EnumTextOrientation.Center);
+                var extents = labelFont.GetTextExtents(text);
+                labels[id] = capi.Gui.TextTexture.GenTextTexture(text, labelFont, (int)Math.Ceiling(extents.Width) + 4, (int)Math.Ceiling(labelFont.GetFontExtents().Height) + 4, null, EnumTextOrientation.Center);
             }
         }
 
-        if (labels.TryGetValue(entry.Id, out LoadedTexture? label))
+        if (labels.TryGetValue(id, out LoadedTexture? label))
         {
             capi.Render.GetEngineShader(EnumShaderProgram.Gui).Use();
-            capi.Render.Render2DLoadedTexture(label, (float)x - label.Width / 2f, (float)y + iconSize / 2f, 60);
+            capi.Render.Render2DLoadedTexture(label, (float)x - label.Width / 2f, (float)y, 60);
         }
     }
     #endregion

@@ -1,7 +1,7 @@
 # Quick-Tool Radial Menu Implementation TODO
 
 Source proposal: [QuickToolRadialMenu.proposal.md](QuickToolRadialMenu.proposal.md)
-Status: Phases 2-4 and the shared-selector investigation are complete at their stated verification boundaries (2026-09-23). Phase 4 implements action-time ItemStack reference lookup, with a fresh second review and independent completion audit. Earlier server-owned and callback-driven equipment conclusions are superseded. Phases 5-6 remain unstarted; live multiplayer acceptance remains in Phase 6.
+Status: Phases 2-5 and the shared-selector investigation are complete at their stated source/integration boundaries (2026-09-23). Phase 5 wires the hold menu, cached entries, local equipment results, localization and lifecycle, with retained traceability, second review and completion audit. Earlier missing evidence records are identified explicitly below. Phase 6 runtime acceptance remains unstarted.
 
 ## Goal and scope
 
@@ -90,7 +90,7 @@ Completion criteria:
 ✔ Focused correctness checks demonstrate geometry reuse for state/candidate changes and reopenings, permitted rebuilds for geometry changes, and consistent center/wedge boundary selection. No timing measurements or comparative benchmarks are required.
 ✔ Focused automated evidence covers logic; actual camera/click/focus behavior remains an explicit live-runtime check in Phase 6.
 
-Completion evidence: [traceability](docs/quick-tool/Phase2Traceability.md), [second review](docs/quick-tool/Phase2SecondReview.md), and [independent audit](docs/quick-tool/Phase2CompletionAudit.md).
+Implementation retained in commit `7d66d77`. The previously linked review files are absent; see [current dependency evidence and provenance](docs/quick-tool/Phase5Traceability.md#prior-evidence-references).
 
 ## Phase 3: Deterministic category layout and candidate cache
 
@@ -123,7 +123,7 @@ Completion criteria:
 
 During selector extraction, strengthen existing brightest-source tests to assert the exact winning slot/item, including a brightest candidate at the end, and remove stale test commentary. The independent amendment audit identified these as part of the planned parity coverage.
 
-Completion evidence: [traceability](docs/quick-tool/Phase3Traceability.md), [second review](docs/quick-tool/Phase3SecondReview.md), and [independent audit](docs/quick-tool/Phase3CompletionAudit.md).
+Implementation retained in commit `2084c29`. The previously linked review files are absent; see [current dependency evidence and provenance](docs/quick-tool/Phase5Traceability.md#prior-evidence-references).
 
 ## Phase 4: Client-owned equipment and restoration
 
@@ -153,26 +153,28 @@ Completion criteria:
 ✔ Tests demonstrate no loss, duplication, unintended identical-item substitution, or false success under the revised client/native-flip boundary. Equipment operations have no pending server-result or slot-callback state.
 ✔ Local fixture evidence is kept distinct from native multiplayer acceptance still required in Phase 6. Phase 4 does not claim live server acceptance or synchronization proof.
 
-Completion evidence for this revision: [traceability](docs/quick-tool/Phase4Traceability.md), [second review](docs/quick-tool/Phase4SecondReview.md), and [independent audit](docs/quick-tool/Phase4CompletionAudit.md).
+Implementation retained in commit `e0389e6`. The previously linked review files are absent; see [current dependency evidence and provenance](docs/quick-tool/Phase5Traceability.md#prior-evidence-references).
 
 ## Phase 5: Quick-tool integration and user feedback
 
 Dependencies: Phases 2-4.
 Outcome: The feature is usable through its configured keybind with reusable menu and domain logic kept separate.
 
-☐ Extend the existing QuickToolSystem and QuickToolClientOperations from Phase 4 with menu/cache/keybind integration. Reuse their equipment and lifecycle ownership; do not register a second equipment owner. Wire feature enablement and cleanup using existing conventions.
-☐ Register and localize the keybind; hold opens, release without click cancels, click selects once and closes, and continued hold cannot reopen until release/repress.
-☐ Supply cached entries and canonical geometry to the radial-menu system; route selected identifiers through current candidate validation and equipment execution.
-☐ Keep the center labeled Unequip and explain restoration where applicable. Call QuickToolClientOperations.ValidateRestoration once when preparing menu-open availability under D6; HasSession alone does not establish a valid reference or return route. Use Restore on click for fresh validation, and handle changes since opening. Never scan inventory every render frame.
-☐ Localize and display the Light source entry using its resolved item's icon and availability; keep provider-specific policy out of radial-menu code.
-☐ Handle the return value of Select/Restore for localized rejected, interrupted, or session-invalidated feedback, including calls that return before LocalResult fires. Avoid duplicate feedback if also subscribing to LocalResult. LocallyApplied describes the local operation, not server confirmation. Guard synchronous reentrancy and prevent gameplay click-through; do not add pending-server-result UI.
-☐ Separate menu lifetime from equipment lifetime. Ordinary menu close, release/cancel, and focus loss release input and UI resources while preserving an intact equipment session across openings. Manual active-hotbar change, feature disablement, player/world replacement, and disposal clear the session; menu-open/action validation handles invalid stack references. Candidate-cache subscriptions follow feature/player lifetime.
-☐ Add integration verification for input-to-selection-to-local result, stale open-menu candidates, changes between menu-open validation and click, disabled center/categories, immediate reopen-and-select without callbacks/ticks, and synchronous reentrancy. Verify menu close/cancel/focus loss preserve restoration, while equipment lifecycle events clear it.
-☐ Review source layout, dependency direction, documentation comments, region organization, and absence of unnecessary wrapper methods.
+✔ Extend the existing QuickToolSystem and QuickToolClientOperations from Phase 4 with menu/cache/keybind integration. Reuse their equipment and lifecycle ownership; do not register a second equipment owner. Wire feature enablement and cleanup using existing conventions.
+✔ Register and localize the keybind; hold opens, release without click cancels, click selects once and closes, and continued hold cannot reopen until release/repress.
+✔ Supply cached entries with the resolved items' game-localized names (including Light), leaving unavailable wedges unlabeled, and canonical geometry to the radial-menu system; route selected identifiers through current candidate validation and equipment execution.
+✔ Keep the center labeled Unequip and explain restoration where applicable. Call QuickToolClientOperations.ValidateRestoration once when preparing menu-open availability under D6; HasSession alone does not establish a valid reference or return route. Use Restore on click for fresh validation, and handle changes since opening. Never scan inventory every render frame.
+✔ Localize and display the Light source entry using its resolved item's icon and availability; keep provider-specific policy out of radial-menu code.
+✔ Handle the return value of Select/Restore for localized rejected, interrupted, or session-invalidated feedback, including calls that return before LocalResult fires. Avoid duplicate feedback if also subscribing to LocalResult. LocallyApplied describes the local operation, not server confirmation. Guard synchronous reentrancy and prevent gameplay click-through; do not add pending-server-result UI.
+✔ Separate menu lifetime from equipment lifetime. Ordinary menu close, release/cancel, and focus loss release input and UI resources while preserving an intact equipment session across openings. Manual active-hotbar change, feature disablement, player/world replacement, and disposal clear the session; menu-open/action validation handles invalid stack references. Candidate-cache subscriptions follow feature/player lifetime.
+✔ Add integration verification for input-to-selection-to-local result, stale open-menu candidates, changes between menu-open validation and click, disabled center/categories, immediate reopen-and-select without callbacks/ticks, and synchronous reentrancy. Verify menu close/cancel/focus loss preserve restoration, while equipment lifecycle events clear it.
+✔ Review source layout, dependency direction, documentation comments, region organization, and absence of unnecessary wrapper methods.
 
 Completion criteria:
-☐ Both functionality systems are independently owned; radial-menu code has no quick-tool dependency.
-☐ End-to-end integration satisfies the approved interaction sequence and preserves existing equip-light behavior.
+✔ Both functionality systems are independently owned; radial-menu code has no quick-tool dependency.
+✔ End-to-end integration satisfies the approved interaction sequence and preserves existing equip-light behavior.
+
+Completion evidence: [traceability](docs/quick-tool/Phase5Traceability.md), [second review](docs/quick-tool/Phase5SecondReview.md), and [independent completion audit](docs/quick-tool/Phase5CompletionAudit.md). Production build passed; 136 focused tests passed. Live acceptance remains in Phase 6.
 
 ## Phase 6: Runtime acceptance and delivery evidence
 

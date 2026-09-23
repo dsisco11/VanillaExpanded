@@ -43,6 +43,14 @@
         "default": true,
         "weight": 1.4
       },
+      "ENABLE_QUICK_TOOLS": {
+        "code": "EnableQuickTools",
+        "name": "EnableQuickTools",
+        "ingui": "vanillaexpanded:config-enable-quick-tools",
+        "comment": "vanillaexpanded:config-enable-quick-tools-tooltip",
+        "default": true,
+        "weight": 1.5
+      },
       "ENABLE_BACKPACK_DECRAFT": {
         "code": "EnableBackpackDecraft",
         "name": "EnableBackpackDecraft",
