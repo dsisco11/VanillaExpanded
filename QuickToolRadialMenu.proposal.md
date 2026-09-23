@@ -47,7 +47,7 @@ After a selection, keep the menu closed until the player releases and presses th
 
 The center is labeled Unequip, with explanatory text indicating restoration of the previous item when applicable. Disable it when no supported unequip operation is available. A failed selection leaves the inventory unchanged and provides brief feedback.
 
-Use a deterministic category order. Freeze wedge placement for the lifetime of an open menu so inventory updates cannot move targets beneath the pointer. Update candidate details or disabled states without rearranging wedges; apply structural changes on the next opening.
+Assign each supported tool category a fixed wedge in a canonical layout with a defined starting angle and direction. Preserve those positions across menu openings and inventory changes, independently of inventory enumeration order, tool acquisition order, candidate ranking, or current tool availability. Keep unavailable categories visible as disabled wedges. Replacing the best candidate updates the same wedge; inventory changes never rotate, compact, or resize the layout.
 
 ## Candidate Discovery and Cache
 
@@ -134,7 +134,7 @@ The initial feature covers tool-category selection, the reusable radial interact
 - Whether manual hotbar selection ends the restoration session as proposed.
 - Whether occupied-slot fallback should use any valid empty player inventory slot or fail unless the original arrangement can be restored.
 - Whether the center action should support manually equipped tools when no restoration session exists.
-- Whether absent categories retain disabled wedges between menu openings or are omitted.
+- The canonical category-to-wedge mapping, starting angle, direction, and deterministic layout-extension policy for modded categories. Unavailable categories retain disabled wedges. The quick-tool system supplies category positions and the radial-menu system preserves them. Only changes to the supported category set or explicit layout configuration may rebuild the layout, never while the menu is open.
 
 ## Acceptance Criteria
 
@@ -143,7 +143,7 @@ The initial feature covers tool-category selection, the reusable radial interact
 - The center circle consistently represents unequip/restore.
 - Each eligible category exposes its highest-ranked candidate under the chosen policy.
 - Inventory and ranking-relevant changes refresh cached results without a per-frame inventory scan.
-- Inventory changes while the menu is open cannot cause a click to select a different category because wedges moved.
+- Each category retains the same wedge across menu openings, inventory reorderings, tool acquisition or removal, and best-candidate changes. Unavailable categories retain disabled wedges; the remaining wedges never compact or redistribute. The same supported category set and layout configuration produce identical positions regardless of registration or inventory enumeration order.
 - Selecting tool B while holding item A, then selecting unequip, returns B to its original location and restores A when the arrangement remains valid.
 - If chained restoration is accepted, selecting B then C then unequip restores A and returns both tools to their original slots when possible.
 - Initially empty hands, already-held candidates, duplicate tools, restricted slots, moved items, full inventories, broken tools, and rejected operations have deterministic behavior without item loss or duplication.
