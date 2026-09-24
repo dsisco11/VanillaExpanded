@@ -156,6 +156,22 @@ public sealed class QuickToolClientOperationsTests
         Assert.Same(original, f.Hotbar[1].Itemstack);
     }
 
+    /// <summary>A refresh of the selected hotbar position keeps the exact-stack restoration session.</summary>
+    [Fact]
+    public void SameActiveSlotEvent_PreservesRestoration()
+    {
+        using var f = new Fixture();
+        ItemStack original = f.PutPlain(f.Hotbar[0], 1);
+        ItemStack pick = f.PutPick(f.Hotbar[1], 2);
+        QuickToolCandidate displayed = new ToolCandidateProvider(EnumTool.Pickaxe).Resolve(f.Manager.Object, f.Offhand)!;
+        Assert.Equal(QuickToolEquipmentResult.LocallyApplied, f.Operations.Select("tool:Pickaxe", displayed));
+        f.Events.Raise(e => e.AfterActiveSlotChanged += null!, new ActiveSlotChangeEventArgs(0, 0));
+        Assert.True(f.Operations.ValidateRestoration());
+        Assert.Equal(QuickToolEquipmentResult.LocallyApplied, f.Operations.Restore());
+        Assert.Same(original, f.Hotbar[0].Itemstack);
+        Assert.Same(pick, f.Hotbar[1].Itemstack);
+    }
+
     /// <summary>Unrelated bag topology changes do not end an intact reference-based session.</summary>
     [Fact]
     public void BackpackSlotReplacement_PreservesIntactReferences()

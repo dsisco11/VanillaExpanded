@@ -9,31 +9,31 @@ public static class LightSourceSelection
 {
     #region Selection
     /// <summary>Returns the legacy offhand, active hand, hotbar, then backpack choice.</summary>
-    public static ItemSlot? ResolveLightSourceSlot(IPlayerInventoryManager playerInventory, ItemSlot offhandSlot, out bool isInLeftHand, out bool isInRightHand)
+    public static ItemSlot? ResolveLightSourceSlot(IPlayerInventoryManager playerInventory, ItemSlot offhandSlot, out bool isInLeftHand, out bool isInRightHand, ItemSlot? excludedSlot = null)
     {
         isInLeftHand = IsLightSource(offhandSlot);
         isInRightHand = false;
-        if (isInLeftHand) return offhandSlot;
+        if (isInLeftHand && !ReferenceEquals(offhandSlot, excludedSlot)) return offhandSlot;
 
         ItemSlot active = playerInventory.ActiveHotbarSlot;
         isInRightHand = IsLightSource(active);
-        if (isInRightHand) return active;
+        if (isInRightHand && !ReferenceEquals(active, excludedSlot)) return active;
 
         // The first inventory with a light wins, even if a later inventory has a brighter one.
         IInventory? hotbar = playerInventory.GetOwnInventory(GlobalConstants.hotBarInvClassName);
-        if (hotbar is not null && TryFindBrightestLightSource(hotbar, out ItemSlot? hotbarSlot)) return hotbarSlot;
+        if (hotbar is not null && TryFindBrightestLightSource(hotbar, out ItemSlot? hotbarSlot, excludedSlot)) return hotbarSlot;
         IInventory? backpack = playerInventory.GetOwnInventory(GlobalConstants.backpackInvClassName);
-        return backpack is not null && TryFindBrightestLightSource(backpack, out ItemSlot? backpackSlot) ? backpackSlot : null;
+        return backpack is not null && TryFindBrightestLightSource(backpack, out ItemSlot? backpackSlot, excludedSlot) ? backpackSlot : null;
     }
 
     /// <summary>Returns the brightest slot in inventory order, keeping the first on equal brightness.</summary>
-    public static bool TryFindBrightestLightSource(IInventory inventory, [NotNullWhen(true)] out ItemSlot? result)
+    public static bool TryFindBrightestLightSource(IInventory inventory, [NotNullWhen(true)] out ItemSlot? result, ItemSlot? excludedSlot = null)
     {
         result = null;
         int brightness = 0;
         foreach (ItemSlot slot in inventory)
         {
-            int level = slot.Empty ? 0 : slot.Itemstack.Collectible.LightHsv[2];
+            int level = ReferenceEquals(slot, excludedSlot) || slot.Empty ? 0 : slot.Itemstack.Collectible.LightHsv[2];
             if (level <= brightness) continue;
             brightness = level;
             result = slot;

@@ -170,7 +170,8 @@ public sealed class QuickToolCandidateCache : IDisposable
         // Publish one complete snapshot after all provider resolutions, never halfway through a callback.
         ReportUnsupportedCategories();
         var next = new Dictionary<string, QuickToolCandidate?>(StringComparer.Ordinal);
-        foreach (IQuickToolCandidateProvider provider in providers) next[provider.EntryId] = provider.Resolve(manager, offhand);
+        ItemSlot? activeHand = manager.ActiveHotbarSlot;
+        foreach (IQuickToolCandidateProvider provider in providers) next[provider.EntryId] = provider.Resolve(manager, offhand, activeHand);
         winners.Clear();
         foreach (var pair in next) winners.Add(pair.Key, pair.Value);
         dirty = false;
@@ -195,7 +196,7 @@ public sealed class QuickToolCandidateCache : IDisposable
         if (!ownsHand) return false;
         IQuickToolCandidateProvider? provider = providers.FirstOrDefault(p => p.EntryId == entryId);
         if (provider is null) return false;
-        current = provider.Resolve(manager, offhand);
+        current = provider.Resolve(manager, offhand, expectedHand);
         if (!displayed.Matches(current)) { Invalidate(); return false; }
         return true;
     }

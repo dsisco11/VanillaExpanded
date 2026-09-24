@@ -12,22 +12,22 @@ public sealed class ToolCandidateProvider(EnumTool category, Action<string>? dia
 
     #region Selection
     /// <summary>Scans only supported player-owned ordinary hotbar and bag-content slots.</summary>
-    public QuickToolCandidate? Resolve(IPlayerInventoryManager manager, ItemSlot offhand)
+    public QuickToolCandidate? Resolve(IPlayerInventoryManager manager, ItemSlot offhand, ItemSlot? excludedHand = null)
     {
         QuickToolCandidate? best = null;
-        Scan(manager.GetOwnInventory(GlobalConstants.hotBarInvClassName), false, ref best);
-        Scan(manager.GetOwnInventory(GlobalConstants.backpackInvClassName), true, ref best);
+        Scan(manager.GetOwnInventory(GlobalConstants.hotBarInvClassName), false, excludedHand, ref best);
+        Scan(manager.GetOwnInventory(GlobalConstants.backpackInvClassName), true, excludedHand, ref best);
         return best;
     }
 
     /// <summary>Inspects one inventory in stable slot order, retaining the earlier slot on exact ties.</summary>
-    private void Scan(IInventory? inventory, bool backpack, ref QuickToolCandidate? best)
+    private void Scan(IInventory? inventory, bool backpack, ItemSlot? excludedHand, ref QuickToolCandidate? best)
     {
         if (inventory is null) return;
         for (int index = 0; index < inventory.Count; index++)
         {
             ItemSlot? slot = inventory[index];
-            if (slot is null) continue;
+            if (slot is null || ReferenceEquals(slot, excludedHand)) continue;
             if (backpack ? slot is not ItemSlotBagContent : slot.GetType() != typeof(ItemSlotSurvival)) continue;
             if (slot.Empty) continue;
             try

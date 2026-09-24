@@ -66,19 +66,19 @@ public sealed class QuickToolEquipmentTests
         Assert.Same(pick, f.Hotbar[1].Itemstack);
     }
 
-    /// <summary>Selecting a candidate already held cannot create artificial restoration state.</summary>
+    /// <summary>The active hand is not a selectable candidate and cannot create restoration state.</summary>
     [Fact]
-    public void AlreadyHeldCandidate_IsNoOp()
+    public void AlreadyHeldCandidate_IsRejected()
     {
         var f = new Fixture();
         ItemStack pick = f.PutTool(f.Hotbar[0], 1, EnumTool.Pickaxe);
-        Assert.Equal(QuickToolEquipmentResult.NoOp, f.Select("tool:Pickaxe"));
+        Assert.Equal(QuickToolEquipmentResult.Rejected, f.Select("tool:Pickaxe"));
         Assert.Same(pick, f.Hotbar[0].Itemstack);
         Assert.False(f.Equipment.HasSession);
         Assert.Empty(f.Packets);
     }
 
-    /// <summary>Two semantic entries resolving to one held stack do not create another movement.</summary>
+    /// <summary>A second entry cannot select the same held stack after the first movement.</summary>
     [Fact]
     public void ToolAndLightAliases_KeepOneSessionAndOneStack()
     {
@@ -87,7 +87,7 @@ public sealed class QuickToolEquipmentTests
         var dual = new ItemStack(new TestItem(2, EnumTool.Pickaxe, 20, true));
         f.Hotbar[1].Itemstack = dual;
         Assert.Equal(QuickToolEquipmentResult.LocallyApplied, f.Select("tool:Pickaxe"));
-        Assert.Equal(QuickToolEquipmentResult.NoOp, f.Select(QuickToolLayout.LightId));
+        Assert.Equal(QuickToolEquipmentResult.Rejected, f.Select(QuickToolLayout.LightId));
         Assert.Single(f.Packets);
         Assert.Equal(QuickToolEquipmentResult.LocallyApplied, f.Equipment.Restore());
         Assert.Same(original, f.Hotbar[0].Itemstack);

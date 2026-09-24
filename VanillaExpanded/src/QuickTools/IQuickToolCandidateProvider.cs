@@ -8,6 +8,6 @@ public interface IQuickToolCandidateProvider
     /// <summary>Gets the entry identifier fixed by the quick-tool layout.</summary>
     string EntryId { get; }
 
-    /// <summary>Resolves the current winner without moving items.</summary>
-    QuickToolCandidate? Resolve(IPlayerInventoryManager manager, ItemSlot offhand);
+    /// <summary>Resolves the current winner without moving items, optionally excluding the active hand.</summary>
+    QuickToolCandidate? Resolve(IPlayerInventoryManager manager, ItemSlot offhand, ItemSlot? excludedHand = null);
 }

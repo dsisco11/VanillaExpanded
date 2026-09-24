@@ -60,7 +60,7 @@ internal sealed class QuickToolEquipment
         IQuickToolCandidateProvider? provider = ResolveProvider(entryId);
         if (provider is null) return QuickToolEquipmentResult.Rejected;
         QuickToolCandidate? candidate;
-        try { candidate = provider.Resolve(manager, physicalOffhand); }
+        try { candidate = provider.Resolve(manager, physicalOffhand, hand); }
         catch (Exception) { return QuickToolEquipmentResult.Rejected; }
         if (candidate is null || !displayed.Matches(candidate)) return QuickToolEquipmentResult.Rejected;
         bool light = entryId == QuickToolLayout.LightId;

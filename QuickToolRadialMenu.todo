@@ -1,7 +1,7 @@
 # Quick-Tool Radial Menu Implementation TODO
 
 Source proposal: [QuickToolRadialMenu.proposal.md](QuickToolRadialMenu.proposal.md)
-Status: Phases 2-5 and the shared-selector investigation are complete at their stated source/integration boundaries (2026-09-23). A later user-directed amendment makes outer wedges follow available entries; earlier fixed-position evidence is historical. Phase 6 runtime acceptance remains unstarted.
+Status: Phases 2-5 and the shared-selector investigation are complete at their stated source/integration boundaries (2026-09-23). Later user-directed amendments make outer wedges follow available entries, omit the held right-hand item, darken the full screen, clip icons to wedges, and use warm brown/orange wedges. Same-position active-slot callbacks preserve Unequip restoration. Earlier fixed-position evidence is historical. Phase 6 runtime acceptance remains unstarted.
 
 ## Goal and scope
 
@@ -177,6 +177,8 @@ Completion criteria:
 Completion evidence from the earlier menu integration was not retained in this checkout. Current source, regression coverage, and the [available-entry amendment](docs/quick-tool/AvailableEntryLayout.md) document the present behavior. Live acceptance remains in Phase 6.
 
 Available-entry amendment (2026-09-23): Build the ring from currently available cached candidates in canonical provider order. Preserve the center independently; support zero outer wedges. Rebuild geometry and hit targets on candidate addition/removal, including while open; reuse geometry when only the candidate item or IDs change at the same wedge count. Revalidate the displayed ItemStack on selection. The earlier fixed-position checks above document the superseded design, not current acceptance.
+
+Held-item and visual amendment (2026-09-23): Exclude the active right-hand slot when resolving quick-tool candidates; ordinary light hotkeys retain their existing selection policy. A native refresh of the same active hotbar position does not end an otherwise valid restoration session. Draw a fullscreen dimming layer behind brown/orange wedges and clip each game-rendered item icon to its wedge. Confirm these effects and Unequip availability in live runtime acceptance.
 
 ## Phase 6: Runtime acceptance and delivery evidence
 

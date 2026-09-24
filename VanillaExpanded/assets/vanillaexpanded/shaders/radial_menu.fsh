@@ -8,6 +8,7 @@ out vec4 fragColor;
 uniform vec4 entryStates[64];
 uniform int entryCount;
 uniform int hoveredIndex;
+uniform int maskIndex;
 uniform float centerRadius;
 uniform float innerRadius;
 uniform float outerRadius;
@@ -34,17 +35,24 @@ void main()
         coverage *= 1.0 - smoothstep(1.0 - separatorFraction - angularAA, 1.0 - separatorFraction + angularAA, wedgeFraction);
     }
 
+    if (maskIndex >= 0)
+    {
+        if (entryIndex != maskIndex || coverage < 0.5) discard;
+        fragColor = vec4(1.0);
+        return;
+    }
+
     vec4 state = entryStates[entryIndex];
     float enabled = state.x;
     float selected = state.y;
     float hovered = entryIndex == hoveredIndex ? 1.0 : 0.0;
-    vec3 baseColor = mix(vec3(0.15, 0.16, 0.19), vec3(0.25, 0.29, 0.36), enabled);
+    vec3 baseColor = mix(vec3(0.17, 0.11, 0.075), vec3(0.38, 0.21, 0.075), enabled);
     float pulse = 0.5 + 0.5 * sin(animationTime * 4.0);
-    vec3 color = mix(baseColor, vec3(0.60, 0.73, 0.91) + pulse * 0.07, hovered * enabled);
-    color = mix(color, vec3(0.86, 0.77, 0.48) + pulse * 0.09, selected);
+    vec3 color = mix(baseColor, vec3(0.72, 0.40, 0.12) + pulse * 0.04, hovered * enabled);
+    color = mix(color, vec3(0.90, 0.56, 0.19) + pulse * 0.05, selected);
     float edge = center ? abs(radius - centerRadius) : min(abs(radius - innerRadius), abs(radius - outerRadius));
-    color += (1.0 - smoothstep(0.0, radialAA * 3.0, edge)) * vec3(0.10);
-    fragColor = vec4(color, coverage * mix(0.50, 0.90, enabled));
+    color += (1.0 - smoothstep(0.0, radialAA * 3.0, edge)) * vec3(0.18, 0.10, 0.025);
+    fragColor = vec4(color, coverage * mix(0.80, 0.96, enabled));
 }
 
 

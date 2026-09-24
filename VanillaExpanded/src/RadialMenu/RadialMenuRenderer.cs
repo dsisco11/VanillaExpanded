@@ -17,6 +17,7 @@ internal sealed class RadialMenuRenderer : IDisposable
     private readonly Dictionary<(string Id, bool Description), LoadedTexture> labels = new();
     private readonly Dictionary<(string Id, bool Description), string> renderedLabels = new();
     private readonly CairoFont labelFont = CairoFont.WhiteSmallText().WithStroke([0, 0, 0, 0.65], 1.5);
+    private readonly LoadedTexture dimTexture;
     private RadialMenuLayout? meshLayout;
     private MeshRef? mesh;
     private ShaderProgram? shader;
@@ -30,6 +31,8 @@ internal sealed class RadialMenuRenderer : IDisposable
     public RadialMenuRenderer(ICoreClientAPI capi)
     {
         this.capi = capi ?? throw new ArgumentNullException(nameof(capi));
+        dimTexture = new LoadedTexture(capi) { Width = 1, Height = 1 };
+        capi.Render.LoadOrUpdateTextureFromRgba([unchecked((int)0xffffffff)], false, 0, ref dimTexture);
         ReloadShader();
     }
 
@@ -107,9 +110,15 @@ internal sealed class RadialMenuRenderer : IDisposable
         capi.Render.GlToggleBlend(true);
         try
         {
+            var guiShader = capi.Render.GetEngineShader(EnumShaderProgram.Gui);
+            guiShader.Use();
+            capi.Render.Render2DTexture(dimTexture.TextureId, 0, 0, capi.Render.FrameWidth, capi.Render.FrameHeight,
+                35, new Vec4f(0.025f, 0.02f, 0.015f, 0.66f));
+            guiShader.Stop();
             shader.Use();
             try
             {
+                shader.Uniform("maskIndex", -1);
                 var states = new float[(layout.WedgeIds.Count + 1) * 4];
                 for (int i = 0; i < layout.WedgeIds.Count; i++)
                 {
@@ -161,6 +170,7 @@ internal sealed class RadialMenuRenderer : IDisposable
         shader?.Dispose();
         if (mesh is not null) capi.Render.DeleteMesh(mesh);
         foreach (LoadedTexture texture in labels.Values) texture.Dispose();
+        dimTexture.Dispose();
         labelFont.Dispose();
         labels.Clear();
     }
@@ -190,7 +200,7 @@ internal sealed class RadialMenuRenderer : IDisposable
             {
                 RadialMenuEntry entry = interaction.GetEntry(layout.WedgeIds[i]);
                 (double x, double y) = layout.GetWedgeCenter(i, centerX, centerY, radiusPixels, midRadius);
-                DrawEntry(entry, x, y, radiusPixels * 0.12f);
+                DrawClippedEntry(entry, i, x, y, radiusPixels * 0.12f, guiShader);
             }
             RadialMenuEntry center = interaction.GetEntry(layout.CenterId);
             DrawEntry(center, centerX, centerY, radiusPixels * 0.2f);
@@ -201,6 +211,54 @@ internal sealed class RadialMenuRenderer : IDisposable
         {
             guiShader.Stop();
         }
+    }
+
+    /// <summary>Uses one stencil bit to confine a game-rendered icon to its curved wedge.</summary>
+    private void DrawClippedEntry(RadialMenuEntry entry, int index, double x, double y, float iconSize, IShaderProgram guiShader)
+    {
+        if (entry.Icon is null) { DrawLabel((entry.Id, false), entry.Label, x, y + iconSize / 2f); return; }
+        bool hadStencil = GL.IsEnabled(EnableCap.StencilTest);
+        int oldWriteMask = GL.GetInteger(GetPName.StencilWritemask);
+        int oldFunction = GL.GetInteger(GetPName.StencilFunc);
+        int oldReference = GL.GetInteger(GetPName.StencilRef);
+        int oldValueMask = GL.GetInteger(GetPName.StencilValueMask);
+        int oldFail = GL.GetInteger(GetPName.StencilFail);
+        int oldDepthFail = GL.GetInteger(GetPName.StencilPassDepthFail);
+        int oldDepthPass = GL.GetInteger(GetPName.StencilPassDepthPass);
+        int oldClearValue = GL.GetInteger(GetPName.StencilClearValue);
+        try
+        {
+            // Reserve the high stencil bit and preserve any lower bits owned by the game UI.
+            GL.Enable(EnableCap.StencilTest);
+            GL.StencilMask(0x80);
+            GL.ClearStencil(0);
+            GL.Clear(ClearBufferMask.StencilBufferBit);
+            GL.StencilFunc(StencilFunction.Always, 0x80, 0x80);
+            GL.StencilOp(StencilOp.Keep, StencilOp.Keep, StencilOp.Replace);
+            GL.ColorMask(false, false, false, false);
+            guiShader.Stop();
+            shader!.Use();
+            shader.Uniform("maskIndex", index);
+            capi.Render.RenderMesh(mesh!);
+            shader.Stop();
+            GL.ColorMask(true, true, true, true);
+            GL.StencilMask(0);
+            GL.StencilFunc(StencilFunction.Equal, 0x80, 0x80);
+            GL.StencilOp(StencilOp.Keep, StencilOp.Keep, StencilOp.Keep);
+            guiShader.Use();
+            entry.Icon.Render(capi, x, y, iconSize, entry.Enabled);
+        }
+        finally
+        {
+            GL.ColorMask(true, true, true, true);
+            GL.StencilMask(oldWriteMask);
+            GL.StencilFunc((StencilFunction)oldFunction, oldReference, oldValueMask);
+            GL.StencilOp((StencilOp)oldFail, (StencilOp)oldDepthFail, (StencilOp)oldDepthPass);
+            GL.ClearStencil(oldClearValue);
+            if (!hadStencil) GL.Disable(EnableCap.StencilTest);
+            guiShader.Use();
+        }
+        DrawLabel((entry.Id, false), entry.Label, x, y + iconSize / 2f);
     }
 
     /// <summary>Refreshes changed content without touching the geometry cache.</summary>

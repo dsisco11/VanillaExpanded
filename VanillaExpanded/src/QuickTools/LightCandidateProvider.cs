@@ -13,9 +13,9 @@ public sealed class LightCandidateProvider : IQuickToolCandidateProvider
 
     #region Selection
     /// <summary>Resolves the legacy winner, then checks that its source is supported for quick-tool movement.</summary>
-    public QuickToolCandidate? Resolve(IPlayerInventoryManager manager, ItemSlot offhand)
+    public QuickToolCandidate? Resolve(IPlayerInventoryManager manager, ItemSlot offhand, ItemSlot? excludedHand = null)
     {
-        ItemSlot? selected = LightSourceSelection.ResolveLightSourceSlot(manager, offhand, out _, out _);
+        ItemSlot? selected = LightSourceSelection.ResolveLightSourceSlot(manager, offhand, out _, out _, excludedHand);
         if (selected is null || selected.Empty) return null;
         IInventory? hotbar = manager.GetOwnInventory(GlobalConstants.hotBarInvClassName);
         IInventory? backpack = manager.GetOwnInventory(GlobalConstants.backpackInvClassName);

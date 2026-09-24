@@ -60,6 +60,18 @@ public sealed class QuickToolCandidateTests
         f.Backpack[0].Itemstack = null;
         Assert.Null(new ToolCandidateProvider(EnumTool.Axe).Resolve(f.Manager.Object, f.Offhand));
     }
+    /// <summary>The held tool is omitted while the next eligible tool remains selectable.</summary>
+    [Fact]
+    public void ToolRanking_ExcludesActiveHand()
+    {
+        var f = new Fixture();
+        f.Put(f.Hotbar[0], 1, EnumTool.Axe, 9, 1);
+        f.Put(f.Hotbar[1], 2, EnumTool.Axe, 2, 5);
+        var provider = new ToolCandidateProvider(EnumTool.Axe);
+        Assert.Same(f.Hotbar[1], provider.Resolve(f.Manager.Object, f.Offhand, f.Hotbar[0])?.Slot);
+        f.Hotbar[1].Itemstack = null;
+        Assert.Null(provider.Resolve(f.Manager.Object, f.Offhand, f.Hotbar[0]));
+    }
     /// <summary>Excludes broken durable tools and ranks non-wearing tools after worn tools of equal tier.</summary>
     [Fact]
     public void ToolRanking_HandlesBrokenAndNonWearingMetadata()
@@ -106,6 +118,17 @@ public sealed class QuickToolCandidateTests
         Assert.Same(f.Backpack[0], provider.Resolve(f.Manager.Object, f.Offhand)?.Slot);
         f.Backpack[0].Itemstack = null;
         Assert.Null(provider.Resolve(f.Manager.Object, f.Offhand));
+    }
+    /// <summary>The quick-tool light entry skips the held light while legacy selection retains it.</summary>
+    [Fact]
+    public void LightSelection_ExcludesActiveHandOnlyWhenRequested()
+    {
+        var f = new Fixture();
+        f.PutLight(f.Hotbar[0], 1, 20);
+        f.PutLight(f.Hotbar[1], 2, 10);
+        var provider = new LightCandidateProvider();
+        Assert.Same(f.Hotbar[0], provider.Resolve(f.Manager.Object, f.Offhand)?.Slot);
+        Assert.Same(f.Hotbar[1], provider.Resolve(f.Manager.Object, f.Offhand, f.Hotbar[0])?.Slot);
     }
     #endregion
 
