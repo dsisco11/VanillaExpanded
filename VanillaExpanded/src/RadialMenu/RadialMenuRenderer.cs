@@ -234,7 +234,8 @@ internal sealed class RadialMenuRenderer : IDisposable
                 ? interaction.GetEntry(hoveredId)
                 : center;
             center.Icon?.Render(capi, centerX, centerY, radiusPixels * 0.2f, center.Enabled);
-            DrawLabel(center.Id, centerLabel.Label, centerX, centerY);
+            DrawLabel(center.Id, centerLabel.Label, centerX, centerY,
+                (int)Math.Max(1, radiusPixels * layout.CenterRadius * 1.6f));
         }
         finally
         {
@@ -296,16 +297,19 @@ internal sealed class RadialMenuRenderer : IDisposable
     }
 
     /// <summary>Caches a text-only entry label and centers its texture at the entry position.</summary>
-    private void DrawLabel(string id, string text, double x, double y)
+    private void DrawLabel(string id, string text, double x, double y, int maximumWidth = 0)
     {
-        if (!renderedLabels.TryGetValue(id, out string? previous) || previous != text)
+        string cacheKey = text + '\0' + maximumWidth;
+        if (!renderedLabels.TryGetValue(id, out string? previous) || previous != cacheKey)
         {
             if (labels.Remove(id, out LoadedTexture? old)) old.Dispose();
-            renderedLabels[id] = text;
+            renderedLabels[id] = cacheKey;
             if (!string.IsNullOrEmpty(text))
             {
-                var extents = labelFont.GetTextExtents(text);
-                labels[id] = capi.Gui.TextTexture.GenTextTexture(text, labelFont, (int)Math.Ceiling(extents.Width) + 4, (int)Math.Ceiling(labelFont.GetFontExtents().Height) + 4, null, EnumTextOrientation.Center);
+                labels[id] = maximumWidth > 0
+                    ? capi.Gui.TextTexture.GenTextTexture(text, labelFont, maximumWidth, null, EnumTextOrientation.Center)
+                    : capi.Gui.TextTexture.GenTextTexture(text, labelFont, (int)Math.Ceiling(labelFont.GetTextExtents(text).Width) + 4,
+                        (int)Math.Ceiling(labelFont.GetFontExtents().Height) + 4, null, EnumTextOrientation.Center);
             }
         }
 
