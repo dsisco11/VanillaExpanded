@@ -11,20 +11,21 @@ namespace VanillaExpanded.Tests.QuickTools;
 public sealed class QuickToolCandidateTests
 {
     #region Layout
-    /// <summary>Verifies every fixed category position and the appended virtual entry.</summary>
+    /// <summary>Verifies Light owns the top position and every tool retains canonical clockwise order.</summary>
     [Fact]
     public void CanonicalLayout_IsIndependentOfInventoryAndEnumEnumeration()
     {
         string[] categories = ["Knife", "Pickaxe", "Axe", "Sword", "Shovel", "Hammer", "Spear", "Bow", "Shears", "Sickle", "Hoe", "Saw", "Chisel", "Scythe", "Sling", "Wrench", "Probe", "Meter", "Drill", "Firearm", "Crossbow", "Javelin", "Pike", "Shield", "Club", "Mace", "Warhammer", "Poleaxe", "Halberd", "Polearm", "Staff", "Tongs", "Crowbar"];
         Assert.Equal(34, QuickToolLayout.WedgeIds.Count);
+        Assert.Equal(QuickToolLayout.LightId, QuickToolLayout.WedgeIds[0]);
         for (int i = 0; i < categories.Length; i++)
         {
-            Assert.Equal($"tool:{categories[i]}", QuickToolLayout.WedgeIds[i]);
-            Assert.Equal(QuickToolLayout.WedgeIds[i], QuickToolLayout.GetToolId(Enum.Parse<EnumTool>(categories[i])));
+            Assert.Equal($"tool:{categories[i]}", QuickToolLayout.WedgeIds[i + 1]);
+            Assert.Equal(QuickToolLayout.WedgeIds[i + 1], QuickToolLayout.GetToolId(Enum.Parse<EnumTool>(categories[i])));
         }
-        Assert.Equal(QuickToolLayout.LightId, QuickToolLayout.WedgeIds[33]);
-        var available = new[] { "tool:Knife", QuickToolLayout.LightId };
+        var available = new[] { QuickToolLayout.LightId, "tool:Knife" };
         Assert.Equal(available, QuickToolLayout.CreateLayout(available).WedgeIds);
+        Assert.Equal(QuickToolLayout.LightId, QuickToolLayout.CreateLayout(available).HitTest(0, -60, 0, 0, 100));
         Assert.Equal("unequip", QuickToolLayout.CreateLayout([]).CenterId);
         Assert.Null(QuickToolLayout.GetToolId((EnumTool)500));
     }

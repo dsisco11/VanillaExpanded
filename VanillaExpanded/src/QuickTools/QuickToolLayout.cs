@@ -62,8 +62,8 @@ public static class QuickToolLayout
     private static string[] BuildIds()
     {
         var ids = new string[Categories.Length + 1];
-        for (int i = 0; i < Categories.Length; i++) ids[i] = $"tool:{Categories[i]}";
-        ids[^1] = LightId;
+        ids[0] = LightId;
+        for (int i = 0; i < Categories.Length; i++) ids[i + 1] = $"tool:{Categories[i]}";
         return ids;
     }
     #endregion
