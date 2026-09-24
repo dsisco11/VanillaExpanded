@@ -26,7 +26,7 @@ This document specifies approved intended behavior. The [implementation contract
 
 The radial-menu system owns rendering, pointer interaction, highlighting, opening and closing, and selection reporting. It accepts a description of menu entries, including stable identifiers, labels, icons, enabled states, and a center entry.
 
-It has no knowledge of tool ranking, inventory locations, item movement, or equipment restoration. It reports a selected entry identifier to the caller. Quick-tool outer entries display the resolved item's game-localized name, including the Light entry. Unavailable candidates have no wedge. Its public composition entry point remains thin; menu interaction and lifetime belong to the menu's owning module.
+It has no knowledge of tool ranking, inventory locations, item movement, or equipment restoration. It reports a selected entry identifier to the caller. Quick-tool outer entries retain the resolved item's game-localized name as entry data while the wedges show icons alone. Unavailable candidates have no wedge. Its public composition entry point remains thin; menu interaction and lifetime belong to the menu's owning module.
 
 ### Quick-Tool Functionality
 
@@ -46,13 +46,13 @@ Dependencies run from the quick-tool integration toward the reusable radial-menu
 
 After a selection, keep the menu closed until the player releases and presses the key again. Consume the selection click so it cannot also trigger a world interaction. Restore normal input ownership on every close path, including cancellation, loss of focus, feature disablement, and world exit.
 
-The center is labeled Unequip, with explanatory text indicating restoration of the previous item when applicable. Disable it when no supported unequip operation is available. A flip rejected before any movement leaves the inventory unchanged and provides brief feedback. A later failure in a multi-flip sequence must report interruption and reconcile the actual contents; it must never claim the original inventory remained unchanged.
+The center has a centered Unequip label and no bottom help text. Disable it when no supported unequip operation is available. A flip rejected before any movement leaves the inventory unchanged and provides brief feedback. A later failure in a multi-flip sequence must report interruption and reconcile the actual contents; it must never claim the original inventory remained unchanged.
 
 Build one outer wedge per available cached entry. Order those entries by the canonical category table, with Light after tool categories, starting at screen up and proceeding clockwise. Available entries divide the ring equally. Acquisition or removal adds or removes a wedge and can move other entries; replacing a category's best item without changing availability updates its existing wedge. If no outer candidate is available, show only the center Unequip action, disabled when restoration is unavailable. A cache refresh that changes availability also updates the open menu's geometry and hit targets without closing it.
 
 ## Rendering
 
-Use cached wedge geometry with shader-driven appearance. Generate and upload one combined mesh containing all category wedges and the center circle, with an entry identifier per vertex that remains constant across each triangle. Draw the menu geometry in one call over a fullscreen dimming layer. Use a warm dark orange and brown wedge palette that remains distinct from that layer. Render icons and text with existing game rendering APIs, clipping each item icon to its own wedge.
+Use cached wedge geometry with shader-driven appearance. Generate and upload one combined mesh containing all category wedges and the center circle, with an entry identifier per vertex that remains constant across each triangle. Draw the menu geometry in one call over a fullscreen dimming layer. Use a warm dark orange and brown wedge palette that remains distinct from that layer. Render icons and the centered middle label with existing game rendering APIs, clipping each item icon to its own wedge.
 
 Size the wheel to 60% of its previous screen radius, leave a visible angular gap between wedges, and keep the wedges slightly transparent. Scale the hovered outer wedge and its content to 115% for a bump effect while leaving its selection sector stable.
 

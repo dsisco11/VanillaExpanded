@@ -15,8 +15,8 @@ internal sealed class RadialMenuRenderer : IDisposable
     private const float HoverBumpScale = 1.15f;
     private readonly ICoreClientAPI capi;
     private readonly Matrixf matrix = new();
-    private readonly Dictionary<(string Id, bool Description), LoadedTexture> labels = new();
-    private readonly Dictionary<(string Id, bool Description), string> renderedLabels = new();
+    private readonly Dictionary<string, LoadedTexture> labels = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> renderedLabels = new(StringComparer.Ordinal);
     private readonly CairoFont labelFont = CairoFont.WhiteSmallText().WithStroke([0, 0, 0, 0.65], 1.5);
     private readonly LoadedTexture dimTexture;
     private RadialMenuLayout? meshLayout;
@@ -47,9 +47,9 @@ internal sealed class RadialMenuRenderer : IDisposable
     public void PrepareLayout(RadialMenuLayout layout)
     {
         var retainedIds = new HashSet<string>(layout.WedgeIds, StringComparer.Ordinal) { layout.CenterId };
-        foreach (var id in new List<(string Id, bool Description)>(renderedLabels.Keys))
+        foreach (string id in new List<string>(renderedLabels.Keys))
         {
-            if (retainedIds.Contains(id.Id) && (!id.Description || id.Id == layout.CenterId)) continue;
+            if (retainedIds.Contains(id)) continue;
             if (labels.Remove(id, out LoadedTexture? texture)) texture.Dispose();
             renderedLabels.Remove(id);
         }
@@ -205,9 +205,8 @@ internal sealed class RadialMenuRenderer : IDisposable
                 DrawClippedEntry(entry, i, x, y, radiusPixels * 0.12f * scale, guiShader);
             }
             RadialMenuEntry center = interaction.GetEntry(layout.CenterId);
-            DrawEntry(center, centerX, centerY, radiusPixels * 0.2f);
-            double footerY = Math.Min(centerY + radiusPixels + 12, capi.Render.FrameHeight - labelFont.GetFontExtents().Height - 8);
-            DrawLabel((center.Id, true), center.Description ?? string.Empty, centerX, footerY);
+            center.Icon?.Render(capi, centerX, centerY, radiusPixels * 0.2f, center.Enabled);
+            DrawLabel(center.Id, center.Label, centerX, centerY);
         }
         finally
         {
@@ -218,7 +217,11 @@ internal sealed class RadialMenuRenderer : IDisposable
     /// <summary>Uses one stencil bit to confine a game-rendered icon to its curved wedge.</summary>
     private void DrawClippedEntry(RadialMenuEntry entry, int index, double x, double y, float iconSize, IShaderProgram guiShader)
     {
-        if (entry.Icon is null) { DrawLabel((entry.Id, false), entry.Label, x, y + iconSize / 2f); return; }
+        if (entry.Icon is null)
+        {
+            DrawLabel(entry.Id, entry.Label, x, y);
+            return;
+        }
         bool hadStencil = GL.IsEnabled(EnableCap.StencilTest);
         int oldWriteMask = GL.GetInteger(GetPName.StencilWritemask);
         int oldFunction = GL.GetInteger(GetPName.StencilFunc);
@@ -260,18 +263,10 @@ internal sealed class RadialMenuRenderer : IDisposable
             if (!hadStencil) GL.Disable(EnableCap.StencilTest);
             guiShader.Use();
         }
-        DrawLabel((entry.Id, false), entry.Label, x, y + iconSize / 2f);
     }
 
-    /// <summary>Refreshes changed content without touching the geometry cache.</summary>
-    private void DrawEntry(RadialMenuEntry entry, double x, double y, float iconSize)
-    {
-        entry.Icon?.Render(capi, x, y, iconSize, entry.Enabled);
-        DrawLabel((entry.Id, false), entry.Label, x, y + iconSize / 2f);
-    }
-
-    /// <summary>Caches changed text independently of icons and menu geometry.</summary>
-    private void DrawLabel((string Id, bool Description) id, string text, double x, double y)
+    /// <summary>Caches a text-only entry label and centers its texture at the entry position.</summary>
+    private void DrawLabel(string id, string text, double x, double y)
     {
         if (!renderedLabels.TryGetValue(id, out string? previous) || previous != text)
         {
@@ -287,7 +282,7 @@ internal sealed class RadialMenuRenderer : IDisposable
         if (labels.TryGetValue(id, out LoadedTexture? label))
         {
             capi.Render.GetEngineShader(EnumShaderProgram.Gui).Use();
-            capi.Render.Render2DLoadedTexture(label, (float)x - label.Width / 2f, (float)y, 60);
+            capi.Render.Render2DLoadedTexture(label, (float)x - label.Width / 2f, (float)y - label.Height / 2f, 60);
         }
     }
     #endregion

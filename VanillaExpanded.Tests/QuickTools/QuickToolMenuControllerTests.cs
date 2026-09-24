@@ -22,7 +22,7 @@ public sealed class QuickToolMenuControllerTests
         f.Open();
         Assert.Equal(new[] { "tool:Pickaxe" }, f.Menu.Layout!.WedgeIds);
         Assert.Equal("localized:quicktool-unequip", f.Entry("unequip").Label);
-        Assert.Equal("localized:quicktool-restore-description", f.Entry("unequip").Description);
+        Assert.Null(f.Entry("unequip").Description);
         Assert.False(f.Entry("unequip").Enabled);
         Assert.DoesNotContain("tool:Axe", f.Menu.Layout.WedgeIds);
         Assert.Equal("game-item-name:2", f.Entry("tool:Pickaxe").Label);

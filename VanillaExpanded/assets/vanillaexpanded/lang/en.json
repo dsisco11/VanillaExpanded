@@ -3,7 +3,6 @@
   "config-enable-quick-tools": "Quick Tools",
   "config-enable-quick-tools-tooltip": "Enable the quick-tool radial menu. Assign its hold key in Controls.",
   "quicktool-unequip": "Unequip",
-  "quicktool-restore-description": "Restore the item held before your first quick-tool selection.",
   "quicktool-rejected": "That quick-tool selection is no longer available.",
   "quicktool-interrupted": "The swap was interrupted. Your current items were kept; restoration is no longer available.",
   "quicktool-session-unavailable": "The previous item can no longer be restored.",
