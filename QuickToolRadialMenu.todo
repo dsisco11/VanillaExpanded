@@ -163,7 +163,7 @@ Outcome: The feature is usable through its configured keybind with reusable menu
 ✔ Extend the existing QuickToolSystem and QuickToolClientOperations from Phase 4 with menu/cache/keybind integration. Reuse their equipment and lifecycle ownership; do not register a second equipment owner. Wire feature enablement and cleanup using existing conventions.
 ✔ Register and localize the keybind; hold opens, release without click cancels, click selects once and closes, and continued hold cannot reopen until release/repress.
 ✔ Supply cached available entries with the resolved items' game-localized names (including Light), and geometry with the matching wedge count to the radial-menu system; route selected identifiers through current candidate validation and equipment execution.
-✔ Keep the center labeled Unequip and explain restoration where applicable. Call QuickToolClientOperations.ValidateRestoration once when preparing menu-open availability under D6; HasSession alone does not establish a valid reference or return route. Use Restore on click for fresh validation, and handle changes since opening. Never scan inventory every render frame.
+✔ Keep Unequip as the center action and default label, replacing the displayed label with the hovered outer item's localized name. Call QuickToolClientOperations.ValidateRestoration once when preparing menu-open availability under D6; HasSession alone does not establish a valid reference or return route. Use Restore on click for fresh validation, and handle changes since opening. Never scan inventory every render frame.
 ✔ Localize and display the Light source entry using its resolved item's icon and availability; keep provider-specific policy out of radial-menu code.
 ✔ Handle the return value of Select/Restore for localized rejected, interrupted, or session-invalidated feedback, including calls that return before LocalResult fires. Avoid duplicate feedback if also subscribing to LocalResult. LocallyApplied describes the local operation, not server confirmation. Guard synchronous reentrancy and prevent gameplay click-through; do not add pending-server-result UI.
 ✔ Separate menu lifetime from equipment lifetime. Ordinary menu close, release/cancel, and focus loss release input and UI resources while preserving an intact equipment session across openings. Manual active-hotbar change, feature disablement, player/world replacement, and disposal clear the session; menu-open/action validation handles invalid stack references. Candidate-cache subscriptions follow feature/player lifetime.
@@ -182,7 +182,7 @@ Held-item and visual amendment (2026-09-23): Exclude the active right-hand slot 
 
 Wheel sizing amendment (2026-09-23): Use 60% of the prior wheel radius, slightly transparent wedges, wider angular gaps, and a 115% hovered wedge/content bump. Verify their appearance and pointer feel in live runtime acceptance.
 
-Menu text amendment (2026-09-23): Show item icons without wedge labels. Center the Unequip label in the middle circle and remove the bottom restoration help text. Keep localized item names in entry data for callers and future accessibility use.
+Menu text amendment (2026-09-23): Show item icons without wedge labels. Show the hovered item's localized name in the middle circle, falling back to Unequip when no outer wedge is hovered, and remove the bottom restoration help text.
 
 ## Phase 5A: Wedge appearance polish
 
@@ -190,7 +190,7 @@ Dependencies: Phase 5 and the available-entry, wheel-sizing, and menu-text amend
 Outcome: Dark translucent brown wedges with thin bronze borders, softened corners, a smooth amber hover effect, and an evaluated subtle-texture option.
 
 ✔ Establish shared appearance parameters for fill opacity, bronze border color/width, corner radius, amber hover color, and animation duration. Start with a 1-2 screen-pixel border, a small corner radius, and approximately 100 ms for hover transitions; settle values after user visual review.
-✔ Refine the translucent dark-brown fill so item icons remain clear and the wedges remain distinct from the fullscreen dimming layer. Keep the existing wheel radius, wider gaps, icon-only outer entries, centered Unequip label, and absence of bottom help text.
+✔ Refine the translucent dark-brown fill so item icons remain clear and the wedges remain distinct from the fullscreen dimming layer. Keep the existing wheel radius, wider gaps, icon-only outer entries, contextual center label, and absence of bottom help text.
 ✔ Trial a faint parchment-like grain in the wedge fill, with adjustable strength and a temporary runtime toggle for direct comparison with the plain fill. Keep the grain low contrast and confined to the fill; borders, icons, center text, and fullscreen dimming remain clean.
 ✔ Anchor the texture to each wedge so it moves with the hover animation without swimming, flickering, or regenerating every frame. Avoid obvious repeating patterns and shimmer.
 ✔ Compare textured and plain wedges. Record the preferred treatment and strength after user visual feedback; do not assume the texture should ship merely because the trial is implemented. Remove temporary comparison controls once the choice is settled.

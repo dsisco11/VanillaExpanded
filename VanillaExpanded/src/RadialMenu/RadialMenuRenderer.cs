@@ -230,8 +230,11 @@ internal sealed class RadialMenuRenderer : IDisposable
                 DrawClippedEntry(entry, i, x, y, radiusPixels * RadialMenuWedgeStyle.IconSizeFraction * scale, guiShader);
             }
             RadialMenuEntry center = interaction.GetEntry(layout.CenterId);
+            RadialMenuEntry centerLabel = interaction.HoveredId is string hoveredId && hoveredId != layout.CenterId
+                ? interaction.GetEntry(hoveredId)
+                : center;
             center.Icon?.Render(capi, centerX, centerY, radiusPixels * 0.2f, center.Enabled);
-            DrawLabel(center.Id, center.Label, centerX, centerY);
+            DrawLabel(center.Id, centerLabel.Label, centerX, centerY);
         }
         finally
         {
@@ -314,7 +317,6 @@ internal sealed class RadialMenuRenderer : IDisposable
     }
     #endregion
 }
-
 
 
 

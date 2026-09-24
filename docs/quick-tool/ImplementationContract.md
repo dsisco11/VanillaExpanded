@@ -54,7 +54,7 @@ Add a feature enable flag following `VanillaExpandedConfig` conventions and cons
 
 Initialize local inventory state on `LevelFinalize` and local `PlayerEntitySpawn`; check `PlayerReadyFired` and the presence of the local inventory manager before opening. Ignore spawn/despawn events for other players. On local replacement/despawn/death, close and discard old references. Use `LeaveWorld` and disposal as idempotent cleanup boundaries. Restoration history is client-local and never survives a world or player-context change.
 
-Localization belongs in `VanillaExpanded/assets/vanillaexpanded/lang/en.json`: keybind display name, Unequip/restore explanation, session-unavailable and local-failure messages. Do not add pending-server-result UI. Use `Lang.Get` with the mod domain for feature text. Outer entries display their resolved ItemStack.GetName() through the game item-name/localization path, including Light. Unavailable entries have no wedge. Do not add category-name translations. Preserve the existing light-source shortcuts and behavior.
+Localization belongs in `VanillaExpanded/assets/vanillaexpanded/lang/en.json`: keybind display name, Unequip/restore explanation, session-unavailable and local-failure messages. Do not add pending-server-result UI. Use `Lang.Get` with the mod domain for feature text. Outer entries retain their resolved `ItemStack.GetName()` through the game item-name/localization path, including Light; the center displays that name while the entry is hovered. Unavailable entries have no wedge. Do not add category-name translations. Preserve the existing light-source shortcuts and behavior.
 
 ## Input contract
 
@@ -168,7 +168,7 @@ The earlier [second review](SecondReview.md) and [completion audit](CompletionAu
 
 The requested Light source entry extends the original audited scope. [Proposal / Virtual Entries](../../QuickToolRadialMenu.proposal.md#virtual-entries) governs this amendment; completed incremental investigation and outstanding implementation tasks are recorded in the checklist. CompletionAudit.md and its installed inventory probe remain evidence for the original contract only, not proof of offhand-source restoration or shared-selector extraction.
 
-Use a stable identity such as `virtual:light-source` alongside `tool:Pickaxe`. Light follows the named tool categories in provider order and appears only when its candidate is available. The center remains Unequip. Changes to available candidates rebuild the outer arrangement without changing the supported provider set.
+Use a stable identity such as `virtual:light-source` alongside `tool:Pickaxe`. Light precedes the named tool categories so it owns the screen-up wedge when available. The center action remains Unequip, while its displayed label shows the hovered outer item's localized name. Changes to available candidates rebuild the outer arrangement without changing the supported provider set.
 
 A virtual provider resolves a real ItemSlot under its own selection policy, shares the candidate cache and client native-swap path, and supplies an ordinary generic menu entry. It does not spawn an item, mutate the tool enum, or implement separate swapping. Known entry IDs are dispatched to known client providers; no quick-tool-specific server request is sent. If several entries resolve to the same item, retain each available entry in provider order and honor already-held/identity checks.
 
