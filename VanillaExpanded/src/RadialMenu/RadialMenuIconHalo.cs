@@ -67,6 +67,7 @@ internal sealed class RadialMenuIconHalo : IDisposable
             // Capture the entire silhouette before wedge clipping, including its alpha cutouts.
             GL.Disable(EnableCap.StencilTest);
             GL.Disable(EnableCap.ScissorTest);
+            GL.Enable(EnableCap.DepthTest);
             GL.ColorMask(true, true, true, true);
             GL.DepthMask(true);
             GL.ClearColor(0, 0, 0, 0);
@@ -88,7 +89,7 @@ internal sealed class RadialMenuIconHalo : IDisposable
         }
     }
 
-    /// <summary>Draws one hard-edged halo through the caller's wedge stencil.</summary>
+    /// <summary>Draws the captured icon and its hard-edged halo through the caller's wedge stencil.</summary>
     public void Render()
     {
         if (shader is null) return;

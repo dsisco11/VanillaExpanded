@@ -243,7 +243,7 @@ internal sealed class RadialMenuRenderer : IDisposable
         }
     }
 
-    /// <summary>Clips a pixel-distance icon halo and the original artwork to the wedge stencil.</summary>
+    /// <summary>Clips a depth-correct icon capture and its pixel-distance halo to the wedge stencil.</summary>
     private void DrawClippedEntry(RadialMenuEntry entry, int index, double x, double y, float iconSize, IShaderProgram guiShader)
     {
         if (entry.Icon is null)
@@ -282,7 +282,6 @@ internal sealed class RadialMenuRenderer : IDisposable
             GL.StencilOp(StencilOp.Keep, StencilOp.Keep, StencilOp.Keep);
             iconHalo.Render();
             guiShader.Use();
-            entry.Icon.Render(capi, x, y, iconSize, entry.Enabled);
         }
         finally
         {

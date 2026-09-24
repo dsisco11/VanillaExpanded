@@ -17,7 +17,12 @@ float coverage(ivec2 pixel)
 void main()
 {
     ivec2 pixel = ivec2(gl_FragCoord.xy - viewportOrigin);
-    if (coverage(pixel) > 0.1) discard;
+    vec4 icon = texelFetch(iconMask, pixel, 0);
+    if (icon.a > 0.1)
+    {
+        fragColor = icon;
+        return;
+    }
     float nearestSquared = (haloRadius + 1.0) * (haloRadius + 1.0);
     int radius = int(ceil(haloRadius + 0.5));
     // Euclidean distance keeps the same radius along horizontal, vertical and diagonal edges.
