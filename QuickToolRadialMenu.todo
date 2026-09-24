@@ -184,9 +184,35 @@ Wheel sizing amendment (2026-09-23): Use 60% of the prior wheel radius, slightly
 
 Menu text amendment (2026-09-23): Show item icons without wedge labels. Center the Unequip label in the middle circle and remove the bottom restoration help text. Keep localized item names in entry data for callers and future accessibility use.
 
+## Phase 5A: Wedge appearance polish
+
+Dependencies: Phase 5 and the available-entry, wheel-sizing, and menu-text amendments above.
+Outcome: Dark translucent brown wedges with thin bronze borders, softened corners, a smooth amber hover effect, and an evaluated subtle-texture option.
+
+☐ Establish shared appearance parameters for fill opacity, bronze border color/width, corner radius, amber hover color, and animation duration. Start with a 1-2 screen-pixel border, a small corner radius, and approximately 100 ms for hover transitions; tune these in game across supported GUI scales.
+☐ Refine the translucent dark-brown fill so item icons remain clear and the wedges remain distinct from the fullscreen dimming layer. Keep the existing wheel radius, wider gaps, icon-only outer entries, centered Unequip label, and absence of bottom help text.
+☐ Trial a faint parchment-like grain in the wedge fill, with adjustable strength and a temporary runtime toggle for direct comparison with the plain fill. Keep the grain low contrast and confined to the fill; borders, icons, center text, and fullscreen dimming remain clean.
+☐ Anchor the texture to each wedge so it moves with the hover animation without swimming, flickering, or regenerating every frame. Check grain scale across supported GUI scales and crowded layouts; avoid obvious repeating patterns and shimmer.
+☐ Compare textured and plain wedges in the same bright/dark scenes and with the same item icons. Record the preferred treatment and strength after user visual feedback; do not assume the texture should ship merely because the trial is implemented. Remove temporary comparison controls once the choice is settled.
+☐ Add a thin, muted bronze border along the complete visible wedge contour, including inner/outer arcs and separator edges. Blend toward brighter amber on hover without making the border appear thicker or closing the gaps.
+☐ Soften the four corners where each wedge's arcs meet its separator edges. Clamp the rounding to the available wedge width and ring thickness so sparse and crowded layouts remain well formed. Keep edges antialiased and account for the single-wedge layout.
+☐ Use the same rounded contour for the visible wedge and its item-icon clipping mask. Ensure icons cannot spill across rounded corners, separators, or the inner/outer boundaries, including during hover animation.
+☐ Animate hover growth smoothly from 100% to the existing 115% scale and back over approximately 100 ms. Apply the same transform to the wedge, border, and icon, and interpolate the amber highlight with the same progress value.
+☐ Handle rapid pointer changes by transitioning from each entry's current animation progress. Key animation state by stable entry ID, reset it on close/reopen, and discard state for removed entries when the available set changes. Keep hover animation independent of frame rate and avoid mesh uploads for animation alone.
+☐ Keep the established base selection sectors stable during the visual bump. Verify that rounded cutouts and separator gaps do not activate a wedge and that the visible hover expansion does not cause selection flicker. Keep the center's input behavior and centered label intact.
+☐ Delegate the repository build and focused tests to a subagent. Add focused regression coverage only for new contour/hit-test geometry or animation-state behavior that can fail independently; verify shader compilation through the game or an existing shader validation path.
+☐ Inspect the menu in game with zero, one, two, several, and the maximum supported number of outer entries. Check supported GUI scales, bright/dark scenes, large item icons, fast pointer movement, entry addition/removal while open, and shader reload.
+☐ Record the final tuned values and visual evidence. Review the implementation against this checklist and carry any unresolved live checks into Phase 6 without marking them complete.
+
+Completion criteria:
+☐ Wedges have a readable translucent brown fill, continuous bronze borders, softened corners, and smooth amber hover transitions reaching 115% scale.
+☐ Borders and icons follow the same animated contour; gaps remain visible, pointer selection is stable, and center text stays centered.
+☐ The subtle texture trial has a recorded visual comparison and a settled keep/remove decision; any retained grain preserves icon readability and remains stable during hover.
+☐ Focused checks pass and live visual checks have recorded results. Extra shadows and additional decorative effects are outside this styling task list.
+
 ## Phase 6: Runtime acceptance and delivery evidence
 
-Dependencies: Phase 5.
+Dependencies: Phases 5 and 5A.
 Outcome: Evidence supports the feature's behavior in the actual game and supported multiplayer setup.
 
 ☐ Delegate focused tests and required repository build/check commands to subagents; record commands, versions, results, and remaining failures. Broaden only where required or justified by integration changes.
@@ -209,7 +235,7 @@ Completion criteria:
 
 - Functional requirements and system responsibilities: Phases 1-5.
 - Interaction and deterministic available-entry order: Phases 2, 3, 5, 6 and the later amendment.
-- Approved cached-mesh rendering, shader effects, and rendering lifecycle: Phases 2 and 6; no performance-testing gate.
+- Approved cached-mesh rendering, shader effects, wedge appearance polish, and rendering lifecycle: Phases 2, 5A, and 6; no performance-testing gate.
 - Candidate discovery, ranking, cache and invalidation: Phases 1, 3, 6.
 - Virtual Light source entry, shared selector parity, placement after available tools, client provider revalidation, and offhand-source restoration: phase 1 amendment and Phases 2-6.
 - Equipment, restoration, external inventory changes: Phases 1, 4-6.
