@@ -19,6 +19,7 @@ internal sealed class RadialMenuRenderer : IDisposable
     private readonly Dictionary<string, string> renderedLabels = new(StringComparer.Ordinal);
     private readonly CairoFont labelFont = CairoFont.WhiteSmallText().WithStroke([0, 0, 0, 0.65], 1.5);
     private readonly LoadedTexture dimTexture;
+    private readonly RadialMenuIconHalo iconHalo;
     private RadialMenuLayout? meshLayout;
     private MeshRef? mesh;
     private ShaderProgram? shader;
@@ -31,6 +32,7 @@ internal sealed class RadialMenuRenderer : IDisposable
     public RadialMenuRenderer(ICoreClientAPI capi)
     {
         this.capi = capi ?? throw new ArgumentNullException(nameof(capi));
+        iconHalo = new RadialMenuIconHalo(capi);
         dimTexture = new LoadedTexture(capi) { Width = 1, Height = 1 };
         capi.Render.LoadOrUpdateTextureFromRgba([unchecked((int)0xffffffff)], false, 0, ref dimTexture);
         ReloadShader();
@@ -87,6 +89,7 @@ internal sealed class RadialMenuRenderer : IDisposable
                 program.Dispose();
                 return false;
             }
+            if (!iconHalo.ReloadShader()) { program.Dispose(); return false; }
             shader = program;
             return true;
         }
@@ -127,7 +130,8 @@ internal sealed class RadialMenuRenderer : IDisposable
                 for (int i = 0; i < layout.WedgeIds.Count; i++)
                 {
                     string id = layout.WedgeIds[i];
-                    states[i * 4] = interaction.GetEntry(id).Enabled ? 1 : 0;
+                    RadialMenuEntry entry = interaction.GetEntry(id);
+                    states[i * 4] = entry.Enabled ? 1 : 0;
                     states[i * 4 + 1] = interaction.SelectedId == id ? 1 : 0;
                     states[i * 4 + 2] = hoverAnimation.VisualProgress(id);
                 }
@@ -191,6 +195,7 @@ internal sealed class RadialMenuRenderer : IDisposable
         if (mesh is not null) capi.Render.DeleteMesh(mesh);
         foreach (LoadedTexture texture in labels.Values) texture.Dispose();
         dimTexture.Dispose();
+        iconHalo.Dispose();
         labelFont.Dispose();
         labels.Clear();
     }
@@ -222,7 +227,7 @@ internal sealed class RadialMenuRenderer : IDisposable
                 RadialMenuEntry entry = interaction.GetEntry(layout.WedgeIds[i]);
                 float scale = 1f + (RadialMenuWedgeStyle.HoverScale - 1f) * hoverAnimation.VisualProgress(entry.Id);
                 (double x, double y) = layout.GetWedgeCenter(i, centerX, centerY, radiusPixels, midRadius * scale);
-                DrawClippedEntry(entry, i, x, y, radiusPixels * 0.12f * scale, guiShader);
+                DrawClippedEntry(entry, i, x, y, radiusPixels * RadialMenuWedgeStyle.IconSizeFraction * scale, guiShader);
             }
             RadialMenuEntry center = interaction.GetEntry(layout.CenterId);
             center.Icon?.Render(capi, centerX, centerY, radiusPixels * 0.2f, center.Enabled);
@@ -234,7 +239,7 @@ internal sealed class RadialMenuRenderer : IDisposable
         }
     }
 
-    /// <summary>Uses one stencil bit to confine a game-rendered icon to its curved wedge.</summary>
+    /// <summary>Clips a pixel-distance icon halo and the original artwork to the wedge stencil.</summary>
     private void DrawClippedEntry(RadialMenuEntry entry, int index, double x, double y, float iconSize, IShaderProgram guiShader)
     {
         if (entry.Icon is null)
@@ -253,7 +258,8 @@ internal sealed class RadialMenuRenderer : IDisposable
         int oldClearValue = GL.GetInteger(GetPName.StencilClearValue);
         try
         {
-            // Reserve the high stencil bit and preserve any lower bits owned by the game UI.
+            iconHalo.Capture(entry.Icon, x, y, iconSize, entry.Enabled);
+            // Reserve only the wedge bit; the unscaled icon mask lives in its own texture.
             GL.Enable(EnableCap.StencilTest);
             GL.StencilMask(0x80);
             GL.ClearStencil(0);
@@ -270,6 +276,7 @@ internal sealed class RadialMenuRenderer : IDisposable
             GL.StencilMask(0);
             GL.StencilFunc(StencilFunction.Equal, 0x80, 0x80);
             GL.StencilOp(StencilOp.Keep, StencilOp.Keep, StencilOp.Keep);
+            iconHalo.Render();
             guiShader.Use();
             entry.Icon.Render(capi, x, y, iconSize, entry.Enabled);
         }
