@@ -42,7 +42,7 @@ public static class QuickToolLayout
         {
             if (!supported.Contains(id) || !seen.Add(id)) throw new ArgumentException("Expected distinct supported identifiers.", nameof(availableIds));
         }
-        return new RadialMenuLayout(availableIds, RestoreId, 0.18, 0.24, 1, 0, true, separatorDegrees: 1.5);
+        return new RadialMenuLayout(availableIds, RestoreId, 0.24, 0.30, 1, 0, true, separatorDegrees: 1.5);
     }
 
     /// <summary>Returns an identifier only for a category in the explicit supported set.</summary>
