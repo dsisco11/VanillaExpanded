@@ -88,7 +88,7 @@ internal sealed class RadialMenuIconHalo : IDisposable
         }
     }
 
-    /// <summary>Draws one feathered halo through the caller's wedge stencil.</summary>
+    /// <summary>Draws one hard-edged halo through the caller's wedge stencil.</summary>
     public void Render()
     {
         if (shader is null) return;
@@ -115,7 +115,6 @@ internal sealed class RadialMenuIconHalo : IDisposable
             shader.BindTexture2D("iconMask", texture, 0);
             shader.Uniform("viewportOrigin", (float)viewport[0], (float)viewport[1]);
             shader.Uniform("haloRadius", RadialMenuWedgeStyle.IconHaloRadiusPixels);
-            shader.Uniform("haloFeather", RadialMenuWedgeStyle.IconHaloFeatherPixels);
             shader.Uniform("haloTint", RadialMenuWedgeStyle.IconHaloTint);
             capi.Render.RenderMesh(quad);
         }

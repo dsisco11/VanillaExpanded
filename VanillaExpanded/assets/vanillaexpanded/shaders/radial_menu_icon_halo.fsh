@@ -2,7 +2,6 @@
 uniform sampler2D iconMask;
 uniform vec2 viewportOrigin;
 uniform float haloRadius;
-uniform float haloFeather;
 uniform vec4 haloTint;
 out vec4 fragColor;
 
@@ -14,7 +13,7 @@ float coverage(ivec2 pixel)
     return texelFetch(iconMask, pixel, 0).a;
 }
 
-/* Finds the nearest covered pixel in a circular neighborhood and feathers once. */
+/* Finds the nearest covered pixel in a circular neighborhood. */
 void main()
 {
     ivec2 pixel = ivec2(gl_FragCoord.xy - viewportOrigin);
@@ -30,7 +29,6 @@ void main()
             nearestSquared = distanceSquared;
     }
     float distancePixels = max(0.0, sqrt(nearestSquared) - 0.5);
-    float opacity = 1.0 - smoothstep(max(0.0, haloRadius - haloFeather), haloRadius, distancePixels);
-    if (opacity <= 0.0) discard;
-    fragColor = vec4(haloTint.rgb, haloTint.a * opacity);
+    if (distancePixels > haloRadius) discard;
+    fragColor = haloTint;
 }
