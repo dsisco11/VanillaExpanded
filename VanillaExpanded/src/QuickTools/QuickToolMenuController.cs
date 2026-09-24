@@ -174,7 +174,7 @@ internal sealed class QuickToolMenuController : IDisposable
             availableIds.Add(id);
             displayed.Add(id, candidate);
             entries.Add(new RadialMenuEntry(id, candidate.Stack.GetName(), true,
-                new QuickToolItemIcon(candidate.Stack)));
+                new QuickToolItemIcon(candidate.Stack, candidate.EntryId)));
         }
         layout = QuickToolLayout.CreateLayout(availableIds);
         entries.Add(new RadialMenuEntry(QuickToolLayout.RestoreId, text("quicktool-unequip"), restoreAvailable));

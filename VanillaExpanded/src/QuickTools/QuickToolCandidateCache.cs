@@ -210,7 +210,8 @@ public sealed class QuickToolCandidateCache : IDisposable
         {
             QuickToolCandidate? candidate = GetCached(id);
             if (candidate is not null)
-                entries.Add(new RadialMenuEntry(id, candidate.Stack.GetName(), true, new QuickToolItemIcon(candidate.Stack)));
+                entries.Add(new RadialMenuEntry(id, candidate.Stack.GetName(), true,
+                    new QuickToolItemIcon(candidate.Stack, candidate.EntryId)));
         }
         entries.Add(new RadialMenuEntry(QuickToolLayout.RestoreId, "Unequip", canRestore));
         return entries;
