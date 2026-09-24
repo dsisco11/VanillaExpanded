@@ -52,7 +52,7 @@ void main()
     color = mix(color, vec3(0.90, 0.56, 0.19) + pulse * 0.05, selected);
     float edge = center ? abs(radius - centerRadius) : min(abs(radius - innerRadius), abs(radius - outerRadius));
     color += (1.0 - smoothstep(0.0, radialAA * 3.0, edge)) * vec3(0.18, 0.10, 0.025);
-    fragColor = vec4(color, coverage * mix(0.80, 0.96, enabled));
+    fragColor = vec4(color, coverage * mix(0.58, 0.72, enabled));
 }
 
 

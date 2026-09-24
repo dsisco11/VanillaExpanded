@@ -12,6 +12,7 @@ internal sealed class RadialMenuRenderer : IDisposable
 {
     #region Resources
     private const string ShaderName = "radial_menu";
+    private const float HoverBumpScale = 1.15f;
     private readonly ICoreClientAPI capi;
     private readonly Matrixf matrix = new();
     private readonly Dictionary<(string Id, bool Description), LoadedTexture> labels = new();
@@ -199,8 +200,9 @@ internal sealed class RadialMenuRenderer : IDisposable
             for (int i = 0; i < layout.WedgeIds.Count; i++)
             {
                 RadialMenuEntry entry = interaction.GetEntry(layout.WedgeIds[i]);
-                (double x, double y) = layout.GetWedgeCenter(i, centerX, centerY, radiusPixels, midRadius);
-                DrawClippedEntry(entry, i, x, y, radiusPixels * 0.12f, guiShader);
+                float scale = interaction.HoveredId == entry.Id ? HoverBumpScale : 1f;
+                (double x, double y) = layout.GetWedgeCenter(i, centerX, centerY, radiusPixels, midRadius * scale);
+                DrawClippedEntry(entry, i, x, y, radiusPixels * 0.12f * scale, guiShader);
             }
             RadialMenuEntry center = interaction.GetEntry(layout.CenterId);
             DrawEntry(center, centerX, centerY, radiusPixels * 0.2f);

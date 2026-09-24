@@ -180,6 +180,8 @@ Available-entry amendment (2026-09-23): Build the ring from currently available 
 
 Held-item and visual amendment (2026-09-23): Exclude the active right-hand slot when resolving quick-tool candidates; ordinary light hotkeys retain their existing selection policy. A native refresh of the same active hotbar position does not end an otherwise valid restoration session. Draw a fullscreen dimming layer behind brown/orange wedges and clip each game-rendered item icon to its wedge. Confirm these effects and Unequip availability in live runtime acceptance.
 
+Wheel sizing amendment (2026-09-23): Use 60% of the prior wheel radius, slightly transparent wedges, wider angular gaps, and a 115% hovered wedge/content bump. Verify their appearance and pointer feel in live runtime acceptance.
+
 ## Phase 6: Runtime acceptance and delivery evidence
 
 Dependencies: Phase 5.

@@ -9,6 +9,7 @@ namespace VanillaExpanded.RadialMenu;
 internal sealed class RadialMenuDialog : GuiDialog
 {
     #region State
+    private const float ScreenRadiusFraction = 0.252f;
     private readonly RadialMenuRenderer renderer;
     private RadialMenuLayout? layout;
     private RadialMenuInteraction? interaction;
@@ -47,13 +48,13 @@ internal sealed class RadialMenuDialog : GuiDialog
             if (!capi.Input.MouseButton.Left) TryClose();
             else if (interaction is not null && layout is not null)
             {
-                float heldRadius = MathF.Min(capi.Render.FrameWidth, capi.Render.FrameHeight) * 0.42f;
+                float heldRadius = MathF.Min(capi.Render.FrameWidth, capi.Render.FrameHeight) * ScreenRadiusFraction;
                 renderer.Render(layout, interaction, deltaTime, capi.Render.FrameWidth / 2f, capi.Render.FrameHeight / 2f, heldRadius);
             }
             return;
         }
         if (interaction?.IsOpen != true || layout is null) return;
-        float radius = MathF.Min(capi.Render.FrameWidth, capi.Render.FrameHeight) * 0.42f;
+        float radius = MathF.Min(capi.Render.FrameWidth, capi.Render.FrameHeight) * ScreenRadiusFraction;
         float x = capi.Render.FrameWidth / 2f;
         float y = capi.Render.FrameHeight / 2f;
         interaction.MovePointer(capi.Input.MouseX, capi.Input.MouseY, x, y, radius);
@@ -66,7 +67,7 @@ internal sealed class RadialMenuDialog : GuiDialog
         if (!IsOpened()) return;
         if (interaction?.IsOpen == true && layout is not null)
         {
-            float radius = MathF.Min(capi.Render.FrameWidth, capi.Render.FrameHeight) * 0.42f;
+            float radius = MathF.Min(capi.Render.FrameWidth, capi.Render.FrameHeight) * ScreenRadiusFraction;
             interaction.MovePointer(args.X, args.Y, capi.Render.FrameWidth / 2f, capi.Render.FrameHeight / 2f, radius);
         }
         args.Handled = true;
@@ -83,7 +84,7 @@ internal sealed class RadialMenuDialog : GuiDialog
             Cancel();
             return;
         }
-        float radius = MathF.Min(capi.Render.FrameWidth, capi.Render.FrameHeight) * 0.42f;
+        float radius = MathF.Min(capi.Render.FrameWidth, capi.Render.FrameHeight) * ScreenRadiusFraction;
         interaction.MovePointer(args.X, args.Y, capi.Render.FrameWidth / 2f, capi.Render.FrameHeight / 2f, radius);
         waitForMouseUp = true;
         if (!interaction.SelectHovered()) waitForMouseUp = false;
