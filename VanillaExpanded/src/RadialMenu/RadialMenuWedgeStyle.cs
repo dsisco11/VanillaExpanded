@@ -12,7 +12,7 @@ internal static class RadialMenuWedgeStyle
     internal const float EnabledOpacity = 0.72f;
     internal const float DisabledOpacity = 0.58f;
     internal const float DefaultGrainStrength = 0.035f;
-    internal const float IconSizeFraction = 0.138f;
+    internal const float IconSizeFraction = 0.35f;
     internal const float IconHaloRadiusPixels = 6f;
     internal const float IconHaloFeatherPixels = 4f;
     internal static readonly Vec4f IconHaloTint = new(0.055f, 0.035f, 0.02f, 0.55f);
