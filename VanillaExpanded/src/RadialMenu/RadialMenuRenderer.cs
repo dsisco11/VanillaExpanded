@@ -12,8 +12,8 @@ internal sealed class RadialMenuRenderer : IDisposable
 {
     #region Resources
     private const string ShaderName = "radial_menu";
-    private const float HoverBumpScale = 1.15f;
     private readonly ICoreClientAPI capi;
+    private readonly RadialMenuHoverAnimation hoverAnimation = new();
     private readonly Matrixf matrix = new();
     private readonly Dictionary<string, LoadedTexture> labels = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> renderedLabels = new(StringComparer.Ordinal);
@@ -23,7 +23,6 @@ internal sealed class RadialMenuRenderer : IDisposable
     private MeshRef? mesh;
     private ShaderProgram? shader;
     private double supportedRadiusPixels;
-    private float animationTime;
     private bool disposed;
     #endregion
 
@@ -46,6 +45,7 @@ internal sealed class RadialMenuRenderer : IDisposable
     /// <summary>Disposes cached labels that cannot be used by the next fixed layout.</summary>
     public void PrepareLayout(RadialMenuLayout layout)
     {
+        hoverAnimation.Retain(layout);
         var retainedIds = new HashSet<string>(layout.WedgeIds, StringComparer.Ordinal) { layout.CenterId };
         foreach (string id in new List<string>(renderedLabels.Keys))
         {
@@ -54,6 +54,9 @@ internal sealed class RadialMenuRenderer : IDisposable
             renderedLabels.Remove(id);
         }
     }
+
+    /// <summary>Starts hover animation anew for one menu opening.</summary>
+    public void ResetInteraction() => hoverAnimation.Reset();
 
     /// <summary>Recompiles the menu shader after an engine shader reload.</summary>
     public bool ReloadShader()
@@ -101,7 +104,7 @@ internal sealed class RadialMenuRenderer : IDisposable
         if (disposed || shader is null || radiusPixels <= 0) return;
         EnsureMesh(layout, radiusPixels);
         if (mesh is null) return;
-        animationTime += deltaTime;
+        hoverAnimation.Advance(layout, interaction.HoveredId, deltaTime);
 
         var previousShader = capi.Render.CurrentActiveShader;
         bool hadDepthTest = GL.IsEnabled(EnableCap.DepthTest);
@@ -123,8 +126,10 @@ internal sealed class RadialMenuRenderer : IDisposable
                 var states = new float[(layout.WedgeIds.Count + 1) * 4];
                 for (int i = 0; i < layout.WedgeIds.Count; i++)
                 {
-                    states[i * 4] = interaction.GetEntry(layout.WedgeIds[i]).Enabled ? 1 : 0;
-                    states[i * 4 + 1] = interaction.SelectedId == layout.WedgeIds[i] ? 1 : 0;
+                    string id = layout.WedgeIds[i];
+                    states[i * 4] = interaction.GetEntry(id).Enabled ? 1 : 0;
+                    states[i * 4 + 1] = interaction.SelectedId == id ? 1 : 0;
+                    states[i * 4 + 2] = hoverAnimation.VisualProgress(id);
                 }
                 states[layout.WedgeIds.Count * 4] = interaction.GetEntry(layout.CenterId).Enabled ? 1 : 0;
                 states[layout.WedgeIds.Count * 4 + 1] = interaction.SelectedId == layout.CenterId ? 1 : 0;
@@ -141,7 +146,21 @@ internal sealed class RadialMenuRenderer : IDisposable
                 shader.Uniform("innerRadius", (float)layout.InnerRadius);
                 shader.Uniform("outerRadius", (float)layout.OuterRadius);
                 shader.Uniform("separatorFraction", layout.WedgeIds.Count == 0 ? 0 : (float)(layout.SeparatorDegrees / layout.StepDegrees));
-                shader.Uniform("animationTime", animationTime);
+                shader.Uniform("startAngleRadians", (float)(layout.StartAngleDegrees * Math.PI / 180d));
+                shader.Uniform("clockwiseSign", layout.Clockwise ? 1f : -1f);
+                shader.Uniform("radiusPixels", radiusPixels);
+                shader.Uniform("cornerRadiusPixels", RadialMenuWedgeStyle.CornerRadiusPixels);
+                shader.Uniform("borderWidthPixels", RadialMenuWedgeStyle.BorderWidthPixels);
+                shader.Uniform("hoverScale", RadialMenuWedgeStyle.HoverScale);
+                shader.Uniform("enabledOpacity", RadialMenuWedgeStyle.EnabledOpacity);
+                shader.Uniform("disabledOpacity", RadialMenuWedgeStyle.DisabledOpacity);
+                shader.Uniform("grainStrength", RadialMenuWedgeStyle.DefaultGrainStrength);
+                shader.Uniform("disabledFill", RadialMenuWedgeStyle.DisabledFill);
+                shader.Uniform("enabledFill", RadialMenuWedgeStyle.EnabledFill);
+                shader.Uniform("hoverFill", RadialMenuWedgeStyle.HoverFill);
+                shader.Uniform("selectedFill", RadialMenuWedgeStyle.SelectedFill);
+                shader.Uniform("borderColor", RadialMenuWedgeStyle.Border);
+                shader.Uniform("hoverBorderColor", RadialMenuWedgeStyle.HoverBorder);
                 matrix.Set(capi.Render.CurrentModelviewMatrix).Translate(centerX, centerY, 50).Scale(radiusPixels, radiusPixels, 1);
                 ((IShaderProgram)shader).UniformMatrix("projectionMatrix", capi.Render.CurrentProjectionMatrix);
                 ((IShaderProgram)shader).UniformMatrix("modelViewMatrix", matrix.Values);
@@ -181,9 +200,10 @@ internal sealed class RadialMenuRenderer : IDisposable
     /// <summary>Uploads geometry only when layout or supported screen-space tolerance changes.</summary>
     private void EnsureMesh(RadialMenuLayout layout, double radiusPixels)
     {
-        if (mesh is not null && meshLayout?.HasSameGeometry(layout) == true && radiusPixels <= supportedRadiusPixels) return;
+        double requiredRadiusPixels = radiusPixels * RadialMenuWedgeStyle.HoverScale;
+        if (mesh is not null && meshLayout?.HasSameGeometry(layout) == true && requiredRadiusPixels <= supportedRadiusPixels) return;
         if (mesh is not null) capi.Render.DeleteMesh(mesh);
-        supportedRadiusPixels = radiusPixels;
+        supportedRadiusPixels = requiredRadiusPixels;
         mesh = capi.Render.UploadMesh(RadialMenuMesh.Build(layout, supportedRadiusPixels));
         meshLayout = layout;
         MeshUploadCount++;
@@ -200,7 +220,7 @@ internal sealed class RadialMenuRenderer : IDisposable
             for (int i = 0; i < layout.WedgeIds.Count; i++)
             {
                 RadialMenuEntry entry = interaction.GetEntry(layout.WedgeIds[i]);
-                float scale = interaction.HoveredId == entry.Id ? HoverBumpScale : 1f;
+                float scale = 1f + (RadialMenuWedgeStyle.HoverScale - 1f) * hoverAnimation.VisualProgress(entry.Id);
                 (double x, double y) = layout.GetWedgeCenter(i, centerX, centerY, radiusPixels, midRadius * scale);
                 DrawClippedEntry(entry, i, x, y, radiusPixels * 0.12f * scale, guiShader);
             }

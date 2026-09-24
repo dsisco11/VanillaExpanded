@@ -21,6 +21,20 @@ public sealed class RadialMenuTests
         Assert.Null(layout.HitTest(201, 100, 100, 100, 100));
     }
 
+    /// <summary>Rounded wedge corners and separator gaps remain outside the pointer target.</summary>
+    [Fact]
+    public void RoundedCornersDoNotSelectTheirCutouts()
+    {
+        var layout = new RadialMenuLayout(["north", "east", "south", "west"], "center", 0.2, 0.3, 1,
+            separatorDegrees: 1);
+        double nearCornerAngle = 43.8 * Math.PI / 180d;
+        double nearCornerRadius = 0.31 * 100d;
+        Assert.Null(layout.HitTest(Math.Sin(nearCornerAngle) * nearCornerRadius,
+            -Math.Cos(nearCornerAngle) * nearCornerRadius, 0, 0, 100));
+        Assert.Equal("north", layout.HitTest(0, -45, 0, 0, 100));
+        Assert.Null(layout.HitTest(70, -70, 0, 0, 100));
+    }
+
     /// <summary>Checks counterclockwise layout and transformed icon centers use the same direction as hit testing.</summary>
     [Fact]
     public void CounterclockwiseCentersAgreeWithHitTest()
@@ -106,6 +120,26 @@ public sealed class RadialMenuTests
     }
     #endregion
     #region Interaction
+    /// <summary>Rapid pointer changes continue from current hover progress and discard removed entries.</summary>
+    [Fact]
+    public void HoverAnimationContinuesAndResetsByStableId()
+    {
+        var first = new RadialMenuLayout(["a", "b"], "center", 0.2, 0.3, 1);
+        var next = new RadialMenuLayout(["b", "c"], "center", 0.2, 0.3, 1);
+        var animation = new RadialMenuHoverAnimation();
+        animation.Advance(first, "a", 0.025f);
+        float risingA = animation.VisualProgress("a");
+        Assert.InRange(risingA, 0.15f, 0.16f);
+        animation.Advance(first, "b", 0.01f);
+        Assert.True(animation.VisualProgress("a") < risingA);
+        Assert.True(animation.VisualProgress("b") > 0f);
+        animation.Retain(next);
+        Assert.Equal(0f, animation.VisualProgress("a"));
+        animation.Advance(next, "b", 1f);
+        Assert.Equal(1f, animation.VisualProgress("b"));
+        animation.Reset();
+        Assert.Equal(0f, animation.VisualProgress("b"));
+    }
     /// <summary>Checks disabled content remains present and cannot commit, while enabled selection reports once.</summary>
     [Fact]
     public void DisabledEntryRemainsVisibleAndSelectionReportsOnce()

@@ -169,6 +169,7 @@ internal sealed class RadialMenuDialog : GuiDialog
     public bool Open(RadialMenuLayout nextLayout, IEnumerable<RadialMenuEntry> entries, Action<string> selected, Action cancelled)
     {
         if (IsOpened() || !renderer.IsReady) return false;
+        renderer.ResetInteraction();
         layout = nextLayout ?? throw new ArgumentNullException(nameof(nextLayout));
         renderer.PrepareLayout(layout);
         interaction = new RadialMenuInteraction(layout, entries);

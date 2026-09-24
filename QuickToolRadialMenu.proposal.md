@@ -56,6 +56,8 @@ Use cached wedge geometry with shader-driven appearance. Generate and upload one
 
 Size the wheel to 60% of its previous screen radius, leave a visible angular gap between wedges, and keep the wedges slightly transparent. Scale the hovered outer wedge and its content to 115% for a bump effect while leaving its selection sector stable.
 
+Polish the dark translucent fill with a thin bronze contour around each wedge and small rounded corners. Animate the amber hover color and 115% bump over about 100 ms, applying the same contour and transform to icon clipping while retaining the base pointer sectors. Compare a faint, wedge-anchored grain with the plain fill in game; retain the treatment chosen after visual review and remove its temporary comparison control.
+
 Generate geometry when first needed and reuse it across frames and menu openings while the geometric layout is unchanged. Rebuild when the available wedge count changes, when relative radii/layout change, or when resource recreation is necessary. A different available set with the same count can reuse geometry while replacing entry identifiers and text. Position and uniform scale use transforms. Hover, selection, enabled state, animation, and candidate/icon changes alone do not rebuild or re-upload geometry.
 
 The shader uses supplied entry identifiers and state parameters for colors, highlighting, disabled appearance, animation, and edge effects. Wedge membership comes from the mesh rather than per-fragment angular classification over a full quad. Tessellate arcs to a defined screen-space visual tolerance across supported GUI scales and provide edge data for smooth antialiasing. Retessellation is permitted if scale exceeds cached tolerance or availability changes wedge count.

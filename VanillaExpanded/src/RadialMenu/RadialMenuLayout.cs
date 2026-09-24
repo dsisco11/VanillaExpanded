@@ -78,6 +78,16 @@ public sealed class RadialMenuLayout
         double delta = directed - nearest * StepDegrees;
         if (delta > 180) delta -= 360;
         if (Math.Abs(delta) >= StepDegrees / 2d - SeparatorDegrees) return null;
+        // Apply the same inward-rounded annular contour used by the shader, in screen pixels.
+        double radialInside = Math.Min(radius - InnerRadius, OuterRadius - radius) * radiusPixels;
+        double halfAngle = (StepDegrees / 2d - SeparatorDegrees) * Math.PI / 180d;
+        double angularInside = radius * Math.Sin(halfAngle - Math.Abs(delta) * Math.PI / 180d) * radiusPixels;
+        double corner = Math.Min(RadialMenuWedgeStyle.CornerRadiusPixels,
+            Math.Max(0d, Math.Min((OuterRadius - InnerRadius) * radiusPixels / 2d,
+                radius * Math.Sin(halfAngle) * radiusPixels / 2d)));
+        if (radialInside < corner && angularInside < corner
+            && corner - Math.Sqrt(Math.Pow(corner - radialInside, 2d) + Math.Pow(corner - angularInside, 2d)) <= 0d)
+            return null;
         return WedgeIds[(int)nearest % WedgeIds.Count];
     }
 
