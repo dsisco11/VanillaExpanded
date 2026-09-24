@@ -18,7 +18,7 @@ public sealed class RadialMenuTests
         Assert.Equal("south", layout.HitTest(100, 160, 100, 100, 100));
         Assert.Equal("west", layout.HitTest(40, 100, 100, 100, 100));
         Assert.Null(layout.HitTest(160, 40, 100, 100, 100));
-        Assert.Null(layout.HitTest(201, 100, 100, 100, 100));
+        Assert.Equal("east", layout.HitTest(201, 100, 100, 100, 100));
     }
 
     /// <summary>Rounded wedge corners and separator gaps remain outside the pointer target.</summary>
