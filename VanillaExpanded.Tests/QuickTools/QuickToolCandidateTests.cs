@@ -34,9 +34,24 @@ public sealed class QuickToolCandidateTests
     [Fact]
     public void DynamicToolTags_CreateSelectableLayoutEntries()
     {
-        string[] available = [QuickToolLayout.GetToolId("tool-cleaver"), QuickToolLayout.GetToolId("tool-solderingiron")];
+        string[] available = [QuickToolLayout.GetToolId(["tool-cleaver"]), QuickToolLayout.GetToolId(["tool-solderingiron"])];
 
         Assert.Equal(available, QuickToolLayout.CreateLayout(available).WedgeIds);
+    }
+
+    /// <summary>Keeps a multi-category tool group distinct from a group containing only a subset of its tags.</summary>
+    [Fact]
+    public void ToolTagGroups_DistinguishSubsetAndMultiCategoryTools()
+    {
+        string pickaxe = QuickToolLayout.GetToolId(["tool-pickaxe"]);
+        string prospectingPick = QuickToolLayout.GetToolId(["tool-prospectingpick", "tool-pickaxe"]);
+
+        var layout = QuickToolLayout.CreateLayout([pickaxe, prospectingPick]);
+
+        Assert.NotEqual(pickaxe, prospectingPick);
+        Assert.Equal("tool:pickaxe", pickaxe);
+        Assert.Equal("tool:pickaxe+prospectingpick", prospectingPick);
+        Assert.Equal([pickaxe, prospectingPick], layout.WedgeIds);
     }
     #endregion
 

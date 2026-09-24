@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
@@ -12,6 +14,8 @@ public sealed class ToolCandidateProvider : IQuickToolCandidateProvider
     private readonly Action<string>? diagnostic;
     private readonly TagSet categoryTags;
     private readonly bool hasCategoryTags;
+    private readonly HashSet<string>? toolTags;
+    private readonly ITagRegistry<TagSet>? tagRegistry;
 
     /// <summary>Gets the fixed category identifier.</summary>
     public string EntryId { get; }
@@ -26,13 +30,14 @@ public sealed class ToolCandidateProvider : IQuickToolCandidateProvider
             ["tool", $"tool-{category.ToString().ToLowerInvariant()}"]) == TagRegistryError.None;
     }
 
-    /// <summary>Creates a provider for one discovered tool tag without requiring an EnumTool value.</summary>
-    public ToolCandidateProvider(string toolTag, Action<string>? diagnostic = null, ITagRegistry<TagSet>? tagRegistry = null)
+    /// <summary>Creates a provider for one complete discovered tool-tag group without requiring an EnumTool value.</summary>
+    public ToolCandidateProvider(IReadOnlyCollection<string> toolTags, Action<string>? diagnostic = null, ITagRegistry<TagSet>? tagRegistry = null)
     {
-        if (!QuickToolLayout.TryGetToolTag(toolTag, out string normalizedTag)) throw new ArgumentOutOfRangeException(nameof(toolTag));
+        EntryId = QuickToolLayout.GetToolId(toolTags);
         this.diagnostic = diagnostic;
-        EntryId = QuickToolLayout.GetToolId(normalizedTag);
-        hasCategoryTags = tagRegistry?.TryCreateTagSet(out categoryTags, ["tool", normalizedTag]) == TagRegistryError.None;
+        this.tagRegistry = tagRegistry;
+        this.toolTags = [.. toolTags];
+        hasCategoryTags = tagRegistry?.TryCreateTagSet(out categoryTags, ["tool", .. this.toolTags]) == TagRegistryError.None;
     }
 
     #region Selection
@@ -76,9 +81,16 @@ public sealed class ToolCandidateProvider : IQuickToolCandidateProvider
         }
     }
 
-    /// <summary>Accepts matching tool tags first, retaining legacy metadata as a fallback for untagged definitions.</summary>
+    /// <summary>Matches only the exact discovered tool-tag group, retaining legacy metadata for registry-less fixtures.</summary>
     private bool MatchesCategory(CollectibleObject collectible, ItemStack stack, ItemSlot slot)
-        => hasCategoryTags && categoryTags.IsFullyContainedIn(collectible.GetTags(stack))
-            || category is EnumTool legacyCategory && collectible.GetTool(slot) == legacyCategory;
+    {
+        if (hasCategoryTags && toolTags is not null && tagRegistry is not null)
+        {
+            var actual = new HashSet<string>(tagRegistry.SlowEnumerateTagNames(collectible.GetTags(stack))
+                .Where(name => QuickToolLayout.TryGetToolTag(name, out _)), StringComparer.Ordinal);
+            return actual.SetEquals(toolTags);
+        }
+        return category is EnumTool legacyCategory && collectible.GetTool(slot) == legacyCategory;
+    }
     #endregion
 }

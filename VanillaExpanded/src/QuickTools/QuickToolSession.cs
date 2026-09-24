@@ -110,7 +110,7 @@ internal sealed class QuickToolSession
             if (max > 0 && stack.Collectible.GetRemainingDurability(stack) <= 0) return false;
             if (entryId is null) return true;
             if (entryId == QuickToolLayout.LightId) return Lighting.LightSourceSelection.IsLightSource(stack.Collectible);
-            return QuickToolLayout.TryGetToolTagFromId(entryId, out _)
+            return QuickToolLayout.TryGetToolTagsFromId(entryId, out _)
                 || QuickToolLayout.TryGetTool(entryId, out EnumTool category) && stack.Collectible.GetTool(slot) == category;
         }
         catch (Exception) { return false; }

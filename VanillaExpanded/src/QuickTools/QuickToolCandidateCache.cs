@@ -232,7 +232,7 @@ public sealed class QuickToolCandidateCache : IDisposable
     private void DiscoverProviders()
     {
         providers.Clear();
-        var toolTags = new SortedSet<string>(StringComparer.Ordinal);
+        var toolGroups = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
         var fixtureCategories = new SortedSet<EnumTool>();
         foreach (IInventory? inventory in new[] { hotbar, backpack })
         {
@@ -242,12 +242,12 @@ public sealed class QuickToolCandidateCache : IDisposable
             {
                 ItemSlot? slot = inventory[i];
                 if (slot is null || slot.Empty || (isBackpack ? slot is not ItemSlotBagContent : slot.GetType() != typeof(ItemSlotSurvival))) continue;
-                try { DiscoverSlot(slot, toolTags, fixtureCategories); }
+                try { DiscoverSlot(slot, toolGroups, fixtureCategories); }
                 catch (Exception exception) { diagnostic?.Invoke($"Unable to classify slot {i}: {exception.Message}"); }
             }
         }
         providers.Add(new LightCandidateProvider());
-        foreach (string tag in toolTags) providers.Add(new ToolCandidateProvider(tag, diagnostic, tagRegistry));
+        foreach (string[] tags in toolGroups.Values) providers.Add(new ToolCandidateProvider(tags, diagnostic, tagRegistry));
         // The production integration always supplies CollectibleTagRegistry. Existing isolated fixtures have no registry.
         if (tagRegistry is null)
             foreach (EnumTool category in fixtureCategories)
@@ -255,7 +255,7 @@ public sealed class QuickToolCandidateCache : IDisposable
     }
 
     /// <summary>Collects concrete tool categories only from an item's resolved collectible tags.</summary>
-    private void DiscoverSlot(ItemSlot slot, ISet<string> toolTags, ISet<EnumTool> fixtureCategories)
+    private void DiscoverSlot(ItemSlot slot, IDictionary<string, string[]> toolGroups, ISet<EnumTool> fixtureCategories)
     {
         ItemStack? stack = slot.Itemstack;
         CollectibleObject? collectible = stack?.Collectible;
@@ -268,7 +268,8 @@ public sealed class QuickToolCandidateCache : IDisposable
         }
         string[] names = [.. tagRegistry.SlowEnumerateTagNames(tags)];
         if (!names.Contains("tool", StringComparer.Ordinal)) return;
-        foreach (string name in names) if (QuickToolLayout.TryGetToolTag(name, out string toolTag)) toolTags.Add(toolTag);
+        string[] toolTags = names.Where(name => QuickToolLayout.TryGetToolTag(name, out _)).Order(StringComparer.Ordinal).ToArray();
+        if (toolTags.Length > 0) toolGroups.TryAdd(QuickToolLayout.GetToolId(toolTags), toolTags);
     }
     #region Topology helpers
     /// <summary>Captures slot object identity separately from inventory object identity.</summary>

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using VanillaExpanded.RadialMenu;
 using Vintagestory.API.Common;
 
@@ -32,8 +33,15 @@ public static class QuickToolLayout
     /// <summary>Gets supported identifiers in their clockwise menu order.</summary>
     public static IReadOnlyList<string> WedgeIds => Ids;
 
-    /// <summary>Builds a stable entry identifier directly from a discovered tool category tag.</summary>
-    public static string GetToolId(string toolTag) => "tool:" + toolTag[5..];
+    /// <summary>Builds a stable entry identifier from a complete normalized set of discovered tool category tags.</summary>
+    public static string GetToolId(IReadOnlyCollection<string> toolTags)
+    {
+        ArgumentNullException.ThrowIfNull(toolTags);
+        string[] normalized = toolTags.Select(tag => TryGetToolTag(tag, out string value) ? value : throw new ArgumentOutOfRangeException(nameof(toolTags)))
+            .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+        if (normalized.Length == 0) throw new ArgumentException("Expected at least one concrete tool tag.", nameof(toolTags));
+        return "tool:" + string.Join('+', normalized.Select(tag => tag[5..]));
+    }
 
     /// <summary>Checks whether a tag names one concrete tool category rather than the generic tool tag.</summary>
     public static bool TryGetToolTag(string toolTag, out string normalizedTag)
@@ -44,9 +52,19 @@ public static class QuickToolLayout
         return true;
     }
 
-    /// <summary>Resolves a dynamic entry identifier back to its originating category tag.</summary>
-    public static bool TryGetToolTagFromId(string id, out string toolTag)
-        => TryGetToolTag(id is not null && id.StartsWith("tool:", StringComparison.Ordinal) ? "tool-" + id[5..] : string.Empty, out toolTag);
+    /// <summary>Resolves a dynamic entry identifier back to its complete tool category tag set.</summary>
+    public static bool TryGetToolTagsFromId(string id, out string[] toolTags)
+    {
+        toolTags = [];
+        if (id is null || !id.StartsWith("tool:", StringComparison.Ordinal)) return false;
+        string[] values = id[5..].Split('+', StringSplitOptions.RemoveEmptyEntries);
+        if (values.Length == 0) return false;
+        var normalized = new SortedSet<string>(StringComparer.Ordinal);
+        foreach (string value in values)
+            if (!TryGetToolTag("tool-" + value, out string toolTag) || !normalized.Add(toolTag)) return false;
+        toolTags = [.. normalized];
+        return true;
+    }
 
     /// <summary>Creates geometry for the currently available identifiers in canonical order.</summary>
     public static RadialMenuLayout CreateLayout(IReadOnlyList<string> availableIds)

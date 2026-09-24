@@ -206,7 +206,7 @@ internal sealed class QuickToolEquipment
     {
         if (id == QuickToolLayout.LightId) return new LightCandidateProvider();
         if (tagRegistry is null && QuickToolLayout.TryGetTool(id, out EnumTool category)) return new ToolCandidateProvider(category);
-        return QuickToolLayout.TryGetToolTagFromId(id, out string toolTag) ? new ToolCandidateProvider(toolTag, tagRegistry: tagRegistry) : null;
+        return QuickToolLayout.TryGetToolTagsFromId(id, out string[] toolTags) ? new ToolCandidateProvider(toolTags, tagRegistry: tagRegistry) : null;
     }
     #endregion
 }
