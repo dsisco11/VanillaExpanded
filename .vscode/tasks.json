@@ -2,7 +2,8 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "build",
+            "label": "Build (dotnet)",
+            "group": "build",
             "command": "dotnet",
             "type": "process",
             "args": [
@@ -14,7 +15,8 @@
             "problemMatcher": "$msCompile"
         },
         {
-            "label": "package",
+            "label": "Package",
+            "group": "build",
             "command": "dotnet",
             "type": "process",
             "args": [
@@ -25,7 +27,8 @@
             "problemMatcher": "$msCompile"
         },
         {
-            "label": "build (Cake)",
+            "label": "Build (Cake)",
+            "group": "build",
             "command": "dotnet",
             "type": "process",
             "args": [
@@ -35,6 +38,20 @@
                 "${workspaceFolder}/CakeBuild/CakeBuild.csproj"
             ],
             "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "Install development mod",
+            "type": "shell",
+            "group": "build",
+            "dependsOn": "Package",
+            "dependsOrder": "sequence",
+            "command": "$modsDirectory = Join-Path $env:APPDATA 'VintagestoryData\\Mods'; New-Item -ItemType Directory -Force -Path $modsDirectory | Out-Null; $archive = Get-ChildItem -Path '${workspaceFolder}/Releases' -Filter 'vanillaexpanded_*.zip' -File | Select-Object -First 1; if ($null -eq $archive) { throw 'CakeBuild did not produce a VanillaExpanded archive.' }; Copy-Item -LiteralPath $archive.FullName -Destination $modsDirectory -Force; Write-Host \"Installed $($archive.Name) to $modsDirectory\""
+        },
+        {
+            "label": "Uninstall development mod",
+            "type": "shell",
+            "group": "build",
+            "command": "$archivePath = Join-Path $env:APPDATA 'VintagestoryData\\Mods\\vanillaexpanded_999.99.9.zip'; Remove-Item -LiteralPath $archivePath -Force -ErrorAction SilentlyContinue; Write-Host \"Uninstalled development mod from $archivePath\""
         }
     ]
 }
