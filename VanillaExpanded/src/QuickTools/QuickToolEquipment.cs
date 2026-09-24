@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Vintagestory.API.Common;
+using Vintagestory.API.Datastructures;
 
 namespace VanillaExpanded.QuickTools;
 
@@ -11,16 +12,19 @@ internal sealed class QuickToolEquipment
     private readonly ItemSlot physicalOffhand;
     private readonly QuickToolInventoryView view;
     private readonly Action<object> send;
+    private readonly ITagRegistry<TagSet>? tagRegistry;
     private QuickToolSession? session;
     private bool operationActive;
     private long lifetimeVersion;
 
     /// <summary>Creates an equipment owner using the game's client inventory-packet sender.</summary>
-    internal QuickToolEquipment(IPlayerInventoryManager manager, ItemSlot physicalOffhand, Action<object> send, bool allowGenericFixture = false)
+    internal QuickToolEquipment(IPlayerInventoryManager manager, ItemSlot physicalOffhand, Action<object> send,
+        bool allowGenericFixture = false, ITagRegistry<TagSet>? tagRegistry = null)
     {
         this.manager = manager;
         this.physicalOffhand = physicalOffhand;
         this.send = send;
+        this.tagRegistry = tagRegistry;
         view = new QuickToolInventoryView(manager, allowGenericFixture);
     }
 
@@ -198,10 +202,11 @@ internal sealed class QuickToolEquipment
     }
 
     /// <summary>Dispatches only stable identifiers in the supported client provider set.</summary>
-    private static IQuickToolCandidateProvider? ResolveProvider(string id)
+    private IQuickToolCandidateProvider? ResolveProvider(string id)
     {
         if (id == QuickToolLayout.LightId) return new LightCandidateProvider();
-        return QuickToolLayout.TryGetTool(id, out EnumTool category) ? new ToolCandidateProvider(category) : null;
+        if (tagRegistry is null && QuickToolLayout.TryGetTool(id, out EnumTool category)) return new ToolCandidateProvider(category);
+        return QuickToolLayout.TryGetToolTagFromId(id, out string toolTag) ? new ToolCandidateProvider(toolTag, tagRegistry: tagRegistry) : null;
     }
     #endregion
 }

@@ -23,7 +23,7 @@ internal sealed class QuickToolClientIntegration : IRenderer
     {
         this.api = api;
         contextAvailable = api.PlayerReadyFired;
-        cache = new QuickToolCandidateCache(ScheduleRefresh, message => api.Logger.Warning(message));
+        cache = new QuickToolCandidateCache(ScheduleRefresh, message => api.Logger.Warning(message), api.CollectibleTagRegistry);
         controller = new QuickToolMenuController(equipment, cache, api.ModLoader.GetModSystem<RadialMenuSystem>(),
             api.Event, IsReady,
             () => (api.World.Player?.InventoryManager, api.World.Player?.Entity?.LeftHandItemSlot),

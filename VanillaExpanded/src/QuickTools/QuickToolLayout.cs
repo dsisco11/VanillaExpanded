@@ -32,15 +32,30 @@ public static class QuickToolLayout
     /// <summary>Gets supported identifiers in their clockwise menu order.</summary>
     public static IReadOnlyList<string> WedgeIds => Ids;
 
+    /// <summary>Builds a stable entry identifier directly from a discovered tool category tag.</summary>
+    public static string GetToolId(string toolTag) => "tool:" + toolTag[5..];
+
+    /// <summary>Checks whether a tag names one concrete tool category rather than the generic tool tag.</summary>
+    public static bool TryGetToolTag(string toolTag, out string normalizedTag)
+    {
+        normalizedTag = string.Empty;
+        if (string.IsNullOrWhiteSpace(toolTag) || !toolTag.StartsWith("tool-", StringComparison.Ordinal) || toolTag.Length == 5) return false;
+        normalizedTag = toolTag.ToLowerInvariant();
+        return true;
+    }
+
+    /// <summary>Resolves a dynamic entry identifier back to its originating category tag.</summary>
+    public static bool TryGetToolTagFromId(string id, out string toolTag)
+        => TryGetToolTag(id is not null && id.StartsWith("tool:", StringComparison.Ordinal) ? "tool-" + id[5..] : string.Empty, out toolTag);
+
     /// <summary>Creates geometry for the currently available identifiers in canonical order.</summary>
     public static RadialMenuLayout CreateLayout(IReadOnlyList<string> availableIds)
     {
         ArgumentNullException.ThrowIfNull(availableIds);
-        var supported = new HashSet<string>(Ids, StringComparer.Ordinal);
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (string id in availableIds)
         {
-            if (!supported.Contains(id) || !seen.Add(id)) throw new ArgumentException("Expected distinct supported identifiers.", nameof(availableIds));
+            if (string.IsNullOrWhiteSpace(id) || !seen.Add(id)) throw new ArgumentException("Expected distinct nonempty identifiers.", nameof(availableIds));
         }
         return new RadialMenuLayout(availableIds, RestoreId, 0.24, 0.30, 1, 0, true, separatorDegrees: 1.5);
     }

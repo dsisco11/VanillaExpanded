@@ -29,6 +29,15 @@ public sealed class QuickToolCandidateTests
         Assert.Equal("unequip", QuickToolLayout.CreateLayout([]).CenterId);
         Assert.Null(QuickToolLayout.GetToolId((EnumTool)500));
     }
+
+    /// <summary>Accepts dynamically discovered concrete tool tags outside the legacy EnumTool catalog.</summary>
+    [Fact]
+    public void DynamicToolTags_CreateSelectableLayoutEntries()
+    {
+        string[] available = [QuickToolLayout.GetToolId("tool-cleaver"), QuickToolLayout.GetToolId("tool-solderingiron")];
+
+        Assert.Equal(available, QuickToolLayout.CreateLayout(available).WedgeIds);
+    }
     #endregion
 
     #region Ranking
@@ -224,9 +233,9 @@ public sealed class QuickToolCandidateTests
         cache.RefreshPending();
         Assert.False(cache.IsDirty);
     }
-    /// <summary>Unknown numeric metadata remains unsupported and produces one diagnostic.</summary>
+    /// <summary>Untagged numeric metadata does not create a quick-tool entry.</summary>
     [Fact]
-    public void Cache_ReportsUnknownCategoryWithoutAddingWedge()
+    public void Cache_IgnoresUntaggedNumericCategory()
     {
         var f = new Fixture();
         f.Put(f.Hotbar[1], 1, (EnumTool)500, 5, 1);
@@ -234,7 +243,7 @@ public sealed class QuickToolCandidateTests
         using var cache = new QuickToolCandidateCache(diagnostic: diagnostics.Add);
         cache.Bind(f.Manager.Object, f.Offhand);
         Assert.Null(cache.GetCached("tool:500"));
-        Assert.Single(diagnostics, message => message.Contains("500"));
+        Assert.Empty(diagnostics);
         Assert.Single(cache.CreateEntries(false));
     }
 

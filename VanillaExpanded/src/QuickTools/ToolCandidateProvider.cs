@@ -1,14 +1,39 @@
 using System;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
+using Vintagestory.API.Datastructures;
 
 namespace VanillaExpanded.QuickTools;
 
 /// <summary>Finds the highest-tier, most worn usable tool in one supported category.</summary>
-public sealed class ToolCandidateProvider(EnumTool category, Action<string>? diagnostic = null) : IQuickToolCandidateProvider
+public sealed class ToolCandidateProvider : IQuickToolCandidateProvider
 {
+    private readonly EnumTool? category;
+    private readonly Action<string>? diagnostic;
+    private readonly TagSet categoryTags;
+    private readonly bool hasCategoryTags;
+
     /// <summary>Gets the fixed category identifier.</summary>
-    public string EntryId { get; } = QuickToolLayout.GetToolId(category) ?? throw new ArgumentOutOfRangeException(nameof(category));
+    public string EntryId { get; }
+
+    /// <summary>Creates a provider for one supported category, optionally recognizing matching collectible tags.</summary>
+    public ToolCandidateProvider(EnumTool category, Action<string>? diagnostic = null, ITagRegistry<TagSet>? tagRegistry = null)
+    {
+        this.category = category;
+        this.diagnostic = diagnostic;
+        EntryId = QuickToolLayout.GetToolId(category) ?? throw new ArgumentOutOfRangeException(nameof(category));
+        hasCategoryTags = tagRegistry?.TryCreateTagSet(out categoryTags,
+            ["tool", $"tool-{category.ToString().ToLowerInvariant()}"]) == TagRegistryError.None;
+    }
+
+    /// <summary>Creates a provider for one discovered tool tag without requiring an EnumTool value.</summary>
+    public ToolCandidateProvider(string toolTag, Action<string>? diagnostic = null, ITagRegistry<TagSet>? tagRegistry = null)
+    {
+        if (!QuickToolLayout.TryGetToolTag(toolTag, out string normalizedTag)) throw new ArgumentOutOfRangeException(nameof(toolTag));
+        this.diagnostic = diagnostic;
+        EntryId = QuickToolLayout.GetToolId(normalizedTag);
+        hasCategoryTags = tagRegistry?.TryCreateTagSet(out categoryTags, ["tool", normalizedTag]) == TagRegistryError.None;
+    }
 
     #region Selection
     /// <summary>Scans only supported player-owned ordinary hotbar and bag-content slots.</summary>
@@ -34,7 +59,7 @@ public sealed class ToolCandidateProvider(EnumTool category, Action<string>? dia
             {
                 ItemStack? stack = slot.Itemstack;
                 if (stack?.Collectible is not CollectibleObject collectible) continue;
-                if (collectible.GetTool(slot) != category) continue;
+                if (!MatchesCategory(collectible, stack, slot)) continue;
                 int tier = collectible.GetToolTier(slot);
                 int maxDurability = collectible.GetMaxDurability(stack);
                 int remaining = maxDurability <= 0 ? int.MaxValue : collectible.GetRemainingDurability(stack);
@@ -50,5 +75,10 @@ public sealed class ToolCandidateProvider(EnumTool category, Action<string>? dia
             }
         }
     }
+
+    /// <summary>Accepts matching tool tags first, retaining legacy metadata as a fallback for untagged definitions.</summary>
+    private bool MatchesCategory(CollectibleObject collectible, ItemStack stack, ItemSlot slot)
+        => hasCategoryTags && categoryTags.IsFullyContainedIn(collectible.GetTags(stack))
+            || category is EnumTool legacyCategory && collectible.GetTool(slot) == legacyCategory;
     #endregion
 }

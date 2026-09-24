@@ -5,16 +5,18 @@ using VanillaExpanded.RadialMenu;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
+using Vintagestory.API.Datastructures;
 
 namespace VanillaExpanded.QuickTools;
 
 /// <summary>Observes eligible inventories and caches one current winner for every fixed entry.</summary>
 public sealed class QuickToolCandidateCache : IDisposable
 {
-    private readonly IReadOnlyList<IQuickToolCandidateProvider> providers;
+    private readonly List<IQuickToolCandidateProvider> providers = [];
     private readonly Dictionary<string, QuickToolCandidate?> winners = new(StringComparer.Ordinal);
     private readonly Action? scheduleRefresh;
     private readonly Action<string>? diagnostic;
+    private readonly ITagRegistry<TagSet>? tagRegistry;
     private IPlayerInventoryManager? manager;
     private IClientEventAPI? activeSlotEvents;
     private ItemSlot? offhand;
@@ -27,13 +29,12 @@ public sealed class QuickToolCandidateCache : IDisposable
     private bool disposed;
 
     /// <summary>Creates the fixed providers; a scheduler can enqueue one deferred refresh per dirty burst.</summary>
-    public QuickToolCandidateCache(Action? scheduleRefresh = null, Action<string>? diagnostic = null)
+    public QuickToolCandidateCache(Action? scheduleRefresh = null, Action<string>? diagnostic = null,
+        ITagRegistry<TagSet>? tagRegistry = null)
     {
-        providers = QuickToolLayout.WedgeIds.Select(id => id == QuickToolLayout.LightId
-            ? (IQuickToolCandidateProvider)new LightCandidateProvider()
-            : new ToolCandidateProvider(Enum.Parse<EnumTool>(id.AsSpan(5)), diagnostic)).ToArray();
         this.scheduleRefresh = scheduleRefresh;
         this.diagnostic = diagnostic;
+        this.tagRegistry = tagRegistry;
     }
 
     /// <summary>Signals that a complete candidate snapshot is ready for visible entry updates.</summary>
@@ -168,7 +169,7 @@ public sealed class QuickToolCandidateCache : IDisposable
         ReconcileTopology();
         if (!dirty) { scheduled = false; return; }
         // Publish one complete snapshot after all provider resolutions, never halfway through a callback.
-        ReportUnsupportedCategories();
+        DiscoverProviders();
         var next = new Dictionary<string, QuickToolCandidate?>(StringComparer.Ordinal);
         ItemSlot? activeHand = manager.ActiveHotbarSlot;
         foreach (IQuickToolCandidateProvider provider in providers) next[provider.EntryId] = provider.Resolve(manager, offhand, activeHand);
@@ -182,6 +183,9 @@ public sealed class QuickToolCandidateCache : IDisposable
 
     /// <summary>Gets the last refreshed winner for a fixed entry.</summary>
     public QuickToolCandidate? GetCached(string entryId) => winners.TryGetValue(entryId, out QuickToolCandidate? candidate) ? candidate : null;
+
+    /// <summary>Gets live available-entry ordering from the most recent inventory scan.</summary>
+    public IReadOnlyList<string> EntryIds => providers.Select(provider => provider.EntryId).ToArray();
 
     /// <summary>Rechecks the displayed candidate and current owned hand before equipment movement.</summary>
     public bool Revalidate(string entryId, QuickToolCandidate displayed, ItemSlot expectedHand, out QuickToolCandidate? current)
@@ -205,8 +209,8 @@ public sealed class QuickToolCandidateCache : IDisposable
     public IReadOnlyList<RadialMenuEntry> CreateEntries(bool canRestore)
     {
         RefreshPending();
-        var entries = new List<RadialMenuEntry>(QuickToolLayout.WedgeIds.Count + 1);
-        foreach (string id in QuickToolLayout.WedgeIds)
+        var entries = new List<RadialMenuEntry>(providers.Count + 1);
+        foreach (string id in EntryIds)
         {
             QuickToolCandidate? candidate = GetCached(id);
             if (candidate is not null)
@@ -224,11 +228,12 @@ public sealed class QuickToolCandidateCache : IDisposable
     public bool IsDirty => dirty;
     #endregion
 
-    /// <summary>Reports unsupported enum values once per refresh without inventing a wedge for them.</summary>
-    private void ReportUnsupportedCategories()
+    /// <summary>Builds providers from every concrete tool tag currently present in eligible owned slots.</summary>
+    private void DiscoverProviders()
     {
-        if (diagnostic is null) return;
-        var reported = new HashSet<EnumTool>();
+        providers.Clear();
+        var toolTags = new SortedSet<string>(StringComparer.Ordinal);
+        var fixtureCategories = new SortedSet<EnumTool>();
         foreach (IInventory? inventory in new[] { hotbar, backpack })
         {
             if (inventory is null) continue;
@@ -237,18 +242,33 @@ public sealed class QuickToolCandidateCache : IDisposable
             {
                 ItemSlot? slot = inventory[i];
                 if (slot is null || slot.Empty || (isBackpack ? slot is not ItemSlotBagContent : slot.GetType() != typeof(ItemSlotSurvival))) continue;
-                try
-                {
-                    EnumTool? category = slot.Itemstack?.Collectible?.GetTool(slot);
-                    if (category is EnumTool value && QuickToolLayout.GetToolId(value) is null && reported.Add(value))
-                        diagnostic($"Unsupported tool category {value} ({(int)value}).");
-                }
-                catch (Exception exception)
-                {
-                    diagnostic($"Unable to classify slot {i}: {exception.Message}");
-                }
+                try { DiscoverSlot(slot, toolTags, fixtureCategories); }
+                catch (Exception exception) { diagnostic?.Invoke($"Unable to classify slot {i}: {exception.Message}"); }
             }
         }
+        providers.Add(new LightCandidateProvider());
+        foreach (string tag in toolTags) providers.Add(new ToolCandidateProvider(tag, diagnostic, tagRegistry));
+        // The production integration always supplies CollectibleTagRegistry. Existing isolated fixtures have no registry.
+        if (tagRegistry is null)
+            foreach (EnumTool category in fixtureCategories)
+                if (QuickToolLayout.GetToolId(category) is not null) providers.Add(new ToolCandidateProvider(category, diagnostic));
+    }
+
+    /// <summary>Collects concrete tool categories only from an item's resolved collectible tags.</summary>
+    private void DiscoverSlot(ItemSlot slot, ISet<string> toolTags, ISet<EnumTool> fixtureCategories)
+    {
+        ItemStack? stack = slot.Itemstack;
+        CollectibleObject? collectible = stack?.Collectible;
+        if (stack is null || collectible is null) return;
+        TagSet tags = collectible.GetTags(stack);
+        if (tagRegistry is null)
+        {
+            if (collectible.GetTool(slot) is EnumTool category) fixtureCategories.Add(category);
+            return;
+        }
+        string[] names = [.. tagRegistry.SlowEnumerateTagNames(tags)];
+        if (!names.Contains("tool", StringComparer.Ordinal)) return;
+        foreach (string name in names) if (QuickToolLayout.TryGetToolTag(name, out string toolTag)) toolTags.Add(toolTag);
     }
     #region Topology helpers
     /// <summary>Captures slot object identity separately from inventory object identity.</summary>

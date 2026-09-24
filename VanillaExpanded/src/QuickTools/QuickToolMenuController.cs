@@ -164,10 +164,10 @@ internal sealed class QuickToolMenuController : IDisposable
     /// <summary>Builds one wedge per available item and remembers the candidates visible under those wedges.</summary>
     private IReadOnlyList<RadialMenuEntry> SnapshotEntries()
     {
-        var entries = new List<RadialMenuEntry>(QuickToolLayout.WedgeIds.Count + 1);
-        var availableIds = new List<string>(QuickToolLayout.WedgeIds.Count);
+        var entries = new List<RadialMenuEntry>(cache.EntryIds.Count + 1);
+        var availableIds = new List<string>(cache.EntryIds.Count);
         displayed.Clear();
-        foreach (string id in QuickToolLayout.WedgeIds)
+        foreach (string id in cache.EntryIds)
         {
             QuickToolCandidate? candidate = cache.GetCached(id);
             if (candidate is null) continue;

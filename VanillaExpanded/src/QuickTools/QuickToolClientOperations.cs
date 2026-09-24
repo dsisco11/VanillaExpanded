@@ -1,6 +1,7 @@
 using System;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Datastructures;
 
 namespace VanillaExpanded.QuickTools;
 
@@ -12,6 +13,7 @@ internal sealed class QuickToolClientOperations : IDisposable
     private readonly Func<(IPlayerInventoryManager? Manager, ItemSlot? Offhand)> currentPlayer;
     private readonly Action<object> send;
     private readonly bool allowGenericFixture;
+    private readonly ITagRegistry<TagSet>? tagRegistry;
     private readonly long tickId;
     private IPlayerInventoryManager? manager;
     private ItemSlot? offhand;
@@ -25,20 +27,21 @@ internal sealed class QuickToolClientOperations : IDisposable
             () => VanillaExpandedModSystem.Config.EnableQuickTools && api.PlayerReadyFired
                 && api.World.Player?.Entity?.Alive == true,
             () => (api.World.Player?.InventoryManager, api.World.Player?.Entity?.LeftHandItemSlot),
-            api.Network.SendPacketClient)
+            api.Network.SendPacketClient, tagRegistry: api.CollectibleTagRegistry)
     {
     }
 
     /// <summary>Accepts narrow client context and event seams for installed-slot verification.</summary>
     internal QuickToolClientOperations(IClientEventAPI events, Func<bool> ready,
         Func<(IPlayerInventoryManager? Manager, ItemSlot? Offhand)> currentPlayer,
-        Action<object> send, bool allowGenericFixture = false)
+        Action<object> send, bool allowGenericFixture = false, ITagRegistry<TagSet>? tagRegistry = null)
     {
         this.events = events;
         this.ready = ready;
         this.currentPlayer = currentPlayer;
         this.send = send;
         this.allowGenericFixture = allowGenericFixture;
+        this.tagRegistry = tagRegistry;
         events.AfterActiveSlotChanged += OnActiveSlotChanged;
         events.LeaveWorld += OnLeaveWorld;
         tickId = events.RegisterGameTickListener(OnTick, 500);
@@ -102,7 +105,7 @@ internal sealed class QuickToolClientOperations : IDisposable
             equipment?.Clear();
             manager = nextManager;
             offhand = nextOffhand;
-            equipment = new QuickToolEquipment(manager, offhand, send, allowGenericFixture);
+            equipment = new QuickToolEquipment(manager, offhand, send, allowGenericFixture, tagRegistry);
         }
         return equipment is not null;
     }
