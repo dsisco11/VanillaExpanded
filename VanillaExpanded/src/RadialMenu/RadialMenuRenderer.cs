@@ -12,6 +12,7 @@ internal sealed class RadialMenuRenderer : IDisposable
 {
     #region Resources
     private const string ShaderName = "radial_menu";
+    private const float CenterLabelInsetPixels = 8f;
     private readonly ICoreClientAPI capi;
     private readonly RadialMenuHoverAnimation hoverAnimation = new();
     private readonly Matrixf matrix = new();
@@ -235,7 +236,7 @@ internal sealed class RadialMenuRenderer : IDisposable
                 : center;
             center.Icon?.Render(capi, centerX, centerY, radiusPixels * 0.2f, center.Enabled);
             DrawLabel(center.Id, centerLabel.Label, centerX, centerY,
-                (int)Math.Max(1, radiusPixels * layout.CenterRadius * 1.6f));
+                (int)Math.Max(1, radiusPixels * layout.CenterRadius * 2f - CenterLabelInsetPixels));
         }
         finally
         {
