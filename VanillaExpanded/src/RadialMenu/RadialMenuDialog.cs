@@ -78,6 +78,11 @@ internal sealed class RadialMenuDialog : GuiDialog
     {
         if (!IsOpened()) return;
         args.Handled = true;
+        if (args.Button == EnumMouseButton.Right)
+        {
+            Cancel();
+            return;
+        }
         if (args.Button != EnumMouseButton.Left || interaction?.IsOpen != true || layout is null) return;
         if (Vintagestory.Client.ScreenManager.Platform?.IsFocused != true)
         {
