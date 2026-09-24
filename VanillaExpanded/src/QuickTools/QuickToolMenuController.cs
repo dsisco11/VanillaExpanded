@@ -18,6 +18,7 @@ internal sealed class QuickToolMenuController : IDisposable
     private readonly System.Func<QuickToolBinding> currentBinding;
     private readonly System.Func<int, bool> down;
     private readonly System.Func<bool> focused;
+    private readonly System.Func<bool> selectOnRelease;
     private readonly System.Func<string, string> text;
     private readonly Action<string> feedback;
     private readonly System.Func<object?> playerIdentity;
@@ -28,6 +29,7 @@ internal sealed class QuickToolMenuController : IDisposable
     private object? boundPlayerIdentity;
     private QuickToolBinding openingBinding;
     private bool restoreAvailable;
+    private bool selectingOnRelease;
     private bool disposed;
 
     /// <summary>Accepts domain owners and narrow host seams without requiring a game player proxy.</summary>
@@ -35,7 +37,8 @@ internal sealed class QuickToolMenuController : IDisposable
         IRadialMenu menu, IClientEventAPI events, System.Func<bool> ready,
         System.Func<(IPlayerInventoryManager? Manager, ItemSlot? Offhand)> currentPlayer,
         System.Func<QuickToolBinding> currentBinding, System.Func<int, bool> down, System.Func<bool> focused,
-        System.Func<string, string> text, Action<string> feedback, System.Func<object?>? playerIdentity = null)
+        System.Func<bool> selectOnRelease, System.Func<string, string> text, Action<string> feedback,
+        System.Func<object?>? playerIdentity = null)
     {
         this.equipment = equipment;
         this.cache = cache;
@@ -46,6 +49,7 @@ internal sealed class QuickToolMenuController : IDisposable
         this.currentBinding = currentBinding;
         this.down = down;
         this.focused = focused;
+        this.selectOnRelease = selectOnRelease;
         this.text = text;
         this.feedback = feedback;
         this.playerIdentity = playerIdentity ?? (() => currentPlayer().Manager);
@@ -101,7 +105,15 @@ internal sealed class QuickToolMenuController : IDisposable
             return;
         }
         if (State == QuickToolMenuState.OpenHeld && (binding != openingBinding || !openingBinding.IsHeld(IsDown)))
+        {
+            if (binding == openingBinding && selectOnRelease())
+            {
+                selectingOnRelease = true;
+                try { menu.SelectHovered(); }
+                finally { selectingOnRelease = false; }
+            }
             CancelMenu();
+        }
         // Rebinding and modifier release cannot turn a still-held activation key into a new press.
         if (State == QuickToolMenuState.ClosedAwaitRelease
             && !openingBinding.AnyActivationDown(IsDown) && !binding.AnyActivationDown(IsDown))
@@ -193,7 +205,7 @@ internal sealed class QuickToolMenuController : IDisposable
         State = QuickToolMenuState.ClosedAwaitRelease;
         menu.Cancel();
         displayed.Clear();
-        if (!focused() || currentBinding() != openingBinding || !openingBinding.IsHeld(down)) return;
+        if (!focused() || currentBinding() != openingBinding || (!selectingOnRelease && !openingBinding.IsHeld(down))) return;
         if (!RefreshContext() || !ReferenceEquals(manager, openedManager) || !ReferenceEquals(offhand, openedOffhand)
             || !ReferenceEquals(boundPlayerIdentity, openedPlayerIdentity))
         {

@@ -29,6 +29,7 @@ internal sealed class QuickToolClientIntegration : IRenderer
             () => (api.World.Player?.InventoryManager, api.World.Player?.Entity?.LeftHandItemSlot),
             () => QuickToolBinding.From(api.Input.GetHotKeyByCode(HotkeyCode)?.CurrentMapping),
             IsDown, () => Vintagestory.Client.ScreenManager.Platform?.IsFocused == true,
+            () => VanillaExpandedModSystem.Config.QuickToolSelectOnRelease,
             key => Lang.Get(Constants.ModId + ":" + key),
             message => api.TriggerIngameError(this, "quicktool", message),
             () => api.World.Player?.Entity);

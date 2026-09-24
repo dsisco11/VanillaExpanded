@@ -195,6 +195,9 @@ internal sealed class RadialMenuDialog : GuiDialog
         renderer.PrepareLayout(nextLayout);
     }
 
+    /// <summary>Selects the current enabled hover target without requiring a mouse click.</summary>
+    public bool SelectHovered() => interaction?.SelectHovered() == true;
+
     /// <summary>Cancels the current interaction and restores normal GUI input ownership.</summary>
     public void Cancel()
     {

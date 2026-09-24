@@ -70,6 +70,9 @@ public sealed class RadialMenuSystem : ModSystem, IRadialMenu
     /// <summary>Updates the open interaction when its available entry set changes.</summary>
     public void UpdateLayout(RadialMenuLayout layout, IEnumerable<RadialMenuEntry> entries) => dialog?.UpdateLayout(layout, entries);
 
+    /// <summary>Selects the current enabled hover target without requiring a mouse click.</summary>
+    public bool SelectHovered() => dialog?.SelectHovered() == true;
+
     /// <summary>Cancels an open menu on release, focus loss, feature disablement, or world exit.</summary>
     public void Cancel() => dialog?.Cancel();
 

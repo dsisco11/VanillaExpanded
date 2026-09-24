@@ -45,6 +45,9 @@ public class VanillaExpandedConfig
     /// <summary>Enables client-owned temporary quick-tool selections through native inventory flips.</summary>
     public bool EnableQuickTools { get; set; } = true;
 
+    /// <summary>Selects the hovered quick-tool menu entry when its activation key is released.</summary>
+    public bool QuickToolSelectOnRelease { get; set; } = true;
+
     #endregion
 
     #region Recipe Toggles

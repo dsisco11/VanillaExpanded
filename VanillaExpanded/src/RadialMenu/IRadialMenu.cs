@@ -14,6 +14,8 @@ public interface IRadialMenu
     void UpdateEntries(IEnumerable<RadialMenuEntry> entries);
     /// <summary>Replaces geometry and content together when the caller's available set changes.</summary>
     void UpdateLayout(RadialMenuLayout layout, IEnumerable<RadialMenuEntry> entries);
+    /// <summary>Selects the currently hovered entry if it is enabled.</summary>
+    bool SelectHovered();
     /// <summary>Cancels the current dialog and releases its input.</summary>
     void Cancel();
 }

@@ -181,6 +181,23 @@ public sealed class QuickToolMenuControllerTests
         Assert.Equal(2, f.Packets.Count);
     }
 
+    /// <summary>Releasing the activation key selects the current enabled hover target when configured.</summary>
+    [Fact]
+    public void SelectOnRelease_SelectsHoveredEntry()
+    {
+        using var f = new Fixture { SelectOnRelease = true };
+        f.Put(0, 1);
+        f.Put(1, 2, EnumTool.Pickaxe);
+        f.Open();
+        f.Menu.Hover("tool:Pickaxe");
+
+        f.Release();
+
+        Assert.False(f.Menu.IsOpen);
+        Assert.Equal(2, Assert.IsType<ItemStack>(f.Hotbar[0].Itemstack).Id);
+        Assert.Single(f.Packets);
+    }
+
     /// <summary>Secondary keys and modifiers cancel when released; a held activation cannot reopen after rebinding.</summary>
     [Fact]
     public void ModifierSecondaryAndRebind_RequireActivationRelease()
@@ -390,6 +407,7 @@ public sealed class QuickToolMenuControllerTests
         internal bool Ready = true;
         internal bool EquipmentReady = true;
         internal bool Focused = true;
+        internal bool SelectOnRelease;
         internal object PlayerIdentity = new();
 
         /// <summary>Configures real native packet creation and immediate inventory mutation.</summary>
@@ -412,6 +430,7 @@ public sealed class QuickToolMenuControllerTests
                 () => (CurrentManager, Hotbar[5]), Packets.Add, allowGenericFixture: true);
             Controller = new QuickToolMenuController(Operations, Cache, Menu, Events.Object, () => Ready,
                 () => (CurrentManager, Hotbar[5]), () => Binding, Down.Contains, () => Focused,
+                () => SelectOnRelease,
                 key => "localized:" + key, Feedback.Add, () => PlayerIdentity);
         }
 
@@ -485,14 +504,21 @@ public sealed class QuickToolMenuControllerTests
             LayoutUpdateCount++;
         }
         /// <inheritdoc />
+        public bool SelectHovered() => Interaction?.SelectHovered() == true;
+        /// <inheritdoc />
         public void Cancel() => Interaction?.Cancel();
         /// <summary>Clicks the real center or wedge center through shared hit testing.</summary>
         internal bool Click(string id)
         {
+            Hover(id);
+            return Interaction.SelectHovered();
+        }
+        /// <summary>Moves the shared interaction pointer to the specified center or wedge target.</summary>
+        internal void Hover(string id)
+        {
             int index = Layout!.WedgeIds.ToList().IndexOf(id);
             (double x, double y) = index < 0 ? (0, 0) : Layout.GetWedgeCenter(index, 0, 0, 100, 0.6);
             Interaction!.MovePointer(x, y, 0, 0, 100);
-            return Interaction.SelectHovered();
         }
     }
 
