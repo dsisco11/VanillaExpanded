@@ -6,14 +6,18 @@ namespace VanillaExpanded.QuickTools;
 /// <summary>Tracks the original item and temporary selection in the current client inventory view.</summary>
 internal sealed class QuickToolSession
 {
+    private ItemStack? originalSnapshot;
+    private ItemStack currentSnapshot;
     /// <summary>Starts a session after a successful first equip.</summary>
     internal QuickToolSession(int handPosition, ItemStack? original, string entryId, ItemStack current, QuickToolSlotAddress currentHome)
     {
         HandPosition = handPosition;
         Original = original;
+        originalSnapshot = original?.Clone();
         OriginalQuantity = original?.StackSize ?? 0;
         CurrentEntryId = entryId;
         Current = current;
+        currentSnapshot = current.Clone();
         CurrentQuantity = current.StackSize;
         CurrentHome = currentHome;
     }
@@ -22,7 +26,7 @@ internal sealed class QuickToolSession
     /// <summary>Gets the original active hotbar position, independently of its current slot object.</summary>
     internal int HandPosition { get; }
     /// <summary>Gets the item displaced by the first selection, if any.</summary>
-    internal ItemStack? Original { get; }
+    internal ItemStack? Original { get; private set; }
     /// <summary>Gets the original whole-stack quantity.</summary>
     internal int OriginalQuantity { get; }
     /// <summary>Gets the currently selected semantic entry.</summary>
@@ -39,6 +43,7 @@ internal sealed class QuickToolSession
     {
         CurrentEntryId = entryId;
         Current = current;
+        currentSnapshot = current.Clone();
         CurrentQuantity = current.StackSize;
         CurrentHome = currentHome;
     }
@@ -50,16 +55,49 @@ internal sealed class QuickToolSession
     {
         hand = null!;
         originalAt = null;
-        ItemSlot? currentAt = view.Find(Current, CurrentQuantity, physicalOffhand);
+        ItemSlot? exactCurrent = view.Find(Current, CurrentQuantity, physicalOffhand);
+        ItemSlot? exactOriginal = Original is null ? null : view.Find(Original, OriginalQuantity, physicalOffhand);
+        // A normal two-slot server echo recreates both objects. A lone replacement is indistinguishable
+        // from an unrelated equal-looking item placed by another action, so leave that session invalid.
+        if (Original is not null && (exactCurrent is null) != (exactOriginal is null)) return false;
+        ItemSlot? currentAt = ResolveStack(view, physicalOffhand, Current, currentSnapshot, CurrentQuantity);
         if (currentAt is null || !ReferenceEquals(view.ActiveHand(), currentAt)
             || currentAt.Inventory.GetSlotId(currentAt) != HandPosition
-            || !Usable(Current, currentAt, CurrentEntryId)) return false;
+            || !Usable(currentAt.Itemstack!, currentAt, CurrentEntryId)) return false;
+        Current = currentAt.Itemstack!;
+        currentSnapshot = Current.Clone();
         hand = currentAt;
 
         if (Original is null) return true;
-        // A may have moved without any callback. Its reference, rather than its previous slot, identifies it.
-        originalAt = view.Find(Original, OriginalQuantity, physicalOffhand);
-        return originalAt is not null && !ReferenceEquals(originalAt, hand) && Usable(Original, originalAt, null);
+        // Search current inventory rather than trusting A's previous slot; server synchronization may recreate its object.
+        originalAt = ResolveStack(view, physicalOffhand, Original, originalSnapshot!, OriginalQuantity);
+        if (originalAt is null || ReferenceEquals(originalAt, hand) || !Usable(originalAt.Itemstack!, originalAt, null)) return false;
+        Original = originalAt.Itemstack;
+        originalSnapshot = Original.Clone();
+        return true;
+    }
+
+    /// <summary>Rebinds a server-recreated stack only when its complete saved contents identify one eligible slot.</summary>
+    private static ItemSlot? ResolveStack(QuickToolInventoryView view, ItemSlot physicalOffhand,
+        ItemStack tracked, ItemStack snapshot, int quantity)
+    {
+        ItemSlot? exact = view.Find(tracked, quantity, physicalOffhand);
+        if (exact is not null) return exact;
+        ItemSlot? match = null;
+        foreach (ItemSlot slot in view.TrackedSlots(physicalOffhand))
+        {
+            ItemStack? candidate = slot.Itemstack;
+            if (candidate is null || candidate.StackSize != quantity) continue;
+            try
+            {
+                if (!snapshot.Equals(slot.Inventory.Api.World, candidate)) continue;
+            }
+            catch (Exception) { return null; }
+            // Equal-looking duplicates cannot establish which physical stack the server returned.
+            if (match is not null) return null;
+            match = slot;
+        }
+        return match;
     }
 
     /// <summary>Rejects broken durable stacks and a current selection that ceased matching its entry.</summary>

@@ -28,6 +28,24 @@ public sealed class QuickToolEquipmentTests
         Assert.Equal(2, f.Packets.Count);
     }
 
+    /// <summary>Server-recreated stack objects remain restorable when each full stack has one matching slot.</summary>
+    [Fact]
+    public void ServerRecreatedStacks_RestoreUniqueMatches()
+    {
+        var f = new Fixture();
+        ItemStack original = f.PutPlain(f.Hotbar[0], 1);
+        ItemStack pick = f.PutTool(f.Hotbar[1], 2, EnumTool.Pickaxe);
+        Assert.Equal(QuickToolEquipmentResult.LocallyApplied, f.Select("tool:Pickaxe"));
+        ItemStack syncedPick = pick.Clone();
+        ItemStack syncedOriginal = original.Clone();
+        f.Hotbar[0].Itemstack = syncedPick;
+        f.Hotbar[1].Itemstack = syncedOriginal;
+        Assert.True(f.Equipment.ValidateRestoration());
+        Assert.Equal(QuickToolEquipmentResult.LocallyApplied, f.Equipment.Restore());
+        Assert.Same(syncedOriginal, f.Hotbar[0].Itemstack);
+        Assert.Same(syncedPick, f.Hotbar[1].Itemstack);
+    }
+
     /// <summary>Carries the first displaced item through two selections, including an offhand light.</summary>
     [Fact]
     public void ToolLightToolRestore_PreservesAllHomesAndOriginal()

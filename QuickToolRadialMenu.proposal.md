@@ -106,7 +106,7 @@ The [virtual-entry implementation contract](docs/quick-tool/VirtualEntryContract
 
 A successful local quick-tool selection starts a client-owned temporary equipment session when none exists. Retain the original `ItemStack` reference (or initially-empty-hand state), the current quick-tool's `ItemStack` reference, the original active hotbar position, and the quick-tool's preferred home address. Whole-stack quantities and the selected entry remain validation metadata. The home address identifies a return destination; it does not identify an item. Do not retain an expected displaced-item slot.
 
-Before a switch or restoration, search the current eligible player inventory for the tracked `ItemStack` objects using reference identity. Resolve source slots from those searches, then validate the active hand, quantities, item usability, and destinations. Each required reference must occur exactly once. If it is missing, replaced, or ambiguous, end the session without moving anything; never substitute an equal-looking stack. Native synchronization can replace an `ItemStack` object even when its contents look unchanged; restoration then becomes unavailable when next validated. No persistent item ID or serialized-content rebinding is introduced. Records do not reserve inventory slots.
+Before a switch or restoration, search the current eligible player inventory for the tracked `ItemStack` objects using reference identity. Resolve source slots from those searches, then validate the active hand, quantities, item usability, and destinations. Each required reference must occur exactly once. A lone missing reference or an ambiguous match ends the session without movement. If normal synchronization recreates both tracked objects, rebind only when each complete saved stack and quantity has one eligible match and the current tool remains in the recorded active hand. An initially empty hand needs only the current tool to match. No persistent item ID is introduced. Records do not reserve inventory slots.
 
 A tool already held should be a no-op selection and must not create an artificial restoration record.
 
@@ -142,7 +142,7 @@ Handling for external changes:
 - Unrelated inventory changes refresh candidates and preserve the session.
 - A manual change of active hotbar slot immediately ends the session. Detect replacement of the held item during the next menu-open or action validation, preventing restoration from overriding the player's new intent.
 - Moving the original stack elsewhere in eligible inventory preserves restoration: the next lookup finds the same object at its new location. Moving the current quick-tool out of the recorded active hand ends the session when validated.
-- Consumption, removal, breakage, splitting, merging, or object replacement is checked during the next validation. A missing reference, changed whole-stack quantity, or unusable item ends restoration without substitution.
+- Consumption, removal, breakage, splitting, merging, or object replacement is checked during the next validation. Changed whole-stack quantity, unusable item, lone reference replacement, or ambiguous matching ends restoration without substitution.
 - World exit, player replacement, or feature disablement clears transient restoration state.
 
 Invalidating a session does not move items automatically. An unequip action without a valid session is disabled. General unequipping of manually equipped tools is outside the initial scope.
@@ -171,7 +171,7 @@ The [implementation contract](docs/quick-tool/ImplementationContract.md#resolved
 - The ring contains exactly one wedge per available entry, in canonical order, plus the separate center action. Inventory reorderings and candidate upgrades that preserve the available set keep positions. Acquisition/removal redistributes wedges deterministically, including while the menu is open.
 - Selecting tool B while holding item A, then selecting unequip, returns B to its original location and restores A when the arrangement remains valid.
 - Selecting B then C then unequip restores A and returns both tools to their original slots when possible.
-- Moving the original `ItemStack` to another eligible slot does not prevent restoration; lookup finds its current location. Missing or replaced references end restoration safely. Immediate successive actions require no server response or slot callback, and inventory events continue refreshing the candidate cache independently.
+- Moving the original `ItemStack` to another eligible slot does not prevent restoration; lookup finds its current location. Normal paired object recreation can rebind unique full-stack matches; lone replacement and ambiguity end restoration safely. Immediate successive actions require no server response or slot callback, and inventory events continue refreshing the candidate cache independently.
 - Initially empty hands, already-held candidates, duplicate tools, restricted slots, moved items, full inventories, broken tools, and rejected operations have deterministic behavior without item loss or duplication.
 - The radial-menu system can present non-tool entries without depending on quick-tool inventory logic.
 - Light source occupies a wedge after available tools when its shared selector finds a supported candidate and disappears when unavailable.
