@@ -45,13 +45,13 @@
             "group": "build",
             "dependsOn": "Package",
             "dependsOrder": "sequence",
-            "command": "$modsDirectory = Join-Path $env:APPDATA 'VintagestoryData\\Mods'; New-Item -ItemType Directory -Force -Path $modsDirectory | Out-Null; $archive = Get-ChildItem -Path '${workspaceFolder}/Releases' -Filter 'vanillaexpanded_*.zip' -File | Select-Object -First 1; if ($null -eq $archive) { throw 'CakeBuild did not produce a VanillaExpanded archive.' }; Copy-Item -LiteralPath $archive.FullName -Destination $modsDirectory -Force; Write-Host \"Installed $($archive.Name) to $modsDirectory\""
+            "command": "& '${workspaceFolder}/tools/ManageDevelopmentMod.ps1' -Action Install"
         },
         {
             "label": "Uninstall development mod",
             "type": "shell",
             "group": "build",
-            "command": "$archivePath = Join-Path $env:APPDATA 'VintagestoryData\\Mods\\vanillaexpanded_999.99.9.zip'; Remove-Item -LiteralPath $archivePath -Force -ErrorAction SilentlyContinue; Write-Host \"Uninstalled development mod from $archivePath\""
+            "command": "& '${workspaceFolder}/tools/ManageDevelopmentMod.ps1' -Action Uninstall"
         }
     ]
 }
