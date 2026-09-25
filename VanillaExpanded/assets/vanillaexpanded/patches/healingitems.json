@@ -1,0 +1,14 @@
+[
+  {
+    "op": "add",
+    "path": "/tags",
+    "value": ["tool-healingitem"],
+    "file": "game:itemtypes/bandage.json"
+  },
+  {
+    "op": "add",
+    "path": "/tags",
+    "value": ["tool-healingitem"],
+    "file": "game:itemtypes/utility/poultice.json"
+  }
+]

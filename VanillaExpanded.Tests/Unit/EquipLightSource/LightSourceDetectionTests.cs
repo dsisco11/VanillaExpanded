@@ -19,7 +19,7 @@ public class LightSourceDetectionTests
         ItemSlot? slot = null;
 
         // Act
-        bool result = VanillaExpanded.EquipLightSource.IsLightSource(slot);
+        bool result = VanillaExpanded.Lighting.LightSourceSelection.IsLightSource(slot);
 
         // Assert
         Assert.False(result);
@@ -32,7 +32,7 @@ public class LightSourceDetectionTests
         var slot = new DummySlot();
 
         // Act
-        bool result = VanillaExpanded.EquipLightSource.IsLightSource(slot);
+        bool result = VanillaExpanded.Lighting.LightSourceSelection.IsLightSource(slot);
 
         // Assert
         Assert.False(result);
@@ -46,7 +46,7 @@ public class LightSourceDetectionTests
         var slot = new DummySlot(new ItemStack(item));
 
         // Act
-        bool result = VanillaExpanded.EquipLightSource.IsLightSource(slot);
+        bool result = VanillaExpanded.Lighting.LightSourceSelection.IsLightSource(slot);
 
         // Assert
         Assert.False(result);
@@ -60,7 +60,7 @@ public class LightSourceDetectionTests
         var slot = new DummySlot(new ItemStack(item));
 
         // Act
-        bool result = VanillaExpanded.EquipLightSource.IsLightSource(slot);
+        bool result = VanillaExpanded.Lighting.LightSourceSelection.IsLightSource(slot);
 
         // Assert
         Assert.True(result);
@@ -77,7 +77,7 @@ public class LightSourceDetectionTests
         var slot = new DummySlot(new ItemStack(item));
 
         // Act
-        bool result = VanillaExpanded.EquipLightSource.IsLightSource(slot);
+        bool result = VanillaExpanded.Lighting.LightSourceSelection.IsLightSource(slot);
 
         // Assert
         Assert.True(result);
@@ -94,7 +94,7 @@ public class LightSourceDetectionTests
         CollectibleObject? item = null;
 
         // Act
-        bool result = VanillaExpanded.EquipLightSource.IsLightSource(item);
+        bool result = VanillaExpanded.Lighting.LightSourceSelection.IsLightSource(item);
 
         // Assert
         Assert.False(result);
@@ -107,7 +107,7 @@ public class LightSourceDetectionTests
         var collectible = MockItem.CreateNonLightSource(id: 1);
 
         // Act
-        bool result = VanillaExpanded.EquipLightSource.IsLightSource(collectible);
+        bool result = VanillaExpanded.Lighting.LightSourceSelection.IsLightSource(collectible);
 
         // Assert
         Assert.False(result);
@@ -120,7 +120,7 @@ public class LightSourceDetectionTests
         var collectible = MockItem.CreateLightSource(id: 1, brightness: 20);
 
         // Act
-        bool result = VanillaExpanded.EquipLightSource.IsLightSource(collectible);
+        bool result = VanillaExpanded.Lighting.LightSourceSelection.IsLightSource(collectible);
 
         // Assert
         Assert.True(result);
@@ -136,7 +136,7 @@ public class LightSourceDetectionTests
         var collectible = MockItem.CreateLightSource(id: 1, brightness: brightness);
 
         // Act
-        bool result = VanillaExpanded.EquipLightSource.IsLightSource(collectible);
+        bool result = VanillaExpanded.Lighting.LightSourceSelection.IsLightSource(collectible);
 
         // Assert
         Assert.True(result);

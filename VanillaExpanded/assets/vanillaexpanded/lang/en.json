@@ -1,4 +1,14 @@
 {
+  "hotkey-quick-tool": "Quick tools (hold)",
+  "config-enable-quick-tools": "Quick Tools",
+  "config-enable-quick-tools-tooltip": "Enable the quick-tool radial menu. Assign its hold key in Controls.",
+  "quicktool-unequip": "Unequip",
+  "quicktool-rejected": "That quick-tool selection is no longer available.",
+  "quicktool-interrupted": "The swap was interrupted. Your current items were kept; restoration is no longer available.",
+  "quicktool-session-unavailable": "The previous item can no longer be restored.",
+  "quicktool-menu-unavailable": "The quick-tool menu could not be opened.",
+  "quicktool-binding-unavailable": "Bind Quick tools to a keyboard key or the middle or right mouse button.",
+
   "blockhelp-autostash-container": "[Hold] Deposit similar items",
   "blockhelp-autostash-full": "[AutoStash] Container is full",
   "blockhelp-autostash-bloomery": "[Hold] Deposit all",

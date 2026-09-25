@@ -20,7 +20,7 @@ public class FindBrightestLightSourceTests
         var inventory = MockInventory.Empty(slotCount: 10);
 
         // Act
-        bool result = TestableEquipLightSource.TryFindBrightestLightSource(inventory.Object, out var slot);
+        bool result = VanillaExpanded.Lighting.LightSourceSelection.TryFindBrightestLightSource(inventory.Object, out var slot);
 
         // Assert
         Assert.False(result);
@@ -38,7 +38,7 @@ public class FindBrightestLightSourceTests
         );
 
         // Act
-        bool result = TestableEquipLightSource.TryFindBrightestLightSource(inventory.Object, out var slot);
+        bool result = VanillaExpanded.Lighting.LightSourceSelection.TryFindBrightestLightSource(inventory.Object, out var slot);
 
         // Assert
         Assert.False(result);
@@ -57,7 +57,7 @@ public class FindBrightestLightSourceTests
         var inventory = MockInventory.WithItems(lightSource);
 
         // Act
-        bool result = TestableEquipLightSource.TryFindBrightestLightSource(inventory.Object, out var slot);
+        bool result = VanillaExpanded.Lighting.LightSourceSelection.TryFindBrightestLightSource(inventory.Object, out var slot);
 
         // Assert
         Assert.True(result);
@@ -77,7 +77,7 @@ public class FindBrightestLightSourceTests
         }, totalSlots: 5);
 
         // Act
-        bool result = TestableEquipLightSource.TryFindBrightestLightSource(inventory.Object, out var slot);
+        bool result = VanillaExpanded.Lighting.LightSourceSelection.TryFindBrightestLightSource(inventory.Object, out var slot);
 
         // Assert
         Assert.True(result);
@@ -101,14 +101,12 @@ public class FindBrightestLightSourceTests
         }, totalSlots: 5);
 
         // Act
-        bool result = TestableEquipLightSource.TryFindBrightestLightSource(inventory.Object, out var slot);
+        bool result = VanillaExpanded.Lighting.LightSourceSelection.TryFindBrightestLightSource(inventory.Object, out var slot);
 
         // Assert
         Assert.True(result);
         Assert.NotNull(slot);
-        // Note: Current implementation returns first light source found, not necessarily brightest
-        // This test documents expected behavior - brightest should be selected
-        Assert.True(slot!.Itemstack.Collectible.LightHsv[2] > 0);
+        Assert.Same(inventory[1], slot);
     }
 
     [Fact]
@@ -123,11 +121,11 @@ public class FindBrightestLightSourceTests
         }, totalSlots: 5);
 
         // Act
-        bool result = TestableEquipLightSource.TryFindBrightestLightSource(inventory.Object, out var slot);
+        bool result = VanillaExpanded.Lighting.LightSourceSelection.TryFindBrightestLightSource(inventory.Object, out var slot);
 
         // Assert
         Assert.True(result);
-        Assert.NotNull(slot);
+        Assert.Same(inventory[2], slot);
     }
 
     [Fact]
@@ -142,7 +140,7 @@ public class FindBrightestLightSourceTests
         }, totalSlots: 5);
 
         // Act
-        bool result = TestableEquipLightSource.TryFindBrightestLightSource(inventory.Object, out var slot);
+        bool result = VanillaExpanded.Lighting.LightSourceSelection.TryFindBrightestLightSource(inventory.Object, out var slot);
 
         // Assert
         Assert.True(result);
@@ -165,7 +163,7 @@ public class FindBrightestLightSourceTests
         var inventory = MockInventory.WithItems(MockItem.CreateLightSource(id: 1, brightness: brightness));
 
         // Act
-        bool result = TestableEquipLightSource.TryFindBrightestLightSource(inventory.Object, out var slot);
+        bool result = VanillaExpanded.Lighting.LightSourceSelection.TryFindBrightestLightSource(inventory.Object, out var slot);
 
         // Assert
         Assert.True(result);
@@ -174,32 +172,4 @@ public class FindBrightestLightSourceTests
     }
 
     #endregion
-}
-
-/// <summary>
-/// Testable wrapper to expose protected methods for unit testing.
-/// </summary>
-internal static class TestableEquipLightSource
-{
-    /// <summary>
-    /// Wrapper for the protected TryFindBrightestLightSource method.
-    /// </summary>
-    public static bool TryFindBrightestLightSource(IInventory inventory, out ItemSlot? result)
-    {
-        // Use reflection to call the protected method
-        var method = typeof(VanillaExpanded.EquipLightSource)
-            .GetMethod("TryFindBrightestLightSource", 
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
-        
-        if (method is null)
-        {
-            result = null;
-            return false;
-        }
-
-        object?[] parameters = [inventory, null];
-        bool returnValue = (bool)method.Invoke(null, parameters)!;
-        result = parameters[1] as ItemSlot;
-        return returnValue;
-    }
 }

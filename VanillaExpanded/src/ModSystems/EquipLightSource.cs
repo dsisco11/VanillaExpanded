@@ -1,5 +1,4 @@
-﻿using System;
-using System.Diagnostics.CodeAnalysis;
+using System;
 using System.Linq;
 
 using Vintagestory.API.Client;
@@ -9,6 +8,7 @@ using Vintagestory.API.Config;
 namespace VanillaExpanded;
 
 using VanillaExpanded.ModSystems;
+using VanillaExpanded.Lighting;
 internal record struct SlotId(string InvClassName, int SlotIndex);
 public class EquipLightSource : ModSystem
 {
@@ -85,7 +85,7 @@ public class EquipLightSource : ModSystem
             return false;
         }
 
-        ItemSlot? lightSourceSlot = ResolveLightSourceSlot(playerInventory, offhandSlot, out bool isInLeftHand, out bool isInRightHand);
+        ItemSlot? lightSourceSlot = LightSourceSelection.ResolveLightSourceSlot(playerInventory, offhandSlot, out bool isInLeftHand, out bool isInRightHand);
         if (lightSourceSlot is null)
         {// player has no light sources
             return false;
@@ -189,95 +189,6 @@ public class EquipLightSource : ModSystem
         return true;
     }
 
-    /// <summary>
-    /// Resolves the most relevant light source item for the player according to a list of priorities.
-    /// </summary>
-    protected static ItemSlot? ResolveLightSourceSlot(
-        IPlayerInventoryManager playerInventory,
-        ItemSlot offhandSlot,
-        out bool isInLeftHand,
-        out bool isInRightHand)
-    {
-        isInLeftHand = false;
-        isInRightHand = false;
-
-        // Check offhand slot first
-        if (!offhandSlot.Empty)
-        {
-            if (IsLightSource(offhandSlot))
-            {
-                isInLeftHand = true;
-                return offhandSlot;
-            }
-        }
-
-        // Check active hotbar slot next
-        ItemSlot activeHotbarSlot = playerInventory.ActiveHotbarSlot;
-        if (!activeHotbarSlot.Empty)
-        {
-            if (IsLightSource(activeHotbarSlot))
-            {
-                isInRightHand = true;
-                return activeHotbarSlot;
-            }
-        }
-
-        // Check other hotbar slots
-        IInventory? hotbar = playerInventory.GetOwnInventory(GlobalConstants.hotBarInvClassName);
-        if (hotbar is not null)
-        {
-            if (TryFindBrightestLightSource(hotbar, out ItemSlot? brightestHotbarSlot))
-            {
-                return brightestHotbarSlot;
-            }
-        }
-
-        // Check backpack slots last
-        IInventory? backpack = playerInventory.GetOwnInventory(GlobalConstants.backpackInvClassName);
-        if (backpack is not null)
-        {
-            if (TryFindBrightestLightSource(backpack, out ItemSlot? brightestBackpackSlot))
-            {
-                return brightestBackpackSlot;
-            }
-        }
-
-        return null;
-    }
-
-    /// <summary>
-    /// Searches the given inventory for the brightest light source item.
-    /// </summary>
-    /// <returns> True if a light source was found; otherwise, false. </returns>
-    protected static bool TryFindBrightestLightSource(in IInventory inventory, [NotNullWhen(true)] out ItemSlot? result)
-    {
-        CollectibleObject? current = null;
-        result = null;
-        foreach (ItemSlot slot in inventory)
-        {
-            if (slot.Empty) continue;
-            CollectibleObject item = slot.Itemstack.Collectible;
-            int itemLightLevel = item.LightHsv[2];
-            // check the lightHsv value to know if it's a light source
-            if (itemLightLevel <= 0) continue;
-            // if we have no current light source, take the first we find
-            if (current is null)
-            {
-                current = item;
-                result = slot;
-                continue;
-            }
-
-            int currentItemLightLevel = current.LightHsv[2];
-            // if the found light source is brighter than the current one, take it
-            if (itemLightLevel > currentItemLightLevel)
-            {
-                current = item;
-                result = slot;
-            }
-        }
-        return result is not null;
-    }
     #endregion
 
     #region Private Methods
@@ -288,22 +199,5 @@ public class EquipLightSource : ModSystem
     private static ItemSlot? FindEmptySlotThatCanHold(IInventory? inventory, ItemSlot sourceSlot)
         => inventory?.FirstOrDefault(slot => slot.Empty && slot.CanHold(sourceSlot));
 
-    /// <summary>
-    /// Determines if the given item slot contains a light source.
-    /// </summary>
-    internal static bool IsLightSource(in ItemSlot? slot)
-    {
-        if (slot?.Empty ?? true) return false;
-        CollectibleObject item = slot.Itemstack.Collectible;
-        return item.LightHsv[2] > 0;
-    }
-
-    /// <summary>
-    /// Determines if the given collectible object is a light source.
-    /// </summary>
-    internal static bool IsLightSource(in CollectibleObject? item)
-    {
-        return (item?.LightHsv[2] ?? 0) > 0;
-    }
     #endregion
 }
