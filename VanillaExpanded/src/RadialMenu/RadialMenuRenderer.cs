@@ -231,17 +231,29 @@ internal sealed class RadialMenuRenderer : IDisposable
                 DrawClippedEntry(entry, i, x, y, radiusPixels * RadialMenuWedgeStyle.IconSizeFraction * scale, guiShader);
             }
             RadialMenuEntry center = interaction.GetEntry(layout.CenterId);
-            RadialMenuEntry centerLabel = interaction.HoveredId is string hoveredId && hoveredId != layout.CenterId
-                ? interaction.GetEntry(hoveredId)
-                : center;
+            string? hoveredId = interaction.HoveredId;
+            bool showingHoveredLabel = hoveredId is not null && hoveredId != layout.CenterId;
+            RadialMenuEntry centerLabel = showingHoveredLabel ? interaction.GetEntry(hoveredId!) : center;
             center.Icon?.Render(capi, centerX, centerY, radiusPixels * 0.2f, center.Enabled);
-            DrawLabel(center.Id, centerLabel.Label, centerX, centerY,
-                (int)Math.Max(1, radiusPixels * layout.CenterRadius * 2f - CenterLabelInsetPixels));
+            DrawCenterLabel(center.Id, centerLabel.Label, showingHoveredLabel, layout, centerX, centerY, radiusPixels);
         }
         finally
         {
             guiShader.Stop();
         }
+    }
+
+    /// <summary>Renders the center action as one line and wraps only the temporary hovered-entry label.</summary>
+    private void DrawCenterLabel(string id, string text, bool showingHoveredLabel, RadialMenuLayout layout,
+        float centerX, float centerY, float radiusPixels)
+    {
+        if (!showingHoveredLabel)
+        {
+            DrawLabel(id, text, centerX, centerY);
+            return;
+        }
+        int maximumWidth = (int)Math.Max(1, radiusPixels * layout.InnerRadius * 2f - CenterLabelInsetPixels);
+        DrawLabel(id, text, centerX, centerY, maximumWidth);
     }
 
     /// <summary>Clips a depth-correct icon capture and its pixel-distance halo to the wedge stencil.</summary>
@@ -308,8 +320,7 @@ internal sealed class RadialMenuRenderer : IDisposable
             {
                 labels[id] = maximumWidth > 0
                     ? capi.Gui.TextTexture.GenTextTexture(text, labelFont, maximumWidth, null, EnumTextOrientation.Center)
-                    : capi.Gui.TextTexture.GenTextTexture(text, labelFont, (int)Math.Ceiling(labelFont.GetTextExtents(text).Width) + 4,
-                        (int)Math.Ceiling(labelFont.GetFontExtents().Height) + 4, null, EnumTextOrientation.Center);
+                    : capi.Gui.TextTexture.GenTextTexture(text, labelFont);
             }
         }
 
