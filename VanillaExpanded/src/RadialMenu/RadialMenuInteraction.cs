@@ -25,6 +25,8 @@ public sealed class RadialMenuInteraction
     public event Action<string>? Selected;
     /// <summary>Reports a close without selection once.</summary>
     public event Action? Cancelled;
+    /// <summary>Reports a changed hover target, including transitions to or from no target.</summary>
+    public event Action<string?>? HoverChanged;
     /// <summary>Gets whether the interaction is currently open.</summary>
     public bool IsOpen => isOpen;
     /// <summary>Gets the current hovered identifier, including disabled entries.</summary>
@@ -81,7 +83,11 @@ public sealed class RadialMenuInteraction
     /// <summary>Updates the hovered identifier using the same coordinates as the renderer.</summary>
     public void MovePointer(double x, double y, double centerX, double centerY, double radiusPixels)
     {
-        if (isOpen) HoveredId = layout.HitTest(x, y, centerX, centerY, radiusPixels);
+        if (!isOpen) return;
+        string? nextHoveredId = layout.HitTest(x, y, centerX, centerY, radiusPixels);
+        if (nextHoveredId == HoveredId) return;
+        HoveredId = nextHoveredId;
+        HoverChanged?.Invoke(nextHoveredId);
     }
 
     /// <summary>Selects the enabled hovered entry at most once and closes the interaction.</summary>

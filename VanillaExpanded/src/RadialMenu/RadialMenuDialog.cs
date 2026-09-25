@@ -10,6 +10,7 @@ internal sealed class RadialMenuDialog : GuiDialog
 {
     #region State
     private const float ScreenRadiusFraction = 0.252f;
+    private const float HoverSoundVolume = 0.7f;
     private readonly RadialMenuRenderer renderer;
     private RadialMenuLayout? layout;
     private RadialMenuInteraction? interaction;
@@ -180,6 +181,7 @@ internal sealed class RadialMenuDialog : GuiDialog
         interaction = new RadialMenuInteraction(layout, entries);
         interaction.Selected += selected;
         interaction.Cancelled += cancelled;
+        interaction.HoverChanged += OnHoverChanged;
         interaction.Open();
         if (TryOpen()) return true;
         interaction.Cancel();
@@ -217,6 +219,9 @@ internal sealed class RadialMenuDialog : GuiDialog
         if (!success) Cancel();
         return success;
     }
+
+    /// <summary>Plays the game's standard button hover sound for each changed menu target.</summary>
+    private void OnHoverChanged(string? hoveredId) => capi.Gui.PlaySound("menubutton", volume: HoverSoundVolume);
     #endregion
 }
 
