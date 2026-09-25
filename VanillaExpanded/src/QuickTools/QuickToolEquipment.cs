@@ -129,13 +129,13 @@ internal sealed class QuickToolEquipment
         return plan;
     }
 
-    /// <summary>Plans a single native flip that stores an ordinary active-hand stack in the first compatible empty slot.</summary>
+    /// <summary>Plans a single native flip that stores an active-hand stack in backpack storage before hotbar slots.</summary>
     private QuickToolMovementPlan? PlanUnequip(out ItemSlot hand, out ItemSlot target)
     {
         hand = view.ActiveHand()!;
         target = null!;
         if (hand is null || hand.Empty || view.Find(hand.Itemstack!, hand.Itemstack!.StackSize, physicalOffhand) != hand) return null;
-        foreach (ItemSlot slot in view.OrdinarySlots())
+        foreach (ItemSlot slot in view.UnequipSlots())
         {
             if (ReferenceEquals(slot, hand) || !slot.Empty) continue;
             try

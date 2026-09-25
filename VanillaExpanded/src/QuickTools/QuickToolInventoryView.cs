@@ -72,6 +72,19 @@ internal sealed class QuickToolInventoryView
                 if (GetSource(true, i, null!, false) is ItemSlot slot) yield return slot;
     }
 
+    /// <summary>Enumerates ordinary storage with backpack contents preferred over hotbar slots.</summary>
+    internal IEnumerable<ItemSlot> UnequipSlots()
+    {
+        IInventory? backpack = Backpack();
+        if (backpack is not null)
+            for (int i = 0; i < backpack.Count; i++)
+                if (GetSource(true, i, null!, false) is ItemSlot slot) yield return slot;
+        IInventory? hotbar = Hotbar();
+        if (hotbar is not null)
+            for (int i = 0; i < hotbar.Count; i++)
+                if (GetSource(false, i, null!, false) is ItemSlot slot) yield return slot;
+    }
+
     /// <summary>Enumerates ordinary storage and the physical offhand for identity continuity.</summary>
     internal IEnumerable<ItemSlot> TrackedSlots(ItemSlot physicalOffhand)
     {

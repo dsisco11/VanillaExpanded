@@ -84,9 +84,9 @@ public sealed class QuickToolEquipmentTests
         Assert.Same(pick, f.Hotbar[1].Itemstack);
     }
 
-    /// <summary>Unequip stores an ordinary held item without creating restoration history.</summary>
+    /// <summary>Unequip stores an ordinary held item in backpack storage before empty hotbar slots.</summary>
     [Fact]
-    public void UnequipWithoutSession_MovesHeldItemToFirstCompatibleEmptySlot()
+    public void UnequipWithoutSession_PrefersBackpackOverEmptyHotbarSlot()
     {
         var f = new Fixture();
         ItemStack held = f.PutPlain(f.Hotbar[0], 1);
@@ -95,7 +95,8 @@ public sealed class QuickToolEquipmentTests
         Assert.Equal(QuickToolEquipmentResult.LocallyApplied, f.Equipment.Unequip());
 
         Assert.Null(f.Hotbar[0].Itemstack);
-        Assert.Same(held, f.Hotbar[1].Itemstack);
+        Assert.Null(f.Hotbar[1].Itemstack);
+        Assert.Same(held, f.Backpack[0].Itemstack);
         Assert.False(f.Equipment.HasSession);
         Assert.Single(f.Packets);
     }
