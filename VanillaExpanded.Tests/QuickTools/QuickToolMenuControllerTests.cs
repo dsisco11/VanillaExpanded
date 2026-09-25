@@ -23,10 +23,9 @@ public sealed class QuickToolMenuControllerTests
         Assert.Equal(new[] { "tool:Pickaxe" }, f.Menu.Layout!.WedgeIds);
         Assert.Equal("localized:quicktool-unequip", f.Entry("unequip").Label);
         Assert.Null(f.Entry("unequip").Description);
-        Assert.False(f.Entry("unequip").Enabled);
+        Assert.True(f.Entry("unequip").Enabled);
         Assert.DoesNotContain("tool:Axe", f.Menu.Layout.WedgeIds);
         Assert.Equal("game-item-name:2", f.Entry("tool:Pickaxe").Label);
-        Assert.False(f.Menu.Click("unequip"));
         Assert.True(f.Menu.Click("tool:Pickaxe"));
         Assert.False(f.Menu.Click("tool:Pickaxe"));
         Assert.False(f.Menu.IsOpen);
@@ -337,7 +336,7 @@ public sealed class QuickToolMenuControllerTests
         Assert.False(f.Operations.HasSession);
         f.Release();
         f.Open();
-        Assert.False(f.Entry("unequip").Enabled);
+        Assert.True(f.Entry("unequip").Enabled);
     }
 
     /// <summary>The action finds the original object at its new location after the menu was opened.</summary>

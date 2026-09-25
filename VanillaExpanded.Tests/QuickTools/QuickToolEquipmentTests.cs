@@ -84,6 +84,22 @@ public sealed class QuickToolEquipmentTests
         Assert.Same(pick, f.Hotbar[1].Itemstack);
     }
 
+    /// <summary>Unequip stores an ordinary held item without creating restoration history.</summary>
+    [Fact]
+    public void UnequipWithoutSession_MovesHeldItemToFirstCompatibleEmptySlot()
+    {
+        var f = new Fixture();
+        ItemStack held = f.PutPlain(f.Hotbar[0], 1);
+
+        Assert.True(f.Equipment.ValidateUnequip());
+        Assert.Equal(QuickToolEquipmentResult.LocallyApplied, f.Equipment.Unequip());
+
+        Assert.Null(f.Hotbar[0].Itemstack);
+        Assert.Same(held, f.Hotbar[1].Itemstack);
+        Assert.False(f.Equipment.HasSession);
+        Assert.Single(f.Packets);
+    }
+
     /// <summary>The active hand is not a selectable candidate and cannot create restoration state.</summary>
     [Fact]
     public void AlreadyHeldCandidate_IsRejected()

@@ -63,6 +63,14 @@ internal sealed class QuickToolClientOperations : IDisposable
         return equipment!.ValidateRestoration();
     }
 
+    /// <summary>Checks whether the center action can restore history or store the currently held stack.</summary>
+    internal bool ValidateUnequip()
+    {
+        if (IsOperating) return false;
+        if (!Ready() || !BindCurrent()) { Clear(); return false; }
+        return equipment!.ValidateUnequip();
+    }
+
     /// <summary>Reruns the selected provider and sends its native inventory flip packets.</summary>
     internal QuickToolEquipmentResult Select(string entryId, QuickToolCandidate displayed)
     {
@@ -84,6 +92,19 @@ internal sealed class QuickToolClientOperations : IDisposable
         QuickToolEquipmentResult result;
         operationActive = true;
         try { result = equipment!.Restore(); }
+        finally { operationActive = false; }
+        LocalResult?.Invoke(result);
+        return result;
+    }
+
+    /// <summary>Restores quick-tool history or stores an ordinary active-hand item.</summary>
+    internal QuickToolEquipmentResult Unequip()
+    {
+        if (IsOperating) return QuickToolEquipmentResult.Rejected;
+        if (!Ready() || !BindCurrent()) { Clear(); return QuickToolEquipmentResult.Rejected; }
+        QuickToolEquipmentResult result;
+        operationActive = true;
+        try { result = equipment!.Unequip(); }
         finally { operationActive = false; }
         LocalResult?.Invoke(result);
         return result;

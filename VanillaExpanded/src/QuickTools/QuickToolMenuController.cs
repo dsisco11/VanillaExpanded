@@ -77,7 +77,7 @@ internal sealed class QuickToolMenuController : IDisposable
         if (State != QuickToolMenuState.ClosedReady) return true;
 
         openingBinding = binding;
-        restoreAvailable = equipment.ValidateRestoration();
+        restoreAvailable = equipment.ValidateUnequip();
         IReadOnlyList<RadialMenuEntry> entries = SnapshotEntries();
         State = QuickToolMenuState.OpenHeld;
         if (!menu.Open(layout!, entries, OnSelected, OnCancelled))
@@ -214,7 +214,7 @@ internal sealed class QuickToolMenuController : IDisposable
         }
 
         QuickToolEquipmentResult result = id == QuickToolLayout.RestoreId && restoreAvailable
-            ? equipment.Restore()
+            ? equipment.Unequip()
             : candidate is not null ? equipment.Select(id, candidate) : QuickToolEquipmentResult.Rejected;
         string? message = result switch
         {

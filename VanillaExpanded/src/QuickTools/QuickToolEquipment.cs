@@ -42,9 +42,13 @@ internal sealed class QuickToolEquipment
     /// <summary>Retains restoration history while the player temporarily uses another active-hand slot.</summary>
     internal void OnManualActiveSlotChanged() { }
 
-    /// <summary>Validates references and the return route once when preparing menu availability.</summary>
+    /// <summary>Validates references and the return route once when preparing restoration availability.</summary>
     internal bool ValidateRestoration()
         => !operationActive && session is not null && PlanRestoration(out _, out _) is not null;
+
+    /// <summary>Validates either restoration history or moving the current active stack to ordinary storage.</summary>
+    internal bool ValidateUnequip()
+        => !operationActive && (session is not null ? PlanRestoration(out _, out _) is not null : PlanUnequip(out _, out _) is not null);
     #endregion
 
     #region Selection and restoration
@@ -88,6 +92,15 @@ internal sealed class QuickToolEquipment
         return Execute(plan, hand, targets, () => session = null);
     }
 
+    /// <summary>Restores tracked history or moves an unrelated active-hand stack off the hotbar.</summary>
+    internal QuickToolEquipmentResult Unequip()
+    {
+        if (operationActive) return QuickToolEquipmentResult.Rejected;
+        if (session is not null) return Restore();
+        QuickToolMovementPlan? plan = PlanUnequip(out ItemSlot hand, out ItemSlot target);
+        return plan is null ? QuickToolEquipmentResult.Rejected : Execute(plan, hand, [target], static () => { });
+    }
+
     /// <summary>Resolves the tracked objects and validates a return route without changing inventory.</summary>
     private QuickToolMovementPlan? PlanRestoration(out ItemSlot hand, out List<ItemSlot> targets)
     {
@@ -114,6 +127,35 @@ internal sealed class QuickToolEquipment
         targets.Add(returnSlot);
         if (originalAt is not null && !ReferenceEquals(originalAt, returnSlot)) targets.Add(originalAt);
         return plan;
+    }
+
+    /// <summary>Plans a single native flip that stores an ordinary active-hand stack in the first compatible empty slot.</summary>
+    private QuickToolMovementPlan? PlanUnequip(out ItemSlot hand, out ItemSlot target)
+    {
+        hand = view.ActiveHand()!;
+        target = null!;
+        if (hand is null || hand.Empty || view.Find(hand.Itemstack!, hand.Itemstack!.StackSize, physicalOffhand) != hand) return null;
+        foreach (ItemSlot slot in view.OrdinarySlots())
+        {
+            if (ReferenceEquals(slot, hand) || !slot.Empty) continue;
+            try
+            {
+                if (hand.Itemstack!.StackSize > slot.MaxSlotStackSize || !slot.CanHold(hand)) continue;
+            }
+            catch (Exception) { continue; }
+            var desired = new Dictionary<ItemSlot, ItemStack?>(ReferenceEqualityComparer.Instance)
+            {
+                [hand] = null,
+                [slot] = hand.Itemstack
+            };
+            QuickToolMovementPlan? plan = QuickToolMovementPlan.TryCreate(view, physicalOffhand, desired);
+            if (plan is not null)
+            {
+                target = slot;
+                return plan;
+            }
+        }
+        return null;
     }
 
     /// <summary>Starts history only after the first native flip produces the intended local arrangement.</summary>
