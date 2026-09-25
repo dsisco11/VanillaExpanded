@@ -60,7 +60,7 @@ public sealed class RadialMenuLayout
         && StartAngleDegrees == other.StartAngleDegrees
         && Clockwise == other.Clockwise;
 
-    /// <summary>Returns the supplied identifier under a screen-space point, or null in intentional gaps.</summary>
+    /// <summary>Returns the supplied identifier under a screen-space point, or null outside selectable radial bands.</summary>
     public string? HitTest(double x, double y, double centerX, double centerY, double radiusPixels)
     {
         if (radiusPixels <= 0) return null;
@@ -77,12 +77,11 @@ public sealed class RadialMenuLayout
         double nearest = Math.Floor(directed / StepDegrees + 0.5);
         double delta = directed - nearest * StepDegrees;
         if (delta > 180) delta -= 360;
-        if (Math.Abs(delta) >= StepDegrees / 2d - SeparatorDegrees) return null;
         if (radius <= OuterRadius)
         {
             // Apply the same inward-rounded annular contour used by the shader, in screen pixels.
             double radialInside = Math.Min(radius - InnerRadius, OuterRadius - radius) * radiusPixels;
-            double halfAngle = (StepDegrees / 2d - SeparatorDegrees) * Math.PI / 180d;
+            double halfAngle = StepDegrees / 2d * Math.PI / 180d;
             double angularInside = radius * Math.Sin(halfAngle - Math.Abs(delta) * Math.PI / 180d) * radiusPixels;
             double corner = Math.Min(RadialMenuWedgeStyle.CornerRadiusPixels,
                 Math.Max(0d, Math.Min((OuterRadius - InnerRadius) * radiusPixels / 2d,
