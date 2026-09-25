@@ -18,7 +18,7 @@ internal sealed class QuickToolClientIntegration : IRenderer
     private bool disposed;
     private bool contextAvailable;
 
-    /// <summary>Registers the unbound inventory hotkey and separates input polling from cache refreshes.</summary>
+    /// <summary>Registers the Quick Tools inventory hotkey and separates input polling from cache refreshes.</summary>
     internal QuickToolClientIntegration(ICoreClientAPI api, QuickToolClientOperations equipment)
     {
         this.api = api;
@@ -33,7 +33,7 @@ internal sealed class QuickToolClientIntegration : IRenderer
             key => Lang.Get(Constants.ModId + ":" + key),
             message => api.TriggerIngameError(this, "quicktool", message),
             () => api.World.Player?.Entity);
-        api.Input.RegisterHotKey(HotkeyCode, Lang.Get(Constants.ModId + ":hotkey-quick-tool"), GlKeys.Unknown, HotkeyType.InventoryHotkeys);
+        api.Input.RegisterHotKey(HotkeyCode, Lang.Get(Constants.ModId + ":hotkey-quick-tool"), GlKeys.R, HotkeyType.InventoryHotkeys);
         hotkeyHandler = _ => controller.Press();
         api.Input.SetHotKeyHandler(HotkeyCode, hotkeyHandler);
         api.Event.KeyUp += OnKeyUp;

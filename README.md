@@ -27,6 +27,8 @@ Hold the Quick Tools hotkey (assign it in Controls) to open a radial menu of ava
 
 - Hotkey for quickly swapping a light source into the off-hand (default: `F`) or hotbar (default: `Shift + F`) when available (press again to swap the light source back into its prior slot).
 
+- Hotkey for quickly opening the Quick Tools radial menu (default: `R`).
+
 ### Alloy Calculator
 
 When opening a firepit with a crucible, an Alloy Calculator dialog automatically appears alongside the firepit UI. This tool helps you calculate the exact metal ratios needed for creating alloys:
