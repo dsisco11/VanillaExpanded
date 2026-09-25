@@ -87,7 +87,7 @@ public sealed class ToolCandidateProvider : IQuickToolCandidateProvider
         if (hasCategoryTags && toolTags is not null && tagRegistry is not null)
         {
             var actual = new HashSet<string>(tagRegistry.SlowEnumerateTagNames(collectible.GetTags(stack))
-                .Where(name => QuickToolLayout.TryGetToolTag(name, out _)), StringComparer.Ordinal);
+            .Where(name => QuickToolLayout.TryGetToolTag(name, out _)), StringComparer.Ordinal);
             return actual.SetEquals(toolTags);
         }
         return category is EnumTool legacyCategory && collectible.GetTool(slot) == legacyCategory;

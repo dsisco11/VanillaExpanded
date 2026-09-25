@@ -123,6 +123,23 @@ public sealed class QuickToolMenuControllerTests
         Assert.Equal(new[] { "localized:quicktool-rejected" }, f.Feedback);
     }
 
+    /// <summary>A server-recreated stack with unchanged contents remains selectable from the visible menu snapshot.</summary>
+    [Fact]
+    public void CandidateRecreatedAfterOpen_RemainsSelectable()
+    {
+        using var f = new Fixture();
+        f.Put(0, 1);
+        ItemStack pick = f.Put(1, 2, EnumTool.Pickaxe);
+        f.Open();
+
+        f.Hotbar[1].Itemstack = pick.Clone();
+
+        Assert.True(f.Menu.Click("tool:Pickaxe"));
+        Assert.Equal(2, f.Hotbar[0].Itemstack!.Id);
+        Assert.Single(f.Packets);
+        Assert.Empty(f.Feedback);
+    }
+
     /// <summary>Reference replacement between availability validation and click disables restoration without substitution.</summary>
     [Fact]
     public void OriginalReplacedAfterOpen_RestoreRevalidatesAndReportsOnce()
