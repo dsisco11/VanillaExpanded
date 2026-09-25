@@ -46,6 +46,17 @@ public sealed class QuickToolCandidateTests
         Assert.Equal("tool:sword", QuickToolLayout.GetToolId(["tool-sword"]));
     }
 
+    /// <summary>Includes weapon categories in the same exact-tag grouping as concrete tool categories.</summary>
+    [Fact]
+    public void DynamicToolTags_IncludeWeaponCategories()
+    {
+        string id = QuickToolLayout.GetToolId(["weapon-ranged", "weapon-bow"]);
+
+        Assert.Equal("tool:weapon-bow+weapon-ranged", id);
+        Assert.True(QuickToolLayout.TryGetToolTagsFromId(id, out string[] tags));
+        Assert.Equal(["weapon-bow", "weapon-ranged"], tags);
+    }
+
     /// <summary>Keeps a multi-category tool group distinct from a group containing only a subset of its tags.</summary>
     [Fact]
     public void ToolTagGroups_DistinguishSubsetAndMultiCategoryTools()

@@ -33,26 +33,28 @@ public static class QuickToolLayout
     /// <summary>Gets supported identifiers in their clockwise menu order.</summary>
     public static IReadOnlyList<string> WedgeIds => Ids;
 
-    /// <summary>Builds a stable entry identifier from a complete normalized set of discovered tool category tags.</summary>
+    /// <summary>Builds a stable entry identifier from a complete normalized set of discovered tool and weapon category tags.</summary>
     public static string GetToolId(IReadOnlyCollection<string> toolTags)
     {
         ArgumentNullException.ThrowIfNull(toolTags);
         string[] normalized = toolTags.Select(tag => TryGetToolTag(tag, out string value) ? value : throw new ArgumentOutOfRangeException(nameof(toolTags)))
             .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
         if (normalized.Length == 0) throw new ArgumentException("Expected at least one concrete tool tag.", nameof(toolTags));
-        return "tool:" + string.Join('+', normalized.Select(tag => tag[5..]));
+        return "tool:" + string.Join('+', normalized.Select(tag => tag.StartsWith("tool-", StringComparison.Ordinal) ? tag[5..] : tag));
     }
 
-    /// <summary>Checks whether a tag names one concrete tool category rather than the generic tool tag.</summary>
+    /// <summary>Checks whether a tag names one concrete tool or weapon category rather than a generic tag.</summary>
     public static bool TryGetToolTag(string toolTag, out string normalizedTag)
     {
         normalizedTag = string.Empty;
-        if (string.IsNullOrWhiteSpace(toolTag) || !toolTag.StartsWith("tool-", StringComparison.Ordinal) || toolTag.Length == 5) return false;
+        if (string.IsNullOrWhiteSpace(toolTag)
+            || (!toolTag.StartsWith("tool-", StringComparison.Ordinal) && !toolTag.StartsWith("weapon-", StringComparison.Ordinal))
+            || toolTag is "tool-" or "weapon-") return false;
         normalizedTag = toolTag.ToLowerInvariant();
         return true;
     }
 
-    /// <summary>Resolves a dynamic entry identifier back to its complete tool category tag set.</summary>
+    /// <summary>Resolves a dynamic entry identifier back to its complete tool and weapon category tag set.</summary>
     public static bool TryGetToolTagsFromId(string id, out string[] toolTags)
     {
         toolTags = [];
@@ -61,7 +63,8 @@ public static class QuickToolLayout
         if (values.Length == 0) return false;
         var normalized = new SortedSet<string>(StringComparer.Ordinal);
         foreach (string value in values)
-            if (!TryGetToolTag("tool-" + value, out string toolTag) || !normalized.Add(toolTag)) return false;
+            if (!TryGetToolTag(value.StartsWith("weapon-", StringComparison.Ordinal) ? value : "tool-" + value,
+                out string toolTag) || !normalized.Add(toolTag)) return false;
         toolTags = [.. normalized];
         return true;
     }
