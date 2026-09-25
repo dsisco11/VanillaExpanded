@@ -44,6 +44,7 @@ internal sealed class RadialMenuDialog : GuiDialog
             Cancel();
             return;
         }
+        SuppressWorldLeftClick();
         if (waitForMouseUp)
         {
             if (!capi.Input.MouseButton.Left) TryClose();
@@ -183,7 +184,11 @@ internal sealed class RadialMenuDialog : GuiDialog
         interaction.Cancelled += cancelled;
         interaction.HoverChanged += OnHoverChanged;
         interaction.Open();
-        if (TryOpen()) return true;
+        if (TryOpen())
+        {
+            SuppressWorldLeftClick();
+            return true;
+        }
         interaction.Cancel();
         interaction = null;
         layout = null;
@@ -222,6 +227,9 @@ internal sealed class RadialMenuDialog : GuiDialog
 
     /// <summary>Plays the game's standard button hover sound for each changed menu target.</summary>
     private void OnHoverChanged(string? hoveredId) => capi.Gui.PlaySound("menubutton", volume: HoverSoundVolume);
+
+    /// <summary>Prevents a left click held before the dialog opened from continuing as an in-world action.</summary>
+    private void SuppressWorldLeftClick() => capi.Input.InWorldMouseButton.Left = false;
     #endregion
 }
 
