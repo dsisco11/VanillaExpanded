@@ -44,11 +44,10 @@ The calculator remembers your settings per crucible, so your preferred alloy and
 ### Quality of Life Additions
 
 - Player respawn point appears as a glowing gear symbol on the ground.
-- Handbook search prioritizes full-word matches (searching "iron" ranks "Iron Ingot" higher than "Ironwood").
 
 ### Implemented Missing Functionalities
 
-- Ignitable things (firepits, etc) can now be ignited using lanterns (_oillamps & candles pending_).
+- Ignitable things (firepits, etc) can now be ignited using lanterns, oil lamps, and candles.
 
 ### New Recipes
 
