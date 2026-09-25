@@ -267,7 +267,6 @@ public sealed class QuickToolCandidateCache : IDisposable
             return;
         }
         string[] names = [.. tagRegistry.SlowEnumerateTagNames(tags)];
-        if (!names.Contains("tool", StringComparer.Ordinal)) return;
         string[] toolTags = names.Where(name => QuickToolLayout.TryGetToolTag(name, out _)).Order(StringComparer.Ordinal).ToArray();
         if (toolTags.Length > 0) toolGroups.TryAdd(QuickToolLayout.GetToolId(toolTags), toolTags);
     }

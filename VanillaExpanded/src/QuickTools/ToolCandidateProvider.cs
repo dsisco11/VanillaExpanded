@@ -37,7 +37,7 @@ public sealed class ToolCandidateProvider : IQuickToolCandidateProvider
         this.diagnostic = diagnostic;
         this.tagRegistry = tagRegistry;
         this.toolTags = [.. toolTags];
-        hasCategoryTags = tagRegistry?.TryCreateTagSet(out categoryTags, ["tool", .. this.toolTags]) == TagRegistryError.None;
+        hasCategoryTags = tagRegistry?.TryCreateTagSet(out categoryTags, [.. this.toolTags]) == TagRegistryError.None;
     }
 
     #region Selection

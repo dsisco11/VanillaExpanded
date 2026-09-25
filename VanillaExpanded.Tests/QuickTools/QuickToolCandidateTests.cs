@@ -39,6 +39,13 @@ public sealed class QuickToolCandidateTests
         Assert.Equal(available, QuickToolLayout.CreateLayout(available).WedgeIds);
     }
 
+    /// <summary>Recognizes concrete weapon-tool categories that omit the optional generic tool tag.</summary>
+    [Fact]
+    public void DynamicToolTags_AcceptConcreteCategoryWithoutGenericToolTag()
+    {
+        Assert.Equal("tool:sword", QuickToolLayout.GetToolId(["tool-sword"]));
+    }
+
     /// <summary>Keeps a multi-category tool group distinct from a group containing only a subset of its tags.</summary>
     [Fact]
     public void ToolTagGroups_DistinguishSubsetAndMultiCategoryTools()
