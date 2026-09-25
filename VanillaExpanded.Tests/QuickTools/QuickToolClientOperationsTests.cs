@@ -140,9 +140,9 @@ public sealed class QuickToolClientOperationsTests
         Assert.False(f.Operations.HasSession);
     }
 
-    /// <summary>A manual active-slot event ends restoration without sending another inventory packet.</summary>
+    /// <summary>A manual active-slot event retains restoration history for when the player returns to its recorded slot.</summary>
     [Fact]
-    public void ManualActiveSlotEvent_DiscardsOnlySession()
+    public void ManualActiveSlotEvent_PreservesSession()
     {
         using var f = new Fixture();
         ItemStack original = f.PutPlain(f.Hotbar[0], 1);
@@ -150,7 +150,7 @@ public sealed class QuickToolClientOperationsTests
         QuickToolCandidate displayed = new ToolCandidateProvider(EnumTool.Pickaxe).Resolve(f.Manager.Object, f.Offhand)!;
         Assert.Equal(QuickToolEquipmentResult.LocallyApplied, f.Operations.Select("tool:Pickaxe", displayed));
         f.Events.Raise(e => e.AfterActiveSlotChanged += null!, new ActiveSlotChangeEventArgs(0, 1));
-        Assert.False(f.Operations.HasSession);
+        Assert.True(f.Operations.HasSession);
         Assert.Single(f.Packets);
         Assert.Same(pick, f.Hotbar[0].Itemstack);
         Assert.Same(original, f.Hotbar[1].Itemstack);
@@ -228,9 +228,9 @@ public sealed class QuickToolClientOperationsTests
         Assert.Same(pick, f.Backpack[1].Itemstack);
     }
 
-    /// <summary>A replacement without callbacks is rejected by the action itself, with no tick required.</summary>
+    /// <summary>A unique equivalent replacement without callbacks is rebound by the action itself, with no tick required.</summary>
     [Fact]
-    public void SilentReplacement_InvalidatesOnRestore()
+    public void SilentReplacement_RebindsOnRestore()
     {
         using var f = new Fixture();
         f.PutPlain(f.Hotbar[0], 1);
@@ -238,9 +238,9 @@ public sealed class QuickToolClientOperationsTests
         QuickToolCandidate displayed = new ToolCandidateProvider(EnumTool.Pickaxe).Resolve(f.Manager.Object, f.Offhand)!;
         Assert.Equal(QuickToolEquipmentResult.LocallyApplied, f.Operations.Select("tool:Pickaxe", displayed));
         ItemStack replacement = f.PutPlain(f.Hotbar[1], 1);
-        Assert.Equal(QuickToolEquipmentResult.SessionInvalidated, f.Operations.Restore());
-        Assert.Same(replacement, f.Hotbar[1].Itemstack);
-        Assert.Single(f.Packets);
+        Assert.Equal(QuickToolEquipmentResult.LocallyApplied, f.Operations.Restore());
+        Assert.Same(replacement, f.Hotbar[0].Itemstack);
+        Assert.Equal(2, f.Packets.Count);
     }
 
     /// <summary>Availability validation checks the route and performs no movement.</summary>

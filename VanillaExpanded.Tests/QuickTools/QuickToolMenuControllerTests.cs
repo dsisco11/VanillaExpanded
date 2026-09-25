@@ -140,9 +140,9 @@ public sealed class QuickToolMenuControllerTests
         Assert.Empty(f.Feedback);
     }
 
-    /// <summary>Reference replacement between availability validation and click disables restoration without substitution.</summary>
+    /// <summary>A uniquely recreated original stack remains restorable after availability validation.</summary>
     [Fact]
-    public void OriginalReplacedAfterOpen_RestoreRevalidatesAndReportsOnce()
+    public void OriginalRecreatedAfterOpen_RestoreRevalidates()
     {
         using var f = new Fixture();
         f.EquipPick();
@@ -150,9 +150,9 @@ public sealed class QuickToolMenuControllerTests
         Assert.True(f.Entry("unequip").Enabled);
         f.Put(1, 1);
         f.Menu.Click("unequip");
-        Assert.Single(f.Packets);
+        Assert.Equal(2, f.Packets.Count);
         Assert.False(f.Operations.HasSession);
-        Assert.Equal(new[] { "localized:quicktool-session-unavailable" }, f.Feedback);
+        Assert.Empty(f.Feedback);
     }
 
     /// <summary>An intact session with no safe return route does not enable the center.</summary>
@@ -260,13 +260,12 @@ public sealed class QuickToolMenuControllerTests
         Assert.Empty(f.Packets);
     }
 
-    /// <summary>Disablement and context replacement discard the old session and menu references.</summary>
+    /// <summary>Disablement and player-context replacement discard the old session and menu references.</summary>
     [Theory]
     [InlineData("disabled")]
     [InlineData("replacement")]
     [InlineData("entity")]
     [InlineData("world")]
-    [InlineData("active-slot")]
     public void EquipmentLifecycle_ClearsHistory(string reason)
     {
         using var f = new Fixture();
@@ -276,11 +275,6 @@ public sealed class QuickToolMenuControllerTests
         if (reason == "replacement") { f.CurrentManager = new Mock<IPlayerInventoryManager>().Object; f.Controller.RefreshContext(); }
         if (reason == "entity") { f.PlayerIdentity = new object(); f.Controller.PollInput(); }
         if (reason == "world") f.Controller.ClearContext();
-        if (reason == "active-slot")
-        {
-            f.Events.Raise(x => x.AfterActiveSlotChanged += null, new ActiveSlotChangeEventArgs(0, 1));
-            f.Controller.CancelMenu();
-        }
         Assert.False(f.Menu.IsOpen);
         Assert.False(f.Operations.HasSession);
         Assert.Single(f.Packets);

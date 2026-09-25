@@ -110,11 +110,11 @@ internal sealed class QuickToolClientOperations : IDisposable
         return equipment is not null;
     }
 
-    /// <summary>Ends restoration only when the selected hotbar position actually changes.</summary>
+    /// <summary>Leaves restoration history intact; it becomes available again when the player returns to its recorded slot.</summary>
     private void OnActiveSlotChanged(ActiveSlotChangeEventArgs args)
     {
-        // Native inventory flips may refresh the held slot without changing the player's selection.
-        if (args.FromSlot != args.ToSlot) equipment?.OnManualActiveSlotChanged();
+        // Native inventory flips and ordinary player slot changes both raise this event. Action-time validation
+        // ensures restoration is only offered when the recorded hand slot is active again.
     }
 
     /// <summary>Clears unavailable or replaced player context without scanning inventory or reconciling items.</summary>

@@ -213,19 +213,18 @@ public sealed class QuickToolEquipmentTests
         Assert.False(f.Equipment.HasSession);
     }
 
-    /// <summary>Replacing a recorded item with an identical-looking stack invalidates restoration.</summary>
+    /// <summary>Replacing a recorded item with one uniquely matching saved contents preserves restoration.</summary>
     [Fact]
-    public void ReplacedOriginal_InvalidatesWithoutSubstitution()
+    public void ReplacedOriginal_RebindsWithoutSubstitution()
     {
         var f = new Fixture();
         f.PutPlain(f.Hotbar[0], 1);
         f.PutTool(f.Hotbar[1], 2, EnumTool.Pickaxe);
         Assert.Equal(QuickToolEquipmentResult.LocallyApplied, f.Select("tool:Pickaxe"));
         ItemStack replacement = f.PutPlain(f.Hotbar[1], 1);
-        f.Equipment.ValidateRestoration();
-        Assert.False(f.Equipment.HasSession);
-        Assert.Equal(QuickToolEquipmentResult.Rejected, f.Equipment.Restore());
-        Assert.Same(replacement, f.Hotbar[1].Itemstack);
+        Assert.True(f.Equipment.ValidateRestoration());
+        Assert.Equal(QuickToolEquipmentResult.LocallyApplied, f.Equipment.Restore());
+        Assert.Same(replacement, f.Hotbar[0].Itemstack);
     }
 
     /// <summary>Moved original references can still restore, while unrelated contents remain untouched.</summary>
@@ -360,16 +359,16 @@ public sealed class QuickToolEquipmentTests
         Assert.Same(original, f.Hotbar[1].Itemstack);
     }
 
-    /// <summary>Manual active-slot intent ends the prior restoration history without moving stacks.</summary>
+    /// <summary>Manual active-slot changes retain the prior restoration history without moving stacks.</summary>
     [Fact]
-    public void ManualHotbarChange_DiscardsSessionOnly()
+    public void ManualHotbarChange_PreservesSession()
     {
         var f = new Fixture();
         ItemStack original = f.PutPlain(f.Hotbar[0], 1);
         ItemStack pick = f.PutTool(f.Hotbar[1], 2, EnumTool.Pickaxe);
         Assert.Equal(QuickToolEquipmentResult.LocallyApplied, f.Select("tool:Pickaxe"));
         f.Equipment.OnManualActiveSlotChanged();
-        Assert.False(f.Equipment.HasSession);
+        Assert.True(f.Equipment.HasSession);
         Assert.Same(pick, f.Hotbar[0].Itemstack);
         Assert.Same(original, f.Hotbar[1].Itemstack);
     }
@@ -421,31 +420,29 @@ public sealed class QuickToolEquipmentTests
         Assert.Same(pick, f.Hotbar[1].Itemstack);
     }
 
-    /// <summary>A corrective replacement ends restoration even when the item looks identical.</summary>
+    /// <summary>A uniquely recreated original stack remains restorable when its contents are unchanged.</summary>
     [Fact]
-    public void CorrectiveReplacement_InvalidatesOriginal()
+    public void CorrectiveReplacement_RebindsOriginal()
     {
         var f = new Fixture();
         f.PutPlain(f.Hotbar[0], 1);
         f.PutTool(f.Hotbar[1], 2, EnumTool.Pickaxe);
         Assert.Equal(QuickToolEquipmentResult.LocallyApplied, f.Select("tool:Pickaxe"));
         f.PutPlain(f.Hotbar[1], 1);
-        f.Equipment.ValidateRestoration();
-        Assert.False(f.Equipment.HasSession);
-        Assert.Equal(QuickToolEquipmentResult.Rejected, f.Equipment.Restore());
+        Assert.True(f.Equipment.ValidateRestoration());
+        Assert.Equal(QuickToolEquipmentResult.LocallyApplied, f.Equipment.Restore());
     }
 
-    /// <summary>An equal-looking replacement outside an expected native update cannot be treated as A.</summary>
+    /// <summary>An equal-looking unique replacement can be treated as a server-recreated original stack.</summary>
     [Fact]
-    public void UnexpectedReplacement_InvalidatesEvenWithEqualContents()
+    public void UnexpectedReplacement_RebindsWhenUnique()
     {
         var f = new Fixture();
         f.PutPlain(f.Hotbar[0], 1);
         f.PutTool(f.Hotbar[1], 2, EnumTool.Pickaxe);
         Assert.Equal(QuickToolEquipmentResult.LocallyApplied, f.Select("tool:Pickaxe"));
         f.PutPlain(f.Hotbar[1], 1);
-        f.Equipment.ValidateRestoration();
-        Assert.False(f.Equipment.HasSession);
+        Assert.True(f.Equipment.ValidateRestoration());
     }
 
     /// <summary>A chained selection emits two ordinary packets in the precise return-then-equip order.</summary>

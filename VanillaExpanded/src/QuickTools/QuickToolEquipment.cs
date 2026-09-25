@@ -39,8 +39,8 @@ internal sealed class QuickToolEquipment
         session = null;
         lifetimeVersion++;
     }
-    /// <summary>Ends restoration after manual active-hand intent.</summary>
-    internal void OnManualActiveSlotChanged() => Clear();
+    /// <summary>Retains restoration history while the player temporarily uses another active-hand slot.</summary>
+    internal void OnManualActiveSlotChanged() { }
 
     /// <summary>Validates references and the return route once when preparing menu availability.</summary>
     internal bool ValidateRestoration()

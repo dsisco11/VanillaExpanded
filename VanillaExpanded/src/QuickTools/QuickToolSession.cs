@@ -55,11 +55,6 @@ internal sealed class QuickToolSession
     {
         hand = null!;
         originalAt = null;
-        ItemSlot? exactCurrent = view.Find(Current, CurrentQuantity, physicalOffhand);
-        ItemSlot? exactOriginal = Original is null ? null : view.Find(Original, OriginalQuantity, physicalOffhand);
-        // A normal two-slot server echo recreates both objects. A lone replacement is indistinguishable
-        // from an unrelated equal-looking item placed by another action, so leave that session invalid.
-        if (Original is not null && (exactCurrent is null) != (exactOriginal is null)) return false;
         ItemSlot? currentAt = ResolveStack(view, physicalOffhand, Current, currentSnapshot, CurrentQuantity);
         if (currentAt is null || !ReferenceEquals(view.ActiveHand(), currentAt)
             || currentAt.Inventory.GetSlotId(currentAt) != HandPosition
