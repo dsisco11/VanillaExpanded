@@ -8,6 +8,7 @@ using VanillaExpanded.IgnitionTools;
 using VanillaExpanded.SpawnDecal;
 using VanillaExpanded.src.AutoStashing;
 using VanillaExpanded.src.IgnitionTools;
+using VanillaExpanded.ToolModeRadialMenu;
 
 using Vintagestory.API.Common;
 
@@ -122,6 +123,10 @@ public class VanillaExpandedModSystem : ModSystem
             new PatchClassProcessor(harmony, typeof(IgnitionSourcesPatch)).Patch();
         }
 
+        if (Config.EnableToolModeRadialMenu)
+        {
+            new PatchClassProcessor(harmony, typeof(ToolModeDialogPatch)).Patch();
+        }
     }
 
     public override void AssetsFinalize(ICoreAPI api)

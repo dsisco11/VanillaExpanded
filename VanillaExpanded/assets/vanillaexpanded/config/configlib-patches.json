@@ -67,6 +67,14 @@
         "default": true,
         "weight": 1.6
       },
+      "EnableToolModeRadialMenu": {
+        "code": "EnableToolModeRadialMenu",
+        "name": "EnableToolModeRadialMenu",
+        "ingui": "vanillaexpanded:config-enable-tool-mode-radial-menu",
+        "comment": "vanillaexpanded:config-enable-tool-mode-radial-menu-tooltip",
+        "default": true,
+        "weight": 1.7
+      },
       "EnableBackpackDecraft": {
         "code": "EnableBackpackDecraft",
         "name": "EnableBackpackDecraft",
