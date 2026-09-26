@@ -38,7 +38,12 @@ internal sealed class ConfigLibIntegrationModSystem : ModSystem
     {
         if (api is null) return;
 
-        TrySyncConfigFromConfigLib();
+        HandleConfigUpdated(api, TrySyncConfigFromConfigLib);
+    }
+
+    internal static void HandleConfigUpdated(ICoreAPI api, Action syncConfig)
+    {
+        syncConfig();
         LiveConfigReload.NotifyAll(api);
     }
 
@@ -75,15 +80,13 @@ internal sealed class ConfigLibIntegrationModSystem : ModSystem
             Action onSyncedFromServer = () =>
             {
                 if (api is null) return;
-                TrySyncConfigFromConfigLib();
-                LiveConfigReload.NotifyAll(api);
+                HandleConfigUpdated(api, TrySyncConfigFromConfigLib);
             };
 
             Action onConfigSaved = () =>
             {
                 if (api is null) return;
-                TrySyncConfigFromConfigLib();
-                LiveConfigReload.NotifyAll(api);
+                HandleConfigUpdated(api, TrySyncConfigFromConfigLib);
             };
 
             object?[] args = BuildArgs(method, onSyncedFromServer, onConfigSaved);

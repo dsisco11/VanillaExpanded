@@ -29,28 +29,31 @@ public class VanillaExpandedModSystem : ModSystem
     public static void EnsureConfigLoaded(ICoreAPI api)
     {
         if (configLoaded) return;
-        
+
+        Config = LoadConfig(api);
+        configLoaded = true;
+    }
+
+    internal static VanillaExpandedConfig LoadConfig(ICoreAPI api)
+    {
         try
         {
             var loadedConfig = api.LoadModConfig<VanillaExpandedConfig>(Constants.ConfigFileName);
             if (loadedConfig is null)
             {
-                Config = new VanillaExpandedConfig();
-                api.StoreModConfig(Config, Constants.ConfigFileName);
+                var defaultConfig = new VanillaExpandedConfig();
+                api.StoreModConfig(defaultConfig, Constants.ConfigFileName);
                 api.Logger.Notification("[VanillaExpanded] Created default configuration file: {0}", Constants.ConfigFileName);
+                return defaultConfig;
             }
-            else
-            {
-                Config = loadedConfig;
-            }
+
+            return loadedConfig;
         }
         catch (Exception ex)
         {
             api.Logger.Error("[VanillaExpanded] Failed to load configuration: {0}", ex.Message);
-            Config = new VanillaExpandedConfig();
+            return new VanillaExpandedConfig();
         }
-        
-        configLoaded = true;
     }
 
     public override void Dispose()
