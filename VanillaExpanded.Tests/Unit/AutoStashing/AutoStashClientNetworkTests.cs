@@ -55,4 +55,23 @@ public class AutoStashClientNetworkTests
             logger => logger.Error("Cannot send auto-stash request packet: Network channel is null."),
             Times.Once);
     }
+
+    [Fact]
+    public void RequestEntityAutoStash_ChannelAvailable_SendsEntityAndAttachmentSlot()
+    {
+        var fixture = VsTestFixture.Client();
+        var channel = new MockClientNetworkChannel();
+        fixture.ClientNetworkMock!
+            .Setup(network => network.GetChannel(Constants.ModId))
+            .Returns(channel);
+
+        var system = new AutoStashSystem_Client();
+        system.StartClientSide(fixture.ClientApi);
+
+        system.RequestEntityAutoStash(42, 3);
+
+        Packet_RequestEntityAutoStash packet = Assert.IsType<Packet_RequestEntityAutoStash>(Assert.Single(channel.SentPackets));
+        Assert.Equal(42, packet.EntityId);
+        Assert.Equal(3, packet.AttachmentSlotIndex);
+    }
 }

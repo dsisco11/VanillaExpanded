@@ -2,6 +2,8 @@
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
 
+using VanillaExpanded.AutoStashing;
+
 namespace VanillaExpanded;
 
 internal class AutoStashSystem_Client : ModSystem
@@ -9,6 +11,7 @@ internal class AutoStashSystem_Client : ModSystem
     #region Fields
     private ICoreClientAPI? api;
     private IClientNetworkChannel? channel;
+    internal EntityAttachedContainerAutoStashClient? EntityAttachedContainers { get; private set; }
     #endregion
 
     #region Accessors
@@ -23,6 +26,8 @@ internal class AutoStashSystem_Client : ModSystem
 
     public override void Dispose()
     {
+        EntityAttachedContainers?.Dispose();
+        EntityAttachedContainers = null;
         base.Dispose();
         api = null;
         channel = null;
@@ -32,6 +37,7 @@ internal class AutoStashSystem_Client : ModSystem
     {
         this.api = api;
         channel = api.Network.GetChannel(Constants.ModId);
+        EntityAttachedContainers = new EntityAttachedContainerAutoStashClient(api, RequestEntityAutoStash);
     }
     #endregion
 
@@ -50,5 +56,21 @@ internal class AutoStashSystem_Client : ModSystem
         };
         channel?.SendPacket(packet);
     }
+
+    public void RequestEntityAutoStash(long entityId, int attachmentSlotIndex)
+    {
+        if (channel is null)
+        {
+            Logger.Error("Cannot send entity auto-stash request packet: Network channel is null.");
+            return;
+        }
+
+        channel.SendPacket(new Network.Packet_RequestEntityAutoStash
+        {
+            EntityId = entityId,
+            AttachmentSlotIndex = attachmentSlotIndex
+        });
+    }
+
     #endregion
 }
