@@ -152,16 +152,7 @@ internal static class EntityAttachedContainerAutoStash
         HashSet<AssetLocation> contentTypes = [.. contentSlots
             .Where(static slot => slot.Itemstack?.Collectible is not null)
             .Select(static slot => slot.Itemstack!.Collectible.Code)];
-        bool openedForStash = usesWorkspace && !targetInventory.HasOpened(player);
-        if (openedForStash)
-        {
-            player.InventoryManager.OpenInventory(targetInventory);
-        }
-
-        bool movedItems;
-        try
-        {
-            movedItems = contentTypes.Count != 0 && BlockBehaviorAutoStashable.AutoStashToInventory(
+        bool movedItems = contentTypes.Count != 0 && AutoStashTransferService.AutoStashToInventory(
             world,
             player.InventoryManager,
             player.PlayerName,
@@ -169,15 +160,7 @@ internal static class EntityAttachedContainerAutoStash
             hostEntity.Pos.AsBlockPos,
             $"attached container on {hostEntity.Code}",
             stack => contentTypes.Contains(stack.Collectible.Code),
-            syncTargetInventory: false);
-        }
-        finally
-        {
-            if (openedForStash)
-            {
-                player.InventoryManager.CloseInventoryAndSync(targetInventory);
-            }
-        }
+            manageInventorySession: usesWorkspace) > 0;
 
         if (movedItems)
         {

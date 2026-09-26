@@ -424,7 +424,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
                 continue;
             }
 
-            if (container.Inventory.Any(targetSlot => CanAcceptForAutoStash(targetSlot, sourceSlot)))
+            if (container.Inventory.Any(targetSlot => AutoStashTransferService.CanAcceptForAutoStash(targetSlot, sourceSlot)))
             {
                 stashableIds.Add(collectibleId);
             }
@@ -508,14 +508,14 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         string playerName = "")
     {
         HashSet<AssetLocation> itemTypesInContainer = [.. container.GetNonEmptyContentStacks().Select(static stack => stack.Collectible.Code)];
-        bool itemsStashed = itemTypesInContainer.Count != 0 && AutoStashToInventory(
+        bool itemsStashed = itemTypesInContainer.Count != 0 && AutoStashTransferService.AutoStashToInventory(
             world,
             playerInventory,
             playerName,
             container.Inventory,
             container.Pos,
             container.InventoryClassName,
-            stack => itemTypesInContainer.Contains(stack.Collectible.Code));
+            stack => itemTypesInContainer.Contains(stack.Collectible.Code)) > 0;
 
         if (itemsStashed)
         {
@@ -541,14 +541,14 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         string playerName = "")
     {
         AssetLocation? containerAcceptedItem = container.Inventory.FirstNonEmptySlot?.Itemstack?.Collectible?.Code;
-        bool itemsStashed = containerAcceptedItem is not null && AutoStashToInventory(
+        bool itemsStashed = containerAcceptedItem is not null && AutoStashTransferService.AutoStashToInventory(
             world,
             playerInventory,
             playerName,
             container.Inventory,
             container.Pos,
             container.InventoryClassName,
-            stack => stack.Collectible.Code.Equals(containerAcceptedItem));
+            stack => stack.Collectible.Code.Equals(containerAcceptedItem)) > 0;
 
         if (itemsStashed)
         {
@@ -759,250 +759,6 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     #endregion
 
     #region Private Implementation
-
-    /// <summary>
-    /// Unified method to stash items from player's inventory into any inventory.
-    /// Uses a predicate to determine which items can be stashed, and optionally a slot selector for targeted stashing.
-    /// </summary>
-    /// <param name="world">The world accessor.</param>
-    /// <param name="playerInventory">The inventory manager whose slots are stashed.</param>
-    /// <param name="playerName">The player name used for audit logging.</param>
-    /// <param name="targetInventory">The inventory to stash items into.</param>
-    /// <param name="targetPos">The position of the target block entity (for logging).</param>
-    /// <param name="targetName">The name of the target (for logging).</param>
-    /// <param name="canAccept">Predicate that returns true if the item can be stashed.</param>
-    /// <param name="getPreferredSlot">Optional function to get the preferred slot index for an item. If null, uses GetBestSuitedSlot.</param>
-    /// <returns>True if any items were stashed, false otherwise.</returns>
-    internal static bool AutoStashToInventory(
-        in IWorldAccessor world,
-        IPlayerInventoryManager playerInventory,
-        string playerName,
-        in IInventory targetInventory,
-        in BlockPos targetPos,
-        in string targetName,
-        System.Func<ItemStack, bool> canAccept,
-        System.Func<ItemStack, int?>? getPreferredSlot = null,
-        bool syncTargetInventory = true)
-    {
-        IInventory? backpackInventory = playerInventory.GetOwnInventory(GlobalConstants.backpackInvClassName);
-        IInventory? hotbarInventory = playerInventory.GetOwnInventory(GlobalConstants.hotBarInvClassName);
-        bool canStashBackpack = CanStashAnyItems(backpackInventory, targetInventory, canAccept, getPreferredSlot);
-        bool canStashHotbar = CanStashAnyItems(hotbarInventory, targetInventory, canAccept, getPreferredSlot);
-
-        if (!canStashBackpack && !canStashHotbar)
-        {
-            return false;
-        }
-
-        if (syncTargetInventory)
-        {
-            _ = playerInventory.OpenInventory(targetInventory);
-        }
-
-        int totalStashed = 0;
-        try
-        {
-            if (backpackInventory is not null)
-            {
-                totalStashed += AutoStashInventoryIntoInventory(world, playerInventory, playerName, targetInventory, targetPos, targetName, backpackInventory, canAccept, getPreferredSlot);
-            }
-
-            if (hotbarInventory is not null)
-            {
-                totalStashed += AutoStashInventoryIntoInventory(world, playerInventory, playerName, targetInventory, targetPos, targetName, hotbarInventory, canAccept, getPreferredSlot);
-            }
-        }
-        finally
-        {
-            if (syncTargetInventory)
-            {
-                playerInventory.CloseInventoryAndSync(targetInventory);
-            }
-        }
-
-        if (totalStashed > 0)
-        {
-            world.Api?.World.Logger.Audit("'{0}' auto-stashed {1} items into {2} at <{3}>.",
-                playerName,
-                totalStashed,
-                targetName,
-                targetPos
-            );
-        }
-        return totalStashed > 0;
-    }
-
-    private static int AutoStashInventoryIntoInventory(
-        in IWorldAccessor world,
-        IPlayerInventoryManager playerInventory,
-        string playerName,
-        in IInventory targetInventory,
-        in BlockPos targetPos,
-        in string targetName,
-        in IInventory sourceInventory,
-        System.Func<ItemStack, bool> canAccept,
-        System.Func<ItemStack, int?>? getPreferredSlot)
-    {
-        int totalStashed = 0;
-
-        foreach (ItemSlot? itemSlot in sourceInventory)
-        {
-            if (itemSlot.Empty)
-            {
-                continue;
-            }
-
-            if (!canAccept(itemSlot.Itemstack))
-            {
-                continue;
-            }
-
-            totalStashed += TransferItemToInventory(world, playerInventory, playerName, targetInventory, targetPos, targetName, itemSlot, getPreferredSlot);
-        }
-        return totalStashed;
-    }
-
-    private static int TransferItemToInventory(
-        in IWorldAccessor world,
-        IPlayerInventoryManager playerInventory,
-        string playerName,
-        in IInventory targetInventory,
-        in BlockPos targetPos,
-        in string targetName,
-        in ItemSlot sourceSlot,
-        System.Func<ItemStack, int?>? getPreferredSlot)
-    {
-        int totalMoved = 0;
-        List<ItemSlot> skipSlots = [];
-        List<ItemSlot> directMergeSlots = [];
-        foreach (ItemSlot targetSlot in targetInventory)
-        {
-            if (!CanAcceptForAutoStash(targetSlot, sourceSlot))
-            {
-                skipSlots.Add(targetSlot);
-            }
-        }
-
-        while (!sourceSlot.Empty)
-        {
-            ItemSlot? targetSlot = null;
-            EnumMergePriority mergePriority = EnumMergePriority.AutoMerge;
-
-            // If a preferred slot function is provided, try to use it
-            if (getPreferredSlot is not null)
-            {
-                int? preferredSlotIndex = getPreferredSlot(sourceSlot.Itemstack);
-                if (preferredSlotIndex.HasValue && preferredSlotIndex.Value < targetInventory.Count)
-                {
-                    ItemSlot candidateSlot = targetInventory[preferredSlotIndex.Value];
-                    if (!skipSlots.Contains(candidateSlot) && candidateSlot.CanTakeFrom(sourceSlot))
-                    {
-                        targetSlot = candidateSlot;
-                    }
-                }
-            }
-
-            // Fall back to GetBestSuitedSlot if no preferred slot or preferred slot can't accept
-            if (targetSlot is null)
-            {
-                ItemStackMoveOperation findOp = new(world, EnumMouseButton.Left, EnumModifierKey.SHIFT, EnumMergePriority.AutoMerge, sourceSlot.StackSize);
-                WeightedSlot? bestSlot = targetInventory.GetBestSuitedSlot(sourceSlot, findOp, skipSlots);
-                targetSlot = bestSlot.slot;
-            }
-
-            if (targetSlot is null && directMergeSlots.Count > 0)
-            {
-                targetSlot = directMergeSlots[0];
-                directMergeSlots.RemoveAt(0);
-                mergePriority = EnumMergePriority.DirectMerge;
-            }
-
-            if (targetSlot is null)
-            {
-                break;
-            }
-
-            int requestedQuantity = sourceSlot.StackSize;
-            ItemStackMoveOperation moveOperation = new(world, EnumMouseButton.Left, EnumModifierKey.SHIFT, mergePriority, requestedQuantity);
-            int movedQuantity = sourceSlot.TryPutInto(targetSlot, ref moveOperation);
-            totalMoved += movedQuantity;
-
-            if (movedQuantity > 0)
-            {
-                world.Api?.World.Logger.Audit("'{0}' moved {1}x{2} into {3} at <{4}>.",
-                    playerName,
-                    movedQuantity,
-                    targetSlot.Itemstack?.Collectible.Code,
-                    targetName,
-                    targetPos
-                );
-            }
-
-            skipSlots.Add(targetSlot);
-
-            int notMovedQuantity = requestedQuantity - movedQuantity;
-            if (notMovedQuantity == 0)
-            {
-                break;
-            }
-
-            if (movedQuantity == 0)
-            {
-                if (!targetSlot.Empty
-                    && moveOperation.RequiredPriority == EnumMergePriority.DirectMerge
-                    && targetSlot.CanTakeFrom(sourceSlot, EnumMergePriority.DirectMerge))
-                {
-                    directMergeSlots.Add(targetSlot);
-                }
-            }
-        }
-        return totalMoved;
-    }
-
-    private static bool CanStashAnyItems(
-        IInventory? sourceInventory,
-        IInventory targetInventory,
-        System.Func<ItemStack, bool> canAccept,
-        System.Func<ItemStack, int?>? getPreferredSlot)
-    {
-        if (sourceInventory is null)
-        {
-            return false;
-        }
-
-        foreach (ItemSlot sourceSlot in sourceInventory)
-        {
-            if (sourceSlot.Empty || !canAccept(sourceSlot.Itemstack))
-            {
-                continue;
-            }
-
-            if (getPreferredSlot?.Invoke(sourceSlot.Itemstack) is int preferredSlotIndex
-                && preferredSlotIndex >= 0
-                && preferredSlotIndex < targetInventory.Count)
-            {
-                if (targetInventory[preferredSlotIndex] is ItemSlot preferredSlot
-                    && CanAcceptForAutoStash(preferredSlot, sourceSlot))
-                {
-                    return true;
-                }
-
-                continue;
-            }
-
-            if (targetInventory.Any(targetSlot => CanAcceptForAutoStash(targetSlot, sourceSlot)))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool CanAcceptForAutoStash(ItemSlot targetSlot, ItemSlot sourceSlot)
-    {
-        return targetSlot.CanTakeFrom(sourceSlot, EnumMergePriority.AutoMerge);
-    }
 
     private bool HasStashables(in IWorldAccessor world, IPlayerInventoryManager playerInventory, BlockSelection selection)
     {

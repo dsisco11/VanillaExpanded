@@ -17,6 +17,61 @@ namespace VanillaExpanded.Tests.Unit.AutoStashing;
 [Trait("Category", "Unit")]
 public class AutoStashTransferTests
 {
+    [Theory]
+    [InlineData(true, false, 1)]
+    [InlineData(true, true, 0)]
+    [InlineData(false, false, 0)]
+    public void TransferService_ManagesOnlySessionsItOwns(bool manageSession, bool alreadyOpen, int expectedLifecycleCalls)
+    {
+        var sharedItem = MockItem.CreateNonLightSource(1);
+        sharedItem.MaxStackSize = 64;
+        var fixture = CreateFixture();
+        fixture.WithBackpackSlot(0, sharedItem, stackSize: 7);
+        fixture.WithHotbarSlot(0, sharedItem, stackSize: 3);
+        var container = MockBlockEntityContainer.WithItems(fixture.Api, sharedItem);
+        int initialQuantity = container.Inventory[0].StackSize;
+        fixture.InventoryManagerMock.Setup(manager => manager.OpenedInventories)
+            .Returns(alreadyOpen ? new List<IInventory> { container.Inventory } : new List<IInventory>());
+
+        int moved = AutoStashTransferService.AutoStashToInventory(
+            fixture.World, fixture.Player, "test-player", container.Inventory,
+            new BlockPos(0), "test-container", _ => true,
+            manageInventorySession: manageSession);
+
+        Assert.Equal(10, moved);
+        Assert.Equal(initialQuantity + 10, container.Inventory[0].StackSize);
+        Assert.True(fixture.BackpackInventory[0].Empty);
+        Assert.True(fixture.HotbarInventory[0].Empty);
+        fixture.InventoryManagerMock.Verify(manager => manager.OpenInventory(container.Inventory), Times.Exactly(expectedLifecycleCalls));
+        fixture.InventoryManagerMock.Verify(manager => manager.CloseInventoryAndSync(container.Inventory), Times.Exactly(expectedLifecycleCalls));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TransferService_NoMatchingItemsOrCapacity_DoesNotOpenSession(bool full)
+    {
+        var sharedItem = MockItem.CreateNonLightSource(1);
+        sharedItem.MaxStackSize = 64;
+        var fixture = CreateFixture();
+        fixture.WithBackpackSlot(0, sharedItem, stackSize: 7);
+        var container = MockBlockEntityContainer.WithItems(
+            new Dictionary<int, MockItem> { { 0, sharedItem } }, totalSlots: 1, api: fixture.Api);
+        if (full)
+        {
+            container.Inventory[0].Itemstack!.StackSize = 64;
+        }
+
+        int moved = AutoStashTransferService.AutoStashToInventory(
+            fixture.World, fixture.Player, "test-player", container.Inventory,
+            new BlockPos(0), "test-container", _ => full);
+
+        Assert.Equal(0, moved);
+        Assert.Equal(7, fixture.BackpackInventory[0].StackSize);
+        fixture.InventoryManagerMock.Verify(manager => manager.OpenInventory(container.Inventory), Times.Never);
+        fixture.InventoryManagerMock.Verify(manager => manager.CloseInventoryAndSync(container.Inventory), Times.Never);
+    }
+
     [Fact]
     public void RefreshWorkspaceSlots_RepeatedReloads_UpdateContentsWithoutReplacingSlots()
     {
