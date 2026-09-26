@@ -165,7 +165,7 @@ internal sealed class ConfigLibIntegrationModSystem : ModSystem
         }
     }
 
-    private static object?[] BuildArgs(MethodInfo method, Action onSyncedFromServer, Action onConfigSaved)
+    internal static object?[] BuildArgs(MethodInfo method, Action onSyncedFromServer, Action onConfigSaved)
     {
         ParameterInfo[] parameters = method.GetParameters();
         object?[] args = new object?[parameters.Length];
