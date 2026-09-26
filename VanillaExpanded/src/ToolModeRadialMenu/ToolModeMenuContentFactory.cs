@@ -35,7 +35,7 @@ internal static class ToolModeMenuContentFactory
             : fallbackCurrentLabel;
         entries.Add(new RadialMenuEntry(CenterId, currentLabel, enabled: false));
         content = new ToolModeMenuContent(
-            new RadialMenuLayout(ids, CenterId, 0.24, 0.30, 1, separatorDegrees: 1.5),
+            new RadialMenuLayout(ids, CenterId, 0.24, 0.30, 1, separatorDegrees: 1.5, radiusScale: 0.6),
             entries);
         return true;
     }

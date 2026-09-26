@@ -35,6 +35,7 @@ public sealed class ToolModeMenuContentFactoryTests
         Assert.NotNull(content);
         Assert.Equal(new[] { "0", "1" }, content.Layout.WedgeIds);
         Assert.Equal("current", content.Layout.CenterId);
+        Assert.Equal(0.6, content.Layout.RadiusScale);
         Assert.Collection(content.Entries,
             first =>
             {
