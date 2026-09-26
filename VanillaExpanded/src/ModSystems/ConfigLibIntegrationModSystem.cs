@@ -40,7 +40,6 @@ internal sealed class ConfigLibIntegrationModSystem : ModSystem
 
         TrySyncConfigFromConfigLib();
         LiveConfigReload.NotifyAll(api);
-        VanillaExpandedModSystem.PersistConfigAndNotifyReloadRequired(api, source: "ConfigLib");
     }
 
     private void TryRegisterConfigWithConfigLib()
@@ -78,7 +77,6 @@ internal sealed class ConfigLibIntegrationModSystem : ModSystem
                 if (api is null) return;
                 TrySyncConfigFromConfigLib();
                 LiveConfigReload.NotifyAll(api);
-                VanillaExpandedModSystem.PersistConfigAndNotifyReloadRequired(api, source: "ConfigLib (server sync)");
             };
 
             Action onConfigSaved = () =>
@@ -86,7 +84,6 @@ internal sealed class ConfigLibIntegrationModSystem : ModSystem
                 if (api is null) return;
                 TrySyncConfigFromConfigLib();
                 LiveConfigReload.NotifyAll(api);
-                VanillaExpandedModSystem.PersistConfigAndNotifyReloadRequired(api, source: "ConfigLib");
             };
 
             object?[] args = BuildArgs(method, onSyncedFromServer, onConfigSaved);
