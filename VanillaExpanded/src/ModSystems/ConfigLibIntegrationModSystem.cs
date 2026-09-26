@@ -1,9 +1,10 @@
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 
-using VanillaExpanded;
-using VanillaExpanded.ModSystems;
+using Newtonsoft.Json;
 
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
@@ -12,174 +13,178 @@ namespace VanillaExpanded.ModSystems;
 
 internal sealed class ConfigLibIntegrationModSystem : ModSystem
 {
+    internal const string ConfigSavedEvent = "configlib:{0}:config-saved";
+    internal const string ConfigChangedEvent = "configlib:{0}:setting-changed";
+    internal const string ConfigLoadedEvent = "configlib:{0}:setting-loaded";
+    internal const string ConfigReloadEvent = "configlib:config-reload";
+
     private ICoreAPI? api;
-    private bool registered;
-    private object? configLibConfig;
 
     public override double ExecuteOrder() => 0.0;
 
     public override void StartPre(ICoreAPI api)
     {
         this.api = api;
-
         VanillaExpandedModSystem.EnsureConfigLoaded(api);
-        TryRegisterConfigWithConfigLib();
     }
 
     public override void Start(ICoreAPI api)
     {
         this.api = api;
 
-        // ConfigLib emits events on the VS event bus when settings change / config is saved.
-        api.Event.RegisterEventBusListener(OnConfigLibConfigSaved, filterByEventName: string.Format("configlib:{0}:config-saved", Constants.ModId));
+        api.Event.RegisterEventBusListener(OnConfigLibEvent, filterByEventName: string.Format(ConfigSavedEvent, Constants.ModId));
+        api.Event.RegisterEventBusListener(OnConfigLibEvent, filterByEventName: string.Format(ConfigChangedEvent, Constants.ModId));
+        api.Event.RegisterEventBusListener(OnConfigLibEvent, filterByEventName: string.Format(ConfigLoadedEvent, Constants.ModId));
+        api.Event.RegisterEventBusListener(OnConfigLibEvent, filterByEventName: ConfigReloadEvent);
     }
 
-    private void OnConfigLibConfigSaved(string eventName, ref EnumHandling handling, IAttribute data)
+    private void OnConfigLibEvent(string eventName, ref EnumHandling handling, IAttribute data)
     {
         if (api is null) return;
+        if (ApplyConfigLibSettings(VanillaExpandedModSystem.Config, data) == 0) return;
 
-        HandleConfigUpdated(api, TrySyncConfigFromConfigLib);
-    }
-
-    internal static void HandleConfigUpdated(ICoreAPI api, Action syncConfig)
-    {
-        syncConfig();
         LiveConfigReload.NotifyAll(api);
     }
 
-    private void TryRegisterConfigWithConfigLib()
+    internal static int ApplyConfigLibSettings(VanillaExpandedConfig config, IAttribute data)
     {
-        if (registered) return;
-        if (api is null) return;
-        if (!api.ModLoader.IsModEnabled("configlib")) return;
+        int applied = 0;
 
-        ModSystem? configLib = api.ModLoader.GetModSystem("ConfigLib.ConfigLibModSystem");
-        if (configLib is null)
+        foreach (ConfigLibSettingUpdate update in ExtractSettingUpdates(data))
         {
-            api.Logger.Debug("[VanillaExpanded] ConfigLib mod is enabled but ConfigLib.ConfigLibModSystem was not found.");
-            return;
+            PropertyInfo? property = typeof(VanillaExpandedConfig).GetProperty(
+                update.PropertyName,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase);
+
+            if (property?.CanWrite != true) continue;
+            if (!TryConvertValue(update.Value, property.PropertyType, out object? value)) continue;
+
+            property.SetValue(config, value);
+            applied++;
         }
 
-        MethodInfo? method = configLib.GetType()
-            .GetMethods(BindingFlags.Instance | BindingFlags.Public)
-            .FirstOrDefault(m =>
-            {
-                if (m.Name != "RegisterCustomManagedConfig") return false;
-                var p = m.GetParameters();
-                return p.Length >= 2 && p[0].ParameterType == typeof(string) && p[1].ParameterType == typeof(object);
-            });
-
-        if (method is null)
-        {
-            api.Logger.Debug("[VanillaExpanded] ConfigLib.ConfigLibModSystem.RegisterCustomManagedConfig(...) was not found (API mismatch?).");
-            return;
-        }
-
-        try
-        {
-            Action onSyncedFromServer = () =>
-            {
-                if (api is null) return;
-                HandleConfigUpdated(api, TrySyncConfigFromConfigLib);
-            };
-
-            Action onConfigSaved = () =>
-            {
-                if (api is null) return;
-                HandleConfigUpdated(api, TrySyncConfigFromConfigLib);
-            };
-
-            object?[] args = BuildArgs(method, onSyncedFromServer, onConfigSaved);
-            method.Invoke(configLib, args);
-            registered = true;
-
-            // Capture the created/registered config instance and do an initial sync.
-            configLibConfig = TryGetConfigInstance(configLib);
-            TrySyncConfigFromConfigLib();
-            LiveConfigReload.NotifyAll(api);
-        }
-        catch (Exception ex)
-        {
-            api.Logger.Warning("[VanillaExpanded] Failed to register config with ConfigLib: {0}", ex);
-        }
+        return applied;
     }
 
-    private void TrySyncConfigFromConfigLib()
+    private static ConfigLibSettingUpdate[] ExtractSettingUpdates(IAttribute data)
     {
-        if (api is null) return;
-        if (!api.ModLoader.IsModEnabled("configlib")) return;
-
-        // Prefer cached instance (if we captured it after registration).
-        configLibConfig ??= TryGetConfigInstance(api.ModLoader.GetModSystem("ConfigLib.ConfigLibModSystem"));
-        if (configLibConfig is null) return;
-
-        try
+        if (data is TreeAttribute tree)
         {
-            MethodInfo? assignMethod = configLibConfig.GetType().GetMethod(
-                "AssignSettingsValues",
-                BindingFlags.Instance | BindingFlags.Public,
-                binder: null,
-                types: new[] { typeof(object) },
-                modifiers: null);
+            var updates = new List<ConfigLibSettingUpdate>();
 
-            if (assignMethod is null)
+            if (TryExtractSingleSetting(tree, out ConfigLibSettingUpdate single))
             {
-                api.Logger.Debug("[VanillaExpanded] ConfigLib config does not expose AssignSettingsValues(object). Cannot sync settings into mod config.");
-                return;
+                updates.Add(single);
             }
 
-            assignMethod.Invoke(configLibConfig, new object?[] { VanillaExpandedModSystem.Config });
-        }
-        catch (Exception ex)
-        {
-            api.Logger.Warning("[VanillaExpanded] Failed to sync settings from ConfigLib into mod config: {0}", ex);
-        }
-    }
+            if (TryGetTree(tree, "Settings", out TreeAttribute? settings))
+            {
+                foreach (string key in settings!.Keys)
+                {
+                    if (settings[key] is TreeAttribute entry && TryExtractSingleSetting(entry, out ConfigLibSettingUpdate update))
+                    {
+                        updates.Add(update);
+                    }
+                }
+            }
 
-    private object? TryGetConfigInstance(object? configLibModSystem)
-    {
-        if (api is null) return null;
-        if (configLibModSystem is null) return null;
+            return updates.ToArray();
+        }
+
+        if (data is not StringAttribute attribute || string.IsNullOrWhiteSpace(attribute.value))
+        {
+            return Array.Empty<ConfigLibSettingUpdate>();
+        }
 
         try
         {
-            MethodInfo? getConfig = configLibModSystem.GetType().GetMethod(
-                "GetConfig",
-                BindingFlags.Instance | BindingFlags.Public,
-                binder: null,
-                types: new[] { typeof(string) },
-                modifiers: null);
-
-            if (getConfig is null)
-            {
-                api.Logger.Debug("[VanillaExpanded] ConfigLib mod system does not expose GetConfig(string). Cannot locate config instance.");
-                return null;
-            }
-
-            return getConfig.Invoke(configLibModSystem, new object?[] { Constants.ModId });
+            Dictionary<string, string>? values = JsonConvert.DeserializeObject<Dictionary<string, string>>(attribute.value);
+            return values?.Select(pair => new ConfigLibSettingUpdate(pair.Key, pair.Value)).ToArray()
+                ?? Array.Empty<ConfigLibSettingUpdate>();
         }
-        catch (Exception ex)
+        catch
         {
-            api.Logger.Warning("[VanillaExpanded] Failed to get ConfigLib config instance: {0}", ex);
-            return null;
+            return Array.Empty<ConfigLibSettingUpdate>();
         }
     }
 
-    internal static object?[] BuildArgs(MethodInfo method, Action onSyncedFromServer, Action onConfigSaved)
+    private static bool TryExtractSingleSetting(TreeAttribute tree, out ConfigLibSettingUpdate update)
     {
-        ParameterInfo[] parameters = method.GetParameters();
-        object?[] args = new object?[parameters.Length];
+        string? propertyName = TryGetString(tree, "MappingKey")
+            ?? TryGetString(tree, "Setting")
+            ?? TryGetString(tree, "Code")
+            ?? TryGetString(tree, "Key");
 
-        // Required
-        args[0] = Constants.ModId;
-        args[1] = VanillaExpandedModSystem.Config;
+        string? value = TryGetString(tree, "Value")
+            ?? TryGetString(tree, "value")
+            ?? TryGetString(tree, "NewValue");
 
-        // Optional parameters (in current ConfigLib): path, onSyncedFromServer, onSettingChanged, onConfigSaved
-        if (parameters.Length >= 3) args[2] = Constants.ConfigFileName;
-        if (parameters.Length >= 4) args[3] = onSyncedFromServer;
-        if (parameters.Length >= 5) args[4] = null;
-        if (parameters.Length >= 6) args[5] = onConfigSaved;
+        if (string.IsNullOrWhiteSpace(propertyName) || value is null)
+        {
+            update = default;
+            return false;
+        }
 
-        return args;
+        update = new ConfigLibSettingUpdate(propertyName, value);
+        return true;
     }
+
+    private static bool TryGetTree(TreeAttribute tree, string key, out TreeAttribute? value)
+    {
+        foreach (string candidate in tree.Keys)
+        {
+            if (!string.Equals(candidate, key, StringComparison.OrdinalIgnoreCase)) continue;
+
+            value = tree[candidate] as TreeAttribute;
+            return value is not null;
+        }
+
+        value = null;
+        return false;
+    }
+
+    private static string? TryGetString(TreeAttribute tree, string key)
+    {
+        foreach (string candidate in tree.Keys)
+        {
+            if (!string.Equals(candidate, key, StringComparison.OrdinalIgnoreCase)) continue;
+
+            return tree[candidate] switch
+            {
+                StringAttribute value => value.value,
+                IntAttribute value => value.value.ToString(CultureInfo.InvariantCulture),
+                LongAttribute value => value.value.ToString(CultureInfo.InvariantCulture),
+                FloatAttribute value => value.value.ToString("R", CultureInfo.InvariantCulture),
+                DoubleAttribute value => value.value.ToString("R", CultureInfo.InvariantCulture),
+                BoolAttribute value => value.value ? "true" : "false",
+                _ => tree[candidate].ToString()
+            };
+        }
+
+        return null;
+    }
+
+    private static bool TryConvertValue(string rawValue, Type targetType, out object? value)
+    {
+        try
+        {
+            value = JsonConvert.DeserializeObject(rawValue, targetType);
+            return value is not null;
+        }
+        catch
+        {
+            try
+            {
+                value = Convert.ChangeType(rawValue, targetType, CultureInfo.InvariantCulture);
+                return true;
+            }
+            catch
+            {
+                value = null;
+                return false;
+            }
+        }
+    }
+
+    private readonly record struct ConfigLibSettingUpdate(string PropertyName, string Value);
 }

@@ -1,10 +1,9 @@
-using Moq;
-
-using System.Reflection;
-
 using VanillaExpanded.ModSystems;
 
-using Vintagestory.API.Common;
+using System.Reflection;
+using System.Text.Json;
+
+using Vintagestory.API.Datastructures;
 
 namespace VanillaExpanded.Tests.Unit.Configuration;
 
@@ -12,101 +11,131 @@ namespace VanillaExpanded.Tests.Unit.Configuration;
 public class ConfigLibIntegrationTests
 {
     [Fact]
-    public void BuildArgs_MinimalSignature_MapsRequiredArguments()
+    public void ConfigLibAsset_DeclaresEveryConfigProperty()
     {
-        MethodInfo method = GetRegistrationMethod(nameof(RegistrationSignatures.Minimal));
+        string repositoryRoot = FindRepositoryRoot();
+        string assetPath = Path.Combine(
+            repositoryRoot,
+            "VanillaExpanded",
+            "assets",
+            "vanillaexpanded",
+            "config",
+            "configlib-patches.json");
 
-        object?[] result = ConfigLibIntegrationModSystem.BuildArgs(method, () => { }, () => { });
+        using JsonDocument document = JsonDocument.Parse(File.ReadAllText(assetPath));
+        JsonElement settings = document.RootElement.GetProperty("settings");
+        var declaredSettings = new Dictionary<string, string>();
 
-        Assert.Equal(2, result.Length);
-        Assert.Equal(Constants.ModId, result[0]);
-        Assert.Same(VanillaExpandedModSystem.Config, result[1]);
+        foreach (JsonProperty category in settings.EnumerateObject())
+        {
+            foreach (JsonProperty setting in category.Value.EnumerateObject())
+            {
+                declaredSettings.Add(setting.Name, setting.Value.GetProperty("code").GetString()!);
+            }
+        }
+
+        string[] configProperties = typeof(VanillaExpandedConfig)
+            .GetProperties(BindingFlags.Instance | BindingFlags.Public)
+            .Select(property => property.Name)
+            .Order()
+            .ToArray();
+
+        Assert.Equal(configProperties, declaredSettings.Keys.Order());
+        Assert.All(declaredSettings, setting => Assert.Equal(setting.Key, setting.Value));
     }
 
     [Fact]
-    public void BuildArgs_CurrentSignature_MapsCallbacksToExpectedSlots()
+    public void ApplyConfigLibSettings_SingleTreeUpdate_AppliesBoolean()
     {
-        MethodInfo method = GetRegistrationMethod(nameof(RegistrationSignatures.Current));
-        Action onSyncedFromServer = () => { };
-        Action onConfigSaved = () => { };
+        var config = new VanillaExpandedConfig { EnableAutoStash = true };
+        var data = new TreeAttribute
+        {
+            ["MappingKey"] = new StringAttribute(nameof(VanillaExpandedConfig.EnableAutoStash)),
+            ["Value"] = new BoolAttribute(false)
+        };
 
-        object?[] result = ConfigLibIntegrationModSystem.BuildArgs(
-            method,
-            onSyncedFromServer,
-            onConfigSaved);
+        int applied = ConfigLibIntegrationModSystem.ApplyConfigLibSettings(config, data);
 
-        Assert.Equal(6, result.Length);
-        Assert.Equal(Constants.ModId, result[0]);
-        Assert.Same(VanillaExpandedModSystem.Config, result[1]);
-        Assert.Equal(Constants.ConfigFileName, result[2]);
-        Assert.Same(onSyncedFromServer, result[3]);
-        Assert.Null(result[4]);
-        Assert.Same(onConfigSaved, result[5]);
+        Assert.Equal(1, applied);
+        Assert.False(config.EnableAutoStash);
     }
 
     [Fact]
-    public void HandleConfigUpdated_SynchronizesAndNotifiesWithoutPersisting()
+    public void ApplyConfigLibSettings_BatchedTreeUpdate_AppliesEveryKnownSetting()
     {
-        var operations = new List<string>();
-        var liveSystem = new RecordingLiveConfigurable(operations);
-        var modLoader = new Mock<IModLoader>();
-        modLoader.Setup(loader => loader.Systems).Returns(new ModSystem[] { liveSystem });
+        var config = new VanillaExpandedConfig();
+        var settings = new TreeAttribute
+        {
+            ["autoStash"] = CreateSetting(nameof(VanillaExpandedConfig.EnableAutoStash), "false"),
+            ["delay"] = CreateSetting(nameof(VanillaExpandedConfig.AutoStashDelay), "1.25")
+        };
+        var data = new TreeAttribute { ["Settings"] = settings };
 
-        var api = new Mock<ICoreAPI>();
-        api.Setup(coreApi => coreApi.ModLoader).Returns(modLoader.Object);
+        int applied = ConfigLibIntegrationModSystem.ApplyConfigLibSettings(config, data);
 
-        ConfigLibIntegrationModSystem.HandleConfigUpdated(api.Object, () => operations.Add("sync"));
-
-        Assert.Equal(["sync", "reload"], operations);
-        Assert.Equal(1, liveSystem.ReloadCount);
-        Assert.Same(api.Object, liveSystem.LastApi);
-        api.Verify(
-            coreApi => coreApi.StoreModConfig(It.IsAny<VanillaExpandedConfig>(), It.IsAny<string>()),
-            Times.Never);
+        Assert.Equal(2, applied);
+        Assert.False(config.EnableAutoStash);
+        Assert.Equal(1.25f, config.AutoStashDelay);
     }
 
-    private sealed class RecordingLiveConfigurable : ModSystem, ILiveConfigurable
+    [Fact]
+    public void ApplyConfigLibSettings_StringPayload_AppliesKnownSettings()
     {
-        private readonly List<string> operations;
+        var config = new VanillaExpandedConfig();
+        var data = new StringAttribute(
+            "{\"EnableIgnitionTools\":\"false\",\"SpawnDecalSize\":\"0.8\"}");
 
-        public RecordingLiveConfigurable(List<string> operations)
-        {
-            this.operations = operations;
-        }
+        int applied = ConfigLibIntegrationModSystem.ApplyConfigLibSettings(config, data);
 
-        public int ReloadCount { get; private set; }
-
-        public ICoreAPI? LastApi { get; private set; }
-
-        public void OnConfigReloaded(ICoreAPI api)
-        {
-            operations.Add("reload");
-            ReloadCount++;
-            LastApi = api;
-        }
+        Assert.Equal(2, applied);
+        Assert.False(config.EnableIgnitionTools);
+        Assert.Equal(0.8f, config.SpawnDecalSize);
     }
 
-    private static MethodInfo GetRegistrationMethod(string name)
+    [Fact]
+    public void ApplyConfigLibSettings_UnknownOrInvalidSettings_IgnoresThem()
     {
-        return typeof(RegistrationSignatures).GetMethod(
-            name,
-            BindingFlags.Static | BindingFlags.Public)!;
+        var config = new VanillaExpandedConfig();
+        var data = new StringAttribute(
+            "{\"UnknownSetting\":\"true\",\"AutoStashDelay\":\"not-a-number\"}");
+
+        int applied = ConfigLibIntegrationModSystem.ApplyConfigLibSettings(config, data);
+
+        Assert.Equal(0, applied);
+        Assert.Equal(0.5f, config.AutoStashDelay);
     }
 
-    private static class RegistrationSignatures
+    [Fact]
+    public void ApplyConfigLibSettings_MalformedPayload_DoesNothing()
     {
-        public static void Minimal(string modId, object config)
+        var config = new VanillaExpandedConfig();
+
+        int applied = ConfigLibIntegrationModSystem.ApplyConfigLibSettings(
+            config,
+            new StringAttribute("not-json"));
+
+        Assert.Equal(0, applied);
+    }
+
+    private static TreeAttribute CreateSetting(string propertyName, string value)
+    {
+        return new TreeAttribute
         {
+            ["MappingKey"] = new StringAttribute(propertyName),
+            ["Value"] = new StringAttribute(value)
+        };
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "VanillaExpanded.sln")))
+        {
+            directory = directory.Parent;
         }
 
-        public static void Current(
-            string modId,
-            object config,
-            string path,
-            Action onSyncedFromServer,
-            Action? onSettingChanged,
-            Action onConfigSaved)
-        {
-        }
+        return directory?.FullName
+            ?? throw new DirectoryNotFoundException("Could not locate the VanillaExpanded repository root.");
     }
 }
