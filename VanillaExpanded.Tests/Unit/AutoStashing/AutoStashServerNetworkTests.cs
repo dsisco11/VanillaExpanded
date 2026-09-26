@@ -28,6 +28,7 @@ public class AutoStashServerNetworkTests
 
         // Assert
         Assert.True(channel.HasMessageHandler<Packet_RequestAutoStash>());
+        Assert.True(channel.HasMessageHandler<Packet_RequestEntityAutoStash>());
     }
 
     [Fact]

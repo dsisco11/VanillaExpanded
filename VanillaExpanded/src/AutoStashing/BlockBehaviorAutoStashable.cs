@@ -773,7 +773,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     /// <param name="canAccept">Predicate that returns true if the item can be stashed.</param>
     /// <param name="getPreferredSlot">Optional function to get the preferred slot index for an item. If null, uses GetBestSuitedSlot.</param>
     /// <returns>True if any items were stashed, false otherwise.</returns>
-    protected static bool AutoStashToInventory(
+    internal static bool AutoStashToInventory(
         in IWorldAccessor world,
         IPlayerInventoryManager playerInventory,
         string playerName,
@@ -781,7 +781,8 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         in BlockPos targetPos,
         in string targetName,
         System.Func<ItemStack, bool> canAccept,
-        System.Func<ItemStack, int?>? getPreferredSlot = null)
+        System.Func<ItemStack, int?>? getPreferredSlot = null,
+        bool syncTargetInventory = true)
     {
         IInventory? backpackInventory = playerInventory.GetOwnInventory(GlobalConstants.backpackInvClassName);
         IInventory? hotbarInventory = playerInventory.GetOwnInventory(GlobalConstants.hotBarInvClassName);
@@ -793,7 +794,10 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             return false;
         }
 
-        _ = playerInventory.OpenInventory(targetInventory);
+        if (syncTargetInventory)
+        {
+            _ = playerInventory.OpenInventory(targetInventory);
+        }
 
         int totalStashed = 0;
         try
@@ -810,7 +814,10 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         }
         finally
         {
-            playerInventory.CloseInventoryAndSync(targetInventory);
+            if (syncTargetInventory)
+            {
+                playerInventory.CloseInventoryAndSync(targetInventory);
+            }
         }
 
         if (totalStashed > 0)

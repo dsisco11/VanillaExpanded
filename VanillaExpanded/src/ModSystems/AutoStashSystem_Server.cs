@@ -3,7 +3,9 @@ using VanillaExpanded.Network;
 using VanillaExpanded.src.AutoStashing;
 
 using Vintagestory.API.Common;
+using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Server;
+using Vintagestory.GameContent;
 
 namespace VanillaExpanded.src.ModSystems;
 
@@ -31,6 +33,7 @@ internal class AutoStashSystem_Server : ModSystem
         this.api = api;
         channel = api.Network.GetChannel(Constants.ModId);
         channel.SetMessageHandler<Packet_RequestAutoStash>(ProcessAutoStashRequest);
+        channel.SetMessageHandler<Packet_RequestEntityAutoStash>(ProcessEntityAutoStashRequest);
     }
     #endregion
 
@@ -58,6 +61,23 @@ internal class AutoStashSystem_Server : ModSystem
         // get the "AutoStashable" behavior for the block
         var autoStashBehavior = block.GetBehavior<BlockBehaviorAutoStashable>();
         autoStashBehavior?.TryStashPlayerInventory(api.World, fromPlayer, packet.position.Copy());
+    }
+
+    private void ProcessEntityAutoStashRequest(IServerPlayer fromPlayer, Packet_RequestEntityAutoStash packet)
+    {
+        Entity? entity = api!.World.GetEntityById(packet.EntityId);
+        EntityBehaviorAttachable? attachable = entity?.GetBehavior<EntityBehaviorAttachable>();
+        if (entity is null || attachable is null || fromPlayer.Entity.Pos.SquareDistanceTo(entity.Pos) > 36)
+        {
+            return;
+        }
+
+        EntityAttachedContainerAutoStash.TryAutoStash(
+            api.World,
+            fromPlayer,
+            entity,
+            attachable,
+            packet.AttachmentSlotIndex);
     }
     #endregion
 }

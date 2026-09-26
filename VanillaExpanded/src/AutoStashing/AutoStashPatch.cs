@@ -6,7 +6,10 @@ using HarmonyLib;
 
 using VanillaExpanded.AutoStashing;
 
+using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Common.Entities;
+using Vintagestory.API.MathTools;
 using Vintagestory.GameContent;
 
 namespace VanillaExpanded.src.AutoStashing;
@@ -60,6 +63,26 @@ public static class AutoStashPatch
             }
         }
     }
+
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(EntityBehaviorAttachable), nameof(EntityBehaviorAttachable.OnInteract))]
+    public static bool EntityBehaviorAttachable_OnInteract_Prefix(
+        EntityBehaviorAttachable __instance,
+        EntityAgent byEntity,
+        Vec3d hitPosition,
+        EnumInteractMode mode,
+        ref EnumHandling handled)
+        => EntityAttachedContainerAutoStash.HandleInteract(__instance, byEntity, mode, ref handled);
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(EntityBehaviorAttachable), nameof(EntityBehaviorAttachable.GetInteractionHelp))]
+    public static void EntityBehaviorAttachable_GetInteractionHelp_Postfix(
+        EntityBehaviorAttachable __instance,
+        IClientWorldAccessor world,
+        EntitySelection es,
+        IClientPlayer player,
+        ref WorldInteraction[] __result)
+        => EntityAttachedContainerAutoStash.AppendInteractionHelp(__instance, world, es, player, ref __result);
 
     /// <summary>
     /// Reverse patch to call Block.OnBlockInteractStart directly, bypassing BlockBloomery's override.

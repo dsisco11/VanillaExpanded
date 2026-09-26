@@ -17,6 +17,34 @@ namespace VanillaExpanded.Tests.Unit.AutoStashing;
 [Trait("Category", "Unit")]
 public class AutoStashTransferTests
 {
+    [Fact]
+    public void RefreshWorkspaceSlots_RepeatedReloads_UpdateContentsWithoutReplacingSlots()
+    {
+        var inventory = new InventoryGeneric(2, "mountedbaginv", "test", null!);
+        ItemSlot firstSlot = inventory[0];
+        ItemSlot secondSlot = inventory[1];
+        var originalStack = new ItemStack(MockItem.CreateNonLightSource(1));
+        var updatedStack = new ItemStack(MockItem.CreateNonLightSource(2));
+        firstSlot.Itemstack = originalStack;
+        secondSlot.Itemstack = originalStack.Clone();
+
+        EntityAttachedContainerAutoStash.RefreshWorkspaceSlots(inventory,
+            new ItemSlot[] { new DummySlot(updatedStack), new DummySlot(null) });
+
+        Assert.Same(firstSlot, inventory[0]);
+        Assert.Same(secondSlot, inventory[1]);
+        Assert.Same(updatedStack, firstSlot.Itemstack);
+        Assert.True(secondSlot.Empty);
+
+        EntityAttachedContainerAutoStash.RefreshWorkspaceSlots(inventory,
+            new ItemSlot[] { new DummySlot(null), new DummySlot(originalStack) });
+
+        Assert.Same(firstSlot, inventory[0]);
+        Assert.Same(secondSlot, inventory[1]);
+        Assert.True(firstSlot.Empty);
+        Assert.Same(originalStack, secondSlot.Itemstack);
+    }
+
     #region Test Infrastructure
 
     /// <summary>
