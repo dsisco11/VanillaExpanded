@@ -18,7 +18,7 @@ internal sealed class RadialMenuRenderer : IDisposable
     private readonly Matrixf matrix = new();
     private readonly Dictionary<string, LoadedTexture> labels = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> renderedLabels = new(StringComparer.Ordinal);
-    private readonly CairoFont labelFont = CairoFont.WhiteSmallText().WithStroke([0, 0, 0, 0.65], 1.5);
+    private CairoFont? labelFont;
     private readonly LoadedTexture dimTexture;
     private readonly RadialMenuIconHalo iconHalo;
     private RadialMenuLayout? meshLayout;
@@ -197,7 +197,8 @@ internal sealed class RadialMenuRenderer : IDisposable
         foreach (LoadedTexture texture in labels.Values) texture.Dispose();
         dimTexture.Dispose();
         iconHalo.Dispose();
-        labelFont.Dispose();
+        labelFont?.Dispose();
+        labelFont = null;
         labels.Clear();
     }
     #endregion
@@ -318,6 +319,7 @@ internal sealed class RadialMenuRenderer : IDisposable
             renderedLabels[id] = cacheKey;
             if (!string.IsNullOrEmpty(text))
             {
+                labelFont ??= CairoFont.WhiteSmallText().WithStroke([0, 0, 0, 0.65], 1.5);
                 labels[id] = maximumWidth > 0
                     ? capi.Gui.TextTexture.GenTextTexture(text, labelFont, maximumWidth, null, EnumTextOrientation.Center)
                     : capi.Gui.TextTexture.GenTextTexture(text, labelFont);
