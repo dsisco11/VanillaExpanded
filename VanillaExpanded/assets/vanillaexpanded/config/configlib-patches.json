@@ -90,6 +90,15 @@
         "comment": "vanillaexpanded:config-enable-wattle-decraft-tooltip",
         "default": true,
         "weight": 3.4
+      },
+      "USE_TEMPORAL_GEAR_SPAWN_MARKER": {
+        "code": "UseTemporalGearSpawnMarker",
+        "name": "UseTemporalGearSpawnMarker",
+        "ingui": "vanillaexpanded:config-use-temporal-gear-spawn-marker",
+        "comment": "vanillaexpanded:config-use-temporal-gear-spawn-marker-tooltip",
+        "default": false,
+        "weight": 3.6,
+        "clientSide": true
       }
     },
     "float": {

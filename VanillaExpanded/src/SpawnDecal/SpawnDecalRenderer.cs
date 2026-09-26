@@ -35,7 +35,10 @@ public class SpawnDecalRenderer : IRenderer
 
     #region Constants
     private float DecalSize => VanillaExpandedModSystem.Config.SpawnDecalSize;
+    private bool UseTemporalGear => VanillaExpandedModSystem.Config.UseTemporalGearSpawnMarker;
     private const float Z_OFFSET = 0.0001f;
+    private const float GEAR_HOVER_HEIGHT = 0.65f;
+    private const float GEAR_ROTATIONS_PER_SECOND = 0.2f;
     private const float FADE_DURATION = 1f / 2f;
     private const float COLOR_PHASE_DURATION = 1f / 5f;
     private const float STRENGTH_PHASE_DURATION = 1f / 13f;
@@ -47,6 +50,7 @@ public class SpawnDecalRenderer : IRenderer
     #region Fields
     private readonly ICoreClientAPI capi;
     private MeshRef? decalMeshRef;
+    private MultiTextureMeshRef? temporalGearMeshRef;
     private int decalTextureId;
     private readonly Matrixf modelMatrix = new();
     private readonly System.Numerics.Vector4[] PhaseColors = [new(0.28f, 0.8f, 1.0f, 1.0f), new(0.7f, 0.28f, 1.0f, 1.0f)];
@@ -82,6 +86,25 @@ public class SpawnDecalRenderer : IRenderer
     private void InitializeMesh()
     {
         decalMeshRef?.Dispose();
+        decalMeshRef = null;
+        temporalGearMeshRef?.Dispose();
+        temporalGearMeshRef = null;
+
+        if (UseTemporalGear)
+        {
+            Item? temporalGear = capi.World.GetItem(new AssetLocation("gear-temporal"));
+            if (temporalGear is null)
+            {
+                capi.Logger.Warning("Unable to render the respawn marker: temporal gear item was not found.");
+                return;
+            }
+
+            capi.Tesselator.TesselateItem(temporalGear, out MeshData temporalGearMeshData);
+            temporalGearMeshData.Rotate((float)(Math.PI / 4), 0, 0); // Rotate 45 degrees around X-axis
+            temporalGearMeshData.Translate(-0.5f, -0.5f, -0.4f);
+            temporalGearMeshRef = capi.Render.UploadMultiTextureMesh(temporalGearMeshData);
+            return;
+        }
 
         // Create a flat quad mesh for the decal (lying on the ground)
         var meshData = QuadMeshUtil.GetCustomQuadHorizontal(0.5f, Z_OFFSET, -0.5f, -1f, 1f, 255, 255, 255, 255);
@@ -137,7 +160,7 @@ public class SpawnDecalRenderer : IRenderer
     #region IRenderer Implementation
     public void OnRenderFrame(float deltaTime, EnumRenderStage stage)
     {
-        if (spawnPosition is null || decalMeshRef is null)
+        if (spawnPosition is null || (decalMeshRef is null && temporalGearMeshRef is null))
             return;
 
         // Handle fade animation
@@ -179,6 +202,14 @@ public class SpawnDecalRenderer : IRenderer
             (float)(spawnPosition.Z - camPos.Z)
         );
 
+        if (UseTemporalGear)
+        {
+            modelMatrix
+                .Translate(0f, GEAR_HOVER_HEIGHT, 0f)
+                .RotateZ((float)(capi.InWorldEllapsedMilliseconds / 1000d * GEAR_ROTATIONS_PER_SECOND * Math.PI * 2))
+                .Scale(DecalSize, DecalSize, DecalSize);
+        }
+
         bool debugGroupPushed = TryPushGlDebugGroup("VanillaExpanded: SpawnDecalRenderer");
         try
         {
@@ -187,12 +218,23 @@ public class SpawnDecalRenderer : IRenderer
             shader.Use();
             shader.Tex2D = decalTextureId;
             shader.ModelMatrix = modelMatrix.Values;
-            shader.RgbaTint = FinalRenderGlow;
+            shader.ViewMatrix = rapi.CameraMatrixOriginf;
+            shader.ProjectionMatrix = rapi.CurrentProjectionMatrix;
+            shader.RgbaLightIn = capi.World.BlockAccessor.GetLightRGBs(spawnPosition.XInt, spawnPosition.YInt, spawnPosition.ZInt);
+            shader.RgbaTint = temporalGearMeshRef is not null ? ColorUtil.WhiteArgbVec : FinalRenderGlow;
             shader.RgbaGlowIn = FinalRenderGlow;
             shader.ExtraGlow = (int)strength;
+            shader.NormalShaded = temporalGearMeshRef is not null ? 1 : 0;
 
             ApplyDecalBuf0BlendState();
-            rapi.RenderMesh(decalMeshRef);
+            if (temporalGearMeshRef is not null)
+            {
+                rapi.RenderMultiTextureMesh(temporalGearMeshRef, "tex");
+            }
+            else if (decalMeshRef is not null)
+            {
+                rapi.RenderMesh(decalMeshRef);
+            }
 
             // Reset shader inputs to defaults to prevent affecting subsequent renders (e.g., particles)
             shader.RgbaTint = ColorUtil.WhiteArgbVec;  // Reset tint to white
@@ -246,6 +288,8 @@ public class SpawnDecalRenderer : IRenderer
     {
         decalMeshRef?.Dispose();
         decalMeshRef = null;
+        temporalGearMeshRef?.Dispose();
+        temporalGearMeshRef = null;
     }
     #endregion
 

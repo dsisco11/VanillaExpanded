@@ -57,6 +57,8 @@
   "config-ignition-delay-tooltip": "Time in seconds to hold the interact key before igniting a fire.",
   "config-spawn-decal-size": "Spawn Decal Size",
   "config-spawn-decal-size-tooltip": "Size of the spawn point decal (0.2 to 1.0).",
+  "config-use-temporal-gear-spawn-marker": "Temporal Gear Spawn Marker",
+  "config-use-temporal-gear-spawn-marker-tooltip": "Show a hovering temporal gear instead of a ground decal at the respawn point.",
 
   "config-enable-backpack-decraft": "Backpack Decrafting",
   "config-enable-backpack-decraft-tooltip": "Enable decrafting backpacks into leather using knife or shears.",

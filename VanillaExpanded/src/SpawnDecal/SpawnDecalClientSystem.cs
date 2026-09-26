@@ -19,6 +19,7 @@ public class SpawnDecalClientSystem : ModSystem, ILiveConfigurable
     private ICoreClientAPI? capi;
     private SpawnDecalRenderer? renderer;
     private float? lastDecalSize;
+    private bool? lastUseTemporalGear;
     #endregion
 
     #region ModSystem Overrides
@@ -84,14 +85,19 @@ public class SpawnDecalClientSystem : ModSystem, ILiveConfigurable
         {
             renderer = new SpawnDecalRenderer(api);
             lastDecalSize = VanillaExpandedModSystem.Config.SpawnDecalSize;
+            lastUseTemporalGear = VanillaExpandedModSystem.Config.UseTemporalGearSpawnMarker;
             return;
         }
 
         float currentSize = VanillaExpandedModSystem.Config.SpawnDecalSize;
-        if (lastDecalSize is null || Math.Abs(lastDecalSize.Value - currentSize) > 0.0001f)
+        bool useTemporalGear = VanillaExpandedModSystem.Config.UseTemporalGearSpawnMarker;
+        if (lastDecalSize is null
+            || Math.Abs(lastDecalSize.Value - currentSize) > 0.0001f
+            || lastUseTemporalGear != useTemporalGear)
         {
             renderer.ReloadMesh();
             lastDecalSize = currentSize;
+            lastUseTemporalGear = useTemporalGear;
         }
     }
 
@@ -103,6 +109,7 @@ public class SpawnDecalClientSystem : ModSystem, ILiveConfigurable
         renderer.Dispose();
         renderer = null;
         lastDecalSize = null;
+        lastUseTemporalGear = null;
     }
     #endregion
 

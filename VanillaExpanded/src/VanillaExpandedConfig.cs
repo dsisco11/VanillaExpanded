@@ -96,6 +96,11 @@ public class VanillaExpandedConfig
     public float SpawnDecalSize { get; set; } = 0.4f;
 
     /// <summary>
+    /// Render a hovering temporal gear instead of a ground decal at the respawn point.
+    /// </summary>
+    public bool UseTemporalGearSpawnMarker { get; set; } = false;
+
+    /// <summary>
     /// Render the auto-stash progress bar above all other base game UI (dialogs, HUD, etc.) instead of behind it.
     /// </summary>
     public bool AutoStashGuiRendersTopmost { get; set; } = true;
