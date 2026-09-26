@@ -8,10 +8,10 @@ public sealed class RadialMenuLayout
 {
     #region Public API
     /// <summary>Creates a circular layout with the first wedge centered at the supplied clockwise angle from screen up.</summary>
-    public RadialMenuLayout(IReadOnlyList<string> wedgeIds, string centerId, double centerRadius, double innerRadius, double outerRadius, double startAngleDegrees = 0, bool clockwise = true, double separatorDegrees = 0.3)
+    public RadialMenuLayout(IReadOnlyList<string> wedgeIds, string centerId, double centerRadius, double innerRadius, double outerRadius, double startAngleDegrees = 0, bool clockwise = true, double separatorDegrees = 0.3, double radiusScale = 1)
     {
         ArgumentNullException.ThrowIfNull(wedgeIds);
-        if (wedgeIds.Count > 63 || string.IsNullOrWhiteSpace(centerId) || !double.IsFinite(centerRadius) || !double.IsFinite(innerRadius) || !double.IsFinite(outerRadius) || !double.IsFinite(startAngleDegrees) || !double.IsFinite(separatorDegrees) || centerRadius <= 0 || innerRadius <= centerRadius || outerRadius <= innerRadius || separatorDegrees < 0 || (wedgeIds.Count > 0 && separatorDegrees >= 180d / wedgeIds.Count))
+        if (wedgeIds.Count > 63 || string.IsNullOrWhiteSpace(centerId) || !double.IsFinite(centerRadius) || !double.IsFinite(innerRadius) || !double.IsFinite(outerRadius) || !double.IsFinite(startAngleDegrees) || !double.IsFinite(separatorDegrees) || !double.IsFinite(radiusScale) || centerRadius <= 0 || innerRadius <= centerRadius || outerRadius <= innerRadius || separatorDegrees < 0 || radiusScale <= 0 || (wedgeIds.Count > 0 && separatorDegrees >= 180d / wedgeIds.Count))
         {
             throw new ArgumentOutOfRangeException(nameof(wedgeIds), "The radial layout needs distinct positive radii and a separator narrower than half a wedge.");
         }
@@ -30,6 +30,7 @@ public sealed class RadialMenuLayout
         StartAngleDegrees = startAngleDegrees;
         Clockwise = clockwise;
         SeparatorDegrees = separatorDegrees;
+        RadiusScale = radiusScale;
     }
 
     /// <summary>Gets immutable wedge identifiers in their supplied position order.</summary>
@@ -48,6 +49,8 @@ public sealed class RadialMenuLayout
     public bool Clockwise { get; }
     /// <summary>Gets the angular half-gap at each wedge boundary.</summary>
     public double SeparatorDegrees { get; }
+    /// <summary>Gets this caller's scale relative to the shared screen-space menu radius.</summary>
+    public double RadiusScale { get; }
     /// <summary>Gets the angular width of one wedge in degrees.</summary>
     public double StepDegrees => WedgeIds.Count == 0 ? 0 : 360d / WedgeIds.Count;
 

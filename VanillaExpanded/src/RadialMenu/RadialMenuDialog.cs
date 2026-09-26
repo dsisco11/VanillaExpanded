@@ -50,13 +50,13 @@ internal sealed class RadialMenuDialog : GuiDialog
             if (!capi.Input.MouseButton.Left) TryClose();
             else if (interaction is not null && layout is not null)
             {
-                float heldRadius = MathF.Min(capi.Render.FrameWidth, capi.Render.FrameHeight) * ScreenRadiusFraction;
+                float heldRadius = GetRadiusPixels(layout);
                 renderer.Render(layout, interaction, deltaTime, capi.Render.FrameWidth / 2f, capi.Render.FrameHeight / 2f, heldRadius);
             }
             return;
         }
         if (interaction?.IsOpen != true || layout is null) return;
-        float radius = MathF.Min(capi.Render.FrameWidth, capi.Render.FrameHeight) * ScreenRadiusFraction;
+        float radius = GetRadiusPixels(layout);
         float x = capi.Render.FrameWidth / 2f;
         float y = capi.Render.FrameHeight / 2f;
         interaction.MovePointer(capi.Input.MouseX, capi.Input.MouseY, x, y, radius);
@@ -69,7 +69,7 @@ internal sealed class RadialMenuDialog : GuiDialog
         if (!IsOpened()) return;
         if (interaction?.IsOpen == true && layout is not null)
         {
-            float radius = MathF.Min(capi.Render.FrameWidth, capi.Render.FrameHeight) * ScreenRadiusFraction;
+            float radius = GetRadiusPixels(layout);
             interaction.MovePointer(args.X, args.Y, capi.Render.FrameWidth / 2f, capi.Render.FrameHeight / 2f, radius);
         }
         args.Handled = true;
@@ -91,7 +91,7 @@ internal sealed class RadialMenuDialog : GuiDialog
             Cancel();
             return;
         }
-        float radius = MathF.Min(capi.Render.FrameWidth, capi.Render.FrameHeight) * ScreenRadiusFraction;
+        float radius = GetRadiusPixels(layout);
         interaction.MovePointer(args.X, args.Y, capi.Render.FrameWidth / 2f, capi.Render.FrameHeight / 2f, radius);
         waitForMouseUp = true;
         if (!interaction.SelectHovered()) waitForMouseUp = false;
@@ -169,6 +169,9 @@ internal sealed class RadialMenuDialog : GuiDialog
         renderer.Dispose();
         base.Dispose();
     }
+
+    private float GetRadiusPixels(RadialMenuLayout currentLayout) =>
+        MathF.Min(capi.Render.FrameWidth, capi.Render.FrameHeight) * ScreenRadiusFraction * (float)currentLayout.RadiusScale;
     #endregion
 
     #region Caller interaction

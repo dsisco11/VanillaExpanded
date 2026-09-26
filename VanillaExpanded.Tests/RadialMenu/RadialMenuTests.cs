@@ -11,6 +11,7 @@ public sealed class RadialMenuTests
     public void HitTestUsesRenderedRadiiAndFixedClockwiseWedges()
     {
         var layout = new RadialMenuLayout(["north", "east", "south", "west"], "center", 0.2, 0.3, 1, separatorDegrees: 1);
+        Assert.Equal(1, layout.RadiusScale);
         Assert.Equal("center", layout.HitTest(100, 100, 100, 100, 100));
         Assert.Null(layout.HitTest(100, 75, 100, 100, 100));
         Assert.Equal("north", layout.HitTest(100, 40, 100, 100, 100));
