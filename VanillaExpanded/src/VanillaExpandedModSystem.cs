@@ -29,28 +29,31 @@ public class VanillaExpandedModSystem : ModSystem
     public static void EnsureConfigLoaded(ICoreAPI api)
     {
         if (configLoaded) return;
-        
+
+        Config = LoadConfig(api);
+        configLoaded = true;
+    }
+
+    internal static VanillaExpandedConfig LoadConfig(ICoreAPI api)
+    {
         try
         {
             var loadedConfig = api.LoadModConfig<VanillaExpandedConfig>(Constants.ConfigFileName);
             if (loadedConfig is null)
             {
-                Config = new VanillaExpandedConfig();
-                api.StoreModConfig(Config, Constants.ConfigFileName);
+                var defaultConfig = new VanillaExpandedConfig();
+                api.StoreModConfig(defaultConfig, Constants.ConfigFileName);
                 api.Logger.Notification("[VanillaExpanded] Created default configuration file: {0}", Constants.ConfigFileName);
+                return defaultConfig;
             }
-            else
-            {
-                Config = loadedConfig;
-            }
+
+            return loadedConfig;
         }
         catch (Exception ex)
         {
             api.Logger.Error("[VanillaExpanded] Failed to load configuration: {0}", ex.Message);
-            Config = new VanillaExpandedConfig();
+            return new VanillaExpandedConfig();
         }
-        
-        configLoaded = true;
     }
 
     public override void Dispose()
@@ -74,19 +77,6 @@ public class VanillaExpandedModSystem : ModSystem
         {
             api.Logger.Notification("[VanillaExpanded] ConfigLib is not installed. Install it for an in-game configuration GUI. Settings can be edited manually in ModConfig/{0}", Constants.ConfigFileName);
         }
-    }
-
-    internal static void PersistConfigAndNotifyReloadRequired(ICoreAPI api, string source)
-    {
-        // ConfigLib updates our config object instance via reflection.
-        // We persist to our normal ModConfig file, but we can't safely hot-apply
-        // Harmony patches or recipe enable/disable without a reload.
-        api.StoreModConfig(Config, Constants.ConfigFileName);
-
-        api.Logger.Notification(
-            "[VanillaExpanded] Configuration updated via {0}. Changes will apply after re-entering the world (and may require a restart).",
-            source
-        );
     }
 
     public override void Start(ICoreAPI api)

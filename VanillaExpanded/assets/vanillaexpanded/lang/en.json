@@ -48,8 +48,12 @@
   "config-enable-spawn-decal-tooltip": "Show a glowing decal at the player's respawn point.",
   "config-enable-alloy-calculator": "Alloy Calculator",
   "config-enable-alloy-calculator-tooltip": "Enable the alloy calculator GUI for crucibles.",
+  "config-disable-alloy-calculator-patch": "Disable Alloy Calculator Patch",
+  "config-disable-alloy-calculator-patch-tooltip": "Disable the Harmony patch that detects firepit GUI changes. Requires re-entering the world or restarting.",
   "config-enable-equip-light-hotkey": "Equip Light Source Hotkey",
   "config-enable-equip-light-hotkey-tooltip": "Enable the hotkey to equip light sources to offhand/hotbar.",
+  "config-quick-tool-select-on-release": "Select Quick Tool on Release",
+  "config-quick-tool-select-on-release-tooltip": "Select the hovered quick-tool entry when the activation key is released.",
 
   "config-auto-stash-delay": "Auto-Stash Delay",
   "config-auto-stash-delay-tooltip": "Time in seconds to hold the interact key before auto-stashing begins.",
@@ -57,6 +61,8 @@
   "config-ignition-delay-tooltip": "Time in seconds to hold the interact key before igniting a fire.",
   "config-spawn-decal-size": "Spawn Decal Size",
   "config-spawn-decal-size-tooltip": "Size of the spawn point decal (0.2 to 1.0).",
+  "config-auto-stash-gui-renders-topmost": "Topmost Auto-Stash Progress",
+  "config-auto-stash-gui-renders-topmost-tooltip": "Render the auto-stash progress bar above dialogs and other game UI.",
 
   "config-enable-backpack-decraft": "Backpack Decrafting",
   "config-enable-backpack-decraft-tooltip": "Enable decrafting backpacks into leather using knife or shears.",
