@@ -150,6 +150,26 @@ internal sealed class RadialMenuRenderer : IDisposable
                 shader.Uniform("selectedFill", RadialMenuWedgeStyle.SelectedFill);
                 shader.Uniform("borderColor", RadialMenuWedgeStyle.Border);
                 shader.Uniform("hoverBorderColor", RadialMenuWedgeStyle.HoverBorder);
+                shader.Uniform("hoverShadowColor", RadialMenuWedgeStyle.HoverShadow);
+                if (hovered >= 0)
+                {
+                    shader.Uniform("shadowIndex", hovered);
+                    matrix.Set(capi.Render.CurrentModelviewMatrix)
+                        .Translate(centerX + RadialMenuWedgeStyle.HoverShadowOffsetXPixels,
+                            centerY + RadialMenuWedgeStyle.HoverShadowOffsetYPixels, 49)
+                        .Scale(radiusPixels, radiusPixels, 1);
+                    ((IShaderProgram)shader).UniformMatrix("projectionMatrix", capi.Render.CurrentProjectionMatrix);
+                    ((IShaderProgram)shader).UniformMatrix("modelViewMatrix", matrix.Values);
+                    int shadowOffset = 0;
+                    int shadowMesh = 0;
+                    for (RadialMenuLayout? ring = layout; ring is not null; ring = ring.InnerMenu)
+                    {
+                        ConfigureRingShader(ring, shadowOffset, maskIndex: -1);
+                        capi.Render.RenderMesh(meshes[shadowMesh++]);
+                        shadowOffset += ring.EntryIds.Count;
+                    }
+                }
+                shader.Uniform("shadowIndex", -1);
                 matrix.Set(capi.Render.CurrentModelviewMatrix).Translate(centerX, centerY, 50).Scale(radiusPixels, radiusPixels, 1);
                 ((IShaderProgram)shader).UniformMatrix("projectionMatrix", capi.Render.CurrentProjectionMatrix);
                 ((IShaderProgram)shader).UniformMatrix("modelViewMatrix", matrix.Values);
@@ -252,7 +272,7 @@ internal sealed class RadialMenuRenderer : IDisposable
                     bool showingHoveredLabel = hoveredId is not null && hoveredId != single.Id;
                     RadialMenuEntry label = showingHoveredLabel ? interaction.GetEntry(hoveredId!) : single;
                     single.Icon?.Render(capi, centerX, centerY, radiusPixels * (float)ring.OuterRadius, single.Enabled);
-                    DrawCenterLabel(single.Id, label.Label, showingHoveredLabel, ring, centerX, centerY, radiusPixels);
+                    DrawCenterLabel(single.Id, label.Label, ring, centerX, centerY, radiusPixels);
                 }
                 else
                 {
@@ -277,17 +297,12 @@ internal sealed class RadialMenuRenderer : IDisposable
         }
     }
 
-    /// <summary>Renders the center action as one line and wraps only the temporary hovered-entry label.</summary>
-    private void DrawCenterLabel(string id, string text, bool showingHoveredLabel, RadialMenuLayout layout,
+    /// <summary>Wraps and scales center text into the circle's inset square.</summary>
+    private void DrawCenterLabel(string id, string text, RadialMenuLayout layout,
         float centerX, float centerY, float radiusPixels)
     {
-        if (!showingHoveredLabel)
-        {
-            DrawLabel(id, text, centerX, centerY);
-            return;
-        }
-        int maximumWidth = (int)Math.Max(1, radiusPixels * layout.OuterRadius * 2f - CenterLabelInsetPixels);
-        DrawLabel(id, text, centerX, centerY, maximumWidth);
+        int maximumSize = (int)Math.Max(1, radiusPixels * layout.OuterRadius * 2f - CenterLabelInsetPixels * 2f);
+        DrawLabel(id, text, centerX, centerY, maximumSize, maximumSize);
     }
 
     /// <summary>Clips a depth-correct icon capture and its pixel-distance halo to the wedge stencil.</summary>
@@ -344,7 +359,7 @@ internal sealed class RadialMenuRenderer : IDisposable
     }
 
     /// <summary>Caches a text-only entry label and centers its texture at the entry position.</summary>
-    private void DrawLabel(string id, string text, double x, double y, int maximumWidth = 0)
+    private void DrawLabel(string id, string text, double x, double y, int maximumWidth = 0, int maximumHeight = 0)
     {
         string cacheKey = text + '\0' + maximumWidth;
         if (!renderedLabels.TryGetValue(id, out string? previous) || previous != cacheKey)
@@ -363,7 +378,14 @@ internal sealed class RadialMenuRenderer : IDisposable
         if (labels.TryGetValue(id, out LoadedTexture? label))
         {
             capi.Render.GetEngineShader(EnumShaderProgram.Gui).Use();
-            capi.Render.Render2DLoadedTexture(label, (float)x - label.Width / 2f, (float)y - label.Height / 2f, 60);
+            float scale = maximumHeight > 0 ? Math.Min(1f, maximumHeight / (float)label.Height) : 1f;
+            float width = label.Width * scale;
+            float height = label.Height * scale;
+            if (scale < 1f)
+                capi.Render.Render2DTexture(label.TextureId, (float)x - width / 2f, (float)y - height / 2f,
+                    width, height, 60);
+            else
+                capi.Render.Render2DLoadedTexture(label, (float)x - label.Width / 2f, (float)y - label.Height / 2f, 60);
         }
     }
     #endregion

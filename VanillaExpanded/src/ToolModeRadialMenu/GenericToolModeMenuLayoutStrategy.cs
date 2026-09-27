@@ -12,8 +12,8 @@ internal sealed class GenericToolModeMenuLayoutStrategy : IToolModeMenuLayoutStr
     /// <inheritdoc />
     public bool TryCreate(in ToolModeMenuLayoutContext context, out RadialMenuLayout? layout)
     {
-        layout = new RadialMenuLayout(context.ModeIds, 0.30, 1, context.CurrentMenu,
-            separatorDegrees: 1.0, radiusScale: 0.7);
+        layout = new RadialMenuLayout(context.ModeIds, 0.27, 1, context.CurrentMenu,
+            separatorDegrees: 1.0, radiusScale: 0.77);
         return true;
     }
 }

@@ -12,6 +12,7 @@ uniform int ringEntryCount;
 uniform int ringMode;
 uniform int hoveredIndex;
 uniform int maskIndex;
+uniform int shadowIndex;
 uniform float innerRadius;
 uniform float outerRadius;
 uniform float separatorFraction;
@@ -30,6 +31,7 @@ uniform vec3 hoverFill;
 uniform vec3 selectedFill;
 uniform vec3 borderColor;
 uniform vec3 hoverBorderColor;
+uniform vec4 hoverShadowColor;
 
 /* Produces stable, gently filtered grain in the wedge's unscaled local coordinates. */
 float grain(vec2 position)
@@ -78,6 +80,12 @@ void main()
     {
         if (entryIndex != maskIndex || coverage < 0.5) discard;
         fragColor = vec4(1.0);
+        return;
+    }
+    if (shadowIndex >= 0)
+    {
+        if (entryIndex != shadowIndex) discard;
+        fragColor = vec4(hoverShadowColor.rgb, coverage * hoverShadowColor.a);
         return;
     }
 

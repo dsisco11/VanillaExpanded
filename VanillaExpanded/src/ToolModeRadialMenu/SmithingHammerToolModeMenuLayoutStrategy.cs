@@ -48,8 +48,8 @@ internal sealed class SmithingHammerToolModeMenuLayoutStrategy : IToolModeMenuLa
             context.Entries.Add(new RadialMenuEntry(paddingId, string.Empty, enabled: false));
         }
 
-        layout = new RadialMenuLayout(Array.ConvertAll(slots, static id => id!), 0.30, 1, context.CurrentMenu,
-            separatorDegrees: 1.5, radiusScale: 0.6);
+        layout = new RadialMenuLayout(Array.ConvertAll(slots, static id => id!), 0.27, 1, context.CurrentMenu,
+            separatorDegrees: 1.5, radiusScale: 0.66);
         return true;
     }
 
