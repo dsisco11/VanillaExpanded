@@ -30,7 +30,7 @@ internal sealed class RadialMenuDialog : GuiDialog
     /// <inheritdoc />
     public override double InputOrder => 0;
     /// <inheritdoc />
-    // public override double DrawOrder => 1;
+    public override double DrawOrder => 1.1;
     /// <inheritdoc />
     public override bool PrefersUngrabbedMouse => true;
     /// <inheritdoc />
