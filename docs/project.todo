@@ -14,6 +14,19 @@
         ☐ Lighting fires with candles.
         ☐ New "crafting menu" similar to minecraft: shows all craftable items with current inventory, allows searching. (Maybe this can just be added to the handbook?)
 
+    ## Tool-Mode Radial Menus:
+        ☐ Review chisel modes: group the seven actions separately from the dynamic material list using nested rings.
+        ☐ Review boat roller modes: place the four facing options at their matching cardinal directions.
+        ☐ Review wrench modes: group rotate separately from block-specific North/South, East/West, and Up/Down offsets.
+        ☐ Review art pigment modes: handle potentially large dynamic icon-only lists and define a safe radial fallback.
+        ☐ Review texture flipper modes: handle variable texture counts and define a safe radial fallback.
+        ☐ Review plumb-and-square modes: organize the player option and dynamic group list.
+        ☐ Review clay-forming modes and determine whether their four options need a specialized layout.
+        ☐ Review scythe trim/remove modes and determine whether their two-option layout needs refinement.
+        ☐ Review rope shorten/lengthen modes and determine whether their two-option layout needs refinement.
+        ☐ Review prospecting-pick density/node modes, including the single-mode configuration.
+        ☐ Review hacking-spear modes and determine whether they need a specialized layout.
+
     ## Death Penalties:
         ☐ New death penalty option: lose *bag* items on death (items in inventory are lost, items on hotbar and equipped armor and weapons are kept).
         ☐ New death penalty option: lose *unequipped* items on death (items in inventory and hotbar are lost, equipped armor and weapons are kept).
