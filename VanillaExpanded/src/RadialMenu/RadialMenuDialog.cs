@@ -100,7 +100,8 @@ internal sealed class RadialMenuDialog : GuiDialog
             if (interaction?.IsOpen != true || layout is null) return;
             float radius = GetRadiusPixels(layout);
             interaction.MovePointer(args.X, args.Y, capi.Render.FrameWidth / 2f, capi.Render.FrameHeight / 2f, radius);
-            if (interaction.SelectHovered() && !interaction.IsOpen) TryClose();
+            RadialMenuInteraction selectedInteraction = interaction;
+            if (selectedInteraction.SelectHovered() && !selectedInteraction.IsOpen && IsOpened()) TryClose();
         }
     }
 
