@@ -5,6 +5,19 @@ namespace VanillaExpanded.Tests.RadialMenu;
 /// <summary>Checks generic menu geometry and exactly-once interaction independently of inventory.</summary>
 public sealed class RadialMenuTests
 {
+    [Fact]
+    public void RingModeUsesEngineSupportedIntegerUniform()
+    {
+        string shaderRoot = Path.Combine(AppContext.BaseDirectory, "Mods", "mod", "assets", "vanillaexpanded", "shaders");
+        if (!Directory.Exists(shaderRoot)) return;
+        foreach (string path in new[] { Path.Combine(shaderRoot, "radial_menu.vsh"), Path.Combine(shaderRoot, "radial_menu.fsh") })
+        {
+            string source = File.ReadAllText(path);
+            Assert.Contains("uniform int ringMode;", source);
+            Assert.DoesNotContain("uniform bool", source);
+        }
+    }
+
     #region Geometry
     /// <summary>Checks center, ring gap, wedge boundaries, and the fixed clockwise orientation.</summary>
     [Fact]
@@ -20,6 +33,55 @@ public sealed class RadialMenuTests
         Assert.Equal("west", layout.HitTest(40, 100, 100, 100, 100));
         Assert.Equal("east", layout.HitTest(160, 40, 100, 100, 100));
         Assert.Equal("east", layout.HitTest(201, 100, 100, 100, 100));
+    }
+
+    [Fact]
+    public void NestedMenusHitTestFromOuterRingToSingleOptionDisc()
+    {
+        var inner = new RadialMenuLayout(["center"], 0, 0.2);
+        var middle = new RadialMenuLayout(["inner-north", "inner-south"], 0.3, 0.55, inner);
+        var outer = new RadialMenuLayout(["outer-north", "outer-south"], 0.65, 1, middle);
+
+        Assert.Equal(new[] { "outer-north", "outer-south", "inner-north", "inner-south", "center" }, outer.AllEntryIds);
+        Assert.Equal("center", outer.HitTest(0, 0, 0, 0, 100));
+        Assert.Equal("inner-north", outer.HitTest(0, -45, 0, 0, 100));
+        Assert.Equal("outer-north", outer.HitTest(0, -80, 0, 0, 100));
+        Assert.Null(outer.HitTest(0, -60, 0, 0, 100));
+    }
+
+    [Theory]
+    [InlineData("inner-north")]
+    [InlineData("center")]
+    public void NestedInteractionSelectsEntriesAtEveryDepth(string targetId)
+    {
+        var inner = new RadialMenuLayout(["center"], 0, 0.2);
+        var middle = new RadialMenuLayout(["inner-north", "inner-south"], 0.3, 0.55, inner);
+        var outer = new RadialMenuLayout(["outer-north", "outer-south"], 0.65, 1, middle);
+        var interaction = new RadialMenuInteraction(outer,
+        [
+            new("outer-north", "Outer North", true), new("outer-south", "Outer South", true),
+            new("inner-north", "Inner North", true), new("inner-south", "Inner South", true),
+            new("center", "Center", true)
+        ]);
+        Assert.True(outer.TryGetEntryCenter(targetId, 0, 0, 100, out (double X, double Y) position));
+
+        interaction.Open();
+        interaction.MovePointer(position.X, position.Y, 0, 0, 100);
+
+        Assert.Equal(targetId, interaction.HoveredId);
+        Assert.True(interaction.SelectHovered());
+        Assert.Equal(targetId, interaction.SelectedId);
+    }
+
+    [Fact]
+    public void NestedLayoutRejectsDuplicateIdsAndMoreThanShaderCapacity()
+    {
+        var duplicate = new RadialMenuLayout(["duplicate"], 0, 0.2);
+        Assert.Throws<ArgumentException>(() => new RadialMenuLayout(["duplicate", "other"], 0.3, 1, duplicate));
+
+        string[] outerIds = [.. Enumerable.Range(0, 63).Select(index => $"outer:{index}")];
+        var inner = new RadialMenuLayout(["inner:a", "inner:b"], 0.1, 0.2);
+        Assert.Throws<ArgumentOutOfRangeException>(() => new RadialMenuLayout(outerIds, 0.3, 1, inner));
     }
 
     /// <summary>Rounded wedge corners remain outside the pointer target while separator gaps snap to a wedge.</summary>
@@ -72,6 +134,16 @@ public sealed class RadialMenuTests
             Assert.Equal(id, mesh.Uv[mesh.Indices[index + 1] * 2]);
             Assert.Equal(id, mesh.Uv[mesh.Indices[index + 2] * 2]);
         }
+    }
+
+    [Fact]
+    public void SingleOptionMeshIsADiscWithItsGlobalEntryId()
+    {
+        var layout = new RadialMenuLayout(["only"], 0, 0.25);
+        var mesh = RadialMenuMesh.Build(layout, 300, entryOffset: 4);
+
+        Assert.True(mesh.VerticesCount > 0);
+        for (int index = 0; index < mesh.VerticesCount; index++) Assert.Equal(4, mesh.Uv[index * 2]);
     }
     /// <summary>Gets the signed area of the first mesh triangle for face-winding assertions.</summary>
     private static float SignedArea(Vintagestory.API.Client.MeshData mesh)

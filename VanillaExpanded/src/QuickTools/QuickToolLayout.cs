@@ -78,7 +78,10 @@ public static class QuickToolLayout
         {
             if (string.IsNullOrWhiteSpace(id) || !seen.Add(id)) throw new ArgumentException("Expected distinct nonempty identifiers.", nameof(availableIds));
         }
-        return new RadialMenuLayout(availableIds, RestoreId, 0.24, 0.30, 1, 0, true, separatorDegrees: 1.5);
+        var innerMenu = new RadialMenuLayout([RestoreId], 0, 0.24);
+        return availableIds.Count == 0
+            ? innerMenu
+            : new RadialMenuLayout(availableIds, 0.30, 1, innerMenu, separatorDegrees: 1.5);
     }
 
     /// <summary>Returns an identifier only for a category in the explicit supported set.</summary>

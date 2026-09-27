@@ -26,7 +26,8 @@ public sealed class QuickToolCandidateTests
         var available = new[] { QuickToolLayout.LightId, "tool:Knife" };
         Assert.Equal(available, QuickToolLayout.CreateLayout(available).WedgeIds);
         Assert.Equal(QuickToolLayout.LightId, QuickToolLayout.CreateLayout(available).HitTest(0, -60, 0, 0, 100));
-        Assert.Equal("unequip", QuickToolLayout.CreateLayout([]).CenterId);
+        Assert.True(QuickToolLayout.CreateLayout([]).IsSingleOption);
+        Assert.Equal(new[] { "unequip" }, QuickToolLayout.CreateLayout([]).EntryIds);
         Assert.Null(QuickToolLayout.GetToolId((EnumTool)500));
     }
 

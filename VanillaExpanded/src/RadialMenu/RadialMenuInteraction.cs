@@ -44,9 +44,8 @@ public sealed class RadialMenuInteraction
             if (!replacement.TryAdd(entry.Id, entry)) throw new ArgumentException("Duplicate entry identifier.", nameof(newEntries));
         }
 
-        // Every fixed wedge and the center keep a visible entry even when unavailable.
-        if (replacement.Count != layout.WedgeIds.Count + 1 || !replacement.ContainsKey(layout.CenterId)) throw new ArgumentException("Content must cover the complete layout.", nameof(newEntries));
-        foreach (string id in layout.WedgeIds)
+        if (replacement.Count != layout.EntryCount) throw new ArgumentException("Content must cover the complete nested layout.", nameof(newEntries));
+        foreach (string id in layout.AllEntryIds)
         {
             if (!replacement.ContainsKey(id)) throw new ArgumentException("Content must cover the complete layout.", nameof(newEntries));
         }
@@ -62,8 +61,7 @@ public sealed class RadialMenuInteraction
         var replacement = new RadialMenuInteraction(nextLayout, newEntries);
         layout = nextLayout;
         entries.Clear();
-        foreach (string id in nextLayout.WedgeIds) entries.Add(id, replacement.GetEntry(id));
-        entries.Add(nextLayout.CenterId, replacement.GetEntry(nextLayout.CenterId));
+        foreach (string id in nextLayout.AllEntryIds) entries.Add(id, replacement.GetEntry(id));
         HoveredId = null;
     }
 
