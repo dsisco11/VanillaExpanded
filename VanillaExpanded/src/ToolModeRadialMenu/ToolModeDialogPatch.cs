@@ -1,5 +1,4 @@
 using HarmonyLib;
-using Vintagestory.API.Client;
 using Vintagestory.Client.NoObf;
 
 namespace VanillaExpanded.ToolModeRadialMenu;

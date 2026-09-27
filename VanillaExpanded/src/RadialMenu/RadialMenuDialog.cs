@@ -176,7 +176,8 @@ internal sealed class RadialMenuDialog : GuiDialog
 
     #region Caller interaction
     /// <summary>Opens a complete fixed layout and reports its selection and cancellation.</summary>
-    public bool Open(RadialMenuLayout nextLayout, IEnumerable<RadialMenuEntry> entries, Action<string> selected, Action cancelled)
+    public bool Open(RadialMenuLayout nextLayout, IEnumerable<RadialMenuEntry> entries, Action<string> selected,
+        Action cancelled)
     {
         if (IsOpened() || !renderer.IsReady) return false;
         renderer.ResetInteraction();

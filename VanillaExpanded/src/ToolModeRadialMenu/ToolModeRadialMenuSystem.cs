@@ -44,6 +44,11 @@ internal sealed class ToolModeRadialMenuSystem : ModSystem, ILiveConfigurable
 
     internal bool TryOpen()
     {
+        if (menu?.IsOpen == true)
+        {
+            menu.Cancel();
+            return true;
+        }
         if (api?.World.Player is not IClientPlayer player || menu is null)
             return false;
 
@@ -59,8 +64,6 @@ internal sealed class ToolModeRadialMenuSystem : ModSystem, ILiveConfigurable
             out ToolModeMenuContent? content);
         if (!created)
             return false;
-        if (menu.IsOpen) return true;
-
         return menu.Open(content!.Layout, content.Entries,
             id => SelectMode(id, collectible, slot, player, blockSelection), static () => { });
     }
