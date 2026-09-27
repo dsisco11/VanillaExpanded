@@ -14,6 +14,15 @@ internal static class ToolModeMenuContentFactory
 
     /// <summary>Builds radial content, or declines mode sets that must remain on the vanilla grid.</summary>
     internal static bool TryCreate(SkillItem[]? modes, int currentMode, string fallbackCurrentLabel, out ToolModeMenuContent? content)
+        => TryCreate(modes, currentMode, fallbackCurrentLabel, smithingHammer: false, out content);
+
+    /// <summary>Builds the smithing hammer's directional outer ring and action inner ring.</summary>
+    internal static bool TryCreateSmithingHammer(SkillItem[]? modes, int currentMode, string fallbackCurrentLabel,
+        out ToolModeMenuContent? content)
+        => TryCreate(modes, currentMode, fallbackCurrentLabel, smithingHammer: true, out content);
+
+    private static bool TryCreate(SkillItem[]? modes, int currentMode, string fallbackCurrentLabel, bool smithingHammer,
+        out ToolModeMenuContent? content)
     {
         content = null;
         if (modes is null || modes.Length is 0 or > MaximumModes
@@ -34,12 +43,50 @@ internal static class ToolModeMenuContentFactory
             ? modes[currentMode].Name
             : fallbackCurrentLabel;
         entries.Add(new RadialMenuEntry(CenterId, currentLabel, enabled: false));
-        var innerMenu = new RadialMenuLayout([CenterId], 0, 0.24);
+        var currentMenu = new RadialMenuLayout([CenterId], 0, 0.25);
+        RadialMenuLayout layout = smithingHammer
+            ? CreateSmithingLayout(modes, ids, currentMenu)
+            : CreateGenericLayout(ids, currentMenu);
         content = new ToolModeMenuContent(
-            new RadialMenuLayout(ids, 0.30, 1, innerMenu, separatorDegrees: 1.5, radiusScale: 0.6),
+            layout,
             entries);
         return true;
     }
+
+    private static RadialMenuLayout CreateSmithingLayout(SkillItem[] modes, string[] ids, RadialMenuLayout currentMenu)
+    {
+        var directional = new List<(int Index, int Direction)>();
+        var actions = new List<string>();
+        for (int index = 0; index < modes.Length; index++)
+        {
+            int direction = GetUpsetDirection(modes[index].Code?.Path);
+            if (direction >= 0) directional.Add((index, direction));
+            else actions.Add(ids[index]);
+        }
+
+        if (directional.Count == 0 || actions.Count == 0) return CreateGenericLayout(ids, currentMenu);
+        directional.Sort(static (left, right) =>
+        {
+            int direction = left.Direction.CompareTo(right.Direction);
+            return direction != 0 ? direction : left.Index.CompareTo(right.Index);
+        });
+        string[] directionalIds = [.. directional.ConvertAll(item => ids[item.Index])];
+        var actionMenu = new RadialMenuLayout(actions, 0.31, 0.56, currentMenu);
+        return new RadialMenuLayout(directionalIds, 0.62, 1, actionMenu,
+            separatorDegrees: 1.5, radiusScale: 0.6);
+    }
+
+    private static RadialMenuLayout CreateGenericLayout(string[] ids, RadialMenuLayout currentMenu) =>
+        new(ids, 0.30, 1, currentMenu, separatorDegrees: 1.5, radiusScale: 0.6);
+
+    private static int GetUpsetDirection(string? code) => code switch
+    {
+        "upsetup" => 0,
+        "upsetright" => 1,
+        "upsetdown" => 2,
+        "upsetleft" => 3,
+        _ => -1
+    };
 
     /// <summary>Parses only the invariant nonnegative identifiers emitted by <see cref="TryCreate"/>.</summary>
     internal static bool TryGetMode(string id, out int mode) =>

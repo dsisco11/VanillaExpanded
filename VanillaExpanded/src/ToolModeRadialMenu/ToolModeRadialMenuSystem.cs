@@ -3,6 +3,7 @@ using VanillaExpanded.RadialMenu;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
+using Vintagestory.GameContent;
 
 namespace VanillaExpanded.ToolModeRadialMenu;
 
@@ -54,7 +55,10 @@ internal sealed class ToolModeRadialMenuSystem : ModSystem, ILiveConfigurable
         BlockSelection? blockSelection = player.CurrentBlockSelection;
         SkillItem[]? modes = collectible.GetToolModes(slot, player, blockSelection!);
         int currentMode = collectible.GetToolMode(slot, player, blockSelection!);
-        if (!ToolModeMenuContentFactory.TryCreate(modes, currentMode, Lang.Get("Current mode"), out ToolModeMenuContent? content))
+        bool created = collectible is ItemHammer
+            ? ToolModeMenuContentFactory.TryCreateSmithingHammer(modes, currentMode, Lang.Get("Current mode"), out ToolModeMenuContent? content)
+            : ToolModeMenuContentFactory.TryCreate(modes, currentMode, Lang.Get("Current mode"), out content);
+        if (!created)
             return false;
         if (menu.IsOpen) return true;
 

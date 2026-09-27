@@ -1,3 +1,4 @@
+using VanillaExpanded.RadialMenu;
 using VanillaExpanded.ToolModeRadialMenu;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -61,6 +62,64 @@ public sealed class ToolModeMenuContentFactoryTests
                 Assert.Equal("Second", center.Label);
                 Assert.False(center.Enabled);
             });
+    }
+
+    [Fact]
+    public void TryCreateSmithingHammer_GroupsDirectionalAndActionModesWithoutChangingIndices()
+    {
+        string[] codes = ["hit", "upsetup", "upsetright", "upsetdown", "upsetleft", "split"];
+        SkillItem[] modes = [.. codes.Select(code => new SkillItem { Code = new AssetLocation(code), Name = code })];
+
+        Assert.True(ToolModeMenuContentFactory.TryCreateSmithingHammer(modes, 0, "Current", out ToolModeMenuContent? content));
+
+        Assert.NotNull(content);
+        Assert.Equal(new[] { "1", "2", "3", "4" }, content.Layout.EntryIds);
+        RadialMenuLayout actionMenu = Assert.IsType<RadialMenuLayout>(content.Layout.InnerMenu);
+        Assert.Equal(new[] { "0", "5" }, actionMenu.EntryIds);
+        Assert.Equal(new[] { "current" }, actionMenu.InnerMenu!.EntryIds);
+        Assert.Equal(new[] { "1", "2", "3", "4", "0", "5", "current" }, content.Layout.AllEntryIds);
+        Assert.True(content.Layout.TryGetEntryCenter("2", 0, 0, 100, out (double X, double Y) right));
+        Assert.True(right.X > 0);
+        Assert.Equal(0, right.Y, precision: 6);
+    }
+
+    [Fact]
+    public void TryCreateSmithingHammer_NonVanillaModesUseGenericLayout()
+    {
+        SkillItem[] modes = [new() { Code = new AssetLocation("custom"), Name = "Custom" }];
+
+        Assert.True(ToolModeMenuContentFactory.TryCreateSmithingHammer(modes, 0, "Current", out ToolModeMenuContent? content));
+
+        Assert.Equal(new[] { "0" }, content!.Layout.EntryIds);
+        Assert.Equal(new[] { "current" }, content.Layout.InnerMenu!.EntryIds);
+    }
+
+    [Fact]
+    public void TryCreateSmithingHammer_ReorderedExtendedModesGroupByCodeAndPreserveIndices()
+    {
+        string[] codes = ["split", "upsetdown", "custom", "upsetup", "hit", "upsetleft", "upsetright"];
+        SkillItem[] modes = [.. codes.Select(code => new SkillItem { Code = new AssetLocation(code), Name = code })];
+
+        Assert.True(ToolModeMenuContentFactory.TryCreateSmithingHammer(modes, 4, "Current", out ToolModeMenuContent? content));
+
+        Assert.Equal(new[] { "3", "6", "1", "5" }, content!.Layout.EntryIds);
+        Assert.Equal(new[] { "0", "2", "4" }, content.Layout.InnerMenu!.EntryIds);
+        Assert.Equal("hit", content.Entries[^1].Label);
+    }
+
+    [Fact]
+    public void TryCreateSmithingHammer_MissingGroupUsesGenericLayout()
+    {
+        SkillItem[] directionalOnly =
+        [
+            new() { Code = new AssetLocation("upsetup"), Name = "Up" },
+            new() { Code = new AssetLocation("upsetdown"), Name = "Down" }
+        ];
+
+        Assert.True(ToolModeMenuContentFactory.TryCreateSmithingHammer(directionalOnly, 0, "Current", out ToolModeMenuContent? content));
+
+        Assert.Equal(new[] { "0", "1" }, content!.Layout.EntryIds);
+        Assert.Equal(new[] { "current" }, content.Layout.InnerMenu!.EntryIds);
     }
 
     [Theory]
