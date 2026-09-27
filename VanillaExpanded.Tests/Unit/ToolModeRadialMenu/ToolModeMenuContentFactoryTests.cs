@@ -2,6 +2,7 @@ using VanillaExpanded.RadialMenu;
 using VanillaExpanded.ToolModeRadialMenu;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.GameContent;
 
 namespace VanillaExpanded.Tests.Unit.ToolModeRadialMenu;
 
@@ -30,7 +31,8 @@ public sealed class ToolModeMenuContentFactoryTests
             }
         };
 
-        bool created = ToolModeMenuContentFactory.TryCreate(modes, 1, "Fallback", out ToolModeMenuContent? content);
+        bool created = ToolModeMenuContentFactory.TryCreate(modes, 1, "Fallback",
+            GenericToolModeMenuLayoutStrategy.Instance, out ToolModeMenuContent? content);
 
         Assert.True(created);
         Assert.NotNull(content);
@@ -38,7 +40,7 @@ public sealed class ToolModeMenuContentFactoryTests
         Assert.Equal("current", content.Layout.CenterId);
         Assert.Equal(new[] { "current" }, content.Layout.InnerMenu!.EntryIds);
         Assert.True(content.Layout.InnerMenu.IsSingleOption);
-        Assert.Equal(0.6, content.Layout.RadiusScale);
+        Assert.Equal(0.7, content.Layout.RadiusScale);
         Assert.Collection(content.Entries,
             first =>
             {
@@ -70,7 +72,8 @@ public sealed class ToolModeMenuContentFactoryTests
         string[] codes = ["hit", "upsetup", "upsetright", "upsetdown", "upsetleft", "split"];
         SkillItem[] modes = [.. codes.Select(code => new SkillItem { Code = new AssetLocation(code), Name = code })];
 
-        Assert.True(ToolModeMenuContentFactory.TryCreateSmithingHammer(modes, 0, "Current", out ToolModeMenuContent? content));
+        Assert.True(ToolModeMenuContentFactory.TryCreate(modes, 0, "Current",
+            SmithingHammerToolModeMenuLayoutStrategy.Instance, out ToolModeMenuContent? content));
 
         Assert.NotNull(content);
         Assert.Equal(new[] { "1", "0", "2", "5", "3", "padding:5", "4", "padding:7" }, content.Layout.EntryIds);
@@ -91,7 +94,8 @@ public sealed class ToolModeMenuContentFactoryTests
     {
         SkillItem[] modes = [new() { Code = new AssetLocation("custom"), Name = "Custom" }];
 
-        Assert.True(ToolModeMenuContentFactory.TryCreateSmithingHammer(modes, 0, "Current", out ToolModeMenuContent? content));
+        Assert.True(ToolModeMenuContentFactory.TryCreate(modes, 0, "Current",
+            SmithingHammerToolModeMenuLayoutStrategy.Instance, out ToolModeMenuContent? content));
 
         Assert.Equal(new[] { "0" }, content!.Layout.EntryIds);
         Assert.Equal(new[] { "current" }, content.Layout.InnerMenu!.EntryIds);
@@ -103,7 +107,8 @@ public sealed class ToolModeMenuContentFactoryTests
         string[] codes = ["split", "upsetdown", "custom", "upsetup", "hit", "upsetleft", "upsetright"];
         SkillItem[] modes = [.. codes.Select(code => new SkillItem { Code = new AssetLocation(code), Name = code })];
 
-        Assert.True(ToolModeMenuContentFactory.TryCreateSmithingHammer(modes, 4, "Current", out ToolModeMenuContent? content));
+        Assert.True(ToolModeMenuContentFactory.TryCreate(modes, 4, "Current",
+            SmithingHammerToolModeMenuLayoutStrategy.Instance, out ToolModeMenuContent? content));
 
         Assert.Equal(new[] { "3", "0", "6", "2", "1", "4", "5", "padding:7" }, content!.Layout.EntryIds);
         Assert.Equal(new[] { "current" }, content.Layout.InnerMenu!.EntryIds);
@@ -119,7 +124,8 @@ public sealed class ToolModeMenuContentFactoryTests
             new() { Code = new AssetLocation("upsetdown"), Name = "Down" }
         ];
 
-        Assert.True(ToolModeMenuContentFactory.TryCreateSmithingHammer(directionalOnly, 0, "Current", out ToolModeMenuContent? content));
+        Assert.True(ToolModeMenuContentFactory.TryCreate(directionalOnly, 0, "Current",
+            SmithingHammerToolModeMenuLayoutStrategy.Instance, out ToolModeMenuContent? content));
 
         Assert.Equal(new[] { "0", "1" }, content!.Layout.EntryIds);
         Assert.Equal(new[] { "current" }, content.Layout.InnerMenu!.EntryIds);
@@ -137,7 +143,8 @@ public sealed class ToolModeMenuContentFactoryTests
             new SkillItem { Code = new AssetLocation("addmat"), Name = "Add material", Enabled = false }
         ];
 
-        Assert.True(ToolModeMenuContentFactory.TryCreateChisel(modes, 2, "Current", out ToolModeMenuContent? content));
+        Assert.True(ToolModeMenuContentFactory.TryCreate(modes, 2, "Current",
+            ChiselToolModeMenuLayoutStrategy.Instance, out ToolModeMenuContent? content));
 
         Assert.Equal(Enumerable.Range(0, 7).Select(index => index.ToString()), content!.Layout.EntryIds);
         Assert.Equal(new[] { "7", "8", "9" }, content.Layout.InnerMenu!.EntryIds);
@@ -155,7 +162,8 @@ public sealed class ToolModeMenuContentFactoryTests
             new() { Code = new AssetLocation("material"), Name = "Material" }
         ];
 
-        Assert.True(ToolModeMenuContentFactory.TryCreateChisel(modes, 0, "Current", out ToolModeMenuContent? content));
+        Assert.True(ToolModeMenuContentFactory.TryCreate(modes, 0, "Current",
+            ChiselToolModeMenuLayoutStrategy.Instance, out ToolModeMenuContent? content));
 
         Assert.Equal(new[] { "0", "1" }, content!.Layout.EntryIds);
         Assert.Equal(new[] { "current" }, content.Layout.InnerMenu!.EntryIds);
@@ -168,7 +176,8 @@ public sealed class ToolModeMenuContentFactoryTests
     {
         SkillItem[] modes = [new() { Code = new AssetLocation("only"), Name = "Only" }];
 
-        Assert.True(ToolModeMenuContentFactory.TryCreate(modes, currentMode, "Current mode", out ToolModeMenuContent? content));
+        Assert.True(ToolModeMenuContentFactory.TryCreate(modes, currentMode, "Current mode",
+            GenericToolModeMenuLayoutStrategy.Instance, out ToolModeMenuContent? content));
 
         Assert.Equal("Current mode", content!.Entries[^1].Label);
     }
@@ -176,11 +185,23 @@ public sealed class ToolModeMenuContentFactoryTests
     [Fact]
     public void TryCreate_UnsupportedModeSets_DeclinesForVanillaFallback()
     {
-        Assert.False(ToolModeMenuContentFactory.TryCreate(null, 0, "Current", out _));
-        Assert.False(ToolModeMenuContentFactory.TryCreate([], 0, "Current", out _));
-        Assert.False(ToolModeMenuContentFactory.TryCreate(new SkillItem[64], 0, "Current", out _));
-        Assert.False(ToolModeMenuContentFactory.TryCreate([null!], 0, "Current", out _));
-        Assert.False(ToolModeMenuContentFactory.TryCreate([new SkillItem { Name = null! }], 0, "Current", out _));
+        IToolModeMenuLayoutStrategy strategy = GenericToolModeMenuLayoutStrategy.Instance;
+        Assert.False(ToolModeMenuContentFactory.TryCreate(null, 0, "Current", strategy, out _));
+        Assert.False(ToolModeMenuContentFactory.TryCreate([], 0, "Current", strategy, out _));
+        Assert.False(ToolModeMenuContentFactory.TryCreate(new SkillItem[64], 0, "Current", strategy, out _));
+        Assert.False(ToolModeMenuContentFactory.TryCreate([null!], 0, "Current", strategy, out _));
+        Assert.False(ToolModeMenuContentFactory.TryCreate([new SkillItem { Name = null! }], 0, "Current", strategy, out _));
+    }
+
+    [Fact]
+    public void StrategyRegistry_ResolvesSpecializedAndGenericCollectibles()
+    {
+        Assert.Same(SmithingHammerToolModeMenuLayoutStrategy.Instance,
+            ToolModeMenuLayoutStrategyRegistry.Resolve(new ItemHammer()));
+        Assert.Same(ChiselToolModeMenuLayoutStrategy.Instance,
+            ToolModeMenuLayoutStrategyRegistry.Resolve(new ItemChisel()));
+        Assert.Same(GenericToolModeMenuLayoutStrategy.Instance,
+            ToolModeMenuLayoutStrategyRegistry.Resolve(new Item()));
     }
 
     [Theory]
