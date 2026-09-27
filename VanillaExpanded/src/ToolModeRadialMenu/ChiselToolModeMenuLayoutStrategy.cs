@@ -1,9 +1,10 @@
 using System;
+using System.Collections.Generic;
 using VanillaExpanded.RadialMenu;
 
 namespace VanillaExpanded.ToolModeRadialMenu;
 
-/// <summary>Separates fixed chisel actions from dynamic material choices.</summary>
+/// <summary>Places chisel sizes inside all non-size actions and material choices.</summary>
 internal sealed class ChiselToolModeMenuLayoutStrategy : IToolModeMenuLayoutStrategy
 {
     internal static ChiselToolModeMenuLayoutStrategy Instance { get; } = new();
@@ -31,13 +32,26 @@ internal sealed class ChiselToolModeMenuLayoutStrategy : IToolModeMenuLayoutStra
                 entry.Icon, entry.Description);
         }
 
-        string[] actionIds = context.ModeIds[..materialStart];
-        string[] materialIds = context.ModeIds[materialStart..];
-        // Materials occupy the inner ring while the factory-owned current-mode disc remains at the center.
-        var materialMenu = new RadialMenuLayout(materialIds, 0.30, 0.56, context.CurrentMenu,
+        var sizeIds = new List<string>(4);
+        var outerIds = new List<string>(context.ModeIds.Length - 4);
+        for (int index = 0; index < context.Modes.Length; index++)
+        {
+            if (IsSizeMode(context.Modes[index].Code?.Path)) sizeIds.Add(context.ModeIds[index]);
+            else outerIds.Add(context.ModeIds[index]);
+        }
+        if (sizeIds.Count != 4 || outerIds.Count == 0)
+        {
+            layout = null;
+            return false;
+        }
+
+        // The four carving sizes surround the current-mode disc; every other option remains easy to reach outside.
+        var sizeMenu = new RadialMenuLayout(sizeIds, 0.30, 0.56, context.CurrentMenu,
             separatorDegrees: 1.5);
-        layout = new RadialMenuLayout(actionIds, 0.62, 1, materialMenu,
+        layout = new RadialMenuLayout(outerIds, 0.62, 1, sizeMenu,
             separatorDegrees: 1.5, radiusScale: 0.6);
         return true;
     }
+
+    private static bool IsSizeMode(string? code) => code is "1size" or "2size" or "4size" or "8size";
 }

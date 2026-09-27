@@ -132,12 +132,17 @@ public sealed class ToolModeMenuContentFactoryTests
     }
 
     [Fact]
-    public void TryCreateChisel_GroupsActionsOutsideDynamicMaterialsByLinebreak()
+    public void TryCreateChisel_GroupsSizesInsideAllOtherOptions()
     {
         SkillItem[] modes =
         [
-            .. Enumerable.Range(0, 7).Select(index => new SkillItem
-                { Code = new AssetLocation($"action-{index}"), Name = $"Action {index}" }),
+            new SkillItem { Code = new AssetLocation("1size"), Name = "1x1x1" },
+            new SkillItem { Code = new AssetLocation("2size"), Name = "2x2x2" },
+            new SkillItem { Code = new AssetLocation("4size"), Name = "4x4x4" },
+            new SkillItem { Code = new AssetLocation("8size"), Name = "8x8x8" },
+            new SkillItem { Code = new AssetLocation("rotate"), Name = "Rotate" },
+            new SkillItem { Code = new AssetLocation("flip"), Name = "Flip" },
+            new SkillItem { Code = new AssetLocation("rename"), Name = "Rename" },
             new SkillItem { Code = new AssetLocation("granite"), Name = "Granite", Linebreak = true },
             new SkillItem { Code = new AssetLocation("basalt"), Name = "Basalt" },
             new SkillItem { Code = new AssetLocation("addmat"), Name = "Add material", Enabled = false }
@@ -146,10 +151,10 @@ public sealed class ToolModeMenuContentFactoryTests
         Assert.True(ToolModeMenuContentFactory.TryCreate(modes, 2, "Current",
             ChiselToolModeMenuLayoutStrategy.Instance, out ToolModeMenuContent? content));
 
-        Assert.Equal(Enumerable.Range(0, 7).Select(index => index.ToString()), content!.Layout.EntryIds);
-        Assert.Equal(new[] { "7", "8", "9" }, content.Layout.InnerMenu!.EntryIds);
+        Assert.Equal(new[] { "4", "5", "6", "7", "8", "9" }, content!.Layout.EntryIds);
+        Assert.Equal(new[] { "0", "1", "2", "3" }, content.Layout.InnerMenu!.EntryIds);
         Assert.Equal(new[] { "current" }, content.Layout.InnerMenu.InnerMenu!.EntryIds);
-        Assert.Equal("Action 2", content.Entries[^1].Label);
+        Assert.Equal("4x4x4", content.Entries[^1].Label);
         Assert.True(content.Entries.Single(entry => entry.Id == "9").Enabled);
     }
 
