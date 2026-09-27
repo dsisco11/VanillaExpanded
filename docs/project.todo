@@ -15,7 +15,7 @@
         ☐ New "crafting menu" similar to minecraft: shows all craftable items with current inventory, allows searching. (Maybe this can just be added to the handbook?)
 
     ## Tool-Mode Radial Menus:
-        ☐ Review chisel modes: group the seven actions separately from the dynamic material list using nested rings.
+        ✔ Review chisel modes: group the seven actions separately from the dynamic material list using nested rings. @done(26-09-26)
         ☐ Review boat roller modes: place the four facing options at their matching cardinal directions.
         ☐ Review wrench modes: group rotate separately from block-specific North/South, East/West, and Up/Down offsets.
         ☐ Review art pigment modes: handle potentially large dynamic icon-only lists and define a safe radial fallback.

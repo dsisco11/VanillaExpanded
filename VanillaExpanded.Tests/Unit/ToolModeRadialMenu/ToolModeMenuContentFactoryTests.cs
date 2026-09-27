@@ -125,6 +125,42 @@ public sealed class ToolModeMenuContentFactoryTests
         Assert.Equal(new[] { "current" }, content.Layout.InnerMenu!.EntryIds);
     }
 
+    [Fact]
+    public void TryCreateChisel_GroupsActionsOutsideDynamicMaterialsByLinebreak()
+    {
+        SkillItem[] modes =
+        [
+            .. Enumerable.Range(0, 7).Select(index => new SkillItem
+                { Code = new AssetLocation($"action-{index}"), Name = $"Action {index}" }),
+            new SkillItem { Code = new AssetLocation("granite"), Name = "Granite", Linebreak = true },
+            new SkillItem { Code = new AssetLocation("basalt"), Name = "Basalt" },
+            new SkillItem { Code = new AssetLocation("addmat"), Name = "Add material", Enabled = false }
+        ];
+
+        Assert.True(ToolModeMenuContentFactory.TryCreateChisel(modes, 2, "Current", out ToolModeMenuContent? content));
+
+        Assert.Equal(Enumerable.Range(0, 7).Select(index => index.ToString()), content!.Layout.EntryIds);
+        Assert.Equal(new[] { "7", "8", "9" }, content.Layout.InnerMenu!.EntryIds);
+        Assert.Equal(new[] { "current" }, content.Layout.InnerMenu.InnerMenu!.EntryIds);
+        Assert.Equal("Action 2", content.Entries[^1].Label);
+        Assert.False(content.Entries.Single(entry => entry.Id == "9").Enabled);
+    }
+
+    [Fact]
+    public void TryCreateChisel_WithoutMaterialLinebreakUsesGenericLayout()
+    {
+        SkillItem[] modes =
+        [
+            new() { Code = new AssetLocation("action"), Name = "Action" },
+            new() { Code = new AssetLocation("material"), Name = "Material" }
+        ];
+
+        Assert.True(ToolModeMenuContentFactory.TryCreateChisel(modes, 0, "Current", out ToolModeMenuContent? content));
+
+        Assert.Equal(new[] { "0", "1" }, content!.Layout.EntryIds);
+        Assert.Equal(new[] { "current" }, content.Layout.InnerMenu!.EntryIds);
+    }
+
     [Theory]
     [InlineData(-1)]
     [InlineData(2)]

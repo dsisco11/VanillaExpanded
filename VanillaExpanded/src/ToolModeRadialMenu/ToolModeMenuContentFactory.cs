@@ -14,15 +14,20 @@ internal static class ToolModeMenuContentFactory
 
     /// <summary>Builds radial content, or declines mode sets that must remain on the vanilla grid.</summary>
     internal static bool TryCreate(SkillItem[]? modes, int currentMode, string fallbackCurrentLabel, out ToolModeMenuContent? content)
-        => TryCreate(modes, currentMode, fallbackCurrentLabel, smithingHammer: false, out content);
+        => TryCreate(modes, currentMode, fallbackCurrentLabel, smithingHammer: false, chisel: false, out content);
 
     /// <summary>Builds the smithing hammer's padded ring with directional modes fixed to cardinal wedges.</summary>
     internal static bool TryCreateSmithingHammer(SkillItem[]? modes, int currentMode, string fallbackCurrentLabel,
         out ToolModeMenuContent? content)
-        => TryCreate(modes, currentMode, fallbackCurrentLabel, smithingHammer: true, out content);
+        => TryCreate(modes, currentMode, fallbackCurrentLabel, smithingHammer: true, chisel: false, out content);
+
+    /// <summary>Builds chisel actions outside its dynamic material choices.</summary>
+    internal static bool TryCreateChisel(SkillItem[]? modes, int currentMode, string fallbackCurrentLabel,
+        out ToolModeMenuContent? content)
+        => TryCreate(modes, currentMode, fallbackCurrentLabel, smithingHammer: false, chisel: true, out content);
 
     private static bool TryCreate(SkillItem[]? modes, int currentMode, string fallbackCurrentLabel, bool smithingHammer,
-        out ToolModeMenuContent? content)
+        bool chisel, out ToolModeMenuContent? content)
     {
         content = null;
         if (modes is null || modes.Length is 0 or > MaximumModes
@@ -44,10 +49,13 @@ internal static class ToolModeMenuContentFactory
             : fallbackCurrentLabel;
         entries.Add(new RadialMenuEntry(CenterId, currentLabel, enabled: false));
         var currentMenu = new RadialMenuLayout([CenterId], 0, 0.25);
-        bool useSmithingLayout = smithingHammer && CanCreateSmithingLayout(modes);
-        RadialMenuLayout layout = useSmithingLayout
-            ? CreateSmithingLayout(modes, ids, entries, currentMenu)
-            : CreateGenericLayout(ids, currentMenu);
+        RadialMenuLayout layout;
+        if (chisel && TryCreateChiselLayout(modes, ids, currentMenu, out RadialMenuLayout? chiselLayout))
+            layout = chiselLayout!;
+        else if (smithingHammer && CanCreateSmithingLayout(modes))
+            layout = CreateSmithingLayout(modes, ids, entries, currentMenu);
+        else
+            layout = CreateGenericLayout(ids, currentMenu);
         content = new ToolModeMenuContent(
             layout,
             entries);
@@ -106,6 +114,25 @@ internal static class ToolModeMenuContentFactory
 
     private static RadialMenuLayout CreateGenericLayout(string[] ids, RadialMenuLayout currentMenu) =>
         new(ids, 0.30, 1, currentMenu, separatorDegrees: 1.5, radiusScale: 0.6);
+
+    private static bool TryCreateChiselLayout(SkillItem[] modes, string[] ids, RadialMenuLayout currentMenu,
+        out RadialMenuLayout? layout)
+    {
+        int materialStart = Array.FindIndex(modes, static mode => mode.Linebreak);
+        if (materialStart <= 0 || materialStart >= modes.Length)
+        {
+            layout = null;
+            return false;
+        }
+
+        string[] actionIds = ids[..materialStart];
+        string[] materialIds = ids[materialStart..];
+        var materialMenu = new RadialMenuLayout(materialIds, 0.30, 0.56, currentMenu,
+            separatorDegrees: 1.5);
+        layout = new RadialMenuLayout(actionIds, 0.62, 1, materialMenu,
+            separatorDegrees: 1.5, radiusScale: 0.6);
+        return true;
+    }
 
     private static int GetUpsetDirection(string? code) => code switch
     {
