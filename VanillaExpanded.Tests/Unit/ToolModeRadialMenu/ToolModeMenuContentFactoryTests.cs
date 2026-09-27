@@ -65,7 +65,7 @@ public sealed class ToolModeMenuContentFactoryTests
     }
 
     [Fact]
-    public void TryCreateSmithingHammer_GroupsDirectionalAndActionModesWithoutChangingIndices()
+    public void TryCreateSmithingHammer_UsesPaddedRingWithDirectionalCardinalSlots()
     {
         string[] codes = ["hit", "upsetup", "upsetright", "upsetdown", "upsetleft", "split"];
         SkillItem[] modes = [.. codes.Select(code => new SkillItem { Code = new AssetLocation(code), Name = code })];
@@ -73,12 +73,14 @@ public sealed class ToolModeMenuContentFactoryTests
         Assert.True(ToolModeMenuContentFactory.TryCreateSmithingHammer(modes, 0, "Current", out ToolModeMenuContent? content));
 
         Assert.NotNull(content);
-        Assert.Equal(new[] { "1", "2", "3", "4" }, content.Layout.EntryIds);
-        RadialMenuLayout actionMenu = Assert.IsType<RadialMenuLayout>(content.Layout.InnerMenu);
-        Assert.Equal(new[] { "0", "5" }, actionMenu.EntryIds);
-        Assert.True(actionMenu.RenderAsCenter);
-        Assert.Null(actionMenu.InnerMenu);
-        Assert.Equal(new[] { "1", "2", "3", "4", "0", "5" }, content.Layout.AllEntryIds);
+        Assert.Equal(new[] { "1", "0", "2", "5", "3", "padding:5", "4", "padding:7" }, content.Layout.EntryIds);
+        Assert.Equal(new[] { "current" }, content.Layout.InnerMenu!.EntryIds);
+        Assert.Equal(9, content.Entries.Count);
+        Assert.All(content.Entries.Where(entry => entry.Id.StartsWith("padding:")), entry =>
+        {
+            Assert.False(entry.Enabled);
+            Assert.Empty(entry.Label);
+        });
         Assert.True(content.Layout.TryGetEntryCenter("2", 0, 0, 100, out (double X, double Y) right));
         Assert.True(right.X > 0);
         Assert.Equal(0, right.Y, precision: 6);
@@ -103,10 +105,9 @@ public sealed class ToolModeMenuContentFactoryTests
 
         Assert.True(ToolModeMenuContentFactory.TryCreateSmithingHammer(modes, 4, "Current", out ToolModeMenuContent? content));
 
-        Assert.Equal(new[] { "3", "6", "1", "5" }, content!.Layout.EntryIds);
-        Assert.Equal(new[] { "0", "2", "4" }, content.Layout.InnerMenu!.EntryIds);
-        Assert.Equal(codes, content.Entries.Select(entry => entry.Label));
-        Assert.Equal("4", content.Layout.InnerMenu.EntryIds[^1]);
+        Assert.Equal(new[] { "3", "0", "6", "2", "1", "4", "5", "padding:7" }, content!.Layout.EntryIds);
+        Assert.Equal(new[] { "current" }, content.Layout.InnerMenu!.EntryIds);
+        Assert.Equal(codes, content.Entries.Take(codes.Length).Select(entry => entry.Label));
     }
 
     [Fact]

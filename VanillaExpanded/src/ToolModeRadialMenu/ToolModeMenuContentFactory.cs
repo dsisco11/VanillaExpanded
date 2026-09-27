@@ -16,7 +16,7 @@ internal static class ToolModeMenuContentFactory
     internal static bool TryCreate(SkillItem[]? modes, int currentMode, string fallbackCurrentLabel, out ToolModeMenuContent? content)
         => TryCreate(modes, currentMode, fallbackCurrentLabel, smithingHammer: false, out content);
 
-    /// <summary>Builds the smithing hammer's directional outer ring and action inner ring.</summary>
+    /// <summary>Builds the smithing hammer's padded ring with directional modes fixed to cardinal wedges.</summary>
     internal static bool TryCreateSmithingHammer(SkillItem[]? modes, int currentMode, string fallbackCurrentLabel,
         out ToolModeMenuContent? content)
         => TryCreate(modes, currentMode, fallbackCurrentLabel, smithingHammer: true, out content);
@@ -46,9 +46,8 @@ internal static class ToolModeMenuContentFactory
         var currentMenu = new RadialMenuLayout([CenterId], 0, 0.25);
         bool useSmithingLayout = smithingHammer && CanCreateSmithingLayout(modes);
         RadialMenuLayout layout = useSmithingLayout
-            ? CreateSmithingLayout(modes, ids)
+            ? CreateSmithingLayout(modes, ids, entries, currentMenu)
             : CreateGenericLayout(ids, currentMenu);
-        if (useSmithingLayout) entries.RemoveAt(entries.Count - 1);
         content = new ToolModeMenuContent(
             layout,
             entries);
@@ -59,33 +58,49 @@ internal static class ToolModeMenuContentFactory
     {
         bool hasDirectional = false;
         bool hasAction = false;
+        var directions = new HashSet<int>();
         foreach (SkillItem mode in modes)
         {
-            if (GetUpsetDirection(mode.Code?.Path) >= 0) hasDirectional = true;
+            int direction = GetUpsetDirection(mode.Code?.Path);
+            if (direction >= 0)
+            {
+                if (!directions.Add(direction)) return false;
+                hasDirectional = true;
+            }
             else hasAction = true;
         }
-        return hasDirectional && hasAction;
+        int wedgeCount = (modes.Length + 3) / 4 * 4;
+        return hasDirectional && hasAction && wedgeCount <= 63;
     }
 
-    private static RadialMenuLayout CreateSmithingLayout(SkillItem[] modes, string[] ids)
+    private static RadialMenuLayout CreateSmithingLayout(SkillItem[] modes, string[] ids,
+        List<RadialMenuEntry> entries, RadialMenuLayout currentMenu)
     {
-        var directional = new List<(int Index, int Direction)>();
+        int wedgeCount = (modes.Length + 3) / 4 * 4;
+        var slots = new string?[wedgeCount];
         var actions = new List<string>();
         for (int index = 0; index < modes.Length; index++)
         {
             int direction = GetUpsetDirection(modes[index].Code?.Path);
-            if (direction >= 0) directional.Add((index, direction));
+            if (direction >= 0) slots[direction * wedgeCount / 4] = ids[index];
             else actions.Add(ids[index]);
         }
 
-        directional.Sort(static (left, right) =>
+        int actionIndex = 0;
+        for (int slot = 0; slot < slots.Length; slot++)
         {
-            int direction = left.Direction.CompareTo(right.Direction);
-            return direction != 0 ? direction : left.Index.CompareTo(right.Index);
-        });
-        string[] directionalIds = [.. directional.ConvertAll(item => ids[item.Index])];
-        var actionMenu = new RadialMenuLayout(actions, 0, 0.25, renderAsCenter: true);
-        return new RadialMenuLayout(directionalIds, 0.30, 1, actionMenu,
+            if (slots[slot] is not null) continue;
+            if (actionIndex < actions.Count)
+            {
+                slots[slot] = actions[actionIndex++];
+                continue;
+            }
+            string paddingId = $"padding:{slot}";
+            slots[slot] = paddingId;
+            entries.Add(new RadialMenuEntry(paddingId, string.Empty, enabled: false));
+        }
+
+        return new RadialMenuLayout(Array.ConvertAll(slots, static id => id!), 0.30, 1, currentMenu,
             separatorDegrees: 1.5, radiusScale: 0.6);
     }
 
