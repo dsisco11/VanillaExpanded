@@ -113,7 +113,9 @@ internal sealed class RadialMenuDialog : GuiDialog
     /// <inheritdoc />
     public override void OnKeyDown(KeyEvent args)
     {
-        if (IsOpened()) args.Handled = true;
+        if (!IsOpened()) return;
+        // Escape remains unhandled so the engine routes it through OnEscapePressed.
+        if (args.KeyCode != (int)GlKeys.Escape) args.Handled = true;
     }
 
     /// <inheritdoc />
