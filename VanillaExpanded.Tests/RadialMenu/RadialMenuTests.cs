@@ -49,6 +49,19 @@ public sealed class RadialMenuTests
         Assert.Null(outer.HitTest(0, -60, 0, 0, 100));
     }
 
+    [Fact]
+    public void MultiOptionCenterMenuOccupiesOnlyCenterDisc()
+    {
+        var centerMenu = new RadialMenuLayout(["north", "south"], 0, 0.25, renderAsCenter: true);
+        var outer = new RadialMenuLayout(["outer-north", "outer-south"], 0.30, 1, centerMenu);
+
+        Assert.True(centerMenu.RenderAsCenter);
+        Assert.Equal("north", outer.HitTest(0, -20, 0, 0, 100));
+        Assert.Equal("south", outer.HitTest(0, 20, 0, 0, 100));
+        Assert.Null(outer.HitTest(0, -27, 0, 0, 100));
+        Assert.Equal("outer-north", outer.HitTest(0, -50, 0, 0, 100));
+    }
+
     [Theory]
     [InlineData("inner-north")]
     [InlineData("center")]

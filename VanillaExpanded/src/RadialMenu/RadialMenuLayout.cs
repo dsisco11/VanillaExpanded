@@ -10,16 +10,17 @@ public sealed class RadialMenuLayout
     /// <summary>Creates one concentric menu ring with an optional menu occupying its center.</summary>
     public RadialMenuLayout(IReadOnlyList<string> entryIds, double innerRadius, double outerRadius,
         RadialMenuLayout? innerMenu = null, double startAngleDegrees = 0, bool clockwise = true,
-        double separatorDegrees = 0.3, double radiusScale = 1)
+        double separatorDegrees = 0.3, double radiusScale = 1, bool renderAsCenter = false)
     {
         ArgumentNullException.ThrowIfNull(entryIds);
         bool singleOptionLeaf = entryIds.Count == 1 && innerMenu is null;
+        bool centerMenu = singleOptionLeaf || renderAsCenter;
         if (entryIds.Count is 0 or > 63 || entryIds.Count + (innerMenu?.EntryCount ?? 0) > 64
             || !double.IsFinite(innerRadius) || !double.IsFinite(outerRadius)
             || !double.IsFinite(startAngleDegrees) || !double.IsFinite(separatorDegrees) || !double.IsFinite(radiusScale)
             || innerRadius < 0 || outerRadius <= innerRadius || separatorDegrees < 0 || radiusScale <= 0
-            || (singleOptionLeaf && innerRadius != 0)
-            || (!singleOptionLeaf && innerRadius <= 0)
+            || (centerMenu && (innerRadius != 0 || innerMenu is not null))
+            || (!centerMenu && innerRadius <= 0)
             || (entryIds.Count > 1 && separatorDegrees >= 180d / entryIds.Count)
             || (innerMenu is not null && innerMenu.OuterRadius > innerRadius))
             throw new ArgumentOutOfRangeException(nameof(entryIds), "Nested radial rings need valid nonoverlapping radii; a one-entry innermost ring renders as a disc.");
@@ -39,6 +40,7 @@ public sealed class RadialMenuLayout
         Clockwise = clockwise;
         SeparatorDegrees = separatorDegrees;
         RadiusScale = radiusScale;
+        RenderAsCenter = centerMenu;
         WedgeIds = EntryIds;
         CenterId = InnerMenu?.IsSingleOption == true ? InnerMenu.EntryIds[0] : IsSingleOption ? EntryIds[0] : string.Empty;
         CenterRadius = InnerMenu?.IsSingleOption == true ? InnerMenu.OuterRadius : IsSingleOption ? OuterRadius : 0;
@@ -75,6 +77,8 @@ public sealed class RadialMenuLayout
     public int EntryCount => EntryIds.Count + (InnerMenu?.EntryCount ?? 0);
     /// <summary>Gets whether this innermost one-entry menu renders as a disc.</summary>
     public bool IsSingleOption => EntryIds.Count == 1 && InnerMenu is null;
+    /// <summary>Gets whether this leaf occupies and uses the visual treatment of the center disc.</summary>
+    public bool RenderAsCenter { get; }
     /// <summary>Compatibility alias for this ring's identifiers.</summary>
     public IReadOnlyList<string> WedgeIds { get; private set; }
     /// <summary>Compatibility accessor for a directly nested one-entry menu.</summary>
@@ -103,6 +107,7 @@ public sealed class RadialMenuLayout
         && OuterRadius == other.OuterRadius
         && StartAngleDegrees == other.StartAngleDegrees
         && Clockwise == other.Clockwise
+        && RenderAsCenter == other.RenderAsCenter
         && ((InnerMenu is null && other.InnerMenu is null) || InnerMenu?.HasSameGeometry(other.InnerMenu!) == true);
 
     /// <summary>Returns the supplied identifier under a screen-space point, or null outside selectable radial bands.</summary>
@@ -113,6 +118,7 @@ public sealed class RadialMenuLayout
         double dy = (y - centerY) / radiusPixels;
         double radius = Math.Sqrt(dx * dx + dy * dy);
         if (IsSingleOption) return radius <= OuterRadius ? EntryIds[0] : null;
+        if (RenderAsCenter && radius > OuterRadius) return null;
         if (radius < InnerRadius) return InnerMenu is not null && radius <= InnerMenu.OuterRadius
             ? InnerMenu.HitTest(x, y, centerX, centerY, radiusPixels)
             : null;

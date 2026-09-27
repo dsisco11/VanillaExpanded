@@ -226,10 +226,10 @@ internal sealed class RadialMenuRenderer : IDisposable
         shader!.Uniform("maskIndex", maskIndex);
         shader.Uniform("ringEntryOffset", entryOffset);
         shader.Uniform("ringEntryCount", ring.EntryIds.Count);
-        shader.Uniform("ringMode", ring.IsSingleOption ? 1 : 0);
+        shader.Uniform("ringMode", ring.RenderAsCenter ? 1 : 0);
         shader.Uniform("innerRadius", (float)ring.InnerRadius);
         shader.Uniform("outerRadius", (float)ring.OuterRadius);
-        shader.Uniform("separatorFraction", ring.IsSingleOption ? 0 : (float)(ring.SeparatorDegrees / ring.StepDegrees));
+        shader.Uniform("separatorFraction", ring.RenderAsCenter ? 0 : (float)(ring.SeparatorDegrees / ring.StepDegrees));
         shader.Uniform("startAngleRadians", (float)(ring.StartAngleDegrees * Math.PI / 180d));
         shader.Uniform("clockwiseSign", ring.Clockwise ? 1f : -1f);
     }
