@@ -46,7 +46,8 @@ public sealed class RadialMenuSystem : ModSystem, IRadialMenu
 
     #region Public API
     /// <summary>Opens caller-supplied generic entries at the supplied circular positions.</summary>
-    public bool Open(RadialMenuLayout layout, IEnumerable<RadialMenuEntry> entries, Action<string> selected, Action cancelled)
+    public bool Open(RadialMenuLayout layout, IEnumerable<RadialMenuEntry> entries,
+        System.Func<string, RadialMenuSelectionResult> selected, Action cancelled)
     {
         ArgumentNullException.ThrowIfNull(selected);
         ArgumentNullException.ThrowIfNull(cancelled);
@@ -58,9 +59,10 @@ public sealed class RadialMenuSystem : ModSystem, IRadialMenu
         }
         return dialog.Open(layout, entries, id =>
         {
-            // Keep the release guard even if the caller closes this dialog in the callback.
-            pendingSelectionRelease = true;
-            selected(id);
+            RadialMenuSelectionResult result = selected(id);
+            // Keep the release guard only when this selection releases the dialog back to world input.
+            if (result == RadialMenuSelectionResult.Close) pendingSelectionRelease = true;
+            return result;
         }, cancelled);
     }
 

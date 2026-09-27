@@ -495,7 +495,8 @@ public sealed class QuickToolMenuControllerTests
         /// <inheritdoc />
         public bool IsOpen => Interaction?.IsOpen == true;
         /// <inheritdoc />
-        public bool Open(RadialMenuLayout layout, IEnumerable<RadialMenuEntry> entries, Action<string> selected, Action cancelled)
+        public bool Open(RadialMenuLayout layout, IEnumerable<RadialMenuEntry> entries,
+            System.Func<string, RadialMenuSelectionResult> selected, Action cancelled)
         {
             Layout = layout;
             Interaction = new RadialMenuInteraction(layout, entries);

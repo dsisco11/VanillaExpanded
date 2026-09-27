@@ -233,7 +233,11 @@ public sealed class RadialMenuTests
         var layout = new RadialMenuLayout(["virtual:light", "generic:other"], "center", 0.2, 0.3, 1);
         var menu = new RadialMenuInteraction(layout, [new("virtual:light", "Light", false), new("generic:other", "Other", true), new("center", "Restore", true)]);
         int selections = 0;
-        menu.Selected += _ => selections++;
+        menu.Selected += _ =>
+        {
+            selections++;
+            return RadialMenuSelectionResult.Close;
+        };
         menu.Open();
         menu.MovePointer(0, -60, 0, 0, 100);
         Assert.Equal("virtual:light", menu.HoveredId);
@@ -254,7 +258,11 @@ public sealed class RadialMenuTests
         var layout = new RadialMenuLayout(["outer"], "unequip", 0.2, 0.3, 1);
         var menu = new RadialMenuInteraction(layout, [new("outer", "Outer", true), new("unequip", "Unequip", true)]);
         string? selected = null;
-        menu.Selected += id => selected = id;
+        menu.Selected += id =>
+        {
+            selected = id;
+            return RadialMenuSelectionResult.Close;
+        };
         menu.Open();
         menu.MovePointer(50, 50, 50, 50, 100);
         Assert.True(menu.SelectHovered());
@@ -290,6 +298,31 @@ public sealed class RadialMenuTests
         Assert.Equal("b", menu.HoveredId);
         Assert.True(menu.SelectHovered());
     }
+
+    [Fact]
+    public void KeepOpenSelectionAllowsAnotherSelectionBeforeClosing()
+    {
+        var layout = new RadialMenuLayout(["repeat"], "center", 0.2, 0.3, 1);
+        var menu = new RadialMenuInteraction(layout,
+            [new("repeat", "Repeat", true), new("center", "Center", true)]);
+        int selections = 0;
+        menu.Selected += _ => ++selections == 1
+            ? RadialMenuSelectionResult.KeepOpen
+            : RadialMenuSelectionResult.Close;
+        menu.Open();
+
+        menu.MovePointer(0, -60, 0, 0, 100);
+        Assert.True(menu.SelectHovered());
+        Assert.True(menu.IsOpen);
+        Assert.Null(menu.SelectedId);
+
+        menu.MovePointer(0, -60, 0, 0, 100);
+        Assert.True(menu.SelectHovered());
+        Assert.False(menu.IsOpen);
+        Assert.Equal("repeat", menu.SelectedId);
+        Assert.Equal(2, selections);
+    }
+
     /// <summary>Checks cancellation reports once and never selects an entry.</summary>
     [Fact]
     public void CancellationReportsWithoutSelection()
@@ -299,7 +332,11 @@ public sealed class RadialMenuTests
         int cancellations = 0;
         int selections = 0;
         menu.Cancelled += () => cancellations++;
-        menu.Selected += _ => selections++;
+        menu.Selected += _ =>
+        {
+            selections++;
+            return RadialMenuSelectionResult.Close;
+        };
         menu.Open();
         menu.MovePointer(0, 0, 0, 0, 100);
         menu.Cancel();

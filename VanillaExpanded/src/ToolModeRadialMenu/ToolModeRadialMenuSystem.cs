@@ -3,6 +3,7 @@ using VanillaExpanded.RadialMenu;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
+using Vintagestory.GameContent;
 
 namespace VanillaExpanded.ToolModeRadialMenu;
 
@@ -69,9 +70,21 @@ internal sealed class ToolModeRadialMenuSystem : ModSystem, ILiveConfigurable
             id => SelectMode(id, collectible, slot, player, blockSelection), static () => { });
     }
 
-    private void SelectMode(string id, CollectibleObject collectible, ItemSlot slot, IClientPlayer player, BlockSelection? blockSelection)
+    private RadialMenuSelectionResult SelectMode(string id, CollectibleObject collectible, ItemSlot slot,
+        IClientPlayer player, BlockSelection? blockSelection)
     {
-        if (ToolModeMenuContentFactory.TryGetMode(id, out int mode))
-            ToolModeSelection.Apply(api!, collectible, slot, player, blockSelection, mode);
+        if (!ToolModeMenuContentFactory.TryGetMode(id, out int mode)) return RadialMenuSelectionResult.Close;
+        bool addingChiselMaterial = collectible is ItemChisel
+            && player.InventoryManager.MouseItemSlot.Itemstack?.Block is not null;
+        ToolModeSelection.Apply(api!, collectible, slot, player, blockSelection, mode);
+        if (!addingChiselMaterial) return RadialMenuSelectionResult.Close;
+
+        SkillItem[]? refreshedModes = collectible.GetToolModes(slot, player, blockSelection!);
+        int currentMode = collectible.GetToolMode(slot, player, blockSelection!);
+        IToolModeMenuLayoutStrategy strategy = ToolModeMenuLayoutStrategyRegistry.Resolve(collectible);
+        if (ToolModeMenuContentFactory.TryCreate(refreshedModes, currentMode, Lang.Get("Current mode"), strategy,
+            out ToolModeMenuContent? refreshed))
+            menu!.UpdateLayout(refreshed!.Layout, refreshed.Entries);
+        return RadialMenuSelectionResult.KeepOpen;
     }
 }

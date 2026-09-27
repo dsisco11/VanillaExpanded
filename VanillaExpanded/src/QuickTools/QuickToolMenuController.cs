@@ -80,7 +80,11 @@ internal sealed class QuickToolMenuController : IDisposable
         restoreAvailable = equipment.ValidateUnequip();
         IReadOnlyList<RadialMenuEntry> entries = SnapshotEntries();
         State = QuickToolMenuState.OpenHeld;
-        if (!menu.Open(layout!, entries, OnSelected, OnCancelled))
+        if (!menu.Open(layout!, entries, id =>
+            {
+                OnSelected(id);
+                return RadialMenuSelectionResult.Close;
+            }, OnCancelled))
         {
             State = QuickToolMenuState.ClosedAwaitRelease;
             displayed.Clear();
