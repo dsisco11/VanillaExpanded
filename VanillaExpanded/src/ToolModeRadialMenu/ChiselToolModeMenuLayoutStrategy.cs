@@ -21,6 +21,16 @@ internal sealed class ChiselToolModeMenuLayoutStrategy : IToolModeMenuLayoutStra
             return false;
         }
 
+        // The base skill grid invokes disabled tiles as drop targets. The radial flow makes only Add Material actionable.
+        int addMaterial = Array.FindIndex(context.Modes,
+            static mode => mode.Code?.Path == "addmat");
+        if (addMaterial >= 0)
+        {
+            RadialMenuEntry entry = context.Entries[addMaterial];
+            context.Entries[addMaterial] = new RadialMenuEntry(entry.Id, entry.Label, enabled: true,
+                entry.Icon, entry.Description);
+        }
+
         string[] actionIds = context.ModeIds[..materialStart];
         string[] materialIds = context.ModeIds[materialStart..];
         // Materials occupy the inner ring while the factory-owned current-mode disc remains at the center.

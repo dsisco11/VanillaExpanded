@@ -150,7 +150,7 @@ public sealed class ToolModeMenuContentFactoryTests
         Assert.Equal(new[] { "7", "8", "9" }, content.Layout.InnerMenu!.EntryIds);
         Assert.Equal(new[] { "current" }, content.Layout.InnerMenu.InnerMenu!.EntryIds);
         Assert.Equal("Action 2", content.Entries[^1].Label);
-        Assert.False(content.Entries.Single(entry => entry.Id == "9").Enabled);
+        Assert.True(content.Entries.Single(entry => entry.Id == "9").Enabled);
     }
 
     [Fact]

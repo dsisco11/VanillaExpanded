@@ -56,7 +56,8 @@ internal sealed class ToolModeRadialMenuSystem : ModSystem, ILiveConfigurable
         CollectibleObject? collectible = slot.Itemstack?.Collectible;
         if (collectible is null) return false;
 
-        BlockSelection? blockSelection = player.CurrentBlockSelection;
+        // Match the base dialog: selection and packet data must refer to the target present when the menu opened.
+        BlockSelection? blockSelection = player.CurrentBlockSelection?.Clone();
         SkillItem[]? modes = collectible.GetToolModes(slot, player, blockSelection!);
         int currentMode = collectible.GetToolMode(slot, player, blockSelection!);
         IToolModeMenuLayoutStrategy strategy = ToolModeMenuLayoutStrategyRegistry.Resolve(collectible);
@@ -71,6 +72,6 @@ internal sealed class ToolModeRadialMenuSystem : ModSystem, ILiveConfigurable
     private void SelectMode(string id, CollectibleObject collectible, ItemSlot slot, IClientPlayer player, BlockSelection? blockSelection)
     {
         if (ToolModeMenuContentFactory.TryGetMode(id, out int mode))
-            collectible.SetToolMode(slot, player, blockSelection!, mode);
+            ToolModeSelection.Apply(api!, collectible, slot, player, blockSelection, mode);
     }
 }
