@@ -180,6 +180,21 @@ public sealed class RadialMenuTests
         }
         Assert.True(RadialMenuMesh.Build(layout, 600).VerticesCount >= RadialMenuMesh.Build(layout, 300).VerticesCount);
     }
+
+    [Fact]
+    public void IconSizeFitsRingThicknessAndShrinksForDenseWedges()
+    {
+        var sparse = new RadialMenuLayout(["a", "b", "c", "d"], 0.3, 0.6);
+        string[] denseIds = [.. Enumerable.Range(0, 16).Select(index => index.ToString())];
+        var dense = new RadialMenuLayout(denseIds, 0.3, 0.6);
+
+        float sparseSize = sparse.GetIconSizePixels(200, 4);
+        float denseSize = dense.GetIconSizePixels(200, 4);
+
+        Assert.True(sparseSize <= (sparse.OuterRadius - sparse.InnerRadius) * 200);
+        Assert.True(denseSize < sparseSize);
+        Assert.True(denseSize > 0);
+    }
     /// <summary>Checks both layout directions produce visible triangles under the same face-culling rule.</summary>
     [Fact]
     public void WedgeTriangleWindingIsConsistentAcrossDirections()

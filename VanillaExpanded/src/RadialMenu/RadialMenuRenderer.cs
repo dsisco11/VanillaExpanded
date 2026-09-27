@@ -257,13 +257,14 @@ internal sealed class RadialMenuRenderer : IDisposable
                 else
                 {
                     double midRadius = (ring.InnerRadius + ring.OuterRadius) / 2d;
+                    float iconSize = ring.GetIconSizePixels(radiusPixels, RadialMenuWedgeStyle.IconInsetPixels);
                     for (int i = 0; i < ring.EntryIds.Count; i++)
                     {
                         RadialMenuEntry entry = interaction.GetEntry(ring.EntryIds[i]);
                         float scale = 1f + (RadialMenuWedgeStyle.HoverScale - 1f) * hoverAnimation.VisualProgress(entry.Id);
                         (double x, double y) = ring.GetWedgeCenter(i, centerX, centerY, radiusPixels, midRadius * scale);
                         DrawClippedEntry(entry, entryOffset + i, ring, meshes[meshIndex], entryOffset, x, y,
-                            radiusPixels * RadialMenuWedgeStyle.IconSizeFraction * scale, guiShader);
+                            iconSize * scale, guiShader);
                     }
                 }
                 entryOffset += ring.EntryIds.Count;

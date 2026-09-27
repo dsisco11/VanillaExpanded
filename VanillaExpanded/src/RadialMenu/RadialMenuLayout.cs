@@ -153,6 +153,18 @@ public sealed class RadialMenuLayout
         return (centerX + Math.Sin(angle) * radiusPixels * radiusFraction, centerY - Math.Cos(angle) * radiusPixels * radiusFraction);
     }
 
+    /// <summary>Gets the largest icon square supported by this ring's radial and angular dimensions.</summary>
+    internal float GetIconSizePixels(double radiusPixels, double insetPixels)
+    {
+        if (radiusPixels <= 0 || insetPixels < 0) throw new ArgumentOutOfRangeException(nameof(radiusPixels));
+        if (IsSingleOption) return (float)Math.Max(1d, OuterRadius * radiusPixels * 2d - insetPixels * 2d);
+        double midRadius = (InnerRadius + OuterRadius) / 2d;
+        double halfAngle = Math.Max(0d, StepDegrees / 2d - SeparatorDegrees) * Math.PI / 180d;
+        double radialCapacity = (OuterRadius - InnerRadius) * radiusPixels;
+        double angularCapacity = 2d * midRadius * radiusPixels * Math.Sin(halfAngle);
+        return (float)Math.Max(1d, Math.Min(radialCapacity, angularCapacity) - insetPixels * 2d);
+    }
+
     /// <summary>Gets the rendered center for an entry anywhere in this nested menu.</summary>
     public bool TryGetEntryCenter(string id, double centerX, double centerY, double radiusPixels, out (double X, double Y) position)
     {

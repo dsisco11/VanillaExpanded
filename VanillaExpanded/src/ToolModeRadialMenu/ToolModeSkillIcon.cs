@@ -23,7 +23,19 @@ internal sealed class ToolModeSkillIcon(SkillItem skillItem) : IRadialMenuIcon
         if (skillItem.RenderHandler is not null)
         {
             double renderedSize = GuiElement.scaled(GuiElementPassiveItemSlot.unscaledSlotSize);
-            skillItem.RenderHandler(skillItem.Code, 0, centerX - renderedSize / 2d, centerY - renderedSize / 2d);
+            float scale = sizePixels / (float)renderedSize;
+            api.Render.GlPushMatrix();
+            try
+            {
+                api.Render.GlTranslate(centerX, centerY, 0);
+                api.Render.GlScale(scale, scale, 1);
+                api.Render.GlTranslate(-centerX, -centerY, 0);
+                skillItem.RenderHandler(skillItem.Code, 0, centerX - renderedSize / 2d, centerY - renderedSize / 2d);
+            }
+            finally
+            {
+                api.Render.GlPopMatrix();
+            }
         }
     }
 }
