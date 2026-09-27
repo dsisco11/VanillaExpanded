@@ -76,8 +76,9 @@ public sealed class ToolModeMenuContentFactoryTests
         Assert.Equal(new[] { "1", "2", "3", "4" }, content.Layout.EntryIds);
         RadialMenuLayout actionMenu = Assert.IsType<RadialMenuLayout>(content.Layout.InnerMenu);
         Assert.Equal(new[] { "0", "5" }, actionMenu.EntryIds);
-        Assert.Equal(new[] { "current" }, actionMenu.InnerMenu!.EntryIds);
-        Assert.Equal(new[] { "1", "2", "3", "4", "0", "5", "current" }, content.Layout.AllEntryIds);
+        Assert.True(actionMenu.RenderAsCenter);
+        Assert.Null(actionMenu.InnerMenu);
+        Assert.Equal(new[] { "1", "2", "3", "4", "0", "5" }, content.Layout.AllEntryIds);
         Assert.True(content.Layout.TryGetEntryCenter("2", 0, 0, 100, out (double X, double Y) right));
         Assert.True(right.X > 0);
         Assert.Equal(0, right.Y, precision: 6);
@@ -104,7 +105,8 @@ public sealed class ToolModeMenuContentFactoryTests
 
         Assert.Equal(new[] { "3", "6", "1", "5" }, content!.Layout.EntryIds);
         Assert.Equal(new[] { "0", "2", "4" }, content.Layout.InnerMenu!.EntryIds);
-        Assert.Equal("hit", content.Entries[^1].Label);
+        Assert.Equal(codes, content.Entries.Select(entry => entry.Label));
+        Assert.Equal("4", content.Layout.InnerMenu.EntryIds[^1]);
     }
 
     [Fact]

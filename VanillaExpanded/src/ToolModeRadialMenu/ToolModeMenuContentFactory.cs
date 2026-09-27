@@ -44,16 +44,30 @@ internal static class ToolModeMenuContentFactory
             : fallbackCurrentLabel;
         entries.Add(new RadialMenuEntry(CenterId, currentLabel, enabled: false));
         var currentMenu = new RadialMenuLayout([CenterId], 0, 0.25);
-        RadialMenuLayout layout = smithingHammer
-            ? CreateSmithingLayout(modes, ids, currentMenu)
+        bool useSmithingLayout = smithingHammer && CanCreateSmithingLayout(modes);
+        RadialMenuLayout layout = useSmithingLayout
+            ? CreateSmithingLayout(modes, ids)
             : CreateGenericLayout(ids, currentMenu);
+        if (useSmithingLayout) entries.RemoveAt(entries.Count - 1);
         content = new ToolModeMenuContent(
             layout,
             entries);
         return true;
     }
 
-    private static RadialMenuLayout CreateSmithingLayout(SkillItem[] modes, string[] ids, RadialMenuLayout currentMenu)
+    private static bool CanCreateSmithingLayout(SkillItem[] modes)
+    {
+        bool hasDirectional = false;
+        bool hasAction = false;
+        foreach (SkillItem mode in modes)
+        {
+            if (GetUpsetDirection(mode.Code?.Path) >= 0) hasDirectional = true;
+            else hasAction = true;
+        }
+        return hasDirectional && hasAction;
+    }
+
+    private static RadialMenuLayout CreateSmithingLayout(SkillItem[] modes, string[] ids)
     {
         var directional = new List<(int Index, int Direction)>();
         var actions = new List<string>();
@@ -64,15 +78,14 @@ internal static class ToolModeMenuContentFactory
             else actions.Add(ids[index]);
         }
 
-        if (directional.Count == 0 || actions.Count == 0) return CreateGenericLayout(ids, currentMenu);
         directional.Sort(static (left, right) =>
         {
             int direction = left.Direction.CompareTo(right.Direction);
             return direction != 0 ? direction : left.Index.CompareTo(right.Index);
         });
         string[] directionalIds = [.. directional.ConvertAll(item => ids[item.Index])];
-        var actionMenu = new RadialMenuLayout(actions, 0.31, 0.56, currentMenu);
-        return new RadialMenuLayout(directionalIds, 0.62, 1, actionMenu,
+        var actionMenu = new RadialMenuLayout(actions, 0, 0.25, renderAsCenter: true);
+        return new RadialMenuLayout(directionalIds, 0.30, 1, actionMenu,
             separatorDegrees: 1.5, radiusScale: 0.6);
     }
 
