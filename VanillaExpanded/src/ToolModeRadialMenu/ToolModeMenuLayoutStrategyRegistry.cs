@@ -12,7 +12,8 @@ internal static class ToolModeMenuLayoutStrategyRegistry
         new Dictionary<Type, IToolModeMenuLayoutStrategy>
         {
             [typeof(ItemHammer)] = SmithingHammerToolModeMenuLayoutStrategy.Instance,
-            [typeof(ItemChisel)] = ChiselToolModeMenuLayoutStrategy.Instance
+            [typeof(ItemChisel)] = ChiselToolModeMenuLayoutStrategy.Instance,
+            [typeof(ItemRoller)] = BoatRollerToolModeMenuLayoutStrategy.Instance
         };
 
     /// <summary>Resolves the nearest registered collectible base type, or the generic strategy.</summary>

@@ -174,6 +174,24 @@ public sealed class ToolModeMenuContentFactoryTests
         Assert.Equal(new[] { "current" }, content.Layout.InnerMenu!.EntryIds);
     }
 
+    [Fact]
+    public void TryCreateBoatRoller_PlacesFacingModesAtCardinalWedges()
+    {
+        SkillItem[] modes =
+        [
+            new() { Code = new AssetLocation("east"), Name = "East" },
+            new() { Code = new AssetLocation("north"), Name = "North" },
+            new() { Code = new AssetLocation("west"), Name = "West" },
+            new() { Code = new AssetLocation("south"), Name = "South" }
+        ];
+
+        Assert.True(ToolModeMenuContentFactory.TryCreate(modes, 0, "Current",
+            BoatRollerToolModeMenuLayoutStrategy.Instance, out ToolModeMenuContent? content));
+
+        Assert.Equal(new[] { "1", "0", "3", "2" }, content!.Layout.EntryIds);
+        Assert.Equal(new[] { "current" }, content.Layout.InnerMenu!.EntryIds);
+    }
+
     [Theory]
     [InlineData(-1)]
     [InlineData(2)]
@@ -205,6 +223,8 @@ public sealed class ToolModeMenuContentFactoryTests
             ToolModeMenuLayoutStrategyRegistry.Resolve(new ItemHammer()));
         Assert.Same(ChiselToolModeMenuLayoutStrategy.Instance,
             ToolModeMenuLayoutStrategyRegistry.Resolve(new ItemChisel()));
+        Assert.Same(BoatRollerToolModeMenuLayoutStrategy.Instance,
+            ToolModeMenuLayoutStrategyRegistry.Resolve(new ItemRoller()));
         Assert.Same(GenericToolModeMenuLayoutStrategy.Instance,
             ToolModeMenuLayoutStrategyRegistry.Resolve(new Item()));
     }
