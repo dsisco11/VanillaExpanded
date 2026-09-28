@@ -7,22 +7,24 @@ using Vintagestory.Client.NoObf;
 
 namespace VanillaExpanded.RadialMenu;
 
-/// <summary>Owns the combined menu mesh, shader, and separate game-rendered entry content.</summary>
+/// <summary>Owns nested ring meshes, their shader, and separate game-rendered entry content.</summary>
 internal sealed class RadialMenuRenderer : IDisposable
 {
     #region Resources
     private const string ShaderName = "radial_menu";
     private const float CenterLabelInsetPixels = 8f;
+    private const int CenterLabelTexturePaddingPixels = 2;
     private readonly ICoreClientAPI capi;
     private readonly RadialMenuHoverAnimation hoverAnimation = new();
     private readonly Matrixf matrix = new();
     private readonly Dictionary<string, LoadedTexture> labels = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> renderedLabels = new(StringComparer.Ordinal);
-    private readonly CairoFont labelFont = CairoFont.WhiteSmallText().WithStroke([0, 0, 0, 0.65], 1.5);
+    private readonly Dictionary<string, float> labelScales = new(StringComparer.Ordinal);
+    private CairoFont? labelFont;
     private readonly LoadedTexture dimTexture;
     private readonly RadialMenuIconHalo iconHalo;
     private RadialMenuLayout? meshLayout;
-    private MeshRef? mesh;
+    private readonly List<MeshRef> meshes = [];
     private ShaderProgram? shader;
     private double supportedRadiusPixels;
     private bool disposed;
@@ -49,12 +51,13 @@ internal sealed class RadialMenuRenderer : IDisposable
     public void PrepareLayout(RadialMenuLayout layout)
     {
         hoverAnimation.Retain(layout);
-        var retainedIds = new HashSet<string>(layout.WedgeIds, StringComparer.Ordinal) { layout.CenterId };
+        var retainedIds = new HashSet<string>(layout.AllEntryIds, StringComparer.Ordinal);
         foreach (string id in new List<string>(renderedLabels.Keys))
         {
             if (retainedIds.Contains(id)) continue;
             if (labels.Remove(id, out LoadedTexture? texture)) texture.Dispose();
             renderedLabels.Remove(id);
+            labelScales.Remove(id);
         }
     }
 
@@ -67,12 +70,7 @@ internal sealed class RadialMenuRenderer : IDisposable
         if (disposed) return false;
         shader?.Dispose();
         shader = null;
-        if (mesh is not null)
-        {
-            capi.Render.DeleteMesh(mesh);
-            mesh = null;
-            meshLayout = null;
-        }
+        DeleteMeshes();
         ShaderProgram? program = null;
         try
         {
@@ -106,8 +104,8 @@ internal sealed class RadialMenuRenderer : IDisposable
     public void Render(RadialMenuLayout layout, RadialMenuInteraction interaction, float deltaTime, float centerX, float centerY, float radiusPixels)
     {
         if (disposed || shader is null || radiusPixels <= 0) return;
-        EnsureMesh(layout, radiusPixels);
-        if (mesh is null) return;
+        EnsureMeshes(layout, radiusPixels);
+        if (meshes.Count == 0) return;
         hoverAnimation.Advance(layout, interaction.HoveredId, deltaTime);
 
         var previousShader = capi.Render.CurrentActiveShader;
@@ -121,38 +119,27 @@ internal sealed class RadialMenuRenderer : IDisposable
             var guiShader = capi.Render.GetEngineShader(EnumShaderProgram.Gui);
             guiShader.Use();
             capi.Render.Render2DTexture(dimTexture.TextureId, 0, 0, capi.Render.FrameWidth, capi.Render.FrameHeight,
-                35, new Vec4f(0.025f, 0.02f, 0.015f, 0.66f));
+                35, new Vec4f(0.025f, 0.02f, 0.015f, 0.70f));
             guiShader.Stop();
             shader.Use();
             try
             {
-                shader.Uniform("maskIndex", -1);
-                var states = new float[(layout.WedgeIds.Count + 1) * 4];
-                for (int i = 0; i < layout.WedgeIds.Count; i++)
+                string[] entryIds = [.. layout.AllEntryIds];
+                var states = new float[entryIds.Length * 4];
+                int hovered = -1;
+                for (int i = 0; i < entryIds.Length; i++)
                 {
-                    string id = layout.WedgeIds[i];
+                    string id = entryIds[i];
                     RadialMenuEntry entry = interaction.GetEntry(id);
                     states[i * 4] = entry.Enabled ? 1 : 0;
                     states[i * 4 + 1] = interaction.SelectedId == id ? 1 : 0;
                     states[i * 4 + 2] = hoverAnimation.VisualProgress(id);
-                }
-                states[layout.WedgeIds.Count * 4] = interaction.GetEntry(layout.CenterId).Enabled ? 1 : 0;
-                states[layout.WedgeIds.Count * 4 + 1] = interaction.SelectedId == layout.CenterId ? 1 : 0;
-                int hovered = interaction.HoveredId == layout.CenterId ? layout.WedgeIds.Count : -1;
-                if (hovered < 0 && interaction.HoveredId is not null)
-                {
-                    for (int i = 0; i < layout.WedgeIds.Count; i++) if (layout.WedgeIds[i] == interaction.HoveredId) { hovered = i; break; }
+                    if (interaction.HoveredId == id) hovered = i;
                 }
 
-                shader.Uniforms4("entryStates", layout.WedgeIds.Count + 1, states);
-                shader.Uniform("entryCount", layout.WedgeIds.Count + 1);
+                shader.Uniforms4("entryStates", entryIds.Length, states);
+                shader.Uniform("entryCount", entryIds.Length);
                 shader.Uniform("hoveredIndex", hovered);
-                shader.Uniform("centerRadius", (float)layout.CenterRadius);
-                shader.Uniform("innerRadius", (float)layout.InnerRadius);
-                shader.Uniform("outerRadius", (float)layout.OuterRadius);
-                shader.Uniform("separatorFraction", layout.WedgeIds.Count == 0 ? 0 : (float)(layout.SeparatorDegrees / layout.StepDegrees));
-                shader.Uniform("startAngleRadians", (float)(layout.StartAngleDegrees * Math.PI / 180d));
-                shader.Uniform("clockwiseSign", layout.Clockwise ? 1f : -1f);
                 shader.Uniform("radiusPixels", radiusPixels);
                 shader.Uniform("cornerRadiusPixels", RadialMenuWedgeStyle.CornerRadiusPixels);
                 shader.Uniform("borderWidthPixels", RadialMenuWedgeStyle.BorderWidthPixels);
@@ -169,7 +156,14 @@ internal sealed class RadialMenuRenderer : IDisposable
                 matrix.Set(capi.Render.CurrentModelviewMatrix).Translate(centerX, centerY, 50).Scale(radiusPixels, radiusPixels, 1);
                 ((IShaderProgram)shader).UniformMatrix("projectionMatrix", capi.Render.CurrentProjectionMatrix);
                 ((IShaderProgram)shader).UniformMatrix("modelViewMatrix", matrix.Values);
-                capi.Render.RenderMesh(mesh);
+                int offset = 0;
+                int meshIndex = 0;
+                for (RadialMenuLayout? ring = layout; ring is not null; ring = ring.InnerMenu)
+                {
+                    ConfigureRingShader(ring, offset, maskIndex: -1);
+                    capi.Render.RenderMesh(meshes[meshIndex++]);
+                    offset += ring.EntryIds.Count;
+                }
             }
             finally
             {
@@ -193,26 +187,55 @@ internal sealed class RadialMenuRenderer : IDisposable
         if (disposed) return;
         disposed = true;
         shader?.Dispose();
-        if (mesh is not null) capi.Render.DeleteMesh(mesh);
+        DeleteMeshes();
         foreach (LoadedTexture texture in labels.Values) texture.Dispose();
         dimTexture.Dispose();
         iconHalo.Dispose();
-        labelFont.Dispose();
+        labelFont?.Dispose();
+        labelFont = null;
         labels.Clear();
+        labelScales.Clear();
     }
     #endregion
 
     #region Geometry and content
     /// <summary>Uploads geometry only when layout or supported screen-space tolerance changes.</summary>
-    private void EnsureMesh(RadialMenuLayout layout, double radiusPixels)
+    private void EnsureMeshes(RadialMenuLayout layout, double radiusPixels)
     {
         double requiredRadiusPixels = radiusPixels * RadialMenuWedgeStyle.HoverScale;
-        if (mesh is not null && meshLayout?.HasSameGeometry(layout) == true && requiredRadiusPixels <= supportedRadiusPixels) return;
-        if (mesh is not null) capi.Render.DeleteMesh(mesh);
+        if (meshes.Count > 0 && meshLayout?.HasSameGeometry(layout) == true && requiredRadiusPixels <= supportedRadiusPixels) return;
+        DeleteMeshes();
         supportedRadiusPixels = requiredRadiusPixels;
-        mesh = capi.Render.UploadMesh(RadialMenuMesh.Build(layout, supportedRadiusPixels));
+        int offset = 0;
+        for (RadialMenuLayout? ring = layout; ring is not null; ring = ring.InnerMenu)
+        {
+            meshes.Add(capi.Render.UploadMesh(RadialMenuMesh.Build(ring, supportedRadiusPixels, offset)));
+            offset += ring.EntryIds.Count;
+        }
         meshLayout = layout;
         MeshUploadCount++;
+    }
+
+    /// <summary>Deletes every ring mesh as one cached layout generation.</summary>
+    private void DeleteMeshes()
+    {
+        foreach (MeshRef ringMesh in meshes) capi.Render.DeleteMesh(ringMesh);
+        meshes.Clear();
+        meshLayout = null;
+    }
+
+    /// <summary>Supplies geometry parameters for one ring while global entry states remain bound.</summary>
+    private void ConfigureRingShader(RadialMenuLayout ring, int entryOffset, int maskIndex)
+    {
+        shader!.Uniform("maskIndex", maskIndex);
+        shader.Uniform("ringEntryOffset", entryOffset);
+        shader.Uniform("ringEntryCount", ring.EntryIds.Count);
+        shader.Uniform("ringMode", ring.RenderAsCenter ? 1 : 0);
+        shader.Uniform("innerRadius", (float)ring.InnerRadius);
+        shader.Uniform("outerRadius", (float)ring.OuterRadius);
+        shader.Uniform("separatorFraction", ring.RenderAsCenter ? 0 : (float)(ring.SeparatorDegrees / ring.StepDegrees));
+        shader.Uniform("startAngleRadians", (float)(ring.StartAngleDegrees * Math.PI / 180d));
+        shader.Uniform("clockwiseSign", ring.Clockwise ? 1f : -1f);
     }
 
     /// <summary>Uses normal game icon and GUI text paths after the background shader has stopped.</summary>
@@ -222,20 +245,35 @@ internal sealed class RadialMenuRenderer : IDisposable
         guiShader.Use();
         try
         {
-            double midRadius = (layout.InnerRadius + layout.OuterRadius) / 2d;
-            for (int i = 0; i < layout.WedgeIds.Count; i++)
+            int entryOffset = 0;
+            int meshIndex = 0;
+            for (RadialMenuLayout? ring = layout; ring is not null; ring = ring.InnerMenu)
             {
-                RadialMenuEntry entry = interaction.GetEntry(layout.WedgeIds[i]);
-                float scale = 1f + (RadialMenuWedgeStyle.HoverScale - 1f) * hoverAnimation.VisualProgress(entry.Id);
-                (double x, double y) = layout.GetWedgeCenter(i, centerX, centerY, radiusPixels, midRadius * scale);
-                DrawClippedEntry(entry, i, x, y, radiusPixels * RadialMenuWedgeStyle.IconSizeFraction * scale, guiShader);
+                if (ring.IsSingleOption)
+                {
+                    RadialMenuEntry single = interaction.GetEntry(ring.EntryIds[0]);
+                    string? hoveredId = interaction.HoveredId;
+                    bool showingHoveredLabel = hoveredId is not null && hoveredId != single.Id;
+                    RadialMenuEntry label = showingHoveredLabel ? interaction.GetEntry(hoveredId!) : single;
+                    single.Icon?.Render(capi, centerX, centerY, radiusPixels * (float)ring.OuterRadius, single.Enabled);
+                    DrawCenterLabel(single.Id, label.Label, ring, centerX, centerY, radiusPixels);
+                }
+                else
+                {
+                    double midRadius = (ring.InnerRadius + ring.OuterRadius) / 2d;
+                    float iconSize = ring.GetIconSizePixels(radiusPixels, RadialMenuWedgeStyle.IconInsetPixels);
+                    for (int i = 0; i < ring.EntryIds.Count; i++)
+                    {
+                        RadialMenuEntry entry = interaction.GetEntry(ring.EntryIds[i]);
+                        float scale = 1f + (RadialMenuWedgeStyle.HoverScale - 1f) * hoverAnimation.VisualProgress(entry.Id);
+                        (double x, double y) = ring.GetWedgeCenter(i, centerX, centerY, radiusPixels, midRadius * scale);
+                        DrawClippedEntry(entry, entryOffset + i, ring, meshes[meshIndex], entryOffset, x, y,
+                            iconSize * scale, guiShader);
+                    }
+                }
+                entryOffset += ring.EntryIds.Count;
+                meshIndex++;
             }
-            RadialMenuEntry center = interaction.GetEntry(layout.CenterId);
-            string? hoveredId = interaction.HoveredId;
-            bool showingHoveredLabel = hoveredId is not null && hoveredId != layout.CenterId;
-            RadialMenuEntry centerLabel = showingHoveredLabel ? interaction.GetEntry(hoveredId!) : center;
-            center.Icon?.Render(capi, centerX, centerY, radiusPixels * 0.2f, center.Enabled);
-            DrawCenterLabel(center.Id, centerLabel.Label, showingHoveredLabel, layout, centerX, centerY, radiusPixels);
         }
         finally
         {
@@ -243,21 +281,18 @@ internal sealed class RadialMenuRenderer : IDisposable
         }
     }
 
-    /// <summary>Renders the center action as one line and wraps only the temporary hovered-entry label.</summary>
-    private void DrawCenterLabel(string id, string text, bool showingHoveredLabel, RadialMenuLayout layout,
+    /// <summary>Wraps and scales center text to fit the circular button without splitting words.</summary>
+    private void DrawCenterLabel(string id, string text, RadialMenuLayout layout,
         float centerX, float centerY, float radiusPixels)
     {
-        if (!showingHoveredLabel)
-        {
-            DrawLabel(id, text, centerX, centerY);
-            return;
-        }
-        int maximumWidth = (int)Math.Max(1, radiusPixels * layout.InnerRadius * 2f - CenterLabelInsetPixels);
-        DrawLabel(id, text, centerX, centerY, maximumWidth);
+        int usableDiameter = (int)Math.Max(1d,
+            radiusPixels * layout.OuterRadius * 2d - CenterLabelInsetPixels * 2d);
+        DrawLabel(id, text, centerX, centerY, usableDiameter);
     }
 
     /// <summary>Clips a depth-correct icon capture and its pixel-distance halo to the wedge stencil.</summary>
-    private void DrawClippedEntry(RadialMenuEntry entry, int index, double x, double y, float iconSize, IShaderProgram guiShader)
+    private void DrawClippedEntry(RadialMenuEntry entry, int index, RadialMenuLayout ring, MeshRef ringMesh,
+        int entryOffset, double x, double y, float iconSize, IShaderProgram guiShader)
     {
         if (entry.Icon is null)
         {
@@ -286,8 +321,8 @@ internal sealed class RadialMenuRenderer : IDisposable
             GL.ColorMask(false, false, false, false);
             guiShader.Stop();
             shader!.Use();
-            shader.Uniform("maskIndex", index);
-            capi.Render.RenderMesh(mesh!);
+            ConfigureRingShader(ring, entryOffset, index);
+            capi.Render.RenderMesh(ringMesh);
             shader.Stop();
             GL.ColorMask(true, true, true, true);
             GL.StencilMask(0);
@@ -309,25 +344,54 @@ internal sealed class RadialMenuRenderer : IDisposable
     }
 
     /// <summary>Caches a text-only entry label and centers its texture at the entry position.</summary>
-    private void DrawLabel(string id, string text, double x, double y, int maximumWidth = 0)
+    private void DrawLabel(string id, string text, double x, double y, int circleDiameter = 0)
     {
-        string cacheKey = text + '\0' + maximumWidth;
+        string cacheKey = text + '\0' + circleDiameter;
         if (!renderedLabels.TryGetValue(id, out string? previous) || previous != cacheKey)
         {
             if (labels.Remove(id, out LoadedTexture? old)) old.Dispose();
             renderedLabels[id] = cacheKey;
             if (!string.IsNullOrEmpty(text))
             {
-                labels[id] = maximumWidth > 0
-                    ? capi.Gui.TextTexture.GenTextTexture(text, labelFont, maximumWidth, null, EnumTextOrientation.Center)
-                    : capi.Gui.TextTexture.GenTextTexture(text, labelFont);
+                labelFont ??= CairoFont.WhiteSmallText().WithStroke([0, 0, 0, 0.65], 1.5);
+                if (circleDiameter > 0)
+                {
+                    double lineHeight = labelFont.GetFontExtents().Height;
+                    string wrapped = RadialMenuLabelLayout.FitToCircle(text, circleDiameter, lineHeight,
+                        value => labelFont.GetTextExtents(value).Width, CenterLabelTexturePaddingPixels);
+                    string[] lines = wrapped.Split('\n');
+                    labelScales[id] = (float)RadialMenuLabelLayout.GetScaleForCircle(lines, circleDiameter,
+                        lineHeight, value => labelFont.GetTextExtents(value).Width, CenterLabelTexturePaddingPixels);
+                    double widestLine = 1d;
+                    foreach (string line in lines)
+                        widestLine = Math.Max(widestLine, labelFont.GetTextExtents(line).Width);
+                    int width = (int)Math.Ceiling(widestLine) + CenterLabelTexturePaddingPixels * 2;
+                    int height = (int)Math.Ceiling(lineHeight * lines.Length)
+                        + CenterLabelTexturePaddingPixels * 2;
+                    labels[id] = capi.Gui.TextTexture.GenTextTexture(wrapped, labelFont, width, height,
+                        null, EnumTextOrientation.Center);
+                }
+                else
+                {
+                    labelScales.Remove(id);
+                    labels[id] = capi.Gui.TextTexture.GenTextTexture(text, labelFont);
+                }
             }
         }
 
         if (labels.TryGetValue(id, out LoadedTexture? label))
         {
             capi.Render.GetEngineShader(EnumShaderProgram.Gui).Use();
-            capi.Render.Render2DLoadedTexture(label, (float)x - label.Width / 2f, (float)y - label.Height / 2f, 60);
+            float scale = circleDiameter > 0 && labelScales.TryGetValue(id, out float fittedScale)
+                ? fittedScale
+                : 1f;
+            float width = label.Width * scale;
+            float height = label.Height * scale;
+            if (scale < 1f)
+                capi.Render.Render2DTexture(label.TextureId, (float)x - width / 2f, (float)y - height / 2f,
+                    width, height, 60);
+            else
+                capi.Render.Render2DLoadedTexture(label, (float)x - label.Width / 2f, (float)y - label.Height / 2f, 60);
         }
     }
     #endregion

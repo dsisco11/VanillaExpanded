@@ -48,6 +48,9 @@ public class VanillaExpandedConfig
     /// <summary>Selects the hovered quick-tool menu entry when its activation key is released.</summary>
     public bool QuickToolSelectOnRelease { get; set; } = true;
 
+    /// <summary>Replaces the base-game tool-mode grid with a radial menu.</summary>
+    public bool EnableToolModeRadialMenu { get; set; } = true;
+
     #endregion
 
     #region Recipe Toggles

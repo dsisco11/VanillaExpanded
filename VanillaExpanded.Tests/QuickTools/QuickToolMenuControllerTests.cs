@@ -81,7 +81,8 @@ public sealed class QuickToolMenuControllerTests
         f.Hotbar[1].Itemstack = null;
         f.Hotbar[1].MarkDirty();
         f.Cache.RefreshPending();
-        Assert.Empty(f.Menu.Layout!.WedgeIds);
+        Assert.True(f.Menu.Layout!.IsSingleOption);
+        Assert.Equal(new[] { "unequip" }, f.Menu.Layout.EntryIds);
         Assert.NotSame(layout, f.Menu.Layout);
         Assert.Equal(1, f.Menu.LayoutUpdateCount);
         Assert.True(f.Menu.IsOpen);
@@ -494,7 +495,8 @@ public sealed class QuickToolMenuControllerTests
         /// <inheritdoc />
         public bool IsOpen => Interaction?.IsOpen == true;
         /// <inheritdoc />
-        public bool Open(RadialMenuLayout layout, IEnumerable<RadialMenuEntry> entries, Action<string> selected, Action cancelled)
+        public bool Open(RadialMenuLayout layout, IEnumerable<RadialMenuEntry> entries,
+            System.Func<string, RadialMenuSelectionResult> selected, Action cancelled)
         {
             Layout = layout;
             Interaction = new RadialMenuInteraction(layout, entries);
@@ -526,8 +528,8 @@ public sealed class QuickToolMenuControllerTests
         /// <summary>Moves the shared interaction pointer to the specified center or wedge target.</summary>
         internal void Hover(string id)
         {
-            int index = Layout!.WedgeIds.ToList().IndexOf(id);
-            (double x, double y) = index < 0 ? (0, 0) : Layout.GetWedgeCenter(index, 0, 0, 100, 0.6);
+            Assert.True(Layout!.TryGetEntryCenter(id, 0, 0, 100, out (double X, double Y) position));
+            (double x, double y) = position;
             Interaction!.MovePointer(x, y, 0, 0, 100);
         }
     }

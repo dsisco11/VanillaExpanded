@@ -7,9 +7,11 @@ out vec4 fragColor;
 
 uniform vec4 entryStates[64];
 uniform int entryCount;
+uniform int ringEntryOffset;
+uniform int ringEntryCount;
+uniform int ringMode;
 uniform int hoveredIndex;
 uniform int maskIndex;
-uniform float centerRadius;
 uniform float innerRadius;
 uniform float outerRadius;
 uniform float separatorFraction;
@@ -43,13 +45,13 @@ float grain(vec2 position)
 }
 
 /* Measures the rounded annular sector in screen pixels so borders and corners share one contour. */
-float wedgeDistance(float radius, float scale)
+float wedgeDistance(vec2 position, float radius, float scale)
 {
     float pixelScale = radiusPixels * scale;
     float radialInside = min(radius - innerRadius, outerRadius - radius) * pixelScale;
-    float angle = atan(radialPosition.x, -radialPosition.y);
-    float wedgeCount = float(entryCount - 1);
-    float centerAngle = startAngleRadians + clockwiseSign * float(entryIndex) * 6.28318530718 / wedgeCount;
+    float angle = atan(position.x, -position.y);
+    float wedgeCount = float(ringEntryCount);
+    float centerAngle = startAngleRadians + clockwiseSign * float(entryIndex - ringEntryOffset) * 6.28318530718 / wedgeCount;
     float delta = atan(sin(angle - centerAngle), cos(angle - centerAngle));
     float halfAngle = 3.14159265359 / wedgeCount - separatorFraction * 6.28318530718 / wedgeCount;
     float angularInside = radius * sin(halfAngle - abs(delta)) * pixelScale;
@@ -65,12 +67,11 @@ float wedgeDistance(float radius, float scale)
 void main()
 {
     if (entryIndex < 0 || entryIndex >= entryCount) discard;
-    bool center = entryIndex == entryCount - 1;
     float radius = length(radialPosition);
-    float scale = center ? 1.0 : mix(1.0, hoverScale, entryStates[entryIndex].z);
+    float scale = ringMode == 1 ? 1.0 : mix(1.0, hoverScale, entryStates[entryIndex].z);
     float distancePixels;
-    if (center) distancePixels = (centerRadius - radius) * radiusPixels;
-    else distancePixels = wedgeDistance(radius, scale);
+    if (ringMode == 1) distancePixels = (outerRadius - radius) * radiusPixels;
+    else distancePixels = wedgeDistance(radialPosition, radius, scale);
     float aa = max(fwidth(distancePixels), 0.75);
     float coverage = smoothstep(-aa, aa, distancePixels);
     if (maskIndex >= 0)
@@ -79,21 +80,22 @@ void main()
         fragColor = vec4(1.0);
         return;
     }
-
     vec4 state = entryStates[entryIndex];
     float enabled = state.x;
-    float hover = center ? float(entryIndex == hoveredIndex) : state.z;
+    float hover = ringMode == 1 ? float(entryIndex == hoveredIndex) : state.z;
     vec3 baseColor = mix(disabledFill, enabledFill, enabled);
     vec3 fill = mix(baseColor, hoverFill, hover * enabled);
     fill = mix(fill, selectedFill, state.y);
-    if (!center && grainStrength > 0.0)
+    if (ringMode != 1 && grainStrength > 0.0)
         fill += vec3(grain(radialPosition * radiusPixels / 6.0) * grainStrength);
 
-    if (!center)
+    if (ringMode != 1)
     {
         float border = 1.0 - smoothstep(borderWidthPixels - aa, borderWidthPixels + aa, distancePixels);
         vec3 bronze = mix(borderColor, hoverBorderColor, hover * enabled);
         fill = mix(fill, bronze, border);
     }
-    fragColor = vec4(fill, coverage * mix(disabledOpacity, enabledOpacity, enabled));
+    float opacity = mix(disabledOpacity, enabledOpacity, enabled);
+    if (hover > 0.0 && enabled > 0.0) opacity = 1.0;
+    fragColor = vec4(fill, coverage * opacity);
 }

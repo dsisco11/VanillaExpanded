@@ -11,7 +11,6 @@ public sealed class RadialMenuSystem : ModSystem, IRadialMenu
     #region Lifecycle
     private ICoreClientAPI? capi;
     private RadialMenuDialog? dialog;
-    private bool pendingSelectionRelease;
 
     /// <inheritdoc />
     public override bool ShouldLoad(EnumAppSide forSide) => forSide == EnumAppSide.Client;
@@ -24,7 +23,6 @@ public sealed class RadialMenuSystem : ModSystem, IRadialMenu
         api.Event.ReloadShader += ReloadShader;
         api.Event.LeaveWorld += Cancel;
         api.Event.PauseResume += OnPauseResume;
-        api.Event.MouseUp += OnMouseUp;
     }
 
     /// <inheritdoc />
@@ -35,7 +33,6 @@ public sealed class RadialMenuSystem : ModSystem, IRadialMenu
             capi.Event.ReloadShader -= ReloadShader;
             capi.Event.LeaveWorld -= Cancel;
             capi.Event.PauseResume -= OnPauseResume;
-            capi.Event.MouseUp -= OnMouseUp;
         }
         dialog?.Dispose();
         dialog = null;
@@ -46,22 +43,13 @@ public sealed class RadialMenuSystem : ModSystem, IRadialMenu
 
     #region Public API
     /// <summary>Opens caller-supplied generic entries at the supplied circular positions.</summary>
-    public bool Open(RadialMenuLayout layout, IEnumerable<RadialMenuEntry> entries, Action<string> selected, Action cancelled)
+    public bool Open(RadialMenuLayout layout, IEnumerable<RadialMenuEntry> entries,
+        System.Func<string, RadialMenuSelectionResult> selected, Action cancelled)
     {
         ArgumentNullException.ThrowIfNull(selected);
         ArgumentNullException.ThrowIfNull(cancelled);
         if (dialog is null) return false;
-        if (pendingSelectionRelease)
-        {
-            if (capi?.Input.MouseButton.Left == true) return false;
-            pendingSelectionRelease = false;
-        }
-        return dialog.Open(layout, entries, id =>
-        {
-            // Keep the release guard even if the caller closes this dialog in the callback.
-            pendingSelectionRelease = true;
-            selected(id);
-        }, cancelled);
+        return dialog.Open(layout, entries, selected, cancelled);
     }
 
     /// <summary>Refreshes entry content without moving wedges or uploading geometry.</summary>
@@ -88,13 +76,6 @@ public sealed class RadialMenuSystem : ModSystem, IRadialMenu
     private void OnPauseResume(bool isPaused)
     {
         if (isPaused) Cancel();
-    }
-    /// <summary>Consumes the matching release after a selection closes the dialog.</summary>
-    private void OnMouseUp(MouseEvent args)
-    {
-        if (!pendingSelectionRelease || args.Button != EnumMouseButton.Left) return;
-        args.Handled = true;
-        pendingSelectionRelease = false;
     }
     #endregion
 }

@@ -21,8 +21,8 @@ public sealed class RadialMenuInteraction
         UpdateEntries(entries);
     }
 
-    /// <summary>Reports one enabled selected identifier.</summary>
-    public event Action<string>? Selected;
+    /// <summary>Reports an enabled selection and determines whether this interaction completes.</summary>
+    public event Func<string, RadialMenuSelectionResult>? Selected;
     /// <summary>Reports a close without selection once.</summary>
     public event Action? Cancelled;
     /// <summary>Reports a changed hover target, including transitions to or from no target.</summary>
@@ -44,9 +44,8 @@ public sealed class RadialMenuInteraction
             if (!replacement.TryAdd(entry.Id, entry)) throw new ArgumentException("Duplicate entry identifier.", nameof(newEntries));
         }
 
-        // Every fixed wedge and the center keep a visible entry even when unavailable.
-        if (replacement.Count != layout.WedgeIds.Count + 1 || !replacement.ContainsKey(layout.CenterId)) throw new ArgumentException("Content must cover the complete layout.", nameof(newEntries));
-        foreach (string id in layout.WedgeIds)
+        if (replacement.Count != layout.EntryCount) throw new ArgumentException("Content must cover the complete nested layout.", nameof(newEntries));
+        foreach (string id in layout.AllEntryIds)
         {
             if (!replacement.ContainsKey(id)) throw new ArgumentException("Content must cover the complete layout.", nameof(newEntries));
         }
@@ -62,8 +61,7 @@ public sealed class RadialMenuInteraction
         var replacement = new RadialMenuInteraction(nextLayout, newEntries);
         layout = nextLayout;
         entries.Clear();
-        foreach (string id in nextLayout.WedgeIds) entries.Add(id, replacement.GetEntry(id));
-        entries.Add(nextLayout.CenterId, replacement.GetEntry(nextLayout.CenterId));
+        foreach (string id in nextLayout.AllEntryIds) entries.Add(id, replacement.GetEntry(id));
         HoveredId = null;
     }
 
@@ -90,16 +88,21 @@ public sealed class RadialMenuInteraction
         HoverChanged?.Invoke(nextHoveredId);
     }
 
-    /// <summary>Selects the enabled hovered entry at most once and closes the interaction.</summary>
+    /// <summary>Selects the enabled hovered entry and applies the caller's completion policy.</summary>
     public bool SelectHovered()
     {
         if (!isOpen || isFinished || HoveredId is null || !entries[HoveredId].Enabled) return false;
         string selected = HoveredId;
         SelectedId = selected;
+        HoveredId = null;
+        RadialMenuSelectionResult result = Selected?.Invoke(selected) ?? RadialMenuSelectionResult.Close;
+        if (result == RadialMenuSelectionResult.KeepOpen)
+        {
+            SelectedId = null;
+            return true;
+        }
         isFinished = true;
         isOpen = false;
-        HoveredId = null;
-        Selected?.Invoke(selected);
         return true;
     }
 

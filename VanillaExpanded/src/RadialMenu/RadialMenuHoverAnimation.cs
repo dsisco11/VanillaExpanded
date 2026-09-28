@@ -15,7 +15,7 @@ internal sealed class RadialMenuHoverAnimation
     /// <summary>Removes state for entries no longer present after a layout change.</summary>
     internal void Retain(RadialMenuLayout layout)
     {
-        var current = new HashSet<string>(layout.WedgeIds, StringComparer.Ordinal);
+        var current = new HashSet<string>(layout.AllEntryIds, StringComparer.Ordinal);
         foreach (string id in new List<string>(progress.Keys))
             if (!current.Contains(id)) progress.Remove(id);
     }
@@ -26,7 +26,7 @@ internal sealed class RadialMenuHoverAnimation
     internal void Advance(RadialMenuLayout layout, string? hoveredId, float elapsedSeconds)
     {
         float step = Math.Clamp(elapsedSeconds, 0f, 1f) / RadialMenuWedgeStyle.HoverDurationSeconds;
-        foreach (string id in layout.WedgeIds)
+        foreach (string id in layout.AllEntryIds)
         {
             progress.TryGetValue(id, out float current);
             float target = id == hoveredId ? 1f : 0f;

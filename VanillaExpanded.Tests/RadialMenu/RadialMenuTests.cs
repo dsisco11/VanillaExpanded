@@ -5,12 +5,26 @@ namespace VanillaExpanded.Tests.RadialMenu;
 /// <summary>Checks generic menu geometry and exactly-once interaction independently of inventory.</summary>
 public sealed class RadialMenuTests
 {
+    [Fact]
+    public void RingModeUsesEngineSupportedIntegerUniform()
+    {
+        string shaderRoot = Path.Combine(AppContext.BaseDirectory, "Mods", "mod", "assets", "vanillaexpanded", "shaders");
+        if (!Directory.Exists(shaderRoot)) return;
+        foreach (string path in new[] { Path.Combine(shaderRoot, "radial_menu.vsh"), Path.Combine(shaderRoot, "radial_menu.fsh") })
+        {
+            string source = File.ReadAllText(path);
+            Assert.Contains("uniform int ringMode;", source);
+            Assert.DoesNotContain("uniform bool", source);
+        }
+    }
+
     #region Geometry
     /// <summary>Checks center, ring gap, wedge boundaries, and the fixed clockwise orientation.</summary>
     [Fact]
     public void HitTestUsesRenderedRadiiAndFixedClockwiseWedges()
     {
         var layout = new RadialMenuLayout(["north", "east", "south", "west"], "center", 0.2, 0.3, 1, separatorDegrees: 1);
+        Assert.Equal(1, layout.RadiusScale);
         Assert.Equal("center", layout.HitTest(100, 100, 100, 100, 100));
         Assert.Null(layout.HitTest(100, 75, 100, 100, 100));
         Assert.Equal("north", layout.HitTest(100, 40, 100, 100, 100));
@@ -19,6 +33,68 @@ public sealed class RadialMenuTests
         Assert.Equal("west", layout.HitTest(40, 100, 100, 100, 100));
         Assert.Equal("east", layout.HitTest(160, 40, 100, 100, 100));
         Assert.Equal("east", layout.HitTest(201, 100, 100, 100, 100));
+    }
+
+    [Fact]
+    public void NestedMenusHitTestFromOuterRingToSingleOptionDisc()
+    {
+        var inner = new RadialMenuLayout(["center"], 0, 0.2);
+        var middle = new RadialMenuLayout(["inner-north", "inner-south"], 0.3, 0.55, inner);
+        var outer = new RadialMenuLayout(["outer-north", "outer-south"], 0.65, 1, middle);
+
+        Assert.Equal(new[] { "outer-north", "outer-south", "inner-north", "inner-south", "center" }, outer.AllEntryIds);
+        Assert.Equal("center", outer.HitTest(0, 0, 0, 0, 100));
+        Assert.Equal("inner-north", outer.HitTest(0, -45, 0, 0, 100));
+        Assert.Equal("outer-north", outer.HitTest(0, -80, 0, 0, 100));
+        Assert.Null(outer.HitTest(0, -60, 0, 0, 100));
+    }
+
+    [Fact]
+    public void MultiOptionCenterMenuOccupiesOnlyCenterDisc()
+    {
+        var centerMenu = new RadialMenuLayout(["north", "south"], 0, 0.25, renderAsCenter: true);
+        var outer = new RadialMenuLayout(["outer-north", "outer-south"], 0.30, 1, centerMenu);
+
+        Assert.True(centerMenu.RenderAsCenter);
+        Assert.Equal("north", outer.HitTest(0, -20, 0, 0, 100));
+        Assert.Equal("south", outer.HitTest(0, 20, 0, 0, 100));
+        Assert.Null(outer.HitTest(0, -27, 0, 0, 100));
+        Assert.Equal("outer-north", outer.HitTest(0, -50, 0, 0, 100));
+    }
+
+    [Theory]
+    [InlineData("inner-north")]
+    [InlineData("center")]
+    public void NestedInteractionSelectsEntriesAtEveryDepth(string targetId)
+    {
+        var inner = new RadialMenuLayout(["center"], 0, 0.2);
+        var middle = new RadialMenuLayout(["inner-north", "inner-south"], 0.3, 0.55, inner);
+        var outer = new RadialMenuLayout(["outer-north", "outer-south"], 0.65, 1, middle);
+        var interaction = new RadialMenuInteraction(outer,
+        [
+            new("outer-north", "Outer North", true), new("outer-south", "Outer South", true),
+            new("inner-north", "Inner North", true), new("inner-south", "Inner South", true),
+            new("center", "Center", true)
+        ]);
+        Assert.True(outer.TryGetEntryCenter(targetId, 0, 0, 100, out (double X, double Y) position));
+
+        interaction.Open();
+        interaction.MovePointer(position.X, position.Y, 0, 0, 100);
+
+        Assert.Equal(targetId, interaction.HoveredId);
+        Assert.True(interaction.SelectHovered());
+        Assert.Equal(targetId, interaction.SelectedId);
+    }
+
+    [Fact]
+    public void NestedLayoutRejectsDuplicateIdsAndMoreThanShaderCapacity()
+    {
+        var duplicate = new RadialMenuLayout(["duplicate"], 0, 0.2);
+        Assert.Throws<ArgumentException>(() => new RadialMenuLayout(["duplicate", "other"], 0.3, 1, duplicate));
+
+        string[] outerIds = [.. Enumerable.Range(0, 63).Select(index => $"outer:{index}")];
+        var inner = new RadialMenuLayout(["inner:a", "inner:b"], 0.1, 0.2);
+        Assert.Throws<ArgumentOutOfRangeException>(() => new RadialMenuLayout(outerIds, 0.3, 1, inner));
     }
 
     /// <summary>Rounded wedge corners remain outside the pointer target while separator gaps snap to a wedge.</summary>
@@ -72,6 +148,16 @@ public sealed class RadialMenuTests
             Assert.Equal(id, mesh.Uv[mesh.Indices[index + 2] * 2]);
         }
     }
+
+    [Fact]
+    public void SingleOptionMeshIsADiscWithItsGlobalEntryId()
+    {
+        var layout = new RadialMenuLayout(["only"], 0, 0.25);
+        var mesh = RadialMenuMesh.Build(layout, 300, entryOffset: 4);
+
+        Assert.True(mesh.VerticesCount > 0);
+        for (int index = 0; index < mesh.VerticesCount; index++) Assert.Equal(4, mesh.Uv[index * 2]);
+    }
     /// <summary>Gets the signed area of the first mesh triangle for face-winding assertions.</summary>
     private static float SignedArea(Vintagestory.API.Client.MeshData mesh)
     {
@@ -93,6 +179,101 @@ public sealed class RadialMenuTests
             Assert.Equal(ids[index], layout.HitTest(x, y, 400, 300, 260));
         }
         Assert.True(RadialMenuMesh.Build(layout, 600).VerticesCount >= RadialMenuMesh.Build(layout, 300).VerticesCount);
+    }
+
+    [Fact]
+    public void IconSizeFitsRingThicknessAndShrinksForDenseWedges()
+    {
+        var sparse = new RadialMenuLayout(["a", "b", "c", "d"], 0.3, 0.6);
+        string[] denseIds = [.. Enumerable.Range(0, 16).Select(index => index.ToString())];
+        var dense = new RadialMenuLayout(denseIds, 0.3, 0.6);
+
+        float sparseSize = sparse.GetIconSizePixels(200, 4);
+        float denseSize = dense.GetIconSizePixels(200, 4);
+
+        Assert.True(sparseSize <= (sparse.OuterRadius - sparse.InnerRadius) * 200);
+        Assert.True(denseSize < sparseSize);
+        Assert.True(denseSize > 0);
+    }
+
+    [Theory]
+    [InlineData("2x2x2", "2x2x2")]
+    [InlineData("Andesite Cobblestone", "Andesite\nCobblestone")]
+    public void CenterLabelLayoutPreservesWholeWords(string text, string expected)
+    {
+        string wrapped = RadialMenuLabelLayout.FitToCircle(text, 15, 3, value => value.Length, 0);
+
+        Assert.Equal(expected, wrapped);
+    }
+
+    [Fact]
+    public void CenterLabelLayoutCollapsesWhitespaceAndAvoidsEmptyLines()
+    {
+        string wrapped = RadialMenuLabelLayout.FitToCircle(
+            "Drop  blocks\n\nhere to add a new material", 18, 3, value => value.Length, 0);
+
+        Assert.DoesNotContain("\n\n", wrapped);
+        Assert.Equal("Drop blocks here to add a new material", wrapped.Replace('\n', ' '));
+    }
+
+    [Fact]
+    public void CenterLabelScaleUsesEachLinesActualWidth()
+    {
+        string[] lines = ["x", "longlong", "x"];
+
+        double scale = RadialMenuLabelLayout.GetScaleForCircle(lines, 8, 2, value => value.Length, 0);
+        double boundingBoxScale = 8 / Math.Sqrt(8 * 8 + 6 * 6);
+
+        Assert.True(scale > boundingBoxScale);
+    }
+
+    [Fact]
+    public void CenterLabelLayoutMatchesExhaustiveOptimalScale()
+    {
+        var random = new Random(7331);
+        for (int sample = 0; sample < 250; sample++)
+        {
+            int wordCount = random.Next(1, 10);
+            string[] words = Enumerable.Range(0, wordCount)
+                .Select(index => $"w{index}" + new string('x', random.Next(1, 12)))
+                .ToArray();
+            string text = string.Join(' ', words);
+            double diameter = random.Next(12, 42);
+            double lineHeight = random.Next(2, 7);
+            double padding = random.Next(0, 3);
+
+            string fitted = RadialMenuLabelLayout.FitToCircle(
+                text, diameter, lineHeight, value => value.Length, padding);
+            double actualScale = RadialMenuLabelLayout.GetScaleForCircle(
+                fitted.Split('\n'), diameter, lineHeight, value => value.Length, padding);
+            double optimalScale = GetExhaustiveOptimalScale(words, diameter, lineHeight, padding);
+
+            Assert.Equal(optimalScale, actualScale, precision: 10);
+            Assert.Equal(words, fitted.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+            Assert.DoesNotContain("\n\n", fitted);
+        }
+    }
+
+    private static double GetExhaustiveOptimalScale(string[] words, double diameter,
+        double lineHeight, double padding)
+    {
+        double best = 0;
+        int partitionCount = 1 << Math.Max(0, words.Length - 1);
+        for (int mask = 0; mask < partitionCount; mask++)
+        {
+            var lines = new List<string>();
+            int start = 0;
+            for (int boundary = 0; boundary < words.Length - 1; boundary++)
+            {
+                if ((mask & 1 << boundary) == 0) continue;
+                lines.Add(string.Join(' ', words[start..(boundary + 1)]));
+                start = boundary + 1;
+            }
+            lines.Add(string.Join(' ', words[start..]));
+            best = Math.Max(best, RadialMenuLabelLayout.GetScaleForCircle(
+                lines, diameter, lineHeight, value => value.Length, padding));
+        }
+        return best;
     }
     /// <summary>Checks both layout directions produce visible triangles under the same face-culling rule.</summary>
     [Fact]
@@ -147,7 +328,11 @@ public sealed class RadialMenuTests
         var layout = new RadialMenuLayout(["virtual:light", "generic:other"], "center", 0.2, 0.3, 1);
         var menu = new RadialMenuInteraction(layout, [new("virtual:light", "Light", false), new("generic:other", "Other", true), new("center", "Restore", true)]);
         int selections = 0;
-        menu.Selected += _ => selections++;
+        menu.Selected += _ =>
+        {
+            selections++;
+            return RadialMenuSelectionResult.Close;
+        };
         menu.Open();
         menu.MovePointer(0, -60, 0, 0, 100);
         Assert.Equal("virtual:light", menu.HoveredId);
@@ -168,7 +353,11 @@ public sealed class RadialMenuTests
         var layout = new RadialMenuLayout(["outer"], "unequip", 0.2, 0.3, 1);
         var menu = new RadialMenuInteraction(layout, [new("outer", "Outer", true), new("unequip", "Unequip", true)]);
         string? selected = null;
-        menu.Selected += id => selected = id;
+        menu.Selected += id =>
+        {
+            selected = id;
+            return RadialMenuSelectionResult.Close;
+        };
         menu.Open();
         menu.MovePointer(50, 50, 50, 50, 100);
         Assert.True(menu.SelectHovered());
@@ -204,6 +393,31 @@ public sealed class RadialMenuTests
         Assert.Equal("b", menu.HoveredId);
         Assert.True(menu.SelectHovered());
     }
+
+    [Fact]
+    public void KeepOpenSelectionAllowsAnotherSelectionBeforeClosing()
+    {
+        var layout = new RadialMenuLayout(["repeat"], "center", 0.2, 0.3, 1);
+        var menu = new RadialMenuInteraction(layout,
+            [new("repeat", "Repeat", true), new("center", "Center", true)]);
+        int selections = 0;
+        menu.Selected += _ => ++selections == 1
+            ? RadialMenuSelectionResult.KeepOpen
+            : RadialMenuSelectionResult.Close;
+        menu.Open();
+
+        menu.MovePointer(0, -60, 0, 0, 100);
+        Assert.True(menu.SelectHovered());
+        Assert.True(menu.IsOpen);
+        Assert.Null(menu.SelectedId);
+
+        menu.MovePointer(0, -60, 0, 0, 100);
+        Assert.True(menu.SelectHovered());
+        Assert.False(menu.IsOpen);
+        Assert.Equal("repeat", menu.SelectedId);
+        Assert.Equal(2, selections);
+    }
+
     /// <summary>Checks cancellation reports once and never selects an entry.</summary>
     [Fact]
     public void CancellationReportsWithoutSelection()
@@ -213,7 +427,11 @@ public sealed class RadialMenuTests
         int cancellations = 0;
         int selections = 0;
         menu.Cancelled += () => cancellations++;
-        menu.Selected += _ => selections++;
+        menu.Selected += _ =>
+        {
+            selections++;
+            return RadialMenuSelectionResult.Close;
+        };
         menu.Open();
         menu.MovePointer(0, 0, 0, 0, 100);
         menu.Cancel();

@@ -28,6 +28,10 @@ internal sealed class RadialMenuDialog : GuiDialog
     /// <inheritdoc />
     public override string ToggleKeyCombinationCode => string.Empty;
     /// <inheritdoc />
+    public override double InputOrder => 0;
+    /// <inheritdoc />
+    public override double DrawOrder => 1.1;
+    /// <inheritdoc />
     public override bool PrefersUngrabbedMouse => true;
     /// <inheritdoc />
     public override bool DisableMouseGrab => true;
@@ -45,21 +49,10 @@ internal sealed class RadialMenuDialog : GuiDialog
             return;
         }
         SuppressWorldLeftClick();
-        if (waitForMouseUp)
-        {
-            if (!capi.Input.MouseButton.Left) TryClose();
-            else if (interaction is not null && layout is not null)
-            {
-                float heldRadius = MathF.Min(capi.Render.FrameWidth, capi.Render.FrameHeight) * ScreenRadiusFraction;
-                renderer.Render(layout, interaction, deltaTime, capi.Render.FrameWidth / 2f, capi.Render.FrameHeight / 2f, heldRadius);
-            }
-            return;
-        }
-        if (interaction?.IsOpen != true || layout is null) return;
-        float radius = MathF.Min(capi.Render.FrameWidth, capi.Render.FrameHeight) * ScreenRadiusFraction;
+        if (interaction is null || layout is null) return;
+        float radius = GetRadiusPixels(layout);
         float x = capi.Render.FrameWidth / 2f;
         float y = capi.Render.FrameHeight / 2f;
-        interaction.MovePointer(capi.Input.MouseX, capi.Input.MouseY, x, y, radius);
         renderer.Render(layout, interaction, deltaTime, x, y, radius);
     }
 
@@ -69,7 +62,7 @@ internal sealed class RadialMenuDialog : GuiDialog
         if (!IsOpened()) return;
         if (interaction?.IsOpen == true && layout is not null)
         {
-            float radius = MathF.Min(capi.Render.FrameWidth, capi.Render.FrameHeight) * ScreenRadiusFraction;
+            float radius = GetRadiusPixels(layout);
             interaction.MovePointer(args.X, args.Y, capi.Render.FrameWidth / 2f, capi.Render.FrameHeight / 2f, radius);
         }
         args.Handled = true;
@@ -91,10 +84,9 @@ internal sealed class RadialMenuDialog : GuiDialog
             Cancel();
             return;
         }
-        float radius = MathF.Min(capi.Render.FrameWidth, capi.Render.FrameHeight) * ScreenRadiusFraction;
+        float radius = GetRadiusPixels(layout);
         interaction.MovePointer(args.X, args.Y, capi.Render.FrameWidth / 2f, capi.Render.FrameHeight / 2f, radius);
         waitForMouseUp = true;
-        if (!interaction.SelectHovered()) waitForMouseUp = false;
     }
 
     /// <inheritdoc />
@@ -105,7 +97,11 @@ internal sealed class RadialMenuDialog : GuiDialog
         if (waitForMouseUp && args.Button == EnumMouseButton.Left)
         {
             waitForMouseUp = false;
-            TryClose();
+            if (interaction?.IsOpen != true || layout is null) return;
+            float radius = GetRadiusPixels(layout);
+            interaction.MovePointer(args.X, args.Y, capi.Render.FrameWidth / 2f, capi.Render.FrameHeight / 2f, radius);
+            RadialMenuInteraction selectedInteraction = interaction;
+            if (selectedInteraction.SelectHovered() && !selectedInteraction.IsOpen && IsOpened()) TryClose();
         }
     }
 
@@ -118,7 +114,9 @@ internal sealed class RadialMenuDialog : GuiDialog
     /// <inheritdoc />
     public override void OnKeyDown(KeyEvent args)
     {
-        if (IsOpened()) args.Handled = true;
+        if (!IsOpened()) return;
+        // Escape remains unhandled so the engine routes it through OnEscapePressed.
+        if (args.KeyCode != (int)GlKeys.Escape) args.Handled = true;
     }
 
     /// <inheritdoc />
@@ -133,13 +131,6 @@ internal sealed class RadialMenuDialog : GuiDialog
         if (!IsOpened()) return false;
         Cancel();
         return true;
-    }
-
-    /// <inheritdoc />
-    public override void UnFocus()
-    {
-        base.UnFocus();
-        if (!closing && IsOpened()) Cancel();
     }
 
     /// <inheritdoc />
@@ -169,11 +160,15 @@ internal sealed class RadialMenuDialog : GuiDialog
         renderer.Dispose();
         base.Dispose();
     }
+
+    private float GetRadiusPixels(RadialMenuLayout currentLayout) =>
+        MathF.Min(capi.Render.FrameWidth, capi.Render.FrameHeight) * ScreenRadiusFraction * (float)currentLayout.RadiusScale;
     #endregion
 
     #region Caller interaction
     /// <summary>Opens a complete fixed layout and reports its selection and cancellation.</summary>
-    public bool Open(RadialMenuLayout nextLayout, IEnumerable<RadialMenuEntry> entries, Action<string> selected, Action cancelled)
+    public bool Open(RadialMenuLayout nextLayout, IEnumerable<RadialMenuEntry> entries,
+        System.Func<string, RadialMenuSelectionResult> selected, Action cancelled)
     {
         if (IsOpened() || !renderer.IsReady) return false;
         renderer.ResetInteraction();
@@ -184,6 +179,9 @@ internal sealed class RadialMenuDialog : GuiDialog
         interaction.Cancelled += cancelled;
         interaction.HoverChanged += OnHoverChanged;
         interaction.Open();
+        float radius = GetRadiusPixels(layout);
+        interaction.MovePointer(capi.Input.MouseX, capi.Input.MouseY,
+            capi.Render.FrameWidth / 2f, capi.Render.FrameHeight / 2f, radius);
         if (TryOpen())
         {
             SuppressWorldLeftClick();
