@@ -153,28 +153,6 @@ internal sealed class RadialMenuRenderer : IDisposable
                 shader.Uniform("selectedFill", RadialMenuWedgeStyle.SelectedFill);
                 shader.Uniform("borderColor", RadialMenuWedgeStyle.Border);
                 shader.Uniform("hoverBorderColor", RadialMenuWedgeStyle.HoverBorder);
-                shader.Uniform("hoverShadowColor", RadialMenuWedgeStyle.HoverShadow);
-                shader.Uniform("shadowExpansionPixels", RadialMenuWedgeStyle.HoverShadowExpansionPixels);
-                shader.Uniform("shadowFalloffPixels", RadialMenuWedgeStyle.HoverShadowFalloffPixels);
-                if (hovered >= 0)
-                {
-                    shader.Uniform("shadowIndex", hovered);
-                    matrix.Set(capi.Render.CurrentModelviewMatrix)
-                        .Translate(centerX + RadialMenuWedgeStyle.HoverShadowOffsetXPixels,
-                            centerY + RadialMenuWedgeStyle.HoverShadowOffsetYPixels, 49)
-                        .Scale(radiusPixels, radiusPixels, 1);
-                    ((IShaderProgram)shader).UniformMatrix("projectionMatrix", capi.Render.CurrentProjectionMatrix);
-                    ((IShaderProgram)shader).UniformMatrix("modelViewMatrix", matrix.Values);
-                    int shadowOffset = 0;
-                    int shadowMesh = 0;
-                    for (RadialMenuLayout? ring = layout; ring is not null; ring = ring.InnerMenu)
-                    {
-                        ConfigureRingShader(ring, shadowOffset, maskIndex: -1);
-                        capi.Render.RenderMesh(meshes[shadowMesh++]);
-                        shadowOffset += ring.EntryIds.Count;
-                    }
-                }
-                shader.Uniform("shadowIndex", -1);
                 matrix.Set(capi.Render.CurrentModelviewMatrix).Translate(centerX, centerY, 50).Scale(radiusPixels, radiusPixels, 1);
                 ((IShaderProgram)shader).UniformMatrix("projectionMatrix", capi.Render.CurrentProjectionMatrix);
                 ((IShaderProgram)shader).UniformMatrix("modelViewMatrix", matrix.Values);

@@ -1,7 +1,6 @@
 #version 330 core
 
 in vec2 radialPosition;
-in vec2 renderedRadialPosition;
 in float wedgeFraction;
 flat in int entryIndex;
 out vec4 fragColor;
@@ -13,7 +12,6 @@ uniform int ringEntryCount;
 uniform int ringMode;
 uniform int hoveredIndex;
 uniform int maskIndex;
-uniform int shadowIndex;
 uniform float innerRadius;
 uniform float outerRadius;
 uniform float separatorFraction;
@@ -32,8 +30,6 @@ uniform vec3 hoverFill;
 uniform vec3 selectedFill;
 uniform vec3 borderColor;
 uniform vec3 hoverBorderColor;
-uniform vec4 hoverShadowColor;
-uniform float shadowFalloffPixels;
 
 /* Produces stable, gently filtered grain in the wedge's unscaled local coordinates. */
 float grain(vec2 position)
@@ -84,19 +80,6 @@ void main()
         fragColor = vec4(1.0);
         return;
     }
-    if (shadowIndex >= 0)
-    {
-        if (entryIndex != shadowIndex) discard;
-        float hoverShapeScale = ringMode == 1 ? 1.0 : mix(1.0, hoverScale, entryStates[entryIndex].z);
-        vec2 hoverShapePosition = renderedRadialPosition / hoverShapeScale;
-        float shadowDistance = ringMode == 1
-            ? (outerRadius - length(hoverShapePosition)) * radiusPixels * hoverShapeScale
-            : wedgeDistance(hoverShapePosition, length(hoverShapePosition), hoverShapeScale);
-        float shadowCoverage = smoothstep(-shadowFalloffPixels, 0.0, shadowDistance);
-        fragColor = vec4(hoverShadowColor.rgb, shadowCoverage * hoverShadowColor.a);
-        return;
-    }
-
     vec4 state = entryStates[entryIndex];
     float enabled = state.x;
     float hover = ringMode == 1 ? float(entryIndex == hoveredIndex) : state.z;
@@ -112,5 +95,7 @@ void main()
         vec3 bronze = mix(borderColor, hoverBorderColor, hover * enabled);
         fill = mix(fill, bronze, border);
     }
-    fragColor = vec4(fill, coverage * mix(disabledOpacity, enabledOpacity, enabled));
+    float opacity = mix(disabledOpacity, enabledOpacity, enabled);
+    if (hover > 0.0 && enabled > 0.0) opacity = 1.0;
+    fragColor = vec4(fill, coverage * opacity);
 }
