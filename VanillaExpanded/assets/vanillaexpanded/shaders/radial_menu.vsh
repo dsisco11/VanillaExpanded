@@ -10,8 +10,12 @@ uniform int ringEntryOffset;
 uniform int ringMode;
 uniform vec4 entryStates[64];
 uniform float hoverScale;
+uniform int shadowIndex;
+uniform float shadowExpansionPixels;
+uniform float radiusPixels;
 
 out vec2 radialPosition;
+out vec2 renderedRadialPosition;
 out float wedgeFraction;
 flat out int entryIndex;
 
@@ -23,6 +27,8 @@ void main()
     entryIndex = int(uv.x + 0.5);
     // Stable entry IDs select an interpolated scale; the underlying mesh remains cached.
     float scale = ringMode == 1 ? 1.0 : mix(1.0, hoverScale, entryStates[entryIndex].z);
+    if (entryIndex == shadowIndex) scale += shadowExpansionPixels / radiusPixels;
+    renderedRadialPosition = vertex.xy * scale;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(vertex.xy * scale, vertex.z, 1.0);
 }
 

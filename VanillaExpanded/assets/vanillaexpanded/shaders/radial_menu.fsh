@@ -1,6 +1,7 @@
 #version 330 core
 
 in vec2 radialPosition;
+in vec2 renderedRadialPosition;
 in float wedgeFraction;
 flat in int entryIndex;
 out vec4 fragColor;
@@ -32,6 +33,7 @@ uniform vec3 selectedFill;
 uniform vec3 borderColor;
 uniform vec3 hoverBorderColor;
 uniform vec4 hoverShadowColor;
+uniform float shadowFalloffPixels;
 
 /* Produces stable, gently filtered grain in the wedge's unscaled local coordinates. */
 float grain(vec2 position)
@@ -47,11 +49,11 @@ float grain(vec2 position)
 }
 
 /* Measures the rounded annular sector in screen pixels so borders and corners share one contour. */
-float wedgeDistance(float radius, float scale)
+float wedgeDistance(vec2 position, float radius, float scale)
 {
     float pixelScale = radiusPixels * scale;
     float radialInside = min(radius - innerRadius, outerRadius - radius) * pixelScale;
-    float angle = atan(radialPosition.x, -radialPosition.y);
+    float angle = atan(position.x, -position.y);
     float wedgeCount = float(ringEntryCount);
     float centerAngle = startAngleRadians + clockwiseSign * float(entryIndex - ringEntryOffset) * 6.28318530718 / wedgeCount;
     float delta = atan(sin(angle - centerAngle), cos(angle - centerAngle));
@@ -73,7 +75,7 @@ void main()
     float scale = ringMode == 1 ? 1.0 : mix(1.0, hoverScale, entryStates[entryIndex].z);
     float distancePixels;
     if (ringMode == 1) distancePixels = (outerRadius - radius) * radiusPixels;
-    else distancePixels = wedgeDistance(radius, scale);
+    else distancePixels = wedgeDistance(radialPosition, radius, scale);
     float aa = max(fwidth(distancePixels), 0.75);
     float coverage = smoothstep(-aa, aa, distancePixels);
     if (maskIndex >= 0)
@@ -85,7 +87,13 @@ void main()
     if (shadowIndex >= 0)
     {
         if (entryIndex != shadowIndex) discard;
-        fragColor = vec4(hoverShadowColor.rgb, coverage * hoverShadowColor.a);
+        float hoverShapeScale = ringMode == 1 ? 1.0 : mix(1.0, hoverScale, entryStates[entryIndex].z);
+        vec2 hoverShapePosition = renderedRadialPosition / hoverShapeScale;
+        float shadowDistance = ringMode == 1
+            ? (outerRadius - length(hoverShapePosition)) * radiusPixels * hoverShapeScale
+            : wedgeDistance(hoverShapePosition, length(hoverShapePosition), hoverShapeScale);
+        float shadowCoverage = smoothstep(-shadowFalloffPixels, 0.0, shadowDistance);
+        fragColor = vec4(hoverShadowColor.rgb, shadowCoverage * hoverShadowColor.a);
         return;
     }
 
