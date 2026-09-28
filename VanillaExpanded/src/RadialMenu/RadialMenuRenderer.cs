@@ -13,11 +13,13 @@ internal sealed class RadialMenuRenderer : IDisposable
     #region Resources
     private const string ShaderName = "radial_menu";
     private const float CenterLabelInsetPixels = 8f;
+    private const int CenterLabelTexturePaddingPixels = 2;
     private readonly ICoreClientAPI capi;
     private readonly RadialMenuHoverAnimation hoverAnimation = new();
     private readonly Matrixf matrix = new();
     private readonly Dictionary<string, LoadedTexture> labels = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> renderedLabels = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, float> labelScales = new(StringComparer.Ordinal);
     private CairoFont? labelFont;
     private readonly LoadedTexture dimTexture;
     private readonly RadialMenuIconHalo iconHalo;
@@ -55,6 +57,7 @@ internal sealed class RadialMenuRenderer : IDisposable
             if (retainedIds.Contains(id)) continue;
             if (labels.Remove(id, out LoadedTexture? texture)) texture.Dispose();
             renderedLabels.Remove(id);
+            labelScales.Remove(id);
         }
     }
 
@@ -213,6 +216,7 @@ internal sealed class RadialMenuRenderer : IDisposable
         labelFont?.Dispose();
         labelFont = null;
         labels.Clear();
+        labelScales.Clear();
     }
     #endregion
 
@@ -299,12 +303,13 @@ internal sealed class RadialMenuRenderer : IDisposable
         }
     }
 
-    /// <summary>Wraps and scales center text into the circle's inset square.</summary>
+    /// <summary>Wraps and scales center text to fit the circular button without splitting words.</summary>
     private void DrawCenterLabel(string id, string text, RadialMenuLayout layout,
         float centerX, float centerY, float radiusPixels)
     {
-        int maximumSize = (int)Math.Max(1, radiusPixels * layout.OuterRadius * 2f - CenterLabelInsetPixels * 2f);
-        DrawLabel(id, text, centerX, centerY, maximumSize, maximumSize);
+        int usableDiameter = (int)Math.Max(1d,
+            radiusPixels * layout.OuterRadius * 2d - CenterLabelInsetPixels * 2d);
+        DrawLabel(id, text, centerX, centerY, usableDiameter);
     }
 
     /// <summary>Clips a depth-correct icon capture and its pixel-distance halo to the wedge stencil.</summary>
@@ -361,9 +366,9 @@ internal sealed class RadialMenuRenderer : IDisposable
     }
 
     /// <summary>Caches a text-only entry label and centers its texture at the entry position.</summary>
-    private void DrawLabel(string id, string text, double x, double y, int maximumWidth = 0, int maximumHeight = 0)
+    private void DrawLabel(string id, string text, double x, double y, int circleDiameter = 0)
     {
-        string cacheKey = text + '\0' + maximumWidth;
+        string cacheKey = text + '\0' + circleDiameter;
         if (!renderedLabels.TryGetValue(id, out string? previous) || previous != cacheKey)
         {
             if (labels.Remove(id, out LoadedTexture? old)) old.Dispose();
@@ -371,16 +376,37 @@ internal sealed class RadialMenuRenderer : IDisposable
             if (!string.IsNullOrEmpty(text))
             {
                 labelFont ??= CairoFont.WhiteSmallText().WithStroke([0, 0, 0, 0.65], 1.5);
-                labels[id] = maximumWidth > 0
-                    ? capi.Gui.TextTexture.GenTextTexture(text, labelFont, maximumWidth, null, EnumTextOrientation.Center)
-                    : capi.Gui.TextTexture.GenTextTexture(text, labelFont);
+                if (circleDiameter > 0)
+                {
+                    double lineHeight = labelFont.GetFontExtents().Height;
+                    string wrapped = RadialMenuLabelLayout.FitToCircle(text, circleDiameter, lineHeight,
+                        value => labelFont.GetTextExtents(value).Width, CenterLabelTexturePaddingPixels);
+                    string[] lines = wrapped.Split('\n');
+                    labelScales[id] = (float)RadialMenuLabelLayout.GetScaleForCircle(lines, circleDiameter,
+                        lineHeight, value => labelFont.GetTextExtents(value).Width, CenterLabelTexturePaddingPixels);
+                    double widestLine = 1d;
+                    foreach (string line in lines)
+                        widestLine = Math.Max(widestLine, labelFont.GetTextExtents(line).Width);
+                    int width = (int)Math.Ceiling(widestLine) + CenterLabelTexturePaddingPixels * 2;
+                    int height = (int)Math.Ceiling(lineHeight * lines.Length)
+                        + CenterLabelTexturePaddingPixels * 2;
+                    labels[id] = capi.Gui.TextTexture.GenTextTexture(wrapped, labelFont, width, height,
+                        null, EnumTextOrientation.Center);
+                }
+                else
+                {
+                    labelScales.Remove(id);
+                    labels[id] = capi.Gui.TextTexture.GenTextTexture(text, labelFont);
+                }
             }
         }
 
         if (labels.TryGetValue(id, out LoadedTexture? label))
         {
             capi.Render.GetEngineShader(EnumShaderProgram.Gui).Use();
-            float scale = maximumHeight > 0 ? Math.Min(1f, maximumHeight / (float)label.Height) : 1f;
+            float scale = circleDiameter > 0 && labelScales.TryGetValue(id, out float fittedScale)
+                ? fittedScale
+                : 1f;
             float width = label.Width * scale;
             float height = label.Height * scale;
             if (scale < 1f)

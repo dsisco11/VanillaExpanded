@@ -195,6 +195,86 @@ public sealed class RadialMenuTests
         Assert.True(denseSize < sparseSize);
         Assert.True(denseSize > 0);
     }
+
+    [Theory]
+    [InlineData("2x2x2", "2x2x2")]
+    [InlineData("Andesite Cobblestone", "Andesite\nCobblestone")]
+    public void CenterLabelLayoutPreservesWholeWords(string text, string expected)
+    {
+        string wrapped = RadialMenuLabelLayout.FitToCircle(text, 15, 3, value => value.Length, 0);
+
+        Assert.Equal(expected, wrapped);
+    }
+
+    [Fact]
+    public void CenterLabelLayoutCollapsesWhitespaceAndAvoidsEmptyLines()
+    {
+        string wrapped = RadialMenuLabelLayout.FitToCircle(
+            "Drop  blocks\n\nhere to add a new material", 18, 3, value => value.Length, 0);
+
+        Assert.DoesNotContain("\n\n", wrapped);
+        Assert.Equal("Drop blocks here to add a new material", wrapped.Replace('\n', ' '));
+    }
+
+    [Fact]
+    public void CenterLabelScaleUsesEachLinesActualWidth()
+    {
+        string[] lines = ["x", "longlong", "x"];
+
+        double scale = RadialMenuLabelLayout.GetScaleForCircle(lines, 8, 2, value => value.Length, 0);
+        double boundingBoxScale = 8 / Math.Sqrt(8 * 8 + 6 * 6);
+
+        Assert.True(scale > boundingBoxScale);
+    }
+
+    [Fact]
+    public void CenterLabelLayoutMatchesExhaustiveOptimalScale()
+    {
+        var random = new Random(7331);
+        for (int sample = 0; sample < 250; sample++)
+        {
+            int wordCount = random.Next(1, 10);
+            string[] words = Enumerable.Range(0, wordCount)
+                .Select(index => $"w{index}" + new string('x', random.Next(1, 12)))
+                .ToArray();
+            string text = string.Join(' ', words);
+            double diameter = random.Next(12, 42);
+            double lineHeight = random.Next(2, 7);
+            double padding = random.Next(0, 3);
+
+            string fitted = RadialMenuLabelLayout.FitToCircle(
+                text, diameter, lineHeight, value => value.Length, padding);
+            double actualScale = RadialMenuLabelLayout.GetScaleForCircle(
+                fitted.Split('\n'), diameter, lineHeight, value => value.Length, padding);
+            double optimalScale = GetExhaustiveOptimalScale(words, diameter, lineHeight, padding);
+
+            Assert.Equal(optimalScale, actualScale, precision: 10);
+            Assert.Equal(words, fitted.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+            Assert.DoesNotContain("\n\n", fitted);
+        }
+    }
+
+    private static double GetExhaustiveOptimalScale(string[] words, double diameter,
+        double lineHeight, double padding)
+    {
+        double best = 0;
+        int partitionCount = 1 << Math.Max(0, words.Length - 1);
+        for (int mask = 0; mask < partitionCount; mask++)
+        {
+            var lines = new List<string>();
+            int start = 0;
+            for (int boundary = 0; boundary < words.Length - 1; boundary++)
+            {
+                if ((mask & 1 << boundary) == 0) continue;
+                lines.Add(string.Join(' ', words[start..(boundary + 1)]));
+                start = boundary + 1;
+            }
+            lines.Add(string.Join(' ', words[start..]));
+            best = Math.Max(best, RadialMenuLabelLayout.GetScaleForCircle(
+                lines, diameter, lineHeight, value => value.Length, padding));
+        }
+        return best;
+    }
     /// <summary>Checks both layout directions produce visible triangles under the same face-culling rule.</summary>
     [Fact]
     public void WedgeTriangleWindingIsConsistentAcrossDirections()
