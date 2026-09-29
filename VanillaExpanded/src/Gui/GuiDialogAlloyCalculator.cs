@@ -33,6 +33,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private const double TargetUnitsButtonHeight = 12;
     private const double TargetUnitsButtonVerticalGap = 1;
     private const int DefaultTargetUnits = 100;
+    private const int TargetUnitsInputStep = 10;
     private const int TargetUnitsStep = 100;
     private const double TitlebarHeight = 20;
     private const double SlotSize = 40;
@@ -345,6 +346,10 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
         // Set target units value
         var targetInput = SingleComposer?.GetNumberInput("targetUnits");
+        if (targetInput is not null)
+        {
+            targetInput.Interval = TargetUnitsInputStep;
+        }
         targetInput?.SetValue(targetUnits.ToString());
 
         // Initialize slider values after composition
