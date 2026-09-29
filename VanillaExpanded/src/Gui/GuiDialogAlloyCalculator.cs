@@ -32,6 +32,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private const double TargetUnitsControlGap = 5;
     private const double TargetUnitsButtonHeight = 12;
     private const double TargetUnitsButtonVerticalGap = 1;
+    private const float TargetUnitsButtonFontSize = 8;
     private const int DefaultTargetUnits = 100;
     private const int TargetUnitsInputStep = 10;
     private const int TargetUnitsStep = 100;
@@ -251,9 +252,9 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-dropdown-tooltip"), CairoFont.WhiteDetailText(), 250, dropdownBounds.FlatCopy(), "dropdownTooltip")
             .AddNumberInput(inputBounds, OnTargetUnitsChanged, CairoFont.WhiteDetailText(), "targetUnits")
             .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-targetunits-tooltip"), CairoFont.WhiteDetailText(), 250, inputBounds.FlatCopy(), "targetUnitsTooltip")
-            .AddSmallButton("+", () => ChangeTargetUnits(TargetUnitsStep), incrementBounds, EnumButtonStyle.Normal, "incrementTargetUnits")
+            .AddButton("+", () => ChangeTargetUnits(TargetUnitsStep), incrementBounds, CairoFont.WhiteDetailText().WithFontSize(TargetUnitsButtonFontSize), EnumButtonStyle.Normal, "incrementTargetUnits")
             .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-increment-tooltip"), CairoFont.WhiteDetailText(), 250, incrementBounds.FlatCopy(), "incrementTargetUnitsTooltip")
-            .AddSmallButton("-", () => ChangeTargetUnits(-TargetUnitsStep), decrementBounds, EnumButtonStyle.Normal, "decrementTargetUnits")
+            .AddButton("-", () => ChangeTargetUnits(-TargetUnitsStep), decrementBounds, CairoFont.WhiteDetailText().WithFontSize(TargetUnitsButtonFontSize), EnumButtonStyle.Normal, "decrementTargetUnits")
             .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-decrement-tooltip"), CairoFont.WhiteDetailText(), 250, decrementBounds.FlatCopy(), "decrementTargetUnitsTooltip");
 
         // Add ingredient sliders if an alloy is selected
