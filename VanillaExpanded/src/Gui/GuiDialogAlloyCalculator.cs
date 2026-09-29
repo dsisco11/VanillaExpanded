@@ -794,10 +794,14 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     {
         if (SingleComposer is null || selectedOption is null) return;
 
-        Dictionary<int, int> percentages = AlloyCalculatorLogic.CalculateContentPercentages(
+        var composition = AlloyCalculatorLogic.CalculateContentComposition(
             contents,
             selectedIngredients);
+        Dictionary<int, int> percentages = composition.Percentages;
         if (percentages.Count == 0) return;
+
+        SingleComposer.GetNumberInput("targetUnits")?.SetValue(composition.TotalUnits.ToString());
+        OnTargetUnitsChanged(composition.TotalUnits.ToString());
 
         isAdjustingSliders = true;
         try

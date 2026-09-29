@@ -58,7 +58,7 @@ internal static class AlloyCalculatorLogic
             && option.OutputCode.Equals(outputCode));
     }
 
-    internal static Dictionary<int, int> CalculateContentPercentages(
+    internal static (Dictionary<int, int> Percentages, int TotalUnits) CalculateContentComposition(
         IReadOnlyList<ItemStack> contents,
         IReadOnlyList<MetalDepositIngredient> ingredients)
     {
@@ -71,6 +71,7 @@ internal static class AlloyCalculatorLogic
             CombustibleProperties? properties = stack.Collectible.GetCombustibleProperties(null, stack, null);
             if (properties?.SmeltedStack?.ResolvedItemstack is ItemStack smeltedStack)
             {
+                amount *= smeltedStack.StackSize;
                 amount /= Math.Max(1, properties.SmeltedRatio);
                 comparableStack = smeltedStack;
             }
@@ -87,7 +88,7 @@ internal static class AlloyCalculatorLogic
         }
 
         double totalAmount = amounts.Sum();
-        if (totalAmount <= 0) return [];
+    if (totalAmount <= 0) return ([], 0);
 
         double[] exactPercentages = [.. amounts.Select(amount => amount * 100 / totalAmount)];
         int[] percentages = [.. exactPercentages.Select(static percentage => (int)Math.Floor(percentage))];
@@ -101,8 +102,10 @@ internal static class AlloyCalculatorLogic
             percentages[index]++;
         }
 
-        return Enumerable.Range(0, percentages.Length)
+        Dictionary<int, int> result = Enumerable.Range(0, percentages.Length)
             .ToDictionary(static index => index, index => percentages[index]);
+        int totalUnits = (int)Math.Round(totalAmount * 100);
+        return (result, totalUnits);
     }
 
     internal static MetalDepositOption FromAlloyRecipe(AlloyRecipe recipe)
