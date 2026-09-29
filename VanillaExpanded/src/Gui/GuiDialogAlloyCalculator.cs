@@ -28,7 +28,12 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private const double RowHeight = 35;
     private const double DropdownWidth = 150;
     private const double InputWidth = 70;
+    private const double TargetUnitsButtonWidth = 25;
+    private const double TargetUnitsControlGap = 5;
+    private const double TargetUnitsButtonHeight = 12;
+    private const double TargetUnitsButtonVerticalGap = 1;
     private const int DefaultTargetUnits = 100;
+    private const int TargetUnitsStep = 100;
     private const double TitlebarHeight = 20;
     private const double SlotSize = 40;
     private const double ButtonHeight = 25;
@@ -169,7 +174,8 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         // Width: either slider row or slot row, whichever is wider
         var sliderRowWidth = showRatioControls ? LabelWidth + SliderWidth : 0;
         var slotRowWidth = ingredientCount * SlotSize;
-        var controlsWidth = DropdownWidth + 10 + InputWidth;
+        var controlsWidth = DropdownWidth + 10 + InputWidth
+            + TargetUnitsControlGap + TargetUnitsButtonWidth;
         var contentWidth = Math.Max(controlsWidth, Math.Max(sliderRowWidth, slotRowWidth));
         
         // Height: titlebar + dropdown row + sliders + slot row + button row
@@ -205,6 +211,16 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         // Define element bounds
         var dropdownBounds = ElementBounds.Fixed(0, yOffset, DropdownWidth, 25);
         var inputBounds = ElementBounds.Fixed(DropdownWidth + 10, yOffset, InputWidth, 25);
+        var incrementBounds = ElementBounds.Fixed(
+            DropdownWidth + 10 + InputWidth + TargetUnitsControlGap,
+            yOffset,
+            TargetUnitsButtonWidth,
+            TargetUnitsButtonHeight);
+        var decrementBounds = ElementBounds.Fixed(
+            DropdownWidth + 10 + InputWidth + TargetUnitsControlGap,
+            yOffset + TargetUnitsButtonHeight + TargetUnitsButtonVerticalGap,
+            TargetUnitsButtonWidth,
+            TargetUnitsButtonHeight);
         yOffset += 30;
 
         var alloyValues = depositOptions.Select(static (_, i) => i.ToString());
@@ -233,7 +249,11 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                 CairoFont.WhiteSmallText()), "alloyDropdown")
             .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-dropdown-tooltip"), CairoFont.WhiteDetailText(), 250, dropdownBounds.FlatCopy(), "dropdownTooltip")
             .AddNumberInput(inputBounds, OnTargetUnitsChanged, CairoFont.WhiteDetailText(), "targetUnits")
-            .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-targetunits-tooltip"), CairoFont.WhiteDetailText(), 250, inputBounds.FlatCopy(), "targetUnitsTooltip");
+            .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-targetunits-tooltip"), CairoFont.WhiteDetailText(), 250, inputBounds.FlatCopy(), "targetUnitsTooltip")
+            .AddSmallButton("+", () => ChangeTargetUnits(TargetUnitsStep), incrementBounds, EnumButtonStyle.Normal, "incrementTargetUnits")
+            .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-increment-tooltip"), CairoFont.WhiteDetailText(), 250, incrementBounds.FlatCopy(), "incrementTargetUnitsTooltip")
+            .AddSmallButton("-", () => ChangeTargetUnits(-TargetUnitsStep), decrementBounds, EnumButtonStyle.Normal, "decrementTargetUnits")
+            .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-decrement-tooltip"), CairoFont.WhiteDetailText(), 250, decrementBounds.FlatCopy(), "decrementTargetUnitsTooltip");
 
         // Add ingredient sliders if an alloy is selected
         if (selectedOption is not null && ingredientCount > 0)
@@ -586,6 +606,19 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             GetOrCreateSavedState().TargetUnits = units;
             UpdateResultsDisplay();
         }
+    }
+
+    private bool ChangeTargetUnits(int amount)
+    {
+        if (amount < 0 && targetUnits <= TargetUnitsStep)
+        {
+            return true;
+        }
+
+        var updatedUnits = targetUnits + amount;
+        SingleComposer?.GetNumberInput("targetUnits")?.SetValue(updatedUnits.ToString());
+        OnTargetUnitsChanged(updatedUnits.ToString());
+        return true;
     }
 
     private void OnTitleBarClose()
