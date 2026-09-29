@@ -58,6 +58,53 @@ internal static class AlloyCalculatorLogic
             && option.OutputCode.Equals(outputCode));
     }
 
+    internal static Dictionary<int, int> CalculateContentPercentages(
+        IReadOnlyList<ItemStack> contents,
+        IReadOnlyList<MetalDepositIngredient> ingredients)
+    {
+        var amounts = new double[ingredients.Count];
+
+        foreach (ItemStack stack in contents)
+        {
+            ItemStack comparableStack = stack;
+            double amount = stack.StackSize;
+            CombustibleProperties? properties = stack.Collectible.GetCombustibleProperties(null, stack, null);
+            if (properties?.SmeltedStack?.ResolvedItemstack is ItemStack smeltedStack)
+            {
+                amount /= Math.Max(1, properties.SmeltedRatio);
+                comparableStack = smeltedStack;
+            }
+
+            for (var i = 0; i < ingredients.Count; i++)
+            {
+                ItemStack ingredientStack = ingredients[i].ResolvedStack;
+                if (ingredientStack.Class == comparableStack.Class && ingredientStack.Id == comparableStack.Id)
+                {
+                    amounts[i] += amount;
+                    break;
+                }
+            }
+        }
+
+        double totalAmount = amounts.Sum();
+        if (totalAmount <= 0) return [];
+
+        double[] exactPercentages = [.. amounts.Select(amount => amount * 100 / totalAmount)];
+        int[] percentages = [.. exactPercentages.Select(static percentage => (int)Math.Floor(percentage))];
+        int remaining = 100 - percentages.Sum();
+
+        foreach (int index in Enumerable.Range(0, percentages.Length)
+            .OrderByDescending(index => exactPercentages[index] - percentages[index])
+            .ThenBy(static index => index)
+            .Take(remaining))
+        {
+            percentages[index]++;
+        }
+
+        return Enumerable.Range(0, percentages.Length)
+            .ToDictionary(static index => index, index => percentages[index]);
+    }
+
     internal static MetalDepositOption FromAlloyRecipe(AlloyRecipe recipe)
     {
         return new MetalDepositOption(

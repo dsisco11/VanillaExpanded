@@ -143,6 +143,25 @@ public class MetalDepositOptionTests
     }
 
     [Fact]
+    public void CalculateContentPercentages_MatchingAlloy_ReturnsCrucibleRatios()
+    {
+        MockItem copperIngot = CreateItem(1, "ingot-copper");
+        MockItem tinIngot = CreateItem(2, "ingot-tin");
+        MockItem bronzeIngot = CreateItem(3, "ingot-bronze");
+        MockItem copperBits = CreateSmeltable(4, "metalbit-copper", copperIngot);
+        MockItem tinBits = CreateSmeltable(5, "metalbit-tin", tinIngot);
+        MetalDepositOption option = AlloyCalculatorLogic.FromAlloyRecipe(
+            CreateAlloyRecipe(copperIngot, tinIngot, bronzeIngot));
+
+        Dictionary<int, int> result = AlloyCalculatorLogic.CalculateContentPercentages(
+            [new ItemStack(copperBits, 9), new ItemStack(tinBits, 1)],
+            option.Ingredients);
+
+        Assert.Equal(90, result[0]);
+        Assert.Equal(10, result[1]);
+    }
+
+    [Fact]
     public void FindOptionForContents_InvalidAlloyRatio_ReturnsNull()
     {
         MockItem copperIngot = CreateItem(1, "ingot-copper");

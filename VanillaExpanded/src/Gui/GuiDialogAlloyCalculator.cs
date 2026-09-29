@@ -750,10 +750,11 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         depositSystem = capi.ModLoader.GetModSystem<AlloyDepositSystem>();
         depositSystem.DepositCompleted += OnDepositCompleted;
 
-        MetalDepositOption? detectedOption = DetectOptionFromCrucible();
+        MetalDepositOption? detectedOption = DetectOptionFromCrucible(out ItemStack[] contents);
         if (detectedOption is not null)
         {
             OnAlloySelected(depositOptions.IndexOf(detectedOption).ToString(), true);
+            ApplyDetectedRatios(contents);
             return;
         }
 
@@ -772,13 +773,14 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         }
     }
 
-    private MetalDepositOption? DetectOptionFromCrucible()
+    private MetalDepositOption? DetectOptionFromCrucible(out ItemStack[] contents)
     {
+        contents = [];
         BlockEntityFirepit? firepit = capi.World.BlockAccessor
             .GetBlockEntity<BlockEntityFirepit>(BlockEntityPosition);
         if (firepit?.Inventory is not InventorySmelting inventory) return null;
 
-        ItemStack[] contents = [.. inventory.CookingSlots
+        contents = [.. inventory.CookingSlots
             .Where(static slot => !slot.Empty)
             .Select(static slot => slot.Itemstack)
             .OfType<ItemStack>()];
@@ -786,6 +788,39 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             contents,
             depositOptions,
             capi.GetMetalAlloys());
+    }
+
+    private void ApplyDetectedRatios(IReadOnlyList<ItemStack> contents)
+    {
+        if (SingleComposer is null || selectedOption is null) return;
+
+        Dictionary<int, int> percentages = AlloyCalculatorLogic.CalculateContentPercentages(
+            contents,
+            selectedIngredients);
+        if (percentages.Count == 0) return;
+
+        isAdjustingSliders = true;
+        try
+        {
+            foreach (var (index, percentage) in percentages)
+            {
+                MetalDepositIngredient ingredient = selectedIngredients[index];
+                int minPercent = (int)Math.Round(ingredient.MinRatio * 100);
+                int maxPercent = (int)Math.Round(ingredient.MaxRatio * 100);
+                int clampedPercentage = Math.Clamp(percentage, minPercent, maxPercent);
+
+                sliderValues[index] = clampedPercentage;
+                SingleComposer.GetSlider($"slider_{index}")
+                    ?.SetValues(clampedPercentage, minPercent, maxPercent, 1, "%");
+            }
+        }
+        finally
+        {
+            isAdjustingSliders = false;
+        }
+
+        SaveSliderValues();
+        UpdateResultsDisplay();
     }
 
     public override void OnGuiClosed()
