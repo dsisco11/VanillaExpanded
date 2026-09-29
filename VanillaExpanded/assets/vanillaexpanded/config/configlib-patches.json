@@ -75,6 +75,15 @@
         "default": true,
         "weight": 1.7
       },
+      "EnablePerishableItemFreshnessIndicators": {
+        "code": "EnablePerishableItemFreshnessIndicators",
+        "name": "EnablePerishableItemFreshnessIndicators",
+        "ingui": "vanillaexpanded:config-enable-perishable-item-freshness-indicators",
+        "comment": "vanillaexpanded:config-enable-perishable-item-freshness-indicators-tooltip",
+        "default": true,
+        "weight": 1.71,
+        "clientSide": true
+      },
       "EnableBackpackDecraft": {
         "code": "EnableBackpackDecraft",
         "name": "EnableBackpackDecraft",

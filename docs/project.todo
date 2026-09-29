@@ -11,7 +11,7 @@
         ✔ Smelt tool heads back into metal nuggets (100% return). @done(25-12-01 12:39)
 
     ## Functionality:
-        ☐ Perishable items in inventory/hotbar render a vertical decay bar as their item slot background, indicating remaining freshness.
+        ✔ Perishable items in inventory/hotbar render a vertical decay bar as their item slot background, indicating remaining freshness. @done(26-09-29)
         ☐ Targeted items such as tools on toolracks have a subtle highlight to indicate that they are targeted.
         ☐ New "crafting menu" similar to minecraft: shows all craftable items with current inventory, allows searching. (Maybe this can just be added to the handbook?)
 

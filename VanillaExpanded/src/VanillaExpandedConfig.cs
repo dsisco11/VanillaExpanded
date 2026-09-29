@@ -51,6 +51,9 @@ public class VanillaExpandedConfig
     /// <summary>Replaces the base-game tool-mode grid with a radial menu.</summary>
     public bool EnableToolModeRadialMenu { get; set; } = true;
 
+    /// <summary>Shows freshness as a colored background overlay on perishable item slots.</summary>
+    public bool EnablePerishableItemFreshnessIndicators { get; set; } = true;
+
     #endregion
 
     #region Recipe Toggles

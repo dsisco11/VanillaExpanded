@@ -6,12 +6,14 @@ using VanillaExpanded.AlloyCalculator;
 using VanillaExpanded.AutoStashing;
 using VanillaExpanded.Fishing;
 using VanillaExpanded.IgnitionTools;
+using VanillaExpanded.PerishableItemSlots;
 using VanillaExpanded.SpawnDecal;
 using VanillaExpanded.src.AutoStashing;
 using VanillaExpanded.src.IgnitionTools;
 using VanillaExpanded.ToolModeRadialMenu;
 
 using Vintagestory.API.Common;
+using Vintagestory.API.Client;
 
 namespace VanillaExpanded;
 
@@ -60,6 +62,7 @@ public class VanillaExpandedModSystem : ModSystem
 
     public override void Dispose()
     {
+        PerishableItemSlotPatch.DisposeTexture();
         base.Dispose();
         new Harmony(Constants.ModId).UnpatchAll(Constants.ModId);
         configLoaded = false; // Reset so config reloads on next game start
@@ -83,6 +86,11 @@ public class VanillaExpandedModSystem : ModSystem
 
     public override void Start(ICoreAPI api)
     {
+        if (Config.EnablePerishableItemFreshnessIndicators && api.Side == EnumAppSide.Client && api is ICoreClientAPI clientApi)
+        {
+            PerishableItemSlotPatch.InitializeTexture(clientApi);
+        }
+
         api.RegisterBlockBehaviorClass(BlockBehaviorAutoStashable.RegistryId, typeof(BlockBehaviorAutoStashable));
         api.RegisterBlockBehaviorClass(BehaviorCrateEntityEventBridge.RegistryId, typeof(BehaviorCrateEntityEventBridge));
 
@@ -102,6 +110,11 @@ public class VanillaExpandedModSystem : ModSystem
     private static void ApplySelectivePatches(Harmony harmony)
     {
         new PatchClassProcessor(harmony, typeof(FishingBiteSoundPatch)).Patch();
+
+        if (Config.EnablePerishableItemFreshnessIndicators)
+        {
+            new PatchClassProcessor(harmony, typeof(PerishableItemSlotPatch)).Patch();
+        }
 
         // Patch the firepit GUI open/close hooks unless explicitly disabled.
         // Users can disable this as a safety valve if it ever breaks or conflicts.

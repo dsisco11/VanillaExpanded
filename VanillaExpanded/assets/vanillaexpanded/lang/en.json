@@ -4,6 +4,8 @@
   "config-enable-quick-tools-tooltip": "Enable the quick-tool radial menu. Assign its hold key in Controls.",
   "config-enable-tool-mode-radial-menu": "Tool-Mode Radial Menu",
   "config-enable-tool-mode-radial-menu-tooltip": "Replace base-game tool-mode grids with a radial menu.",
+  "config-enable-perishable-item-freshness-indicators": "Perishable Item Freshness Indicators",
+  "config-enable-perishable-item-freshness-indicators-tooltip": "Show freshness as a colored background overlay on perishable item slots. Requires re-entering the world or restarting.",
   "quicktool-unequip": "Unequip",
   "quicktool-rejected": "That quick-tool selection is no longer available.",
   "quicktool-interrupted": "The swap was interrupted. Your current items were kept; restoration is no longer available.",

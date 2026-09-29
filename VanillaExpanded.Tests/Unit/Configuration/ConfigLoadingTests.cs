@@ -33,6 +33,7 @@ public class ConfigLoadingTests
         VanillaExpandedConfig result = VanillaExpandedModSystem.LoadConfig(api.Object);
 
         Assert.True(result.EnableAutoStash);
+        Assert.True(result.EnablePerishableItemFreshnessIndicators);
         Assert.True(result.EnableIgnitionTools);
         Assert.True(result.EnableSpawnDecal);
         api.Verify(
