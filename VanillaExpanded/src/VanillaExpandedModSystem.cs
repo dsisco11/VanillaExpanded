@@ -4,6 +4,7 @@ using HarmonyLib;
 
 using VanillaExpanded.AlloyCalculator;
 using VanillaExpanded.AutoStashing;
+using VanillaExpanded.Fishing;
 using VanillaExpanded.IgnitionTools;
 using VanillaExpanded.SpawnDecal;
 using VanillaExpanded.src.AutoStashing;
@@ -100,6 +101,8 @@ public class VanillaExpandedModSystem : ModSystem
     /// </summary>
     private static void ApplySelectivePatches(Harmony harmony)
     {
+        new PatchClassProcessor(harmony, typeof(FishingBiteSoundPatch)).Patch();
+
         // Patch the firepit GUI open/close hooks unless explicitly disabled.
         // Users can disable this as a safety valve if it ever breaks or conflicts.
         if (!Config.DisableAlloyCalculatorPatch)
