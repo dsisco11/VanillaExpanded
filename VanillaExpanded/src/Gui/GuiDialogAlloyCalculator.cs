@@ -32,7 +32,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private const double TargetUnitsControlGap = 5;
     private const double TargetUnitsButtonHeight = 12;
     private const double TargetUnitsButtonVerticalGap = 1;
-    private const float TargetUnitsButtonFontSize = 8;
+    private const float TargetUnitsButtonFontSize = 10;
     private const int DefaultTargetUnits = 100;
     private const int TargetUnitsInputStep = 10;
     private const int TargetUnitsStep = 100;
