@@ -274,7 +274,8 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         IPlayerInventoryManager playerInventory,
         string[]? hotKeyCodes = null)
     {
-        string? actionLangCode = HasStashables(world, playerInventory, selection)
+        ItemStack[]? stashableStacks = GetStashableItemStacks(world, playerInventory, selection);
+        string? actionLangCode = stashableStacks is { Length: > 0 }
             ? "vanillaexpanded:blockhelp-autostash-container"
             : HasContainerStashCandidates(world, playerInventory, selection)
                 ? "vanillaexpanded:blockhelp-autostash-full"
@@ -288,6 +289,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
                     ActionLangCode = actionLangCode,
                     MouseButton = EnumMouseButton.Right,
                     HotKeyCodes = hotKeyCodes,
+                    Itemstacks = stashableStacks,
                 }
             ];
     }
@@ -303,7 +305,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         }
 
         BlockEntity? blockEntity = world.BlockAccessor.GetBlockEntity(selection.Position);
-        if (blockEntity is not BlockEntityBloomery bloomery)
+        if (blockEntity is null)
         {
             return null;
         }
