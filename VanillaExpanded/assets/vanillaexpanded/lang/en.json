@@ -67,6 +67,8 @@
   "config-ignition-delay-tooltip": "Time in seconds to hold the interact key before igniting a fire.",
   "config-spawn-decal-size": "Spawn Decal Size",
   "config-spawn-decal-size-tooltip": "Size of the spawn point decal (0.2 to 1.0).",
+  "config-perishable-item-freshness-indicator-intensity": "Freshness Indicator Intensity",
+  "config-perishable-item-freshness-indicator-intensity-tooltip": "Opacity of perishable item freshness overlays (0.05 to 1.00).",
   "config-auto-stash-gui-renders-topmost": "Topmost Auto-Stash Progress",
   "config-auto-stash-gui-renders-topmost-tooltip": "Render the auto-stash progress bar above dialogs and other game UI.",
 

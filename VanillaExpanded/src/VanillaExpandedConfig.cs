@@ -105,5 +105,8 @@ public class VanillaExpandedConfig
     /// Render the auto-stash progress bar above all other base game UI (dialogs, HUD, etc.) instead of behind it.
     /// </summary>
     public bool AutoStashGuiRendersTopmost { get; set; } = true;
+
+    /// <summary>Opacity of perishable item freshness overlays (0.05 to 1.0).</summary>
+    public float PerishableItemFreshnessIndicatorIntensity { get; set; } = 0.35f;
     #endregion
 }

@@ -18,13 +18,12 @@ namespace VanillaExpanded.PerishableItemSlots;
 internal static class PerishableItemSlotPatch
 {
     private const long RefreshIntervalMilliseconds = 1_000;
-    private const float FreshOpacity = 0.34f;
-    private const float StaleOpacity = 0.44f;
+    private const float StaleOpacityMultiplier = 1.3f;
     private const float FullyStaleFreshness = 0.35f;
     private const float FullyFreshFreshness = 0.75f;
 
-    private static readonly Vector4 StaleColor = new(0.88f, 0.08f, 0.05f, StaleOpacity);
-    private static readonly Vector4 FreshColor = new(0.18f, 0.48f, 0.24f, FreshOpacity);
+    private static readonly Vector4 StaleColor = new(0.88f, 0.08f, 0.05f, 1);
+    private static readonly Vector4 FreshColor = new(0.18f, 0.48f, 0.24f, 1);
 
     private static readonly MethodInfo RenderItemstackMethod = AccessTools.Method(
         typeof(IRenderAPI),
@@ -154,11 +153,17 @@ internal static class PerishableItemSlotPatch
             0,
             1);
         amount = amount * amount * (3 - 2 * amount);
-        return PremultipliedColor(Vector4.Lerp(StaleColor, FreshColor, amount));
+        Vector4 color = Vector4.Lerp(StaleColor, FreshColor, amount);
+        float freshOpacity = Math.Clamp(VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity, 0, 1);
+        color.W = float.Lerp(Math.Min(1, freshOpacity * StaleOpacityMultiplier), freshOpacity, amount);
+        return PremultipliedColor(color);
     }
 
     private static Vec4f PremultipliedColor(Vector4 color)
-        => new(color.X * color.W, color.Y * color.W, color.Z * color.W, color.W);
+    {
+        color *= new Vector4(color.W, color.W, color.W, 1);
+        return new Vec4f(color.X, color.Y, color.Z, color.W);
+    }
 
     internal static void InitializeTexture(ICoreClientAPI api)
     {

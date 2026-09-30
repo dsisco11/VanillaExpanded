@@ -68,7 +68,7 @@ public sealed class PerishableItemSlotPatchTests
         var color = PerishableItemSlotPatch.FreshnessColorVector(0);
 
         Assert.True(color.R > color.G);
-        Assert.True(color.A <= 0.45f);
+        Assert.True(color.A <= VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity * 1.3f);
         Assert.True(color.R <= color.A && color.G <= color.A && color.B <= color.A);
     }
 
