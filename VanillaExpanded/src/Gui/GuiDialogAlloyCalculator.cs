@@ -27,11 +27,11 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private const double RowHeight = 35;
     private const double DropdownWidth = 150;
     private const double InputWidth = 70;
-    private const double TargetUnitsButtonWidth = 25;
+    private const double TargetUnitsButtonWidth = 20;
     private const double TargetUnitsControlGap = 5;
-    private const double TargetUnitsButtonHeight = 12;
-    private const double TargetUnitsButtonVerticalGap = 1;
-    private const float TargetUnitsButtonFontSize = 10;
+    private const double TargetUnitsButtonHeight = 13;
+    private const double TargetUnitsButtonVerticalGap = 3;
+    private const float TargetUnitsButtonFontSize = 12;
     private const int DefaultTargetUnits = 100;
     private const int TargetUnitsInputStep = 10;
     private const int TargetUnitsStep = 100;
@@ -249,9 +249,9 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-dropdown-tooltip"), CairoFont.WhiteDetailText(), 250, dropdownBounds.FlatCopy(), "dropdownTooltip")
             .AddNumberInput(inputBounds, OnTargetUnitsChanged, CairoFont.WhiteDetailText(), "targetUnits")
             .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-targetunits-tooltip"), CairoFont.WhiteDetailText(), 250, inputBounds.FlatCopy(), "targetUnitsTooltip")
-            .AddButton("+", () => ChangeTargetUnits(TargetUnitsStep), incrementBounds, CairoFont.WhiteDetailText().WithFontSize(TargetUnitsButtonFontSize), EnumButtonStyle.Normal, "incrementTargetUnits")
+            .AddButton("+", () => ChangeTargetUnits(TargetUnitsStep), incrementBounds, CairoFont.WhiteDetailText().WithFontSize(TargetUnitsButtonFontSize).WithOrientation(EnumTextOrientation.Center), EnumButtonStyle.Small, "incrementTargetUnits")
             .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-increment-tooltip"), CairoFont.WhiteDetailText(), 250, incrementBounds.FlatCopy(), "incrementTargetUnitsTooltip")
-            .AddButton("-", () => ChangeTargetUnits(-TargetUnitsStep), decrementBounds, CairoFont.WhiteDetailText().WithFontSize(TargetUnitsButtonFontSize), EnumButtonStyle.Normal, "decrementTargetUnits")
+            .AddButton("-", () => ChangeTargetUnits(-TargetUnitsStep), decrementBounds, CairoFont.WhiteDetailText().WithFontSize(TargetUnitsButtonFontSize).WithOrientation(EnumTextOrientation.Center), EnumButtonStyle.Small, "decrementTargetUnits")
             .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-decrement-tooltip"), CairoFont.WhiteDetailText(), 250, decrementBounds.FlatCopy(), "decrementTargetUnitsTooltip");
 
         // Add ingredient sliders if an alloy is selected
