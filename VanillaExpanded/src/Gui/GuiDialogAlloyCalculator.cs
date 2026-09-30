@@ -4,7 +4,6 @@ using System.Collections.Immutable;
 using System.Linq;
 
 using VanillaExpanded.AlloyCalculator;
-using VanillaExpanded.ModSystems;
 using VanillaExpanded.Network;
 
 using Vintagestory.API.Client;
@@ -73,8 +72,6 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private List<ItemStack>? smeltingContainers;
     private List<ItemStack>? smeltingFuels;
     private int maxFuelTemperature;
-    private AlloyDepositSystem? depositSystem;
-    private string? pendingDepositRequestId;
     #endregion
 
     #region Properties
@@ -335,12 +332,18 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             // Add deposit button
             yOffset += (int)SlotSize + 18;
             var buttonBounds = ElementBounds
-                .Fixed(0, yOffset, 80, ButtonHeight)
+                .Fixed(-55, yOffset, 100, ButtonHeight)
+                .WithParent(contentBounds)
+                .WithAlignment(EnumDialogArea.CenterFixed);
+            var fuelButtonBounds = ElementBounds
+                .Fixed(55, yOffset, 100, ButtonHeight)
                 .WithParent(contentBounds)
                 .WithAlignment(EnumDialogArea.CenterFixed);
             composer
                 .AddSmallButton(Lang.Get($"{Constants.ModId}:gui-alloycalculator-deposit"), OnDepositButtonClicked, buttonBounds, EnumButtonStyle.Normal, "depositButton")
-                .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-deposit-tooltip"), CairoFont.WhiteDetailText(), 250, buttonBounds.FlatCopy(), "depositTooltip");
+                .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-deposit-tooltip"), CairoFont.WhiteDetailText(), 250, buttonBounds.FlatCopy(), "depositTooltip")
+                .AddSmallButton(Lang.Get($"{Constants.ModId}:gui-alloycalculator-deposit-fuel"), OnDepositFuelButtonClicked, fuelButtonBounds, EnumButtonStyle.Normal, "depositFuelButton")
+                .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-deposit-fuel-tooltip"), CairoFont.WhiteDetailText(), 250, fuelButtonBounds.FlatCopy(), "depositFuelTooltip");
         }
 
         SingleComposer = composer.EndChildElements().Compose();
@@ -637,108 +640,49 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         DepositIngredientsIntoCrucible();
         return true;
     }
+
+    private bool OnDepositFuelButtonClicked()
+    {
+        BlockEntityFirepit? firepit = capi.World.BlockAccessor
+            .GetBlockEntity<BlockEntityFirepit>(BlockEntityPosition);
+        AlloyDepositResultCode result = firepit is null
+            ? AlloyDepositResultCode.InvalidRequest
+            : AlloyFuelDepositService.Execute(capi, firepit);
+        ShowDepositError(result, fuel: true);
+        return true;
+    }
     #endregion
 
     #region Deposit Logic
-    /// <summary>
-    /// Requests an atomic, server-authoritative deposit of the calculated ingredients.
-    /// </summary>
     private void DepositIngredientsIntoCrucible()
     {
-        if (pendingDepositRequestId is not null || selectedOption is null) return;
+        if (selectedOption is null) return;
         BlockEntityFirepit? firepit = capi.World.BlockAccessor
             .GetBlockEntity<BlockEntityFirepit>(BlockEntityPosition);
-        if (firepit?.Inventory is not InventorySmelting inventory || inventory.CookingSlots.Length == 0) return;
+        AlloyDepositResultCode result = firepit is null
+            ? AlloyDepositResultCode.InvalidRequest
+            : AlloyDepositService.Execute(capi, firepit, selectedIngredients, calculatedStacks);
+        ShowDepositError(result, fuel: false);
+    }
 
-        var ingredients = new List<(string Code, int Amount)>();
-        for (int index = 0; index < selectedIngredients.Length; index++)
+    private void ShowDepositError(AlloyDepositResultCode result, bool fuel)
+    {
+        if (result == AlloyDepositResultCode.Success) return;
+
+        string resultKey = result switch
         {
-            if (!calculatedStacks.TryGetValue(index, out ItemStack? targetStack)
-                || targetStack.StackSize <= 0)
-            {
-                return;
-            }
-
-            ingredients.Add((selectedIngredients[index].Code.ToString(), targetStack.StackSize));
-        }
-
-        ingredients.Sort(static (left, right) => right.Amount.CompareTo(left.Amount));
-        int[] allocations = AlloyCalculatorLogic.AllocateSlotsProportionally(
-            ingredients.Select(static ingredient => ingredient.Amount).ToArray(),
-            inventory.CookingSlots.Length);
-        var slotIndices = new List<int>();
-        var slotIngredientCodes = new List<string>();
-        var slotAmounts = new List<int>();
-        int slotIndex = 0;
-
-        for (int ingredientIndex = 0; ingredientIndex < ingredients.Count; ingredientIndex++)
-        {
-            (string code, int amount) = ingredients[ingredientIndex];
-            int allocatedSlots = allocations[ingredientIndex];
-            int itemsPerSlot = amount / allocatedSlots;
-            int remainder = amount % allocatedSlots;
-
-            for (int offset = 0; offset < allocatedSlots; offset++, slotIndex++)
-            {
-                int slotAmount = itemsPerSlot + (offset < remainder ? 1 : 0);
-                if (slotAmount <= 0) continue;
-
-                slotIndices.Add(slotIndex);
-                slotIngredientCodes.Add(code);
-                slotAmounts.Add(slotAmount);
-            }
-        }
-
-        string requestId = Guid.NewGuid().ToString("N");
-        var request = new Packet_RequestAlloyDeposit
-        {
-            RequestId = requestId,
-            Position = BlockEntityPosition.Copy(),
-            AlloyCode = selectedOption.OutputCode.ToString(),
-            SlotIndices = [.. slotIndices],
-            SlotIngredientCodes = [.. slotIngredientCodes],
-            SlotAmounts = [.. slotAmounts]
+            AlloyDepositResultCode.InventoryClosed => "inventory-closed",
+            AlloyDepositResultCode.InvalidRecipe => "invalid-recipe",
+            AlloyDepositResultCode.InsufficientItems => "insufficient-items",
+            AlloyDepositResultCode.InsufficientSpace => "insufficient-space",
+            AlloyDepositResultCode.TransferFailed => "transfer-failed",
+            _ => "invalid-request"
         };
-
-        depositSystem ??= capi.ModLoader.GetModSystem<AlloyDepositSystem>();
-        if (depositSystem?.RequestDeposit(request) != true) return;
-
-        pendingDepositRequestId = requestId;
-        SetDepositButtonEnabled(false);
-    }
-
-    private void OnDepositCompleted(Packet_AlloyDepositResult result)
-    {
-        if (result.RequestId != pendingDepositRequestId) return;
-
-        pendingDepositRequestId = null;
-        SetDepositButtonEnabled(true);
-
-        if (result.ResultCode != AlloyDepositResultCode.Success)
-        {
-            string resultKey = result.ResultCode switch
-            {
-                AlloyDepositResultCode.InventoryClosed => "inventory-closed",
-                AlloyDepositResultCode.InvalidRecipe => "invalid-recipe",
-                AlloyDepositResultCode.InsufficientItems => "insufficient-items",
-                AlloyDepositResultCode.InsufficientSpace => "insufficient-space",
-                AlloyDepositResultCode.TransferFailed => "transfer-failed",
-                _ => "invalid-request"
-            };
-            capi.TriggerIngameError(
-                this,
-                $"alloy-deposit-{resultKey}",
-                Lang.Get($"{Constants.ModId}:gui-alloycalculator-deposit-{resultKey}"));
-        }
-    }
-
-    private void SetDepositButtonEnabled(bool enabled)
-    {
-        GuiElementTextButton? button = SingleComposer?.GetButton("depositButton");
-        if (button is not null)
-        {
-            button.Enabled = enabled;
-        }
+        string keyPrefix = fuel ? "deposit-fuel" : "deposit";
+        capi.TriggerIngameError(
+            this,
+            $"alloy-{keyPrefix}-{resultKey}",
+            Lang.Get($"{Constants.ModId}:gui-alloycalculator-{keyPrefix}-{resultKey}"));
     }
     #endregion
 
@@ -746,9 +690,6 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     public override void OnGuiOpened()
     {
         base.OnGuiOpened();
-
-        depositSystem = capi.ModLoader.GetModSystem<AlloyDepositSystem>();
-        depositSystem.DepositCompleted += OnDepositCompleted;
 
         MetalDepositOption? detectedOption = DetectOptionFromCrucible(out ItemStack[] contents);
         if (detectedOption is not null)
@@ -829,12 +770,6 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
     public override void OnGuiClosed()
     {
-        if (depositSystem is not null)
-        {
-            depositSystem.DepositCompleted -= OnDepositCompleted;
-        }
-
-        pendingDepositRequestId = null;
         capi.Gui.PlaySound(CloseSound);
     }
 

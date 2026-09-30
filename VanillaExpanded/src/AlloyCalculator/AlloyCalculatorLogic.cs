@@ -246,6 +246,104 @@ internal static class AlloyCalculatorLogic
 
     #endregion
 
+    #region Fuel Calculation
+
+    internal static int CalculateFuelRequired(
+        int stackSize,
+        float meltingPoint,
+        float meltingDuration,
+        float furnaceTemperature,
+        float inputTemperature,
+        float cookingTime,
+        float activeFuelBurnTime,
+        int activeFuelTemperature,
+        float fuelBurnDuration,
+        int fuelTemperature)
+    {
+        if (stackSize <= 0
+            || meltingPoint <= 0
+            || meltingDuration < 0
+            || fuelBurnDuration <= 0
+            || fuelTemperature < meltingPoint)
+        {
+            return 0;
+        }
+
+        const float tickDuration = 0.1f;
+        const int maximumTicks = 10_000_000;
+        int fuelConsumed = 0;
+        float burnTime = Math.Max(0, activeFuelBurnTime);
+        int maximumTemperature = activeFuelTemperature;
+
+        for (int tick = 0; tick < maximumTicks; tick++)
+        {
+            if (burnTime > 0)
+            {
+                burnTime = Math.Max(0, burnTime - tickDuration);
+                furnaceTemperature = ChangeTemperature(
+                    furnaceTemperature,
+                    maximumTemperature,
+                    tickDuration);
+            }
+
+            if (inputTemperature < furnaceTemperature)
+            {
+                float heatingRate = (1 + Math.Clamp(
+                    (furnaceTemperature - inputTemperature) / 30,
+                    0,
+                    1.6f)) * tickDuration;
+                if (inputTemperature >= meltingPoint)
+                {
+                    heatingRate /= 11;
+                }
+
+                float heatedTemperature = ChangeTemperature(
+                    inputTemperature,
+                    furnaceTemperature,
+                    heatingRate);
+                inputTemperature = (heatedTemperature + (stackSize - 1) * inputTemperature) / stackSize;
+            }
+
+            if (inputTemperature >= meltingPoint)
+            {
+                int speed = Math.Clamp((int)(inputTemperature / meltingPoint), 1, 30);
+                cookingTime += speed * tickDuration;
+                if (cookingTime > meltingDuration)
+                {
+                    return fuelConsumed;
+                }
+            }
+            else if (cookingTime > 0)
+            {
+                cookingTime--;
+            }
+
+            if (burnTime <= 0)
+            {
+                burnTime = fuelBurnDuration;
+                maximumTemperature = fuelTemperature;
+                fuelConsumed++;
+            }
+        }
+
+        return 0;
+    }
+
+    private static float ChangeTemperature(float fromTemperature, float toTemperature, float deltaTime)
+    {
+        float difference = Math.Abs(fromTemperature - toTemperature);
+        deltaTime += deltaTime * (difference / 28);
+
+        if (difference < deltaTime || difference < 1)
+        {
+            return toTemperature;
+        }
+
+        return fromTemperature + (fromTemperature > toTemperature ? -deltaTime : deltaTime);
+    }
+
+    #endregion
+
     #region Percentage Normalization
 
     /// <summary>
