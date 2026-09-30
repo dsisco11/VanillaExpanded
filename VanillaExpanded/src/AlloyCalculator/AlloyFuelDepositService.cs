@@ -28,9 +28,18 @@ internal static class AlloyFuelDepositService
         BlockEntityFirepit firepit,
         out AlloyFuelDepositPlan? plan)
     {
+        return CreatePlan(api, firepit, api.World.Player.InventoryManager, out plan);
+    }
+
+    /// <summary>Creates and validates a minimal-fuel plan against the supplied inventory manager.</summary>
+    internal static AlloyDepositResultCode CreatePlan(
+        ICoreClientAPI api,
+        BlockEntityFirepit firepit,
+        IPlayerInventoryManager playerInventory,
+        out AlloyFuelDepositPlan? plan)
+    {
         plan = null;
         IWorldAccessor world = api.World;
-        IPlayerInventoryManager playerInventory = api.World.Player.InventoryManager;
         if (firepit.Inventory is not InventorySmelting inventory
             || !playerInventory.OpenedInventories.Contains(inventory))
         {

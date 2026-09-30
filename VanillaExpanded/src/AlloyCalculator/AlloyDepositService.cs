@@ -36,9 +36,27 @@ internal static class AlloyDepositService
         IReadOnlyDictionary<int, ItemStack> calculatedStacks,
         out AlloyDepositPlan? plan)
     {
+        return CreatePlan(
+            api,
+            firepit,
+            ingredients,
+            calculatedStacks,
+            api.World.Player.InventoryManager,
+            out plan);
+    }
+
+    /// <summary>Creates and validates an ingredient plan against the supplied inventory manager.</summary>
+    internal static AlloyDepositResultCode CreatePlan(
+        ICoreClientAPI api,
+        BlockEntityFirepit firepit,
+        IReadOnlyList<MetalDepositIngredient> ingredients,
+        IReadOnlyDictionary<int, ItemStack> calculatedStacks,
+        IPlayerInventoryManager inventoryManager,
+        out AlloyDepositPlan? plan)
+    {
         plan = null;
         if (firepit.Inventory is not InventorySmelting inventory
-            || !api.World.Player.InventoryManager.OpenedInventories.Contains(inventory))
+            || !inventoryManager.OpenedInventories.Contains(inventory))
         {
             return AlloyDepositResultCode.InventoryClosed;
         }
@@ -52,7 +70,6 @@ internal static class AlloyDepositService
             return AlloyDepositResultCode.InvalidRequest;
         }
 
-        IPlayerInventoryManager inventoryManager = api.World.Player.InventoryManager;
         IInventory? backpack = inventoryManager.GetOwnInventory(GlobalConstants.backpackInvClassName);
         IInventory? hotbar = inventoryManager.GetOwnInventory(GlobalConstants.hotBarInvClassName);
         if (backpack is null || hotbar is null)
