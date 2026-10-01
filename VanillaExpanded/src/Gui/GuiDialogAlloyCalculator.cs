@@ -332,18 +332,12 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             // Add deposit button
             yOffset += (int)SlotSize + 18;
             var buttonBounds = ElementBounds
-                .Fixed(-55, yOffset, 100, ButtonHeight)
-                .WithParent(contentBounds)
-                .WithAlignment(EnumDialogArea.CenterFixed);
-            var fuelButtonBounds = ElementBounds
-                .Fixed(55, yOffset, 100, ButtonHeight)
+                .Fixed(0, yOffset, 100, ButtonHeight)
                 .WithParent(contentBounds)
                 .WithAlignment(EnumDialogArea.CenterFixed);
             composer
                 .AddSmallButton(Lang.Get($"{Constants.ModId}:gui-alloycalculator-deposit"), OnDepositButtonClicked, buttonBounds, EnumButtonStyle.Normal, "depositButton")
-                .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-deposit-tooltip"), CairoFont.WhiteDetailText(), 250, buttonBounds.FlatCopy(), "depositTooltip")
-                .AddSmallButton(Lang.Get($"{Constants.ModId}:gui-alloycalculator-deposit-fuel"), OnDepositFuelButtonClicked, fuelButtonBounds, EnumButtonStyle.Normal, "depositFuelButton")
-                .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-deposit-fuel-tooltip"), CairoFont.WhiteDetailText(), 250, fuelButtonBounds.FlatCopy(), "depositFuelTooltip");
+                .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-deposit-tooltip"), CairoFont.WhiteDetailText(), 250, buttonBounds.FlatCopy(), "depositTooltip");
         }
 
         SingleComposer = composer.EndChildElements().Compose();
@@ -637,33 +631,24 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
     private bool OnDepositButtonClicked()
     {
-        DepositIngredientsIntoCrucible();
-        return true;
-    }
-
-    private bool OnDepositFuelButtonClicked()
-    {
         BlockEntityFirepit? firepit = capi.World.BlockAccessor
             .GetBlockEntity<BlockEntityFirepit>(BlockEntityPosition);
-        AlloyDepositResultCode result = firepit is null
+        AlloyDepositResultCode ingredientResult = firepit is null || selectedOption is null
             ? AlloyDepositResultCode.InvalidRequest
-            : AlloyFuelDepositService.Execute(capi, firepit);
-        ShowDepositError(result, fuel: true);
+            : AlloyDepositService.Execute(capi, firepit, selectedIngredients, calculatedStacks);
+        ShowDepositError(ingredientResult, fuel: false);
+        if (ingredientResult != AlloyDepositResultCode.Success || firepit is null)
+        {
+            return true;
+        }
+
+        AlloyDepositResultCode fuelResult = AlloyFuelDepositService.Execute(capi, firepit);
+        ShowDepositError(fuelResult, fuel: true);
         return true;
     }
     #endregion
 
     #region Deposit Logic
-    private void DepositIngredientsIntoCrucible()
-    {
-        if (selectedOption is null) return;
-        BlockEntityFirepit? firepit = capi.World.BlockAccessor
-            .GetBlockEntity<BlockEntityFirepit>(BlockEntityPosition);
-        AlloyDepositResultCode result = firepit is null
-            ? AlloyDepositResultCode.InvalidRequest
-            : AlloyDepositService.Execute(capi, firepit, selectedIngredients, calculatedStacks);
-        ShowDepositError(result, fuel: false);
-    }
 
     private void ShowDepositError(AlloyDepositResultCode result, bool fuel)
     {
