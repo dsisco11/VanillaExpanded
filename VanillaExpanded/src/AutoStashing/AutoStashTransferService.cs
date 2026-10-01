@@ -4,12 +4,15 @@ using System.Linq;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Server;
 
 namespace VanillaExpanded.AutoStashing;
 
+/// <summary>Executes engine-owned inventory moves with bounded destination selection and session ownership.</summary>
 internal static class AutoStashTransferService
 {
-    #region Transfer Entry Point
+    #region Public API
+    /// <summary>Transfers accepted player items and reports exhausted direct-merge failures to the owning player.</summary>
     internal static int AutoStashToInventory(
         IWorldAccessor world,
         IPlayerInventoryManager playerInventory,
@@ -38,16 +41,17 @@ internal static class AutoStashTransferService
         }
 
         int totalStashed = 0;
+        bool directMergeFailed = false;
         try
         {
             if (backpackInventory is not null)
             {
-                totalStashed += TransferSourceInventory(world, playerName, targetInventory, targetPos, targetName, backpackInventory, canAccept, getPreferredSlot);
+                totalStashed += TransferSourceInventory(world, playerName, targetInventory, targetPos, targetName, backpackInventory, canAccept, getPreferredSlot, ref directMergeFailed);
             }
 
             if (hotbarInventory is not null)
             {
-                totalStashed += TransferSourceInventory(world, playerName, targetInventory, targetPos, targetName, hotbarInventory, canAccept, getPreferredSlot);
+                totalStashed += TransferSourceInventory(world, playerName, targetInventory, targetPos, targetName, hotbarInventory, canAccept, getPreferredSlot, ref directMergeFailed);
             }
         }
         finally
@@ -55,6 +59,17 @@ internal static class AutoStashTransferService
             if (openedForStash)
             {
                 playerInventory.CloseInventoryAndSync(targetInventory);
+            }
+        }
+
+        if (directMergeFailed)
+        {
+            // Use inventory ownership rather than a display name to address the originating player.
+            if (world.AllOnlinePlayers?.FirstOrDefault(player => ReferenceEquals(player.InventoryManager, playerInventory)) is IServerPlayer player)
+            {
+                player.SendMessage(GlobalConstants.GeneralChatGroup,
+                    "AutoStash could not move remaining items after trying every compatible destination.",
+                    EnumChatType.CommandError);
             }
         }
 
@@ -66,34 +81,44 @@ internal static class AutoStashTransferService
 
         return totalStashed;
     }
+
+    /// <summary>Checks engine eligibility for automatic destination selection.</summary>
+    internal static bool CanAcceptForAutoStash(ItemSlot targetSlot, ItemSlot sourceSlot)
+        => targetSlot.CanTakeFrom(sourceSlot, EnumMergePriority.AutoMerge);
     #endregion
 
+    #region Private
     #region Slot Transfers
+    /// <summary>Visits source slots in inventory order and aggregates direct-merge failure feedback.</summary>
     private static int TransferSourceInventory(
         IWorldAccessor world, string playerName, IInventory targetInventory,
         BlockPos targetPos, string targetName, IInventory sourceInventory,
-        System.Func<ItemStack, bool> canAccept, System.Func<ItemStack, int?>? getPreferredSlot)
+        System.Func<ItemStack, bool> canAccept, System.Func<ItemStack, int?>? getPreferredSlot, ref bool directMergeFailed)
     {
         int totalStashed = 0;
         foreach (ItemSlot sourceSlot in sourceInventory)
         {
             if (!sourceSlot.Empty && canAccept(sourceSlot.Itemstack))
             {
-                totalStashed += TransferItemToInventory(world, playerName, targetInventory, targetPos, targetName, sourceSlot, getPreferredSlot);
+                totalStashed += TransferItemToInventory(world, playerName, targetInventory, targetPos, targetName, sourceSlot, getPreferredSlot, ref directMergeFailed);
             }
         }
 
         return totalStashed;
     }
 
+    /// <summary>Exhausts automatic selection, then tries every eligible direct destination until progress stops.</summary>
     private static int TransferItemToInventory(
         IWorldAccessor world, string playerName, IInventory targetInventory,
         BlockPos targetPos, string targetName, ItemSlot sourceSlot,
-        System.Func<ItemStack, int?>? getPreferredSlot)
+        System.Func<ItemStack, int?>? getPreferredSlot, ref bool directMergeFailed)
     {
         int totalMoved = 0;
         List<ItemSlot> skipSlots = [];
-        List<ItemSlot> directMergeSlots = [];
+        List<ItemSlot> deferredDirectSlots = [];
+        HashSet<ItemSlot> rejectedDirectSlots = [];
+        bool directPhase = false;
+        bool rejectedDirectMove = false;
         foreach (ItemSlot targetSlot in targetInventory)
         {
             if (!CanAcceptForAutoStash(targetSlot, sourceSlot))
@@ -106,7 +131,7 @@ internal static class AutoStashTransferService
         {
             ItemSlot? targetSlot = null;
             EnumMergePriority mergePriority = EnumMergePriority.AutoMerge;
-            if (getPreferredSlot?.Invoke(sourceSlot.Itemstack) is int preferredSlotIndex
+            if (!directPhase && getPreferredSlot?.Invoke(sourceSlot.Itemstack) is int preferredSlotIndex
                 && preferredSlotIndex >= 0 && preferredSlotIndex < targetInventory.Count)
             {
                 ItemSlot? candidateSlot = targetInventory[preferredSlotIndex];
@@ -116,21 +141,28 @@ internal static class AutoStashTransferService
                 }
             }
 
-            if (targetSlot is null)
+            if (targetSlot is null && !directPhase)
             {
                 ItemStackMoveOperation findOp = new(world, EnumMouseButton.Left, EnumModifierKey.SHIFT, EnumMergePriority.AutoMerge, sourceSlot.StackSize);
                 targetSlot = targetInventory.GetBestSuitedSlot(sourceSlot, findOp, skipSlots)?.slot;
             }
 
-            if (targetSlot is null && directMergeSlots.Count > 0)
+            if (targetSlot is null)
             {
-                targetSlot = directMergeSlots[0];
-                directMergeSlots.RemoveAt(0);
+                // Scan all live slots, including empty slots and slots excluded by automatic eligibility.
+                // A zero-move direct attempt excludes that slot until another move makes progress.
+                directPhase = true;
+                targetSlot = deferredDirectSlots.FirstOrDefault(slot => !rejectedDirectSlots.Contains(slot)
+                    && slot.CanTakeFrom(sourceSlot, EnumMergePriority.DirectMerge));
+                if (targetSlot is not null) deferredDirectSlots.Remove(targetSlot);
+                targetSlot ??= targetInventory.FirstOrDefault(slot => !rejectedDirectSlots.Contains(slot)
+                    && slot.CanTakeFrom(sourceSlot, EnumMergePriority.DirectMerge));
                 mergePriority = EnumMergePriority.DirectMerge;
             }
 
             if (targetSlot is null)
             {
+                directMergeFailed |= rejectedDirectMove;
                 break;
             }
 
@@ -145,16 +177,33 @@ internal static class AutoStashTransferService
             }
 
             skipSlots.Add(targetSlot);
+            if (mergePriority == EnumMergePriority.DirectMerge && movedQuantity > 0)
+            {
+                // A smaller remainder or changed merge state can make a previously rejected slot usable.
+                // Recheck those slots after progress; each reset consumes source items, keeping retries bounded.
+                rejectedDirectSlots.Clear();
+                rejectedDirectMove = false;
+            }
             if (requestedQuantity == movedQuantity)
             {
                 break;
             }
 
-            if (movedQuantity == 0 && !targetSlot.Empty
-                && moveOperation.RequiredPriority == EnumMergePriority.DirectMerge
+            if (mergePriority == EnumMergePriority.DirectMerge && movedQuantity == 0)
+            {
+                rejectedDirectSlots.Add(targetSlot);
+                rejectedDirectMove = true;
+            }
+            else if (mergePriority == EnumMergePriority.AutoMerge && movedQuantity == 0
+                && moveOperation.RequiredPriority == EnumMergePriority.DirectMerge)
+            {
+                deferredDirectSlots.Add(targetSlot);
+            }
+            else if (mergePriority == EnumMergePriority.DirectMerge && movedQuantity > 0
                 && targetSlot.CanTakeFrom(sourceSlot, EnumMergePriority.DirectMerge))
             {
-                directMergeSlots.Add(targetSlot);
+                // Progress reduces the finite source quantity, so finishing this destination cannot loop forever.
+                deferredDirectSlots.Insert(0, targetSlot);
             }
         }
 
@@ -163,6 +212,7 @@ internal static class AutoStashTransferService
     #endregion
 
     #region Capacity Checks
+    /// <summary>Checks current capacity while preserving preferred-slot preflight exclusivity.</summary>
     private static bool CanStashAnyItems(
         IInventory? sourceInventory, IInventory targetInventory,
         System.Func<ItemStack, bool> canAccept, System.Func<ItemStack, int?>? getPreferredSlot)
@@ -183,7 +233,8 @@ internal static class AutoStashTransferService
                 && preferredSlotIndex >= 0 && preferredSlotIndex < targetInventory.Count)
             {
                 if (targetInventory[preferredSlotIndex] is ItemSlot preferredSlot
-                    && CanAcceptForAutoStash(preferredSlot, sourceSlot))
+                    && (CanAcceptForAutoStash(preferredSlot, sourceSlot)
+                        || preferredSlot.CanTakeFrom(sourceSlot, EnumMergePriority.DirectMerge)))
                 {
                     return true;
                 }
@@ -191,7 +242,8 @@ internal static class AutoStashTransferService
                 continue;
             }
 
-            if (targetInventory.Any(targetSlot => CanAcceptForAutoStash(targetSlot, sourceSlot)))
+            if (targetInventory.Any(targetSlot => CanAcceptForAutoStash(targetSlot, sourceSlot)
+                || targetSlot.CanTakeFrom(sourceSlot, EnumMergePriority.DirectMerge)))
             {
                 return true;
             }
@@ -200,7 +252,6 @@ internal static class AutoStashTransferService
         return false;
     }
 
-    internal static bool CanAcceptForAutoStash(ItemSlot targetSlot, ItemSlot sourceSlot)
-        => targetSlot.CanTakeFrom(sourceSlot, EnumMergePriority.AutoMerge);
+    #endregion
     #endregion
 }

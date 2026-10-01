@@ -1,6 +1,6 @@
 # AutoStash Functional Test Coverage
 
-Status: Phase 1 complete after verification, second review, and independent completion audit; Phases 2–9 remain planned.
+Status: Phases 1–2 complete after verification, second review, and independent completion audits. Phase 2 includes the explicitly authorized direct-merge retry fix. Phases 3–9 remain planned. See [coverage evidence](FunctionalTestCoverageEvidence.md).
 Source: User-requested coverage audit and its eight numbered findings, 2026-10-01.
 Related proposal: [PlanningAndExecutionProposal.md](PlanningAndExecutionProposal.md).
 Purpose: Establish a functional regression contract before changing inventory planning or transfer architecture.
@@ -30,7 +30,7 @@ Unsettled contracts must be resolved without silently treating existing behavior
 - Attached-bag client eligibility detects matching types without proving capacity. Do not require parity with execution where that distinction is intentional.
 - Failure after mutation may leave partial progress. Establish current persistence/notification behavior and the intended contract before asserting stronger guarantees from the architecture proposal.
 - Preferred-slot preflight and execution have inconsistent fallback semantics; no current production caller uses the optional argument. Record the decision on characterization or future removal rather than making either interpretation a new gameplay requirement.
-- Direct-merge retry termination is unverified. Use bounded observation so a problematic case fails deterministically instead of hanging the suite. A guard exception is evidence of excessive retries, not proof of normal termination.
+- Direct-merge retry nontermination was reproduced and resolved by the explicitly authorized fix documented under Phase 2. Retain bounded observation so regression fails deterministically instead of hanging the suite. A guard exception is evidence of excessive retries, not proof of normal termination.
 
 If a new test exposes a discrepancy, retain a minimal reproduction and record expected versus observed behavior. Do not fix production code, change expectations merely to pass, silently skip the scenario, or mark its acceptance complete. Continue independent coverage work; resolve the discrepancy explicitly before declaring the refactor gate satisfied.
 
@@ -57,19 +57,21 @@ Outcome: Shared execution is protected under constrained capacity, rejected move
 Dependencies: Phase 1. Audit finding 3 and shared aspects of finding 5.
 Sources: `AutoStashTransferService.cs`, `AutoStashTransferTests.cs`.
 
-☐ F2.1 Test total target capacity below source quantity, asserting the returned moved count, exact remainder, and conservation; include zero, exact-fit, and partial capacity.
-☐ F2.2 Test several matching source slots competing for limited capacity, with results that distinguish source-slot order and backpack-before-hotbar order.
-☐ F2.3 Test a selected destination returning zero followed by another viable destination; assert continuation and exact final contents.
-☐ F2.4 Test all selected destinations rejecting movement; assert finite attempts, zero result, unchanged inventories, and correct session cleanup.
-☐ F2.5 Test automatic destinations being exhausted before deferred direct merge, and successful direct-merge retry with exact quantities and observed priorities.
-☐ F2.6 Test rejected direct-merge retries, including a repeated request for direct priority; bound observation and verify actual termination or retain a minimal failing reproduction for explicit resolution.
-☐ F2.7 Test source take lock, destination put lock, incompatible storage restrictions, and inventory-level rejection independently; ensure each setup reaches the restriction it intends to exercise.
-☐ F2.8 Test same-type stacks with incompatible relevant attributes, both with an empty alternative destination and without one; assert attributes are not overwritten or incorrectly merged.
-☐ F2.9 Test custom inventory suitability whose winning destination is not first in enumeration order; verify engine ranking is honored.
-☐ F2.10 Test missing backpack, missing hotbar, and both missing inventories through the shared service.
-☐ F2.11 Repeat execution after source exhaustion and after capacity exhaustion; assert no duplication, loss, extra movement, or unnecessary session acquisition.
-☐ F2.12 Record the preferred-slot contract decision from the decisions section. If retained for characterization, cover valid/invalid indices and blocked preferred slot versus viable alternatives, explicitly labeling the current preflight/execution distinction.
-☐ Completion: Focused tests and bounded retry checks pass, all deficits are recorded, and second review plus independent audit confirm changes to ordering, selection, quantities, or progress would be detected.
+Authorized exception (2026-10-01): the user permits the narrow direct-merge retry fix. F2.6 must also verify that every eligible empty or same-item destination is exhausted before abandonment and that failure sends an error to the owning player's in-game chat. Reconsider rejected destinations after positive progress changes the remaining stack; retries without progress must remain bounded. Other production refactoring remains outside scope.
+
+✔ F2.1 Test total target capacity below source quantity, asserting the returned moved count, exact remainder, and conservation; include zero, exact-fit, and partial capacity.
+✔ F2.2 Test several matching source slots competing for limited capacity, with results that distinguish source-slot order and backpack-before-hotbar order.
+✔ F2.3 Test a selected destination returning zero followed by another viable destination; assert continuation and exact final contents.
+✔ F2.4 Test all selected destinations rejecting movement; assert finite attempts, zero result, unchanged inventories, and correct session cleanup.
+✔ F2.5 Test automatic destinations being exhausted before deferred direct merge, and successful direct-merge retry with exact quantities and observed priorities.
+✔ F2.6 Test rejected direct-merge retries, including a repeated request for direct priority; bound observation and verify actual termination or retain a minimal failing reproduction for explicit resolution.
+✔ F2.7 Test source take lock, destination put lock, incompatible storage restrictions, and inventory-level rejection independently; ensure each setup reaches the restriction it intends to exercise.
+✔ F2.8 Test same-type stacks with incompatible relevant attributes, both with an empty alternative destination and without one; assert attributes are not overwritten or incorrectly merged.
+✔ F2.9 Test custom inventory suitability whose winning destination is not first in enumeration order; verify engine ranking is honored.
+✔ F2.10 Test missing backpack, missing hotbar, and both missing inventories through the shared service.
+✔ F2.11 Repeat execution after source exhaustion and after capacity exhaustion; assert no duplication, loss, extra movement, or unnecessary session acquisition.
+✔ F2.12 Record the preferred-slot contract decision from the decisions section. If retained for characterization, cover valid/invalid indices and blocked preferred slot versus viable alternatives, explicitly labeling the current preflight/execution distinction.
+✔ Completion: Focused tests and bounded retry checks pass, all deficits are recorded, and second review plus independent audit confirm changes to ordering, selection, quantities, or progress would be detected.
 
 ## Phase 3: Protect bloomery execution
 
