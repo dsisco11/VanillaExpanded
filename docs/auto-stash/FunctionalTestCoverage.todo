@@ -1,6 +1,6 @@
 # AutoStash Functional Test Coverage
 
-Status: Phases 1–6 complete after verification, second review, and independent completion audits. Phase 2 includes the explicitly authorized direct-merge retry fix; Phase 5 also includes the subsequently authorized failure-finalization fixes. Phase 6 includes the explicitly authorized progress dependency service seam. Phases 7–9 remain planned. See [coverage evidence](FunctionalTestCoverageEvidence.md).
+Status: Phases 1–7 complete after verification, second review, and independent completion audits. Phase 2 includes the explicitly authorized direct-merge retry fix; Phase 5 also includes the subsequently authorized failure-finalization fixes. Phase 6 includes the explicitly authorized progress dependency service seam. Phases 8–9 remain planned. See [coverage evidence](FunctionalTestCoverageEvidence.md).
 Source: User-requested coverage audit and its eight numbered findings, 2026-10-01.
 Related proposal: [PlanningAndExecutionProposal.md](PlanningAndExecutionProposal.md).
 Purpose: Establish a functional regression contract before changing inventory planning or transfer architecture.
@@ -149,14 +149,14 @@ Authorized test seam (2026-10-01): the user approved an injectable IProgressSyst
 Outcome: Network requests reach the intended operation only when current server conditions allow it.
 Dependencies: Phases 3–4 and request/fixture infrastructure from Phase 1. Audit finding 7.
 
-☐ F7.1 Deliver an allowed block request through the registered handler and assert actual expected movement.
-☐ F7.2 Deliver a denied-access request with otherwise transferable contents and assert no movement, session acquisition, or dirty/persistence effects.
-☐ F7.3 Test missing AutoStash behavior and missing target, retaining safe no-op expectations and the existing missing-position test.
-☐ F7.4 Exercise crate, generic-container, and bloomery dispatch with outcomes that establish the correct target-specific path.
-☐ F7.5 Deliver entity requests for missing entity, missing attachable behavior, and invalid attachment indices; assert no transfer.
-☐ F7.6 Test the six-block distance boundary and a position just outside it with otherwise valid attached contents; assert accepted versus rejected movement.
-☐ F7.7 Change target contents/capacity after client eligibility but before server dispatch, then assert the server uses current contents and does not rely on the previous client assessment.
-☐ Completion: Registered handlers are exercised, rejection prerequisites are isolated, focused tests pass, and second review plus independent audit confirm registration-only tests are not counted as dispatch coverage.
+✔ F7.1 Deliver an allowed block request through the registered handler and assert actual expected movement.
+✔ F7.2 Deliver a denied-access request with otherwise transferable contents and assert no movement, session acquisition, or dirty/persistence effects.
+✔ F7.3 Test missing AutoStash behavior and missing target, retaining safe no-op expectations and the existing missing-position test.
+✔ F7.4 Exercise crate, generic-container, and bloomery dispatch with outcomes that establish the correct target-specific path.
+✔ F7.5 Deliver entity requests for missing entity, missing attachable behavior, and invalid attachment indices; assert no transfer.
+✔ F7.6 Test the six-block distance boundary and a position just outside it with otherwise valid attached contents; assert accepted versus rejected movement.
+✔ F7.7 Change target contents/capacity after client eligibility but before server dispatch, then assert the server uses current contents and does not rely on the previous client assessment.
+✔ Completion: Registered handlers are exercised, rejection prerequisites are isolated, focused tests pass, and second review plus independent audit confirm registration-only tests are not counted as dispatch coverage.
 
 ## Phase 8: Protect help text, behavior installation, and Harmony dispatch
 
