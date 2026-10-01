@@ -4,13 +4,13 @@ using Vintagestory.API.Common;
 
 namespace VanillaExpanded.Tests.Unit.AutoStashing;
 
-/// <summary>Characterizes interrupted bag movement separately from normal finalization guarantees.</summary>
+/// <summary>Protects interrupted bag movement through persistence and session cleanup.</summary>
 [Trait("Category", "Unit")]
 [Collection("AutoStash")]
 public sealed class AttachedContainerFailureTests
 {
     #region Public API
-    /// <summary>Checks real live movement and the different saved-state boundaries after transfer or callback interruption.</summary>
+    /// <summary>Checks live movement survives bag and owner reload after transfer or callback interruption.</summary>
     [Theory]
     [InlineData(true, false, false)]
     [InlineData(true, true, false)]
@@ -18,7 +18,7 @@ public sealed class AttachedContainerFailureTests
     [InlineData(true, false, true)]
     [InlineData(true, true, true)]
     [InlineData(false, false, true)]
-    public void InterruptedMovement_CurrentWorkspaceAndTemporaryPersistence(bool vanilla, bool alreadyOpen, bool callbackFailure)
+    public void InterruptedMovement_PersistsLiveContentsBeforeOwnedSessionCleanup(bool vanilla, bool alreadyOpen, bool callbackFailure)
     {
         var test = new AttachedContainerCase(vanilla);
         test.SeedContents(test.Stack(test.Item, 10), test.Stack(test.Unrelated, 4));
@@ -66,11 +66,11 @@ public sealed class AttachedContainerFailureTests
         beforeLive.AssertUnchangedExcept(first, live[0]);
         beforeLive.AssertConserved();
         Assert.Equal(new[] { 0 }, modified);
-        test.AssertPersisted(vanilla ? 12 : 10, 4);
+        test.AssertPersisted(12, 4);
         test.BagMock.Verify(bag => bag.Store(It.IsAny<ItemStack>(), It.IsAny<ItemSlotBagContent>()),
-            Times.Exactly(vanilla ? 1 : 0));
-        test.AttachmentMock.Verify(attachment => attachment.storeInv(), Times.Exactly(vanilla ? 1 : 0));
-        test.AttachmentsMock.Verify(inventory => inventory.MarkSlotDirty(It.IsAny<int>()), Times.Never());
+            Times.Exactly(vanilla ? 3 : 2));
+        test.AttachmentMock.Verify(attachment => attachment.storeInv(), Times.Exactly(vanilla ? 2 : 1));
+        test.AttachmentsMock.Verify(inventory => inventory.MarkSlotDirty(It.IsAny<int>()), Times.Once());
         int owned = vanilla && !alreadyOpen ? 1 : 0;
         test.Fixture.InventoryManagerMock.Verify(manager => manager.OpenInventory(It.IsAny<IInventory>()), Times.Exactly(owned));
         test.Fixture.InventoryManagerMock.Verify(manager => manager.CloseInventoryAndSync(It.IsAny<IInventory>()), Times.Exactly(owned));
@@ -81,10 +81,10 @@ public sealed class AttachedContainerFailureTests
         test.Fixture.InventoryManagerMock.Verify(manager => manager.TryTransferTo(It.IsAny<ItemSlot>(), It.IsAny<ItemSlot>(),
             ref It.Ref<ItemStackMoveOperation>.IsAny), Times.Never());
 
-        // Current behavior: custom temporary contents are absent from saved storage after failure.
-        // Vanilla slot callbacks have already saved the move, even though final attachment dirty marking is bypassed.
+        // Both paths now persist live contents despite interruption.
+        // Reload the real owner serialization to ensure the temporary path cannot lose applied progress.
         test.ReloadOwnerBag();
-        test.AssertPersisted(vanilla ? 12 : 10, 4);
+        test.AssertPersisted(12, 4);
         Assert.Equal(callbackFailure ? 0 : 1, second.Attempts.Count);
     }
     #endregion

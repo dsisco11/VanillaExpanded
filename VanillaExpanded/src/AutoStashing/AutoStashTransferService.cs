@@ -12,7 +12,7 @@ namespace VanillaExpanded.AutoStashing;
 internal static class AutoStashTransferService
 {
     #region Public API
-    /// <summary>Transfers accepted player items and reports exhausted direct-merge failures to the owning player.</summary>
+    /// <summary>Transfers accepted items, finalizes applied or uncertain changes before session cleanup, and reports exhausted direct merges.</summary>
     internal static int AutoStashToInventory(
         IWorldAccessor world,
         IPlayerInventoryManager playerInventory,
@@ -22,7 +22,8 @@ internal static class AutoStashTransferService
         string targetName,
         System.Func<ItemStack, bool> canAccept,
         System.Func<ItemStack, int?>? getPreferredSlot = null,
-        bool manageInventorySession = true)
+        bool manageInventorySession = true,
+        System.Action? finalizeChanges = null)
     {
         IInventory? backpackInventory = playerInventory.GetOwnInventory(GlobalConstants.backpackInvClassName);
         IInventory? hotbarInventory = playerInventory.GetOwnInventory(GlobalConstants.hotBarInvClassName);
@@ -42,24 +43,30 @@ internal static class AutoStashTransferService
 
         int totalStashed = 0;
         bool directMergeFailed = false;
+        var mutation = new AutoStashMutationState();
+        System.Exception? failure = null;
         try
         {
             if (backpackInventory is not null)
             {
-                totalStashed += TransferSourceInventory(world, playerName, targetInventory, targetPos, targetName, backpackInventory, canAccept, getPreferredSlot, ref directMergeFailed);
+                totalStashed += TransferSourceInventory(world, playerName, targetInventory, targetPos, targetName, backpackInventory, canAccept, getPreferredSlot, ref directMergeFailed, mutation);
             }
 
             if (hotbarInventory is not null)
             {
-                totalStashed += TransferSourceInventory(world, playerName, targetInventory, targetPos, targetName, hotbarInventory, canAccept, getPreferredSlot, ref directMergeFailed);
+                totalStashed += TransferSourceInventory(world, playerName, targetInventory, targetPos, targetName, hotbarInventory, canAccept, getPreferredSlot, ref directMergeFailed, mutation);
             }
+        }
+        catch (System.Exception exception)
+        {
+            failure = exception;
+            throw;
         }
         finally
         {
-            if (openedForStash)
-            {
-                playerInventory.CloseInventoryAndSync(targetInventory);
-            }
+            mutation.Finish(finalizeChanges,
+                openedForStash ? () => playerInventory.CloseInventoryAndSync(targetInventory) : null,
+                failure, world.Logger);
         }
 
         if (directMergeFailed)
@@ -93,14 +100,14 @@ internal static class AutoStashTransferService
     private static int TransferSourceInventory(
         IWorldAccessor world, string playerName, IInventory targetInventory,
         BlockPos targetPos, string targetName, IInventory sourceInventory,
-        System.Func<ItemStack, bool> canAccept, System.Func<ItemStack, int?>? getPreferredSlot, ref bool directMergeFailed)
+        System.Func<ItemStack, bool> canAccept, System.Func<ItemStack, int?>? getPreferredSlot, ref bool directMergeFailed, AutoStashMutationState mutation)
     {
         int totalStashed = 0;
         foreach (ItemSlot sourceSlot in sourceInventory)
         {
             if (!sourceSlot.Empty && canAccept(sourceSlot.Itemstack))
             {
-                totalStashed += TransferItemToInventory(world, playerName, targetInventory, targetPos, targetName, sourceSlot, getPreferredSlot, ref directMergeFailed);
+                totalStashed += TransferItemToInventory(world, playerName, targetInventory, targetPos, targetName, sourceSlot, getPreferredSlot, ref directMergeFailed, mutation);
             }
         }
 
@@ -111,7 +118,7 @@ internal static class AutoStashTransferService
     private static int TransferItemToInventory(
         IWorldAccessor world, string playerName, IInventory targetInventory,
         BlockPos targetPos, string targetName, ItemSlot sourceSlot,
-        System.Func<ItemStack, int?>? getPreferredSlot, ref bool directMergeFailed)
+        System.Func<ItemStack, int?>? getPreferredSlot, ref bool directMergeFailed, AutoStashMutationState mutation)
     {
         int totalMoved = 0;
         List<ItemSlot> skipSlots = [];
@@ -168,7 +175,10 @@ internal static class AutoStashTransferService
 
             int requestedQuantity = sourceSlot.StackSize;
             ItemStackMoveOperation moveOperation = new(world, EnumMouseButton.Left, EnumModifierKey.SHIFT, mergePriority, requestedQuantity);
+            // Engine callbacks may throw after mutation, before a moved count can be returned.
+            mutation.BeginAttempt();
             int movedQuantity = sourceSlot.TryPutInto(targetSlot, ref moveOperation);
+            mutation.CompleteAttempt(movedQuantity);
             totalMoved += movedQuantity;
             if (movedQuantity > 0)
             {

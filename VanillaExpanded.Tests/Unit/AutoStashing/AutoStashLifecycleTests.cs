@@ -4,7 +4,7 @@ using Vintagestory.API.Common;
 
 namespace VanillaExpanded.Tests.Unit.AutoStashing;
 
-/// <summary>Characterizes owned-session cleanup, live opening state and interruption after real mutation.</summary>
+/// <summary>Protects owned-session cleanup, live opening state and synchronization after interrupted mutation.</summary>
 [Trait("Category", "Unit")]
 [Collection("AutoStash")]
 public sealed class AutoStashLifecycleTests
@@ -21,7 +21,7 @@ public sealed class AutoStashLifecycleTests
     [InlineData(false, true, true)]
     [InlineData(true, false, true)]
     [InlineData(true, true, true)]
-    public void TransferFailure_CurrentPartialStateAndSessionOwnership(bool crate, bool alreadyOpen, bool earlierMove)
+    public void TransferFailure_FinalizesPartialStateAndPreservesSessionOwnership(bool crate, bool alreadyOpen, bool earlierMove)
     {
         var test = new ContainerLifecycleCase(crate);
         var transfer = test.Transfer;
@@ -53,8 +53,8 @@ public sealed class AutoStashLifecycleTests
         }
         before.AssertConserved();
         transfer.AssertSessions(alreadyOpen ? 0 : 1);
-        // Current behavior: final block synchronization is bypassed when the service throws.
-        test.AssertDirty(0);
+        // A throwing engine call may already have mutated; conservatively synchronize even if it never returns.
+        test.AssertDirty(1);
         Assert.Single(failing.Attempts);
     }
 
@@ -64,7 +64,7 @@ public sealed class AutoStashLifecycleTests
     [InlineData(false, true)]
     [InlineData(true, false)]
     [InlineData(true, true)]
-    public void MutationCallbackFailure_CurrentStateIsNotRolledBack(bool crate, bool alreadyOpen)
+    public void MutationCallbackFailure_SynchronizesAppliedStateWithoutRollback(bool crate, bool alreadyOpen)
     {
         var test = new ContainerLifecycleCase(crate);
         var transfer = test.Transfer;
@@ -92,7 +92,7 @@ public sealed class AutoStashLifecycleTests
         before.AssertConserved();
         Assert.Equal(new[] { 0 }, transfer.ModifiedSlots);
         transfer.AssertSessions(alreadyOpen ? 0 : 1);
-        test.AssertDirty(0);
+        test.AssertDirty(1);
     }
     #endregion
     #region Live state and normal completion

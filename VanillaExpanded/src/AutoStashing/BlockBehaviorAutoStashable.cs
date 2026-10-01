@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -509,6 +509,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         in BlockEntityContainer container,
         string playerName = "")
     {
+        BlockEntityContainer target = container;
         HashSet<AssetLocation> itemTypesInContainer = [.. container.GetNonEmptyContentStacks().Select(static stack => stack.Collectible.Code)];
         bool itemsStashed = itemTypesInContainer.Count != 0 && AutoStashTransferService.AutoStashToInventory(
             world,
@@ -517,13 +518,8 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             container.Inventory,
             container.Pos,
             container.InventoryClassName,
-            stack => itemTypesInContainer.Contains(stack.Collectible.Code)) > 0;
-
-        if (itemsStashed)
-        {
-            // Mark dirty server-side so the player sees the updated contents.
-            container.MarkDirty();
-        }
+            stack => itemTypesInContainer.Contains(stack.Collectible.Code),
+            finalizeChanges: () => target.MarkDirty()) > 0;
 
         return itemsStashed;
     }
@@ -542,6 +538,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         in BlockEntityCrate container,
         string playerName = "")
     {
+        BlockEntityCrate target = container;
         AssetLocation? containerAcceptedItem = container.Inventory.FirstNonEmptySlot?.Itemstack?.Collectible?.Code;
         bool itemsStashed = containerAcceptedItem is not null && AutoStashTransferService.AutoStashToInventory(
             world,
@@ -550,13 +547,8 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             container.Inventory,
             container.Pos,
             container.InventoryClassName,
-            stack => stack.Collectible.Code.Equals(containerAcceptedItem)) > 0;
-
-        if (itemsStashed)
-        {
-            // Mark dirty server-side so the player sees the updated contents.
-            container.MarkDirty();
-        }
+            stack => stack.Collectible.Code.Equals(containerAcceptedItem),
+            finalizeChanges: () => target.MarkDirty()) > 0;
 
         return itemsStashed;
     }
@@ -586,22 +578,31 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         IInventory? hotbarInventory = playerInventory.GetOwnInventory(GlobalConstants.hotBarInvClassName);
 
         int totalStashed = 0;
-
-        if (backpackInventory is not null)
+        var mutation = new AutoStashMutationState();
+        Exception? failure = null;
+        try
         {
-            totalStashed += AutoStashInventoryIntoBloomery(world, playerName, bloomery, bloomeryInv, backpackInventory);
+            if (backpackInventory is not null)
+            {
+                totalStashed += AutoStashInventoryIntoBloomery(world, playerName, bloomery, bloomeryInv, backpackInventory, mutation);
+            }
+            if (hotbarInventory is not null)
+            {
+                totalStashed += AutoStashInventoryIntoBloomery(world, playerName, bloomery, bloomeryInv, hotbarInventory, mutation);
+            }
         }
-
-        if (hotbarInventory is not null)
+        catch (Exception exception)
         {
-            totalStashed += AutoStashInventoryIntoBloomery(world, playerName, bloomery, bloomeryInv, hotbarInventory);
+            failure = exception;
+            throw;
+        }
+        finally
+        {
+            mutation.Finish(() => bloomery.MarkDirty(true), null, failure, world.Logger);
         }
 
         if (totalStashed > 0)
         {
-            // Mark the block entity dirty to update visuals and sync to clients
-            bloomery.MarkDirty(true);
-
             world.Api?.World.Logger.Audit("'{0}' auto-stashed {1} items into bloomery at <{2}>.",
                 playerName,
                 totalStashed,
@@ -620,14 +621,15 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         string playerName,
         BlockEntityBloomery bloomery,
         InventoryGeneric bloomeryInv,
-        IInventory sourceInventory)
+        IInventory sourceInventory,
+        AutoStashMutationState mutation)
     {
         int totalStashed = 0;
 
         // Process ore first (slot 1), then fuel (slot 0)
         // This ensures fuel capacity calculation is based on actual ore amount
-        totalStashed += StashItemsToBloomerySlot(world, playerName, bloomery, bloomeryInv, sourceInventory, targetSlotIndex: 1); // Ore
-        totalStashed += StashItemsToBloomerySlot(world, playerName, bloomery, bloomeryInv, sourceInventory, targetSlotIndex: 0); // Fuel
+        totalStashed += StashItemsToBloomerySlot(world, playerName, bloomery, bloomeryInv, sourceInventory, mutation, targetSlotIndex: 1); // Ore
+        totalStashed += StashItemsToBloomerySlot(world, playerName, bloomery, bloomeryInv, sourceInventory, mutation, targetSlotIndex: 0); // Fuel
 
         return totalStashed;
     }
@@ -641,6 +643,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         BlockEntityBloomery bloomery,
         InventoryGeneric bloomeryInv,
         IInventory sourceInventory,
+        AutoStashMutationState mutation,
         int targetSlotIndex)
     {
         int totalStashed = 0;
@@ -673,7 +676,9 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             }
 
             int quantityToMove = Math.Min(sourceSlot.StackSize, maxCanAdd);
+            mutation.BeginAttempt();
             int moved = sourceSlot.TryPutInto(world, targetSlot, quantityToMove);
+            mutation.CompleteAttempt(moved);
 
             if (moved > 0)
             {

@@ -1,6 +1,6 @@
 # AutoStash Functional Test Coverage
 
-Status: Phases 1–5 complete after verification, second review, and independent completion audits. Phase 2 includes the explicitly authorized direct-merge retry fix. Phases 6–9 remain planned. See [coverage evidence](FunctionalTestCoverageEvidence.md).
+Status: Phases 1–5 complete after verification, second review, and independent completion audits. Phase 2 includes the explicitly authorized direct-merge retry fix; Phase 5 also includes the subsequently authorized failure-finalization fixes. Phases 6–9 remain planned. See [coverage evidence](FunctionalTestCoverageEvidence.md).
 Source: User-requested coverage audit and its eight numbered findings, 2026-10-01.
 Related proposal: [PlanningAndExecutionProposal.md](PlanningAndExecutionProposal.md).
 Purpose: Establish a functional regression contract before changing inventory planning or transfer architecture.
@@ -113,7 +113,7 @@ Sources: `EntityAttachedContainerAutoStash.cs`, existing workspace refresh test.
 Outcome: Session ownership and observable partial progress are covered across interruption paths.
 Dependencies: Phases 2–4. Audit finding 4.
 
-Decision (2026-10-01): after executed interruption tests, the user explicitly chose to characterize current behavior and defer fixes. Retain partial live mutation, missing final generic/crate/bloomery dirty notifications, vanilla workspace callback persistence, and the distinct held-bag temporary-inventory persistence gap as labeled observations. This does not endorse these gaps as desired behavior or authorize stronger proposal finalization; their production fixes remain separate work.
+Decision (2026-10-01): interruption behavior was first characterized with fixes deferred. The user subsequently approved failure-safe finalization. Regression tests now require generic/crate/bloomery synchronization and attached-bag persistence after applied or uncertain mutation, before owned-session cleanup. Normal zero-move operations remain unchanged. Original exceptions survive secondary persistence/cleanup failures, which are reported; caller-owned sessions remain open. This narrow authorization does not include the broader planning/execution redesign.
 
 ✔ F5.1 Inject failure after acquiring an owned inventory session and assert it closes; repeat with an already-open inventory and assert that session stays open.
 ✔ F5.2 Inject failure after an earlier successful move, capturing exact source/target contents, notifications, persistence, and cleanup. Establish current behavior and resolve intended persistence expectations before declaring the scenario satisfied.

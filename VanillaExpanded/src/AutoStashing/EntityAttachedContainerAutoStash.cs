@@ -9,6 +9,7 @@ using Vintagestory.GameContent;
 
 namespace VanillaExpanded.AutoStashing;
 
+/// <summary>Handles attached-container interaction, matching assessment and persistent engine transfers.</summary>
 internal static class EntityAttachedContainerAutoStash
 {
     public static bool HandleInteract(
@@ -98,6 +99,7 @@ internal static class EntityAttachedContainerAutoStash
                 slot.Itemstack?.Collectible is not null && contentTypes.Contains(slot.Itemstack.Collectible.Id));
     }
 
+    /// <summary>Transfers matching contents and persists applied or uncertain changes before releasing an owned workspace session.</summary>
     public static bool TryAutoStash(
         IWorldAccessor world,
         IPlayer player,
@@ -160,18 +162,17 @@ internal static class EntityAttachedContainerAutoStash
             hostEntity.Pos.AsBlockPos,
             $"attached container on {hostEntity.Code}",
             stack => contentTypes.Contains(stack.Collectible.Code),
-            manageInventorySession: usesWorkspace) > 0;
-
-        if (movedItems)
-        {
-            foreach (ItemSlotBagContent contentSlot in contentSlots)
+            manageInventorySession: usesWorkspace,
+            finalizeChanges: () =>
             {
-                heldBag.Store(attachmentStack, contentSlot);
-            }
-
-            attachable.Inventory.MarkSlotDirty(attachmentSlotIndex);
-            attachable.storeInv();
-        }
+                // Save live slots before closing the session, including an interrupted engine move.
+                foreach (ItemSlotBagContent contentSlot in contentSlots)
+                {
+                    heldBag.Store(attachmentStack, contentSlot);
+                }
+                attachable.Inventory.MarkSlotDirty(attachmentSlotIndex);
+                attachable.storeInv();
+            }) > 0;
 
         return movedItems;
     }
