@@ -1,6 +1,6 @@
 # AutoStash Functional Test Coverage
 
-Status: Phases 1–5 complete after verification, second review, and independent completion audits. Phase 2 includes the explicitly authorized direct-merge retry fix; Phase 5 also includes the subsequently authorized failure-finalization fixes. Phases 6–9 remain planned. See [coverage evidence](FunctionalTestCoverageEvidence.md).
+Status: Phases 1–6 complete after verification, second review, and independent completion audits. Phase 2 includes the explicitly authorized direct-merge retry fix; Phase 5 also includes the subsequently authorized failure-finalization fixes. Phase 6 includes the explicitly authorized progress dependency service seam. Phases 7–9 remain planned. See [coverage evidence](FunctionalTestCoverageEvidence.md).
 Source: User-requested coverage audit and its eight numbered findings, 2026-10-01.
 Related proposal: [PlanningAndExecutionProposal.md](PlanningAndExecutionProposal.md).
 Purpose: Establish a functional regression contract before changing inventory planning or transfer architecture.
@@ -129,18 +129,20 @@ Decision (2026-10-01): interruption behavior was first characterized with fixes 
 Outcome: Real interaction entry points produce exactly one request per completed gesture and cancel correctly.
 Dependencies: Phase 1 and usable target fixtures from Phases 3–4. Audit finding 6.
 
-☐ F6.1 Test block interaction start for generic containers, bloomeries, and crates with stashable contents; assert returned value, handling, and state.
-☐ F6.2 Cover all crate Ctrl/Shift combinations and the active-stashable-item exception preserving vanilla interaction.
-☐ F6.3 Test disabled feature, server-side invocation, and no stashable items without starting a gesture or sending packets.
-☐ F6.4 Drive start and subsequent steps just before and exactly at configured stash delay; assert zero versus one request and the correct target. Include a non-default configured delay.
-☐ F6.5 Continue stepping after submission and assert no duplicate request; cover exact end-of-grace and just beyond it.
-☐ F6.6 Cancel/stop before submission and restart, proving state reset and no stale request. Assert progress removal and appropriate handling.
-☐ F6.7 Observe progress creation/update/removal and sound/animation invocation through completion and subsequent steps; isolate presentation callbacks without requiring rendering.
-☐ F6.8 Drive the attached-container controller through registered tick callbacks, testing delay boundaries and exactly-once submission with the selected entity/slot.
-☐ F6.9 Test attached gesture cancellation for right-button, Ctrl, or Shift release; entity/attachment selection changes; and feature disabling. Assert no delayed stale submission and progress cleanup.
-☐ F6.10 Test repeated `Begin` on the same target, `Begin` on a different target, restart after cancellation, and disposal unregistering its listener/removing progress.
-☐ F6.11 Test attached interaction entry gating and selection-box-to-slot mapping, including mounted-player controls, invalid selection, and unavailable client controller.
-☐ Completion: Full gestures pass through entry points without manually pre-seeding the state under test; second review and independent audit confirm packet counts and cleanup effects are directly asserted.
+Authorized test seam (2026-10-01): the user approved an injectable IProgressSystemProvider service for block and attached interaction tests. Production callers retain the existing progress manager. The block's engine-registered one-argument constructor and the client mod system's parameterless constructor remain available. This does not authorize changes to gesture timing, input gates or presentation behavior.
+
+✔ F6.1 Test block interaction start for generic containers, bloomeries, and crates with stashable contents; assert returned value, handling, and state.
+✔ F6.2 Cover all crate Ctrl/Shift combinations and the active-stashable-item exception preserving vanilla interaction.
+✔ F6.3 Test disabled feature, server-side invocation, and no stashable items without starting a gesture or sending packets.
+✔ F6.4 Drive start and subsequent steps just before and exactly at configured stash delay; assert zero versus one request and the correct target. Include a non-default configured delay.
+✔ F6.5 Continue stepping after submission and assert no duplicate request; cover exact end-of-grace and just beyond it.
+✔ F6.6 Cancel/stop before submission and restart, proving state reset and no stale request. Assert progress removal and appropriate handling.
+✔ F6.7 Observe progress creation/update/removal and sound/animation invocation through completion and subsequent steps; isolate presentation callbacks without requiring rendering.
+✔ F6.8 Drive the attached-container controller through registered tick callbacks, testing delay boundaries and exactly-once submission with the selected entity/slot.
+✔ F6.9 Test attached gesture cancellation for right-button, Ctrl, or Shift release; entity/attachment selection changes; and feature disabling. Assert no delayed stale submission and progress cleanup.
+✔ F6.10 Test repeated `Begin` on the same target, `Begin` on a different target, restart after cancellation, and disposal unregistering its listener/removing progress.
+✔ F6.11 Test attached interaction entry gating and selection-box-to-slot mapping, including mounted-player controls, invalid selection, and unavailable client controller.
+✔ Completion: Full gestures pass through entry points without manually pre-seeding the state under test; second review and independent audit confirm packet counts and cleanup effects are directly asserted.
 
 ## Phase 7: Protect server request dispatch and state changes
 

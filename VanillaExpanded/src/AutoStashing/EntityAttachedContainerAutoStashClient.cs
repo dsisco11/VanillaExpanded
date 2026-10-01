@@ -9,6 +9,7 @@ using Vintagestory.GameContent;
 
 namespace VanillaExpanded.AutoStashing;
 
+/// <summary>Owns the attached-container input gesture, progress display and single client request.</summary>
 internal sealed class EntityAttachedContainerAutoStashClient : IDisposable
 {
     private readonly ICoreClientAPI api;
@@ -19,14 +20,20 @@ internal sealed class EntityAttachedContainerAutoStashClient : IDisposable
     private float pendingSeconds;
     private bool requestSent;
     private IRadialProgressBar? progressBar;
+    private readonly IProgressSystemProvider progressSystem;
 
-    public EntityAttachedContainerAutoStashClient(ICoreClientAPI api, Action<long, int> requestAutoStash)
+    #region Public API
+    /// <summary>Registers gesture ticks with the supplied or default progress ownership service.</summary>
+    public EntityAttachedContainerAutoStashClient(ICoreClientAPI api, Action<long, int> requestAutoStash,
+        IProgressSystemProvider? progressSystem = null)
     {
         this.api = api;
         this.requestAutoStash = requestAutoStash;
+        this.progressSystem = progressSystem ?? new ProgressSystemProvider(api);
         tickListenerId = api.Event?.RegisterGameTickListener(OnGameTick, 20) ?? 0;
     }
 
+    /// <summary>Starts a target gesture, preserving an existing gesture for the same target.</summary>
     public void Begin(EntityBehaviorAttachable attachable, int attachmentSlotIndex)
     {
         if (pendingEntityId == attachable.entity.EntityId
@@ -40,6 +47,7 @@ internal sealed class EntityAttachedContainerAutoStashClient : IDisposable
         pendingAttachmentSlotIndex = attachmentSlotIndex;
     }
 
+    /// <summary>Cancels pending presentation and unregisters the owned tick listener.</summary>
     public void Dispose()
     {
         Cancel();
@@ -49,6 +57,10 @@ internal sealed class EntityAttachedContainerAutoStashClient : IDisposable
         }
     }
 
+    #endregion
+
+    #region Private
+    /// <summary>Validates held input and target selection before advancing time and submitting once.</summary>
     private void OnGameTick(float deltaTime)
     {
         if (api.World.Player is not IClientPlayer player || pendingAttachmentSlotIndex < 0)
@@ -83,10 +95,11 @@ internal sealed class EntityAttachedContainerAutoStashClient : IDisposable
             return;
         }
 
+        // Only a continuously held gesture accumulates time; submitted gestures retain their target until cancellation.
         pendingSeconds += deltaTime;
         if (pendingSeconds >= BlockBehaviorAutoStashable.PreStashGracePeriodSeconds)
         {
-            progressBar ??= api.ModLoader.GetModSystem<ModSystemRadialProgressBar>()?.AddProgressBar();
+            progressBar ??= progressSystem.CreateProgressBar();
             if (progressBar is not null)
             {
                 progressBar.Progress = Math.Clamp(pendingSeconds / VanillaExpandedModSystem.Config.AutoStashDelay, 0f, 1f);
@@ -106,6 +119,7 @@ internal sealed class EntityAttachedContainerAutoStashClient : IDisposable
         player.TriggerFpAnimation(EnumHandInteract.HeldItemInteract);
     }
 
+    /// <summary>Clears elapsed gesture state and its progress display.</summary>
     private void Cancel()
     {
         pendingEntityId = 0;
@@ -115,6 +129,7 @@ internal sealed class EntityAttachedContainerAutoStashClient : IDisposable
         RemoveProgressBar();
     }
 
+    /// <summary>Releases the active progress display through its supplied or production owner.</summary>
     private void RemoveProgressBar()
     {
         if (progressBar is null)
@@ -122,7 +137,8 @@ internal sealed class EntityAttachedContainerAutoStashClient : IDisposable
             return;
         }
 
-        api.ModLoader.GetModSystem<ModSystemRadialProgressBar>()?.RemoveProgressBar(progressBar);
+        progressSystem.RemoveProgressBar(progressBar);
         progressBar = null;
     }
+    #endregion
 }

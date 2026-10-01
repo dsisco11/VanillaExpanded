@@ -41,17 +41,25 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     /// </summary>
     //protected HashSet<string> isStashing = [];
     protected EStashingState stashingState = EStashingState.None;
+    private IProgressSystemProvider? progressSystem;
     #endregion
 
     #region Initialization
-    public BlockBehaviorAutoStashable(Block block) : base(block)
+    /// <summary>Creates the engine-registered behavior using the existing progress manager.</summary>
+    public BlockBehaviorAutoStashable(Block block) : base(block) { }
+
+    /// <summary>Creates the interaction behavior with an explicit progress ownership service.</summary>
+    internal BlockBehaviorAutoStashable(Block block, IProgressSystemProvider progressSystem) : base(block)
     {
+        this.progressSystem = progressSystem;
     }
 
+    /// <summary>Binds the engine API and supplies the default progress ownership service when needed.</summary>
     public override void OnLoaded(ICoreAPI api)
     {
         base.OnLoaded(api);
         this.api = api;
+        progressSystem ??= new ProgressSystemProvider(api);
     }
     #endregion
 
@@ -342,23 +350,24 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     #endregion
 
     #region UI Management
+    /// <summary>Creates or releases the gesture display through its configured presentation owner.</summary>
     private void setProgressVisibility(bool desiredVisibility)
     {
         if (api?.Side != EnumAppSide.Client)
         {
             return;
         }
-        ModSystemRadialProgressBar? progressBarSystem = api.ModLoader.GetModSystem<ModSystemRadialProgressBar>();
+        // The provider owns creation and removal; timing and display state remain in the interaction.
         switch (desiredVisibility)
         {
             case true when progressBar is null:
                 {
-                    progressBar = progressBarSystem?.AddProgressBar();
+                    progressBar = progressSystem?.CreateProgressBar();
                     break;
                 }
             case false when progressBar is not null:
                 {
-                    progressBarSystem?.RemoveProgressBar(progressBar);
+                    progressSystem?.RemoveProgressBar(progressBar);
                     progressBar = null;
                     break;
                 }
