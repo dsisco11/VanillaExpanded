@@ -195,7 +195,8 @@ public sealed class AutoStashTransferEdgeTests
     [Fact]
     public void Suitability_HighestRankedDestinationReceivesItems()
     {
-        var test = new TransferCase(createTarget: fixture => new ObservedInventory(2, fixture.Api));
+        var targetMock = new Mock<InventoryGeneric>(2, "observed", "test", null!, (NewSlotDelegate)null!) { CallBase = true };
+        var test = new TransferCase(createTarget: _ => targetMock.Object);
         var source = test.Source(3);
         test.Target.OnGetSuitability = (_, slot, _) => ReferenceEquals(slot, test.Target[1]) ? 9 : 1;
         var before = new InventorySnapshot(test.Fixture.BackpackInventory, test.Fixture.HotbarInventory, test.Target);

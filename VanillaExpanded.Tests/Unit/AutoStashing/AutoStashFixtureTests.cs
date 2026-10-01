@@ -106,16 +106,21 @@ public sealed class AutoStashFixtureTests
 
     /// <summary>Verifies suitability observation delegates ranking and selection to the real engine inventory.</summary>
     [Fact]
-    public void ObservedInventory_RecordsEngineSuitabilityQueries()
+    public void InventoryMock_RecordsEngineSuitabilityQueries()
     {
         var fixture = VsTestFixture.Server();
         var item = MockItem.CreateNonLightSource(1, fixture.Api);
         fixture.WithBackpackSlot(0, item, 1);
-        var target = new ObservedInventory(2, fixture.Api);
+        var targetMock = new Mock<InventoryGeneric>(2, "observed", "test", null!, (NewSlotDelegate)null!) { CallBase = true };
+        var target = targetMock.Object;
+        target.Api = fixture.Api;
         target.OnGetSuitability = (_, slot, _) => ReferenceEquals(slot, target[1]) ? 9 : 1;
         WeightedSlot selected = target.GetBestSuitedSlot(fixture.BackpackInventory[0]);
         Assert.Same(target[1], selected.slot);
-        Assert.Equal(new[] { target[0], target[1] }, target.RankedSlots);
+        var queries = targetMock.Invocations.Where(call => call.Method.Name == nameof(InventoryGeneric.GetSuitability)).ToArray();
+        Assert.Equal(new[] { target[0], target[1] }, queries.Select(call => (ItemSlot)call.Arguments[1]));
+        targetMock.Verify(inventory => inventory.GetSuitability(fixture.BackpackInventory[0], target[0], false), Times.Once);
+        targetMock.Verify(inventory => inventory.GetSuitability(fixture.BackpackInventory[0], target[1], false), Times.Once);
         Assert.Equal(1, fixture.BackpackInventory[0].StackSize);
         Assert.True(target.Empty);
     }
