@@ -1,0 +1,192 @@
+# AutoStash Functional Test Coverage
+
+Status: Planned; all implementation and verification tasks remain unchecked.
+Source: User-requested coverage audit and its eight numbered findings, 2026-10-01.
+Related proposal: [PlanningAndExecutionProposal.md](PlanningAndExecutionProposal.md).
+Purpose: Establish a functional regression contract before changing inventory planning or transfer architecture.
+
+## Scope and execution rules
+
+Implement the missing tests and strengthen existing assertions against current AutoStash entry points. The related architecture proposal is context, not authorization to implement its new components or stronger behavior guarantees. Do not refactor production inventory or transfer systems as part of this tasklist.
+
+Use real engine inventory/slot operations where feasible. Use narrow test doubles for world access, networking, controlled failures, callbacks, and operation observation; do not duplicate the transfer algorithm in test code. A test seam requiring production changes must be documented and reviewed separately before implementation.
+
+Every successful transfer scenario should assert exact source remainder, destination contents, quantity conservation, unchanged unrelated slots, and applicable lifecycle effects. Every rejected operation should assert unchanged contents and absence of unintended persistence/dirty notifications. Assert collectible identity and relevant attributes as well as counts.
+
+Keep test files separated by responsibility under `VanillaExpanded.Tests/Unit/AutoStashing`; place actual Harmony/engine integration tests in an appropriate separate integration suite. Add XML documentation to introduced classes and methods, comments for nontrivial setup, and visibility/functional region grouping. Restore configuration, event registrations, patches, and other shared state in cleanup even on failure.
+
+All builds and test executions must run through subagents. Do not launch the game. Automated integration checks and user-run live acceptance are separate evidence categories. Do not claim live acceptance from unit tests.
+
+For each phase: run its focused tests, review the assertions a second time, and obtain an independent audit of coverage against its listed scenarios before marking completion. Keep evidence under `docs/auto-stash/FunctionalTestCoverageEvidence.md`, created during implementation, with scenario IDs, test names, commands, outcomes, and unresolved decisions.
+
+## Baseline and decisions
+
+The preceding audit ran `dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --filter FullyQualifiedName~AutoStash --verbosity minimal`: 96 passed, 0 failed, 0 skipped. This is historical baseline evidence, not verification of new work. Existing counts: transfer 38; bloomery eligibility 17; container eligibility 14; bloomery help 9; distinct types 7; block interaction 5; client networking 3; server networking 2; container help 1.
+
+Unsettled contracts must be resolved without silently treating existing behavior as intended:
+
+- Current bloomery order is backpack ore, backpack fuel, hotbar ore, hotbar fuel. Characterize it with order-sensitive outcomes; changing it is separate work.
+- The empty-bloomery active-item gate is a client eligibility rule, not currently a server transfer prerequisite.
+- Attached-bag client eligibility detects matching types without proving capacity. Do not require parity with execution where that distinction is intentional.
+- Failure after mutation may leave partial progress. Establish current persistence/notification behavior and the intended contract before asserting stronger guarantees from the architecture proposal.
+- Preferred-slot preflight and execution have inconsistent fallback semantics; no current production caller uses the optional argument. Record the decision on characterization or future removal rather than making either interpretation a new gameplay requirement.
+- Direct-merge retry termination is unverified. Use bounded observation so a problematic case fails deterministically instead of hanging the suite. A guard exception is evidence of excessive retries, not proof of normal termination.
+
+If a new test exposes a discrepancy, retain a minimal reproduction and record expected versus observed behavior. Do not fix production code, change expectations merely to pass, silently skip the scenario, or mark its acceptance complete. Continue independent coverage work; resolve the discrepancy explicitly before declaring the refactor gate satisfied.
+
+## Phase 1: Establish fixtures and strengthen existing assertions
+
+Outcome: Reliable fixtures and precise assertions support the remaining scenarios without changing production behavior.
+Dependencies: None. Audit finding 5, plus common prerequisites for findings 1–8.
+
+☐ F1.1 Refresh the focused baseline through a subagent and record checkout/revision, engine assembly versions, command, counts, and warnings.
+☐ F1.2 Create the evidence document and map every scenario ID in this tasklist to its eventual test(s), contract status, and evidence.
+☐ F1.3 Add narrowly scoped snapshot/assertion helpers for slot identity, stack contents/attributes, per-type totals, unchanged slots, and lifecycle observations.
+☐ F1.4 Strengthen existing backpack, hotbar, combined-source, multiple-type, and crate success tests with exact destination gains and source remainders.
+☐ F1.5 Strengthen empty/no-match/full/no-op tests with complete before/after contents and absence of dirty/persistence effects.
+☐ F1.6 Separate code-based eligibility tests from true existing-stack merge tests; use consistent collectible identities for merge fixtures and assert the exact slot receiving the items.
+☐ F1.7 Repair isolated invalid-bloomery-item setups so unrelated empty-bloomery/active-item gates do not reject first. Check other negative setups for the same masking problem.
+☐ F1.8 Add a fixture using the actual crate inventory type/slot behavior where engine initialization permits; retain generic policy fixtures only with their narrower scope explicit. Record any engine integration requirement rather than claiming generic inventories cover crate restrictions.
+☐ F1.9 Add deterministic observation helpers for zero moves, partial moves, callbacks, exceptions, suitability, persistence, and tick callbacks; retain real engine behavior outside the controlled boundary.
+☐ F1.10 Ensure globals/configuration, patches, and listeners are restored, with isolation for tests that cannot safely run concurrently.
+☐ Completion: Focused baseline remains green, strengthened assertions pass, and second review plus independent audit confirm fixtures cannot satisfy the named behavior through unrelated early exits.
+
+## Phase 2: Protect shared transfers and inventory restrictions
+
+Outcome: Shared execution is protected under constrained capacity, rejected moves, and retry behavior.
+Dependencies: Phase 1. Audit finding 3 and shared aspects of finding 5.
+Sources: `AutoStashTransferService.cs`, `AutoStashTransferTests.cs`.
+
+☐ F2.1 Test total target capacity below source quantity, asserting the returned moved count, exact remainder, and conservation; include zero, exact-fit, and partial capacity.
+☐ F2.2 Test several matching source slots competing for limited capacity, with results that distinguish source-slot order and backpack-before-hotbar order.
+☐ F2.3 Test a selected destination returning zero followed by another viable destination; assert continuation and exact final contents.
+☐ F2.4 Test all selected destinations rejecting movement; assert finite attempts, zero result, unchanged inventories, and correct session cleanup.
+☐ F2.5 Test automatic destinations being exhausted before deferred direct merge, and successful direct-merge retry with exact quantities and observed priorities.
+☐ F2.6 Test rejected direct-merge retries, including a repeated request for direct priority; bound observation and verify actual termination or retain a minimal failing reproduction for explicit resolution.
+☐ F2.7 Test source take lock, destination put lock, incompatible storage restrictions, and inventory-level rejection independently; ensure each setup reaches the restriction it intends to exercise.
+☐ F2.8 Test same-type stacks with incompatible relevant attributes, both with an empty alternative destination and without one; assert attributes are not overwritten or incorrectly merged.
+☐ F2.9 Test custom inventory suitability whose winning destination is not first in enumeration order; verify engine ranking is honored.
+☐ F2.10 Test missing backpack, missing hotbar, and both missing inventories through the shared service.
+☐ F2.11 Repeat execution after source exhaustion and after capacity exhaustion; assert no duplication, loss, extra movement, or unnecessary session acquisition.
+☐ F2.12 Record the preferred-slot contract decision from the decisions section. If retained for characterization, cover valid/invalid indices and blocked preferred slot versus viable alternatives, explicitly labeling the current preflight/execution distinction.
+☐ Completion: Focused tests and bounded retry checks pass, all deficits are recorded, and second review plus independent audit confirm changes to ordering, selection, quantities, or progress would be detected.
+
+## Phase 3: Protect bloomery execution
+
+Outcome: Actual bloomery mutation is covered independently from help/eligibility queries.
+Dependencies: Phase 1; use Phase 2 observation helpers where applicable. Audit finding 2.
+Sources: bloomery methods in `BlockBehaviorAutoStashable.cs`, `GetStashableItemsBloomeryTests.cs`, bloomery fixture.
+
+☐ F3.1 Test ore and fuel together, asserting ore/fuel destination indices and fuel allowance based on actual deposited ore.
+☐ F3.2 Test rounding with five ore at ratio two requiring three fuel, including existing fuel reducing the remaining allowance.
+☐ F3.3 Test existing ore reducing ore capacity, existing fuel reducing fuel capacity, exact-full destinations, and several source stacks sharing remaining capacity.
+☐ F3.4 Test hotbar-only ore/fuel and combined backpack/hotbar sources.
+☐ F3.5 Add outcome-sensitive characterization of backpack ore → backpack fuel → hotbar ore → hotbar fuel. Include a distribution whose final result differs under global ore-first processing; identify the observation as current ordering rather than approving a redesign.
+☐ F3.6 Test burning and occupied-output execution rejection, with every source and target slot unchanged.
+☐ F3.7 Test different existing ore and fuel types, noncombustible/invalid items mixed with valid sources, and full destinations without routing to another slot.
+☐ F3.8 Test configured `bloomeryFuelRatio` overriding the default and zero/negative configured/default ratios; assert observed engine/AutoStash interaction rather than testing an isolated copied formula.
+☐ F3.9 Test fuel temperature immediately below/at its threshold, duration below/at/above its threshold, and ore melting point below/at minimum and below/at maximum, plus missing smelted output.
+☐ F3.10 Verify output and unrelated player slots remain unchanged in successful mixed transfers; assert correct dirty/synchronization effects for full, partial, and zero movement.
+☐ F3.11 Pair client eligibility and server execution tests to document the empty-bloomery active-item distinction without imposing that gate on the server.
+☐ Completion: Combined-input, ordering, capacity, boundary, and no-op execution tests pass; second review and independent audit confirm eligibility-only tests are not counted as mutation coverage.
+
+## Phase 4: Protect complete attached-container operations
+
+Outcome: Transfers persist correctly through both supported bag paths and subsequent reloads.
+Dependencies: Phase 1; shared transfer checks from Phase 2. Audit finding 1.
+Sources: `EntityAttachedContainerAutoStash.cs`, existing workspace refresh test.
+
+☐ F4.1 Build fixtures for vanilla `CollectibleBehaviorHeldBag` workspaces and a distinct `IHeldBag` implementation; invoke `TryAutoStash`, not only workspace helpers.
+☐ F4.2 For both paths, test successful matching transfers with exact source loss, target gain, persisted contents, and unrelated contents preserved.
+☐ F4.3 For both paths, test full bags, partial capacity, nonmatching contents, and initially empty bags.
+☐ F4.4 Test negative/out-of-range attachment indices, empty/non-bag attachments, zero-capacity bags, and failed vanilla workspace loading with no side effects.
+☐ F4.5 Assert workspace-backed session acquisition/ownership and temporary-inventory operation without session management; include already-open workspaces.
+☐ F4.6 Verify `IHeldBag.Store`, attachment dirty notification, and attachment-owner persistence after movement; verify no persistence for unchanged operations.
+☐ F4.7 Reload the actual persisted bag contents and stash again, proving no stale data, duplication, or loss. Retain workspace slot-identity assertions across repeated loads.
+☐ F4.8 Test candidate-only `CanAutoStash` behavior separately from execution capacity, including a matching but full bag; record the current distinction.
+☐ Completion: Both adapter paths have execution and persistence round trips, focused tests pass, and second review plus independent audit verify persisted state rather than only wrapper inventory state.
+
+## Phase 5: Protect lifecycle and partial-failure behavior
+
+Outcome: Session ownership and observable partial progress are covered across interruption paths.
+Dependencies: Phases 2–4. Audit finding 4.
+
+☐ F5.1 Inject failure after acquiring an owned inventory session and assert it closes; repeat with an already-open inventory and assert that session stays open.
+☐ F5.2 Inject failure after an earlier successful move, capturing exact source/target contents, notifications, persistence, and cleanup. Establish current behavior and resolve intended persistence expectations before declaring the scenario satisfied.
+☐ F5.3 Exercise a callback failure after mutation, so the fixture does not assume an unreturned operation left state unchanged. Keep reproduction and contract decision explicit if this exposes a gap.
+☐ F5.4 Change target contents/capacity during session opening and verify execution observes the resulting live state without inventing reserved capacity.
+☐ F5.5 Verify ordinary container/crate zero-move paths do not mark dirty, while successful partial movement produces expected notifications.
+☐ F5.6 Verify bloomery and attached-bag synchronization after successful partial transfers; link rather than duplicate F3.10 and F4.6/F4.7 coverage where sufficient.
+☐ F5.7 Document observed cleanup/persistence boundaries for interrupted attached-bag operations. Keep stronger proposal requirements separate from characterization and record any unresolved acceptance blocker.
+☐ Completion: Focused tests pass, actual partial state and ownership are asserted, and second review plus independent audit confirm no unapproved rollback/persistence guarantee has been introduced.
+
+## Phase 6: Protect complete interaction gestures
+
+Outcome: Real interaction entry points produce exactly one request per completed gesture and cancel correctly.
+Dependencies: Phase 1 and usable target fixtures from Phases 3–4. Audit finding 6.
+
+☐ F6.1 Test block interaction start for generic containers, bloomeries, and crates with stashable contents; assert returned value, handling, and state.
+☐ F6.2 Cover all crate Ctrl/Shift combinations and the active-stashable-item exception preserving vanilla interaction.
+☐ F6.3 Test disabled feature, server-side invocation, and no stashable items without starting a gesture or sending packets.
+☐ F6.4 Drive start and subsequent steps just before and exactly at configured stash delay; assert zero versus one request and the correct target. Include a non-default configured delay.
+☐ F6.5 Continue stepping after submission and assert no duplicate request; cover exact end-of-grace and just beyond it.
+☐ F6.6 Cancel/stop before submission and restart, proving state reset and no stale request. Assert progress removal and appropriate handling.
+☐ F6.7 Observe progress creation/update/removal and sound/animation invocation through completion and subsequent steps; isolate presentation callbacks without requiring rendering.
+☐ F6.8 Drive the attached-container controller through registered tick callbacks, testing delay boundaries and exactly-once submission with the selected entity/slot.
+☐ F6.9 Test attached gesture cancellation for right-button, Ctrl, or Shift release; entity/attachment selection changes; and feature disabling. Assert no delayed stale submission and progress cleanup.
+☐ F6.10 Test repeated `Begin` on the same target, `Begin` on a different target, restart after cancellation, and disposal unregistering its listener/removing progress.
+☐ F6.11 Test attached interaction entry gating and selection-box-to-slot mapping, including mounted-player controls, invalid selection, and unavailable client controller.
+☐ Completion: Full gestures pass through entry points without manually pre-seeding the state under test; second review and independent audit confirm packet counts and cleanup effects are directly asserted.
+
+## Phase 7: Protect server request dispatch and state changes
+
+Outcome: Network requests reach the intended operation only when current server conditions allow it.
+Dependencies: Phases 3–4 and request/fixture infrastructure from Phase 1. Audit finding 7.
+
+☐ F7.1 Deliver an allowed block request through the registered handler and assert actual expected movement.
+☐ F7.2 Deliver a denied-access request with otherwise transferable contents and assert no movement, session acquisition, or dirty/persistence effects.
+☐ F7.3 Test missing AutoStash behavior and missing target, retaining safe no-op expectations and the existing missing-position test.
+☐ F7.4 Exercise crate, generic-container, and bloomery dispatch with outcomes that establish the correct target-specific path.
+☐ F7.5 Deliver entity requests for missing entity, missing attachable behavior, and invalid attachment indices; assert no transfer.
+☐ F7.6 Test the six-block distance boundary and a position just outside it with otherwise valid attached contents; assert accepted versus rejected movement.
+☐ F7.7 Change target contents/capacity after client eligibility but before server dispatch, then assert the server uses current contents and does not rely on the previous client assessment.
+☐ Completion: Registered handlers are exercised, rejection prerequisites are isolated, focused tests pass, and second review plus independent audit confirm registration-only tests are not counted as dispatch coverage.
+
+## Phase 8: Protect help text, behavior installation, and Harmony dispatch
+
+Outcome: Player-facing help and engine hookup remain correct through future extraction.
+Dependencies: Phase 1; target fixtures from Phases 3–4. Audit finding 8.
+
+☐ F8.1 Test container help for full matching target, no matching items, and disabled AutoStash; assert exact action codes and absence/presence of display stacks.
+☐ F8.2 Test crate help hotkeys and returned representative stacks; preserve deduplication assertions.
+☐ F8.3 Prove returned display stacks are independent clones by mutating them and checking source inventories remain unchanged.
+☐ F8.4 Cover attached help append/no-append behavior, Ctrl+Shift help, and preservation of pre-existing interactions.
+☐ F8.5 Test behavior amendment for supported containers, crates, and bloomeries, exclusion of unsupported/null-code entries, correct ordering in both behavior arrays, and preservation of existing behaviors.
+☐ F8.6 Repeat amendment and assert no duplicate AutoStash or crate-bridge behaviors.
+☐ F8.7 Add a focused integration fixture that installs actual Harmony patches and invokes engine crate/bloomery interaction entry points; verify handled interactions suppress the original and unhandled interactions reach vanilla behavior. Include attached interaction/help hooks where feasible in the same isolated integration harness.
+☐ F8.8 Restore all installed patches in cleanup and assert no cross-test contamination. If the engine environment prevents automated integration, record the blocker and leave coverage incomplete rather than substituting helper-only tests.
+☐ Completion: Unit checks and separately identified integration checks pass; second review plus independent audit confirm the real patch/dispatch boundary is exercised.
+
+## Phase 9: Reconcile evidence and establish the refactor gate
+
+Outcome: A reviewable functional contract exists before inventory/transfer refactoring begins.
+Dependencies: Phases 1–8.
+
+☐ F9.1 Reconcile every F1–F8 scenario against implemented test names and outcomes in the evidence document; ensure all eight original findings remain traceable.
+☐ F9.2 Run the full focused AutoStash suite, the separate AutoStash integration suite, and the repository unit suite through subagents to detect shared-fixture regressions. Record exact commands, assembly versions, pass/fail/skip counts, and relevant warnings.
+☐ F9.3 Review assertion sensitivity: for every named scenario identify the behavioral change its assertions detect. Do not use test-count growth as the acceptance metric.
+☐ F9.4 Obtain an independent final audit of scenario completeness, fixture realism, negative-test isolation, lifecycle assertions, and production-code scope.
+☐ F9.5 Resolve all intended-versus-observed discrepancies explicitly. Document minimal reproductions and any separately authorized fixes; do not silently defer or skip required cases.
+☐ F9.6 Confirm no inventory/transfer redesign was introduced, no game was launched, and automated results are not represented as live acceptance.
+☐ Final acceptance: All required scenario mappings have passing evidence and completed reviews/audits, with no unresolved behavioral or integration blockers. This completes the test-coverage prerequisite only; implementing the architecture proposal remains separate work.
+
+## Audit finding cross-reference
+
+1. Attached-container execution and persistence: Phase 4; interrupted persistence in Phase 5.
+2. Bloomery execution and ordering: Phase 3.
+3. Shared transfer-loop edge cases: Phase 2.
+4. Lifecycle and interruption: Phase 5, with successful target synchronization in Phases 3–4.
+5. Weak assertions and fixture fidelity: Phase 1 and assertion contracts throughout.
+6. Complete block and attached gestures: Phase 6.
+7. Server request handling: Phase 7.
+8. Help text, installation, and Harmony dispatch: Phase 8.
