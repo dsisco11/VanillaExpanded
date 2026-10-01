@@ -8,6 +8,7 @@ namespace VanillaExpanded.Tests.Unit.AutoStashing;
 /// Tests item matching between player inventory and container contents.
 /// </summary>
 [Trait("Category", "Unit")]
+[Collection("AutoStash")]
 public class GetStashableItemsTests
 {
     #region Empty Container Tests

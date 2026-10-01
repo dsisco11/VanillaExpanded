@@ -1,6 +1,6 @@
 # AutoStash Functional Test Coverage
 
-Status: Planned; all implementation and verification tasks remain unchecked.
+Status: Phase 1 complete after verification, second review, and independent completion audit; Phases 2–9 remain planned.
 Source: User-requested coverage audit and its eight numbered findings, 2026-10-01.
 Related proposal: [PlanningAndExecutionProposal.md](PlanningAndExecutionProposal.md).
 Purpose: Establish a functional regression contract before changing inventory planning or transfer architecture.
@@ -39,17 +39,17 @@ If a new test exposes a discrepancy, retain a minimal reproduction and record ex
 Outcome: Reliable fixtures and precise assertions support the remaining scenarios without changing production behavior.
 Dependencies: None. Audit finding 5, plus common prerequisites for findings 1–8.
 
-☐ F1.1 Refresh the focused baseline through a subagent and record checkout/revision, engine assembly versions, command, counts, and warnings.
-☐ F1.2 Create the evidence document and map every scenario ID in this tasklist to its eventual test(s), contract status, and evidence.
-☐ F1.3 Add narrowly scoped snapshot/assertion helpers for slot identity, stack contents/attributes, per-type totals, unchanged slots, and lifecycle observations.
-☐ F1.4 Strengthen existing backpack, hotbar, combined-source, multiple-type, and crate success tests with exact destination gains and source remainders.
-☐ F1.5 Strengthen empty/no-match/full/no-op tests with complete before/after contents and absence of dirty/persistence effects.
-☐ F1.6 Separate code-based eligibility tests from true existing-stack merge tests; use consistent collectible identities for merge fixtures and assert the exact slot receiving the items.
-☐ F1.7 Repair isolated invalid-bloomery-item setups so unrelated empty-bloomery/active-item gates do not reject first. Check other negative setups for the same masking problem.
-☐ F1.8 Add a fixture using the actual crate inventory type/slot behavior where engine initialization permits; retain generic policy fixtures only with their narrower scope explicit. Record any engine integration requirement rather than claiming generic inventories cover crate restrictions.
-☐ F1.9 Add deterministic observation helpers for zero moves, partial moves, callbacks, exceptions, suitability, persistence, and tick callbacks; retain real engine behavior outside the controlled boundary.
-☐ F1.10 Ensure globals/configuration, patches, and listeners are restored, with isolation for tests that cannot safely run concurrently.
-☐ Completion: Focused baseline remains green, strengthened assertions pass, and second review plus independent audit confirm fixtures cannot satisfy the named behavior through unrelated early exits.
+✔ F1.1 Refresh the focused baseline through a subagent and record checkout/revision, engine assembly versions, command, counts, and warnings.
+✔ F1.2 Create the evidence document and map every scenario ID in this tasklist to its eventual test(s), contract status, and evidence.
+✔ F1.3 Add narrowly scoped snapshot/assertion helpers for slot identity, stack contents/attributes, per-type totals, unchanged slots, and lifecycle observations.
+✔ F1.4 Strengthen existing backpack, hotbar, combined-source, multiple-type, and crate success tests with exact destination gains and source remainders.
+✔ F1.5 Strengthen empty/no-match/full/no-op tests with complete before/after contents and absence of dirty/persistence effects.
+✔ F1.6 Separate code-based eligibility tests from true existing-stack merge tests; use consistent collectible identities for merge fixtures and assert the exact slot receiving the items.
+✔ F1.7 Repair isolated invalid-bloomery-item setups so unrelated empty-bloomery/active-item gates do not reject first. Check other negative setups for the same masking problem.
+✔ F1.8 Add a fixture using the actual crate inventory type/slot behavior where engine initialization permits; retain generic policy fixtures only with their narrower scope explicit. Record any engine integration requirement rather than claiming generic inventories cover crate restrictions.
+✔ F1.9 Add deterministic observation helpers for zero moves, partial moves, callbacks, exceptions, suitability, persistence, and tick callbacks; retain real engine behavior outside the controlled boundary.
+✔ F1.10 Ensure globals/configuration, patches, and listeners are restored, with isolation for tests that cannot safely run concurrently.
+✔ Completion: Focused baseline remains green, strengthened assertions pass, and second review plus independent audit confirm fixtures cannot satisfy the named behavior through unrelated early exits.
 
 ## Phase 2: Protect shared transfers and inventory restrictions
 

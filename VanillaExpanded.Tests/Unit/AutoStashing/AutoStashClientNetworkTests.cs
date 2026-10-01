@@ -8,6 +8,7 @@ using Vintagestory.API.MathTools;
 namespace VanillaExpanded.Tests.Unit.AutoStashing;
 
 [Trait("Category", "Unit")]
+[Collection("AutoStash")]
 public class AutoStashClientNetworkTests
 {
     [Fact]

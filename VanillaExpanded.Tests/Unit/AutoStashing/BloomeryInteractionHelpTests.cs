@@ -14,8 +14,14 @@ namespace VanillaExpanded.Tests.Unit.AutoStashing;
 /// Verifies the correct interaction help text and item stacks are returned.
 /// </summary>
 [Trait("Category", "Unit")]
-public class BloomeryInteractionHelpTests
+[Collection("AutoStash")]
+public class BloomeryInteractionHelpTests : IDisposable
 {
+    private readonly VanillaExpanded.Tests.Unit.AutoStashing.Support.AutoStashTestScope scope = new();
+
+    /// <summary>Restores AutoStash settings after each test.</summary>
+    public void Dispose() => scope.Dispose();
+
     private const string BloomeryLangCode = "vanillaexpanded:blockhelp-autostash-bloomery";
     private static readonly BlockPos DefaultPos = new(0, 0, 0, 0);
 

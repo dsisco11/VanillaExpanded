@@ -10,8 +10,14 @@ using VanillaExpanded.Tests.Mocks;
 namespace VanillaExpanded.Tests.Unit.AutoStashing;
 
 [Trait("Category", "Unit")]
-public class ContainerInteractionHelpTests
+[Collection("AutoStash")]
+public class ContainerInteractionHelpTests : IDisposable
 {
+    private readonly VanillaExpanded.Tests.Unit.AutoStashing.Support.AutoStashTestScope scope = new();
+
+    /// <summary>Restores AutoStash settings after each test.</summary>
+    public void Dispose() => scope.Dispose();
+
     [Fact]
     public void GetPlacedBlockInteractionHelp_MatchingItems_ShowsEachStashableItemType()
     {

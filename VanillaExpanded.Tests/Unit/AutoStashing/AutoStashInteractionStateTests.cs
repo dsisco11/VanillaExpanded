@@ -8,8 +8,14 @@ using Vintagestory.API.MathTools;
 namespace VanillaExpanded.Tests.Unit.AutoStashing;
 
 [Trait("Category", "Unit")]
-public class AutoStashInteractionStateTests
+[Collection("AutoStash")]
+public class AutoStashInteractionStateTests : IDisposable
 {
+    private readonly VanillaExpanded.Tests.Unit.AutoStashing.Support.AutoStashTestScope scope = new();
+
+    /// <summary>Restores AutoStash settings after each test.</summary>
+    public void Dispose() => scope.Dispose();
+
     private static readonly BlockSelection Selection = new()
     {
         Position = new BlockPos(0)

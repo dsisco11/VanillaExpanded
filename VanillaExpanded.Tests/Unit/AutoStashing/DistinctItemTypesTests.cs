@@ -9,6 +9,7 @@ namespace VanillaExpanded.Tests.Unit.AutoStashing;
 /// Tests for GetDistinctItemTypes method in BlockBehaviorAutoStashable.
 /// </summary>
 [Trait("Category", "Unit")]
+[Collection("AutoStash")]
 public class DistinctItemTypesTests
 {
     /// <summary>
