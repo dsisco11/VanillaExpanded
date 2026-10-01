@@ -163,15 +163,15 @@ Dependencies: Phases 3–4 and request/fixture infrastructure from Phase 1. Audi
 Outcome: Player-facing help and engine hookup remain correct through future extraction.
 Dependencies: Phase 1; target fixtures from Phases 3–4. Audit finding 8.
 
-☐ F8.1 Test container help for full matching target, no matching items, and disabled AutoStash; assert exact action codes and absence/presence of display stacks.
-☐ F8.2 Test crate help hotkeys and returned representative stacks; preserve deduplication assertions.
-☐ F8.3 Prove returned display stacks are independent clones by mutating them and checking source inventories remain unchanged.
-☐ F8.4 Cover attached help append/no-append behavior, Ctrl+Shift help, and preservation of pre-existing interactions.
-☐ F8.5 Test behavior amendment for supported containers, crates, and bloomeries, exclusion of unsupported/null-code entries, correct ordering in both behavior arrays, and preservation of existing behaviors.
-☐ F8.6 Repeat amendment and assert no duplicate AutoStash or crate-bridge behaviors.
-☐ F8.7 Add a focused integration fixture that installs actual Harmony patches and invokes engine crate/bloomery interaction entry points; verify handled interactions suppress the original and unhandled interactions reach vanilla behavior. Include attached interaction/help hooks where feasible in the same isolated integration harness.
-☐ F8.8 Restore all installed patches in cleanup and assert no cross-test contamination. If the engine environment prevents automated integration, record the blocker and leave coverage incomplete rather than substituting helper-only tests.
-☐ Completion: Unit checks and separately identified integration checks pass; second review plus independent audit confirm the real patch/dispatch boundary is exercised.
+✔ F8.1 Test container help for full matching target, no matching items, and disabled AutoStash; assert exact action codes and absence/presence of display stacks.
+✔ F8.2 Test crate help hotkeys and returned representative stacks; preserve deduplication assertions.
+✔ F8.3 Prove returned display stacks are independent clones by mutating them and checking source inventories remain unchanged.
+✔ F8.4 Cover attached help append/no-append behavior, Ctrl+Shift help, and preservation of pre-existing interactions.
+✔ F8.5 Test behavior amendment for supported containers, crates, and bloomeries, exclusion of unsupported/null-code entries, correct ordering in both behavior arrays, and preservation of existing behaviors.
+✔ F8.6 Repeat amendment and assert no duplicate AutoStash or crate-bridge behaviors.
+✔ F8.7 Add a focused integration fixture that installs actual Harmony patches and invokes engine crate/bloomery interaction entry points; verify handled interactions suppress the original and unhandled interactions reach vanilla behavior. Include attached interaction/help hooks where feasible in the same isolated integration harness.
+✔ F8.8 Restore all installed patches in cleanup and assert no cross-test contamination. If the engine environment prevents automated integration, record the blocker and leave coverage incomplete rather than substituting helper-only tests.
+✔ Completion: Unit checks and separately identified integration checks pass; second review plus independent audit confirm the real patch/dispatch boundary is exercised.
 
 ## Phase 9: Reconcile evidence and establish the refactor gate
 
