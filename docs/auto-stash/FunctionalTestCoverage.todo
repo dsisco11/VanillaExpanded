@@ -1,6 +1,6 @@
 # AutoStash Functional Test Coverage
 
-Status: Phases 1–2 complete after verification, second review, and independent completion audits. Phase 2 includes the explicitly authorized direct-merge retry fix. Phases 3–9 remain planned. See [coverage evidence](FunctionalTestCoverageEvidence.md).
+Status: Phases 1–3 complete after verification, second review, and independent completion audits. Phase 2 includes the explicitly authorized direct-merge retry fix. Phases 4–9 remain planned. See [coverage evidence](FunctionalTestCoverageEvidence.md).
 Source: User-requested coverage audit and its eight numbered findings, 2026-10-01.
 Related proposal: [PlanningAndExecutionProposal.md](PlanningAndExecutionProposal.md).
 Purpose: Establish a functional regression contract before changing inventory planning or transfer architecture.
@@ -79,18 +79,18 @@ Outcome: Actual bloomery mutation is covered independently from help/eligibility
 Dependencies: Phase 1; use Phase 2 observation helpers where applicable. Audit finding 2.
 Sources: bloomery methods in `BlockBehaviorAutoStashable.cs`, `GetStashableItemsBloomeryTests.cs`, bloomery fixture.
 
-☐ F3.1 Test ore and fuel together, asserting ore/fuel destination indices and fuel allowance based on actual deposited ore.
-☐ F3.2 Test rounding with five ore at ratio two requiring three fuel, including existing fuel reducing the remaining allowance.
-☐ F3.3 Test existing ore reducing ore capacity, existing fuel reducing fuel capacity, exact-full destinations, and several source stacks sharing remaining capacity.
-☐ F3.4 Test hotbar-only ore/fuel and combined backpack/hotbar sources.
-☐ F3.5 Add outcome-sensitive characterization of backpack ore → backpack fuel → hotbar ore → hotbar fuel. Include a distribution whose final result differs under global ore-first processing; identify the observation as current ordering rather than approving a redesign.
-☐ F3.6 Test burning and occupied-output execution rejection, with every source and target slot unchanged.
-☐ F3.7 Test different existing ore and fuel types, noncombustible/invalid items mixed with valid sources, and full destinations without routing to another slot.
-☐ F3.8 Test configured `bloomeryFuelRatio` overriding the default and zero/negative configured/default ratios; assert observed engine/AutoStash interaction rather than testing an isolated copied formula.
-☐ F3.9 Test fuel temperature immediately below/at its threshold, duration below/at/above its threshold, and ore melting point below/at minimum and below/at maximum, plus missing smelted output.
-☐ F3.10 Verify output and unrelated player slots remain unchanged in successful mixed transfers; assert correct dirty/synchronization effects for full, partial, and zero movement.
-☐ F3.11 Pair client eligibility and server execution tests to document the empty-bloomery active-item distinction without imposing that gate on the server.
-☐ Completion: Combined-input, ordering, capacity, boundary, and no-op execution tests pass; second review and independent audit confirm eligibility-only tests are not counted as mutation coverage.
+✔ F3.1 Test ore and fuel together, asserting ore/fuel destination indices and fuel allowance based on actual deposited ore.
+✔ F3.2 Test rounding with five ore at ratio two requiring three fuel, including existing fuel reducing the remaining allowance.
+✔ F3.3 Test existing ore reducing ore capacity, existing fuel reducing fuel capacity, exact-full destinations, and several source stacks sharing remaining capacity.
+✔ F3.4 Test hotbar-only ore/fuel and combined backpack/hotbar sources.
+✔ F3.5 Add outcome-sensitive characterization of backpack ore → backpack fuel → hotbar ore → hotbar fuel. Include a distribution whose final result differs under global ore-first processing; identify the observation as current ordering rather than approving a redesign.
+✔ F3.6 Test burning and occupied-output execution rejection, with every source and target slot unchanged.
+✔ F3.7 Test different existing ore and fuel types, noncombustible/invalid items mixed with valid sources, and full destinations without routing to another slot.
+✔ F3.8 Test configured `bloomeryFuelRatio` overriding the default and zero/negative configured/default ratios; assert observed engine/AutoStash interaction rather than testing an isolated copied formula.
+✔ F3.9 Test fuel temperature immediately below/at its threshold, duration below/at/above its threshold, and ore melting point below/at minimum and below/at maximum, plus missing smelted output.
+✔ F3.10 Verify output and unrelated player slots remain unchanged in successful mixed transfers; assert correct dirty/synchronization effects for full, partial, and zero movement.
+✔ F3.11 Pair client eligibility and server execution tests to document the empty-bloomery active-item distinction without imposing that gate on the server.
+✔ Completion: Combined-input, ordering, capacity, boundary, and no-op execution tests pass; second review and independent audit confirm eligibility-only tests are not counted as mutation coverage.
 
 ## Phase 4: Protect complete attached-container operations
 
