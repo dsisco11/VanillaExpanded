@@ -1,6 +1,6 @@
 # AutoStash Functional Test Coverage
 
-Status: Phases 1–3 complete after verification, second review, and independent completion audits. Phase 2 includes the explicitly authorized direct-merge retry fix. Phases 4–9 remain planned. See [coverage evidence](FunctionalTestCoverageEvidence.md).
+Status: Phases 1–4 complete after verification, second review, and independent completion audits. Phase 2 includes the explicitly authorized direct-merge retry fix. Phases 5–9 remain planned. See [coverage evidence](FunctionalTestCoverageEvidence.md).
 Source: User-requested coverage audit and its eight numbered findings, 2026-10-01.
 Related proposal: [PlanningAndExecutionProposal.md](PlanningAndExecutionProposal.md).
 Purpose: Establish a functional regression contract before changing inventory planning or transfer architecture.
@@ -98,15 +98,15 @@ Outcome: Transfers persist correctly through both supported bag paths and subseq
 Dependencies: Phase 1; shared transfer checks from Phase 2. Audit finding 1.
 Sources: `EntityAttachedContainerAutoStash.cs`, existing workspace refresh test.
 
-☐ F4.1 Build fixtures for vanilla `CollectibleBehaviorHeldBag` workspaces and a distinct `IHeldBag` implementation; invoke `TryAutoStash`, not only workspace helpers.
-☐ F4.2 For both paths, test successful matching transfers with exact source loss, target gain, persisted contents, and unrelated contents preserved.
-☐ F4.3 For both paths, test full bags, partial capacity, nonmatching contents, and initially empty bags.
-☐ F4.4 Test negative/out-of-range attachment indices, empty/non-bag attachments, zero-capacity bags, and failed vanilla workspace loading with no side effects.
-☐ F4.5 Assert workspace-backed session acquisition/ownership and temporary-inventory operation without session management; include already-open workspaces.
-☐ F4.6 Verify `IHeldBag.Store`, attachment dirty notification, and attachment-owner persistence after movement; verify no persistence for unchanged operations.
-☐ F4.7 Reload the actual persisted bag contents and stash again, proving no stale data, duplication, or loss. Retain workspace slot-identity assertions across repeated loads.
-☐ F4.8 Test candidate-only `CanAutoStash` behavior separately from execution capacity, including a matching but full bag; record the current distinction.
-☐ Completion: Both adapter paths have execution and persistence round trips, focused tests pass, and second review plus independent audit verify persisted state rather than only wrapper inventory state.
+✔ F4.1 Build fixtures for vanilla `CollectibleBehaviorHeldBag` workspaces and a distinct `IHeldBag` implementation; invoke `TryAutoStash`, not only workspace helpers.
+✔ F4.2 For both paths, test successful matching transfers with exact source loss, target gain, persisted contents, and unrelated contents preserved.
+✔ F4.3 For both paths, test full bags, partial capacity, nonmatching contents, and initially empty bags.
+✔ F4.4 Test negative/out-of-range attachment indices, empty/non-bag attachments, zero-capacity bags, and failed vanilla workspace loading with no side effects.
+✔ F4.5 Assert workspace-backed session acquisition/ownership and temporary-inventory operation without session management; include already-open workspaces.
+✔ F4.6 Verify `IHeldBag.Store`, attachment dirty notification, and attachment-owner persistence after movement; verify no persistence for unchanged operations.
+✔ F4.7 Reload the actual persisted bag contents and stash again, proving no stale data, duplication, or loss. Retain workspace slot-identity assertions across repeated loads.
+✔ F4.8 Test candidate-only `CanAutoStash` behavior separately from execution capacity, including a matching but full bag; record the current distinction.
+✔ Completion: Both adapter paths have execution and persistence round trips, focused tests pass, and second review plus independent audit verify persisted state rather than only wrapper inventory state.
 
 ## Phase 5: Protect lifecycle and partial-failure behavior
 
