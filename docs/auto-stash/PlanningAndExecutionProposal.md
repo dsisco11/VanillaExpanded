@@ -1,6 +1,6 @@
 # AutoStash Planning and Execution Proposal
 
-Status: Architecture partially implemented: concrete engine transfers, target policies, incremental planning, lifecycle adapters and shared operation coordination are in place. Shared advisory assessment is in place; final acceptance remains planned. See [implementation plan](PlanningAndExecution.todo).
+Status: Implemented and independently audited. Concrete engine transfers, target policies, incremental planning, lifecycle adapters, shared operation coordination and advisory assessment satisfy automated acceptance. Live-game acceptance remains user-run. See [implementation plan](PlanningAndExecution.todo) for final validation.
 
 ## Purpose
 
@@ -13,8 +13,8 @@ The central design is incremental planning: select one concrete move from curren
 The original analysis was based on these repository sources before extraction:
 
 - The former `AutoStashTransferService` (preserved in Git revision b530316) combined preflight checks, player-source enumeration, inventory session ownership, destination selection, mutation, and auditing.
-- [BlockBehaviorAutoStashable](../../VanillaExpanded/src/AutoStashing/BlockBehaviorAutoStashable.cs) combines interaction handling with eligibility queries, container dispatch, and a separate bloomery transfer loop.
-- [EntityAttachedContainerAutoStash](../../VanillaExpanded/src/AutoStashing/EntityAttachedContainerAutoStash.cs) resolves attached bags, prepares inventories, invokes the shared service, and persists bag contents.
+- [BlockBehaviorAutoStashable](../../VanillaExpanded/src/AutoStashing/BlockBehaviorAutoStashable.cs) originally combined interaction handling with eligibility queries, container dispatch, and a separate bloomery transfer loop.
+- [EntityAttachedContainerAutoStash](../../VanillaExpanded/src/AutoStashing/EntityAttachedContainerAutoStash.cs) originally resolved attached bags, prepared inventories, invoked the shared service, and persisted bag contents.
 - [AutoStashSystem_Server](../../VanillaExpanded/src/ModSystems/AutoStashSystem_Server.cs) validates requests and dispatches server operations.
 - [AutoStashTransferTests](../../VanillaExpanded.Tests/Unit/AutoStashing/AutoStashTransferTests.cs) describes existing transfer, capacity, session, and workspace expectations.
 
@@ -217,4 +217,4 @@ The proposal is satisfied when all target types share the concrete transfer exec
 
 ## Evidence limits
 
-The original architecture analysis was source-only. Subsequent coverage execution reproduced and resolved the retry and failure-finalization defects under separate user authorization; its historical results are identified above. Automated verification of implemented extractions is recorded in the implementation plan. Passing tests do not establish live-game acceptance or completion of the remaining architecture.
+The original architecture analysis was source-only. Subsequent coverage execution reproduced and resolved the retry and failure-finalization defects under separate user authorization; its historical results are identified above. Automated verification of implemented extractions is recorded in the implementation plan. Final source review and independent audit establish implementation acceptance; passing automated tests do not establish live-game acceptance.

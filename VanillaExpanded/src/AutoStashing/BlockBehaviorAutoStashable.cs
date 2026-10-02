@@ -390,12 +390,6 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         return AutoStashService.AssessBlock(owner, blockEntity, interactionAllowed);
     }
 
-    /// <summary>Returns distinct populated collectible IDs for existing inventory-query callers.</summary>
-    internal static HashSet<int> GetDistinctItemTypes(in IInventory inventory)
-    {
-        return [.. inventory.Where(static slot => !slot.Empty).Where(static slot => slot?.Itemstack?.Collectible?.Id is not null).Select(static slot => slot.Itemstack.Collectible.Id)];
-    }
-
     /// <summary>
     /// Automatically stashes items from the player's inventory into the specified generic container.
     /// The item-types which are already present in the container are the ones which will be stashed.
