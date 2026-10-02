@@ -10,9 +10,7 @@ using Vintagestory.API.MathTools;
 using Vintagestory.GameContent;
 
 using VanillaExpanded.RadialProgress;
-using VanillaExpanded.AutoStashing.Transfers;
 using VanillaExpanded.AutoStashing.Planning;
-using VanillaExpanded.AutoStashing.Targets;
 
 namespace VanillaExpanded.AutoStashing;
 
@@ -279,6 +277,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         }
     }
 
+    /// <summary>Retains container/full help actions and caller-selected modifiers using advisory capacity.</summary>
     private WorldInteraction[] GetContainerInteractionHelp(
         IWorldAccessor world,
         BlockSelection selection,
@@ -321,35 +320,9 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             return null;
         }
 
-        HashSet<int> stashableIds = GetStashableItems(playerInventory, blockEntity);
-        if (stashableIds.Count == 0)
-        {
-            return null;
-        }
-
-        IPlayerInventoryManager playerInv = playerInventory;
-        IInventory playerBackpack = playerInv.GetOwnInventory(GlobalConstants.backpackInvClassName);
-        IInventory playerHotbar = playerInv.GetOwnInventory(GlobalConstants.hotBarInvClassName);
-
-        // Collect unique item stacks by collectible ID
-        Dictionary<int, ItemStack> uniqueStacks = [];
-        foreach (ItemSlot slot in playerBackpack.Concat(playerHotbar))
-        {
-            if (slot.Empty || slot.Itemstack?.Collectible?.Id is null)
-            {
-                continue;
-            }
-
-            int id = slot.Itemstack.Collectible.Id;
-            if (stashableIds.Contains(id) && !uniqueStacks.ContainsKey(id))
-            {
-                uniqueStacks[id] = slot.Itemstack.Clone();
-            }
-        }
-
-        return [.. uniqueStacks.Values];
+        AutoStashAssessment assessment = AssessTarget(playerInventory, blockEntity);
+        return assessment.DisplayStacks.Length == 0 ? null : assessment.DisplayStacks;
     }
-
     #endregion
 
     #region UI Management
@@ -399,108 +372,25 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     /// <returns> A set of collectible IDs which can be stashed from the player into the block entity. </returns>
     internal static HashSet<int> GetStashableItems(IPlayerInventoryManager playerInventory, BlockEntity? blockEntity)
     {
-        return blockEntity switch
-        {
-            BlockEntityBloomery bloomery => GetStashableItemsForBloomery(playerInventory, bloomery),
-            BlockEntityContainer container => GetStashableItemsForContainer(playerInventory, container),
-            _ => []
-        };
+        return [.. AssessTarget(playerInventory, blockEntity).AvailableItemIds];
     }
 
-    /// <summary>
-    /// Gets item types which are present in both the player's inventory/hotbar AND the specified container.
-    /// </summary>
-    private static HashSet<int> GetStashableItemsForContainer(IPlayerInventoryManager playerInventory, BlockEntityContainer container, bool requireCapacity = true)
+    /// <summary>Applies the established empty-bloomery interaction gate as an input to shared advisory assessment.</summary>
+    private static AutoStashAssessment AssessTarget(IPlayerInventoryManager owner, BlockEntity? blockEntity)
     {
-        if (container is null)
+        bool interactionAllowed = true;
+        if (blockEntity is BlockEntityBloomery bloomery)
         {
-            return [];
+            InventoryGeneric? inventory = BloomeryAccessor.GetInventory(bloomery);
+            ItemStack? active = owner.ActiveHotbarSlot?.Itemstack;
+            // This input belongs only to interaction eligibility. Server execution never consults the active item.
+            interactionAllowed = inventory is not null && (!inventory[0].Empty || !inventory[1].Empty
+                || (active is not null && bloomery.CanAdd(active)));
         }
-
-        IPlayerInventoryManager playerInv = playerInventory;
-        IInventory playerBackpack = playerInv.GetOwnInventory(GlobalConstants.backpackInvClassName);
-        IInventory playerHotbar = playerInv.GetOwnInventory(GlobalConstants.hotBarInvClassName);
-        HashSet<int> containerItemTypes = [.. container.GetNonEmptyContentStacks().Where(static stack => stack?.Collectible?.Id is not null).Select(static stack => stack.Collectible.Id)];
-        HashSet<int> playerItemTypes = [.. GetDistinctItemTypes(playerBackpack), .. GetDistinctItemTypes(playerHotbar)];
-        containerItemTypes.IntersectWith(playerItemTypes);
-
-        if (!requireCapacity || containerItemTypes.Count == 0)
-        {
-            return containerItemTypes;
-        }
-
-        HashSet<int> stashableIds = [];
-
-        foreach (ItemSlot sourceSlot in playerBackpack.Concat(playerHotbar))
-        {
-            if (sourceSlot.Empty || sourceSlot.Itemstack?.Collectible?.Id is not int collectibleId || !containerItemTypes.Contains(collectibleId))
-            {
-                continue;
-            }
-
-            if (container.Inventory.Any(targetSlot => targetSlot.CanTakeFrom(sourceSlot, EnumMergePriority.AutoMerge)))
-            {
-                stashableIds.Add(collectibleId);
-            }
-        }
-
-        return stashableIds;
+        return AutoStashService.AssessBlock(owner, blockEntity, interactionAllowed);
     }
 
-    /// <summary>
-    /// Gets item types which can be stashed into a bloomery.
-    /// Returns empty set if bloomery is burning, has items in output slot, or slots are empty and active hotbar can't be added.
-    /// </summary>
-    private static HashSet<int> GetStashableItemsForBloomery(IPlayerInventoryManager playerInventory, BlockEntityBloomery bloomery)
-    {
-        if (bloomery is null)
-        {
-            return [];
-        }
-
-        // Bloomery state validation: cannot add items while burning or if output slot has items
-        InventoryGeneric? bloomeryInv = BloomeryAccessor.GetInventory(bloomery);
-        if (bloomery.IsBurning || bloomeryInv is null || !bloomeryInv[2].Empty)
-        {
-            return [];
-        }
-
-        // Bloomery slot validation: fuel or ore slot must have items, OR active hotbar item must be addable
-        bool fuelSlotHasItems = !bloomeryInv[0].Empty;
-        bool oreSlotHasItems = !bloomeryInv[1].Empty;
-        ItemStack? activeStack = playerInventory.ActiveHotbarSlot?.Itemstack;
-        bool activeHotbarCanBeAdded = activeStack is not null && bloomery.CanAdd(activeStack);
-
-        if (!fuelSlotHasItems && !oreSlotHasItems && !activeHotbarCanBeAdded)
-        {
-            return [];
-        }
-
-        IPlayerInventoryManager playerInv = playerInventory;
-        IInventory playerBackpack = playerInv.GetOwnInventory(GlobalConstants.backpackInvClassName);
-        IInventory playerHotbar = playerInv.GetOwnInventory(GlobalConstants.hotBarInvClassName);
-
-        // Find player items that the bloomery can accept
-        HashSet<int> stashableIds = [];
-        foreach (ItemSlot slot in playerBackpack.Concat(playerHotbar))
-        {
-            if (slot.Empty || slot.Itemstack?.Collectible?.Id is null)
-            {
-                continue;
-            }
-
-            int? targetSlotIndex = BloomeryPolicy.Classify(slot.Itemstack);
-            if (bloomery.CanAdd(slot.Itemstack)
-                && targetSlotIndex.HasValue
-                && BloomeryPolicy.GetMaxCanAdd(bloomeryInv, slot.Itemstack, targetSlotIndex.Value) > 0)
-            {
-                stashableIds.Add(slot.Itemstack.Collectible.Id);
-            }
-        }
-
-        return stashableIds;
-    }
-
+    /// <summary>Returns distinct populated collectible IDs for existing inventory-query callers.</summary>
     internal static HashSet<int> GetDistinctItemTypes(in IInventory inventory)
     {
         return [.. inventory.Where(static slot => !slot.Empty).Where(static slot => slot?.Itemstack?.Collectible?.Id is not null).Select(static slot => slot.Itemstack.Collectible.Id)];
@@ -570,11 +460,12 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         return stashables.Count != 0;
     }
 
+    /// <summary>Distinguishes matching contents from apparent capacity without acquiring the target.</summary>
     private bool HasContainerStashCandidates(in IWorldAccessor world, IPlayerInventoryManager playerInventory, BlockSelection selection)
     {
         BlockEntity? blockEntity = world.BlockAccessor.GetBlockEntity(selection.Position);
         return blockEntity is BlockEntityContainer container
-            && GetStashableItemsForContainer(playerInventory, container, requireCapacity: false).Count != 0;
+            && AssessTarget(playerInventory, container).HasCandidates;
     }
     #endregion
 }

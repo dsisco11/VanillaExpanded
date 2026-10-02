@@ -1,6 +1,6 @@
 # AutoStash Planning and Execution Proposal
 
-Status: Architecture partially implemented: concrete engine transfers, target policies, incremental planning, lifecycle adapters and shared operation coordination are in place. Shared assessment remains planned. See [implementation plan](PlanningAndExecution.todo).
+Status: Architecture partially implemented: concrete engine transfers, target policies, incremental planning, lifecycle adapters and shared operation coordination are in place. Shared advisory assessment is in place; final acceptance remains planned. See [implementation plan](PlanningAndExecution.todo).
 
 ## Purpose
 
@@ -18,7 +18,7 @@ The original analysis was based on these repository sources before extraction:
 - [AutoStashSystem_Server](../../VanillaExpanded/src/ModSystems/AutoStashSystem_Server.cs) validates requests and dispatches server operations.
 - [AutoStashTransferTests](../../VanillaExpanded.Tests/Unit/AutoStashing/AutoStashTransferTests.cs) describes existing transfer, capacity, session, and workspace expectations.
 
-The original shared service accepted an item predicate, an optional preferred slot, a session-management boolean, and a target finalization callback. Those inputs could not describe bloomery quantity limits or source-pass ordering, so the bloomery implemented its own execution path. Both paths now share policies, an incremental planner/cursor and the concrete executor. Target adapters own resolution, acquisition, persistence and release; the existing mutation tracker invokes adapter finalization before cleanup. AutoStashService now owns both loops' coordination, actual operation results, auditing and failure feedback; the entry signatures adapt results to their existing Boolean return contract. Client assessment remains to be extracted.
+The original shared service accepted an item predicate, an optional preferred slot, a session-management boolean, and a target finalization callback. Those inputs could not describe bloomery quantity limits or source-pass ordering, so the bloomery implemented its own execution path. Both paths now share policies, an incremental planner/cursor and the concrete executor. Target adapters own resolution, acquisition, persistence and release; the existing mutation tracker invokes adapter finalization before cleanup. AutoStashService now owns both loops' coordination, actual operation results, auditing and failure feedback; the entry signatures adapt results to their existing Boolean return contract. Client eligibility and help now use shared advisory assessment with explicit capacity certainty.
 
 The optional preferred-slot compatibility contract treats a valid preferred index as exclusive during preflight, whereas execution can fall back to other destinations. PreferredSlotCompatibility preserves this characterization separately from bloomery mandatory-slot routing. Current production callers do not supply that argument. This is a source-level abstraction inconsistency, not a reproduced gameplay defect.
 
@@ -153,6 +153,8 @@ A complete precomputed list of exact moves would require predicting engine callb
 Assessment and execution share policy eligibility and destination-selection rules. Client interaction gates remain a separate input so client-only conditions do not silently become execution restrictions.
 
 Assessment must not open sessions, refresh a mutable server workspace, invoke transfer operations, or persist contents. Attached-container assessment can use the available client contents view without constructing an execution workspace. If that view supports only candidate detection, the assessment must represent capacity as unknown rather than claiming that movement is possible. Preserve representative ordering/deduplication and independent display-stack clones, exact help actions/modifiers, and the distinction between full targets and no matching items.
+
+Compatibility remains explicit: client container/bag membership uses collectible IDs while execution matches codes; crate help considers all current contents while crate execution captures the first type; client capacity probes automatic eligibility while execution also permits direct retries. MatchingContentsPolicy.ForAssessment and the shared read-only capacity probe preserve these established distinctions. Shared policy rules do not imply identical client and server gates or guaranteed movement.
 
 The server always resolves current state and plans again. It does not trust client assessment or accept client-authored transfer instructions. UI callers can use candidate and capacity information to retain existing interaction help behavior, including the distinction between no matching contents and a full target.
 

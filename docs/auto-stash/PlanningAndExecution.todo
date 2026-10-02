@@ -1,6 +1,6 @@
 # AutoStash Planning and Execution
 
-Status: Phases 1–4 complete; Phases 5–6 remain planned.
+Status: Phases 1–5 complete; Phase 6 remains planned.
 Source proposal: [PlanningAndExecutionProposal.md](PlanningAndExecutionProposal.md).
 Purpose: Extract shared incremental planning and engine execution while preserving the established functional contract.
 
@@ -193,13 +193,41 @@ Outcome: Client assessment reuses policy while preserving existing interaction g
 Dependencies: Phase 4.
 Sources: Proposal Eligibility assessment, Client assessment and Scope; existing eligibility/help/gesture tests and IProgressSystemProvider.
 
-☐ P5.1 Add AutoStashAssessment distinguishing candidate existence and apparent transfer availability, including unknown capacity and independent representative display stacks. Reuse policy eligibility/routing through a read-only view; do not invoke execution/session/workspace refresh/persistence.
-☐ P5.2 Migrate generic/crate/bloomery eligibility/help queries to shared assessment. Preserve full versus no-match actions, representative backpack-first ordering/deduplication, clone independence, crate modifiers and bloomery thresholds.
-☐ P5.3 Keep empty-bloomery active-hotbar gating as a client interaction input, never a server prerequisite. Retain attached matching-only assessment with unknown capacity; do not claim parity with full bag execution.
-☐ P5.4 Migrate attached eligibility/help using available bag contents without constructing an execution workspace. Preserve append gates, Ctrl+Shift help and original interaction identities/order.
-☐ P5.5 Keep block/attached gesture state machines, mounted controls, timing/grace boundaries, progress provider, sound/animation, cancellation/listener disposal and exactly-once packet submission in their established owners. Shared service coordinates mutation progress only.
-☐ P5.6 Remove duplicated policy classification/assessment implementations after migration, preserving target-specific client gates. Run assessment purity, display-clone and complete gesture regressions plus isolated integration and fresh focused/Unit hosts.
-☐ Completion: Shared assessment makes certainty explicit, exact help/gestures remain unchanged, tests prove no assessment mutation/lifecycle effects, and second review plus independent audit find no client/server gate drift.
+☑ P5.1 Add AutoStashAssessment distinguishing candidate existence and apparent transfer availability, including unknown capacity and independent representative display stacks. Reuse policy eligibility/routing through a read-only view; do not invoke execution/session/workspace refresh/persistence.
+☑ P5.2 Migrate generic/crate/bloomery eligibility/help queries to shared assessment. Preserve full versus no-match actions, representative backpack-first ordering/deduplication, clone independence, crate modifiers and bloomery thresholds.
+☑ P5.3 Keep empty-bloomery active-hotbar gating as a client interaction input, never a server prerequisite. Retain attached matching-only assessment with unknown capacity; do not claim parity with full bag execution.
+☑ P5.4 Migrate attached eligibility/help using available bag contents without constructing an execution workspace. Preserve append gates, Ctrl+Shift help and original interaction identities/order.
+☑ P5.5 Keep block/attached gesture state machines, mounted controls, timing/grace boundaries, progress provider, sound/animation, cancellation/listener disposal and exactly-once packet submission in their established owners. Shared service coordinates mutation progress only.
+☑ P5.6 Remove duplicated policy classification/assessment implementations after migration, preserving target-specific client gates. Run assessment purity, display-clone and complete gesture regressions plus isolated integration and fresh focused/Unit hosts.
+☑ Completion: Shared assessment makes certainty explicit, exact help/gestures remain unchanged, tests prove no assessment mutation/lifecycle effects, and second review plus independent audit find no client/server gate drift.
+
+### Implementation notes and evidence
+
+Implementation starts at 3ce371b2be52352f0f705bc17af314c1f057bc9b. P5.1–P5.6 inherit the complete proposal and Scope and execution rules; Eligibility assessment, Client assessment, Policy contracts, Source layout and dependencies, Scope and Validation requirements govern the changes. Current help/eligibility implementations, ContainerHelpCoverageTests, AttachedHelpCoverageTests, bloomery eligibility/help tests, both complete gesture suites and IProgressSystemProvider were consulted directly. No controlling source was unavailable.
+
+P5.1/P5.2/P5.6 -> proposal Eligibility assessment, Client assessment and Policy contracts -> read-only policy assessment, candidate/capacity distinctions, stable representatives and independent clones -> Planning/AutoStashAssessment, AutoStashCapacity and AutoStashAssessor, shared AutoStashPlanner.CanTransfer probe, and AutoStashService.AssessBlock. Existing block eligibility/help loops are removed. Engine slot eligibility and bloomery CanAdd/classification/live quantity remain authoritative; assessment executes no transfer and acquires no lifecycle.
+
+Preservation decision: existing client container/bag membership uses collectible IDs, while matching execution uses codes. Existing crate help considers all current contents (including the multi-type generic fixture), while crate execution captures only the first type. Client capacity uses automatic eligibility, while execution probes automatic and direct eligibility. MatchingContentsPolicy.ForAssessment explicitly captures the existing client ID membership, and the shared capacity probe explicitly retains automatic-only advisory queries. These distinctions are documented compatibility contracts, not new gameplay rules or a claim of exact client/server parity. Display representatives remain first backpack-before-hotbar stacks by ID, even when another stack of that ID provided capacity evidence; bloomery execution-pass ordering never reorders help.
+
+P5.3/P5.4 -> proposal Client assessment, Bloomery and Attached bags -> keep empty-bloomery active-item gating outside execution and contents-only bag capacity unknown -> interaction-owned AssessTarget supplies a separate gate input to the service; AssessAttached reads IHeldBag.GetContents without target resolution, workspace preparation, refresh, sessions or storage. Attached help retains its existing no-stack Ctrl+Shift append action and preserves prior interaction identities/order.
+
+P5.5 -> proposal Scope and Established regression contract -> timing, progress ownership, mounted controls, cancellation, listeners, feedback and packets stay in existing owners -> no changes to either gesture controller, network handler, IProgressSystemProvider or rendering. Existing complete gesture suites remain unmodified.
+
+P5.6 -> proposal Validation requirements and Client assessment -> AutoStashAssessmentTests add candidate/full/available distinctions, current client ID/crate membership, automatic-only versus direct eligibility, bloomery display order/clone independence, a client gate that does not block server execution, unknown full-bag capacity and absence of workspace/storage effects for both bag implementations, and missing-source uncertainty. Existing help/gesture/dispatch/lifecycle/retry assertions remain intact.
+
+Second review: reread the new assessment contracts/loop, service view resolution, planner probe extraction, MatchingContentsPolicy snapshot factory, both interaction diffs and test assertions against the full controlling proposal. Shared capacity probing preserves mandatory routing, live allowances and preferred-slot compatibility. Client-only identity, crate membership, automatic priority and empty-bloomery gate remain explicit; server execution never calls the assessment gate. Display clones retain engine Clone semantics and representative order. No session, workspace or transfer API is reachable from assessment. Full-versus-unmatched help, modifiers and append behavior are unchanged; old eligibility loops are removed. Diff whitespace check passed. Final acceptance/dependency cleanup remains separate work.
+
+Final validation through tests against the implementation working tree based on 3ce371b2be52352f0f705bc17af314c1f057bc9b:
+
+```powershell
+dotnet test VanillaExpanded.IntegrationTests/VanillaExpanded.IntegrationTests.csproj --no-restore --filter 'Category=Integration' --verbosity minimal
+dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-restore --filter 'FullyQualifiedName~AutoStash' --verbosity minimal
+dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-build --no-restore --filter 'Category=Unit' --verbosity minimal
+```
+
+Integration 1, AutoStash 409 and Unit 605 passed, zero failures/skips/exclusions. All hosts ran sequentially; the dedicated integration host exited before fresh focused and Unit hosts. The final current rebuild emitted the same 7 existing production and 27 test warnings; subsequent incremental runs emitted none. Earlier validation passed 408/604 before the additional direct-only capacity test; the final rebuilt sequence includes it. Fresh installed API/Lib/SurvivalMod/Essentials assembly versions are all 1.22.7.0; API file version 1.22.0, others 1.22.7. No game/client/server launch, tooling installation or standalone audit/verification/log files occurred.
+
+Independent completion audit by audit directly consulted the skill, full current plan/proposal, new assessment implementation and owner diffs, existing/new assertion sensitivity, documentation mapping and final rebuilt evidence. Verdict: P5.1–P5.6 and completion fully satisfied, no confirmed implementation/documentation issues or evidence gaps. Markers were checked only after the second review and this verdict. Automated evidence does not establish live-game acceptance.
 
 ## Phase 6: Remove migration scaffolding and verify acceptance
 

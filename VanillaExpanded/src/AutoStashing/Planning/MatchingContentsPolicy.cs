@@ -20,6 +20,14 @@ internal class MatchingContentsPolicy : AutoStashPolicy
         accepts = stack => types.Contains(stack.Collectible.Code);
     }
 
+    /// <summary>Captures client-visible collectible IDs, preserving advisory matching separately from execution code identity.</summary>
+    public static MatchingContentsPolicy ForAssessment(IEnumerable<ItemStack?> contents)
+    {
+        HashSet<int> types = [.. contents.Where(stack => stack?.Collectible is not null)
+            .Select(stack => stack!.Collectible.Id)];
+        return new MatchingContentsPolicy(stack => types.Contains(stack.Collectible.Id));
+    }
+
     /// <summary>Preserves predicate-based fixtures and the characterized preferred-slot compatibility contract.</summary>
     public MatchingContentsPolicy(System.Func<ItemStack, bool> accepts, System.Func<ItemStack, int?>? preference = null)
     {
@@ -27,7 +35,7 @@ internal class MatchingContentsPolicy : AutoStashPolicy
         PreferredSlot = preference is null ? null : new PreferredSlotCompatibility(preference);
     }
 
-    /// <summary>Applies code eligibility without duplicating the engine's destination compatibility checks.</summary>
+    /// <summary>Applies the captured membership rule without duplicating the engine's destination compatibility checks.</summary>
     public override bool IsEligible(ItemStack stack, AutoStashSourcePass pass) => accepts(stack);
     #endregion
 }

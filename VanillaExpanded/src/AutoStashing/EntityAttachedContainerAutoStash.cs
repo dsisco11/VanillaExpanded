@@ -1,12 +1,6 @@
-using System.Collections.Generic;
-using System.Linq;
-using VanillaExpanded.AutoStashing.Planning;
-using VanillaExpanded.AutoStashing.Targets;
-
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
-using Vintagestory.API.Config;
 using Vintagestory.GameContent;
 
 namespace VanillaExpanded.AutoStashing;
@@ -14,6 +8,9 @@ namespace VanillaExpanded.AutoStashing;
 /// <summary>Handles attached-container interaction, matching assessment and persistent engine transfers.</summary>
 internal static class EntityAttachedContainerAutoStash
 {
+    #region Public API
+    #region Interaction and help
+    /// <summary>Begins the client-owned gesture after mounted-control, selection and candidate gates pass.</summary>
     public static bool HandleInteract(
         EntityBehaviorAttachable attachable,
         EntityAgent byEntity,
@@ -53,6 +50,7 @@ internal static class EntityAttachedContainerAutoStash
         return false;
     }
 
+    /// <summary>Appends the existing Ctrl+Shift action without altering prior interactions or constructing bag workspaces.</summary>
     public static void AppendInteractionHelp(
         EntityBehaviorAttachable attachable,
         IClientWorldAccessor world,
@@ -83,24 +81,12 @@ internal static class EntityAttachedContainerAutoStash
         interactions = [.. interactions, autoStashInteraction];
     }
 
+    /// <summary>Retains matching-only client eligibility while shared assessment explicitly leaves bag capacity unknown.</summary>
     public static bool CanAutoStash(IPlayerInventoryManager playerInventory, ItemSlot attachmentSlot, IWorldAccessor world)
-    {
-        ItemStack? attachmentStack = attachmentSlot.Itemstack;
-        IHeldBag? heldBag = attachmentStack?.Collectible.GetCollectibleInterface<IHeldBag>();
-        if (heldBag is null || attachmentStack is null)
-        {
-            return false;
-        }
+        => AutoStashService.AssessAttached(world, playerInventory, attachmentSlot).HasCandidates;
+    #endregion
 
-        HashSet<int> contentTypes = [.. heldBag.GetContents(attachmentStack, world)
-            .Where(static stack => stack?.Collectible is not null)
-            .Select(static stack => stack.Collectible.Id)];
-
-        return contentTypes.Count != 0
-            && PlayerSlots(playerInventory).Any(slot =>
-                slot.Itemstack?.Collectible is not null && contentTypes.Contains(slot.Itemstack.Collectible.Id));
-    }
-
+    #region Server execution
     /// <summary>Transfers matching contents and persists applied or uncertain changes before releasing an owned workspace session.</summary>
     public static bool TryAutoStash(
         IWorldAccessor world,
@@ -111,11 +97,6 @@ internal static class EntityAttachedContainerAutoStash
     {
         return AutoStashService.StashAttached(world, player, hostEntity, attachable, attachmentSlotIndex).MovedQuantity > 0;
     }
-    private static IEnumerable<ItemSlot> PlayerSlots(IPlayerInventoryManager playerInventory)
-    {
-        IInventory? backpack = playerInventory.GetOwnInventory(GlobalConstants.backpackInvClassName);
-        IInventory? hotbar = playerInventory.GetOwnInventory(GlobalConstants.hotBarInvClassName);
-
-        return (backpack ?? Enumerable.Empty<ItemSlot>()).Concat(hotbar ?? Enumerable.Empty<ItemSlot>());
-    }
+    #endregion
+    #endregion
 }

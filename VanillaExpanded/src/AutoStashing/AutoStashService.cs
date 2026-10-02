@@ -14,6 +14,46 @@ namespace VanillaExpanded.AutoStashing;
 internal static class AutoStashService
 {
     #region Public API
+    #region Advisory assessment
+    /// <summary>Resolves a read-only block view and policy while treating interaction eligibility as a separate caller input.</summary>
+    internal static AutoStashAssessment AssessBlock(IPlayerInventoryManager owner, BlockEntity? blockEntity,
+        bool interactionAllowed)
+    {
+        if (!interactionAllowed) return AutoStashAssessment.Empty;
+        AutoStashPolicy policy;
+        IInventory inventory;
+        if (blockEntity is Vintagestory.GameContent.BlockEntityBloomery bloomery)
+        {
+            var target = BloomeryAutoStashTarget.Resolve(bloomery);
+            if (target is null) return AutoStashAssessment.Empty;
+            inventory = target.Inventory;
+            policy = new BloomeryPolicy(bloomery, (InventoryGeneric)inventory);
+        }
+        else if (blockEntity is Vintagestory.GameContent.BlockEntityContainer container)
+        {
+            inventory = container.Inventory;
+            // Existing crate help considers all current contents, unlike first-type crate execution.
+            // Retain client ID matching instead of silently broadening it to execution's code matching.
+            policy = MatchingContentsPolicy.ForAssessment(container.GetNonEmptyContentStacks());
+        }
+        else return AutoStashAssessment.Empty;
+
+        return AutoStashAssessor.Assess(policy, inventory,
+            owner.GetOwnInventory(GlobalConstants.backpackInvClassName), owner.GetOwnInventory(GlobalConstants.hotBarInvClassName));
+    }
+
+    /// <summary>Reads persisted bag contents only; candidate detection does not claim available space or load execution slots.</summary>
+    internal static AutoStashAssessment AssessAttached(IWorldAccessor world, IPlayerInventoryManager owner, ItemSlot attachment)
+    {
+        ItemStack? stack = attachment.Itemstack;
+        IHeldBag? bag = stack?.Collectible.GetCollectibleInterface<IHeldBag>();
+        if (stack is null || bag is null) return AutoStashAssessment.Empty;
+        var policy = MatchingContentsPolicy.ForAssessment(bag.GetContents(stack, world));
+        return AutoStashAssessor.Assess(policy, null,
+            owner.GetOwnInventory(GlobalConstants.backpackInvClassName), owner.GetOwnInventory(GlobalConstants.hotBarInvClassName));
+    }
+    #endregion
+
     #region Target operations
     /// <summary>Captures container matching types before acquiring its execution session.</summary>
     internal static AutoStashResult StashContainer(IWorldAccessor world, IPlayerInventoryManager owner,

@@ -150,24 +150,27 @@ internal sealed class AutoStashPlanner : IDisposable
         {
             foreach (ItemSlot source in pass.Inventory)
             {
-                if (source.Empty || !policy.IsEligible(source.Itemstack!, pass)) continue;
-                if (pass.RequiredSlot is not null)
-                {
-                    // Required routing is governed by target-specific live limits, never by an alternative slot.
-                    if (policy.GetQuantity(source, pass) > 0) return true;
-                    continue;
-                }
-                if (policy.PreferredSlot?.GetIndex(source.Itemstack!, target.Count) is int preferred)
-                {
-                    // Preserve exclusive valid-index preflight. Execution preference may still fall back later.
-                    if (target[preferred] is ItemSlot candidate && CanAccept(candidate, source)) return true;
-                    continue;
-                }
-                // Either priority can make work plausible; actual engine execution can still reject it.
-                if (target.Any(slot => CanAccept(slot, source))) return true;
+                if (CanTransfer(target, policy, source, pass, includeDirect: true)) return true;
             }
         }
         return false;
+    }
+
+    /// <summary>Probes one live source using policy routing and engine eligibility, without selecting or executing a move.</summary>
+    public static bool CanTransfer(IInventory target, AutoStashPolicy policy, ItemSlot source,
+        AutoStashSourcePass pass, bool includeDirect)
+    {
+        if (source.Empty || !policy.IsEligible(source.Itemstack!, pass)) return false;
+        // Mandatory input routing uses the original engine acceptance and live quantity rules, never ordinary fallback.
+        if (pass.RequiredSlot is not null) return policy.GetQuantity(source, pass) > 0;
+        if (policy.PreferredSlot?.GetIndex(source.Itemstack!, target.Count) is int preferred)
+        {
+            // Compatibility preflight remains exclusive; advisory callers retain automatic-only capacity detection.
+            return target[preferred] is ItemSlot candidate && (includeDirect
+                ? CanAccept(candidate, source) : candidate.CanTakeFrom(source, EnumMergePriority.AutoMerge));
+        }
+        return target.Any(slot => includeDirect
+            ? CanAccept(slot, source) : slot.CanTakeFrom(source, EnumMergePriority.AutoMerge));
     }
 
     /// <summary>Checks candidate membership independently of destination capacity or workspace preparation.</summary>
