@@ -69,6 +69,117 @@ public class NuggetCalculationTests
 
     #endregion
 
+    #region Recipe-Bounded Targets
+
+    /// <summary>
+    /// Verifies exact-ratio recipes still require exact whole-nugget mixtures.
+    /// </summary>
+    [Fact]
+    public void FindAdjacentWasteFreeTarget_ExactRecipe_RequiresExactMixture()
+    {
+        var percentages = new Dictionary<int, int> { [0] = 12, [1] = 88 };
+        MetalDepositIngredient[] ingredients =
+        [
+            new(new("game:ingot-tin"), null!, 0.12f, 0.12f),
+            new(new("game:ingot-copper"), null!, 0.88f, 0.88f)
+        ];
+
+        int result = AlloyCalculatorLogic.FindAdjacentWasteFreeTarget(100, percentages, true, ingredients);
+
+        Assert.Equal(125, result);
+        Assert.Equal(0, AlloyCalculatorLogic.CalculateWastedMetalUnits(result, percentages, ingredients));
+    }
+
+    /// <summary>
+    /// Checks that three-ingredient allocations remain within all recipe bounds.
+    /// </summary>
+    [Fact]
+    public void CalculateAllNuggetsRequired_ThreeIngredients_RespectsBoundsWithoutExcess()
+    {
+        var percentages = new Dictionary<int, int> { [0] = 67, [1] = 22, [2] = 11 };
+        MetalDepositIngredient[] ingredients =
+        [
+            new(new("game:ingot-copper"), null!, 0.5f, 0.7f),
+            new(new("game:ingot-zinc"), null!, 0.2f, 0.3f),
+            new(new("game:ingot-bismuth"), null!, 0.1f, 0.2f)
+        ];
+
+        var nuggets = AlloyCalculatorLogic.CalculateAllNuggetsRequired(50, percentages, ingredients);
+
+        Assert.Equal(10, nuggets.Values.Sum());
+        foreach (var (index, count) in nuggets)
+        {
+            double ratio = Math.Round((double)count / 10, 4);
+            Assert.InRange(ratio,
+                Math.Round(ingredients[index].MinRatio, 4),
+                Math.Round(ingredients[index].MaxRatio, 4));
+        }
+    }
+
+    /// <summary>
+    /// Checks that the minimum tin-bronze batch is reachable even at the copper slider maximum.
+    /// </summary>
+    [Theory]
+    [InlineData(125, false, 60)]
+    [InlineData(65, false, 60)]
+    [InlineData(60, false, 60)]
+    [InlineData(45, false, 45)]
+    [InlineData(55, true, 60)]
+    [InlineData(60, true, 125)]
+    [InlineData(125, true, 185)]
+    [InlineData(185, true, 250)]
+    [InlineData(250, false, 185)]
+    [InlineData(185, false, 125)]
+    [InlineData(100, true, 125)]
+    [InlineData(100, false, 60)]
+    [InlineData(126, false, 125)]
+    public void FindAdjacentWasteFreeTarget_TinBronzeBounds_ReachesSmallestBatch(
+        int targetUnits, bool increase, int expected)
+    {
+        var percentages = new Dictionary<int, int> { [0] = 92, [1] = 8 };
+        MetalDepositIngredient[] ingredients =
+        [
+            new(new("game:ingot-copper"), null!, 0.88f, 0.92f),
+            new(new("game:ingot-tin"), null!, 0.08f, 0.12f)
+        ];
+
+        int result = AlloyCalculatorLogic.FindAdjacentWasteFreeTarget(
+            targetUnits, percentages, increase, ingredients);
+
+        Assert.Equal(expected, result);
+    }
+
+    /// <summary>
+    /// Verifies the displayed minimum batch uses all its metal and respects the recipe.
+    /// </summary>
+    [Fact]
+    public void CalculateAllNuggetsRequired_TinBronzeMinimumYieldTarget_UsesElevenCopperAndOneTin()
+    {
+        var percentages = new Dictionary<int, int> { [0] = 92, [1] = 8 };
+        MetalDepositIngredient[] ingredients =
+        [
+            new(new("game:ingot-copper"), null!, 0.88f, 0.92f),
+            new(new("game:ingot-tin"), null!, 0.08f, 0.12f)
+        ];
+
+        var nuggets = AlloyCalculatorLogic.CalculateAllNuggetsRequired(60, percentages, ingredients);
+
+        Assert.Equal(11, nuggets[0]);
+        Assert.Equal(1, nuggets[1]);
+        Assert.Equal(0, AlloyCalculatorLogic.CalculateWastedMetalUnits(60, percentages, ingredients));
+        int target = 125;
+        while (target > 60)
+        {
+            int nextTarget = AlloyCalculatorLogic.FindAdjacentWasteFreeTarget(
+                target, percentages, false, ingredients);
+            Assert.True(nextTarget < target);
+            target = nextTarget;
+        }
+        Assert.Equal(60, target);
+    }
+
+    #endregion
+
     #region Wasted Metal
 
     /// <summary>

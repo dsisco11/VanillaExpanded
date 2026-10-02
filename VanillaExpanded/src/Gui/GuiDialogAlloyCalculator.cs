@@ -509,12 +509,13 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         if (selectedOption is null || SingleComposer is null) return;
 
         calculatedStacks.Clear();
+        var nuggetCounts = AlloyCalculatorLogic.CalculateAllNuggetsRequired(
+            targetUnits, sliderValues, selectedIngredients);
 
         for (var i = 0; i < selectedIngredients.Length; i++)
         {
             var ingredient = selectedIngredients[i];
-            var percent = sliderValues.TryGetValue(i, out var val) ? val : 0;
-            var nuggets = AlloyCalculatorLogic.CalculateNuggetsRequired(targetUnits, percent);
+            var nuggets = nuggetCounts.GetValueOrDefault(i);
 
             // Update slideshow component with new stack size
             if (i < slideshowComponents.Count)
@@ -534,7 +535,8 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             }
         }
 
-        long wastedUnits = AlloyCalculatorLogic.CalculateWastedMetalUnits(targetUnits, sliderValues);
+        long wastedUnits = AlloyCalculatorLogic.CalculateWastedMetalUnits(
+            targetUnits, sliderValues, selectedIngredients);
         SingleComposer.GetDynamicText("wasteWarning")?.SetNewText(wastedUnits > 0
             ? Lang.Get($"{Constants.ModId}:gui-alloycalculator-waste-warning", wastedUnits)
             : string.Empty);
@@ -630,12 +632,12 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     }
 
     /// <summary>
-    /// Moves the target field to the nearest whole-nugget batch at the current slider ratios.
+    /// Moves the target field to the nearest whole-nugget batch within the recipe ratios.
     /// </summary>
     private bool StepTargetUnits(bool increase)
     {
         int updatedUnits = AlloyCalculatorLogic.FindAdjacentWasteFreeTarget(
-            targetUnits, sliderValues, increase);
+            targetUnits, sliderValues, increase, selectedIngredients);
         SingleComposer?.GetNumberInput("targetUnits")?.SetValue(updatedUnits.ToString());
         OnTargetUnitsChanged(updatedUnits.ToString());
         return true;
