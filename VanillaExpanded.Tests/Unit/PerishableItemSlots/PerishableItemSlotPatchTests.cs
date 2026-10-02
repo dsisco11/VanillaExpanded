@@ -69,15 +69,49 @@ public sealed class PerishableItemSlotPatchTests
         var color = ItemSlotIndicatorRenderer.PremultiplyColor(FreshnessIndicatorProvider.FreshnessColor(0));
 
         Assert.True(color.R > color.G);
-        Assert.True(color.A <= VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity * 1.3f);
+        Assert.Equal(VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity * 0.75f, color.A, precision: 5);
         Assert.True(color.R <= color.A && color.G <= color.A && color.B <= color.A);
     }
 
     [Fact]
-    public void FreshnessColor_PartiallyStale_IsRedDominant()
+    public void FreshnessColor_HalfFresh_IsYellow()
     {
         var color = ItemSlotIndicatorRenderer.PremultiplyColor(FreshnessIndicatorProvider.FreshnessColor(0.5f));
 
-        Assert.True(color.R > color.G * 2);
+        Assert.Equal(color.R, color.G, precision: 5);
+        Assert.True(color.R > color.B * 2);
+    }
+
+    /// <summary>Quarter freshness uses orange between the yellow and red endpoints.</summary>
+    [Fact]
+    public void FreshnessColor_QuarterFresh_IsOrange()
+    {
+        var color = FreshnessIndicatorProvider.FreshnessColor(0.25f);
+
+        Assert.True(color.X > color.Y * 2);
+        Assert.True(color.Y > color.Z * 2);
+    }
+
+    /// <summary>The palette is continuous at each intermediate color stop.</summary>
+    [Theory]
+    [InlineData(0.25f)]
+    [InlineData(0.5f)]
+    [InlineData(0.75f)]
+    public void FreshnessColor_ColorStops_AreContinuous(float freshness)
+    {
+        var before = FreshnessIndicatorProvider.FreshnessColor(freshness - 0.0001f);
+        var after = FreshnessIndicatorProvider.FreshnessColor(freshness + 0.0001f);
+
+        Assert.InRange(System.Numerics.Vector4.Distance(before, after), 0, 0.001f);
+    }
+
+    /// <summary>Stale indicators are less opaque than fresh ones rather than receiving an opacity boost.</summary>
+    [Fact]
+    public void FreshnessColor_Stale_IsLessOpaqueThanFresh()
+    {
+        var stale = FreshnessIndicatorProvider.FreshnessColor(0);
+        var fresh = FreshnessIndicatorProvider.FreshnessColor(1);
+
+        Assert.Equal(fresh.W * 0.75f, stale.W, precision: 5);
     }
 }

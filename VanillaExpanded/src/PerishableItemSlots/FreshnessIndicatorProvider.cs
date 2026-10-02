@@ -13,10 +13,11 @@ namespace VanillaExpanded.PerishableItemSlots;
 internal sealed class FreshnessIndicatorProvider : IItemSlotIndicatorProvider
 {
     private const long RefreshIntervalMilliseconds = 1_000;
-    private const float StaleOpacityMultiplier = 1.3f;
-    private const float FullyStaleFreshness = 0.35f;
+    private const float StaleOpacityMultiplier = 0.75f;
     private const float FullyFreshFreshness = 0.75f;
     private static readonly Vector4 StaleColor = new(0.88f, 0.08f, 0.05f, 1);
+    private static readonly Vector4 OrangeColor = new(0.95f, 0.38f, 0.05f, 1);
+    private static readonly Vector4 YellowColor = new(0.88f, 0.88f, 0.08f, 1);
     private static readonly Vector4 FreshColor = new(0.18f, 0.48f, 0.24f, 1);
     private readonly ConditionalWeakTable<ItemStack, FreshnessSample> samples = new();
 
@@ -59,15 +60,22 @@ internal sealed class FreshnessIndicatorProvider : IItemSlotIndicatorProvider
         return Math.Clamp((state.FreshHoursLeft + remainingTransitionHours) / totalHours, 0, 1);
     }
 
-    /// <summary>Produces the existing smooth red-to-green palette and freshness-dependent opacity.</summary>
+    /// <summary>Transitions from green through yellow and orange to a less opaque red as freshness falls.</summary>
     internal static Vector4 FreshnessColor(float freshness)
     {
-        float amount = Math.Clamp(
-            (freshness - FullyStaleFreshness) / (FullyFreshFreshness - FullyStaleFreshness), 0, 1);
-        amount = amount * amount * (3 - 2 * amount);
-        Vector4 color = Vector4.Lerp(StaleColor, FreshColor, amount);
+        float amount = Math.Clamp(freshness / FullyFreshFreshness, 0, 1);
+        float segmentPosition = amount * 3;
+        int segment = Math.Min((int)segmentPosition, 2);
+        float blend = segmentPosition - segment;
+        blend = blend * blend * (3 - 2 * blend);
+        Vector4 color = segment switch
+        {
+            0 => Vector4.Lerp(StaleColor, OrangeColor, blend),
+            1 => Vector4.Lerp(OrangeColor, YellowColor, blend),
+            _ => Vector4.Lerp(YellowColor, FreshColor, blend)
+        };
         float freshOpacity = Math.Clamp(VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity, 0, 1);
-        color.W = float.Lerp(Math.Min(1, freshOpacity * StaleOpacityMultiplier), freshOpacity, amount);
+        color.W = freshOpacity * float.Lerp(StaleOpacityMultiplier, 1, amount);
         return color;
     }
     #endregion
