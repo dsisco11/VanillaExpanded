@@ -1,6 +1,6 @@
 # AutoStash Planning and Execution Proposal
 
-Status: Proposed. This document describes an architecture change; it does not claim implementation or runtime validation.
+Status: Proposed architecture, updated after completed functional coverage. The architecture is not implemented. See [implementation plan](PlanningAndExecution.todo).
 
 ## Purpose
 
@@ -18,9 +18,17 @@ The analysis is based on these repository sources:
 - [AutoStashSystem_Server](../../VanillaExpanded/src/ModSystems/AutoStashSystem_Server.cs) validates requests and dispatches server operations.
 - [AutoStashTransferTests](../../VanillaExpanded.Tests/Unit/AutoStashing/AutoStashTransferTests.cs) describes existing transfer, capacity, session, and workspace expectations.
 
-The shared service accepts an item predicate, an optional preferred slot, and a session-management boolean. These inputs cannot describe bloomery quantity limits or source-pass ordering, so the bloomery implements its own execution path. Client eligibility also reconstructs rules independently of execution.
+The shared service accepts an item predicate, an optional preferred slot, a session-management boolean, and a target finalization callback. These inputs cannot describe bloomery quantity limits or source-pass ordering, so the bloomery implements its own execution path. Client eligibility also reconstructs rules independently of execution.
 
 The optional preferred-slot contract is inconsistent: preflight treats a valid preferred index as exclusive, whereas execution can fall back to other destinations. Current production callers do not supply that argument. This is a source-level abstraction inconsistency, not a reproduced gameplay defect.
+
+## Established regression contract
+
+The completed coverage work provides the starting contract for this extraction. Its checklist and evidence were intentionally removed in commit 3917cfa; the final evidence remains in Git revision 476f3b3 at docs/auto-stash/FunctionalTestCoverageEvidence.md. The recorded final runs passed 357 AutoStash unit cases, 553 repository unit cases and one separate Harmony integration test, with no failures or skips. These are historical results, not a fresh verification of a future refactor.
+
+Three separately authorized changes are already implemented: bounded direct-merge retries with owning-player error chat, failure-safe target finalization through AutoStashMutationState, and the IProgressSystemProvider presentation dependency. Preserve them during extraction. The progress provider, interaction state machines, network authorization and Harmony hookup remain in their current owners.
+
+Retain the existing regression tests as the behavioral oracle. Tests using generic inventories establish crate matching policy; separately initialized engine crate fixtures establish real crate restrictions. Attached-bag tests verify both vanilla workspaces and distinct IHeldBag implementations through actual persisted bag and attachment-owner reloads.
 
 ## Scope
 
@@ -35,7 +43,7 @@ The initial refactor must preserve observable transfer behavior. It does not int
 | `AutoStashPolicy` | Own target-specific eligibility, ordered source passes, destination restrictions, and live quantity limits. |
 | `AutoStashPlanner` | Evaluate candidates and select the next permitted concrete transfer without modifying inventories. |
 | `InventoryTransferExecutor` | Execute one concrete transfer through engine APIs and report the actual outcome. |
-| `AutoStashService` | Coordinate assessment, lifecycle, planning, execution, progress, aggregate results, and auditing. |
+| `AutoStashService` | Coordinate assessment, lifecycle, planning, execution, mutation progress, aggregate results, auditing, and existing direct-merge failure feedback. |
 | Target adapters | Resolve usable target inventories and own session acquisition, persistence, and target dirty notifications. |
 
 These names describe proposed responsibilities, not a requirement for an interface per class. Introduce interfaces where distinct implementations or a meaningful test boundary require them. Keep engine inventory and slot objects as the owning data model.
@@ -50,7 +58,7 @@ These names describe proposed responsibilities, not a requirement for an interfa
 - Positive requested quantity.
 - Engine move settings, including merge priority and modifier keys.
 
-An instruction is valid only for immediate execution within the current server operation. It must not be serialized, retained across ticks, or supplied by a client. The executor checks basic validity and delegates authoritative movement checks to the engine. Target-specific constraints are evaluated immediately before execution.
+An instruction is valid only for immediate execution within the current server operation. It must not be serialized, retained across ticks, or supplied by a client. The executor checks basic validity and delegates authoritative movement checks to the engine. Preserve the exact move-operation settings and overload semantics of both existing loops, including engine-required priority reporting. Target-specific constraints are evaluated immediately before execution.
 
 ### Transfer result
 
@@ -58,7 +66,7 @@ An instruction is valid only for immediate execution within the current server o
 
 ### Operation result
 
-`AutoStashResult` reports total actual movement and an outcome distinguishing unavailable targets, no eligible candidates, no available destination, and successful movement. Successful movement can be partial. Preserve enough result information for auditing and persistence without inventing a guaranteed total quantity that the planner has not established.
+`AutoStashResult` reports total actual movement and an outcome distinguishing unavailable targets, no eligible candidates, no available destination, and successful movement. Successful movement can be partial and can coexist with exhausted direct-merge failures. Retain a separate failure indicator so movement does not suppress the existing error feedback. Exceptions continue to propagate through failure-safe finalization; they are not converted into an ordinary successful result. Preserve enough result information for auditing and persistence without inventing a guaranteed total quantity that the planner has not established.
 
 ### Eligibility assessment
 
@@ -103,6 +111,10 @@ Use matching-content policy for transfers. Workspace creation, slot refresh, and
 
 The planner cursor owns attempted destinations and deferred direct-merge candidates for the current source. Its lifetime and reset boundaries must preserve the existing source-by-source algorithm. Every zero-move attempt must either exclude a destination, consume a bounded retry, or end that source pass. A direct-merge retry must not requeue itself indefinitely.
 
+Preserve the implemented direct-merge guarantees: exhaust automatic alternatives before deferred direct attempts; inspect every live engine-eligible empty or same-item destination, including those excluded by automatic eligibility; exclude each rejected direct destination until positive movement changes the remaining source state. Resetting exclusions requires actual movement, so retries between progress steps remain finite. The engine may still reject an eligible selected destination; eligibility is not a promise of movement.
+
+Aggregate exhausted direct attempts across sources. After normal finalization and owned-session cleanup, preserve one general-chat CommandError to the owning server player, identified by inventory-manager identity, even if some items moved. A later successful retry that exhausts a source does not leave a stale failure for that source. Ordinary full-target/no-work rejection remains silent. Preserve the existing audit behavior and exception paths; do not add a new notification channel.
+
 Preserve current automatic-merge selection and deferred direct-merge behavior before considering changes. Preserve the engine move settings used by each existing path; sharing an executor does not imply normalizing modifier keys.
 
 Ordinary destination selection continues to use `IInventory.GetBestSuitedSlot`. Mutation continues to use `ItemSlot.TryPutInto`, retaining inventory restrictions, collectible merge behavior, and modification callbacks. Do not replace those APIs with direct stack-size edits or a duplicate suitability algorithm.
@@ -113,7 +125,7 @@ A complete precomputed list of exact moves would require predicting engine callb
 
 Assessment and execution share policy eligibility and destination-selection rules. Client interaction gates remain a separate input so client-only conditions do not silently become execution restrictions.
 
-Assessment must not open sessions, refresh a mutable server workspace, invoke transfer operations, or persist contents. Attached-container assessment can use the available client contents view without constructing an execution workspace. If that view supports only candidate detection, the assessment must represent capacity as unknown rather than claiming that movement is possible.
+Assessment must not open sessions, refresh a mutable server workspace, invoke transfer operations, or persist contents. Attached-container assessment can use the available client contents view without constructing an execution workspace. If that view supports only candidate detection, the assessment must represent capacity as unknown rather than claiming that movement is possible. Preserve representative ordering/deduplication and independent display-stack clones, exact help actions/modifiers, and the distinction between full targets and no matching items.
 
 The server always resolves current state and plans again. It does not trust client assessment or accept client-authored transfer instructions. UI callers can use candidate and capacity information to retain existing interaction help behavior, including the distinction between no matching contents and a full target.
 
@@ -126,6 +138,10 @@ Adapters express lifecycle behavior directly instead of exposing a `manageInvent
 - Attached bags preserve workspace slot identities and persist through `IHeldBag.Store`, attachment-slot dirty marking, and the attachment owner's storage mechanism.
 
 Finalization runs even when execution fails after earlier successful moves. Persist known applied changes before releasing the session, and use a nested cleanup boundary so a persistence failure cannot prevent session release. Report failures without claiming rollback or completion. Engine callback exceptions may occur after mutation, so lifecycle handling must conservatively account for attempted mutations rather than assuming that an unreturned move left state untouched.
+
+Reuse the established AutoStashMutationState accounting or move it without weakening its contract: begin uncertainty immediately before the engine mutation call, clear it only after normal return, and finalize actual or uncertain changes. Ordinary completed zero-move operations do not finalize. Save live bag slots through IHeldBag.Store, mark the attachment dirty and store the owner before closing an owned workspace session; temporary bag inventories do not open sessions. Retain vanilla workspace callbacks and slot identity.
+
+Preserve the original exception identity and stack through finalization and cleanup. Secondary persistence/cleanup failures are reported without replacing it, and a reporting failure cannot prevent cleanup. If no earlier exception exists, propagate the first finalization/cleanup failure. Persistence failure does not imply rollback or guaranteed durable storage.
 
 Inventory session acquisition is not an atomicity or locking guarantee. Plans remain immediate and local to one server operation.
 
@@ -157,14 +173,14 @@ Existing tests are characterization evidence to preserve, not proof that this pr
 - Backpack/hotbar ordering and the exact existing bloomery ore/fuel pass order.
 - Bloomery ratio handling and fuel limits based on actual preceding transfers.
 - Required-slot routing with no fallback.
-- Zero-move termination and bounded deferred direct-merge retries.
+- Zero-move termination, exhaustive direct destinations, progress-based retry resets and exact owner-only error chat.
 - State changes between assessment and execution, with server re-evaluation.
 - No session acquisition for operations with no plausible work; already-open sessions remain open; owned sessions close on failure.
 - Attached workspace slot identity, repeated loads, and persistence of partial progress.
-- Cleanup when execution or persistence throws, including possible mutation before callback failure.
+- Cleanup when execution or persistence throws, including possible mutation before callback failure, persistence-before-close and original/secondary exception handling.
 - Continued server-side transfers without introducing client transfer API calls.
 
-Run builds and tests through subagents as required by repository instructions. Review the extraction for preserved behavior before changing any policy. Live game checks remain user-run and are separate from passing automated tests.
+Run builds and tests through subagents as required by repository instructions. Review the extraction for preserved behavior before changing any policy. Run actual Harmony dispatch in its separate integration test host: remove ordinary patch owners in finally and release the reverse-patched stand-in through dedicated process termination before fresh unit-test hosts. Do not introduce Harmony patching into ordinary unit tests. Live game checks remain user-run and are separate from passing automated tests.
 
 ## Acceptance criteria
 
@@ -172,4 +188,4 @@ The proposal is satisfied when all target types share the concrete transfer exec
 
 ## Evidence limits
 
-The preceding analysis inspected source and existing tests. It did not run builds, tests, or the game. Suspected edge cases described here are validation requirements unless explicitly identified as observed source behavior; they are not claims of reproduced runtime defects.
+The original architecture analysis was source-only. Subsequent coverage execution reproduced and resolved the retry and failure-finalization defects under separate user authorization; its historical results are identified above. This proposal update inspected current source, tests and recorded evidence without running fresh builds, tests or the game. No automated result establishes live-game acceptance or implementation of the proposed architecture.

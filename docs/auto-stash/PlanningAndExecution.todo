@@ -1,0 +1,115 @@
+# AutoStash Planning and Execution
+
+Status: Planned. Every implementation task is unchecked.
+Source proposal: [PlanningAndExecutionProposal.md](PlanningAndExecutionProposal.md).
+Purpose: Extract shared incremental planning and engine execution while preserving the established functional contract.
+
+## Scope and execution rules
+
+The complete source proposal governs every task below, including its Established regression contract, Data contracts, Policy contracts, Incremental planning and execution, Client assessment, Target lifecycle and partial failure, Source layout and dependencies, Validation requirements and Evidence limits. Each phase names the sections most directly applicable; those names do not discard inherited requirements. Read affected current source and regression fixtures before each extraction.
+
+Keep engine inventory/slot objects, GetBestSuitedSlot and TryPutInto authoritative. Do not implement a parallel suitability algorithm, simulated inventories, direct stack-size mutation, precomputed exact move lists, rollback, asynchronous work, client-authored instructions or cross-tick/persisted plans. Alloy deposit execution and general inventory frameworks remain outside scope.
+
+Preserve source/slot order, item-type snapshots, stack compatibility, bloomery required slots/live limits, client-only gates, attached capacity uncertainty, session ownership, persisted partial progress, exception identity, dirty effects, audits and owner-only direct-failure chat. Preserve interaction timing, progress ownership through IProgressSystemProvider, feedback, help, packet formats, permissions and engine behavior installation/Harmony hooks. No policy or gameplay change is implied by extraction.
+
+Use directories Planning, Transfers and Targets under VanillaExpanded/src/AutoStashing, with one named responsibility per file. Keep public composition roots thin and dependencies directional. Interfaces require distinct implementations or a meaningful boundary. Add XML documentation to classes/methods, explain nontrivial logic and group methods by visibility/function. Use Moq for observations and existing real engine fixtures for functional behavior.
+
+All builds/tests run through subagents. After each phase run the focused AutoStash suite and repository Unit suite; run the separate integration suite whenever entry wiring changes and at final acceptance. Integration installs actual production patches only in its dedicated host, removes ordinary owners in finally, and releases the reverse stand-in through host termination before fresh unit hosts. Never start a game, client or server; live acceptance remains user-run and separate.
+
+Review each change twice, including linked-document requirements and assertion sensitivity, and obtain an independent completion audit before checking markers. Keep concise commands/results/decisions in this plan or working context; do not create separate audit, verification or traceability files. A failing regression blocks completion until resolved explicitly; do not weaken, skip or exclude it to obtain green counts.
+
+## Starting evidence and decisions
+
+Coverage prerequisite completed before this plan. Historical final evidence at Git revision 476f3b3, docs/auto-stash/FunctionalTestCoverageEvidence.md: 357 AutoStash, 553 Unit and 1 isolated integration test passed, zero failures/skips/exclusions. The completed documents were intentionally removed in 3917cfa; do not recreate them. Refresh these results against the selected implementation revision before extracting code. Installed engine versions in that evidence were API/Lib/SurvivalMod/Essentials assembly 1.22.7.0, API file 1.22.0 and the others 1.22.7; verify current metadata rather than assuming it.
+
+The existing retry, failure-finalization and progress-provider fixes are part of the preservation baseline. Generic crate-policy fixtures do not establish specialized crate restrictions; use the initialized crate fixtures as well. Both attached-bag paths require independently reloaded persisted bag and owner state, not only wrapper contents.
+
+The unused optional preferred-slot argument has exclusive valid-index preflight but execution fallback after progress. Before migrating its tests, choose and document a compatibility representation preserving that characterization, or obtain an explicit separate decision to remove/change it. Required-slot bloomery routing must never inherit preferred-slot fallback. This is an implementation decision, not authorization to normalize semantics silently.
+
+Exact internal type/interface signatures are chosen during implementation within the proposal responsibilities. Transfer-result contracts must preserve engine-required priority, and operation results must separately retain exhausted direct attempts alongside positive movement. Mutation progress belongs to the service; visual progress remains in interaction owners.
+
+## Phase 1: Establish concrete engine transfer contracts
+
+Outcome: Both existing transfer loops share an immediate engine executor without changing their planning or lifecycle.
+Dependencies: Completed coverage prerequisite.
+Sources: Proposal Data contracts, Incremental planning and execution, Source layout and dependencies; current AutoStashTransferService, BlockBehaviorAutoStashable and AutoStashMutationState.
+
+☐ P1.1 Refresh the separate Integration, focused AutoStash and Unit baselines through subagents; record revision, exact commands, versions, counts, warnings and host isolation in this plan.
+☐ P1.2 Add Transfers/InventoryTransfer and InventoryTransferResult: concrete engine source/destination slots, positive requested quantity, existing move settings, actual movement and RequiredPriority. Keep instructions local to immediate server execution and invalid-instruction checks separate from target policy.
+☐ P1.3 Add InventoryTransferExecutor delegating to the engine mutation API. Preserve each path's existing overload/operation semantics, restrictions and callbacks; inspect the bloomery convenience overload before replacing it with an explicit operation.
+☐ P1.4 Route shared-container and bloomery mutation calls through the executor while retaining their existing selection, ordering, audit and lifecycle loops. Begin mutation uncertainty before the executor call and clear it only on normal return; exceptions continue to unwind unchanged.
+☐ P1.5 Add only boundary tests needed for new contract validity, settings/priority reporting and exception propagation; reuse full-operation regressions for quantities, restrictions and callback mutation.
+☐ Completion: Both loops use the executor, focused/Unit suites pass, and second review plus independent audit confirm actual engine behavior/settings and uncertain mutation remain unchanged.
+
+## Phase 2: Separate target policies and the incremental cursor
+
+Outcome: Planning selects one live instruction and advances on every outcome while existing owners retain lifecycle.
+Dependencies: Phase 1.
+Sources: Proposal Policy contracts and Incremental planning and execution; current transfer loops, edge/retry/preferred-slot tests and bloomery execution/boundary tests.
+
+☐ P2.1 Introduce Planning policy contracts for source eligibility, ordered source passes, destination routing and live quantity limits. Implement matching-content, first-type crate and bloomery policies without moving authorization or presentation.
+☐ P2.2 Capture initial matching types/first crate type once per operation. Preserve empty-target rejection, collectible-code eligibility versus engine attribute compatibility, backpack-before-hotbar and source-slot order, and missing source inventories.
+☐ P2.3 Express bloomery backpack ore → backpack fuel → hotbar ore → hotbar fuel, burning/output rejection, classification/ratios, mandatory ore/fuel indices and limits recalculated from actual live contents. Never route overflow elsewhere.
+☐ P2.4 Implement the operation cursor and AutoStashPlanner around the existing source-by-source control flow, retaining engine suitability for ordinary selection. Planning performs no mutation and does not retain instructions beyond immediate execution.
+☐ P2.5 Preserve automatic-before-direct deferral, every live eligible empty/same-item direct destination, automatically excluded alternatives and exclusion after rejection. Reconsider rejections only after positive movement; aggregate exhausted source failures without stale failure after that source is completely moved. Prove normal bounded termination with existing guarded retry tests.
+☐ P2.6 Resolve and implement the documented preferred-slot compatibility representation before moving its tests; record the choice here. Keep required-slot and preferred-fallback routing distinct. Separate removal/behavior change requires explicit authorization.
+☐ P2.7 Feed actual executor outcomes into the cursor after each instruction. Revalidate target-specific live limits immediately before execution and observe state changes during opening/callbacks without reservations or a copied inventory model.
+☐ P2.8 Route both existing loop owners through the planner/cursor, retaining current finalization ownership until adapters are available. Remove superseded selection loops in the same change; do not leave two active algorithms.
+☐ Completion: Order-sensitive, capacity, attribute, suitability and exhaustive retry regressions pass; focused/Unit suites and independent audit confirm planner purity and finite progress without policy changes.
+
+## Phase 3: Make target lifecycle ownership explicit
+
+Outcome: Target adapters own inventory resolution, acquisition, persistence and cleanup for every target.
+Dependencies: Phase 2.
+Sources: Proposal Attached bags and Target lifecycle and partial failure; existing target entry points, AutoStashMutationState and lifecycle/finalization/persistence tests.
+
+☐ P3.1 Add Targets adapters for ordinary containers/crates, bloomeries and attached bags using their owning engine APIs. Resolve target availability and read-only contents separately from mutation/session acquisition.
+☐ P3.2 Acquire ordinary/workspace sessions only after plausible work; close only sessions acquired by this operation. Keep temporary bag inventories session-free and bloomery lifecycle unchanged. Observe resulting live contents after opening.
+☐ P3.3 Preserve vanilla workspace refresh/wrapper identity, distinct IHeldBag loading, attachment validation and load-failure no-op effects. Preserve Store for live content slots, attachment dirty marking and actual owner storage, including existing workspace callbacks.
+☐ P3.4 Move target finalization into adapters using the established actual/uncertain mutation accounting. Persist or synchronize before owned close; nested cleanup must run despite persistence/reporting failures. Ordinary completed zero moves do not finalize.
+☐ P3.5 Preserve original exception identity/stack and report secondary persistence/cleanup failures without replacing it. When no earlier exception exists, propagate the first failure. Do not claim rollback or successful persistence when storage itself throws.
+☐ P3.6 Integrate adapters into the existing operation owner without adding a second mutation tracker. Replace session-management booleans and target finalizer callbacks at that boundary with explicit lifecycle ownership.
+☐ P3.7 Run acquired/caller-owned, after-earlier-move, after-unreturned-mutation, storage/cleanup failure, zero/partial and bag/owner reload regressions for both bag implementations and actual initialized crate inventories.
+☐ Completion: All targets finalize and release through adapters, persistence round trips and failure assertions pass, and focused/Unit verification plus independent audit establish lifecycle ordering/ownership.
+
+## Phase 4: Introduce shared operation coordination
+
+Outcome: All server target paths use one planner/executor coordinator and a truthful operation result.
+Dependencies: Phases 2–3.
+Sources: Proposal Responsibilities, Operation result, Incremental planning and execution and Scope; server dispatch and direct-feedback regressions.
+
+☐ P4.1 Add AutoStashService coordinating source resolution/type snapshots, plausible-work probe, adapter acquisition, live planning, immediate execution, cursor advancement and finalization. Keep requests synchronous and best-effort.
+☐ P4.2 Add AutoStashResult with actual moved total and unavailable/no-candidate/no-destination/success distinctions, including partial success and a separate exhausted-direct indicator. Throwing operations preserve exceptions; they are not converted into completed results.
+☐ P4.3 Preserve existing per-move/aggregate audit behavior and one owning-player general-chat CommandError after normal finalization/owned cleanup for exhausted direct attempts, including partial movement. Resolve ownership by inventory-manager identity; ordinary full/no-work remains silent.
+☐ P4.4 Delegate generic, crate, bloomery and attached server entry points to the shared service. Preserve registered request handlers, permission/reachability checks, exact six-block entity distance, current-state resolution and packet contracts.
+☐ P4.5 Retain compatibility wrappers only where entry signatures provide a real boundary; remove obsolete AutoStashTransferService orchestration after its callers migrate. Update internal tests to exercise the owning service without losing full-operation/dispatch coverage.
+☐ P4.6 Verify changed-target type/capacity after client assessment, denied/missing targets, target-specific dispatch outcomes and all lifecycle/retry regressions. Run isolated Harmony integration before fresh focused/Unit hosts because entry wiring changed.
+☐ Completion: Every target shares coordinator/executor, existing server boundaries remain thin and authoritative, all required suites pass, and independent audit confirms truthful results/feedback and no duplicated operation algorithm.
+
+## Phase 5: Share advisory assessment and migrate help
+
+Outcome: Client assessment reuses policy while preserving existing interaction gates and uncertainty.
+Dependencies: Phase 4.
+Sources: Proposal Eligibility assessment, Client assessment and Scope; existing eligibility/help/gesture tests and IProgressSystemProvider.
+
+☐ P5.1 Add AutoStashAssessment distinguishing candidate existence and apparent transfer availability, including unknown capacity and independent representative display stacks. Reuse policy eligibility/routing through a read-only view; do not invoke execution/session/workspace refresh/persistence.
+☐ P5.2 Migrate generic/crate/bloomery eligibility/help queries to shared assessment. Preserve full versus no-match actions, representative backpack-first ordering/deduplication, clone independence, crate modifiers and bloomery thresholds.
+☐ P5.3 Keep empty-bloomery active-hotbar gating as a client interaction input, never a server prerequisite. Retain attached matching-only assessment with unknown capacity; do not claim parity with full bag execution.
+☐ P5.4 Migrate attached eligibility/help using available bag contents without constructing an execution workspace. Preserve append gates, Ctrl+Shift help and original interaction identities/order.
+☐ P5.5 Keep block/attached gesture state machines, mounted controls, timing/grace boundaries, progress provider, sound/animation, cancellation/listener disposal and exactly-once packet submission in their established owners. Shared service coordinates mutation progress only.
+☐ P5.6 Remove duplicated policy classification/assessment implementations after migration, preserving target-specific client gates. Run assessment purity, display-clone and complete gesture regressions plus isolated integration and fresh focused/Unit hosts.
+☐ Completion: Shared assessment makes certainty explicit, exact help/gestures remain unchanged, tests prove no assessment mutation/lifecycle effects, and second review plus independent audit find no client/server gate drift.
+
+## Phase 6: Remove migration scaffolding and verify acceptance
+
+Outcome: The proposed boundaries are the sole implementation, with the established behavior preserved.
+Dependencies: Phases 1–5.
+Sources: Proposal Source layout and dependencies, Validation requirements, Relationship to alloy deposits, Acceptance criteria and Evidence limits.
+
+☐ P6.1 Remove obsolete transfer loops, predicates/session flags/finalizer plumbing and temporary migration facades after all consumers/tests migrate. Retain only explicitly documented compatibility boundaries, including the resolved preferred-slot decision.
+☐ P6.2 Audit dependencies: planning depends on policy/engine inventory contracts; executor on engine/move contracts; adapters on owning target APIs; service on these boundaries; interaction/network roots contain no transfer loops. One file owns each responsibility; no general inventory framework or alloy path changes.
+☐ P6.3 Map each proposal requirement to final source/tests and inspect regression sensitivity. Preserve all established scenario outcomes, engine restrictions, exact quantity/identity/attributes, unrelated slots, durable persistence, finite attempts and cleanup effects; test-count growth is not acceptance.
+☐ P6.4 Run final separate Integration, focused AutoStash and repository Unit suites through subagents with fresh unit hosts after integration. Record revision, exact commands, pass/fail/skip counts, assembly metadata and warnings here; no exclusions or silent skips.
+☐ P6.5 Perform a second source/plan/proposal review and obtain an independent final audit of preserved behavior, adapter ownership, planner progress, assessment purity, real Harmony dispatch and production scope. Resolve every required finding before completion.
+☐ P6.6 Update proposal status to implemented only after source and final evidence satisfy it; identify automated versus user-run live evidence accurately. No game launch is required or authorized by this plan.
+☐ Final acceptance: All targets share the concrete executor and coordinator; policies own live routing/limits/order, adapters own lifecycle/persistence, assessment expresses certainty, engine algorithms remain authoritative, old active implementations are removed, and all required regressions/reviews/audits pass without a gameplay change.
