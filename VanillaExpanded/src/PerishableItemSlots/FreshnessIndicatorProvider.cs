@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
@@ -15,10 +16,13 @@ internal sealed class FreshnessIndicatorProvider : IItemSlotIndicatorProvider
     private const long RefreshIntervalMilliseconds = 1_000;
     private const float StaleOpacityMultiplier = 0.75f;
     private const float FullyFreshFreshness = 0.75f;
-    private static readonly Vector4 StaleColor = new(0.88f, 0.08f, 0.05f, 1);
-    private static readonly Vector4 OrangeColor = new(0.95f, 0.38f, 0.05f, 1);
-    private static readonly Vector4 YellowColor = new(0.88f, 0.88f, 0.08f, 1);
-    private static readonly Vector4 FreshColor = new(0.18f, 0.48f, 0.24f, 1);
+    private static readonly ImmutableArray<Vector4> FreshnessColors =
+    [
+        new(0.88f, 0.08f, 0.05f, 1),
+        new(0.95f, 0.38f, 0.05f, 1),
+        new(0.88f, 0.88f, 0.08f, 1),
+        new(0.18f, 0.48f, 0.24f, 1)
+    ];
     private readonly ConditionalWeakTable<ItemStack, FreshnessSample> samples = new();
 
     #region Public API
@@ -64,16 +68,7 @@ internal sealed class FreshnessIndicatorProvider : IItemSlotIndicatorProvider
     internal static Vector4 FreshnessColor(float freshness)
     {
         float amount = Math.Clamp(freshness / FullyFreshFreshness, 0, 1);
-        float segmentPosition = amount * 3;
-        int segment = Math.Min((int)segmentPosition, 2);
-        float blend = segmentPosition - segment;
-        blend = blend * blend * (3 - 2 * blend);
-        Vector4 color = segment switch
-        {
-            0 => Vector4.Lerp(StaleColor, OrangeColor, blend),
-            1 => Vector4.Lerp(OrangeColor, YellowColor, blend),
-            _ => Vector4.Lerp(YellowColor, FreshColor, blend)
-        };
+        Vector4 color = ColorUtilEx.MultiLerp(FreshnessColors.AsSpan(), amount, smooth: true);
         float freshOpacity = Math.Clamp(VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity, 0, 1);
         color.W = freshOpacity * float.Lerp(StaleOpacityMultiplier, 1, amount);
         return color;

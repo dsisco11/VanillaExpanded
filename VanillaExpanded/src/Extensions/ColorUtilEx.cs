@@ -1,3 +1,6 @@
+using System;
+using System.Numerics;
+
 using Vintagestory.API.MathTools;
 
 namespace VanillaExpanded;
@@ -46,4 +49,26 @@ public static class ColorUtilEx
     /// Transparent black as RGBA bytes (0..255). RGB=0, Alpha=0.
     /// </summary>
     public static readonly byte[] TransparentBlackRgbaBytes = [0, 0, 0, 0];
+
+    #region Public API
+    /// <summary>Interpolates straight-alpha RGBA colors at evenly spaced stops across a clamped 0..1 amount.</summary>
+    /// <param name="colors">At least one color, ordered from amount zero to amount one.</param>
+    /// <param name="amount">Interpolation amount; NaN selects the first color.</param>
+    /// <param name="smooth">Whether to apply smoothstep easing within each color segment.</param>
+    /// <returns>The interpolated RGB and alpha channels, without premultiplication.</returns>
+    /// <exception cref="ArgumentException">The color palette is empty.</exception>
+    public static Vector4 MultiLerp(ReadOnlySpan<Vector4> colors, float amount, bool smooth = false)
+    {
+        if (colors.IsEmpty) throw new ArgumentException("At least one color is required.", nameof(colors));
+        amount = Math.Clamp(float.IsNaN(amount) ? 0 : amount, 0, 1);
+        if (colors.Length == 1 || amount <= 0) return colors[0];
+        if (amount >= 1) return colors[^1];
+
+        float position = amount * (colors.Length - 1);
+        int segment = Math.Min((int)position, colors.Length - 2);
+        float blend = position - segment;
+        if (smooth) blend = blend * blend * (3 - 2 * blend);
+        return Vector4.Lerp(colors[segment], colors[segment + 1], blend);
+    }
+    #endregion
 }
