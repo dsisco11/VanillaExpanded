@@ -8,6 +8,104 @@ namespace VanillaExpanded.Tests.Unit.AlloyCalculator;
 [Trait("Category", "Unit")]
 public class NuggetCalculationTests
 {
+    #region Waste-Free Target Stepping
+
+    /// <summary>
+    /// Checks strict adjacent targets, off-grid input, and the smallest positive batch.
+    /// </summary>
+    [Theory]
+    [InlineData(100, 90, true, 150)]
+    [InlineData(100, 90, false, 50)]
+    [InlineData(101, 90, true, 150)]
+    [InlineData(101, 90, false, 100)]
+    [InlineData(100, 88, true, 125)]
+    [InlineData(250, 88, false, 125)]
+    [InlineData(125, 88, false, 125)]
+    [InlineData(100, 88, false, 100)]
+    [InlineData(100, 100, true, 105)]
+    [InlineData(100, 100, false, 95)]
+    [InlineData(0, 90, true, 50)]
+    [InlineData(int.MaxValue, 90, true, int.MaxValue)]
+    public void FindAdjacentWasteFreeTarget_ReturnsNearestPositiveTarget(
+        int targetUnits, int percentage, bool increase, int expected)
+    {
+        var percentages = new Dictionary<int, int> { [0] = percentage, [1] = 100 - percentage };
+
+        int result = AlloyCalculatorLogic.FindAdjacentWasteFreeTarget(targetUnits, percentages, increase);
+
+        Assert.Equal(expected, result);
+    }
+
+    /// <summary>
+    /// Verifies all ingredients contribute to the interval and none need rounding.
+    /// </summary>
+    [Fact]
+    public void FindAdjacentWasteFreeTarget_ThreeIngredients_ProducesExactNuggets()
+    {
+        var percentages = new Dictionary<int, int> { [0] = 67, [1] = 22, [2] = 11, [3] = 0 };
+
+        int result = AlloyCalculatorLogic.FindAdjacentWasteFreeTarget(100, percentages, true);
+        var nuggets = AlloyCalculatorLogic.CalculateAllNuggetsRequired(result, percentages);
+
+        Assert.Equal(500, result);
+        Assert.Equal(result, nuggets.Values.Sum() * 5);
+        foreach (var (index, count) in nuggets)
+        {
+            Assert.Equal(result * percentages[index], count * 500);
+        }
+    }
+
+    /// <summary>
+    /// Leaves manual targets intact when there is no configured ingredient ratio.
+    /// </summary>
+    [Fact]
+    public void FindAdjacentWasteFreeTarget_NoPositiveRatios_LeavesTargetUnchanged()
+    {
+        Assert.Equal(100, AlloyCalculatorLogic.FindAdjacentWasteFreeTarget(
+            100, new Dictionary<int, int>(), true));
+        Assert.Equal(100, AlloyCalculatorLogic.FindAdjacentWasteFreeTarget(
+            100, new Dictionary<int, int> { [0] = 0 }, false));
+    }
+
+    #endregion
+
+    #region Wasted Metal
+
+    /// <summary>
+    /// Checks excess units for clean targets, off-grid targets, and pure metals.
+    /// </summary>
+    [Theory]
+    [InlineData(100, 88, 5)]
+    [InlineData(125, 88, 0)]
+    [InlineData(100, 90, 0)]
+    [InlineData(101, 90, 9)]
+    [InlineData(100, 100, 0)]
+    [InlineData(101, 100, 4)]
+    [InlineData(0, 90, 0)]
+    [InlineData(-100, 90, 0)]
+    [InlineData(int.MaxValue, 100, 3)]
+    public void CalculateWastedMetalUnits_ReturnsRoundedExcess(
+        int targetUnits, int percentage, long expected)
+    {
+        var percentages = new Dictionary<int, int> { [0] = percentage, [1] = 100 - percentage };
+
+        long result = AlloyCalculatorLogic.CalculateWastedMetalUnits(targetUnits, percentages);
+
+        Assert.Equal(expected, result);
+    }
+
+    /// <summary>
+    /// Verifies there is no excess when no ingredients are configured.
+    /// </summary>
+    [Fact]
+    public void CalculateWastedMetalUnits_NoIngredients_ReturnsZero()
+    {
+        Assert.Equal(0, AlloyCalculatorLogic.CalculateWastedMetalUnits(
+            100, new Dictionary<int, int>()));
+    }
+
+    #endregion
+
     #region CalculateNuggetsRequired - Basic Cases
 
     [Fact]

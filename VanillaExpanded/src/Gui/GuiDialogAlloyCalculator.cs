@@ -33,8 +33,9 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private const double TargetUnitsButtonVerticalGap = 3;
     private const float TargetUnitsButtonFontSize = 12;
     private const int DefaultTargetUnits = 100;
-    private const int TargetUnitsInputStep = 10;
-    private const int TargetUnitsStep = 100;
+    private const int TargetUnitsInputStep = 100;
+    private const double WasteWarningHeight = 32;
+    private const double WasteWarningGap = 6;
     private const double TitlebarHeight = 20;
     private const double SlotSize = 40;
     private const double ButtonHeight = 25;
@@ -186,7 +187,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                 contentHeight += ingredientCount * RowHeight;
             }
             contentHeight += 15 + SlotSize; // gap + slot row
-            contentHeight += 10 + ButtonHeight; // gap + button
+            contentHeight += 18 + WasteWarningHeight + WasteWarningGap + ButtonHeight;
         }
         var contentBounds = ElementBounds.Fixed(0, 0, contentWidth, contentHeight);
 
@@ -249,9 +250,9 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-dropdown-tooltip"), CairoFont.WhiteDetailText(), 250, dropdownBounds.FlatCopy(), "dropdownTooltip")
             .AddNumberInput(inputBounds, OnTargetUnitsChanged, CairoFont.WhiteDetailText(), "targetUnits")
             .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-targetunits-tooltip"), CairoFont.WhiteDetailText(), 250, inputBounds.FlatCopy(), "targetUnitsTooltip")
-            .AddButton("+", () => ChangeTargetUnits(TargetUnitsStep), incrementBounds, CairoFont.WhiteDetailText().WithFontSize(TargetUnitsButtonFontSize).WithOrientation(EnumTextOrientation.Center), EnumButtonStyle.Small, "incrementTargetUnits")
+            .AddButton("+", () => StepTargetUnits(true), incrementBounds, CairoFont.WhiteDetailText().WithFontSize(TargetUnitsButtonFontSize).WithOrientation(EnumTextOrientation.Center), EnumButtonStyle.Small, "incrementTargetUnits")
             .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-increment-tooltip"), CairoFont.WhiteDetailText(), 250, incrementBounds.FlatCopy(), "incrementTargetUnitsTooltip")
-            .AddButton("-", () => ChangeTargetUnits(-TargetUnitsStep), decrementBounds, CairoFont.WhiteDetailText().WithFontSize(TargetUnitsButtonFontSize).WithOrientation(EnumTextOrientation.Center), EnumButtonStyle.Small, "decrementTargetUnits")
+            .AddButton("-", () => StepTargetUnits(false), decrementBounds, CairoFont.WhiteDetailText().WithFontSize(TargetUnitsButtonFontSize).WithOrientation(EnumTextOrientation.Center), EnumButtonStyle.Small, "decrementTargetUnits")
             .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-decrement-tooltip"), CairoFont.WhiteDetailText(), 250, decrementBounds.FlatCopy(), "decrementTargetUnitsTooltip");
 
         // Add ingredient sliders if an alloy is selected
@@ -329,8 +330,20 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                 .WithAlignment(EnumDialogArea.CenterFixed);
             composer.AddRichtext(richTextComponents.ToArray(), slotBounds, "ingredientSlots");
 
-            // Add deposit button
             yOffset += (int)SlotSize + 18;
+            var warningBounds = ElementBounds
+                .Fixed(0, yOffset, contentWidth, WasteWarningHeight)
+                .WithParent(contentBounds);
+            composer.AddDynamicText(
+                string.Empty,
+                CairoFont.WhiteDetailText()
+                    .WithFontSize(12)
+                    .WithColor([1, 0.75, 0.3, 1])
+                    .WithOrientation(EnumTextOrientation.Center),
+                warningBounds,
+                "wasteWarning");
+
+            yOffset += WasteWarningHeight + WasteWarningGap;
             var buttonBounds = ElementBounds
                 .Fixed(0, yOffset, 100, ButtonHeight)
                 .WithParent(contentBounds)
@@ -347,6 +360,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         if (targetInput is not null)
         {
             targetInput.Interval = TargetUnitsInputStep;
+            targetInput.IntMode = false;
         }
         targetInput?.SetValue(targetUnits.ToString());
 
@@ -500,8 +514,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         {
             var ingredient = selectedIngredients[i];
             var percent = sliderValues.TryGetValue(i, out var val) ? val : 0;
-            var units = targetUnits * percent / 100.0;
-            var nuggets = (int)Math.Ceiling(units / 5.0); // 1 nugget = 5 units, round up
+            var nuggets = AlloyCalculatorLogic.CalculateNuggetsRequired(targetUnits, percent);
 
             // Update slideshow component with new stack size
             if (i < slideshowComponents.Count)
@@ -520,6 +533,11 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                 }
             }
         }
+
+        long wastedUnits = AlloyCalculatorLogic.CalculateWastedMetalUnits(targetUnits, sliderValues);
+        SingleComposer.GetDynamicText("wasteWarning")?.SetNewText(wastedUnits > 0
+            ? Lang.Get($"{Constants.ModId}:gui-alloycalculator-waste-warning", wastedUnits)
+            : string.Empty);
     }
 
     /// <summary>
@@ -611,14 +629,13 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         }
     }
 
-    private bool ChangeTargetUnits(int amount)
+    /// <summary>
+    /// Moves the target field to the nearest whole-nugget batch at the current slider ratios.
+    /// </summary>
+    private bool StepTargetUnits(bool increase)
     {
-        if (amount < 0 && targetUnits <= TargetUnitsStep)
-        {
-            return true;
-        }
-
-        var updatedUnits = targetUnits + amount;
+        int updatedUnits = AlloyCalculatorLogic.FindAdjacentWasteFreeTarget(
+            targetUnits, sliderValues, increase);
         SingleComposer?.GetNumberInput("targetUnits")?.SetValue(updatedUnits.ToString());
         OnTargetUnitsChanged(updatedUnits.ToString());
         return true;

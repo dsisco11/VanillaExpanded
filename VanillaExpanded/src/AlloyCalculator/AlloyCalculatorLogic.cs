@@ -436,6 +436,52 @@ internal static class AlloyCalculatorLogic
     #region Nugget Calculation
 
     /// <summary>
+    /// Finds the adjacent positive target that needs only whole nuggets at the current ratios.
+    /// Leaves the target unchanged when no adjacent target fits in a positive integer.
+    /// </summary>
+    internal static int FindAdjacentWasteFreeTarget(
+        int targetUnits,
+        IReadOnlyDictionary<int, int> percentages,
+        bool increase)
+    {
+        const int percentageUnitsPerNugget = 500;
+        int divisor = percentageUnitsPerNugget;
+        bool hasIngredient = false;
+        foreach (int percentage in percentages.Values)
+        {
+            if (percentage <= 0) continue;
+            hasIngredient = true;
+            int remainder = percentage;
+            while (remainder != 0)
+            {
+                (divisor, remainder) = (remainder, divisor % remainder);
+            }
+        }
+
+        if (!hasIngredient) return targetUnits;
+
+        int interval = percentageUnitsPerNugget / divisor;
+        long nextTarget = increase
+            ? ((long)Math.Max(0, targetUnits) / interval + 1) * interval
+            : ((long)targetUnits - 1) / interval * interval;
+        return nextTarget is > 0 and <= int.MaxValue ? (int)nextTarget : targetUnits;
+    }
+
+    /// <summary>
+    /// Gets the metal units exceeding the target after rounding each ingredient to whole nuggets.
+    /// </summary>
+    internal static long CalculateWastedMetalUnits(
+        int targetUnits,
+        IReadOnlyDictionary<int, int> percentages)
+    {
+        if (targetUnits <= 0) return 0;
+
+        long roundedUnits = CalculateAllNuggetsRequired(targetUnits, percentages)
+            .Values.Sum(static count => (long)count * 5);
+        return Math.Max(0, roundedUnits - targetUnits);
+    }
+
+    /// <summary>
     /// Calculates the number of nuggets required for a given percentage of target units.
     /// Uses 5 units per nugget and rounds up.
     /// </summary>
@@ -446,7 +492,7 @@ internal static class AlloyCalculatorLogic
     {
         if (targetUnits <= 0 || percentage <= 0) return 0;
 
-        var units = targetUnits * percentage / 100.0;
+        var units = (double)targetUnits * percentage / 100.0;
         return (int)Math.Ceiling(units / 5.0); // 1 nugget = 5 units, round up
     }
 
