@@ -1,6 +1,6 @@
 # AutoStash Functional Test Coverage
 
-Status: Phases 1–7 complete after verification, second review, and independent completion audits. Phase 2 includes the explicitly authorized direct-merge retry fix; Phase 5 also includes the subsequently authorized failure-finalization fixes. Phase 6 includes the explicitly authorized progress dependency service seam. Phases 8–9 remain planned. See [coverage evidence](FunctionalTestCoverageEvidence.md).
+Status: Phases 1–9 complete after verification, second review, and independent completion audits. Phase 2 includes the explicitly authorized direct-merge retry fix; Phase 5 also includes the subsequently authorized failure-finalization fixes. Phase 6 includes the explicitly authorized progress dependency service seam. The functional coverage prerequisite and final refactor gate are satisfied; implementing the architecture proposal remains separate work. See [coverage evidence](FunctionalTestCoverageEvidence.md).
 Source: User-requested coverage audit and its eight numbered findings, 2026-10-01.
 Related proposal: [PlanningAndExecutionProposal.md](PlanningAndExecutionProposal.md).
 Purpose: Establish a functional regression contract before changing inventory planning or transfer architecture.
@@ -178,13 +178,13 @@ Dependencies: Phase 1; target fixtures from Phases 3–4. Audit finding 8.
 Outcome: A reviewable functional contract exists before inventory/transfer refactoring begins.
 Dependencies: Phases 1–8.
 
-☐ F9.1 Reconcile every F1–F8 scenario against implemented test names and outcomes in the evidence document; ensure all eight original findings remain traceable.
-☐ F9.2 Run the full focused AutoStash suite, the separate AutoStash integration suite, and the repository unit suite through subagents to detect shared-fixture regressions. Record exact commands, assembly versions, pass/fail/skip counts, and relevant warnings.
-☐ F9.3 Review assertion sensitivity: for every named scenario identify the behavioral change its assertions detect. Do not use test-count growth as the acceptance metric.
-☐ F9.4 Obtain an independent final audit of scenario completeness, fixture realism, negative-test isolation, lifecycle assertions, and production-code scope.
-☐ F9.5 Resolve all intended-versus-observed discrepancies explicitly. Document minimal reproductions and any separately authorized fixes; do not silently defer or skip required cases.
-☐ F9.6 Confirm no inventory/transfer redesign was introduced, no game was launched, and automated results are not represented as live acceptance.
-☐ Final acceptance: All required scenario mappings have passing evidence and completed reviews/audits, with no unresolved behavioral or integration blockers. This completes the test-coverage prerequisite only; implementing the architecture proposal remains separate work.
+✔ F9.1 Reconcile every F1–F8 scenario against implemented test names and outcomes in the evidence document; ensure all eight original findings remain traceable.
+✔ F9.2 Run the full focused AutoStash suite, the separate AutoStash integration suite, and the repository unit suite through subagents to detect shared-fixture regressions. Record exact commands, assembly versions, pass/fail/skip counts, and relevant warnings.
+✔ F9.3 Review assertion sensitivity: for every named scenario identify the behavioral change its assertions detect. Do not use test-count growth as the acceptance metric.
+✔ F9.4 Obtain an independent final audit of scenario completeness, fixture realism, negative-test isolation, lifecycle assertions, and production-code scope.
+✔ F9.5 Resolve all intended-versus-observed discrepancies explicitly. Document minimal reproductions and any separately authorized fixes; do not silently defer or skip required cases.
+✔ F9.6 Confirm no inventory/transfer redesign was introduced, no game was launched, and automated results are not represented as live acceptance.
+✔ Final acceptance: All required scenario mappings have passing evidence and completed reviews/audits, with no unresolved behavioral or integration blockers. This completes the test-coverage prerequisite only; implementing the architecture proposal remains separate work.
 
 ## Audit finding cross-reference
 

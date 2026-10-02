@@ -2,7 +2,7 @@
 
 ## Scope and controlling documents
 
-Selected contract: [FunctionalTestCoverage.todo](FunctionalTestCoverage.todo), completed Phases 1–7 with inherited Scope and execution rules. Source audit: the eight findings in the conversation dated 2026-10-01, reproduced as the tasklist's audit cross-reference. Related [PlanningAndExecutionProposal.md](PlanningAndExecutionProposal.md) was read completely: its engine ownership, lifecycle distinctions, source ordering and evidence limits are relevant context. Its proposed architecture and stronger failure-persistence guarantees are outside this implementation.
+Selected contract: [FunctionalTestCoverage.todo](FunctionalTestCoverage.todo), completed Phases 1–9 with inherited Scope and execution rules. Source audit: the eight findings in the conversation dated 2026-10-01, reproduced as the tasklist's audit cross-reference. Related [PlanningAndExecutionProposal.md](PlanningAndExecutionProposal.md) was read completely: its engine ownership, lifecycle distinctions, source ordering and evidence limits are relevant context. Its proposed architecture remains outside this implementation. The user separately authorized narrow retry, failure-finalization and progress-service changes, recorded below.
 
 The complete-todo-phase and audit-stage-completion skills were read directly from C:/Users/Sisco/.codex/skills. They require linked-document traceability, second review, an independent audit, and checking markers only after verification. No unavailable controlling documents were identified. The proposed evidence document did not previously exist; this file fulfills its creation task.
 
@@ -23,7 +23,7 @@ Every F1 item inherits FunctionalTestCoverage.todo#scope-and-execution-rules and
 | Task | Document/source requirement | Implementation and observed evidence |
 | --- | --- | --- |
 | F1.1 | Tasklist baseline; proposal evidence limits | Revision/assemblies/command/count/warnings recorded above; clean baseline executed by phase1_tests subagent. |
-| F1.2 | Tasklist evidence mapping | This traceability table and complete scenario register below; future work remains planned. |
+| F1.2 | Tasklist evidence mapping | This traceability table and complete scenario register below; current acceptance and final reconciliation are recorded below. |
 | F1.3 | Tasklist exact state assertions; proposal engine ownership | Support/InventorySnapshot.cs captures slot/collectible identities, quantities, serialized persistent and temporary attributes, and item-class/code totals. Snapshot_DetectsMutationWithoutAliasingExpectedState and ObservedSlot_ControlsBoundaryAndRecordsActualEngineMoves validate its sensitivity and conservation. |
 | F1.4 | Audit finding 5; tasklist exact destination/source assertions | Existing generic backpack/hotbar/combined/multiple-type and crate success tests now assert exact merged destinations, conserved totals, unaffected slots, and session/dirty effects. |
 | F1.5 | Audit finding 5; tasklist no-op assertions | Existing empty/no-match/empty-player/no-exception generic/crate tests and shared no-capacity/full eligibility checks capture unchanged inventories and no dirty/session effects. |
@@ -33,52 +33,52 @@ Every F1 item inherits FunctionalTestCoverage.todo#scope-and-execution-rules and
 | F1.9 | Tasklist deterministic observation; proposal engine ownership | ObservedTransferSlot controls zero/limited movement and callbacks with a finite attempt guard while delegating actual movement; AutoStashObservation records lifecycle/persistence and tick callbacks with reverse cleanup; A CallBase-enabled Moq inventory mock records engine suitability, preserving exact query-order assertions. Fixture tests validate movement, rejection, exceptions, bounded observation, tick delivery, cleanup and engine ranking. These helpers do not simulate the AutoStash loop. |
 | F1.10 | Tasklist isolation/cleanup | AutoStashTestCollection disables parallelization against other collections; existing AutoStash classes join it. Config-dependent classes dispose AutoStashTestScope after each test. ConfigurationScope_RestoresSettingsAfterException validates restoration. Observation_CleansAllResourcesAfterFailure validates all cleanup actions execute even when one fails. No actual Harmony patches or game listeners are installed by this work; future callers can register their exact release action with AutoStashObservation. |
 
-## Test/source locations
+## Historical fixture implementation: test/source locations
 
 Support files and AutoStashFixtureTests are under VanillaExpanded.Tests/Unit/AutoStashing. Existing assertion changes are in AutoStashTransferTests and GetStashableItemsBloomeryTests. Other existing AutoStash test files add collection membership and, where settings are read, a disposable configuration scope. No production files were changed.
 
-## Validation and review
+## Historical fixture validation and review
 
 Initial fixture compilation issues (attribute serialization interface and synchronous assertion overload) were corrected. The first initialized-crate success fixture lacked an item code, so AutoStash correctly rejected it before transfer; setting a valid code fixed the fixture. These were test setup issues, not production defects.
 
 Final focused command: dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-restore --filter FullyQualifiedName~AutoStash --verbosity minimal. Result: 104 passed, 0 failed, 0 skipped. Final repository unit command: dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-restore --filter Category=Unit --verbosity minimal. Result: 300 passed, 0 failed, 0 skipped. Both were run by the phase1_tests subagent.
 
-Durable output: [AutoStash](evidence/FunctionalTestCoverage.Phase1.AutoStash.txt), [Unit](evidence/FunctionalTestCoverage.Phase1.Unit.txt), and [baseline receipt](evidence/FunctionalTestCoverage.Phase1.Baseline.txt). Baseline receipt is reconstructed from the recorded command result, not represented as captured raw output. No new helper/fixture compiler warnings; existing test warnings remain. Independent completion audit concluded all F1.1–F1.10 requirements satisfied, with no remaining required issues or evidence gaps, after reviewing the final paired controls, exact method mapping, and refreshed logs.
+Historical tool results are summarized here; separate output/audit files were removed at the user's request and are not evidence dependencies.
 
 The final eight additional cases are seven fixture test methods, including the initialized-crate two-row theory. Existing assertion tests retain their baseline case count. git diff --check passed (line-ending conversion notices only).
 
-## Decisions and future scope
+## Historical fixture decisions and future scope
 
 No behavior change was approved or implemented. Bloomery ordering, active-item/client-only gates, partial-failure persistence, preferred-slot semantics, and direct-merge termination remain the tasklist's future explicit decisions. Generic crate policy fixtures remain narrower than the new initialized-crate fixture. Engine integration and live game acceptance remain distinct; no game was launched.
 
-## Complete scenario register
+## Complete scenario register (current acceptance)
 
 The following register maps every scenario ID to its evidence or a proposed test responsibility. Entries marked planned remain unimplemented and unverified. No future markers are complete.
 
 | ID | Contract status | Test/evidence mapping |
 | --- | --- | --- |
-| F1.1 | Complete; verified and independently audited | See task-to-document table above |
-| F1.2 | Complete; verified and independently audited | See task-to-document table above |
-| F1.3 | Complete; verified and independently audited | See task-to-document table above |
-| F1.4 | Complete; verified and independently audited | See task-to-document table above |
-| F1.5 | Complete; verified and independently audited | See task-to-document table above |
-| F1.6 | Complete; verified and independently audited | See task-to-document table above |
-| F1.7 | Complete; verified and independently audited | See task-to-document table above |
-| F1.8 | Complete; verified and independently audited | See task-to-document table above |
-| F1.9 | Complete; verified and independently audited | See task-to-document table above |
-| F1.10 | Complete; verified and independently audited | See task-to-document table above |
-| F2.1 | Verified passing; independently audited | Capacity_ReturnsActualQuantityAndPreservesRemainder. Unqualified names belong to AutoStashTransferEdgeTests. |
-| F2.2 | Verified passing; independently audited | CompetingSources_BackpackAndEarlierSlotsConsumeCapacityFirst. Unqualified names belong to AutoStashTransferEdgeTests. |
-| F2.3 | Verified passing; independently audited | SelectedDestinations_ZeroMovesAdvanceToNextCandidate(false). Unqualified names belong to AutoStashTransferEdgeTests. |
-| F2.4 | Verified passing; independently audited | SelectedDestinations_ZeroMovesAdvanceToNextCandidate(true). Unqualified names belong to AutoStashTransferEdgeTests. |
-| F2.5 | Verified passing; independently audited | AutoStashTransferRetryTests.DeferredMerge_RunsAfterAutomaticAlternatives. Unqualified names belong to AutoStashTransferEdgeTests. |
-| F2.6 | Verified passing; independently audited with authorized fix | AutoStashTransferRetryTests.DeferredMerge_RejectedDirectAttemptTerminates; DeferredMerge_RepeatedDirectRequestMustTerminate (bounded reproduction; acceptance unresolved). Unqualified names belong to AutoStashTransferEdgeTests. |
-| F2.7 | Verified passing; independently audited | Restrictions_PreventMovementWithoutSideEffects. Unqualified names belong to AutoStashTransferEdgeTests. |
-| F2.8 | Verified passing; independently audited | IncompatibleAttributes_DoNotOverwriteExistingStack. Unqualified names belong to AutoStashTransferEdgeTests. |
-| F2.9 | Verified passing; independently audited | Suitability_HighestRankedDestinationReceivesItems. Unqualified names belong to AutoStashTransferEdgeTests. |
-| F2.10 | Verified passing; independently audited | MissingSources_TransfersFromAvailableInventory. Unqualified names belong to AutoStashTransferEdgeTests. |
-| F2.11 | Verified passing; independently audited | RepeatedExecution_AfterExhaustionIsUnchanged. Unqualified names belong to AutoStashTransferEdgeTests. |
-| F2.12 | Verified passing; independently audited | AutoStashPreferredSlotTests.PreferredIndex_SelectsValidSlotOrFallsBack; BlockedPreferredSlot_PreflightDoesNotFallBack; PartiallyFilledPreferredSlot_ExecutionFallsBack. Unqualified names belong to AutoStashTransferEdgeTests. |
+| F1.1 | Verified passing; independently audited | Historical baseline command/revision/assembly metadata above; current final command results below. |
+| F1.2 | Verified passing; independently audited | Complete scenario register and assertion sensitivity register; every F1–F8 ID reconciled against current methods and final passing suites. |
+| F1.3 | Verified passing; independently audited | AutoStashFixtureTests.Snapshot_DetectsMutationWithoutAliasingExpectedState and ObservedSlot_ControlsBoundaryAndRecordsActualEngineMoves; InventorySnapshot captures identity, quantities, persistent/temp attributes and conserved totals. |
+| F1.4 | Verified passing; independently audited | AutoStashTransferTests true-merge backpack/hotbar/combined/multiple-type/crate methods explicitly listed under Concrete assertion-test mapping; exact gains, remainders and lifecycle assertions. |
+| F1.5 | Verified passing; independently audited | AutoStashTransferTests no-op methods explicitly listed under Concrete assertion-test mapping; GetStashableItems_FullMatchingContainer_ReturnsEmptySet; unchanged snapshots and no dirty/session effects. |
+| F1.6 | Verified passing; independently audited | AutoStashFixtureTests.GenericContainer_CodeOnlyEligibility_UsesEmptySlotWithoutReplacingExistingIdentity plus the true-merge methods listed under Concrete assertion-test mapping. |
+| F1.7 | Verified passing; independently audited | GetStashableItemsBloomeryTests isolated noncombustible/low-temperature/burning/output methods listed under Concrete assertion-test mapping, with paired valid classification controls. |
+| F1.8 | Verified passing; independently audited | AutoStashFixtureTests.InitializedCrate_UsesVanillaInventoryConfiguration; actual engine initialization and retrieve-only restriction, separately from generic crate policy cases. |
+| F1.9 | Verified passing; independently audited | AutoStashFixtureTests.ObservedSlot_ControlsBoundaryAndRecordsActualEngineMoves, Observation_CleansAllResourcesAfterFailure and InventoryMock_RecordsEngineSuitabilityQueries. |
+| F1.10 | Verified passing; independently audited | AutoStashFixtureTests.ConfigurationScope_RestoresSettingsAfterException and Observation_CleansAllResourcesAfterFailure; AutoStashTestCollection and disposable config scopes; final fresh-host integration isolation separately under F8.8. |
+| F2.1 | Verified passing; independently audited | Capacity_ReturnsActualQuantityAndPreservesRemainder.  |
+| F2.2 | Verified passing; independently audited | CompetingSources_BackpackAndEarlierSlotsConsumeCapacityFirst.  |
+| F2.3 | Verified passing; independently audited | SelectedDestinations_ZeroMovesAdvanceToNextCandidate(false).  |
+| F2.4 | Verified passing; independently audited | SelectedDestinations_ZeroMovesAdvanceToNextCandidate(true).  |
+| F2.5 | Verified passing; independently audited | AutoStashTransferRetryTests.DeferredMerge_RunsAfterAutomaticAlternatives.  |
+| F2.6 | Verified passing; independently audited with authorized fix | AutoStashTransferRetryTests.DeferredMerge_RejectedDirectAttemptTerminates; DeferredMerge_RepeatedDirectRequestMustTerminate (normal bounded termination after the authorized fix); DirectAlternatives_AllCandidatesRejectOnceAndNotifyOwnerOnce; DirectAlternatives_FirstRejectsLaterDestinationSucceeds; DirectAlternatives_ProgressMakesEarlierRejectedSlotViable; DirectAlternatives_PartialProgressThenRejectionPreservesQuantityAndReportsError; DirectAlternatives_AutomaticallyExcludedSlotIsStillAttempted; DirectAlternatives_OrdinaryFullTargetDoesNotReportError.  |
+| F2.7 | Verified passing; independently audited | Restrictions_PreventMovementWithoutSideEffects.  |
+| F2.8 | Verified passing; independently audited | IncompatibleAttributes_DoNotOverwriteExistingStack.  |
+| F2.9 | Verified passing; independently audited | Suitability_HighestRankedDestinationReceivesItems.  |
+| F2.10 | Verified passing; independently audited | MissingSources_TransfersFromAvailableInventory.  |
+| F2.11 | Verified passing; independently audited | RepeatedExecution_AfterExhaustionIsUnchanged.  |
+| F2.12 | Verified passing; independently audited | AutoStashPreferredSlotTests.PreferredIndex_SelectsValidSlotOrFallsBack; BlockedPreferredSlot_PreflightDoesNotFallBack; PartiallyFilledPreferredSlot_ExecutionFallsBack.  |
 | F3.1 | Verified passing; independently audited | BloomeryExecutionTests.MixedInputs_DepositFiveOreAndThreeFuel; PartialOreMove_FuelAllowanceUsesActualDeposit. |
 | F3.2 | Verified passing; independently audited | BloomeryExecutionTests.MixedInputs_DepositFiveOreAndThreeFuel; ExistingFuel_ReducesRoundedRemainingAllowance. |
 | F3.3 | Verified passing; independently audited | BloomeryExecutionTests.ExistingContents_CompetingSourcesConsumeOnlyRemainingCapacity; FullInputs_DoNotRouteToOutput. |
@@ -131,14 +131,14 @@ The following register maps every scenario ID to its evidence or a proposed test
 | F8.6 | Implemented; verification and independent audit passed | BehaviorInstallationTests.SupportedBlock_InstallsInOrderAndRemainsIdempotent repeats amendment and asserts unchanged array identities and exactly one of each required behavior. |
 | F8.7 | Implemented; verification and independent audit passed | Separate IntegrationTests HarmonyDispatchIntegrationTests.ProductionPatches_DispatchAndCleanUpWithinIsolatedHost calls EngineDispatchHarness real crate/bloomery and attached interaction/help entries under actual production patches; handled suppression and unhandled vanilla entry are directly observed. |
 | F8.8 | Implemented; verification and independent audit passed | EngineDispatchHarness removes regular patch owners in finally and asserts no owner remains. The irreversible reverse stand-in is confined to the dedicated single-test host; observed process exit precedes fresh help, AutoStash and Unit hosts. UnpatchAll does not restore the reverse stand-in in-process. |
-| F9.1 | Planned; no completion evidence | Provisional Final coverage reconciliation scenario F9.1 (replace with actual method names during implementation): Reconcile every F1–F8 scenario against implemented test names and outcomes in the evidence document; ensure all eight original findings remain traceable. |
-| F9.2 | Planned; no completion evidence | Provisional Final coverage reconciliation scenario F9.2 (replace with actual method names during implementation): Run the full focused AutoStash suite, the separate AutoStash integration suite, and the repository unit suite through subagents to detect shared-fixture regressions. Record exact commands, assembly versions, pass/fail/skip counts, and relevant warnings. |
-| F9.3 | Planned; no completion evidence | Provisional Final coverage reconciliation scenario F9.3 (replace with actual method names during implementation): Review assertion sensitivity: for every named scenario identify the behavioral change its assertions detect. Do not use test-count growth as the acceptance metric. |
-| F9.4 | Planned; no completion evidence | Provisional Final coverage reconciliation scenario F9.4 (replace with actual method names during implementation): Obtain an independent final audit of scenario completeness, fixture realism, negative-test isolation, lifecycle assertions, and production-code scope. |
-| F9.5 | Planned; no completion evidence | Provisional Final coverage reconciliation scenario F9.5 (replace with actual method names during implementation): Resolve all intended-versus-observed discrepancies explicitly. Document minimal reproductions and any separately authorized fixes; do not silently defer or skip required cases. |
-| F9.6 | Planned; no completion evidence | Provisional Final coverage reconciliation scenario F9.6 (replace with actual method names during implementation): Confirm no inventory/transfer redesign was introduced, no game was launched, and automated results are not represented as live acceptance. |
+| F9.1 | Verified; second review and independent final audit passed | Complete current F1–F8 scenario register, actual method references, historical outcomes and final suite outcomes; original findings map to F4, F3, F2, F5, F1, F6, F7 and F8 respectively. |
+| F9.2 | Verified; second review and independent final audit passed | Final validation commands below: separate Integration 1, fresh AutoStash 357 and Unit 553; zero failures/skips/exclusions; exact metadata and existing warnings recorded. |
+| F9.3 | Verified; second review and independent final audit passed | Assertion sensitivity register below identifies each scenario behavior change; direct test/helper review confirms real engine movement, precise state, negatives and lifecycle assertions. |
+| F9.4 | Verified; second review and independent final audit passed | lifecycle_coverage_audit final verdict: all F9.1–F9.6 and final acceptance satisfied, with no required code, coverage or evidence gaps. |
+| F9.5 | Verified; second review and independent final audit passed | Current decision register below explicitly records authorized retry/finalization/progress changes and retained preferred-slot, bloomery, assessment, presentation and Harmony distinctions. |
+| F9.6 | Verified; second review and independent final audit passed | Baseline-to-current eight-file production scope review below, two-document reconciliation worktree, no runtime launch or architecture redesign; automated evidence separate from live acceptance. |
 
-## Second review
+## Historical fixture second review
 
 The implementer reviewed source diffs and helper implementations against F1.1–F1.10 after implementation. Checks included narrowing changed-slot exceptions so unrelated hotbar/backpack and nonmatching slots must remain unchanged; exact collectible identity for real merges; snapshots retaining copied attribute bytes and resolving current indexed slots for conservation; negative bloomery prerequisites; crate initializer ownership; and cleanup/collection isolation. A suitability fixture initially supplied a mock API to an engine constructor requiring world/calendar infrastructure; it now follows the existing inventory fixture pattern of assigning Api after construction. No production code or transfer algorithm was changed. Independent audit concluded Phase 1 fully satisfied after the final rerun and traceability reconciliation.
 
@@ -180,7 +180,7 @@ F1.7 negative prerequisites and paired validity controls in GetStashableItemsBlo
 
 The two isolated classification negatives seed existing fuel, leaving the ore destination empty. Their paired positive controls change only the candidate to valid ore properties and require that the same source/target fixture is accepted. This distinguishes invalid classification from an unrelated gate or destination incompatibility.
 
-## Independent completion audit
+## Historical fixture independent completion audit
 
 The phase1_audit subagent applied the complete audit-stage-completion workflow after the implementer second review. It independently read both skills, the full tasklist and linked proposal, changed/new test sources, engine crate initialization source, and durable baseline/final receipts. Verdict: Phase 1 fully satisfied, high confidence; F1.1–F1.10 individually satisfied. No required implementation or evidence gaps remain.
 
@@ -188,7 +188,7 @@ The concrete method-traceability request was resolved in this evidence document.
 
 Only after this verdict were Phase 1 task/completion markers updated. No production sources changed; no game launched.
 
-## Shared-transfer coverage: documentation gate and decisions
+## Historical shared-transfer reproduction and review
 
 Selected contract: FunctionalTestCoverage.todo#phase-2-protect-shared-transfers-and-inventory-restrictions, inherited Scope and execution rules and Baseline and decisions. Starting revision: 82b4f3fcdc50d1b365219b119114d3ddb4bf3600. The linked proposal was consulted for engine ownership, incremental execution, source ordering, lifecycle and evidence limits. It supplies context; proposed stronger guarantees remain outside this test-only work.
 
@@ -200,21 +200,21 @@ TransferCase supplies real engine inventories and session observations; Selectiv
 
 Shared-transfer second review: the implementer re-read the new scenario files and support boundaries against every F2 requirement. Assertions distinguish backpack/slot ordering, automatic-before-direct retries, restriction-specific early exits, attribute compatibility, inventory ranking, absent inventories and repeat no-ops. Successful moves assert precise contents and conservation; rejected moves assert untouched state and no slot notifications. Additional first-operation conservation and notification assertions were added to repeated-operation and missing-source cases. The repeated-direct test deliberately requires normal termination and retains failure rather than accepting its guard exception.
 
-Initial focused verification through phase2_tests: 130 passed, 1 failed, 0 skipped (131 total). The sole failure is DeferredMerge_RepeatedDirectRequestMustTerminate: InvalidOperationException, Transfer observation exceeded its attempt limit, reached through AutoStashTransferService.TransferItemToInventory. The collectible requests DirectMerge after rejecting both automatic and direct attempts; the loop removes and re-adds the same deferred slot without progress. Expected: bounded normal termination with zero moved and unchanged state. Observed: four attempts followed by the observer exception; unchanged contents and owned-session cleanup are checked in finally. Receipt: evidence/FunctionalTestCoverage.Phase2.AutoStash.txt. This confirms a controlled collectible-extension defect, not a claim that vanilla collectibles exhibit it in gameplay.
+Initial focused verification through phase2_tests: 130 passed, 1 failed, 0 skipped (131 total). The sole failure is DeferredMerge_RepeatedDirectRequestMustTerminate: InvalidOperationException, Transfer observation exceeded its attempt limit, reached through AutoStashTransferService.TransferItemToInventory. The collectible requests DirectMerge after rejecting both automatic and direct attempts; the loop removes and re-adds the same deferred slot without progress. Expected: bounded normal termination with zero moved and unchanged state. Observed: four attempts followed by the observer exception; unchanged contents and owned-session cleanup are checked in finally. Historical result recorded here; no separate receipt retained. This confirms a controlled collectible-extension defect, not a claim that vanilla collectibles exhibit it in gameplay.
 
-F2.6 and overall completion remain unresolved. All task markers stay unchecked pending the independent audit and explicit decision on the prohibited production fix. User authorization for a narrow retry fix has been requested; no answer is inferred from elapsed time.
+At that historical checkpoint F2.6 and completion were unresolved, and markers remained unchecked while authorization was requested. The subsequently authorized fix and passing resolution below supersede that checkpoint.
 
 Final focused command: dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-restore --filter FullyQualifiedName~AutoStash --verbosity minimal. Result after assertion refinements: 130 passed, 1 failed, 0 skipped. Initial restore needed approved network escalation following NU1301. Final build emitted 27 test-project warnings, matching the prior focused log; no new warnings. Initial rebuild also emitted existing production warnings.
 
-Broader command: dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-build --no-restore --filter 'Category=Unit&FullyQualifiedName!=VanillaExpanded.Tests.Unit.AutoStashing.AutoStashTransferRetryTests.DeferredMerge_RepeatedDirectRequestMustTerminate' --verbosity minimal. Result: 326 passed, 0 failed, 0 skipped. Receipt: evidence/FunctionalTestCoverage.Phase2.Unit.txt. This diagnostic exclusion is explicit and does not establish overall completion; the reproduction remains enabled in the normal suite. This broader run preceded the final assertion-only refinements, which were verified in the final focused run.
+Broader command: dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-build --no-restore --filter 'Category=Unit&FullyQualifiedName!=VanillaExpanded.Tests.Unit.AutoStashing.AutoStashTransferRetryTests.DeferredMerge_RepeatedDirectRequestMustTerminate' --verbosity minimal. Result: 326 passed, 0 failed, 0 skipped. Historical result recorded here; no separate receipt retained. This diagnostic exclusion is explicit and does not establish overall completion; the reproduction remains enabled in the normal suite. This broader run preceded the final assertion-only refinements, which were verified in the final focused run.
 
 Installed engine metadata refreshed by the test subagent: G:/Vintagestory; VintagestoryAPI, VSSurvivalMod, VSEssentials, VintagestoryLib assembly versions 1.22.7.0. API file/product version 1.22.0; other three file/product versions 1.22.7. No game was launched. No production sources changed.
 
 Independent-review refinements: zero-capacity now checks all snapshot contents without changed-slot exceptions; competing-source success now asserts destination modification. The final focused receipt includes both. The repeated-direct failure remains the sole executed behavior discrepancy. Full completion is withheld under the tasklist discrepancy rule and complete-todo-phase review requirements.
 
-Independent audit verdict: F2.1–F2.5 and F2.7–F2.12 satisfy their scenario contracts; F2.6 and overall completion remain incomplete solely due to the reproduced unbounded direct retry. Both assertion gaps are resolved and final metadata reconciled. Full report: [FunctionalTestCoverage.Phase2.Audit.md](evidence/FunctionalTestCoverage.Phase2.Audit.md). No task or goal was marked complete.
+Independent audit verdict: F2.1–F2.5 and F2.7–F2.12 satisfy their scenario contracts; F2.6 and overall completion remain incomplete solely due to the reproduced unbounded direct retry. Both assertion gaps are resolved and final metadata reconciled. Historical independent verdict recorded here; no separate report retained. No task or goal was marked complete.
 
-## Authorized direct-merge resolution
+## Authorized direct-merge resolution (supersedes the historical failure)
 
 The user explicitly authorized fixing the infinite retry loop on 2026-10-01, overriding the tasklist prohibition for this narrow defect. Additional required guarantees: exhaust all eligible empty or same-item direct destinations before abandonment; send an in-game error on failure. This does not authorize the architecture refactor.
 
@@ -226,19 +226,19 @@ Direct candidates rejected before positive movement are rechecked after that mov
 
 The previous unresolved-defect verdict above is historical. The user's explicit authorization supersedes it; final passing receipts and the renewed independent audit are required before completion markers change.
 
-## Authorized-fix verification and second review
+## Authorized-fix verification and second review (passing resolution)
 
-Final focused command through phase2_tests: dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-restore --filter FullyQualifiedName~AutoStash --verbosity minimal. Result: 140 passed, 0 failed, 0 skipped. Receipt: evidence/FunctionalTestCoverage.Phase2.Final.AutoStash.txt. Full Unit command: dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-build --no-restore --filter Category=Unit --verbosity minimal. Result: 336 passed, 0 failed, 0 skipped; no exclusions. Receipt: evidence/FunctionalTestCoverage.Phase2.Final.Unit.txt. Installed engine assembly versions remain 1.22.7.0; API file/product 1.22.0, other assemblies 1.22.7. Existing nullable warnings remain; no new production or test warnings were introduced.
+Final focused command through phase2_tests: dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-restore --filter FullyQualifiedName~AutoStash --verbosity minimal. Result: 140 passed, 0 failed, 0 skipped. Historical result recorded here; no separate receipt retained. Full Unit command: dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-build --no-restore --filter Category=Unit --verbosity minimal. Result: 336 passed, 0 failed, 0 skipped; no exclusions. Historical result recorded here; no separate receipt retained. Installed engine assembly versions remain 1.22.7.0; API file/product 1.22.0, other assemblies 1.22.7. Existing nullable warnings remain; no new production or test warnings were introduced.
 
 Updated F2.6 evidence: DeferredMerge_RepeatedDirectRequestMustTerminate now returns normally after bounded attempts and verifies one owner-only error. DirectAlternatives_FirstRejectsLaterDestinationSucceeds covers later populated and empty direct destinations with exact attempts/contents and no error. DirectAlternatives_AllCandidatesRejectOnceAndNotifyOwnerOnce covers all populated/empty candidates and both source inventories, with one aggregate owner-only general-chat CommandError. DirectAlternatives_ProgressMakesEarlierRejectedSlotViable proves reevaluation after partial progress. DirectAlternatives_PartialProgressThenRejectionPreservesQuantityAndReportsError verifies actual remainder, conservation, notification and error. DirectAlternatives_AutomaticallyExcludedSlotIsStillAttempted covers a direct-only eligible slot with and without other automatic capacity. Engine TryPutInto rechecks automatic eligibility internally, so this controlled slot actually rejects execution; the test proves direct selection is attempted and reported without bypassing engine mutation. DirectAlternatives_OrdinaryFullTargetDoesNotReportError retains normal no-op behavior.
 
 The source-lock/containment and all-rejected destination assertions now include the additional direct attempts explicitly authorized by the user; their unchanged-state, conservation and cleanup checks were retained. Successful automatic selection and deferred-request order remain preserved.
 
-Second review after the fix: the implementer re-read complete production selection/mutation/session/feedback flow, new tests and support fixtures. Failed direct attempts are excluded until positive progress; each reset reduces finite source quantity. All eligible slots are scanned at direct priority, and no stack-size edits replace engine mutation. Feedback is aggregated after owned-session cleanup and addressed by inventory identity. The engine ServerPlayer-derived observer reimplements the interface members for inventory/chat and explicitly initializes only the exercised state without starting server lifecycle. Region grouping and XML comments were checked. Test-only regions were grouped by functional family after verification; this does not affect compiled behavior. No game was launched. Independent final audit pending; markers remain unchecked.
+Second review after the fix: the implementer re-read complete production selection/mutation/session/feedback flow, new tests and support fixtures. Failed direct attempts are excluded until positive progress; each reset reduces finite source quantity. All eligible slots are scanned at direct priority, and no stack-size edits replace engine mutation. Feedback is aggregated after owned-session cleanup and addressed by inventory identity. The current class-backed Moq ServerPlayer interface mock observes inventory ownership/chat without starting server lifecycle. Region grouping and XML comments were checked. Test-only regions were grouped by functional family after verification; this does not affect compiled behavior. No game was launched. Independent final audit pending; markers remain unchecked.
 
-Final independent completion audit: F2.1–F2.12 and the user-authorized candidate-exhaustion/error-chat guarantees are fully satisfied, high confidence, no required gaps. Report: [FunctionalTestCoverage.Phase2.Final.Audit.md](evidence/FunctionalTestCoverage.Phase2.Final.Audit.md). The historical failing reproduction and initial audit remain as prior evidence; the final normal-termination regression passes with no exclusions. Only after this final verdict were Phase 2 task and completion markers checked. Phases 3–9 remain planned; no architecture refactor or live-game validation is claimed.
+Final independent completion audit: F2.1–F2.12 and the user-authorized candidate-exhaustion/error-chat guarantees are fully satisfied, high confidence, no required gaps. Independent verdict recorded here; no separate report retained. The historical failing reproduction and initial audit remain as prior evidence; the final normal-termination regression passes with no exclusions. Only after this final verdict were Phase 2 task and completion markers checked. Phases 3–9 remain planned; no architecture refactor or live-game validation is claimed.
 
-## Bloomery execution coverage
+## Bloomery execution coverage (implementation history)
 
 Selected contract: FunctionalTestCoverage.todo#phase-3-protect-bloomery-execution and inherited scope/decisions; linked PlanningAndExecutionProposal.md read at current revision for bloomery required-slot routing, live limits, established source-pass order, client-only active-item gate and evidence limits. The proposal is context, not refactor authorization. Task-linked BlockBehaviorAutoStashable bloomery methods, GetStashableItemsBloomeryTests and MockBlockEntityBloomery fixture were consulted, as were engine BEBloomery.CanAdd/Ore2FuelRatio and slot movement. No unavailable controlling references found.
 
@@ -246,7 +246,7 @@ F3.1–F3.5 -> tasklist plus proposal Bloomery and Incremental planning -> exact
 
 BloomeryCase uses a Moq partial mock of TestableBlockEntityBloomery with CallBase enabled, retaining real engine CanAdd/inventory movement while intercepting only MarkDirty. Exact redraw/recipient and total call-count verification replaces the extra observer subclass. BloomeryCase seeds stable identities and a checked persistent attribute, snapshots all source/target/output slots, and verifies actual notifications, conservation, untouched state and session/packet effects. No production change or game launch is authorized here.
 
-Bloomery verification revision: 8f2b31995968868540d8db93905ca74841f448dd (clean starting worktree). Commands through phase2_tests: dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-restore --filter FullyQualifiedName~AutoStash --verbosity minimal (179 passed, 0 failed, 0 skipped); dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-build --no-restore --filter Category=Unit --verbosity minimal (375 passed, 0 failed, 0 skipped). No exclusions. Receipts: evidence/FunctionalTestCoverage.Phase3.AutoStash.txt and evidence/FunctionalTestCoverage.Phase3.Unit.txt. Final runs include real-hotbar active-gate assertions. Existing 27 test warnings match the prior baseline; none introduced. Installed G:/Vintagestory assembly versions API/SurvivalMod/Essentials/Lib 1.22.7.0; API file/product 1.22.0, others 1.22.7. No game launched.
+Bloomery verification revision: 8f2b31995968868540d8db93905ca74841f448dd (clean starting worktree). Commands through phase2_tests: dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-restore --filter FullyQualifiedName~AutoStash --verbosity minimal (179 passed, 0 failed, 0 skipped); dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-build --no-restore --filter Category=Unit --verbosity minimal (375 passed, 0 failed, 0 skipped). No exclusions. Historical results recorded here; no separate receipts retained. Final runs include real-hotbar active-gate assertions. Existing 27 test warnings match the prior baseline; none introduced. Installed G:/Vintagestory assembly versions API/SurvivalMod/Essentials/Lib 1.22.7.0; API file/product 1.22.0, others 1.22.7. No game launched.
 
 Bloomery second review: the implementer reviewed all new cases/helpers after final execution against F3.1–F3.11. The observed-ore limit case requires one fuel after only two of five requested ore actually move. Competing source stacks share pre-existing capacity; full mandatory input tests leave the other input empty to detect erroneous fallback. Source ordering asserts both four-pass attempts and backpack/hotbar fuel remainders that differ under global ore-first processing. State/type/classification negatives have valid unrelated prerequisites and server execution does not pass through the client active-item gate. Ratio tests characterize both AutoStash clamping and vanilla CanAdd's nonpositive existing-ore rejection. Every operation verifies unchanged output/unrelated slots, quantity conservation, stack identity/seeded attributes, dirty redraw once on actual success, zero dirty notifications on rejection, and no inventory sessions/client transfer packets. Assessment-only checks do not mutate or attempt movement; paired server tests use actual hotbar slots. No production source changed. Independent completion audit pending; task markers remain unchecked.
 
@@ -256,13 +256,13 @@ Moq fixture simplification requested by the user: removed ObservedBloomery and i
 
 Additional Moq simplification requested by the user: removed ObservedInventory and ObservedServerPlayer. InventoryGeneric partial mocks retain engine ranking and actual moves; Moq invocations and Verify retain exact suitability-query order/counts. TransferErrorObservation now uses class-backed Mock<ServerPlayer>.As<IServerPlayer>() to inherit the engine's inaccessible interface implementation while configuring inventory ownership and verifying exact chat recipient/group/type/text/count. No reflection allocation or handwritten player observer remains. Subagent verification: dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-restore --filter FullyQualifiedName~AutoStash --verbosity minimal (179 passed, 0 failed, 0 skipped); full Category=Unit with --no-build --no-restore (375 passed, 0 failed, 0 skipped). Production unchanged; existing nullable warnings remain.
 
-## Attached-container operation coverage
+## Attached-container operation coverage (implementation history)
 
 Selected contract: FunctionalTestCoverage.todo#phase-4-protect-complete-attached-container-operations, inherited Scope and execution rules and Baseline and decisions. Starting revision: ea3c4185793524f65d5b674cdeb54a9ff4405925; clean worktree. Consulted linked PlanningAndExecutionProposal.md, especially Attached bags, Client assessment, Target lifecycle and partial failure, and Evidence limits. Its proposed architecture and stronger interrupted-persistence guarantees remain outside this work. Consulted EntityAttachedContainerAutoStash.cs and the existing RefreshWorkspaceSlots_RepeatedReloads_UpdateContentsWithoutReplacingSlots test before implementation.
 
 F4.1–F4.3 -> selected checklist, current TryAutoStash, proposal engine ownership -> complete operations through vanilla workspaces and distinct IHeldBag, precise source/persisted destination contents, conservation and no-op boundaries -> attached-container execution tests. F4.4–F4.6 -> current validation/loading/session/persistence branches -> isolated invalid targets, session ownership, actual Store/attachment dirty/owner storage calls -> negative and lifecycle cases with Moq observations. F4.7 -> current workspace refresh and bag storage -> reload persisted stack data and repeat full operations with stable workspace slot identities -> persistence round trips. F4.8 -> checklist decisions and proposal assessment context -> capacity-independent candidate detection remains distinct from execution -> paired full-bag assessment/execution. Verification and actual test-name mappings will be recorded after execution; no completion claim yet.
 
-Attached-container verification: focused `FullyQualifiedName~EntityAttachedContainer` run passed 35 cases, 0 failed, 0 skipped. Final commands through phase2_tests: `dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-restore --filter FullyQualifiedName~AutoStash --verbosity minimal` (214 passed, 0 failed, 0 skipped) and `dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-build --no-restore --filter Category=Unit --verbosity minimal` (410 passed, 0 failed, 0 skipped). No exclusions. Receipts: evidence/FunctionalTestCoverage.Phase4.AutoStash.txt and evidence/FunctionalTestCoverage.Phase4.Unit.txt. Both final runs include unrelated attachment preservation and explicit workspace-load rejection assertions. Current HEAD remains the starting revision above. Existing 27 test warnings match the earlier baseline; none introduced. Installed engine assembly versions remain 1.22.7.0 for API/SurvivalMod/Essentials/Lib; API file/product 1.22.0, other three 1.22.7.
+Attached-container verification: focused `FullyQualifiedName~EntityAttachedContainer` run passed 35 cases, 0 failed, 0 skipped. Final commands through phase2_tests: `dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-restore --filter FullyQualifiedName~AutoStash --verbosity minimal` (214 passed, 0 failed, 0 skipped) and `dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-build --no-restore --filter Category=Unit --verbosity minimal` (410 passed, 0 failed, 0 skipped). No exclusions. Historical results recorded here; no separate receipts retained. Both final runs include unrelated attachment preservation and explicit workspace-load rejection assertions. Current HEAD remains the starting revision above. Existing 27 test warnings match the earlier baseline; none introduced. Installed engine assembly versions remain 1.22.7.0 for API/SurvivalMod/Essentials/Lib; API file/product 1.22.0, other three 1.22.7.
 
 Attached-container second review: the implementer re-read the complete new tests and helper against F4.1–F4.8 and inherited requirements. Both paths use real engine slot transfers; vanilla bag storage/workspace and attachment-owner storeInv run their actual implementations with Moq observations. The distinct IHeldBag mock controls only loading/storage and returns independent cloned contents, so persistence cannot pass through stack aliasing. Snapshots count player sources and independently cloned persisted contents once, preserve stack attributes and unrelated attachments, and verify exact quantities and conservation. Owner serialization is separately restored and checked, and repeat operations replace the attachment with owner-deserialized storage before poisoning stale workspace data. Workspace wrapper slot identities survive both repeat loads; no-op repeats require no persistence/session calls. Failed workspace loading uses a positive outer capacity prerequisite followed by zero in the real loader, explicitly asserting that no wrapper or content slots were created. Each fixture owns its object cache and mocks; no globals or listeners are installed. Independent audit pending; checklist markers remain unchecked.
 
@@ -345,3 +345,114 @@ Verification through phase2_tests at starting HEAD d7e3f14e8d45928b105d9dbb97657
 Isolation boundary: the ordinary unit project contains no test that installs Harmony patches. Its public harness is invoked only by the separate integration assembly, which contains one integration test. Ordinary patch owners are removed in finally and absence is asserted even after an assertion fails. Harmony does not restore the reverse-patched stand-in through UnpatchAll; dedicated test-host process termination releases that process-local detour. Fresh ordinary hosts passing afterward provide cross-suite isolation evidence. These automated checks load installed engine assemblies but never start an actual server/client/game, and are not live acceptance.
 
 Installed metadata was freshly inspected: VintagestoryAPI, VintagestoryLib, VSSurvivalMod and VSEssentials assembly versions remain 1.22.7.0; API file version is 1.22.0 and the other three are 1.22.7. No tool installation, production changes, standalone audit/verification receipts or scratch files were added. git diff --check passed with line-ending conversion notices only. Independent final audit: lifecycle_coverage_audit directly consulted the selected contract and inherited documentation, all new implementation files and final evidence. Verdict: F8.1–F8.8 and completion fully satisfied, with no code, coverage or evidence gaps. Separate integration and fresh unit-host results establish the stated cleanup boundary. Completion markers were updated only after this verdict.
+## Final coverage reconciliation and refactor gate
+
+Selected contract: FunctionalTestCoverage.todo#phase-9-reconcile-evidence-and-establish-the-refactor-gate, inherited Scope and execution rules, Baseline and decisions, all F1–F8 contracts and the eight-finding cross-reference. The complete contextual PlanningAndExecutionProposal.md was consulted again; its architecture acceptance criteria do not apply to this coverage prerequisite. Current revision: 0d20312fc58b23c1788317f030253ec33f7d5cf2, clean before reconciliation. Earlier implementation narratives record historical state; the complete scenario register and this section define current acceptance. Removed log/audit files are not controlling dependencies; their command results and verdicts are summarized in this existing document.
+
+F9.1 -> complete scenario register and F1–F8 checklist -> every scenario must map to actual tests and passing outcomes, all original findings retained -> method reconciliation and final suites. F9.2 -> scope/subagent execution and evidence limits -> isolated integration followed by fresh ordinary test hosts, exact commands/counts/versions/warnings -> final validation below. F9.3 -> exact-state requirements and negative prerequisite isolation -> a behavioral change detected for each named scenario -> sensitivity register below and direct test/helper review. F9.4 -> audit-stage-completion plus all inherited documents -> independent final review of coverage, realism, lifecycle and scope -> independent final verdict recorded below. F9.5 -> Baseline and decisions plus user authorizations -> distinguish desired behavior, characterization and resolved defects -> decision register below. F9.6 -> proposal Scope/Evidence limits -> no redesign or runtime launch, automated evidence kept separate -> historical production diff and current two-document worktree review.
+
+Final validation, sequentially through phase2_tests at the revision above:
+
+1. `dotnet test VanillaExpanded.IntegrationTests/VanillaExpanded.IntegrationTests.csproj --no-restore --filter 'Category=Integration' --verbosity minimal`: 1 passed, 0 failed, 0 skipped. Dedicated host exited with command code 0 before ordinary tests.
+2. `dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-restore --filter 'FullyQualifiedName~AutoStash' --verbosity minimal`: 357 passed, 0 failed, 0 skipped, fresh host, exit 0.
+3. `dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-build --no-restore --filter 'Category=Unit' --verbosity minimal`: 553 passed, 0 failed, 0 skipped, fresh host, exit 0.
+
+No exclusions. Initial integration rebuild emitted 7 existing production and 27 existing test warnings, none new; subsequent commands emitted none. Fresh installed metadata: G:/Vintagestory API/Lib/SurvivalMod/Essentials assemblies 1.22.7.0; API file version 1.22.0 and the other three 1.22.7. No startup, tools installation, or new receipt/report files. Ordinary Harmony owners are removed and checked within the integration fixture; its reverse stand-in ends with the dedicated host process. Fresh unit hosts establish cross-suite isolation. These results are automated evidence, not user-run live acceptance.
+
+Current decision register:
+
+- Direct retry: the repeated DirectMerge request reproduced four zero-move attempts followed by the bounded observer exception. The user authorized termination fixes, exhaustion of every eligible empty/same-item destination, reevaluation after positive progress and one owning-player in-game error. Current normal-return and candidate/error regressions pass. The guard exception remains failure, never accepted termination.
+- Interruption: earlier generic/crate/bloomery final dirty omission and non-vanilla bag durable loss were reproduced after two items moved (saved 10 versus live 12). The user first deferred, then approved fixes. Current tests require applied/uncertain changes finalized before owned cleanup, saved bag/owner reload of 12, preserved original exceptions and reported secondary failures. No rollback or successful-storage guarantee when storage itself fails is claimed.
+- Preferred slot: retain characterization of the unused argument: blocked valid index is exclusive at preflight, while execution can fall back after a successful preferred move. No production caller uses it; future removal/redesign remains separately scoped.
+- Bloomery: preserve backpack ore, backpack fuel, hotbar ore, hotbar fuel; order-sensitive remainders protect it. Nonpositive ratios characterize AutoStash clamping together with engine CanAdd behavior. Empty-bloomery active-item gating remains client-only.
+- Attached assessment: matching contents do not promise capacity; full bags can advertise candidates and execution can reject. Assessment does not open or refresh execution workspaces.
+- Progress: user approved IProgressSystemProvider injection. Engine constructors/default provider retain existing presentation ownership. Block post-submission steps currently recreate progress until stop; tests characterize this sequence rather than approve a presentation change.
+- Harmony: real engine dispatch is separately tested. Ordinary owners are removed in finally; reverse-patch cleanup uses dedicated process exit, not an unsupported in-process restoration claim.
+
+Production scope review against baseline 9434f66: the only eight changed source files implement retry/error feedback, AutoStashMutationState and target finalization, and the progress provider/interface injection. Engine GetBestSuitedSlot/TryPutInto, inventory models, target-specific loops, source ordering, network boundary, gesture timing and packet formats remain owned by existing components. None of the proposed planner/policy/executor/adapter architecture was introduced. This reconciliation changes only the existing checklist and evidence. No actual game/server/client was launched.
+
+### Assertion sensitivity register
+
+Each row names the behavior change detected by the concrete tests in the complete scenario register. Documentation-only baseline/mapping tasks use review evidence; runtime scenarios use assertions, not increased test counts. Test-class qualification: F2 edge methods belong to AutoStashTransferEdgeTests; deferred/direct methods to AutoStashTransferRetryTests; preferred-slot methods to AutoStashPreferredSlotTests.
+
+| Scenario | Change detected |
+| --- | --- |
+| F1.1 | Historical baseline distinguished from current verification by revision and assembly metadata. |
+| F1.2 | Missing scenario IDs, stale methods or unsupported completion claims. |
+| F1.3 | Snapshot aliasing, lost quantity/attributes, changed collectible identity or replaced slots. |
+| F1.4 | Wrong destination gains/source remainders, unrelated movement or missing lifecycle effects. |
+| F1.5 | Mutation, sessions or dirty effects on empty/no-match/full no-ops. |
+| F1.6 | Conflating shared-code eligibility with same-identity stack merging or wrong destination. |
+| F1.7 | Invalid classification accepted; paired valid controls exclude unrelated empty-target rejection. |
+| F1.8 | Engine crate locks/configuration drift or retrieve-only transfer accepted. |
+| F1.9 | Ineffective controlled failures/quantity limits, callbacks/ticks omitted, unbounded observation or replaced engine ranking. |
+| F1.10 | Leaked configuration or skipped cleanup after exceptions; shared-state collection isolation. |
+| F2.1 | Requested rather than actual count, overflow or wrong zero/exact/partial remainder. |
+| F2.2 | Changed source-slot or backpack-before-hotbar order through capacity-sensitive remainders. |
+| F2.3 | Abandonment after first zero move despite another viable destination. |
+| F2.4 | Unbounded rejected attempts, mutation on rejection or missed owned-session cleanup. |
+| F2.5 | Premature direct execution, incorrect merge priorities/quantities or skipped fallback. |
+| F2.6 | Repeated direct-request nontermination, incomplete empty/populated destination exhaustion, missed reevaluation after progress, wrong recipient/error count or false full-target error. |
+| F2.7 | Bypassed take/put lock, storage restriction or inventory containment rejection. |
+| F2.8 | Illegal incompatible-attribute merge/overwrite or wrong empty-alternative fallback. |
+| F2.9 | Enumeration order substituted for engine suitability ranking. |
+| F2.10 | Null-inventory failures or surviving backpack/hotbar ignored. |
+| F2.11 | Repeated duplication/movement/notifications or unnecessary reacquired sessions. |
+| F2.12 | Changed valid/invalid index routing or exclusive-preflight versus partial-execution fallback characterization. |
+| F3.1 | Wrong input routing or fuel allowance based on requested ore instead of actual deposit. |
+| F3.2 | Incorrect ceiling rounding or existing fuel not subtracted. |
+| F3.3 | Overcapacity, wrong competing-source remainder or overflow to output. |
+| F3.4 | Hotbar-only or combined sources omitted. |
+| F3.5 | Reordered ore/fuel passes through exact attempts and different final fuel remainders. |
+| F3.6 | Burning/output rejection removed or unintended synchronization. |
+| F3.7 | Invalid/different-type input moved or mandatory-slot fallback introduced. |
+| F3.8 | Ignored ratio overrides/clamps or changed engine nonpositive existing-ore acceptance. |
+| F3.9 | Temperature/duration/melting-point boundary drift or missing smelted-output classification. |
+| F3.10 | Wrong redraw, output/unrelated mutation, lost identity/attributes/quantity or inappropriate sessions/client transfer. |
+| F3.11 | Client active-item gate promoted to server prerequisite or assessment mutates contents. |
+| F4.1 | Workspace/distinct-interface adaptation bypassed in complete TryAutoStash operation. |
+| F4.2 | Wrong sources/durable gain, lost attributes, unrelated changes or missing owner serialization. |
+| F4.3 | Overfill, wrong partial remainder, empty/nonmatching eligibility or no-op persistence. |
+| F4.4 | Missing validation, masked loader failure or effects before successful load. |
+| F4.5 | Sessions opened for temporary inventories, leaked owned workspaces or closed caller-owned sessions. |
+| F4.6 | Missing per-slot Store, wrong attachment dirty notification, omitted owner storage or no-op persistence. |
+| F4.7 | Stale workspace contents, duplication/loss, ignored owner reload or replaced wrapper slots. |
+| F4.8 | Candidate assessment treated as capacity guarantee or assessment loads/persists workspaces. |
+| F5.1 | Leaked owned sessions or closed caller-owned sessions after failure. |
+| F5.2 | Wrong partial quantities, rollback, lost synchronization or persistence. |
+| F5.3 | Unreturned callback-failing engine move incorrectly treated as unchanged. |
+| F5.4 | Stale capacity captured before session-opening callback. |
+| F5.5 | Dirty on normal no-op or missing synchronization after partial movement. |
+| F5.6 | Missing bloomery/bag synchronization or requested quantities persisted instead of actual movement. |
+| F5.7 | Lost temporary-bag progress, omitted owner serialization, cleanup ordering error or replaced original exception. |
+| F6.1 | Wrong supported-target entry state, result or handling. |
+| F6.2 | Wrong crate modifier combinations or missing vanilla active-item exception. |
+| F6.3 | Gesture/request through disabled, server-side or empty-source gates. |
+| F6.4 | Early/late request, ignored configured delay or wrong packet target. |
+| F6.5 | Duplicate request or changed inclusive post-grace boundary. |
+| F6.6 | Stale request/state/progress after stop/cancel or failed restart. |
+| F6.7 | Wrong progress ownership/update/removal or missing/repeated feedback. |
+| F6.8 | Registered-tick timing, entity/slot identity or exactly-once submission changed. |
+| F6.9 | Delayed stale request after input/selection/configuration invalidation. |
+| F6.10 | Same-target timer reset, different-target non-reset, stale restart or leaked listener/progress. |
+| F6.11 | Wrong mounted controls, ignored entry gates or real selection mapping changed. |
+| F7.1 | Registered handler fails actual transfer. |
+| F7.2 | Mutation or lifecycle effects despite denied claims/reachability. |
+| F7.3 | Unsafe handling or mutation for missing behavior/target/position. |
+| F7.4 | Wrong crate first-type, generic all-matching or bloomery input/ratio dispatch. |
+| F7.5 | Transfer despite missing entity/behavior or invalid attachment index. |
+| F7.6 | Wrong acceptance at exactly six blocks or beyond. |
+| F7.7 | Stale capacity/type assumptions; empty alternatives expose stale matching rather than mask it. |
+| F8.1 | Wrong full/no-match/disabled action/display contract or help side effects. |
+| F8.2 | Wrong crate modifiers, representative ordering or duplicate display types. |
+| F8.3 | Display stack or attribute aliasing into source inventories. |
+| F8.4 | Wrong attached append gates or replaced/reordered pre-existing interactions. |
+| F8.5 | Wrong supported/excluded blocks, insertion order or original identity in either array. |
+| F8.6 | Duplicate installation or changed array identities on repeat. |
+| F8.7 | Missing actual patch dispatch, wrong vanilla suppression/continuation or absent attached help postfix. |
+| F8.8 | Retained ordinary patch owners; host termination and fresh ordinary hosts establish reverse-patch isolation. |
+
+### Second review and final audit
+
+The implementer re-read the checklist, complete proposal and evidence; checked current method names against the test sources; reviewed all eight production-file changes from coverage baseline; and reviewed helper assertions plus both reviewers' independently reconstructed sensitivity maps. F1–F8 mappings now state current concrete evidence, F2 retry methods are correctly qualified, the unresolved historical retry text is superseded, removed receipt/report paths are no longer dependencies, and the current summary includes completed help/installation/dispatch work. All eight original findings retain explicit scenario traceability. Failure characterizations are separated from authorized passing fixes, including no rollback/storage-success claim. No tests or production source needed modification during final reconciliation; final runs apply to the unchanged test/source revision. Second review is complete. The subsequent independent completion audit is recorded below; markers changed only after its clean verdict.
+Independent final completion audit: lifecycle_coverage_audit directly consulted the selected checklist, inherited proposal and current evidence; inspected mappings/sensitivity, real fixtures and negative prerequisites, lifecycle assertions, isolated Harmony dispatch, final execution results and baseline-to-current production scope. The F1 sensitivity-table formatting issue was corrected and independently rechecked, including the restored requirement column in the task-to-document table. Final verdict: F9.1–F9.6 and final acceptance fully satisfied, with no required code, coverage or evidence gaps. Every one of the 74 F1–F8 scenario IDs retains concrete evidence and a sensitivity statement, and all eight original findings are traceable. Final passing evidence is 1 isolated Integration, 357 AutoStash and 553 Unit cases, zero failures/skips/exclusions. No behavior/test changes were necessary during reconciliation. Checklist and scenario statuses were completed only after this verdict. The functional test-coverage prerequisite is satisfied; implementing the architecture proposal remains separate work, and live acceptance remains user-run.
