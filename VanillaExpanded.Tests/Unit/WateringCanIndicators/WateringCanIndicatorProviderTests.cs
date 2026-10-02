@@ -1,4 +1,5 @@
 using VanillaExpanded.ItemSlotIndicators;
+using VanillaExpanded.PerishableItemSlots;
 using VanillaExpanded.Tests.Mocks;
 using VanillaExpanded.WateringCanIndicators;
 
@@ -59,29 +60,32 @@ public sealed class WateringCanIndicatorProviderTests
         Assert.True(indicator.Color.Y > indicator.Color.X);
     }
 
-    /// <summary>Empty and negative levels produce a visible small red strip.</summary>
+    /// <summary>Empty and negative levels fill the slot with the shared freshness-red hue.</summary>
     [Theory]
     [InlineData(0)]
     [InlineData(-10)]
     [InlineData(float.NaN)]
-    public void EmptyCan_ProducesRedSliver(float remaining)
+    public void EmptyCan_ProducesFullSharedRedWarning(float remaining)
     {
         Assert.True(new WateringCanIndicatorProvider().TryGetIndicator(CreateCanSlot(remaining), out var indicator));
 
-        Assert.InRange(indicator.Fill, 0.01f, 0.1f);
-        Assert.True(indicator.Color.X > indicator.Color.Y);
-        Assert.True(indicator.Color.X > indicator.Color.Z);
+        Assert.Equal(1, indicator.Fill);
+        var stale = FreshnessIndicatorProvider.FreshnessColor(0);
+        Assert.Equal(stale.X, indicator.Color.X);
+        Assert.Equal(stale.Y, indicator.Color.Y);
+        Assert.Equal(stale.Z, indicator.Color.Z);
+        Assert.Equal(0.6f, indicator.Color.W);
     }
 
     /// <summary>A newly created can without a water attribute is empty.</summary>
     [Fact]
-    public void MissingWaterAttribute_ProducesRedSliver()
+    public void MissingWaterAttribute_ProducesFullRedWarning()
     {
         var slot = new ItemSlot(null) { Itemstack = new ItemStack(new BlockWateringCan()) };
 
         Assert.True(new WateringCanIndicatorProvider().TryGetIndicator(slot, out var indicator));
 
-        Assert.InRange(indicator.Fill, 0.01f, 0.1f);
+        Assert.Equal(1, indicator.Fill);
         Assert.True(indicator.Color.X > indicator.Color.Z);
     }
 
@@ -98,7 +102,14 @@ public sealed class WateringCanIndicatorProviderTests
         Assert.True(low.Color.X < half.Color.X && half.Color.X < full.Color.X);
         Assert.True(low.Color.Y < half.Color.Y && half.Color.Y < full.Color.Y);
         Assert.True(low.Color.Z < half.Color.Z && half.Color.Z < full.Color.Z);
-        Assert.True(full.Color.Y >= 0.7f && full.Color.Z >= 0.9f);
+        Assert.InRange(full.Color.X, 0, 0.2f);
+        Assert.InRange(full.Color.Y, 0.4f, 0.55f);
+        Assert.InRange(full.Color.Z, 0.8f, 0.95f);
+        Assert.True(full.Color.Y - low.Color.Y >= 0.4f);
+        Assert.True(full.Color.Z - low.Color.Z >= 0.7f);
+        Assert.Equal(0.75f, full.Color.W);
+        Assert.Equal(0.65f, half.Color.W, precision: 5);
+        Assert.Equal(0.55f, low.Color.W, precision: 3);
     }
 
     /// <summary>Pouring, emptying, and refilling the same stack update on the next query.</summary>
@@ -118,6 +129,7 @@ public sealed class WateringCanIndicatorProviderTests
 
         can.SetRemainingWateringSeconds(stack, 0);
         Assert.True(provider.TryGetIndicator(slot, out var empty));
+        Assert.Equal(1, empty.Fill);
         Assert.True(empty.Color.X > empty.Color.Z);
 
         can.SetRemainingWateringSeconds(stack, 32);
@@ -125,15 +137,16 @@ public sealed class WateringCanIndicatorProviderTests
         Assert.Equal(full, refilled);
     }
 
-    /// <summary>The red strip remains visible after shared geometry and alpha conversion.</summary>
+    /// <summary>The empty warning covers the whole slot with correctly premultiplied red.</summary>
     [Fact]
-    public void EmptySliver_RendersNonzeroHeightAndPremultipliedRed()
+    public void EmptyWarning_RendersFullHeightAndPremultipliedRed()
     {
         Assert.True(new WateringCanIndicatorProvider().TryGetIndicator(CreateCanSlot(0), out var indicator));
         var bounds = ItemSlotIndicatorRenderer.CalculateBounds(100, 100, 48, indicator.Fill);
         var color = ItemSlotIndicatorRenderer.PremultiplyColor(indicator.Color);
 
-        Assert.InRange(bounds.Height, 1, 3);
+        Assert.Equal(48, bounds.Height);
+        Assert.Equal(76, bounds.Y);
         Assert.True(color.R > color.G && color.R > color.B);
         Assert.True(color.R <= color.A && color.G <= color.A && color.B <= color.A);
     }
