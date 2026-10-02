@@ -7,6 +7,8 @@ using System.Runtime.CompilerServices;
 
 using HarmonyLib;
 
+using OpenTK.Graphics.OpenGL4;
+
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
@@ -136,14 +138,25 @@ internal static class PerishableItemSlotPatch
         float y = (float)(posY - slotSize / 2);
         float fillHeight = height * freshness;
 
-        renderer.Render2DTexturePremultipliedAlpha(
-            whiteTexture.TextureId,
-            x,
-            y + height - fillHeight,
-            width,
-            fillHeight,
-            80,
-            FreshnessColorVector(freshness));
+        try
+        {
+            // The overlay must respect the existing GUI depth buffer without occluding later GUI draws.
+            GL.Enable(EnableCap.DepthTest);
+            GL.DepthMask(false);
+            renderer.Render2DTexturePremultipliedAlpha(
+                whiteTexture.TextureId,
+                x,
+                y + height - fillHeight,
+                width,
+                fillHeight,
+                80,
+                FreshnessColorVector(freshness));
+        }
+        finally
+        {
+            GL.DepthMask(true);
+            GL.Enable(EnableCap.DepthTest);
+        }
     }
 
     internal static Vec4f FreshnessColorVector(float freshness)
