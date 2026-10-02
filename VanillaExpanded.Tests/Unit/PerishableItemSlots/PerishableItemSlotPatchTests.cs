@@ -1,3 +1,4 @@
+using VanillaExpanded.ItemSlotIndicators;
 using VanillaExpanded.PerishableItemSlots;
 
 using Vintagestory.API.Common;
@@ -27,7 +28,7 @@ public sealed class PerishableItemSlotPatchTests
             TransitionedHours = transitionedHours
         };
 
-        float actual = PerishableItemSlotPatch.CalculateFreshness(state);
+        float actual = FreshnessIndicatorProvider.CalculateFreshness(state);
 
         Assert.Equal(expected, actual, precision: 5);
     }
@@ -37,13 +38,13 @@ public sealed class PerishableItemSlotPatchTests
     {
         var state = new TransitionState();
 
-        Assert.Equal(0, PerishableItemSlotPatch.CalculateFreshness(state));
+        Assert.Equal(0, FreshnessIndicatorProvider.CalculateFreshness(state));
     }
 
     [Fact]
     public void FreshnessColor_VeryFresh_IsGreenDominant()
     {
-        var color = PerishableItemSlotPatch.FreshnessColorVector(1);
+        var color = ItemSlotIndicatorRenderer.PremultiplyColor(FreshnessIndicatorProvider.FreshnessColor(1));
 
         Assert.True(color.G > color.R);
         Assert.True(color.A <= 0.45f);
@@ -53,8 +54,8 @@ public sealed class PerishableItemSlotPatchTests
     [Fact]
     public void FreshnessColor_AtNinetyFivePercent_RemainsFullyGreen()
     {
-        var fullyFresh = PerishableItemSlotPatch.FreshnessColorVector(1);
-        var nearlyFresh = PerishableItemSlotPatch.FreshnessColorVector(0.95f);
+        var fullyFresh = ItemSlotIndicatorRenderer.PremultiplyColor(FreshnessIndicatorProvider.FreshnessColor(1));
+        var nearlyFresh = ItemSlotIndicatorRenderer.PremultiplyColor(FreshnessIndicatorProvider.FreshnessColor(0.95f));
 
         Assert.Equal(fullyFresh.R, nearlyFresh.R);
         Assert.Equal(fullyFresh.G, nearlyFresh.G);
@@ -65,7 +66,7 @@ public sealed class PerishableItemSlotPatchTests
     [Fact]
     public void FreshnessColor_NotFresh_IsRedDominant()
     {
-        var color = PerishableItemSlotPatch.FreshnessColorVector(0);
+        var color = ItemSlotIndicatorRenderer.PremultiplyColor(FreshnessIndicatorProvider.FreshnessColor(0));
 
         Assert.True(color.R > color.G);
         Assert.True(color.A <= VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity * 1.3f);
@@ -75,7 +76,7 @@ public sealed class PerishableItemSlotPatchTests
     [Fact]
     public void FreshnessColor_PartiallyStale_IsRedDominant()
     {
-        var color = PerishableItemSlotPatch.FreshnessColorVector(0.5f);
+        var color = ItemSlotIndicatorRenderer.PremultiplyColor(FreshnessIndicatorProvider.FreshnessColor(0.5f));
 
         Assert.True(color.R > color.G * 2);
     }
