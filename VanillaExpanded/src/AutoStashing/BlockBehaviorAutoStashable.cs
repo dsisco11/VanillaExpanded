@@ -438,7 +438,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
                 continue;
             }
 
-            if (container.Inventory.Any(targetSlot => AutoStashTransferService.CanAcceptForAutoStash(targetSlot, sourceSlot)))
+            if (container.Inventory.Any(targetSlot => targetSlot.CanTakeFrom(sourceSlot, EnumMergePriority.AutoMerge)))
             {
                 stashableIds.Add(collectibleId);
             }
@@ -521,18 +521,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         in BlockEntityContainer container,
         string playerName = "")
     {
-        var target = new ContainerAutoStashTarget(container);
-        var policy = new MatchingContentsPolicy(target.GetContents());
-        bool itemsStashed = AutoStashTransferService.AutoStashToInventory(
-            world,
-            playerInventory,
-            playerName,
-            target,
-            container.Pos,
-            container.InventoryClassName,
-            policy) > 0;
-
-        return itemsStashed;
+        return AutoStashService.StashContainer(world, playerInventory, container, playerName, crate: false).MovedQuantity > 0;
     }
 
     /// <summary>
@@ -549,18 +538,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         in BlockEntityCrate container,
         string playerName = "")
     {
-        var target = new ContainerAutoStashTarget(container);
-        var policy = new CratePolicy(container.Inventory);
-        bool itemsStashed = AutoStashTransferService.AutoStashToInventory(
-            world,
-            playerInventory,
-            playerName,
-            target,
-            container.Pos,
-            container.InventoryClassName,
-            policy) > 0;
-
-        return itemsStashed;
+        return AutoStashService.StashContainer(world, playerInventory, container, playerName, crate: true).MovedQuantity > 0;
     }
 
     /// <summary>
@@ -578,55 +556,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         BlockEntityBloomery bloomery,
         string playerName = "")
     {
-        BloomeryAutoStashTarget? target = BloomeryAutoStashTarget.Resolve(bloomery);
-        if (target is null) return false;
-        var bloomeryInv = (InventoryGeneric)target.Inventory;
-        IInventory? backpackInventory = playerInventory.GetOwnInventory(GlobalConstants.backpackInvClassName);
-        IInventory? hotbarInventory = playerInventory.GetOwnInventory(GlobalConstants.hotBarInvClassName);
-
-        target.Acquire(playerInventory);
-        int totalStashed = 0;
-        var mutation = new AutoStashMutationState();
-        Exception? failure = null;
-        try
-        {
-            var policy = new BloomeryPolicy(bloomery, bloomeryInv);
-            using var planner = new AutoStashPlanner(world, bloomeryInv, policy, backpackInventory, hotbarInventory);
-            InventoryTransfer? transfer;
-            while ((transfer = planner.GetNextTransfer()) is not null)
-            {
-                mutation.BeginAttempt();
-                InventoryTransferResult result = InventoryTransferExecutor.Execute(world, transfer);
-                mutation.CompleteAttempt(result.MovedQuantity);
-                if (result.MovedQuantity > 0)
-                {
-                    totalStashed += result.MovedQuantity;
-                    world.Api?.World.Logger.Audit("'{0}' moved {1}x{2} into bloomery at <{3}>.",
-                        playerName, result.MovedQuantity, transfer.Destination.Itemstack?.Collectible.Code, bloomery.Pos);
-                }
-                planner.Advance(transfer, result);
-            }
-        }
-        catch (Exception exception)
-        {
-            failure = exception;
-            throw;
-        }
-        finally
-        {
-            mutation.Finish(target, playerInventory, failure, world.Logger);
-        }
-
-        if (totalStashed > 0)
-        {
-            world.Api?.World.Logger.Audit("'{0}' auto-stashed {1} items into bloomery at <{2}>.",
-                playerName,
-                totalStashed,
-                bloomery.Pos
-            );
-        }
-
-        return totalStashed > 0;
+        return AutoStashService.StashBloomery(world, playerInventory, bloomery, playerName).MovedQuantity > 0;
     }
 
     #endregion

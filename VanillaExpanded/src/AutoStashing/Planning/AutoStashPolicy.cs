@@ -19,6 +19,9 @@ internal abstract class AutoStashPolicy
     /// <summary>Checks whether the current item belongs to the supplied source pass.</summary>
     public abstract bool IsEligible(ItemStack stack, AutoStashSourcePass pass);
 
+    /// <summary>Detects a candidate independently of available destination capacity.</summary>
+    public virtual bool IsCandidate(ItemStack stack, AutoStashSourcePass pass) => IsEligible(stack, pass);
+
     /// <summary>Returns a live quantity allowance without predicting engine mutation.</summary>
     public virtual int GetQuantity(ItemSlot source, AutoStashSourcePass pass) => source.StackSize;
     #endregion

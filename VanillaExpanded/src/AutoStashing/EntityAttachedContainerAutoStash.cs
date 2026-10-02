@@ -109,11 +109,7 @@ internal static class EntityAttachedContainerAutoStash
         EntityBehaviorAttachable attachable,
         int attachmentSlotIndex)
     {
-        AttachedBagAutoStashTarget? target = AttachedBagAutoStashTarget.Resolve(world, hostEntity, attachable, attachmentSlotIndex);
-        if (target is null) return false;
-        var policy = new MatchingContentsPolicy(target.GetContents());
-        return AutoStashTransferService.AutoStashToInventory(world, player.InventoryManager, player.PlayerName,
-            target, hostEntity.Pos.AsBlockPos, $"attached container on {hostEntity.Code}", policy) > 0;
+        return AutoStashService.StashAttached(world, player, hostEntity, attachable, attachmentSlotIndex).MovedQuantity > 0;
     }
     private static IEnumerable<ItemSlot> PlayerSlots(IPlayerInventoryManager playerInventory)
     {

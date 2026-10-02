@@ -35,6 +35,9 @@ internal sealed class BloomeryPolicy : AutoStashPolicy
     public override bool IsEligible(ItemStack stack, AutoStashSourcePass pass)
         => bloomery.CanAdd(stack) && Classify(stack) == pass.RequiredSlot;
 
+    /// <summary>Recognizes valid input types even when live input capacity is exhausted.</summary>
+    public override bool IsCandidate(ItemStack stack, AutoStashSourcePass pass) => Classify(stack) == pass.RequiredSlot;
+
     /// <summary>Limits the request to remaining capacity using contents left by preceding actual moves.</summary>
     public override int GetQuantity(ItemSlot source, AutoStashSourcePass pass)
         => Math.Min(source.StackSize, GetMaxCanAdd(inventory, source.Itemstack!, pass.RequiredSlot!.Value));

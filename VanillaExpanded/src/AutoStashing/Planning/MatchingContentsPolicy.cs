@@ -20,7 +20,7 @@ internal class MatchingContentsPolicy : AutoStashPolicy
         accepts = stack => types.Contains(stack.Collectible.Code);
     }
 
-    /// <summary>Adapts the existing predicate/preference boundary until its callers migrate to operation coordination.</summary>
+    /// <summary>Preserves predicate-based fixtures and the characterized preferred-slot compatibility contract.</summary>
     public MatchingContentsPolicy(System.Func<ItemStack, bool> accepts, System.Func<ItemStack, int?>? preference = null)
     {
         this.accepts = accepts;

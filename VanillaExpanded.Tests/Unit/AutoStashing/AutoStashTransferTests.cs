@@ -1,3 +1,4 @@
+using VanillaExpanded.AutoStashing.Planning;
 using VanillaExpanded.AutoStashing.Targets;
 using Moq;
 
@@ -51,9 +52,9 @@ public class AutoStashTransferTests : IDisposable
             target.Setup(value => value.Acquire(It.IsAny<IPlayerInventoryManager>()));
             target.Setup(value => value.Release(It.IsAny<IPlayerInventoryManager>()));
         }
-        int moved = AutoStashTransferService.AutoStashToInventory(
+        int moved = AutoStashService.Execute(
             fixture.World, fixture.Player, "test-player", target.Object,
-            new BlockPos(0), "test-container", _ => true);
+            new BlockPos(0), "test-container", new MatchingContentsPolicy(_ => true)).MovedQuantity;
 
         Assert.Equal(10, moved);
         Assert.Equal(initialQuantity + 10, container.Inventory[0].StackSize);
@@ -84,9 +85,9 @@ public class AutoStashTransferTests : IDisposable
 
         var before = new InventorySnapshot(fixture.BackpackInventory, fixture.HotbarInventory, container.Inventory);
 
-        int moved = AutoStashTransferService.AutoStashToInventory(
+        int moved = AutoStashService.Execute(
             fixture.World, fixture.Player, "test-player", new InventoryAutoStashTarget(container.Inventory),
-            new BlockPos(0), "test-container", _ => full);
+            new BlockPos(0), "test-container", new MatchingContentsPolicy(_ => full)).MovedQuantity;
 
         Assert.Equal(0, moved);
         Assert.Equal(7, fixture.BackpackInventory[0].StackSize);

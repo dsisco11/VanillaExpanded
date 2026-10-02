@@ -1,3 +1,4 @@
+using VanillaExpanded.AutoStashing.Planning;
 using VanillaExpanded.AutoStashing.Targets;
 using Moq;
 using VanillaExpanded.AutoStashing;
@@ -38,8 +39,8 @@ public sealed class AutoStashFinalizationTests
 
         var target = new Mock<InventoryAutoStashTarget>(test.Target) { CallBase = true };
         target.Setup(value => value.FinalizeChanges()).Callback(() => { order.Add("finalize"); throw persistence; });
-        var caught = Assert.Throws<InvalidOperationException>(() => AutoStashTransferService.AutoStashToInventory(
-            test.Fixture.World, test.Fixture.Player, "test", target.Object, new BlockPos(0), "test", _ => true));
+        var caught = Assert.Throws<InvalidOperationException>(() => AutoStashService.Execute(
+            test.Fixture.World, test.Fixture.Player, "test", target.Object, new BlockPos(0), "test", new MatchingContentsPolicy(_ => true)));
 
         Assert.Same(transferFailure ? original : persistence, caught);
         if (transferFailure) Assert.Contains("InventoryTransferExecutor.Execute", caught.StackTrace!);
@@ -69,8 +70,8 @@ public sealed class AutoStashFinalizationTests
         int finalized = 0;
         var target = new Mock<InventoryAutoStashTarget>(test.Target) { CallBase = true };
         target.Setup(value => value.FinalizeChanges()).Callback(() => finalized++);
-        Func<int> run = () => AutoStashTransferService.AutoStashToInventory(test.Fixture.World, test.Fixture.Player,
-            "test", target.Object, new BlockPos(0), "test", _ => true);
+        Func<int> run = () => AutoStashService.Execute(test.Fixture.World, test.Fixture.Player,
+            "test", target.Object, new BlockPos(0), "test", new MatchingContentsPolicy(_ => true)).MovedQuantity;
 
         if (throws) Assert.Same(failure, Assert.Throws<InvalidOperationException>(() => run()));
         else Assert.Equal(0, run());

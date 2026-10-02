@@ -1,6 +1,6 @@
 # AutoStash Planning and Execution
 
-Status: Phases 1–3 complete; Phases 4–6 remain planned.
+Status: Phases 1–4 complete; Phases 5–6 remain planned.
 Source proposal: [PlanningAndExecutionProposal.md](PlanningAndExecutionProposal.md).
 Purpose: Extract shared incremental planning and engine execution while preserving the established functional contract.
 
@@ -155,13 +155,37 @@ Outcome: All server target paths use one planner/executor coordinator and a trut
 Dependencies: Phases 2–3.
 Sources: Proposal Responsibilities, Operation result, Incremental planning and execution and Scope; server dispatch and direct-feedback regressions.
 
-☐ P4.1 Add AutoStashService coordinating source resolution/type snapshots, plausible-work probe, adapter acquisition, live planning, immediate execution, cursor advancement and finalization. Keep requests synchronous and best-effort.
-☐ P4.2 Add AutoStashResult with actual moved total and unavailable/no-candidate/no-destination/success distinctions, including partial success and a separate exhausted-direct indicator. Throwing operations preserve exceptions; they are not converted into completed results.
-☐ P4.3 Preserve existing per-move/aggregate audit behavior and one owning-player general-chat CommandError after normal finalization/owned cleanup for exhausted direct attempts, including partial movement. Resolve ownership by inventory-manager identity; ordinary full/no-work remains silent.
-☐ P4.4 Delegate generic, crate, bloomery and attached server entry points to the shared service. Preserve registered request handlers, permission/reachability checks, exact six-block entity distance, current-state resolution and packet contracts.
-☐ P4.5 Retain compatibility wrappers only where entry signatures provide a real boundary; remove obsolete AutoStashTransferService orchestration after its callers migrate. Update internal tests to exercise the owning service without losing full-operation/dispatch coverage.
-☐ P4.6 Verify changed-target type/capacity after client assessment, denied/missing targets, target-specific dispatch outcomes and all lifecycle/retry regressions. Run isolated Harmony integration before fresh focused/Unit hosts because entry wiring changed.
-☐ Completion: Every target shares coordinator/executor, existing server boundaries remain thin and authoritative, all required suites pass, and independent audit confirms truthful results/feedback and no duplicated operation algorithm.
+☑ P4.1 Add AutoStashService coordinating source resolution/type snapshots, plausible-work probe, adapter acquisition, live planning, immediate execution, cursor advancement and finalization. Keep requests synchronous and best-effort.
+☑ P4.2 Add AutoStashResult with actual moved total and unavailable/no-candidate/no-destination/success distinctions, including partial success and a separate exhausted-direct indicator. Throwing operations preserve exceptions; they are not converted into completed results.
+☑ P4.3 Preserve existing per-move/aggregate audit behavior and one owning-player general-chat CommandError after normal finalization/owned cleanup for exhausted direct attempts, including partial movement. Resolve ownership by inventory-manager identity; ordinary full/no-work remains silent.
+☑ P4.4 Delegate generic, crate, bloomery and attached server entry points to the shared service. Preserve registered request handlers, permission/reachability checks, exact six-block entity distance, current-state resolution and packet contracts.
+☑ P4.5 Retain compatibility wrappers only where entry signatures provide a real boundary; remove obsolete AutoStashTransferService orchestration after its callers migrate. Update internal tests to exercise the owning service without losing full-operation/dispatch coverage.
+☑ P4.6 Verify changed-target type/capacity after client assessment, denied/missing targets, target-specific dispatch outcomes and all lifecycle/retry regressions. Run isolated Harmony integration before fresh focused/Unit hosts because entry wiring changed.
+☑ Completion: Every target shares coordinator/executor, existing server boundaries remain thin and authoritative, all required suites pass, and independent audit confirms truthful results/feedback and no duplicated operation algorithm.
+
+### Implementation notes and evidence
+
+Implementation starts at b530316deba9cdf85226cdf044190ed2e198fd1a. P4.1–P4.6 inherit the complete proposal and Scope and execution rules; the Responsibilities, Operation result, Incremental planning and execution, Target lifecycle and partial failure, Scope and Validation requirements sections govern this extraction. Current server handlers and ServerBlockRequestTests/ServerEntityRequestTests were consulted directly, including changed-type/capacity, permission, missing-target and six-block boundary cases. No controlling source was unavailable.
+
+P4.1/P4.4/P4.5 -> proposal Responsibilities, Policy contracts, Source layout and dependencies -> service-owned source resolution/type snapshots, adapter preparation/acquisition, immediate live planning/execution and finalization -> AutoStashService target operations and common Execute loop. The separate bloomery operation loop and obsolete AutoStashTransferService are removed; existing Boolean block/attached entry signatures remain meaningful adapters. Internal callers construct concrete policies, retaining preferred-slot compatibility without a predicate wrapper. Server authorization, packets, interaction and alloy code retain their ownership.
+
+P4.2/P4.3 -> proposal Operation result, Incremental planning and execution and Target lifecycle and partial failure -> actual movement, independent exhausted-direct failure, exact audit templates, owner-only feedback after cleanup and exception propagation -> AutoStashResult/AutoStashOutcome, AutoStashAuditContext and the common service. Candidate membership is now distinct from destination capacity: ordinary policy membership uses its existing eligibility; bloomery candidate detection classifies inputs while execution still uses the original engine CanAdd and live limits. A full bloomery with valid input reports NoDestination. Failed bag preparation reports Unavailable. This reporting distinction does not change engine execution eligibility or routing.
+
+P4.6 -> proposal Validation requirements and established regression contract -> AutoStashServiceTests cover completed outcome distinctions, exact partial totals, zero and positive movement alongside direct failure, ore/fuel totals and exact bloomery audit templates, and independent persistence of both attached-bag paths. Existing full-operation, dispatch, lifecycle and guarded retry tests remain intact; internal service tests migrated without weakening their inventory or exception assertions.
+
+Final validation through tests against the implementation working tree based on b530316deba9cdf85226cdf044190ed2e198fd1a:
+
+```powershell
+dotnet test VanillaExpanded.IntegrationTests/VanillaExpanded.IntegrationTests.csproj --no-restore --filter 'Category=Integration' --verbosity minimal
+dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-restore --filter 'FullyQualifiedName~AutoStash' --verbosity minimal
+dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-build --no-restore --filter 'Category=Unit' --verbosity minimal
+```
+
+Integration 1, AutoStash 397 and Unit 593 passed; zero failures/skips/exclusions. Dedicated integration host exited before fresh focused and Unit hosts. A preceding rebuilt focused run passed 397 cases. Rebuild emitted the same 7 production and 27 test warnings, none newly introduced; final incremental sequence emitted none. The initial new-test run exposed three fixture/assertion mistakes (direct rejection is a failure, automatic zero moves invoke the observer callback, and audit observation requires World.Api); these were corrected without changing production behavior or weakening established assertions. Initial sandbox compiler artifact-write denial was recovered through approved escalation. No game/client/server launch, tooling installation or standalone evidence files occurred. Fresh installed API/Lib/SurvivalMod/Essentials assembly metadata remains 1.22.7.0; API file version 1.22.0, others 1.22.7.
+
+Second review: directly reread service, result/audit contracts, policy candidate separation, both entry diffs and migrated assertions against the complete controlling proposal. Confirmed a single production executor call in the common loop, unchanged engine invocation settings and routing, type snapshots before acquisition, actual-result advancement, mutation uncertainty, persistence-before-release and original exception handling. Per-move audits remain inside the protected operation; aggregate audit and direct-error feedback remain after normal cleanup. Current-state, permission, distance and packet handlers are unchanged. Candidate classification adds result reporting without changing execution CanAdd. Diff whitespace check passed. Shared assessment remains separate work.
+
+Independent completion audit by audit directly consulted the skill, full plan/proposal, current implementation and regression assertions, documentation mapping and final validation evidence. Verdict: P4.1–P4.6 and completion fully satisfied, with no confirmed issues or evidence gaps. Markers were checked only after the second review and this verdict. Passing automated tests do not establish live-game acceptance.
 
 ## Phase 5: Share advisory assessment and migrate help
 

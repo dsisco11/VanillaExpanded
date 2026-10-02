@@ -170,12 +170,12 @@ internal sealed class AutoStashPlanner : IDisposable
         return false;
     }
 
-    /// <summary>Checks candidate existence when a bag has no prepared execution inventory yet; capacity remains unknown.</summary>
+    /// <summary>Checks candidate membership independently of destination capacity or workspace preparation.</summary>
     public static bool HasCandidates(AutoStashPolicy policy, IInventory? backpack, IInventory? hotbar)
     {
         // Candidate detection permits deferred workspace preparation without inventing a client/server capacity model.
         return policy.GetSourcePasses(backpack, hotbar).Any(pass => pass.Inventory.Any(source =>
-            !source.Empty && policy.IsEligible(source.Itemstack!, pass)));
+            !source.Empty && policy.IsCandidate(source.Itemstack!, pass)));
     }
 
     #endregion
