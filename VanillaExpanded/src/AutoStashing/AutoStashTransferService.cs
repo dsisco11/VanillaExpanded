@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using VanillaExpanded.AutoStashing.Transfers;
 
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -174,10 +175,12 @@ internal static class AutoStashTransferService
             }
 
             int requestedQuantity = sourceSlot.StackSize;
-            ItemStackMoveOperation moveOperation = new(world, EnumMouseButton.Left, EnumModifierKey.SHIFT, mergePriority, requestedQuantity);
+            var transfer = new InventoryTransfer(sourceSlot, targetSlot, requestedQuantity,
+                EnumMouseButton.Left, EnumModifierKey.SHIFT, mergePriority);
             // Engine callbacks may throw after mutation, before a moved count can be returned.
             mutation.BeginAttempt();
-            int movedQuantity = sourceSlot.TryPutInto(targetSlot, ref moveOperation);
+            InventoryTransferResult result = InventoryTransferExecutor.Execute(world, transfer);
+            int movedQuantity = result.MovedQuantity;
             mutation.CompleteAttempt(movedQuantity);
             totalMoved += movedQuantity;
             if (movedQuantity > 0)
@@ -205,7 +208,7 @@ internal static class AutoStashTransferService
                 rejectedDirectMove = true;
             }
             else if (mergePriority == EnumMergePriority.AutoMerge && movedQuantity == 0
-                && moveOperation.RequiredPriority == EnumMergePriority.DirectMerge)
+                && result.RequiredPriority == EnumMergePriority.DirectMerge)
             {
                 deferredDirectSlots.Add(targetSlot);
             }

@@ -1,6 +1,6 @@
 # AutoStash Planning and Execution
 
-Status: Planned. Every implementation task is unchecked.
+Status: Phase 1 complete; Phases 2–6 remain planned.
 Source proposal: [PlanningAndExecutionProposal.md](PlanningAndExecutionProposal.md).
 Purpose: Extract shared incremental planning and engine execution while preserving the established functional contract.
 
@@ -34,12 +34,45 @@ Outcome: Both existing transfer loops share an immediate engine executor without
 Dependencies: Completed coverage prerequisite.
 Sources: Proposal Data contracts, Incremental planning and execution, Source layout and dependencies; current AutoStashTransferService, BlockBehaviorAutoStashable and AutoStashMutationState.
 
-☐ P1.1 Refresh the separate Integration, focused AutoStash and Unit baselines through subagents; record revision, exact commands, versions, counts, warnings and host isolation in this plan.
-☐ P1.2 Add Transfers/InventoryTransfer and InventoryTransferResult: concrete engine source/destination slots, positive requested quantity, existing move settings, actual movement and RequiredPriority. Keep instructions local to immediate server execution and invalid-instruction checks separate from target policy.
-☐ P1.3 Add InventoryTransferExecutor delegating to the engine mutation API. Preserve each path's existing overload/operation semantics, restrictions and callbacks; inspect the bloomery convenience overload before replacing it with an explicit operation.
-☐ P1.4 Route shared-container and bloomery mutation calls through the executor while retaining their existing selection, ordering, audit and lifecycle loops. Begin mutation uncertainty before the executor call and clear it only on normal return; exceptions continue to unwind unchanged.
-☐ P1.5 Add only boundary tests needed for new contract validity, settings/priority reporting and exception propagation; reuse full-operation regressions for quantities, restrictions and callback mutation.
-☐ Completion: Both loops use the executor, focused/Unit suites pass, and second review plus independent audit confirm actual engine behavior/settings and uncertain mutation remain unchanged.
+☑ P1.1 Refresh the separate Integration, focused AutoStash and Unit baselines through subagents; record revision, exact commands, versions, counts, warnings and host isolation in this plan.
+☑ P1.2 Add Transfers/InventoryTransfer and InventoryTransferResult: concrete engine source/destination slots, positive requested quantity, existing move settings, actual movement and RequiredPriority. Keep instructions local to immediate server execution and invalid-instruction checks separate from target policy.
+☑ P1.3 Add InventoryTransferExecutor delegating to the engine mutation API. Preserve each path's existing overload/operation semantics, restrictions and callbacks; inspect the bloomery convenience overload before replacing it with an explicit operation.
+☑ P1.4 Route shared-container and bloomery mutation calls through the executor while retaining their existing selection, ordering, audit and lifecycle loops. Begin mutation uncertainty before the executor call and clear it only on normal return; exceptions continue to unwind unchanged.
+☑ P1.5 Add only boundary tests needed for new contract validity, settings/priority reporting and exception propagation; reuse full-operation regressions for quantities, restrictions and callback mutation.
+☑ Completion: Both loops use the executor, focused/Unit suites pass, and second review plus independent audit confirm actual engine behavior/settings and uncertain mutation remain unchanged.
+
+### Implementation notes and evidence
+
+P1.1 baseline refreshed before edits at cb58a0278563157353efb2af56af082b1ed9c0e7 through baseline_tests. These commands ran sequentially in separate hosts, each exiting before the next:
+
+```powershell
+dotnet test VanillaExpanded.IntegrationTests/VanillaExpanded.IntegrationTests.csproj --no-restore --filter Category=Integration --verbosity minimal
+dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-build --no-restore --filter FullyQualifiedName~AutoStash --verbosity minimal
+dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-build --no-restore --filter Category=Unit --verbosity minimal
+```
+
+Baseline: Integration 1, AutoStash 357 and Unit 553 passed; zero failures/skips. Fresh unit hosts followed integration-host termination, isolating its reverse-patched stand-in. Initial sandbox output-write denial was recovered through approved escalation. Existing nullable warnings CS8600/CS8602/CS8603/CS8604 and unused-field warning CS0414 were observed; production emitted seven warning occurrences, while truncated test-build output does not establish an exact combined warning count. No game/client/server process was started.
+
+Current installed metadata independently read from G:/Vintagestory: API, Lib, SurvivalMod and Essentials assembly versions all 1.22.7.0; API file version 1.22.0, others 1.22.7.
+
+P1.2–P1.4 -> proposal Data contracts, Incremental planning and execution, Target lifecycle and partial failure, Source layout and dependencies -> immutable concrete instruction, actual result, original virtual overloads/settings, unchanged engine authority and mutation uncertainty -> Transfers/InventoryTransfer, InventoryTransferResult, InventoryTransferInvocation and InventoryTransferExecutor; only mutation calls/result consumption changed in existing shared-container and bloomery loops. Mutation tracking, selection, retry ordering, audits and finalization remain in their original owners.
+
+Installed API IL confirms bloomery's convenience overload constructs Left/None/AutoMerge and calls the virtual ref-operation overload. The convenience method itself is also virtual, with real engine overrides elsewhere. EngineDefaults instructions therefore retain that exact overload rather than normalize it into an explicit operation. RequiredPriority remains nullable: explicit operations expose the engine value; the convenience overload exposes only movement, so priority is unavailable (null), as clarified in the proposal. Ordinary transfers retain Left/SHIFT and their current automatic/direct priority.
+
+P1.5 -> proposal Transfer result and Validation requirements -> validity, exact settings/dispatch, requested versus actual movement, deferred priority and original exception -> InventoryTransferExecutorTests uses Moq for call-boundary observations and existing real engine fixtures for zero/partial movement and a callback failure after mutation. Existing full-operation suites remain unchanged.
+
+Final verification through phase1_tests against the implementation working tree based on cb58a0278563157353efb2af56af082b1ed9c0e7:
+
+```powershell
+dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-restore --filter FullyQualifiedName~InventoryTransferExecutorTests --verbosity minimal
+dotnet test VanillaExpanded.IntegrationTests/VanillaExpanded.IntegrationTests.csproj --no-restore --filter Category=Integration --verbosity minimal
+dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-restore --filter FullyQualifiedName~AutoStash --verbosity minimal
+dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-restore --filter Category=Unit --verbosity minimal
+```
+
+Boundary 12, Integration 1, AutoStash 369 and Unit 565 passed; zero failures/skips/exclusions. All commands were sequential; the dedicated integration host exited before fresh focused and Unit hosts. An initial integration filter against the unit project matched no tests and was discarded, not counted as verification. The boundary build emitted 34 existing warnings (7 production, 27 tests), none from the new files; subsequent incremental runs emitted none. Sandbox artifact-write restrictions were recovered through approved escalation. No runtime game/server/client launch or additional tooling was required.
+
+Second review: re-read the complete controlling proposal and selected/inherited plan requirements; compared both loop diffs against their original engine calls and AutoStashMutationState boundaries; checked new contracts/tests for settings, dispatch and assertion sensitivity. No source selection, policy, lifecycle, networking, interaction or alloy changes were introduced. Independent completion audit by phase1_audit directly consulted the controlling plan/proposal, implementation, engine overloads, regression fixtures and recorded verification. Verdict: P1.1–P1.5 and completion fully satisfied; no confirmed issues or evidence gaps. Markers were checked only after this verdict. Later architecture work and live acceptance remain separate.
 
 ## Phase 2: Separate target policies and the incremental cursor
 

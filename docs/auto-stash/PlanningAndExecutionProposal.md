@@ -1,6 +1,6 @@
 # AutoStash Planning and Execution Proposal
 
-Status: Proposed architecture, updated after completed functional coverage. The architecture is not implemented. See [implementation plan](PlanningAndExecution.todo).
+Status: Architecture partially implemented: concrete engine transfer contracts and the shared executor are in place. Planning, coordination, lifecycle adapters and shared assessment remain planned. See [implementation plan](PlanningAndExecution.todo).
 
 ## Purpose
 
@@ -89,7 +89,7 @@ An instruction is valid only for immediate execution within the current server o
 
 ### Transfer result
 
-`InventoryTransferResult` reports requested quantity, actual moved quantity, and any engine-required merge priority. A zero result is an ordinary execution outcome and must advance planner state. Requested quantities must never be counted as successful movement.
+`InventoryTransferResult` reports requested quantity, actual moved quantity, and any exposed engine-required merge priority. Preserve overload dispatch as well as settings: explicit-operation instructions report the operation's nullable RequiredPriority; engine-default instructions retain the virtual world/quantity convenience overload, which exposes only actual movement, so their RequiredPriority is unavailable (null). A zero result is an ordinary execution outcome and must advance planner state. Requested quantities must never be counted as successful movement.
 
 ### Operation result
 

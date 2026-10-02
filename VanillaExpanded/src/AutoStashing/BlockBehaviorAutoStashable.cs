@@ -10,6 +10,7 @@ using Vintagestory.API.MathTools;
 using Vintagestory.GameContent;
 
 using VanillaExpanded.RadialProgress;
+using VanillaExpanded.AutoStashing.Transfers;
 
 namespace VanillaExpanded.AutoStashing;
 
@@ -685,8 +686,9 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             }
 
             int quantityToMove = Math.Min(sourceSlot.StackSize, maxCanAdd);
+            var transfer = new InventoryTransfer(sourceSlot, targetSlot, quantityToMove);
             mutation.BeginAttempt();
-            int moved = sourceSlot.TryPutInto(world, targetSlot, quantityToMove);
+            int moved = InventoryTransferExecutor.Execute(world, transfer).MovedQuantity;
             mutation.CompleteAttempt(moved);
 
             if (moved > 0)
