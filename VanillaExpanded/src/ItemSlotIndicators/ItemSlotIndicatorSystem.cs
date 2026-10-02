@@ -2,6 +2,9 @@ using System.Collections.Immutable;
 
 using HarmonyLib;
 
+using VanillaExpanded.PerishableItemSlots;
+using VanillaExpanded.WateringCanIndicators;
+
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 
@@ -21,9 +24,11 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
     /// <summary>Loads indicators only on the client, independently of any individual feature setting.</summary>
     public override bool ShouldLoad(EnumAppSide forSide) => forSide == EnumAppSide.Client;
 
-    /// <summary>Initializes shared rendering and installs the independently owned indicator hook.</summary>
+    /// <summary>Registers built-in providers, initializes rendering, and installs the indicator hook.</summary>
     public override void StartClientSide(ICoreClientAPI api)
     {
+        Register(new FreshnessIndicatorProvider());
+        Register(new WateringCanIndicatorProvider(), priority: 10);
         ItemSlotIndicatorRenderer.InitializeTexture(api);
         Active = this;
         harmony = new Harmony(Constants.ModId + ".itemslotindicators");

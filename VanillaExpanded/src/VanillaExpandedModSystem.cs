@@ -6,8 +6,6 @@ using VanillaExpanded.AlloyCalculator;
 using VanillaExpanded.AutoStashing;
 using VanillaExpanded.Fishing;
 using VanillaExpanded.IgnitionTools;
-using VanillaExpanded.ItemSlotIndicators;
-using VanillaExpanded.PerishableItemSlots;
 using VanillaExpanded.SpawnDecal;
 using VanillaExpanded.src.AutoStashing;
 using VanillaExpanded.src.IgnitionTools;
@@ -95,12 +93,6 @@ public class VanillaExpandedModSystem : ModSystem
             .RegisterMessageType<Network.Packet_TemporalSpawn>();
 
         EnsureHarmonyPatched();
-    }
-
-    /// <summary>Registers the freshness feature with the independently managed client indicator system.</summary>
-    public override void StartClientSide(ICoreClientAPI api)
-    {
-        api.ModLoader.GetModSystem<ItemSlotIndicatorSystem>().Register(new FreshnessIndicatorProvider());
     }
 
     /// <summary>
