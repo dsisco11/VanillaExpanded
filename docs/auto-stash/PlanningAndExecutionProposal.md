@@ -48,6 +48,33 @@ The initial refactor must preserve observable transfer behavior. It does not int
 
 These names describe proposed responsibilities, not a requirement for an interface per class. Introduce interfaces where distinct implementations or a meaningful test boundary require them. Keep engine inventory and slot objects as the owning data model.
 
+### High-level flow
+
+The service owns the operation. Planning and execution repeat one move at a time, using actual movement to advance the cursor and current contents to determine the next move. Client assessment shares policy rules but does not execute transfers.
+
+```mermaid
+flowchart TB
+    Client["Client interactions and help"] --> Assessment["Read-only assessment<br/>Candidates and capacity certainty"]
+    Client -->|Stash request| Server["Existing server boundary<br/>Authorization and current target"]
+    Server --> Service["AutoStashService<br/>Coordinate operation and results"]
+
+    Policy["Target policies<br/>Matching contents · Crate · Bloomery"] -.->|Shared rules| Assessment
+    Policy -.->|Eligibility, order, routing and limits| Planner
+
+    Service -->|Choose next move from live state| Planner["AutoStashPlanner and cursor<br/>Selection and bounded retries"]
+    Planner -->|One concrete instruction| Service
+    Service -->|Attempt move| Executor["InventoryTransferExecutor<br/>Delegate mutation to engine"]
+    Executor -->|Actual movement and required priority| Service
+    Service -->|Advance cursor with actual result| Planner
+
+    Service -->|Resolve, acquire, finalize and release| Adapters["Target adapters<br/>Sessions, bag workspaces and persistence"]
+    Adapters --> Inventories["Engine inventories and slots"]
+    Inventories -.->|Current contents and suitability| Planner
+    Executor -->|TryPutInto| Inventories
+```
+
+Adapters finalize applied or uncertain changes before releasing owned sessions, including when execution throws. Assessment remains advisory; the server resolves current state again for every request.
+
 ## Data contracts
 
 ### Transfer instruction
