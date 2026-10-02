@@ -1,6 +1,7 @@
 using System.Linq;
 using VanillaExpanded.AutoStashing.Transfers;
 using VanillaExpanded.AutoStashing.Planning;
+using VanillaExpanded.AutoStashing.Targets;
 
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -18,15 +19,19 @@ internal static class AutoStashTransferService
         IWorldAccessor world,
         IPlayerInventoryManager playerInventory,
         string playerName,
-        IInventory targetInventory,
+        AutoStashTarget target,
         BlockPos targetPos,
         string targetName,
-        AutoStashPolicy policy,
-        bool manageInventorySession = true,
-        System.Action? finalizeChanges = null)
+        AutoStashPolicy policy)
     {
         IInventory? backpackInventory = playerInventory.GetOwnInventory(GlobalConstants.backpackInvClassName);
         IInventory? hotbarInventory = playerInventory.GetOwnInventory(GlobalConstants.hotBarInvClassName);
+        // Read-only candidate detection precedes bag workspace creation; actual capacity is checked after loading.
+        if (!target.IsPrepared && (!AutoStashPlanner.HasCandidates(policy, backpackInventory, hotbarInventory) || !target.TryPrepare()))
+        {
+            return 0;
+        }
+        IInventory targetInventory = target.Inventory;
         bool canStashBackpack = AutoStashPlanner.HasWork(targetInventory, policy, backpackInventory, null);
         bool canStashHotbar = AutoStashPlanner.HasWork(targetInventory, policy, null, hotbarInventory);
         if (!canStashBackpack && !canStashHotbar)
@@ -34,12 +39,7 @@ internal static class AutoStashTransferService
             return 0;
         }
 
-        bool openedForStash = manageInventorySession
-            && !(playerInventory.OpenedInventories?.Contains(targetInventory) ?? false);
-        if (openedForStash)
-        {
-            playerInventory.OpenInventory(targetInventory);
-        }
+        target.Acquire(playerInventory);
 
         int totalStashed = 0;
         bool directMergeFailed = false;
@@ -72,9 +72,7 @@ internal static class AutoStashTransferService
         }
         finally
         {
-            mutation.Finish(finalizeChanges,
-                openedForStash ? () => playerInventory.CloseInventoryAndSync(targetInventory) : null,
-                failure, world.Logger);
+            mutation.Finish(target, playerInventory, failure, world.Logger);
         }
 
         if (directMergeFailed)
@@ -104,12 +102,11 @@ internal static class AutoStashTransferService
     /// <summary>Adapts existing predicate/preference callers to the policy boundary while preserving lifecycle arguments.</summary>
     internal static int AutoStashToInventory(
         IWorldAccessor world, IPlayerInventoryManager playerInventory, string playerName,
-        IInventory targetInventory, BlockPos targetPos, string targetName,
-        System.Func<ItemStack, bool> canAccept, System.Func<ItemStack, int?>? getPreferredSlot = null,
-        bool manageInventorySession = true, System.Action? finalizeChanges = null)
+        AutoStashTarget target, BlockPos targetPos, string targetName,
+        System.Func<ItemStack, bool> canAccept, System.Func<ItemStack, int?>? getPreferredSlot = null)
     {
-        return AutoStashToInventory(world, playerInventory, playerName, targetInventory, targetPos, targetName,
-            new MatchingContentsPolicy(canAccept, getPreferredSlot), manageInventorySession, finalizeChanges);
+        return AutoStashToInventory(world, playerInventory, playerName, target, targetPos, targetName,
+            new MatchingContentsPolicy(canAccept, getPreferredSlot));
     }
     #endregion
 }

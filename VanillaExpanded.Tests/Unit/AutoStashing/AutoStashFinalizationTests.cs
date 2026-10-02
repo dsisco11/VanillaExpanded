@@ -1,3 +1,4 @@
+using VanillaExpanded.AutoStashing.Targets;
 using Moq;
 using VanillaExpanded.AutoStashing;
 using VanillaExpanded.Tests.Unit.AutoStashing.Support;
@@ -14,9 +15,11 @@ public sealed class AutoStashFinalizationTests
     #region Public API
     /// <summary>Attempts both finalization and cleanup while preserving the first failure and reporting secondary failures.</summary>
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void MultipleFailures_PreserveOriginalExceptionAndStillClose(bool transferFailure)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void MultipleFailures_PreserveOriginalExceptionAndStillClose(bool transferFailure, bool reportingFailure)
     {
         var test = new TransferCase();
         test.Target[0].Itemstack = new ItemStack(test.Item, 10);
@@ -25,16 +28,21 @@ public sealed class AutoStashFinalizationTests
         var original = new InvalidOperationException("transfer failed after mutation");
         var persistence = new InvalidOperationException("finalization failed");
         var cleanup = new InvalidOperationException("cleanup failed");
+        if (reportingFailure)
+            test.Fixture.LoggerMock.Setup(logger => logger.Error(It.IsAny<string>(), It.IsAny<object[]>()))
+                .Throws(new InvalidOperationException("secondary error reporting failed"));
         if (transferFailure) source.AfterMove = _ => throw original;
         var order = new List<string>();
         test.Fixture.InventoryManagerMock.Setup(manager => manager.CloseInventoryAndSync(test.Target))
             .Callback(() => { order.Add("close"); throw cleanup; });
 
+        var target = new Mock<InventoryAutoStashTarget>(test.Target) { CallBase = true };
+        target.Setup(value => value.FinalizeChanges()).Callback(() => { order.Add("finalize"); throw persistence; });
         var caught = Assert.Throws<InvalidOperationException>(() => AutoStashTransferService.AutoStashToInventory(
-            test.Fixture.World, test.Fixture.Player, "test", test.Target, new BlockPos(0), "test", _ => true,
-            finalizeChanges: () => { order.Add("finalize"); throw persistence; }));
+            test.Fixture.World, test.Fixture.Player, "test", target.Object, new BlockPos(0), "test", _ => true));
 
         Assert.Same(transferFailure ? original : persistence, caught);
+        if (transferFailure) Assert.Contains("InventoryTransferExecutor.Execute", caught.StackTrace!);
         Assert.Equal(new[] { "finalize", "close" }, order);
         Assert.True(source.Empty);
         InventorySnapshot.AssertStack(test.Target[0], test.Item, 12);
@@ -59,8 +67,10 @@ public sealed class AutoStashFinalizationTests
         if (throws) source.BeforeMove = _ => throw failure;
         var before = new InventorySnapshot(test.Fixture.BackpackInventory, test.Fixture.HotbarInventory, test.Target);
         int finalized = 0;
+        var target = new Mock<InventoryAutoStashTarget>(test.Target) { CallBase = true };
+        target.Setup(value => value.FinalizeChanges()).Callback(() => finalized++);
         Func<int> run = () => AutoStashTransferService.AutoStashToInventory(test.Fixture.World, test.Fixture.Player,
-            "test", test.Target, new BlockPos(0), "test", _ => true, finalizeChanges: () => finalized++);
+            "test", target.Object, new BlockPos(0), "test", _ => true);
 
         if (throws) Assert.Same(failure, Assert.Throws<InvalidOperationException>(() => run()));
         else Assert.Equal(0, run());

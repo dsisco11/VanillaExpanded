@@ -1,6 +1,6 @@
 # AutoStash Planning and Execution
 
-Status: Phases 1–2 complete; Phases 3–6 remain planned.
+Status: Phases 1–3 complete; Phases 4–6 remain planned.
 Source proposal: [PlanningAndExecutionProposal.md](PlanningAndExecutionProposal.md).
 Purpose: Extract shared incremental planning and engine execution while preserving the established functional contract.
 
@@ -118,14 +118,36 @@ Outcome: Target adapters own inventory resolution, acquisition, persistence and 
 Dependencies: Phase 2.
 Sources: Proposal Attached bags and Target lifecycle and partial failure; existing target entry points, AutoStashMutationState and lifecycle/finalization/persistence tests.
 
-☐ P3.1 Add Targets adapters for ordinary containers/crates, bloomeries and attached bags using their owning engine APIs. Resolve target availability and read-only contents separately from mutation/session acquisition.
-☐ P3.2 Acquire ordinary/workspace sessions only after plausible work; close only sessions acquired by this operation. Keep temporary bag inventories session-free and bloomery lifecycle unchanged. Observe resulting live contents after opening.
-☐ P3.3 Preserve vanilla workspace refresh/wrapper identity, distinct IHeldBag loading, attachment validation and load-failure no-op effects. Preserve Store for live content slots, attachment dirty marking and actual owner storage, including existing workspace callbacks.
-☐ P3.4 Move target finalization into adapters using the established actual/uncertain mutation accounting. Persist or synchronize before owned close; nested cleanup must run despite persistence/reporting failures. Ordinary completed zero moves do not finalize.
-☐ P3.5 Preserve original exception identity/stack and report secondary persistence/cleanup failures without replacing it. When no earlier exception exists, propagate the first failure. Do not claim rollback or successful persistence when storage itself throws.
-☐ P3.6 Integrate adapters into the existing operation owner without adding a second mutation tracker. Replace session-management booleans and target finalizer callbacks at that boundary with explicit lifecycle ownership.
-☐ P3.7 Run acquired/caller-owned, after-earlier-move, after-unreturned-mutation, storage/cleanup failure, zero/partial and bag/owner reload regressions for both bag implementations and actual initialized crate inventories.
-☐ Completion: All targets finalize and release through adapters, persistence round trips and failure assertions pass, and focused/Unit verification plus independent audit establish lifecycle ordering/ownership.
+☑ P3.1 Add Targets adapters for ordinary containers/crates, bloomeries and attached bags using their owning engine APIs. Resolve target availability and read-only contents separately from mutation/session acquisition.
+☑ P3.2 Acquire ordinary/workspace sessions only after plausible work; close only sessions acquired by this operation. Keep temporary bag inventories session-free and bloomery lifecycle unchanged. Observe resulting live contents after opening.
+☑ P3.3 Preserve vanilla workspace refresh/wrapper identity, distinct IHeldBag loading, attachment validation and load-failure no-op effects. Preserve Store for live content slots, attachment dirty marking and actual owner storage, including existing workspace callbacks.
+☑ P3.4 Move target finalization into adapters using the established actual/uncertain mutation accounting. Persist or synchronize before owned close; nested cleanup must run despite persistence/reporting failures. Ordinary completed zero moves do not finalize.
+☑ P3.5 Preserve original exception identity/stack and report secondary persistence/cleanup failures without replacing it. When no earlier exception exists, propagate the first failure. Do not claim rollback or successful persistence when storage itself throws.
+☑ P3.6 Integrate adapters into the existing operation owner without adding a second mutation tracker. Replace session-management booleans and target finalizer callbacks at that boundary with explicit lifecycle ownership.
+☑ P3.7 Run acquired/caller-owned, after-earlier-move, after-unreturned-mutation, storage/cleanup failure, zero/partial and bag/owner reload regressions for both bag implementations and actual initialized crate inventories.
+☑ Completion: All targets finalize and release through adapters, persistence round trips and failure assertions pass, and focused/Unit verification plus independent audit establish lifecycle ordering/ownership.
+
+### Implementation notes and evidence
+
+Implementation starts at 180cac131fdb53a365e46effc901161681bebb63. Every item inherits the complete proposal and Scope and execution rules; the attached-bag and Target lifecycle and partial failure sections govern acquisition, actual/uncertain mutation, persistence ordering and exceptions. Current owners, AutoStashMutationState and full lifecycle/finalization/bag regression sources were consulted before extraction; no controlling reference was unavailable.
+
+P3.1–P3.3 -> proposal Attached bags, Target lifecycle and partial failure, Source layout and dependencies -> owning engine APIs, read-only resolution, deferred acquisition and stable slot/session identity -> Targets/AutoStashTarget, InventoryAutoStashTarget, ContainerAutoStashTarget, BloomeryAutoStashTarget, AttachedBagAutoStashTarget and AutoStashInventorySession. Ordinary/crate inventories are captured from their owners; bloomery resolution retains burning/output rejection and has no session. Attached resolution validates the slot, bag and positive capacity and reads persisted contents without a workspace. Candidate detection precedes bag execution loading; actual capacity is checked before acquiring ordinary/workspace sessions. Distinct bags use session-free temporary inventories. Vanilla loading retains workspace callbacks and refreshes existing wrapper slots in place; a failed load performs no transfer/session/persistence. Planning reads live post-open state.
+
+P3.4–P3.6 -> proposal Target lifecycle and partial failure -> finalize actual or uncertain changes before release, nested cleanup despite storage/reporting failures, original exception identity/stack, no second tracker -> existing AutoStashMutationState now calls adapter FinalizeChanges/Release directly. Container adapters mark their block entity dirty; bloomery preserves MarkDirty(true); bag adapters Store live slots, mark the attachment dirty and store its owner before workspace close. Ordinary completed zero moves do not finalize. Engine-attempt uncertainty and actual movement tracking remain unchanged. Session-management flags and target-finalizer callbacks were removed from the operation boundary; predicate/preference compatibility remains separate. Bare inventory and finalization tests now use adapters and Moq observations; DynamicProxyGenAssembly2 receives internal access so the adapter types remain internal mod implementation details.
+
+P3.7 -> proposal Validation requirements and established regression contract -> acquired/caller-owned sessions, interruption before/after mutation, live opening state, storage/cleanup/reporting failures, no-op/partial transfers and independent persistence reloads -> unchanged full-operation AutoStashLifecycleTests, BloomeryFailureTests, AttachedContainerFailureTests and EntityAttachedContainerTransfer/PersistenceTests, including initialized crate inventories and both bag implementations. Migrated AutoStashFinalizationTests retain their original assertions and add two broken-logger variants plus an original engine stack assertion. Six AutoStashTargetTests cases cover read-only attached resolution, no-candidate workspace avoidance and exact session release ownership.
+
+Final verification through phase2_tests against the implementation working tree, sequential commands with dedicated integration-host termination before fresh focused/Unit hosts:
+
+```powershell
+dotnet test VanillaExpanded.IntegrationTests/VanillaExpanded.IntegrationTests.csproj --no-restore --filter 'Category=Integration' --verbosity minimal
+dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-restore --filter 'FullyQualifiedName~AutoStash' --verbosity minimal
+dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-build --no-restore --filter 'Category=Unit' --verbosity minimal
+```
+
+Integration 1, AutoStash 385 and Unit 581 passed, zero failures/skips/exclusions; every process exited 0. The final integration build emitted 27 existing test warnings, none new; subsequent runs emitted none. Earlier compilation also retained the seven existing production warnings. Initial seven Moq access failures were resolved with internal proxy access; Unit was withheld until the rebuilt focused suite passed. Fresh installed metadata: API/Lib/SurvivalMod/Essentials assemblies all 1.22.7.0, API file 1.22.0, others 1.22.7. No game/client/server launch, tooling installation or separate audit/verification files occurred.
+
+Second review re-read the controlling proposal/plan and checked owner/adapter/tracker diffs, deferred bag loading, exact engine identities/callbacks, finalization ordering, conservative uncertainty and original/secondary exception paths. No planner policy, network, interaction timing or alloy behavior was changed. Storage failure still provides no rollback or durability guarantee. Independent completion audit by phase2_audit directly consulted the controlling plan/proposal, adapter/owner/tracker implementation, regression fixtures and final verification evidence. Verdict: P3.1–P3.7 and completion fully satisfied, with no remaining required implementation or evidence gaps. Task markers were checked only after this clean verdict. Shared operation coordination, assessment and live acceptance remain separate.
 
 ## Phase 4: Introduce shared operation coordination
 

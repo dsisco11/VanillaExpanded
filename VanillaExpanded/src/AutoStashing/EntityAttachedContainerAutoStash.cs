@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using VanillaExpanded.AutoStashing.Planning;
+using VanillaExpanded.AutoStashing.Targets;
 
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -108,85 +109,12 @@ internal static class EntityAttachedContainerAutoStash
         EntityBehaviorAttachable attachable,
         int attachmentSlotIndex)
     {
-        if (attachmentSlotIndex < 0 || attachmentSlotIndex >= attachable.Inventory.Count)
-        {
-            return false;
-        }
-
-        ItemSlot attachmentSlot = attachable.Inventory[attachmentSlotIndex];
-        ItemStack? attachmentStack = attachmentSlot.Itemstack;
-        IHeldBag? heldBag = attachmentStack?.Collectible.GetCollectibleInterface<IHeldBag>();
-        if (heldBag is null || attachmentStack is null)
-        {
-            return false;
-        }
-
-        int slotCount = heldBag.GetQuantitySlots(attachmentStack);
-        if (slotCount <= 0)
-        {
-            return false;
-        }
-
-        InventoryGeneric targetInventory;
-        bool usesWorkspace = heldBag is CollectibleBehaviorHeldBag;
-        if (heldBag is CollectibleBehaviorHeldBag vanillaBag)
-        {
-            AttachedContainerWorkspace workspace = vanillaBag.getOrCreateContainerWorkspace(
-                attachmentSlotIndex, hostEntity, attachable.storeInv);
-            if (!workspace.TryLoadInv(attachmentSlot, attachmentSlotIndex, hostEntity))
-            {
-                return false;
-            }
-
-            targetInventory = workspace.WrapperInv;
-            RefreshWorkspaceSlots(targetInventory, workspace.BagInventory);
-        }
-        else
-        {
-            targetInventory = new InventoryGeneric(slotCount, "attachedcontainer", $"{hostEntity.EntityId}-{attachmentSlotIndex}", world.Api);
-            List<ItemSlotBagContent> loadedSlots = heldBag.GetOrCreateSlots(attachmentStack, targetInventory, 0, world);
-            for (int index = 0; index < loadedSlots.Count && index < targetInventory.Count; index++)
-            {
-                targetInventory[index] = loadedSlots[index];
-            }
-        }
-
-        ItemSlot[] contentSlots = targetInventory.ToArray();
-        var policy = new MatchingContentsPolicy(contentSlots.Where(slot => !slot.Empty).Select(slot => slot.Itemstack));
-        bool movedItems = AutoStashTransferService.AutoStashToInventory(
-            world,
-            player.InventoryManager,
-            player.PlayerName,
-            targetInventory,
-            hostEntity.Pos.AsBlockPos,
-            $"attached container on {hostEntity.Code}",
-            policy,
-            manageInventorySession: usesWorkspace,
-            finalizeChanges: () =>
-            {
-                // Save live slots before closing the session, including an interrupted engine move.
-                foreach (ItemSlotBagContent contentSlot in contentSlots)
-                {
-                    heldBag.Store(attachmentStack, contentSlot);
-                }
-                attachable.Inventory.MarkSlotDirty(attachmentSlotIndex);
-                attachable.storeInv();
-            }) > 0;
-
-        return movedItems;
+        AttachedBagAutoStashTarget? target = AttachedBagAutoStashTarget.Resolve(world, hostEntity, attachable, attachmentSlotIndex);
+        if (target is null) return false;
+        var policy = new MatchingContentsPolicy(target.GetContents());
+        return AutoStashTransferService.AutoStashToInventory(world, player.InventoryManager, player.PlayerName,
+            target, hostEntity.Pos.AsBlockPos, $"attached container on {hostEntity.Code}", policy) > 0;
     }
-
-    internal static void RefreshWorkspaceSlots(InventoryGeneric inventory, IEnumerable<ItemSlot> loadedSlots)
-    {
-        int slotIndex = 0;
-        foreach (ItemSlot loadedSlot in loadedSlots)
-        {
-            inventory[slotIndex].Itemstack = loadedSlot.Itemstack;
-            inventory.MarkSlotDirty(slotIndex);
-            slotIndex++;
-        }
-    }
-
     private static IEnumerable<ItemSlot> PlayerSlots(IPlayerInventoryManager playerInventory)
     {
         IInventory? backpack = playerInventory.GetOwnInventory(GlobalConstants.backpackInvClassName);

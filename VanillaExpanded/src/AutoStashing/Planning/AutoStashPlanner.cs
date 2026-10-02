@@ -15,6 +15,7 @@ internal sealed class AutoStashPlanner : IDisposable
     public bool DirectMergeFailed => cursor.DirectMergeFailed;
 
     #region Public API
+    #region Operation cursor
     /// <summary>Creates an operation-local cursor without copying contents or opening sessions.</summary>
     public AutoStashPlanner(IWorldAccessor world, IInventory target, AutoStashPolicy policy, IInventory? backpack, IInventory? hotbar)
     {
@@ -138,6 +139,9 @@ internal sealed class AutoStashPlanner : IDisposable
         }
     }
 
+    #endregion
+
+    #region Capacity probes
     /// <summary>Probes current capacity without sessions, retaining exclusive valid-index preference preflight.</summary>
     public static bool HasWork(IInventory target, AutoStashPolicy policy, IInventory? backpack, IInventory? hotbar)
     {
@@ -166,8 +170,20 @@ internal sealed class AutoStashPlanner : IDisposable
         return false;
     }
 
+    /// <summary>Checks candidate existence when a bag has no prepared execution inventory yet; capacity remains unknown.</summary>
+    public static bool HasCandidates(AutoStashPolicy policy, IInventory? backpack, IInventory? hotbar)
+    {
+        // Candidate detection permits deferred workspace preparation without inventing a client/server capacity model.
+        return policy.GetSourcePasses(backpack, hotbar).Any(pass => pass.Inventory.Any(source =>
+            !source.Empty && policy.IsEligible(source.Itemstack!, pass)));
+    }
+
+    #endregion
+
+    #region Resource release
     /// <summary>Releases source enumerators on normal completion or failure.</summary>
     public void Dispose() => cursor.Dispose();
+    #endregion
     #endregion
 
     #region Private

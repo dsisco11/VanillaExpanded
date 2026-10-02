@@ -1,6 +1,6 @@
 # AutoStash Planning and Execution Proposal
 
-Status: Architecture partially implemented: concrete engine transfers, target policies and incremental planning are in place. Shared coordination, lifecycle adapters and assessment remain planned. See [implementation plan](PlanningAndExecution.todo).
+Status: Architecture partially implemented: concrete engine transfers, target policies, incremental planning and lifecycle adapters are in place. Shared operation coordination and assessment remain planned. See [implementation plan](PlanningAndExecution.todo).
 
 ## Purpose
 
@@ -18,7 +18,7 @@ The original analysis was based on these repository sources before extraction:
 - [AutoStashSystem_Server](../../VanillaExpanded/src/ModSystems/AutoStashSystem_Server.cs) validates requests and dispatches server operations.
 - [AutoStashTransferTests](../../VanillaExpanded.Tests/Unit/AutoStashing/AutoStashTransferTests.cs) describes existing transfer, capacity, session, and workspace expectations.
 
-The original shared service accepted an item predicate, an optional preferred slot, a session-management boolean, and a target finalization callback. Those inputs could not describe bloomery quantity limits or source-pass ordering, so the bloomery implemented its own execution path. Both paths now share policies, an incremental planner/cursor and the concrete executor, while retaining lifecycle and auditing in their original operation owners. Client assessment and shared operation coordination remain to be extracted.
+The original shared service accepted an item predicate, an optional preferred slot, a session-management boolean, and a target finalization callback. Those inputs could not describe bloomery quantity limits or source-pass ordering, so the bloomery implemented its own execution path. Both paths now share policies, an incremental planner/cursor and the concrete executor. Target adapters own resolution, acquisition, persistence and release; the existing mutation tracker invokes adapter finalization before cleanup. Auditing and coordination remain in the original operation owners. Client assessment and shared operation coordination remain to be extracted.
 
 The optional preferred-slot compatibility contract treats a valid preferred index as exclusive during preflight, whereas execution can fall back to other destinations. PreferredSlotCompatibility preserves this characterization separately from bloomery mandatory-slot routing. Current production callers do not supply that argument. This is a source-level abstraction inconsistency, not a reproduced gameplay defect.
 

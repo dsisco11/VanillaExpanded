@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.ExceptionServices;
 using Vintagestory.API.Common;
+using VanillaExpanded.AutoStashing.Targets;
 
 namespace VanillaExpanded.AutoStashing;
 
@@ -23,12 +24,12 @@ internal sealed class AutoStashMutationState
     }
 
     /// <summary>Finalizes possible changes before cleanup and retains the original failure when either boundary also throws.</summary>
-    public void Finish(Action? finalize, Action? cleanup, Exception? originalFailure, ILogger logger)
+    public void Finish(AutoStashTarget target, IPlayerInventoryManager owner, Exception? originalFailure, ILogger logger)
     {
         Exception? failure = originalFailure;
         try
         {
-            if (NeedsFinalization) finalize?.Invoke();
+            if (NeedsFinalization) target.FinalizeChanges();
         }
         catch (Exception exception)
         {
@@ -39,7 +40,7 @@ internal sealed class AutoStashMutationState
         {
             try
             {
-                cleanup?.Invoke();
+                target.Release(owner);
             }
             catch (Exception exception)
             {

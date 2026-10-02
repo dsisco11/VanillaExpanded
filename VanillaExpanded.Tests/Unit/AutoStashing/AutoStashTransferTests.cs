@@ -1,3 +1,4 @@
+using VanillaExpanded.AutoStashing.Targets;
 using Moq;
 
 using VanillaExpanded.AutoStashing;
@@ -44,10 +45,15 @@ public class AutoStashTransferTests : IDisposable
 
         var before = new InventorySnapshot(fixture.BackpackInventory, fixture.HotbarInventory, container.Inventory);
 
+        var target = new Mock<InventoryAutoStashTarget>(container.Inventory) { CallBase = true };
+        if (!manageSession)
+        {
+            target.Setup(value => value.Acquire(It.IsAny<IPlayerInventoryManager>()));
+            target.Setup(value => value.Release(It.IsAny<IPlayerInventoryManager>()));
+        }
         int moved = AutoStashTransferService.AutoStashToInventory(
-            fixture.World, fixture.Player, "test-player", container.Inventory,
-            new BlockPos(0), "test-container", _ => true,
-            manageInventorySession: manageSession);
+            fixture.World, fixture.Player, "test-player", target.Object,
+            new BlockPos(0), "test-container", _ => true);
 
         Assert.Equal(10, moved);
         Assert.Equal(initialQuantity + 10, container.Inventory[0].StackSize);
@@ -79,7 +85,7 @@ public class AutoStashTransferTests : IDisposable
         var before = new InventorySnapshot(fixture.BackpackInventory, fixture.HotbarInventory, container.Inventory);
 
         int moved = AutoStashTransferService.AutoStashToInventory(
-            fixture.World, fixture.Player, "test-player", container.Inventory,
+            fixture.World, fixture.Player, "test-player", new InventoryAutoStashTarget(container.Inventory),
             new BlockPos(0), "test-container", _ => full);
 
         Assert.Equal(0, moved);
@@ -103,7 +109,7 @@ public class AutoStashTransferTests : IDisposable
         firstSlot.Itemstack = originalStack;
         secondSlot.Itemstack = originalStack.Clone();
 
-        EntityAttachedContainerAutoStash.RefreshWorkspaceSlots(inventory,
+        AttachedBagAutoStashTarget.RefreshWorkspaceSlots(inventory,
             new ItemSlot[] { new DummySlot(updatedStack), new DummySlot(null) });
 
         Assert.Same(firstSlot, inventory[0]);
@@ -111,7 +117,7 @@ public class AutoStashTransferTests : IDisposable
         Assert.Same(updatedStack, firstSlot.Itemstack);
         Assert.True(secondSlot.Empty);
 
-        EntityAttachedContainerAutoStash.RefreshWorkspaceSlots(inventory,
+        AttachedBagAutoStashTarget.RefreshWorkspaceSlots(inventory,
             new ItemSlot[] { new DummySlot(null), new DummySlot(originalStack) });
 
         Assert.Same(firstSlot, inventory[0]);

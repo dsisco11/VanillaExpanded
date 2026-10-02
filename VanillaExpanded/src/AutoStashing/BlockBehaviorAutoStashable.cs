@@ -12,6 +12,7 @@ using Vintagestory.GameContent;
 using VanillaExpanded.RadialProgress;
 using VanillaExpanded.AutoStashing.Transfers;
 using VanillaExpanded.AutoStashing.Planning;
+using VanillaExpanded.AutoStashing.Targets;
 
 namespace VanillaExpanded.AutoStashing;
 
@@ -520,17 +521,16 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         in BlockEntityContainer container,
         string playerName = "")
     {
-        BlockEntityContainer target = container;
-        var policy = new MatchingContentsPolicy(container.GetNonEmptyContentStacks());
+        var target = new ContainerAutoStashTarget(container);
+        var policy = new MatchingContentsPolicy(target.GetContents());
         bool itemsStashed = AutoStashTransferService.AutoStashToInventory(
             world,
             playerInventory,
             playerName,
-            container.Inventory,
+            target,
             container.Pos,
             container.InventoryClassName,
-            policy,
-            finalizeChanges: () => target.MarkDirty()) > 0;
+            policy) > 0;
 
         return itemsStashed;
     }
@@ -549,17 +549,16 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         in BlockEntityCrate container,
         string playerName = "")
     {
-        BlockEntityCrate target = container;
+        var target = new ContainerAutoStashTarget(container);
         var policy = new CratePolicy(container.Inventory);
         bool itemsStashed = AutoStashTransferService.AutoStashToInventory(
             world,
             playerInventory,
             playerName,
-            container.Inventory,
+            target,
             container.Pos,
             container.InventoryClassName,
-            policy,
-            finalizeChanges: () => target.MarkDirty()) > 0;
+            policy) > 0;
 
         return itemsStashed;
     }
@@ -579,15 +578,13 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         BlockEntityBloomery bloomery,
         string playerName = "")
     {
-        InventoryGeneric? bloomeryInv = BloomeryAccessor.GetInventory(bloomery);
-        if (bloomeryInv is null || !BloomeryPolicy.IsAvailable(bloomery, bloomeryInv))
-        {
-            return false;
-        }
-
+        BloomeryAutoStashTarget? target = BloomeryAutoStashTarget.Resolve(bloomery);
+        if (target is null) return false;
+        var bloomeryInv = (InventoryGeneric)target.Inventory;
         IInventory? backpackInventory = playerInventory.GetOwnInventory(GlobalConstants.backpackInvClassName);
         IInventory? hotbarInventory = playerInventory.GetOwnInventory(GlobalConstants.hotBarInvClassName);
 
+        target.Acquire(playerInventory);
         int totalStashed = 0;
         var mutation = new AutoStashMutationState();
         Exception? failure = null;
@@ -617,7 +614,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         }
         finally
         {
-            mutation.Finish(() => bloomery.MarkDirty(true), null, failure, world.Logger);
+            mutation.Finish(target, playerInventory, failure, world.Logger);
         }
 
         if (totalStashed > 0)

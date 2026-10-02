@@ -1,3 +1,4 @@
+using VanillaExpanded.AutoStashing.Targets;
 using Moq;
 using VanillaExpanded.AutoStashing;
 using VanillaExpanded.Tests.Mocks;
@@ -37,7 +38,7 @@ internal sealed class TransferCase
     /// <summary>Runs the actual service against current inventories with optional preferred-slot characterization.</summary>
     public int Run(System.Func<ItemStack, int?>? preferred = null)
     {
-        return AutoStashTransferService.AutoStashToInventory(Fixture.World, Fixture.Player, "test", Target,
+        return AutoStashTransferService.AutoStashToInventory(Fixture.World, Fixture.Player, "test", new InventoryAutoStashTarget(Target),
             new BlockPos(0), "transfer-edge", _ => true, preferred);
     }
 
