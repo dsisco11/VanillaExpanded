@@ -11,6 +11,7 @@ using Vintagestory.GameContent;
 
 using VanillaExpanded.RadialProgress;
 using VanillaExpanded.AutoStashing.Transfers;
+using VanillaExpanded.AutoStashing.Planning;
 
 namespace VanillaExpanded.AutoStashing;
 
@@ -487,10 +488,10 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
                 continue;
             }
 
-            int? targetSlotIndex = GetBloomeryPreferredSlot(slot.Itemstack);
+            int? targetSlotIndex = BloomeryPolicy.Classify(slot.Itemstack);
             if (bloomery.CanAdd(slot.Itemstack)
                 && targetSlotIndex.HasValue
-                && GetBloomeryMaxCanAdd(bloomery, bloomeryInv, slot.Itemstack, targetSlotIndex.Value) > 0)
+                && BloomeryPolicy.GetMaxCanAdd(bloomeryInv, slot.Itemstack, targetSlotIndex.Value) > 0)
             {
                 stashableIds.Add(slot.Itemstack.Collectible.Id);
             }
@@ -520,15 +521,15 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         string playerName = "")
     {
         BlockEntityContainer target = container;
-        HashSet<AssetLocation> itemTypesInContainer = [.. container.GetNonEmptyContentStacks().Select(static stack => stack.Collectible.Code)];
-        bool itemsStashed = itemTypesInContainer.Count != 0 && AutoStashTransferService.AutoStashToInventory(
+        var policy = new MatchingContentsPolicy(container.GetNonEmptyContentStacks());
+        bool itemsStashed = AutoStashTransferService.AutoStashToInventory(
             world,
             playerInventory,
             playerName,
             container.Inventory,
             container.Pos,
             container.InventoryClassName,
-            stack => itemTypesInContainer.Contains(stack.Collectible.Code),
+            policy,
             finalizeChanges: () => target.MarkDirty()) > 0;
 
         return itemsStashed;
@@ -549,15 +550,15 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         string playerName = "")
     {
         BlockEntityCrate target = container;
-        AssetLocation? containerAcceptedItem = container.Inventory.FirstNonEmptySlot?.Itemstack?.Collectible?.Code;
-        bool itemsStashed = containerAcceptedItem is not null && AutoStashTransferService.AutoStashToInventory(
+        var policy = new CratePolicy(container.Inventory);
+        bool itemsStashed = AutoStashTransferService.AutoStashToInventory(
             world,
             playerInventory,
             playerName,
             container.Inventory,
             container.Pos,
             container.InventoryClassName,
-            stack => stack.Collectible.Code.Equals(containerAcceptedItem),
+            policy,
             finalizeChanges: () => target.MarkDirty()) > 0;
 
         return itemsStashed;
@@ -579,7 +580,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         string playerName = "")
     {
         InventoryGeneric? bloomeryInv = BloomeryAccessor.GetInventory(bloomery);
-        if (bloomeryInv is null || bloomery.IsBurning || !bloomeryInv[2].Empty)
+        if (bloomeryInv is null || !BloomeryPolicy.IsAvailable(bloomery, bloomeryInv))
         {
             return false;
         }
@@ -592,13 +593,21 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         Exception? failure = null;
         try
         {
-            if (backpackInventory is not null)
+            var policy = new BloomeryPolicy(bloomery, bloomeryInv);
+            using var planner = new AutoStashPlanner(world, bloomeryInv, policy, backpackInventory, hotbarInventory);
+            InventoryTransfer? transfer;
+            while ((transfer = planner.GetNextTransfer()) is not null)
             {
-                totalStashed += AutoStashInventoryIntoBloomery(world, playerName, bloomery, bloomeryInv, backpackInventory, mutation);
-            }
-            if (hotbarInventory is not null)
-            {
-                totalStashed += AutoStashInventoryIntoBloomery(world, playerName, bloomery, bloomeryInv, hotbarInventory, mutation);
+                mutation.BeginAttempt();
+                InventoryTransferResult result = InventoryTransferExecutor.Execute(world, transfer);
+                mutation.CompleteAttempt(result.MovedQuantity);
+                if (result.MovedQuantity > 0)
+                {
+                    totalStashed += result.MovedQuantity;
+                    world.Api?.World.Logger.Audit("'{0}' moved {1}x{2} into bloomery at <{3}>.",
+                        playerName, result.MovedQuantity, transfer.Destination.Itemstack?.Collectible.Code, bloomery.Pos);
+                }
+                planner.Advance(transfer, result);
             }
         }
         catch (Exception exception)
@@ -621,157 +630,6 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         }
 
         return totalStashed > 0;
-    }
-
-    /// <summary>
-    /// Stashes items from a source inventory into a bloomery, respecting capacity limits.
-    /// </summary>
-    private static int AutoStashInventoryIntoBloomery(
-        IWorldAccessor world,
-        string playerName,
-        BlockEntityBloomery bloomery,
-        InventoryGeneric bloomeryInv,
-        IInventory sourceInventory,
-        AutoStashMutationState mutation)
-    {
-        int totalStashed = 0;
-
-        // Process ore first (slot 1), then fuel (slot 0)
-        // This ensures fuel capacity calculation is based on actual ore amount
-        totalStashed += StashItemsToBloomerySlot(world, playerName, bloomery, bloomeryInv, sourceInventory, mutation, targetSlotIndex: 1); // Ore
-        totalStashed += StashItemsToBloomerySlot(world, playerName, bloomery, bloomeryInv, sourceInventory, mutation, targetSlotIndex: 0); // Fuel
-
-        return totalStashed;
-    }
-
-    /// <summary>
-    /// Stashes items from source inventory into a specific bloomery slot.
-    /// </summary>
-    private static int StashItemsToBloomerySlot(
-        IWorldAccessor world,
-        string playerName,
-        BlockEntityBloomery bloomery,
-        InventoryGeneric bloomeryInv,
-        IInventory sourceInventory,
-        AutoStashMutationState mutation,
-        int targetSlotIndex)
-    {
-        int totalStashed = 0;
-
-        foreach (ItemSlot sourceSlot in sourceInventory)
-        {
-            if (sourceSlot.Empty)
-            {
-                continue;
-            }
-
-            // Check if bloomery can accept this item type at all
-            if (!bloomery.CanAdd(sourceSlot.Itemstack))
-            {
-                continue;
-            }
-
-            int? slotIndex = GetBloomeryPreferredSlot(sourceSlot.Itemstack);
-            if (!slotIndex.HasValue || slotIndex.Value != targetSlotIndex)
-            {
-                continue;
-            }
-
-            ItemSlot targetSlot = bloomeryInv[slotIndex.Value];
-            int maxCanAdd = GetBloomeryMaxCanAdd(bloomery, bloomeryInv, sourceSlot.Itemstack, slotIndex.Value);
-
-            if (maxCanAdd <= 0)
-            {
-                continue;
-            }
-
-            int quantityToMove = Math.Min(sourceSlot.StackSize, maxCanAdd);
-            var transfer = new InventoryTransfer(sourceSlot, targetSlot, quantityToMove);
-            mutation.BeginAttempt();
-            int moved = InventoryTransferExecutor.Execute(world, transfer).MovedQuantity;
-            mutation.CompleteAttempt(moved);
-
-            if (moved > 0)
-            {
-                totalStashed += moved;
-                world.Api?.World.Logger.Audit("'{0}' moved {1}x{2} into bloomery at <{3}>.",
-                    playerName,
-                    moved,
-                    targetSlot.Itemstack?.Collectible.Code,
-                    bloomery.Pos
-                );
-            }
-        }
-
-        return totalStashed;
-    }
-
-    /// <summary>
-    /// Gets the maximum number of items that can be added to a bloomery slot.
-    /// </summary>
-    private static int GetBloomeryMaxCanAdd(BlockEntityBloomery bloomery, InventoryGeneric bloomeryInv, ItemStack stack, int slotIndex)
-    {
-        const int FuelCapacity = 6;
-
-        if (slotIndex == 0) // Fuel slot
-        {
-            // Fuel max is based on ore content: maxRequired = ceil(oreSize / ore2FuelRatio)
-            int oreSize = bloomeryInv[1].StackSize;
-            int ore2FuelRatio = GetOre2FuelRatio(bloomeryInv[1].Itemstack);
-            int maxRequired = oreSize > 0 ? (int)Math.Ceiling((float)oreSize / ore2FuelRatio) : FuelCapacity;
-            return Math.Max(0, maxRequired - bloomeryInv[0].StackSize);
-        }
-        else if (slotIndex == 1) // Ore slot
-        {
-            int ore2FuelRatio = GetOre2FuelRatio(stack);
-            int oreCapacity = ore2FuelRatio * FuelCapacity;
-            return Math.Max(0, oreCapacity - bloomeryInv[1].StackSize);
-        }
-
-        return 0;
-    }
-
-    /// <summary>
-    /// Gets the Ore2FuelRatio for the given ore stack.
-    /// </summary>
-    private static int GetOre2FuelRatio(ItemStack? oreStack)
-    {
-        if (oreStack?.Collectible?.CombustibleProps is not CombustibleProperties combustProps)
-        {
-            return 1;
-        }
-
-        int ratio = combustProps.SmeltedRatio;
-        int configuredRatio = oreStack.ItemAttributes?["bloomeryFuelRatio"].AsInt(ratio) ?? ratio;
-        return Math.Max(1, configuredRatio);
-    }
-
-    /// <summary>
-    /// Determines the preferred slot index for an item in a bloomery.
-    /// Returns slot 0 for fuel, slot 1 for ore, or null if item is not valid.
-    /// </summary>
-    private static int? GetBloomeryPreferredSlot(ItemStack stack)
-    {
-        if (stack?.Collectible?.CombustibleProps is not CombustibleProperties combustProps)
-        {
-            return null;
-        }
-
-        // Ore: has SmeltedStack and melting point in range
-        if (combustProps.SmeltedStack is not null
-            && combustProps.MeltingPoint >= BlockEntityBloomery.MinTemp
-            && combustProps.MeltingPoint < BlockEntityBloomery.MaxTemp)
-        {
-            return 1; // Ore slot
-        }
-
-        // Fuel: high burn temperature and duration
-        if (combustProps.BurnTemperature >= 1200 && combustProps.BurnDuration > 30)
-        {
-            return 0; // Fuel slot
-        }
-
-        return null;
     }
 
     #endregion

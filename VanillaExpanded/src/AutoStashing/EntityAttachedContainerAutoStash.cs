@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using VanillaExpanded.AutoStashing.Planning;
 
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -151,17 +152,15 @@ internal static class EntityAttachedContainerAutoStash
         }
 
         ItemSlot[] contentSlots = targetInventory.ToArray();
-        HashSet<AssetLocation> contentTypes = [.. contentSlots
-            .Where(static slot => slot.Itemstack?.Collectible is not null)
-            .Select(static slot => slot.Itemstack!.Collectible.Code)];
-        bool movedItems = contentTypes.Count != 0 && AutoStashTransferService.AutoStashToInventory(
+        var policy = new MatchingContentsPolicy(contentSlots.Where(slot => !slot.Empty).Select(slot => slot.Itemstack));
+        bool movedItems = AutoStashTransferService.AutoStashToInventory(
             world,
             player.InventoryManager,
             player.PlayerName,
             targetInventory,
             hostEntity.Pos.AsBlockPos,
             $"attached container on {hostEntity.Code}",
-            stack => contentTypes.Contains(stack.Collectible.Code),
+            policy,
             manageInventorySession: usesWorkspace,
             finalizeChanges: () =>
             {

@@ -1,6 +1,6 @@
 # AutoStash Planning and Execution Proposal
 
-Status: Architecture partially implemented: concrete engine transfer contracts and the shared executor are in place. Planning, coordination, lifecycle adapters and shared assessment remain planned. See [implementation plan](PlanningAndExecution.todo).
+Status: Architecture partially implemented: concrete engine transfers, target policies and incremental planning are in place. Shared coordination, lifecycle adapters and assessment remain planned. See [implementation plan](PlanningAndExecution.todo).
 
 ## Purpose
 
@@ -8,9 +8,9 @@ Separate AutoStash eligibility, transfer planning, inventory mutation, and targe
 
 The central design is incremental planning: select one concrete move from current inventory state, execute it through the engine, then use the actual result to plan the next move. An AutoStash operation is best-effort and may partially succeed; it is not an atomic transaction.
 
-## Current implementation
+## Starting architecture
 
-The analysis is based on these repository sources:
+The original analysis was based on these repository sources before extraction:
 
 - [AutoStashTransferService](../../VanillaExpanded/src/AutoStashing/AutoStashTransferService.cs) combines preflight checks, player-source enumeration, inventory session ownership, destination selection, mutation, and auditing.
 - [BlockBehaviorAutoStashable](../../VanillaExpanded/src/AutoStashing/BlockBehaviorAutoStashable.cs) combines interaction handling with eligibility queries, container dispatch, and a separate bloomery transfer loop.
@@ -18,9 +18,9 @@ The analysis is based on these repository sources:
 - [AutoStashSystem_Server](../../VanillaExpanded/src/ModSystems/AutoStashSystem_Server.cs) validates requests and dispatches server operations.
 - [AutoStashTransferTests](../../VanillaExpanded.Tests/Unit/AutoStashing/AutoStashTransferTests.cs) describes existing transfer, capacity, session, and workspace expectations.
 
-The shared service accepts an item predicate, an optional preferred slot, a session-management boolean, and a target finalization callback. These inputs cannot describe bloomery quantity limits or source-pass ordering, so the bloomery implements its own execution path. Client eligibility also reconstructs rules independently of execution.
+The original shared service accepted an item predicate, an optional preferred slot, a session-management boolean, and a target finalization callback. Those inputs could not describe bloomery quantity limits or source-pass ordering, so the bloomery implemented its own execution path. Both paths now share policies, an incremental planner/cursor and the concrete executor, while retaining lifecycle and auditing in their original operation owners. Client assessment and shared operation coordination remain to be extracted.
 
-The optional preferred-slot contract is inconsistent: preflight treats a valid preferred index as exclusive, whereas execution can fall back to other destinations. Current production callers do not supply that argument. This is a source-level abstraction inconsistency, not a reproduced gameplay defect.
+The optional preferred-slot compatibility contract treats a valid preferred index as exclusive during preflight, whereas execution can fall back to other destinations. PreferredSlotCompatibility preserves this characterization separately from bloomery mandatory-slot routing. Current production callers do not supply that argument. This is a source-level abstraction inconsistency, not a reproduced gameplay defect.
 
 ## Established regression contract
 
@@ -215,4 +215,4 @@ The proposal is satisfied when all target types share the concrete transfer exec
 
 ## Evidence limits
 
-The original architecture analysis was source-only. Subsequent coverage execution reproduced and resolved the retry and failure-finalization defects under separate user authorization; its historical results are identified above. This proposal update inspected current source, tests and recorded evidence without running fresh builds, tests or the game. No automated result establishes live-game acceptance or implementation of the proposed architecture.
+The original architecture analysis was source-only. Subsequent coverage execution reproduced and resolved the retry and failure-finalization defects under separate user authorization; its historical results are identified above. Automated verification of implemented extractions is recorded in the implementation plan. Passing tests do not establish live-game acceptance or completion of the remaining architecture.
