@@ -25,6 +25,9 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
     private Harmony? harmony;
     private ItemSlotIndicatorFrameUpdater? frameUpdater;
 
+    /// <summary>Gets the client-owned indicator renderer used by the GUI hook.</summary>
+    internal ItemSlotIndicatorRenderer? Renderer { get; private set; }
+
     /// <summary>Gets shared frame inputs without advancing animation or provider sampling.</summary>
     internal ItemSlotIndicatorFrameSnapshot FrameSnapshot => frameUpdater?.State.Snapshot ?? default;
 
@@ -51,23 +54,24 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
         Resources = new ItemSlotIndicatorResources(api.Event, new ItemSlotIndicatorResourceBackend(api));
         foreach (var registration in providers)
             if (registration.Effect is not null) Resources.Register(registration.Effect);
+        var demonstration = ItemSlotIndicatorDemonstration.FromEnvironment();
         Register(new FreshnessIndicatorProvider(),
             contextKey: static () => (VanillaExpandedModSystem.Config.EnablePerishableItemFreshnessIndicators,
-                VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity));
+                VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity), effect: demonstration);
         Register(new PreparationIndicatorProvider(), priority: -10,
-            contextKey: static () => VanillaExpandedModSystem.Config.EnablePreparationIndicators);
+            contextKey: static () => VanillaExpandedModSystem.Config.EnablePreparationIndicators, effect: demonstration);
         Register(new ClothingIndicatorProvider(), priority: -10,
-            contextKey: static () => VanillaExpandedModSystem.Config.EnableClothingIndicators);
+            contextKey: static () => VanillaExpandedModSystem.Config.EnableClothingIndicators, effect: demonstration);
         // Preserve freshness when applicable; otherwise show the container's liquid volume.
         var adaptiveSampling = new AdaptiveSamplingOptions();
         Register(new LiquidContainerIndicatorProvider(), priority: -10, adaptiveSampling: adaptiveSampling,
-            contextKey: static () => VanillaExpandedModSystem.Config.EnableLiquidContainerIndicators);
+            contextKey: static () => VanillaExpandedModSystem.Config.EnableLiquidContainerIndicators, effect: demonstration);
         Register(new WateringCanIndicatorProvider(), priority: 10, adaptiveSampling: adaptiveSampling,
-            contextKey: static () => VanillaExpandedModSystem.Config.EnableLiquidContainerIndicators);
+            contextKey: static () => VanillaExpandedModSystem.Config.EnableLiquidContainerIndicators, effect: demonstration);
         Register(new NightVisionFuelIndicatorProvider(), priority: 10, adaptiveSampling: adaptiveSampling,
-            contextKey: static () => VanillaExpandedModSystem.Config.EnableNightVisionFuelIndicators);
-        ItemSlotIndicatorRenderer.InitializeTexture(api);
+            contextKey: static () => VanillaExpandedModSystem.Config.EnableNightVisionFuelIndicators, effect: demonstration);
         Resources.Initialize();
+        Renderer = new ItemSlotIndicatorRenderer(Resources, new ItemSlotIndicatorDrawBackend(api));
         frameUpdater = new ItemSlotIndicatorFrameUpdater(api.Event, new ItemSlotIndicatorCameraSource(api), () => NeedsCameraMotion);
         Active = this;
         harmony = new Harmony(Constants.ModId + ".itemslotindicators");
@@ -81,13 +85,14 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
         harmony = null;
         frameUpdater?.Dispose();
         frameUpdater = null;
+        Renderer?.Dispose();
+        Renderer = null;
         Resources?.Dispose();
         Resources = null;
         Clear();
         if (Active == this)
         {
             Active = null;
-            ItemSlotIndicatorRenderer.DisposeTexture();
         }
         base.Dispose();
     }

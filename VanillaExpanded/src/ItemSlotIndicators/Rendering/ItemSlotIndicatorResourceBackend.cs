@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 using OpenTK.Graphics.OpenGL4;
 
@@ -11,6 +12,14 @@ namespace VanillaExpanded.ItemSlotIndicators.Rendering;
 /// <summary>Adapts resource preparation to engine shader compilation and mesh upload on the graphics thread.</summary>
 internal sealed class ItemSlotIndicatorResourceBackend(ICoreClientAPI api) : IItemSlotIndicatorResourceBackend
 {
+    private static readonly Dictionary<string, ActiveUniformType> uniformTypes = new()
+    {
+        ["projectionMatrix"] = ActiveUniformType.FloatMat4, ["modelViewMatrix"] = ActiveUniformType.FloatMat4,
+        ["slotBounds"] = ActiveUniformType.FloatVec4, ["fill"] = ActiveUniformType.Float,
+        ["color"] = ActiveUniformType.FloatVec4, ["timeSeconds"] = ActiveUniformType.Float,
+        ["motion"] = ActiveUniformType.FloatVec2, ["effectParameters"] = ActiveUniformType.FloatVec4,
+        ["segmentCount"] = ActiveUniformType.Int
+    };
     #region Public API
     /// <summary>Allocates through the engine, leaving registration and partial cleanup to the program owner.</summary>
     public IShaderProgram CreateProgram() => api.Shader.NewShaderProgram();
@@ -44,7 +53,9 @@ internal sealed class ItemSlotIndicatorResourceBackend(ICoreClientAPI api) : IIt
         GL.GetProgram(program.ProgramId, GetProgramParameterName.ActiveUniforms, out int uniforms);
         for (int index = 0; index < uniforms; index++)
         {
-            GL.GetActiveUniform(program.ProgramId, index, out _, out ActiveUniformType uniformType);
+            string name = GL.GetActiveUniform(program.ProgramId, index, out int uniformSize, out ActiveUniformType uniformType);
+            if (uniformTypes.TryGetValue(name, out var expected) && (uniformType != expected || uniformSize != 1))
+                throw new InvalidOperationException($"Indicator uniform '{name}' has an incompatible ABI type.");
             if (uniformType.ToString().Contains("Sampler", StringComparison.Ordinal)
                 || uniformType.ToString().Contains("Image", StringComparison.Ordinal))
                 throw new InvalidOperationException("Indicator programs cannot use samplers or image bindings.");

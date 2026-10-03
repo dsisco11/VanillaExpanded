@@ -48,7 +48,7 @@ internal static class ItemSlotIndicatorPatch
     {
         if (ItemSlotIndicatorSystem.Active is { } system && system.TryGetRenderSelection(slot, out ItemSlotIndicatorRenderSelection selection))
         {
-            ItemSlotIndicatorRenderer.Render(renderer, posX, posY, selection);
+            system.Renderer?.Render(posX, posY, selection, system.FrameSnapshot);
         }
 
         renderer.RenderItemstackToGui(slot, posX, posY, posZ, size, color, deltaTime, shading, rotate, showStackSize);

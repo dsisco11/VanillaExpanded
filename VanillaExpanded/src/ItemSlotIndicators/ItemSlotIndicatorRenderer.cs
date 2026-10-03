@@ -1,58 +1,56 @@
 using System;
 using System.Numerics;
 
-using OpenTK.Graphics.OpenGL4;
+using VanillaExpanded.ItemSlotIndicators.Animation;
+using VanillaExpanded.ItemSlotIndicators.Rendering;
 
 using Vintagestory.API.Client;
 using Vintagestory.API.MathTools;
 
 namespace VanillaExpanded.ItemSlotIndicators;
 
-/// <summary>Owns the shared texture and draws feature-neutral slot backgrounds.</summary>
-internal static class ItemSlotIndicatorRenderer
+/// <summary>Submits the selected presentation and isolates effect failure without changing provider selection or samples.</summary>
+internal sealed class ItemSlotIndicatorRenderer(ItemSlotIndicatorResources resources, IItemSlotIndicatorDrawBackend backend,
+    Func<float>? slotSize = null) : IDisposable
 {
-    private static LoadedTexture? whiteTexture;
+    private bool disposed;
+    private readonly Func<float> scaledSlotSize = slotSize ?? (static () => (float)GuiElement.scaled(GuiElementPassiveItemSlot.unscaledSlotSize));
 
     #region Public API
-    /// <summary>Creates the shared white texture on the client.</summary>
-    internal static void InitializeTexture(ICoreClientAPI api)
+    /// <summary>Draws prepared effects or equivalent rectangles, restoring state before fallback and normal item rendering.</summary>
+    internal void Render(double posX, double posY, ItemSlotIndicatorRenderSelection selection, ItemSlotIndicatorFrameSnapshot frame)
     {
-        DisposeTexture();
-        whiteTexture = new LoadedTexture(api) { Width = 1, Height = 1 };
-        api.Render.LoadOrUpdateTextureFromRgba([unchecked((int)0xffffffff)], false, 0, ref whiteTexture);
-    }
-
-    /// <summary>Releases the shared texture when the mod shuts down.</summary>
-    internal static void DisposeTexture()
-    {
-        whiteTexture?.Dispose();
-        whiteTexture = null;
-    }
-
-    /// <summary>Draws the selected presentation as a rectangle behind the item without writing to the GUI depth buffer.</summary>
-    internal static void Render(IRenderAPI renderer, double posX, double posY, ItemSlotIndicatorRenderSelection selection)
-    {
-        if (whiteTexture is null) return;
-
-        // The ordinary rectangle remains available regardless of the selected effect's resource availability.
-        ItemSlotIndicator indicator = selection.Indicator;
-        float slotSize = (float)GuiElement.scaled(GuiElementPassiveItemSlot.unscaledSlotSize);
-        var bounds = CalculateBounds(posX, posY, slotSize, indicator.Fill);
         try
         {
-            GL.Enable(EnableCap.DepthTest);
-            GL.DepthMask(false);
-            renderer.Render2DTexturePremultipliedAlpha(
-                whiteTexture.TextureId,
-                bounds.X, bounds.Y, bounds.Width, bounds.Height,
-                80,
-                PremultiplyColor(indicator.Color));
+            if (disposed || !backend.Supported || !ItemSlotIndicatorDrawInput.TryCreate(posX, posY,
+                scaledSlotSize(), selection.Indicator, out var input)) return;
+            if (selection.Effect is { } effect && resources.TryGet(effect, out var program, out var mesh))
+            {
+                bool successful = false;
+                try
+                {
+                    backend.Begin();
+                    backend.Effect(program!, mesh!, input, effect, frame);
+                    successful = true;
+                }
+                catch (Exception exception) { resources.FailDraw(effect, exception.Message); }
+                finally { backend.Restore(); }
+                if (successful) return;
+            }
+            // Fallback uses the same sampled fill/color after the effect scope has fully restored its caller.
+            if (resources.Rectangle is not { } rectangle) return;
+            try { backend.Begin(); backend.Rectangle(rectangle, input); }
+            finally { backend.Restore(); }
         }
-        finally
-        {
-            GL.DepthMask(true);
-            GL.Enable(EnableCap.DepthTest);
-        }
+        catch (Exception exception) { backend.ReportFailure(exception); }
+    }
+
+    /// <summary>Releases draw-adapter resources once; prepared mesh/program lifetime remains with the resource owner.</summary>
+    public void Dispose()
+    {
+        if (disposed) return;
+        disposed = true;
+        backend.Dispose();
     }
 
     /// <summary>Calculates a bottom-aligned fill using the slot's center and scaled size.</summary>

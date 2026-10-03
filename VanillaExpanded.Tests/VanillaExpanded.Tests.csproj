@@ -26,6 +26,27 @@
 
   <!-- VintageStory API references for testing -->
   <ItemGroup>
+    <!-- Indicator state-boundary tests use the same OpenTK types as the engine without creating a graphics context. -->
+    <Reference Include="SkiaSharp">
+      <HintPath>$(VINTAGE_STORY)/Lib/SkiaSharp.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="cairo-sharp">
+      <HintPath>$(VINTAGE_STORY)/Lib/cairo-sharp.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="OpenTK.Graphics">
+      <HintPath>$(VINTAGE_STORY)/Lib/OpenTK.Graphics.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="OpenTK.Core">
+      <HintPath>$(VINTAGE_STORY)/Lib/OpenTK.Core.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="OpenTK.Mathematics">
+      <HintPath>$(VINTAGE_STORY)/Lib/OpenTK.Mathematics.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
     <Reference Include="VintagestoryAPI">
       <HintPath>$(VINTAGE_STORY)/VintagestoryAPI.dll</HintPath>
       <Private>true</Private>

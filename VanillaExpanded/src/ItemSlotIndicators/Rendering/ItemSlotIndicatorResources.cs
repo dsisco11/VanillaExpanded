@@ -19,6 +19,7 @@ internal sealed class ItemSlotIndicatorResources : IDisposable
     private readonly Dictionary<string, ItemSlotIndicatorEffectDefinition> definitions = [];
     private readonly Dictionary<string, (IShaderProgram Program, MeshRef Mesh)> available = [];
     private readonly List<ItemSlotIndicatorEffectDefinition> pending = [];
+    private readonly HashSet<string> drawFailures = [];
     private bool initialized;
     private bool preparationQueued;
     private bool disposed;
@@ -58,6 +59,7 @@ internal sealed class ItemSlotIndicatorResources : IDisposable
         pending.Clear();
         available.Clear();
         definitions.Clear();
+        drawFailures.Clear();
         programs.Dispose();
         meshes.Dispose();
     }
@@ -95,6 +97,13 @@ internal sealed class ItemSlotIndicatorResources : IDisposable
         mesh = resource.Mesh;
         return true;
     }
+
+    /// <summary>Disables only the selected failed effect until reload, retaining shared resources and bounding diagnostics.</summary>
+    internal void FailDraw(ItemSlotIndicatorEffectDefinition definition, string reason)
+    {
+        available.Remove(definition.Id);
+        if (drawFailures.Add(definition.Id)) backend.ReportFailure(definition.Id, reason);
+    }
     #endregion
     #endregion
 
@@ -122,6 +131,7 @@ internal sealed class ItemSlotIndicatorResources : IDisposable
         EnsureGraphicsThread();
         if (disposed) return true;
         available.Clear();
+        drawFailures.Clear();
         programs.Dispose();
         meshes.ForgetFailures();
         rectangleFailureReported = false;
