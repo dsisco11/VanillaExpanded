@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 
 using HarmonyLib;
 
+using VanillaExpanded.ClothingIndicators;
 using VanillaExpanded.LiquidContainerIndicators;
 using VanillaExpanded.PerishableItemSlots;
 using VanillaExpanded.WateringCanIndicators;
@@ -29,6 +30,7 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
     public override void StartClientSide(ICoreClientAPI api)
     {
         Register(new FreshnessIndicatorProvider());
+        Register(new ClothingIndicatorProvider(), priority: -10);
         // Preserve freshness when applicable; otherwise show the container's liquid volume.
         Register(new LiquidContainerIndicatorProvider(), priority: -10);
         Register(new WateringCanIndicatorProvider(), priority: 10);
