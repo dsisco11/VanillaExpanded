@@ -14,11 +14,11 @@ internal static class RadialMenuWedgeStyle
     /// <summary>Maximum size multiplier applied to a hovered wedge and its icon.</summary>
     internal const float HoverScale = 1.135f;
     /// <summary>Background opacity of enabled entries; hovered enabled entries become fully opaque.</summary>
-    internal const float EnabledOpacity = 0.6f;
+    internal const float EnabledOpacity = 0.5f;
     /// <summary>Background opacity of disabled entries, making unavailable choices less prominent.</summary>
     internal const float DisabledOpacity = 0.4f;
     /// <summary>Opacity of the screen-darkening backdrop behind the modal menu; zero is transparent and one is opaque.</summary>
-    internal const float BackdropOpacity = 0.25f;
+    internal const float BackdropOpacity = 0.2f;
     /// <summary>Amplitude of the subtle procedural grain added to wedge background colors.</summary>
     internal const float DefaultGrainStrength = 0.035f;
     /// <summary>Space reserved around icons for their halo, the wedge border, and additional padding.</summary>
