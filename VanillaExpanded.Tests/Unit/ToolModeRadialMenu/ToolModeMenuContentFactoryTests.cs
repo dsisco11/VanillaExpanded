@@ -40,7 +40,7 @@ public sealed class ToolModeMenuContentFactoryTests
         Assert.Equal("current", content.Layout.CenterId);
         Assert.Equal(new[] { "current" }, content.Layout.InnerMenu!.EntryIds);
         Assert.True(content.Layout.InnerMenu.IsSingleOption);
-        Assert.Equal(0.77, content.Layout.RadiusScale);
+        Assert.Equal(0.70, content.Layout.RadiusScale);
         Assert.Collection(content.Entries,
             first =>
             {

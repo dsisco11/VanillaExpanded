@@ -9,7 +9,7 @@ namespace VanillaExpanded.RadialMenu;
 internal sealed class RadialMenuDialog : GuiDialog
 {
     #region State
-    private const float ScreenRadiusFraction = 0.252f;
+    private const float ScreenRadiusFraction = 0.25f;
     private const float HoverSoundVolume = 0.7f;
     private readonly RadialMenuRenderer renderer;
     private RadialMenuLayout? layout;
