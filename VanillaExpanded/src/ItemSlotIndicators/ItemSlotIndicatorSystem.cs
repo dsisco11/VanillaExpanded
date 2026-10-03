@@ -4,6 +4,7 @@ using HarmonyLib;
 
 using VanillaExpanded.ClothingIndicators;
 using VanillaExpanded.LiquidContainerIndicators;
+using VanillaExpanded.NightVisionIndicators;
 using VanillaExpanded.PerishableItemSlots;
 using VanillaExpanded.WateringCanIndicators;
 
@@ -34,6 +35,7 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
         // Preserve freshness when applicable; otherwise show the container's liquid volume.
         Register(new LiquidContainerIndicatorProvider(), priority: -10);
         Register(new WateringCanIndicatorProvider(), priority: 10);
+        Register(new NightVisionFuelIndicatorProvider(), priority: 10);
         ItemSlotIndicatorRenderer.InitializeTexture(api);
         Active = this;
         harmony = new Harmony(Constants.ModId + ".itemslotindicators");
