@@ -18,7 +18,7 @@ internal static class RadialMenuWedgeStyle
     /// <summary>Background opacity of disabled entries, making unavailable choices less prominent.</summary>
     internal const float DisabledOpacity = 0.4f;
     /// <summary>Opacity of the screen-darkening backdrop behind the modal menu; zero is transparent and one is opaque.</summary>
-    internal const float BackdropOpacity = 0.60f;
+    internal const float BackdropOpacity = 0.25f;
     /// <summary>Amplitude of the subtle procedural grain added to wedge background colors.</summary>
     internal const float DefaultGrainStrength = 0.035f;
     /// <summary>Space reserved around icons for their halo, the wedge border, and additional padding.</summary>
