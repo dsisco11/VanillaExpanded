@@ -20,6 +20,10 @@ internal readonly struct IndicatorColorPallette
     internal static readonly Vector4 DarkBlue = new(0.01f, 0.035f, 0.12f, 1);
     /// <summary>Shared light blue for full water resources.</summary>
     internal static readonly Vector4 LightBlue = new(0.14f, 0.48f, 0.88f, 1);
+    /// <summary>Muted slate for preparation that has just begun.</summary>
+    internal static readonly Vector4 Slate = new(0.26f, 0.32f, 0.40f, 1);
+    /// <summary>Bright teal for preparation approaching completion.</summary>
+    internal static readonly Vector4 Teal = new(0.12f, 0.72f, 0.60f, 1);
     #endregion
 
     #region Gradient Definitions
@@ -27,6 +31,8 @@ internal readonly struct IndicatorColorPallette
     internal static readonly ImmutableArray<Vector4> FreshnessColors = [Red, Orange, Yellow, Green];
     /// <summary>Water colors ordered from nearly empty to full.</summary>
     internal static readonly ImmutableArray<Vector4> WaterColors = [DarkBlue, LightBlue];
+    /// <summary>Preparation colors ordered from newly started to ready.</summary>
+    internal static readonly ImmutableArray<Vector4> PreparationColors = [Slate, Teal];
     #endregion
 
     #region Public API

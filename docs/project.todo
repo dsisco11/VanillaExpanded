@@ -15,7 +15,7 @@
         ✔ Add liquid-container fill indicators using current litres relative to capacity; existing freshness indicators take priority, empty containers show zero fill. Focused tests and independent review passed; in-game appearance remains unverified. @done(26-10-02)
         ✔ Add clothing condition indicators using actual condition fill and green at the 50% full-warmth threshold; zero condition shows a red warning, armor and uninitialized condition are skipped. Focused tests and independent review passed; in-game appearance remains unverified. @done(26-10-03)
         ✔ Add night-vision device fuel indicators using remaining fuel hours relative to each device's capacity via cached Harmony field access; empty fuel shows a red warning. Focused tests and independent review passed; in-game appearance remains unverified. @done(26-10-03)
-        ☐ Add drying/curing progress indicators for bowstaves and hides using their transition state; fill toward completion and account for inventory transition rates.
+        ✔ Add drying/curing progress indicators for bowstaves, hides, and other Dry/Cure transitions; fill toward completion with a slate-to-teal palette using the game's inventory-aware transition progress. Focused tests and independent review passed; in-game appearance remains unverified. @done(26-10-03)
         ☐ Targeted items such as tools on toolracks have a subtle highlight to indicate that they are targeted.
         ☐ New "crafting menu" similar to minecraft: shows all craftable items with current inventory, allows searching. (Maybe this can just be added to the handbook?)
 

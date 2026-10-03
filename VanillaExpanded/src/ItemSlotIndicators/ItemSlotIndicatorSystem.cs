@@ -6,6 +6,7 @@ using VanillaExpanded.ClothingIndicators;
 using VanillaExpanded.LiquidContainerIndicators;
 using VanillaExpanded.NightVisionIndicators;
 using VanillaExpanded.PerishableItemSlots;
+using VanillaExpanded.PreparationIndicators;
 using VanillaExpanded.WateringCanIndicators;
 
 using Vintagestory.API.Client;
@@ -31,6 +32,7 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
     public override void StartClientSide(ICoreClientAPI api)
     {
         Register(new FreshnessIndicatorProvider());
+        Register(new PreparationIndicatorProvider(), priority: -10);
         Register(new ClothingIndicatorProvider(), priority: -10);
         // Preserve freshness when applicable; otherwise show the container's liquid volume.
         Register(new LiquidContainerIndicatorProvider(), priority: -10);
