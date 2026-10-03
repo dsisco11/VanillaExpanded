@@ -14,6 +14,7 @@ internal sealed class PreparationIndicatorProvider : IItemSlotIndicatorProvider
     public bool TryGetIndicator(ItemSlot slot, out ItemSlotIndicator indicator)
     {
         indicator = default;
+        if (!VanillaExpandedModSystem.Config.EnablePreparationIndicators) return false;
         ItemStack? stack = slot.Itemstack;
         ICoreAPI? api = slot.Inventory?.Api;
         if (stack is null || api is null) return false;

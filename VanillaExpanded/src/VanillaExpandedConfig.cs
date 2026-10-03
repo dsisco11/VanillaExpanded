@@ -54,6 +54,18 @@ public class VanillaExpandedConfig
     /// <summary>Shows freshness as a colored background overlay on perishable item slots.</summary>
     public bool EnablePerishableItemFreshnessIndicators { get; set; } = true;
 
+    /// <summary>Shows preparation progress indicators on item slots.</summary>
+    public bool EnablePreparationIndicators { get; set; } = true;
+
+    /// <summary>Shows clothing condition indicators on item slots.</summary>
+    public bool EnableClothingIndicators { get; set; } = true;
+
+    /// <summary>Shows liquid volume indicators on container and watering-can item slots.</summary>
+    public bool EnableLiquidContainerIndicators { get; set; } = true;
+
+    /// <summary>Shows night-vision fuel indicators on item slots.</summary>
+    public bool EnableNightVisionFuelIndicators { get; set; } = true;
+
     #endregion
 
     #region Recipe Toggles

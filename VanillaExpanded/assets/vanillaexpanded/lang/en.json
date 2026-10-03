@@ -88,5 +88,13 @@
   "config-enable-wattle-decraft": "Wattle Decrafting",
   "config-enable-wattle-decraft-tooltip": "Enable decrafting wattle blocks into sticks.",
 
-  "config-section-visual": "Visual Settings"
+  "config-section-visual": "Visual Settings",
+  "config-enable-preparation-indicators": "Show preparation progress indicators",
+  "config-enable-preparation-indicators-tooltip": "Show preparation progress overlays on item slots. Changes take effect immediately.",
+  "config-enable-clothing-indicators": "Show clothing condition indicators",
+  "config-enable-clothing-indicators-tooltip": "Show clothing condition overlays on item slots. Changes take effect immediately.",
+  "config-enable-liquid-container-indicators": "Show liquid container volume indicators",
+  "config-enable-liquid-container-indicators-tooltip": "Show liquid volume overlays on liquid containers and watering cans. Changes take effect immediately.",
+  "config-enable-night-vision-fuel-indicators": "Show night-vision fuel indicators",
+  "config-enable-night-vision-fuel-indicators-tooltip": "Show night-vision fuel overlays on item slots. Changes take effect immediately."
 }

@@ -21,6 +21,7 @@ internal sealed class NightVisionFuelIndicatorProvider : IItemSlotIndicatorProvi
     public bool TryGetIndicator(ItemSlot slot, out ItemSlotIndicator indicator)
     {
         indicator = default;
+        if (!VanillaExpandedModSystem.Config.EnableNightVisionFuelIndicators) return false;
         if (slot.Itemstack is not { Collectible: ItemNightvisiondevice device } stack) return false;
 
         float capacity = Capacity(device);

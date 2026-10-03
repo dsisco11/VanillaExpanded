@@ -20,6 +20,7 @@ internal sealed class WateringCanIndicatorProvider : IItemSlotIndicatorProvider
     public bool TryGetIndicator(ItemSlot slot, out ItemSlotIndicator indicator)
     {
         indicator = default;
+        if (!VanillaExpandedModSystem.Config.EnableLiquidContainerIndicators) return false;
         ItemStack? stack = slot.Itemstack;
         if (stack?.Collectible is not BlockWateringCan can
             || !float.IsFinite(can.CapacitySeconds) || can.CapacitySeconds <= 0)

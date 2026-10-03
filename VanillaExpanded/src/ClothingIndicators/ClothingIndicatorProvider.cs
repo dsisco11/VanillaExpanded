@@ -15,6 +15,7 @@ internal sealed class ClothingIndicatorProvider : IItemSlotIndicatorProvider
     public bool TryGetIndicator(ItemSlot slot, out ItemSlotIndicator indicator)
     {
         indicator = default;
+        if (!VanillaExpandedModSystem.Config.EnableClothingIndicators) return false;
         ItemStack? stack = slot.Itemstack;
         CollectibleBehaviorWearable? wearable = stack?.Collectible.GetCollectibleBehavior<CollectibleBehaviorWearable>(withInheritance: true);
         if (wearable is null || wearable.IsArmorType(slot)

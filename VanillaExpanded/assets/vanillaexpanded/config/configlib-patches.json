@@ -84,6 +84,42 @@
         "weight": 1.71,
         "clientSide": true
       },
+      "EnablePreparationIndicators": {
+        "code": "EnablePreparationIndicators",
+        "name": "EnablePreparationIndicators",
+        "ingui": "vanillaexpanded:config-enable-preparation-indicators",
+        "comment": "vanillaexpanded:config-enable-preparation-indicators-tooltip",
+        "default": true,
+        "weight": 1.72,
+        "clientSide": true
+      },
+      "EnableClothingIndicators": {
+        "code": "EnableClothingIndicators",
+        "name": "EnableClothingIndicators",
+        "ingui": "vanillaexpanded:config-enable-clothing-indicators",
+        "comment": "vanillaexpanded:config-enable-clothing-indicators-tooltip",
+        "default": true,
+        "weight": 1.73,
+        "clientSide": true
+      },
+      "EnableLiquidContainerIndicators": {
+        "code": "EnableLiquidContainerIndicators",
+        "name": "EnableLiquidContainerIndicators",
+        "ingui": "vanillaexpanded:config-enable-liquid-container-indicators",
+        "comment": "vanillaexpanded:config-enable-liquid-container-indicators-tooltip",
+        "default": true,
+        "weight": 1.74,
+        "clientSide": true
+      },
+      "EnableNightVisionFuelIndicators": {
+        "code": "EnableNightVisionFuelIndicators",
+        "name": "EnableNightVisionFuelIndicators",
+        "ingui": "vanillaexpanded:config-enable-night-vision-fuel-indicators",
+        "comment": "vanillaexpanded:config-enable-night-vision-fuel-indicators-tooltip",
+        "default": true,
+        "weight": 1.76,
+        "clientSide": true
+      },
       "EnableBackpackDecraft": {
         "code": "EnableBackpackDecraft",
         "name": "EnableBackpackDecraft",

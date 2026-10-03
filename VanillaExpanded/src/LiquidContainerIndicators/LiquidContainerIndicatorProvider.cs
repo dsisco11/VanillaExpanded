@@ -15,6 +15,7 @@ internal sealed class LiquidContainerIndicatorProvider : IItemSlotIndicatorProvi
     public bool TryGetIndicator(ItemSlot slot, out ItemSlotIndicator indicator)
     {
         indicator = default;
+        if (!VanillaExpandedModSystem.Config.EnableLiquidContainerIndicators) return false;
         if (slot.Itemstack is not { Collectible: BlockLiquidContainerBase container } stack)
         {
             return false;

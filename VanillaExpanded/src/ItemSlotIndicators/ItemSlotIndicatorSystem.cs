@@ -38,13 +38,18 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
         Register(new FreshnessIndicatorProvider(),
             contextKey: static () => (VanillaExpandedModSystem.Config.EnablePerishableItemFreshnessIndicators,
                 VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity));
-        Register(new PreparationIndicatorProvider(), priority: -10);
-        Register(new ClothingIndicatorProvider(), priority: -10);
+        Register(new PreparationIndicatorProvider(), priority: -10,
+            contextKey: static () => VanillaExpandedModSystem.Config.EnablePreparationIndicators);
+        Register(new ClothingIndicatorProvider(), priority: -10,
+            contextKey: static () => VanillaExpandedModSystem.Config.EnableClothingIndicators);
         // Preserve freshness when applicable; otherwise show the container's liquid volume.
         var adaptiveSampling = new AdaptiveSamplingOptions();
-        Register(new LiquidContainerIndicatorProvider(), priority: -10, adaptiveSampling: adaptiveSampling);
-        Register(new WateringCanIndicatorProvider(), priority: 10, adaptiveSampling: adaptiveSampling);
-        Register(new NightVisionFuelIndicatorProvider(), priority: 10, adaptiveSampling: adaptiveSampling);
+        Register(new LiquidContainerIndicatorProvider(), priority: -10, adaptiveSampling: adaptiveSampling,
+            contextKey: static () => VanillaExpandedModSystem.Config.EnableLiquidContainerIndicators);
+        Register(new WateringCanIndicatorProvider(), priority: 10, adaptiveSampling: adaptiveSampling,
+            contextKey: static () => VanillaExpandedModSystem.Config.EnableLiquidContainerIndicators);
+        Register(new NightVisionFuelIndicatorProvider(), priority: 10, adaptiveSampling: adaptiveSampling,
+            contextKey: static () => VanillaExpandedModSystem.Config.EnableNightVisionFuelIndicators);
         ItemSlotIndicatorRenderer.InitializeTexture(api);
         Active = this;
         harmony = new Harmony(Constants.ModId + ".itemslotindicators");
