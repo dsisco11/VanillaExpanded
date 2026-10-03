@@ -12,7 +12,7 @@
 
     ## Functionality:
         ✔ Perishable items in inventory/hotbar render a vertical decay bar as their item slot background, indicating remaining freshness. @done(26-09-29)
-        ☐ Add liquid-container fill indicators using current litres relative to capacity; define priority relative to freshness for perishable contents.
+        ✔ Add liquid-container fill indicators using current litres relative to capacity; existing freshness indicators take priority, empty containers show zero fill. Focused tests and independent review passed; in-game appearance remains unverified. @done(26-10-02)
         ☐ Add clothing condition indicators using the item's condition value; reflect the 50% condition threshold for maximum warmth and handle uninitialized condition without inventing a value.
         ☐ Add night-vision device fuel indicators using remaining fuel hours relative to capacity; establish access to the device's capacity rather than duplicating its constant.
         ☐ Add drying/curing progress indicators for bowstaves and hides using their transition state; fill toward completion and account for inventory transition rates.
