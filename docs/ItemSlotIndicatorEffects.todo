@@ -1,0 +1,131 @@
+# Item-slot indicator effects
+
+Source proposal: the 2026-10-03 conversation proposing optional provider-registered effects, reusable deformable geometry, renderer-owned shader resources, and shared frame inputs.
+Status: planning only; implementation and runtime validation are outstanding.
+
+## Goal and scope
+
+Allow an indicator provider registration to attach an optional rendering effect while preserving provider selection and cached fill/color sampling. Animate actual mesh silhouettes using reusable geometry and vertex shaders by default. Keep ItemSlotIndicatorSystem responsible for composition and selection, with rendering resource and animation responsibilities in separate owners.
+
+Existing registrations retain their rectangular presentation. One minimal deformation effect verifies the extension boundary; selecting production themes for water, freshness, clothing, or other items is separate work.
+
+Out of scope: arbitrary geometry-stage support, generated geometry per frame, per-item CPU simulation, effect stacking, public third-party extension compatibility, and redesigning provider priority or refresh policies. Do not introduce batching that changes GUI draw order. GPU execution alone is not a performance guarantee.
+
+## Assumptions and implementation questions
+
+- The effect attaches to the winning registration; the provider initially continues returning ItemSlotIndicator(Fill, Color). Per-item effect selection and dynamic provider-specific parameter payloads are deferred.
+- Effect definitions describe immutable assets, geometry requirements, parameters, and motion requirements; they never own live GPU objects.
+- The exact client frame callback, camera source, GUI transform, shader reload behavior, and state-restoration boundary require source verification before implementation.
+- Establish bounded subdivision counts, shader input layout, motion units, and performance acceptance criteria before implementing their consumers. These values are not established by this plan.
+- Live appearance and GPU timing require user-run acceptance. Headless tests cannot establish either; do not launch the game for visual acceptance.
+
+## Phase 1: Establish rendering and compatibility contracts
+
+Outcome: implementation has verified engine integration points and an explicit effect contract.
+
+    ☐ Inspect ItemSlotIndicatorSystem, ItemSlotIndicatorRegistration, ItemSlotIndicatorRenderer, ItemSlotIndicatorPatch, existing providers, and their selection/scheduling tests.
+    ☐ Verify the installed engine path used by the item-slot GUI hook, including GUI matrices, slot scaling, depth, blending, clipping, active shader, and item draw ordering.
+    ☐ Identify a once-per-frame update boundary and authoritative camera orientation source; verify how repeated slot draws and multiple GUI surfaces share one frame snapshot.
+    ☐ Verify engine shader registration, compilation, reload invalidation, and disposal behavior before defining resource replacement ownership.
+    ☐ Define the common mesh/shader contract: normalized horizontal coordinate, bottom/surface edge identity, slot bounds, GUI transform, clamped fill, straight-alpha input color, time, motion, and immutable effect parameters.
+    ☐ Define output constraints: slot containment, bottom anchoring, premultiplied output, zero-fill invisibility, full-fill coverage, and behavior near fill limits. Deformation must not turn empty/full values into misleading resource levels.
+    ☐ Define finite-value handling, bounded subdivision counts, supported topology, parameter validation, and effect ID collision behavior.
+    ☐ Establish a matched performance comparison workload and acceptance criteria, including visible slot counts, GUI scale, effect mix, CPU submission time, and GPU time.
+
+Completion criteria:
+    ☐ Integration points and unresolved engine assumptions are recorded in this plan or the owning API documentation, with source references.
+    ☐ Input/output and lifetime contracts are precise enough to implement without choosing production visual themes.
+
+## Phase 2: Attach effects to provider selection
+
+Depends on Phase 1.
+Outcome: selection carries an optional effect without changing provider behavior.
+
+    ☐ Add an immutable ItemSlotIndicatorEffectDefinition with stable ID, shader asset references, supported geometry description, bounded subdivision count, parameters, and motion-input requirement.
+    ☐ Extend registration with an optional effect definition; existing registration calls remain valid and default to the plain rectangle.
+    ☐ Introduce a render-selection value containing the sampled ItemSlotIndicator and the winning registration's effect definition.
+    ☐ Keep IItemSlotIndicatorProvider.TryGetIndicator and its fill/color result unchanged; adapt selection consumers and tests deliberately without adding redundant forwarding APIs.
+    ☐ Preserve descending priority, stable equal-priority ordering, absent-provider skipping, and zero-fill results as successful selections.
+    ☐ Preserve weak sample ownership, context invalidation, refresh intervals, and adaptive sampling. Time and camera changes must not invalidate provider samples.
+    ☐ Verify effect attachment belongs to the selected registration even when the indicator result comes from cache; verify default registrations retain ordinary rendering selection.
+
+Completion criteria:
+    ☐ Focused selection and scheduling checks pass, including cached effect selection and zero-fill priority behavior.
+    ☐ No provider owns shaders, meshes, rendering calls, or animation updates.
+
+## Phase 3: Own reusable rendering resources
+
+Depends on Phases 1–2.
+Outcome: valid effect definitions resolve to shared, lifecycle-managed GPU resources.
+
+    ☐ Add focused owners under ItemSlotIndicators/Rendering for effect programs and reusable meshes; retain one clearly named responsibility per file.
+    ☐ Implement reusable quad and subdivided fill-strip geometry. Each strip sample has bottom and surface vertices using the established input contract.
+    ☐ Cache meshes by geometry requirements and programs by effect identity; allow multiple provider registrations to share resources without duplicate compilation or uploads.
+    ☐ Validate incompatible reuse of an effect ID deterministically; distinguish invalid registration data from runtime shader failure.
+    ☐ Register and compile shader assets through the engine-owned shader API on the graphics thread. Prepare resources at initialization/registration or explicit reload boundaries, never in recurring slot draws.
+    ☐ Handle reload by rebuilding resources under the verified engine ownership rules. Do not retain invalid program handles or assume engine reload preserves old programs.
+    ☐ Isolate failures per effect, log once per load attempt, dispose partial resources, and retry only at an explicit load/reload boundary.
+    ☐ Make disposal release each owned resource once and unsubscribe reload callbacks; support partial initialization and repeated cleanup safely.
+    ☐ Verify shared-resource identity, failure isolation, and lifecycle behavior with focused checks; reserve actual compilation/link validation for a graphics context.
+
+Completion criteria:
+    ☐ Resource ownership is explicit and recurring draws require no compilation, mesh generation, or mesh uploads.
+    ☐ A failing effect does not invalidate unrelated effects or the existing rectangle resources.
+
+## Phase 4: Supply shared frame inputs
+
+Depends on Phases 1–2; may be developed independently of Phase 3.
+Outcome: all indicator draws in a frame consume consistent animation inputs.
+
+    ☐ Add ItemSlotIndicatorFrameState as the owner of animation timing and shared damped camera-motion state.
+    ☐ Update at the verified frame boundary, never once per slot query or draw; expose a read-only snapshot for render consumers.
+    ☐ Define motion axes, units, normalization, damping, and amplitude bounds; effects interpret the shared signal without introducing per-item CPU simulations.
+    ☐ Handle angle wrapping, invalid input, first sample, frame-rate variation, long gaps, unavailable camera, and world/camera replacement without impulses or accumulated catch-up.
+    ☐ Define animation clock precision and pause/resume behavior; avoid precision loss or discontinuities from unbounded float time.
+    ☐ Avoid camera-dependent work when no registered effect needs it, while ensuring reactivation starts from a fresh baseline.
+    ☐ Verify deterministic motion response and reset behavior with controlled inputs; verify repeated draws consume the same snapshot without advancing it.
+
+Completion criteria:
+    ☐ Animation input production is independent of provider sampling and visible slot count.
+    ☐ Missing camera input produces a defined neutral motion signal while time-only animation remains usable.
+
+## Phase 5: Integrate effect rendering and rectangle fallback
+
+Depends on Phases 2–4.
+Outcome: an opted-in indicator can animate its silhouette behind the normal item draw.
+
+    ☐ Extend the renderer to resolve the selected effect, bind shared geometry/programs, and submit the common inputs plus immutable effect parameters.
+    ☐ Retain the ordinary rectangle path for registrations without effects and for unavailable/failed effects, using the same selected provider's fill and color.
+    ☐ Never choose another provider or hide a valid indicator because its effect failed.
+    ☐ Keep ItemSlotIndicatorPatch thin: select, render, then forward every original item-render argument unchanged.
+    ☐ Preserve the current intended GUI layering, clipping, scale, and bottom alignment. Restore every modified surrounding render state, including active shader and depth-write/blend state, on success and exceptional exits.
+    ☐ Apply the established fill/containment contract to effect geometry; avoid transparent fragments writing depth or changing neighboring slot appearance.
+    ☐ Add one minimal deformation shader and an explicit development/test opt-in path to prove the boundary, without assigning production themes to existing providers.
+    ☐ Verify the shader deforms surface vertices while retaining the bottom boundary; keep fragment shading simple and premultiply output exactly once.
+    ☐ Define ownership/removal of any temporary diagnostic registration or instrumentation before shipping; retain reusable validation assets only with a clear purpose.
+
+Completion criteria:
+    ☐ Default and failure paths retain ordinary indicators and normal item rendering.
+    ☐ The demonstration animates from frame inputs while cached provider data remains unchanged.
+    ☐ No new per-frame mesh upload, shader compilation, or per-slot motion simulation occurs.
+
+## Phase 6: Validate, review, and document
+
+Depends on Phase 5.
+Outcome: implementation evidence and its limits are explicit.
+
+    ☐ Run builds and tests through subagents, as required by repository instructions; run focused indicator/provider regressions and relevant rendering-contract checks.
+    ☐ Verify shader assets are included in the distributable and compile/link in the supported engine graphics context; distinguish package inspection from runtime shader validation.
+    ☐ Obtain user-run appearance checks for inventory/hotbar placement, GUI scaling, scrolling/clipping, item overlays, empty/full/near-limit fill, camera movement, long gaps, and camera/world changes.
+    ☐ Exercise failed effect loading, repeated shader reload, and shutdown; verify fallback, state restoration, bounded diagnostics, and resource cleanup in the graphics context.
+    ☐ Measure matched rectangle/effect workloads at the agreed slot counts and GUI scales. Report CPU and GPU measurements separately, including shader switches and mesh-upload counts; do not claim GPU speedups from headless tests.
+    ☐ Resolve regressions or explicitly record unmet acceptance criteria; optimize based on measurements without changing GUI draw order.
+    ☐ Document provider registration, geometry/shader contracts, frame inputs, resource ownership, failure behavior, and how to add an effect.
+    ☐ Ensure new classes/methods have language-appropriate documentation, nontrivial logic comments, and visibility-first method regions. Keep project staging terminology confined to planning documents.
+    ☐ Perform a second implementation review and independent audit against this task list before marking completion; reconcile suspected issues against the full contract.
+
+Final acceptance:
+    ☐ Optional registration effects, shared geometry/programs, vertex deformation, shared frame inputs, fallback, and lifetime handling are implemented and verified.
+    ☐ Existing provider selection, sampling, and unthemed rendering remain compatible.
+    ☐ Required runtime evidence and matched performance results meet the established criteria; outstanding user-run checks remain explicitly unchecked.
+    ☐ Production effect themes and geometry-stage support remain deferred rather than implicitly claimed as delivered.
