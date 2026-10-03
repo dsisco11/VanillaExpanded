@@ -6,11 +6,14 @@ namespace VanillaExpanded.RadialMenu;
 /// <summary>Defines one circular entry arrangement and its shared pointer hit test.</summary>
 public sealed class RadialMenuLayout
 {
+    private readonly double radiusScale;
+    private readonly Func<float>? sizeMultiplier;
+
     #region Public API
-    /// <summary>Creates one concentric menu ring with an optional menu occupying its center.</summary>
+    /// <summary>Creates one concentric menu ring with an optional inner menu and live size multiplier bounded to 0.15–2.5.</summary>
     public RadialMenuLayout(IReadOnlyList<string> entryIds, double innerRadius, double outerRadius,
         RadialMenuLayout? innerMenu = null, double startAngleDegrees = 0, bool clockwise = true,
-        double separatorDegrees = 0.3, double radiusScale = 1, bool renderAsCenter = false)
+        double separatorDegrees = 0.3, double radiusScale = 1, bool renderAsCenter = false, Func<float>? sizeMultiplier = null)
     {
         ArgumentNullException.ThrowIfNull(entryIds);
         bool singleOptionLeaf = entryIds.Count == 1 && innerMenu is null;
@@ -39,7 +42,8 @@ public sealed class RadialMenuLayout
         StartAngleDegrees = startAngleDegrees;
         Clockwise = clockwise;
         SeparatorDegrees = separatorDegrees;
-        RadiusScale = radiusScale;
+        this.radiusScale = radiusScale;
+        this.sizeMultiplier = sizeMultiplier;
         RenderAsCenter = centerMenu;
         WedgeIds = EntryIds;
         CenterId = InnerMenu?.IsSingleOption == true ? InnerMenu.EntryIds[0] : IsSingleOption ? EntryIds[0] : string.Empty;
@@ -95,8 +99,16 @@ public sealed class RadialMenuLayout
     public bool Clockwise { get; }
     /// <summary>Gets the angular half-gap at each wedge boundary.</summary>
     public double SeparatorDegrees { get; }
-    /// <summary>Gets this caller's scale relative to the shared screen-space menu radius.</summary>
-    public double RadiusScale { get; }
+    /// <summary>Gets this caller's scale relative to the shared screen-space menu radius, including its current size multiplier.</summary>
+    public double RadiusScale
+    {
+        get
+        {
+            // Read live settings for both rendering and hit testing, with safe bounds for hand-edited configuration.
+            float multiplier = sizeMultiplier?.Invoke() ?? 1f;
+            return radiusScale * (float.IsFinite(multiplier) ? Math.Clamp(multiplier, 0.15f, 2.5f) : 1f);
+        }
+    }
     /// <summary>Gets the angular width of one wedge in degrees.</summary>
     public double StepDegrees => IsSingleOption ? 360 : 360d / EntryIds.Count;
 

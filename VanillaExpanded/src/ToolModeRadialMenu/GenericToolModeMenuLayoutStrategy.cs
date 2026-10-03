@@ -13,7 +13,8 @@ internal sealed class GenericToolModeMenuLayoutStrategy : IToolModeMenuLayoutStr
     public bool TryCreate(in ToolModeMenuLayoutContext context, out RadialMenuLayout? layout)
     {
         layout = new RadialMenuLayout(context.ModeIds, 0.27, 1, context.CurrentMenu,
-            separatorDegrees: 1.0, radiusScale: 0.70);
+            separatorDegrees: 1.0, radiusScale: 0.70,
+            sizeMultiplier: static () => VanillaExpandedModSystem.Config.ToolModeMenuSize);
         return true;
     }
 }
