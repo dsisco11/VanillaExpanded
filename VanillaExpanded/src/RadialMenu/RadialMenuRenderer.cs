@@ -119,7 +119,7 @@ internal sealed class RadialMenuRenderer : IDisposable
             var guiShader = capi.Render.GetEngineShader(EnumShaderProgram.Gui);
             guiShader.Use();
             capi.Render.Render2DTexture(dimTexture.TextureId, 0, 0, capi.Render.FrameWidth, capi.Render.FrameHeight,
-                35, new Vec4f(0.025f, 0.02f, 0.015f, 0.70f));
+                35, new Vec4f(0.025f, 0.02f, 0.015f, RadialMenuWedgeStyle.BackdropOpacity));
             guiShader.Stop();
             shader.Use();
             try
