@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using HarmonyLib;
 
 using VanillaExpanded.ClothingIndicators;
+using VanillaExpanded.ItemSlotIndicators.Animation;
 using VanillaExpanded.ItemSlotIndicators.Effects;
 using VanillaExpanded.ItemSlotIndicators.Rendering;
 using VanillaExpanded.LiquidContainerIndicators;
@@ -22,6 +23,13 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
 {
     private ImmutableArray<ItemSlotIndicatorRegistration> providers = [];
     private Harmony? harmony;
+    private ItemSlotIndicatorFrameUpdater? frameUpdater;
+
+    /// <summary>Gets shared frame inputs without advancing animation or provider sampling.</summary>
+    internal ItemSlotIndicatorFrameSnapshot FrameSnapshot => frameUpdater?.State.Snapshot ?? default;
+
+    /// <summary>Gets whether registered effects require authoritative camera input.</summary>
+    internal bool NeedsCameraMotion { get; private set; }
 
     /// <summary>Gets the client-owned prepared resources without performing graphics work during selection.</summary>
     internal ItemSlotIndicatorResources? Resources { get; private set; }
@@ -60,6 +68,7 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
             contextKey: static () => VanillaExpandedModSystem.Config.EnableNightVisionFuelIndicators);
         ItemSlotIndicatorRenderer.InitializeTexture(api);
         Resources.Initialize();
+        frameUpdater = new ItemSlotIndicatorFrameUpdater(api.Event, new ItemSlotIndicatorCameraSource(api), () => NeedsCameraMotion);
         Active = this;
         harmony = new Harmony(Constants.ModId + ".itemslotindicators");
         new PatchClassProcessor(harmony, typeof(ItemSlotIndicatorPatch)).Patch();
@@ -70,6 +79,8 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
     {
         harmony?.UnpatchAll(harmony.Id);
         harmony = null;
+        frameUpdater?.Dispose();
+        frameUpdater = null;
         Resources?.Dispose();
         Resources = null;
         Clear();
@@ -105,6 +116,7 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
         int index = 0;
         while (index < providers.Length && providers[index].Priority >= priority) index++;
         providers = providers.Insert(index, registration);
+        NeedsCameraMotion |= effect?.NeedsCameraMotion == true;
     }
 
     /// <summary>Returns the first applicable provider's presentation and registered effect, including zero fill.</summary>
@@ -124,7 +136,11 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
     }
 
     /// <summary>Releases registrations and all system-owned provider samples.</summary>
-    internal void Clear() => providers = [];
+    internal void Clear()
+    {
+        providers = [];
+        NeedsCameraMotion = false;
+    }
     #endregion
     #endregion
 }

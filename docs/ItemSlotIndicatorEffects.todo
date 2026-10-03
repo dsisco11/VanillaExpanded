@@ -1,7 +1,7 @@
 # Item-slot indicator effects
 
 Source proposal: the 2026-10-03 conversation proposing optional provider-registered effects, reusable deformable geometry, renderer-owned shader resources, and shared frame inputs.
-Status: Phases 1–3 complete after their required verification, second review, and independent completion audits. Shared resource ownership is implemented; animation, effect rendering, and runtime validation remain outstanding.
+Status: Phases 1–4 complete after their required verification, second review, and independent completion audits. Shared resources and animation inputs are implemented; effect rendering and runtime validation remain outstanding.
 
 ## Goal and scope
 
@@ -151,17 +151,21 @@ Verification: fresh Release compilation succeeded and all 134 Unit.ItemSlotIndic
 Depends on Phases 1–2; may be developed independently of Phase 3.
 Outcome: all indicator draws in a frame consume consistent animation inputs.
 
-    ☐ Add ItemSlotIndicatorFrameState as the owner of animation timing and shared damped camera-motion state.
-    ☐ Update at the verified frame boundary, never once per slot query or draw; expose a read-only snapshot for render consumers.
-    ☐ Define motion axes, units, normalization, damping, and amplitude bounds; effects interpret the shared signal without introducing per-item CPU simulations.
-    ☐ Handle angle wrapping, invalid input, first sample, frame-rate variation, long gaps, unavailable camera, and world/camera replacement without impulses or accumulated catch-up.
-    ☐ Define animation clock precision and pause/resume behavior; avoid precision loss or discontinuities from unbounded float time.
-    ☐ Avoid camera-dependent work when no registered effect needs it, while ensuring reactivation starts from a fresh baseline.
-    ☐ Verify deterministic motion response and reset behavior with controlled inputs; verify repeated draws consume the same snapshot without advancing it.
+    ✔ Add ItemSlotIndicatorFrameState as the owner of animation timing and shared damped camera-motion state.
+    ✔ Update at the verified frame boundary, never once per slot query or draw; expose a read-only snapshot for render consumers.
+    ✔ Define motion axes, units, normalization, damping, and amplitude bounds; effects interpret the shared signal without introducing per-item CPU simulations.
+    ✔ Handle angle wrapping, invalid input, first sample, frame-rate variation, long gaps, unavailable camera, and world/camera replacement without impulses or accumulated catch-up.
+    ✔ Define animation clock precision and pause/resume behavior; avoid precision loss or discontinuities from unbounded float time.
+    ✔ Avoid camera-dependent work when no registered effect needs it, while ensuring reactivation starts from a fresh baseline.
+    ✔ Verify deterministic motion response and reset behavior with controlled inputs; verify repeated draws consume the same snapshot without advancing it.
 
 Completion criteria:
-    ☐ Animation input production is independent of provider sampling and visible slot count.
-    ☐ Missing camera input produces a defined neutral motion signal while time-only animation remains usable.
+    ✔ Animation input production is independent of provider sampling and visible slot count.
+    ✔ Missing camera input produces a defined neutral motion signal while time-only animation remains usable.
+
+Implementation and traceability (2026-10-03): frame tasks -> the Shared frame snapshot and camera source contract above, ../../vsapi/Client/API/{IRenderer,IClientEventAPI,IRenderAPI}.cs, ../../vsapi/Math/Matrix/Mat4d.cs (LookAt), and the hash-matched installed Camera.Update / PlayerCamera constructor / GuiManager.OnServerIdentificationReceived / ClientEventManager.TriggerRenderStage methods -> one Ortho update at order 0.99, copied view-matrix rows, authoritative context/mode resets, monotonic periodic time, shortest-arc local rotation rates, bounded normalization, and exponential damping -> ../VanillaExpanded/src/ItemSlotIndicators/Animation/{ItemSlotIndicatorFrameState,ItemSlotIndicatorFrameSnapshot,ItemSlotIndicatorFrameUpdater,ItemSlotIndicatorCameraBasis,ItemSlotIndicatorCameraSample,ItemSlotIndicatorCameraSource,IItemSlotIndicatorCameraSource}.cs. ItemSlotIndicatorSystem exposes FrameSnapshot, tracks motion demand from registrations, and owns callback disposal. Slot selection and rendering do not advance state; effect uniform submission remains Phase 5 work.
+
+Verification: fresh Release compilation succeeded and all 164 Unit.ItemSlotIndicators tests passed, including 30 new animation cases. Controlled checks cover right/up signs, ignored pure roll, shortest-arc wrapping and pitched local axes, rate clamping, frame-rate-independent damping and decay, first samples, invalid/long/nonpositive time intervals, missing/malformed/reflected camera bases, world/player/camera/mode replacement, demand gating and reactivation, periodic float bounds, copied matrix storage, repeated read-only snapshots, unchanged provider sample counts, and callback registration/disposal. Second review and independent completion audit found no outstanding Phase 4 issues. Existing unrelated warnings remain; none were introduced in indicator code or tests. No game or graphics context was launched; live appearance and runtime camera acceptance remain unchecked in Phase 6.
 
 ## Phase 5: Integrate effect rendering and rectangle fallback
 
