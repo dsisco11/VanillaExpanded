@@ -41,9 +41,10 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
         Register(new PreparationIndicatorProvider(), priority: -10);
         Register(new ClothingIndicatorProvider(), priority: -10);
         // Preserve freshness when applicable; otherwise show the container's liquid volume.
-        Register(new LiquidContainerIndicatorProvider(), priority: -10);
-        Register(new WateringCanIndicatorProvider(), priority: 10);
-        Register(new NightVisionFuelIndicatorProvider(), priority: 10);
+        var adaptiveSampling = new AdaptiveSamplingOptions();
+        Register(new LiquidContainerIndicatorProvider(), priority: -10, adaptiveSampling: adaptiveSampling);
+        Register(new WateringCanIndicatorProvider(), priority: 10, adaptiveSampling: adaptiveSampling);
+        Register(new NightVisionFuelIndicatorProvider(), priority: 10, adaptiveSampling: adaptiveSampling);
         ItemSlotIndicatorRenderer.InitializeTexture(api);
         Active = this;
         harmony = new Harmony(Constants.ModId + ".itemslotindicators");
@@ -71,10 +72,12 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
     /// <param name="priority">Higher priorities are queried first.</param>
     /// <param name="refreshIntervalMilliseconds">Minimum time between samples of an unchanged stack context; defaults to 1,000 milliseconds, and zero disables caching.</param>
     /// <param name="contextKey">Optional immutable configuration value compared by equality on each query to invalidate cached results.</param>
+    /// <param name="adaptiveSampling">Optional fast sampling policy for changing indicators; ignored when caching is disabled.</param>
     internal void Register(IItemSlotIndicatorProvider provider, int priority = 0,
-        long refreshIntervalMilliseconds = 1_000, Func<object?>? contextKey = null)
+        long refreshIntervalMilliseconds = 1_000, Func<object?>? contextKey = null,
+        AdaptiveSamplingOptions? adaptiveSampling = null)
     {
-        var registration = new ItemSlotIndicatorRegistration(provider, priority, refreshIntervalMilliseconds, contextKey);
+        var registration = new ItemSlotIndicatorRegistration(provider, priority, refreshIntervalMilliseconds, contextKey, adaptiveSampling);
         int index = 0;
         while (index < providers.Length && providers[index].Priority >= priority) index++;
         providers = providers.Insert(index, registration);
