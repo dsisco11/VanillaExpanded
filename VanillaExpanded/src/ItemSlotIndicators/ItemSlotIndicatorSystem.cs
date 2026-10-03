@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Immutable;
 
 using HarmonyLib;
@@ -17,11 +18,14 @@ namespace VanillaExpanded.ItemSlotIndicators;
 /// <summary>Owns the client indicator lifecycle and selects one indicator in descending provider priority.</summary>
 internal sealed class ItemSlotIndicatorSystem : ModSystem
 {
-    private ImmutableArray<(IItemSlotIndicatorProvider Provider, int Priority)> providers = [];
+    private ImmutableArray<ItemSlotIndicatorRegistration> providers = [];
     private Harmony? harmony;
 
     /// <summary>Gets the initialized client system used by the shared GUI render hook.</summary>
     internal static ItemSlotIndicatorSystem? Active { get; private set; }
+
+    /// <summary>Supplies monotonic time for refresh scheduling, replaceable for deterministic tests.</summary>
+    internal Func<long> Clock { get; set; } = static () => Environment.TickCount64;
 
     #region Public API
     #region Lifecycle
@@ -31,7 +35,9 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
     /// <summary>Registers built-in providers, initializes rendering, and installs the indicator hook.</summary>
     public override void StartClientSide(ICoreClientAPI api)
     {
-        Register(new FreshnessIndicatorProvider());
+        Register(new FreshnessIndicatorProvider(),
+            contextKey: static () => (VanillaExpandedModSystem.Config.EnablePerishableItemFreshnessIndicators,
+                VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity));
         Register(new PreparationIndicatorProvider(), priority: -10);
         Register(new ClothingIndicatorProvider(), priority: -10);
         // Preserve freshness when applicable; otherwise show the container's liquid volume.
@@ -60,27 +66,34 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
     #endregion
 
     #region Providers
-    /// <summary>Registers a provider; equal priorities retain registration order.</summary>
-    internal void Register(IItemSlotIndicatorProvider provider, int priority = 0)
+    /// <summary>Registers a provider with one-second caching by default; zero interval stays immediate, and equal priorities retain order.</summary>
+    /// <param name="provider">Calculates an indicator when its cached result is absent or expired.</param>
+    /// <param name="priority">Higher priorities are queried first.</param>
+    /// <param name="refreshIntervalMilliseconds">Minimum time between samples of an unchanged stack context; defaults to 1,000 milliseconds, and zero disables caching.</param>
+    /// <param name="contextKey">Optional immutable configuration value compared by equality on each query to invalidate cached results.</param>
+    internal void Register(IItemSlotIndicatorProvider provider, int priority = 0,
+        long refreshIntervalMilliseconds = 1_000, Func<object?>? contextKey = null)
     {
+        var registration = new ItemSlotIndicatorRegistration(provider, priority, refreshIntervalMilliseconds, contextKey);
         int index = 0;
         while (index < providers.Length && providers[index].Priority >= priority) index++;
-        providers = providers.Insert(index, (provider, priority));
+        providers = providers.Insert(index, registration);
     }
 
     /// <summary>Returns the first applicable indicator, including indicators with zero fill.</summary>
     internal bool TryGetIndicator(ItemSlot slot, out ItemSlotIndicator indicator)
     {
+        long now = Clock();
         foreach (var entry in providers)
         {
-            if (entry.Provider.TryGetIndicator(slot, out indicator)) return true;
+            if (entry.TryGetIndicator(slot, now, out indicator)) return true;
         }
 
         indicator = default;
         return false;
     }
 
-    /// <summary>Releases provider references and their feature-owned caches.</summary>
+    /// <summary>Releases registrations and all system-owned provider samples.</summary>
     internal void Clear() => providers = [];
     #endregion
     #endregion

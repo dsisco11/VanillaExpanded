@@ -153,7 +153,8 @@ public sealed class ItemSlotIndicatorTests
     [Fact]
     public void Freshness_EmptyOrDetachedSlot_ReturnsFalse()
     {
-        var provider = new FreshnessIndicatorProvider();
+        var provider = new ItemSlotIndicatorSystem();
+        provider.Register(new FreshnessIndicatorProvider(), refreshIntervalMilliseconds: 1000);
         var slot = new ItemSlot(null);
         Assert.False(provider.TryGetIndicator(slot, out _));
 
@@ -181,7 +182,8 @@ public sealed class ItemSlotIndicatorTests
         item.Setup(instance => instance.UpdateAndGetTransitionState(world.Object, slot, EnumTransitionType.Perish))
             .Returns(state!);
         slot.Itemstack = new ItemStack(item.Object);
-        var provider = new FreshnessIndicatorProvider();
+        var provider = new ItemSlotIndicatorSystem();
+        provider.Register(new FreshnessIndicatorProvider(), refreshIntervalMilliseconds: 1000);
 
         Assert.Equal(perishable, provider.TryGetIndicator(slot, out var first));
         Assert.Equal(perishable, provider.TryGetIndicator(slot, out var cached));
@@ -209,7 +211,8 @@ public sealed class ItemSlotIndicatorTests
         item.Setup(instance => instance.UpdateAndGetTransitionState(world.Object, target[0], EnumTransitionType.Perish))
             .Returns(new TransitionState { FreshHours = 100, FreshHoursLeft = 50 });
         source[0].Itemstack = new ItemStack(item.Object);
-        var provider = new FreshnessIndicatorProvider();
+        var provider = new ItemSlotIndicatorSystem();
+        provider.Register(new FreshnessIndicatorProvider(), refreshIntervalMilliseconds: 1000);
 
         Assert.True(provider.TryGetIndicator(source[0], out var original));
         target[0].Itemstack = source[0].Itemstack;

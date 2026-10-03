@@ -115,7 +115,7 @@ public sealed class PreparationIndicatorProviderTests
     #region Cache And Lifecycle
     /// <summary>An unchanged stack is sampled again after the short refresh interval expires.</summary>
     [Fact]
-    public async Task ExpiredSample_RefreshesProgress()
+    public void ExpiredSample_RefreshesProgress()
     {
         var (world, api, slot) = CreateContext();
         var item = new Mock<MockItem>(1, (byte)0, api);
@@ -123,10 +123,11 @@ public sealed class PreparationIndicatorProviderTests
             .Returns([State(EnumTransitionType.Dry, 0.2f)])
             .Returns([State(EnumTransitionType.Dry, 0.6f)]);
         slot.Itemstack = new ItemStack(item.Object);
-        var provider = new PreparationIndicatorProvider();
+        var provider = new ItemSlotIndicatorSystem { Clock = () => 0 };
+        provider.Register(new PreparationIndicatorProvider(), refreshIntervalMilliseconds: 1000);
         Assert.True(provider.TryGetIndicator(slot, out var first));
         Assert.Equal(0.2f, first.Fill);
-        await Task.Delay(1_100);
+        provider.Clock = () => 1000;
         Assert.True(provider.TryGetIndicator(slot, out var refreshed));
         Assert.Equal(0.6f, refreshed.Fill);
         item.Verify(value => value.UpdateAndGetTransitionStates(world.Object, slot), Times.Exactly(2));
@@ -142,7 +143,8 @@ public sealed class PreparationIndicatorProviderTests
         item.Setup(value => value.UpdateAndGetTransitionStates(world.Object, slot)).Returns([State(EnumTransitionType.Dry, 0.2f)]);
         item.Setup(value => value.UpdateAndGetTransitionStates(targetWorld.Object, target)).Returns([State(EnumTransitionType.Dry, 0.6f)]);
         slot.Itemstack = new ItemStack(item.Object);
-        var provider = new PreparationIndicatorProvider();
+        var provider = new ItemSlotIndicatorSystem();
+        provider.Register(new PreparationIndicatorProvider(), refreshIntervalMilliseconds: 1000);
         Assert.True(provider.TryGetIndicator(slot, out var first));
         Assert.True(provider.TryGetIndicator(slot, out var cached));
         Assert.Equal(first, cached);
@@ -163,7 +165,8 @@ public sealed class PreparationIndicatorProviderTests
         original.Setup(value => value.UpdateAndGetTransitionStates(world.Object, slot)).Returns([State(EnumTransitionType.Dry, 0.8f)]);
         transformed.Setup(value => value.UpdateAndGetTransitionStates(world.Object, slot)).Returns([State(EnumTransitionType.Cure, 0.1f)]);
         slot.Itemstack = new ItemStack(original.Object);
-        var provider = new PreparationIndicatorProvider();
+        var provider = new ItemSlotIndicatorSystem();
+        provider.Register(new PreparationIndicatorProvider(), refreshIntervalMilliseconds: 1000);
         Assert.True(provider.TryGetIndicator(slot, out _));
         slot.Itemstack.SetFrom(new ItemStack(transformed.Object));
         Assert.True(provider.TryGetIndicator(slot, out var current));
@@ -189,7 +192,9 @@ public sealed class PreparationIndicatorProviderTests
             return [State(EnumTransitionType.Dry, 1)];
         });
         slot.Itemstack = new ItemStack(item.Object);
-        Assert.False(new PreparationIndicatorProvider().TryGetIndicator(slot, out _));
+        var system = new ItemSlotIndicatorSystem();
+        system.Register(new PreparationIndicatorProvider(), refreshIntervalMilliseconds: 1000);
+        Assert.False(system.TryGetIndicator(slot, out _));
     }
     #endregion
     #endregion
@@ -216,3 +221,4 @@ public sealed class PreparationIndicatorProviderTests
     }
     #endregion
 }
+

@@ -1,6 +1,5 @@
 using System;
 using System.Numerics;
-using System.Runtime.CompilerServices;
 
 using VanillaExpanded.ItemSlotIndicators;
 
@@ -9,13 +8,11 @@ using Vintagestory.GameContent;
 
 namespace VanillaExpanded.PerishableItemSlots;
 
-/// <summary>Supplies cached freshness indicators for perishable items and meal containers.</summary>
+/// <summary>Supplies freshness indicators for perishable items and meal containers.</summary>
 internal sealed class FreshnessIndicatorProvider : IItemSlotIndicatorProvider
 {
-    private const long RefreshIntervalMilliseconds = 1_000;
     private const float StaleOpacityMultiplier = 0.75f;
     private const float FullyFreshFreshness = 0.75f;
-    private readonly ConditionalWeakTable<ItemStack, FreshnessSample> samples = new();
 
     #region Public API
     /// <summary>Returns no indicator for disabled freshness, empty slots, or nonperishable stacks.</summary>
@@ -28,21 +25,10 @@ internal sealed class FreshnessIndicatorProvider : IItemSlotIndicatorProvider
         ICoreAPI? api = slot.Inventory?.Api;
         if (stack is null || api is null) return false;
 
-        FreshnessSample sample = samples.GetOrCreateValue(stack);
-        long now = Environment.TickCount64;
-        if (sample.LastUpdatedMilliseconds < 0
-            || !ReferenceEquals(sample.Inventory, slot.Inventory)
-            || now - sample.LastUpdatedMilliseconds >= RefreshIntervalMilliseconds)
-        {
-            TransitionState? state = ResolvePerishState(api.World, slot);
-            sample.HasPerishState = state is not null;
-            sample.Freshness = state is null ? 0 : CalculateFreshness(state);
-            sample.Inventory = slot.Inventory;
-            sample.LastUpdatedMilliseconds = now;
-        }
-
-        if (!sample.HasPerishState) return false;
-        indicator = new ItemSlotIndicator(sample.Freshness, FreshnessColor(sample.Freshness));
+        TransitionState? state = ResolvePerishState(api.World, slot);
+        if (state is null) return false;
+        float freshness = CalculateFreshness(state);
+        indicator = new ItemSlotIndicator(freshness, FreshnessColor(freshness));
         return true;
     }
 
@@ -88,13 +74,5 @@ internal sealed class FreshnessIndicatorProvider : IItemSlotIndicatorProvider
         return contentSlot.Itemstack?.Collectible.UpdateAndGetTransitionState(world, contentSlot, EnumTransitionType.Perish);
     }
 
-    /// <summary>Keeps each weakly owned stack sample tied to its inventory context.</summary>
-    private sealed class FreshnessSample
-    {
-        internal long LastUpdatedMilliseconds { get; set; } = -1;
-        internal InventoryBase? Inventory { get; set; }
-        internal bool HasPerishState { get; set; }
-        internal float Freshness { get; set; }
-    }
     #endregion
 }
