@@ -1,7 +1,7 @@
 # Item-slot indicator effects
 
 Source proposal: the 2026-10-03 conversation proposing optional provider-registered effects, reusable deformable geometry, renderer-owned shader resources, and shared frame inputs.
-Status: Phases 1 and 2 complete after their required verification, second review, and independent completion audits. GPU resources, animation, effect rendering, and runtime validation remain outstanding.
+Status: Phases 1–3 complete after their required verification, second review, and independent completion audits. Shared resource ownership is implemented; animation, effect rendering, and runtime validation remain outstanding.
 
 ## Goal and scope
 
@@ -128,19 +128,23 @@ Verification: a fresh Release compilation of the mod and unit-test project succe
 Depends on Phases 1–2.
 Outcome: valid effect definitions resolve to shared, lifecycle-managed GPU resources.
 
-    ☐ Add focused owners under ItemSlotIndicators/Rendering for effect programs and reusable meshes; retain one clearly named responsibility per file.
-    ☐ Implement reusable quad and subdivided fill-strip geometry. Each strip sample has bottom and surface vertices using the established input contract.
-    ☐ Cache meshes by geometry requirements and programs by effect identity; allow multiple provider registrations to share resources without duplicate compilation or uploads.
-    ☐ Validate incompatible reuse of an effect ID deterministically; distinguish invalid registration data from runtime shader failure.
-    ☐ Register and compile shader assets through the engine-owned shader API on the graphics thread. Prepare resources at initialization/registration or explicit reload boundaries, never in recurring slot draws.
-    ☐ Handle reload by rebuilding resources under the verified engine ownership rules. Do not retain invalid program handles or assume engine reload preserves old programs.
-    ☐ Isolate failures per effect, log once per load attempt, dispose partial resources, and retry only at an explicit load/reload boundary.
-    ☐ Make disposal release each owned resource once and unsubscribe reload callbacks; support partial initialization and repeated cleanup safely.
-    ☐ Verify shared-resource identity, failure isolation, and lifecycle behavior with focused checks; reserve actual compilation/link validation for a graphics context.
+    ✔ Add focused owners under ItemSlotIndicators/Rendering for effect programs and reusable meshes; retain one clearly named responsibility per file.
+    ✔ Implement reusable quad and subdivided fill-strip geometry. Each strip sample has bottom and surface vertices using the established input contract.
+    ✔ Cache meshes by geometry requirements and programs by effect identity; allow multiple provider registrations to share resources without duplicate compilation or uploads.
+    ✔ Validate incompatible reuse of an effect ID deterministically; distinguish invalid registration data from runtime shader failure.
+    ✔ Register and compile shader assets through the engine-owned shader API on the graphics thread. Prepare resources at initialization/registration or explicit reload boundaries, never in recurring slot draws.
+    ✔ Handle reload by rebuilding resources under the verified engine ownership rules. Do not retain invalid program handles or assume engine reload preserves old programs.
+    ✔ Isolate failures per effect, log once per load attempt, dispose partial resources, and retry only at an explicit load/reload boundary.
+    ✔ Make disposal release each owned resource once and unsubscribe reload callbacks; support partial initialization and repeated cleanup safely.
+    ✔ Verify shared-resource identity, failure isolation, and lifecycle behavior with focused checks; reserve actual compilation/link validation for a graphics context.
 
 Completion criteria:
-    ☐ Resource ownership is explicit and recurring draws require no compilation, mesh generation, or mesh uploads.
-    ☐ A failing effect does not invalidate unrelated effects or the existing rectangle resources.
+    ✔ Resource ownership is explicit and recurring draws require no compilation, mesh generation, or mesh uploads.
+    ✔ A failing effect does not invalidate unrelated effects or the existing rectangle resources.
+
+Implementation and traceability (2026-10-03): resource tasks -> the established Definition, mesh, and shader ABI / Program and mesh lifetime contracts above, ../../vsapi/Client/{API/IShaderAPI,API/IRenderAPI,API/IClientEventAPI,Render/IShaderProgram,Model/Mesh/MeshData,Model/Mesh/QuadMeshUtil}.cs, and the hash-matched installed ShaderAPI/ShaderRegistry methods -> fixed normalized indexed geometry, shared engine-created programs, explicit graphics-thread preparation, stable names, reload invalidation, and independent cleanup -> ../VanillaExpanded/src/ItemSlotIndicators/Rendering/{ItemSlotIndicatorResources,ItemSlotIndicatorProgramCache,ItemSlotIndicatorMeshCache,ItemSlotIndicatorMeshGeometry,ItemSlotIndicatorMeshKey,ItemSlotIndicatorResourceBackend,IItemSlotIndicatorResourceBackend}.cs. ItemSlotIndicatorSystem composes and disposes the owner; registrations queue preparation without GPU work, and lookups return only prepared live handles. Reload rebuilds programs and retries failed uploads while retaining successful fixed-ABI meshes. The independent standard GUI quad is ready for the later rectangle adapter; the existing white-texture rectangle renderer remains unchanged.
+
+Verification: fresh Release compilation succeeded and all 134 Unit.ItemSlotIndicators tests passed, including 23 new geometry/resource cases. Checks cover shared program/mesh identity, bounded triangle coverage and winding, atomic identity rejection, queued registration snapshots, compile/asset/ABI/upload failure isolation, partial allocation cleanup, per-attempt diagnostics, failed and repeated reloads, stale-handle rejection, and repeated shutdown/event unsubscription. Existing unrelated warnings remain; none were introduced in indicator code or tests. Second review and independent completion audit found no outstanding Phase 3 issues. These are headless ownership checks with simulated engine handles; actual shader compilation/linking and graphics-context lifecycle execution remain unchecked under Phases 5–6.
 
 ## Phase 4: Supply shared frame inputs
 

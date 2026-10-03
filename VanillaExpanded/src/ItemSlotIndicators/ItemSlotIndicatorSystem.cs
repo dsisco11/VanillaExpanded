@@ -5,6 +5,7 @@ using HarmonyLib;
 
 using VanillaExpanded.ClothingIndicators;
 using VanillaExpanded.ItemSlotIndicators.Effects;
+using VanillaExpanded.ItemSlotIndicators.Rendering;
 using VanillaExpanded.LiquidContainerIndicators;
 using VanillaExpanded.NightVisionIndicators;
 using VanillaExpanded.PerishableItemSlots;
@@ -22,6 +23,9 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
     private ImmutableArray<ItemSlotIndicatorRegistration> providers = [];
     private Harmony? harmony;
 
+    /// <summary>Gets the client-owned prepared resources without performing graphics work during selection.</summary>
+    internal ItemSlotIndicatorResources? Resources { get; private set; }
+
     /// <summary>Gets the initialized client system used by the shared GUI render hook.</summary>
     internal static ItemSlotIndicatorSystem? Active { get; private set; }
 
@@ -36,6 +40,9 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
     /// <summary>Registers built-in providers, initializes rendering, and installs the indicator hook.</summary>
     public override void StartClientSide(ICoreClientAPI api)
     {
+        Resources = new ItemSlotIndicatorResources(api.Event, new ItemSlotIndicatorResourceBackend(api));
+        foreach (var registration in providers)
+            if (registration.Effect is not null) Resources.Register(registration.Effect);
         Register(new FreshnessIndicatorProvider(),
             contextKey: static () => (VanillaExpandedModSystem.Config.EnablePerishableItemFreshnessIndicators,
                 VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity));
@@ -52,6 +59,7 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
         Register(new NightVisionFuelIndicatorProvider(), priority: 10, adaptiveSampling: adaptiveSampling,
             contextKey: static () => VanillaExpandedModSystem.Config.EnableNightVisionFuelIndicators);
         ItemSlotIndicatorRenderer.InitializeTexture(api);
+        Resources.Initialize();
         Active = this;
         harmony = new Harmony(Constants.ModId + ".itemslotindicators");
         new PatchClassProcessor(harmony, typeof(ItemSlotIndicatorPatch)).Patch();
@@ -62,6 +70,8 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
     {
         harmony?.UnpatchAll(harmony.Id);
         harmony = null;
+        Resources?.Dispose();
+        Resources = null;
         Clear();
         if (Active == this)
         {
@@ -87,8 +97,11 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
         var registration = new ItemSlotIndicatorRegistration(provider, priority, refreshIntervalMilliseconds, contextKey, adaptiveSampling, effect);
         // Validate metadata before insertion; a rejected registration cannot change selection or cached samples.
         if (effect is not null)
+        {
             foreach (var existing in providers)
                 existing.Effect?.ValidateCompatibility(effect);
+            Resources?.Register(effect);
+        }
         int index = 0;
         while (index < providers.Length && providers[index].Priority >= priority) index++;
         providers = providers.Insert(index, registration);
