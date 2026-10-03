@@ -1,7 +1,7 @@
 # Item-slot indicator effects
 
 Source proposal: the 2026-10-03 conversation proposing optional provider-registered effects, reusable deformable geometry, renderer-owned shader resources, and shared frame inputs.
-Status: Phase 1 complete after source/installed-IL investigation, second review, and independent completion audit. Implementation and runtime validation remain outstanding.
+Status: Phases 1 and 2 complete after their required verification, second review, and independent completion audits. GPU resources, animation, effect rendering, and runtime validation remain outstanding.
 
 ## Goal and scope
 
@@ -107,17 +107,21 @@ Remaining evidence boundary: no required engine integration assumption is intent
 Depends on Phase 1.
 Outcome: selection carries an optional effect without changing provider behavior.
 
-    ☐ Add an immutable ItemSlotIndicatorEffectDefinition with stable ID, shader asset references, supported geometry description, bounded subdivision count, parameters, and motion-input requirement.
-    ☐ Extend registration with an optional effect definition; existing registration calls remain valid and default to the plain rectangle.
-    ☐ Introduce a render-selection value containing the sampled ItemSlotIndicator and the winning registration's effect definition.
-    ☐ Keep IItemSlotIndicatorProvider.TryGetIndicator and its fill/color result unchanged; adapt selection consumers and tests deliberately without adding redundant forwarding APIs.
-    ☐ Preserve descending priority, stable equal-priority ordering, absent-provider skipping, and zero-fill results as successful selections.
-    ☐ Preserve weak sample ownership, context invalidation, refresh intervals, and adaptive sampling. Time and camera changes must not invalidate provider samples.
-    ☐ Verify effect attachment belongs to the selected registration even when the indicator result comes from cache; verify default registrations retain ordinary rendering selection.
+    ✔ Add an immutable ItemSlotIndicatorEffectDefinition with stable ID, shader asset references, supported geometry description, bounded subdivision count, parameters, and motion-input requirement.
+    ✔ Extend registration with an optional effect definition; existing registration calls remain valid and default to the plain rectangle.
+    ✔ Introduce a render-selection value containing the sampled ItemSlotIndicator and the winning registration's effect definition.
+    ✔ Keep IItemSlotIndicatorProvider.TryGetIndicator and its fill/color result unchanged; adapt selection consumers and tests deliberately without adding redundant forwarding APIs.
+    ✔ Preserve descending priority, stable equal-priority ordering, absent-provider skipping, and zero-fill results as successful selections.
+    ✔ Preserve weak sample ownership, context invalidation, refresh intervals, and adaptive sampling. Time and camera changes must not invalidate provider samples.
+    ✔ Verify effect attachment belongs to the selected registration even when the indicator result comes from cache; verify default registrations retain ordinary rendering selection.
 
 Completion criteria:
-    ☐ Focused selection and scheduling checks pass, including cached effect selection and zero-fill priority behavior.
-    ☐ No provider owns shaders, meshes, rendering calls, or animation updates.
+    ✔ Focused selection and scheduling checks pass, including cached effect selection and zero-fill priority behavior.
+    ✔ No provider owns shaders, meshes, rendering calls, or animation updates.
+
+Implementation evidence (2026-10-03): ../VanillaExpanded/src/ItemSlotIndicators/Effects/{ItemSlotIndicatorEffectDefinition,ItemSlotIndicatorTopology}.cs enforce immutable metadata, canonical names, ABI/geometry limits, finite parameters, and identity compatibility before insertion. ItemSlotIndicatorRegistration attaches metadata outside its unchanged sampling state; ItemSlotIndicatorSystem.TryGetRenderSelection carries the winning indicator/effect to the existing hook and renderer. The renderer still uses the ordinary rectangle until GPU resource/rendering work is implemented.
+
+Verification: a fresh Release compilation of the mod and unit-test project succeeded; all 111 tests in Unit.ItemSlotIndicators passed, including definition validation, atomic collision rejection, cached/zero-fill selection, priorities, scheduling, and context/adaptive sampling. Expanded provider checks passed 192 of 196 tests. The four watering-can opacity expectation failures reproduced identically in a freshly built clean HEAD archive (12 passed, 4 failed in that provider suite); their source and tests are unchanged by this work. Existing unrelated compiler warnings remain. Second review and independent completion audit found no outstanding Phase 2 issues. Shader-specific parameter ranges belong to each future effect declaration, while the shared definition enforces finite copied values.
 
 ## Phase 3: Own reusable rendering resources
 

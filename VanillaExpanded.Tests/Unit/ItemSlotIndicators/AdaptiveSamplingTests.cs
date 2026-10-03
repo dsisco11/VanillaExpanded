@@ -22,13 +22,13 @@ public sealed class AdaptiveSamplingTests
         var slot = new ItemSlot(null) { Itemstack = new ItemStack(MockItem.CreateNonLightSource(1)) };
         system.Register(absent, priority: 10, adaptiveSampling: new AdaptiveSamplingOptions());
         system.Register(visible, adaptiveSampling: new AdaptiveSamplingOptions());
-        system.TryGetIndicator(slot, out _);
+        system.TryGetRenderSelection(slot, out _);
         absent.Fill = 1;
         visible.Fill = 0.5f;
         now = 1000;
-        system.TryGetIndicator(slot, out _);
+        system.TryGetRenderSelection(slot, out _);
         now = 1100;
-        system.TryGetIndicator(slot, out _);
+        system.TryGetRenderSelection(slot, out _);
         Assert.Equal(2, absent.Calls);
         Assert.Equal(3, visible.Calls);
     }
@@ -148,13 +148,13 @@ public sealed class AdaptiveSamplingTests
         var f = new Fixture();
         var other = new ItemSlot(null) { Itemstack = new ItemStack(MockItem.CreateNonLightSource(2)) };
         f.Query(0, 1);
-        f.System.TryGetIndicator(other, out _);
+        f.System.TryGetRenderSelection(other, out _);
         f.Provider.Fill = 0.5f;
         f.Query(1000, 3);
         f.Provider.Fill = 0;
-        f.System.TryGetIndicator(other, out _);
+        f.System.TryGetRenderSelection(other, out _);
         f.Query(1100, 5);
-        f.System.TryGetIndicator(other, out _);
+        f.System.TryGetRenderSelection(other, out _);
         Assert.Equal(5, f.Provider.Calls);
     }
 
@@ -170,12 +170,12 @@ public sealed class AdaptiveSamplingTests
         var slot = new ItemSlot(null) { Itemstack = new ItemStack(MockItem.CreateNonLightSource(1)) };
         system.Register(provider, refreshIntervalMilliseconds: immediate ? 0 : 1000,
             adaptiveSampling: immediate ? new AdaptiveSamplingOptions() : null);
-        system.TryGetIndicator(slot, out _);
+        system.TryGetRenderSelection(slot, out _);
         provider.Fill = 1;
         now = 1000;
-        system.TryGetIndicator(slot, out _);
+        system.TryGetRenderSelection(slot, out _);
         now = 1100;
-        system.TryGetIndicator(slot, out _);
+        system.TryGetRenderSelection(slot, out _);
         Assert.Equal(immediate ? 3 : 2, provider.Calls);
     }
     #endregion
@@ -203,7 +203,7 @@ public sealed class AdaptiveSamplingTests
         var system = new ItemSlotIndicatorSystem();
         Assert.Throws<ArgumentOutOfRangeException>(() => system.Register(new MutableProvider(),
             refreshIntervalMilliseconds: idleInterval, adaptiveSampling: options));
-        Assert.False(system.TryGetIndicator(new ItemSlot(null), out _));
+        Assert.False(system.TryGetRenderSelection(new ItemSlot(null), out _));
     }
 
     /// <summary>Negative and nonfinite tolerances are rejected for either output component.</summary>
@@ -252,7 +252,7 @@ public sealed class AdaptiveSamplingTests
         internal void Query(long time, int calls)
         {
             now = time;
-            System.TryGetIndicator(Slot, out _);
+            System.TryGetRenderSelection(Slot, out _);
             Assert.Equal(calls, Provider.Calls);
         }
         #endregion

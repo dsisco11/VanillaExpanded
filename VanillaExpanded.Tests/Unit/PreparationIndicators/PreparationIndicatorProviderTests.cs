@@ -125,11 +125,11 @@ public sealed class PreparationIndicatorProviderTests
         slot.Itemstack = new ItemStack(item.Object);
         var provider = new ItemSlotIndicatorSystem { Clock = () => 0 };
         provider.Register(new PreparationIndicatorProvider(), refreshIntervalMilliseconds: 1000);
-        Assert.True(provider.TryGetIndicator(slot, out var first));
-        Assert.Equal(0.2f, first.Fill);
+        Assert.True(provider.TryGetRenderSelection(slot, out var first));
+        Assert.Equal(0.2f, first.Indicator.Fill);
         provider.Clock = () => 1000;
-        Assert.True(provider.TryGetIndicator(slot, out var refreshed));
-        Assert.Equal(0.6f, refreshed.Fill);
+        Assert.True(provider.TryGetRenderSelection(slot, out var refreshed));
+        Assert.Equal(0.6f, refreshed.Indicator.Fill);
         item.Verify(value => value.UpdateAndGetTransitionStates(world.Object, slot), Times.Exactly(2));
     }
 
@@ -145,14 +145,14 @@ public sealed class PreparationIndicatorProviderTests
         slot.Itemstack = new ItemStack(item.Object);
         var provider = new ItemSlotIndicatorSystem();
         provider.Register(new PreparationIndicatorProvider(), refreshIntervalMilliseconds: 1000);
-        Assert.True(provider.TryGetIndicator(slot, out var first));
-        Assert.True(provider.TryGetIndicator(slot, out var cached));
+        Assert.True(provider.TryGetRenderSelection(slot, out var first));
+        Assert.True(provider.TryGetRenderSelection(slot, out var cached));
         Assert.Equal(first, cached);
         item.Verify(value => value.UpdateAndGetTransitionStates(world.Object, slot), Times.Once);
         target.Itemstack = slot.Itemstack;
         slot.Itemstack = null;
-        Assert.True(provider.TryGetIndicator(target, out var moved));
-        Assert.Equal(0.6f, moved.Fill);
+        Assert.True(provider.TryGetRenderSelection(target, out var moved));
+        Assert.Equal(0.6f, moved.Indicator.Fill);
     }
 
     /// <summary>An in-place collectible replacement immediately invalidates the old sample.</summary>
@@ -167,10 +167,10 @@ public sealed class PreparationIndicatorProviderTests
         slot.Itemstack = new ItemStack(original.Object);
         var provider = new ItemSlotIndicatorSystem();
         provider.Register(new PreparationIndicatorProvider(), refreshIntervalMilliseconds: 1000);
-        Assert.True(provider.TryGetIndicator(slot, out _));
+        Assert.True(provider.TryGetRenderSelection(slot, out _));
         slot.Itemstack.SetFrom(new ItemStack(transformed.Object));
-        Assert.True(provider.TryGetIndicator(slot, out var current));
-        Assert.Equal(0.1f, current.Fill);
+        Assert.True(provider.TryGetRenderSelection(slot, out var current));
+        Assert.Equal(0.1f, current.Indicator.Fill);
     }
 
     /// <summary>Transitions that remove, replace, or mutate a stack cannot display the old item's state.</summary>
@@ -194,7 +194,7 @@ public sealed class PreparationIndicatorProviderTests
         slot.Itemstack = new ItemStack(item.Object);
         var system = new ItemSlotIndicatorSystem();
         system.Register(new PreparationIndicatorProvider(), refreshIntervalMilliseconds: 1000);
-        Assert.False(system.TryGetIndicator(slot, out _));
+        Assert.False(system.TryGetRenderSelection(slot, out _));
     }
     #endregion
     #endregion

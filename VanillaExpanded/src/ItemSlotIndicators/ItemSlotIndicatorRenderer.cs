@@ -29,11 +29,13 @@ internal static class ItemSlotIndicatorRenderer
         whiteTexture = null;
     }
 
-    /// <summary>Draws the fill behind the item without writing to the GUI depth buffer.</summary>
-    internal static void Render(IRenderAPI renderer, double posX, double posY, ItemSlotIndicator indicator)
+    /// <summary>Draws the selected presentation as a rectangle behind the item without writing to the GUI depth buffer.</summary>
+    internal static void Render(IRenderAPI renderer, double posX, double posY, ItemSlotIndicatorRenderSelection selection)
     {
         if (whiteTexture is null) return;
 
+        // The ordinary rectangle remains available regardless of the selected effect's resource availability.
+        ItemSlotIndicator indicator = selection.Indicator;
         float slotSize = (float)GuiElement.scaled(GuiElementPassiveItemSlot.unscaledSlotSize);
         var bounds = CalculateBounds(posX, posY, slotSize, indicator.Fill);
         try

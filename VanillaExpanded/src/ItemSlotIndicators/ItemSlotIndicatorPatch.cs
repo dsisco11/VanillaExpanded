@@ -46,9 +46,9 @@ internal static class ItemSlotIndicatorPatch
         float size, int color, float deltaTime,
         bool shading = true, bool rotate = false, bool showStackSize = true)
     {
-        if (ItemSlotIndicatorSystem.Active is { } system && system.TryGetIndicator(slot, out ItemSlotIndicator indicator))
+        if (ItemSlotIndicatorSystem.Active is { } system && system.TryGetRenderSelection(slot, out ItemSlotIndicatorRenderSelection selection))
         {
-            ItemSlotIndicatorRenderer.Render(renderer, posX, posY, indicator);
+            ItemSlotIndicatorRenderer.Render(renderer, posX, posY, selection);
         }
 
         renderer.RenderItemstackToGui(slot, posX, posY, posZ, size, color, deltaTime, shading, rotate, showStackSize);

@@ -35,7 +35,7 @@ public sealed class ItemSlotIndicatorTests
 
         system.Dispose();
 
-        Assert.False(system.TryGetIndicator(slot, out _));
+        Assert.False(system.TryGetRenderSelection(slot, out _));
     }
 
     #endregion
@@ -45,7 +45,7 @@ public sealed class ItemSlotIndicatorTests
     [Fact]
     public void NoProviders_ReturnsFalse()
     {
-        Assert.False(new ItemSlotIndicatorSystem().TryGetIndicator(new ItemSlot(null), out var indicator));
+        Assert.False(new ItemSlotIndicatorSystem().TryGetRenderSelection(new ItemSlot(null), out var indicator));
         Assert.Equal(default, indicator);
     }
 
@@ -59,8 +59,9 @@ public sealed class ItemSlotIndicatorTests
         system.Register(CreateProvider(slot, true, expected));
         system.Register(CreateProvider(slot, false, default), priority: 10);
 
-        Assert.True(system.TryGetIndicator(slot, out var actual));
-        Assert.Equal(expected, actual);
+        Assert.True(system.TryGetRenderSelection(slot, out var actual));
+        Assert.Equal(expected, actual.Indicator);
+        Assert.Null(actual.Effect);
     }
 
     /// <summary>Higher priority wins regardless of registration order.</summary>
@@ -73,8 +74,8 @@ public sealed class ItemSlotIndicatorTests
         system.Register(CreateProvider(slot, true, new ItemSlotIndicator(1, Vector4.Zero)));
         system.Register(CreateProvider(slot, true, expected), priority: 10);
 
-        Assert.True(system.TryGetIndicator(slot, out var actual));
-        Assert.Equal(expected, actual);
+        Assert.True(system.TryGetRenderSelection(slot, out var actual));
+        Assert.Equal(expected, actual.Indicator);
     }
 
     /// <summary>Equal priorities select the first registered applicable provider.</summary>
@@ -87,8 +88,8 @@ public sealed class ItemSlotIndicatorTests
         system.Register(CreateProvider(slot, true, expected));
         system.Register(CreateProvider(slot, true, default));
 
-        Assert.True(system.TryGetIndicator(slot, out var actual));
-        Assert.Equal(expected, actual);
+        Assert.True(system.TryGetRenderSelection(slot, out var actual));
+        Assert.Equal(expected, actual.Indicator);
     }
 
     /// <summary>A registry with only inapplicable providers returns no indicator.</summary>
@@ -99,7 +100,7 @@ public sealed class ItemSlotIndicatorTests
         var system = new ItemSlotIndicatorSystem();
         system.Register(CreateProvider(slot, false, new ItemSlotIndicator(1, Vector4.One)));
 
-        Assert.False(system.TryGetIndicator(slot, out var actual));
+        Assert.False(system.TryGetRenderSelection(slot, out var actual));
         Assert.Equal(default, actual);
     }
 
@@ -112,7 +113,7 @@ public sealed class ItemSlotIndicatorTests
         system.Register(CreateProvider(slot, true, default));
         system.Clear();
 
-        Assert.False(system.TryGetIndicator(slot, out _));
+        Assert.False(system.TryGetRenderSelection(slot, out _));
     }
     #endregion
 
@@ -156,10 +157,10 @@ public sealed class ItemSlotIndicatorTests
         var provider = new ItemSlotIndicatorSystem();
         provider.Register(new FreshnessIndicatorProvider(), refreshIntervalMilliseconds: 1000);
         var slot = new ItemSlot(null);
-        Assert.False(provider.TryGetIndicator(slot, out _));
+        Assert.False(provider.TryGetRenderSelection(slot, out _));
 
         slot.Itemstack = new ItemStack(MockItem.CreateNonLightSource(id: 1));
-        Assert.False(provider.TryGetIndicator(slot, out _));
+        Assert.False(provider.TryGetRenderSelection(slot, out _));
     }
 
     /// <summary>Perish states produce indicators, while absent states remain unadorned and cached.</summary>
@@ -185,13 +186,13 @@ public sealed class ItemSlotIndicatorTests
         var provider = new ItemSlotIndicatorSystem();
         provider.Register(new FreshnessIndicatorProvider(), refreshIntervalMilliseconds: 1000);
 
-        Assert.Equal(perishable, provider.TryGetIndicator(slot, out var first));
-        Assert.Equal(perishable, provider.TryGetIndicator(slot, out var cached));
+        Assert.Equal(perishable, provider.TryGetRenderSelection(slot, out var first));
+        Assert.Equal(perishable, provider.TryGetRenderSelection(slot, out var cached));
         Assert.Equal(first, cached);
         if (perishable)
         {
-            Assert.Equal(freshness, first.Fill);
-            Assert.Equal(FreshnessIndicatorProvider.FreshnessColor(freshness), first.Color);
+            Assert.Equal(freshness, first.Indicator.Fill);
+            Assert.Equal(FreshnessIndicatorProvider.FreshnessColor(freshness), first.Indicator.Color);
         }
         item.Verify(instance => instance.UpdateAndGetTransitionState(world.Object, slot, EnumTransitionType.Perish), Times.Once);
     }
@@ -214,13 +215,13 @@ public sealed class ItemSlotIndicatorTests
         var provider = new ItemSlotIndicatorSystem();
         provider.Register(new FreshnessIndicatorProvider(), refreshIntervalMilliseconds: 1000);
 
-        Assert.True(provider.TryGetIndicator(source[0], out var original));
+        Assert.True(provider.TryGetRenderSelection(source[0], out var original));
         target[0].Itemstack = source[0].Itemstack;
         source[0].Itemstack = null;
-        Assert.True(provider.TryGetIndicator(target[0], out var moved));
+        Assert.True(provider.TryGetRenderSelection(target[0], out var moved));
 
-        Assert.Equal(1, original.Fill);
-        Assert.Equal(0.5f, moved.Fill);
+        Assert.Equal(1, original.Indicator.Fill);
+        Assert.Equal(0.5f, moved.Indicator.Fill);
         item.Verify(instance => instance.UpdateAndGetTransitionState(world.Object, target[0], EnumTransitionType.Perish), Times.Once);
     }
     #endregion

@@ -23,13 +23,13 @@ public sealed class ItemSlotIndicatorSchedulingTests
         var provider = new CountingProvider { Applicable = applicable };
         var slot = CreateSlot();
         system.Register(provider);
-        Assert.Equal(applicable, system.TryGetIndicator(slot, out var first));
+        Assert.Equal(applicable, system.TryGetRenderSelection(slot, out var first));
         now = 999;
-        Assert.Equal(applicable, system.TryGetIndicator(slot, out var cached));
+        Assert.Equal(applicable, system.TryGetRenderSelection(slot, out var cached));
         Assert.Equal(first, cached);
         Assert.Equal(1, provider.Calls);
         now = 1000;
-        Assert.Equal(applicable, system.TryGetIndicator(slot, out _));
+        Assert.Equal(applicable, system.TryGetRenderSelection(slot, out _));
         Assert.Equal(2, provider.Calls);
     }
 
@@ -41,8 +41,8 @@ public sealed class ItemSlotIndicatorSchedulingTests
         var provider = new CountingProvider();
         var slot = CreateSlot();
         system.Register(provider, refreshIntervalMilliseconds: 0);
-        system.TryGetIndicator(slot, out _);
-        system.TryGetIndicator(slot, out _);
+        system.TryGetRenderSelection(slot, out _);
+        system.TryGetRenderSelection(slot, out _);
         Assert.Equal(2, provider.Calls);
     }
 
@@ -58,14 +58,14 @@ public sealed class ItemSlotIndicatorSchedulingTests
         var other = CreateSlot();
         system.Register(first, 10, 1000);
         system.Register(second, 0, 2000);
-        Assert.True(system.TryGetIndicator(slot, out _));
+        Assert.True(system.TryGetRenderSelection(slot, out _));
         now = 500;
-        Assert.True(system.TryGetIndicator(other, out _));
+        Assert.True(system.TryGetRenderSelection(other, out _));
         Assert.Equal(2, first.Calls);
         Assert.Equal(2, second.Calls);
         now = 1000;
-        Assert.True(system.TryGetIndicator(slot, out _));
-        Assert.True(system.TryGetIndicator(other, out _));
+        Assert.True(system.TryGetRenderSelection(slot, out _));
+        Assert.True(system.TryGetRenderSelection(other, out _));
         Assert.Equal(3, first.Calls);
         Assert.Equal(2, second.Calls);
     }
@@ -79,14 +79,14 @@ public sealed class ItemSlotIndicatorSchedulingTests
         var system = new ItemSlotIndicatorSystem { Clock = () => 0 };
         var slot = CreateSlot();
         system.Register(provider, refreshIntervalMilliseconds: 1000, contextKey: () => key);
-        system.TryGetIndicator(slot, out _);
-        system.TryGetIndicator(slot, out _);
+        system.TryGetRenderSelection(slot, out _);
+        system.TryGetRenderSelection(slot, out _);
         Assert.Equal(1, provider.Calls);
         key = (true, 0.2f);
-        system.TryGetIndicator(slot, out _);
+        system.TryGetRenderSelection(slot, out _);
         key = (false, 0.2f);
         provider.Applicable = false;
-        Assert.False(system.TryGetIndicator(slot, out _));
+        Assert.False(system.TryGetRenderSelection(slot, out _));
         Assert.Equal(3, provider.Calls);
     }
 
@@ -98,11 +98,11 @@ public sealed class ItemSlotIndicatorSchedulingTests
         var provider = new CountingProvider();
         var slot = CreateSlot();
         system.Register(provider, refreshIntervalMilliseconds: 1000);
-        Assert.True(system.TryGetIndicator(slot, out _));
+        Assert.True(system.TryGetRenderSelection(slot, out _));
         system.Clear();
-        Assert.False(system.TryGetIndicator(slot, out _));
+        Assert.False(system.TryGetRenderSelection(slot, out _));
         system.Register(provider, refreshIntervalMilliseconds: 1000);
-        Assert.True(system.TryGetIndicator(slot, out _));
+        Assert.True(system.TryGetRenderSelection(slot, out _));
         Assert.Equal(2, provider.Calls);
     }
 
@@ -112,7 +112,7 @@ public sealed class ItemSlotIndicatorSchedulingTests
     {
         var system = new ItemSlotIndicatorSystem();
         Assert.Throws<ArgumentOutOfRangeException>(() => system.Register(new CountingProvider(), refreshIntervalMilliseconds: -1));
-        Assert.False(system.TryGetIndicator(CreateSlot(), out _));
+        Assert.False(system.TryGetRenderSelection(CreateSlot(), out _));
     }
     #endregion
 
@@ -129,7 +129,7 @@ public sealed class ItemSlotIndicatorSchedulingTests
         var provider = new CountingProvider();
         var slot = CreateSlot();
         system.Register(provider, refreshIntervalMilliseconds: 1000);
-        Assert.True(system.TryGetIndicator(slot, out _));
+        Assert.True(system.TryGetRenderSelection(slot, out _));
         // Alter one ownership identity while leaving time fixed.
         switch (context)
         {
@@ -138,7 +138,7 @@ public sealed class ItemSlotIndicatorSchedulingTests
             case "slot": slot = new ItemSlot(slot.Inventory) { Itemstack = slot.Itemstack }; break;
             case "api": slot.Inventory.Api = Mock.Of<ICoreAPI>(); break;
         }
-        Assert.True(system.TryGetIndicator(slot, out _));
+        Assert.True(system.TryGetRenderSelection(slot, out _));
         Assert.Equal(2, provider.Calls);
     }
 
@@ -150,10 +150,10 @@ public sealed class ItemSlotIndicatorSchedulingTests
         var provider = new CountingProvider { DuringSample = value => value.Inventory.Api = Mock.Of<ICoreAPI>() };
         var system = new ItemSlotIndicatorSystem { Clock = () => 0 };
         system.Register(provider, refreshIntervalMilliseconds: 1000);
-        Assert.False(system.TryGetIndicator(slot, out var discarded));
+        Assert.False(system.TryGetRenderSelection(slot, out var discarded));
         Assert.Equal(default, discarded);
         provider.DuringSample = null;
-        Assert.True(system.TryGetIndicator(slot, out _));
+        Assert.True(system.TryGetRenderSelection(slot, out _));
         Assert.Equal(2, provider.Calls);
     }
     #endregion

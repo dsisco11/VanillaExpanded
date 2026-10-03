@@ -1,6 +1,8 @@
 using System;
 using System.Runtime.CompilerServices;
 
+using VanillaExpanded.ItemSlotIndicators.Effects;
+
 using Vintagestory.API.Common;
 
 namespace VanillaExpanded.ItemSlotIndicators;
@@ -17,7 +19,8 @@ internal sealed class ItemSlotIndicatorRegistration
     #region Public API
     /// <summary>Creates a registration; zero interval samples every query, and context keys invalidate cached configuration.</summary>
     internal ItemSlotIndicatorRegistration(IItemSlotIndicatorProvider provider, int priority,
-        long refreshIntervalMilliseconds, Func<object?>? contextKey, AdaptiveSamplingOptions? adaptiveSampling = null)
+        long refreshIntervalMilliseconds, Func<object?>? contextKey, AdaptiveSamplingOptions? adaptiveSampling = null,
+        ItemSlotIndicatorEffectDefinition? effect = null)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentOutOfRangeException.ThrowIfNegative(refreshIntervalMilliseconds);
@@ -28,12 +31,16 @@ internal sealed class ItemSlotIndicatorRegistration
         this.adaptiveSampling = adaptiveSampling;
         this.provider = provider;
         Priority = priority;
+        Effect = effect;
         this.refreshIntervalMilliseconds = refreshIntervalMilliseconds;
         this.contextKey = contextKey;
     }
 
     /// <summary>Gets the selection priority of this registration.</summary>
     internal int Priority { get; }
+
+    /// <summary>Gets the optional rendering effect, independently of cached provider samples.</summary>
+    internal ItemSlotIndicatorEffectDefinition? Effect { get; }
 
     /// <summary>Returns a current sample and discards output if sampling changes the item or its context.</summary>
     internal bool TryGetIndicator(ItemSlot slot, long now, out ItemSlotIndicator indicator)

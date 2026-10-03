@@ -118,8 +118,9 @@ public sealed class LiquidContainerIndicatorProviderTests
         system.Register(higher.Object);
 
         Assert.True(liquid.TryGetIndicator(slot, out var liquidIndicator));
-        Assert.True(system.TryGetIndicator(slot, out var selected));
-        Assert.Equal(applicable ? higherIndicator : liquidIndicator, selected);
+        Assert.True(system.TryGetRenderSelection(slot, out var selected));
+        Assert.Equal(applicable ? higherIndicator : liquidIndicator, selected.Indicator);
+        Assert.Null(selected.Effect);
     }
     #endregion
     #endregion
