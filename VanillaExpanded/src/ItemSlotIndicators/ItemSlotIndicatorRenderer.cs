@@ -24,22 +24,29 @@ internal sealed class ItemSlotIndicatorRenderer(ItemSlotIndicatorResources resou
         {
             if (disposed || !backend.Supported || !ItemSlotIndicatorDrawInput.TryCreate(posX, posY,
                 scaledSlotSize(), selection.Indicator, out var input)) return;
+            bool effectDrawn = false;
             if (selection.Effect is { } effect && resources.TryGet(effect, out var program, out var mesh))
             {
-                bool successful = false;
                 try
                 {
                     backend.Begin();
                     backend.Effect(program!, mesh!, input, effect, frame);
-                    successful = true;
+                    effectDrawn = true;
                 }
                 catch (Exception exception) { resources.FailDraw(effect, exception.Message); }
                 finally { backend.Restore(); }
-                if (successful) return;
             }
             // Fallback uses the same sampled fill/color after the effect scope has fully restored its caller.
+            bool hasCue = input.TryCreateBoundaryCue(out var cue);
+            if (effectDrawn && !hasCue) return;
             if (resources.Rectangle is not { } rectangle) return;
-            try { backend.Begin(); backend.Rectangle(rectangle, input); }
+            try
+            {
+                backend.Begin();
+                if (!effectDrawn && input.Fill > 0) backend.Rectangle(rectangle, input);
+                // Cue rendering follows shader restoration and shares the fallback's state scope when possible.
+                if (hasCue) backend.Rectangle(rectangle, cue);
+            }
             finally { backend.Restore(); }
         }
         catch (Exception exception) { backend.ReportFailure(exception); }

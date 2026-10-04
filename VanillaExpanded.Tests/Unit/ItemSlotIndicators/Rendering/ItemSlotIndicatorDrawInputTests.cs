@@ -12,6 +12,62 @@ namespace VanillaExpanded.Tests.Unit.ItemSlotIndicators.Rendering;
 public sealed class ItemSlotIndicatorDrawInputTests
 {
     #region Public API
+    /// <summary>Bounded mode maps resource endpoints while keeping empty visible and the resource fraction unchanged.</summary>
+    [Theory]
+    [InlineData(0, 0.2f)]
+    [InlineData(0.5f, 0.5f)]
+    [InlineData(1, 0.8f)]
+    [InlineData(-1, 0.2f)]
+    [InlineData(2, 0.8f)]
+    public void BoundedFill_MapsLevelsWithoutChangingResourceMeaning(float resource, float height)
+    {
+        Assert.True(ItemSlotIndicatorDrawInput.TryCreate(24, 24, 48,
+            new(resource, Vector4.One, new ItemSlotIndicatorDrawRange(0.2f, 0.8f)), out var input));
+        Assert.Equal(height, input.Fill, 5);
+        Assert.Equal(Math.Clamp(resource, 0, 1), input.ResourceFill);
+        var matrix = new float[16];
+        input.RectangleMatrix(Mat4f.Create(), matrix);
+        Assert.Equal(48 * height / 2, matrix[5], 4);
+        Assert.False(ItemSlotIndicatorDrawInput.TryCreate(24, 24, 48, new(0, Vector4.One), out _));
+    }
+
+    /// <summary>Cues fade near endpoints, remain at the chosen level, and vanish through the middle of the resource range.</summary>
+    [Theory]
+    [InlineData(0, true, 0.6f, 0.2f)]
+    [InlineData(0.075f, true, 0.3f, 0.2f)]
+    [InlineData(0.15f, false, 0, 0)]
+    [InlineData(0.5f, false, 0, 0)]
+    [InlineData(0.925f, true, 0.3f, 0.8f)]
+    [InlineData(1, true, 0.6f, 0.8f)]
+    public void BoundaryCue_FadesAtFixedSlotLevels(float resource, bool visible, float opacity, float level)
+    {
+        Assert.True(ItemSlotIndicatorDrawInput.TryCreate(24, 24, 48,
+            new(resource, Vector4.One, new ItemSlotIndicatorDrawRange(0.2f, 0.8f)), out var input));
+        Assert.Equal(visible, input.TryCreateBoundaryCue(out var cue));
+        if (!visible) return;
+        Assert.Equal(opacity, cue.Color.W, 5);
+        Assert.Equal(48 * (1 - level) - 0.5f, cue.SlotBounds.Y, 4);
+        Assert.Equal(1, cue.SlotBounds.W);
+        Assert.Equal(1, cue.Fill);
+    }
+
+    /// <summary>Malformed ranges cannot enter rendering, and slot-edge cues remain inside the slot.</summary>
+    [Fact]
+    public void DrawRange_RejectsInvalidLevelsAndContainsEdgeCues()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ItemSlotIndicatorDrawRange(-0.1f, 0.8f));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ItemSlotIndicatorDrawRange(0.8f, 0.2f));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ItemSlotIndicatorDrawRange(0.5f, 0.5f));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ItemSlotIndicatorDrawRange(0.2f, float.NaN));
+        Assert.False(ItemSlotIndicatorDrawInput.TryCreate(24, 24, 48, new(0.5f, Vector4.One, default(ItemSlotIndicatorDrawRange)), out _));
+        foreach (float fill in new[] { 0f, 1f })
+        {
+            Assert.True(ItemSlotIndicatorDrawInput.TryCreate(24, 24, 48, new(fill, Vector4.One, new ItemSlotIndicatorDrawRange(0, 1)), out var input));
+            Assert.True(input.TryCreateBoundaryCue(out var cue));
+            Assert.InRange(cue.SlotBounds.Y, 0, 47);
+        }
+    }
+
     /// <summary>Invalid/invisible presentations skip submission while finite components clamp and negative coordinates remain valid.</summary>
     [Fact]
     public void InputSanitation_PreservesClippedSlotsAndProviderDefinedFullWarnings()

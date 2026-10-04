@@ -17,6 +17,48 @@ namespace VanillaExpanded.Tests.Unit.ItemSlotIndicators.Rendering;
 public sealed class ItemSlotIndicatorRendererTests
 {
     #region Public API
+    #region Bounded Drawing
+    /// <summary>Empty bounded resources retain geometry and cues through unavailable-effect fallback.</summary>
+    [Fact]
+    public void BoundedEmpty_FallbackDrawsMappedFillAndBoundaryCue()
+    {
+        using var context = new IndicatorResourceTestContext();
+        context.Resources.Initialize();
+        var backend = Backend();
+        var effect = new ItemSlotIndicatorEffectDefinition("test:unavailable", "test", "vanillaexpanded_itemslot_missing");
+        using var renderer = new ItemSlotIndicatorRenderer(context.Resources, backend.Object, () => 48);
+        renderer.Render(24, 24, new(new(0, Vector4.One, new ItemSlotIndicatorDrawRange(0.2f, 0.8f)), effect), default);
+        backend.Verify(b => b.Rectangle(It.IsAny<MeshRef>(), It.Is<ItemSlotIndicatorDrawInput>(i => i.Fill == 0.2f && i.ResourceFill == 0)), Times.Once);
+        backend.Verify(b => b.Rectangle(It.IsAny<MeshRef>(), It.Is<ItemSlotIndicatorDrawInput>(i => i.Fill == 1 && i.SlotBounds.W == 1)), Times.Once);
+        backend.Verify(b => b.Begin(), Times.Once);
+        backend.Verify(b => b.Restore(), Times.Once);
+    }
+
+    /// <summary>Boundary cues draw after successful shader handoff and do not replace the effect with a rectangle.</summary>
+    [Fact]
+    public void BoundedEffect_DrawsCueAfterReturningToGui()
+    {
+        using var context = new IndicatorResourceTestContext();
+        var effect = new ItemSlotIndicatorEffectDefinition("test:bounded", "test", "vanillaexpanded_itemslot_test");
+        context.Resources.Register(effect);
+        context.Resources.Initialize();
+        var backend = Backend();
+        var order = new List<string>();
+        backend.Setup(b => b.Effect(It.IsAny<IShaderProgram>(), It.IsAny<MeshRef>(), It.IsAny<ItemSlotIndicatorDrawInput>(), effect,
+            It.IsAny<ItemSlotIndicatorFrameSnapshot>())).Callback(() => order.Add("effect"));
+        backend.Setup(b => b.Restore()).Callback(() => order.Add("restore"));
+        backend.Setup(b => b.Rectangle(It.IsAny<MeshRef>(), It.IsAny<ItemSlotIndicatorDrawInput>())).Callback(() => order.Add("cue"));
+        using var renderer = new ItemSlotIndicatorRenderer(context.Resources, backend.Object, () => 48);
+        renderer.Render(24, 24, new(new(1, Vector4.One, new ItemSlotIndicatorDrawRange(0.2f, 0.8f)), effect), default);
+        Assert.Equal(new[] { "effect", "restore", "cue", "restore" }, order);
+        backend.Verify(b => b.Effect(It.IsAny<IShaderProgram>(), It.IsAny<MeshRef>(),
+            It.Is<ItemSlotIndicatorDrawInput>(i => i.Fill == 0.8f && i.ResourceFill == 1), effect,
+            It.IsAny<ItemSlotIndicatorFrameSnapshot>()), Times.Once);
+    }
+
+    #endregion
+
+    #region Default Drawing and Failure Policy
     /// <summary>Effects consume prepared handles and a copied frame snapshot; recurring draws perform no preparation.</summary>
     [Fact]
     public void PreparedEffect_ReceivesSelectedPresentationAndSharedFrameWithoutResourceWork()
@@ -128,6 +170,7 @@ public sealed class ItemSlotIndicatorRendererTests
         backend.Verify(b => b.Restore(), Times.Once);
         backend.Verify(b => b.ReportFailure(It.IsAny<Exception>()), Times.Once);
     }
+    #endregion
     #endregion
 
     #region Private

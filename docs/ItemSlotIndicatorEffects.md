@@ -21,6 +21,14 @@ Define and validate the units/ranges of the four parameter lanes in an effect-sp
 
 IDs and asset domains use canonical lowercase names. Shader basenames must start with `vanillaexpanded_itemslot_`. Place the matching `.vsh` and `.fsh` files in `assets/<domain>/shaders/`. Reusing an identical effect ID/definition is allowed; conflicting definitions under one ID are rejected before changing provider selection. Appearance variants need distinct IDs, but may share the same shader domain/basename/ABI. The same engine shader name cannot identify conflicting program keys.
 
+## Bounded draw levels
+
+Providers may return `new ItemSlotIndicator(fill, color, new ItemSlotIndicatorDrawRange(0.2f, 0.8f))`. Omit the range for existing empty-to-full behavior. Levels are fractions of slot height/area measured upward from the bottom: mapped height is `minimum + resourceFill * (maximum - minimum)`. Thus resource fill 0 draws at 20%, 0.5 at 50%, and 1 at 80% in this example. The colored region remains bottom-anchored; the range limits its top edge, not its bottom. Use a positive minimum to retain visible fill at empty, and a maximum below one to retain headroom at full. Ranges require finite `0 <= minimum < maximum <= 1`.
+
+Resource fill and color remain provider-owned samples. Only rendering maps fill. The shader receives mapped height as `fill`; resource fill and draw levels stay on the CPU for mapping and separate boundary-bar draws. The shader ABI remains unchanged. Effect deformation follows the common slot-containment and mapped-area contract below. Opacity zero remains intentionally invisible. Built-in providers do not opt into a range automatically.
+
+Within the nearest 15% of resource fill to an endpoint, one fixed horizontal bar marks that boundary. It fades in with smoothstep, reaches 60% of provider opacity at the endpoint, and uses RGB lightened 65% toward white. Its thickness is one pixel at a 48-pixel slot, scaling with slot size. The bar stays inside the slot and disappears in the middle range. The GUI rectangle path draws it after an effect returns to the GUI shader, or in the same scope as plain/fallback fill; no new shader assets or mesh uploads are needed. Cached range changes participate in adaptive activity detection.
+
 ## Geometry and shader inputs
 
 ABI 1 uses indexed triangles and one `vec3` position attribute at location 0. Each vertex contains `(u, edge, 0)`: `u` is the normalized horizontal sample and `edge` is zero for the bottom or one for the surface. Quad topology requires one segment; fill strips accept 2–64 segments, with 16 as the default. Meshes have `2(N+1)` vertices and `6N` indices and are shared by ABI/topology/subdivision count.
@@ -30,7 +38,7 @@ ABI 1 uses indexed triangles and one `vec3` position attribute at location 0. Ea
 | `projectionMatrix` | `mat4` | Current engine GUI projection |
 | `modelViewMatrix` | `mat4` | Current engine GUI model-view, including dialog depth |
 | `slotBounds` | `vec4` | Scaled pixel left/top/width/height |
-| `fill` | `float` | Sanitized provider fill in [0,1] |
+| `fill` | `float` | Mapped geometry height in [0,1] |
 | `color` | `vec4` | Sanitized straight RGBA in [0,1] |
 | `timeSeconds` | `float` | Shared periodic animation clock in [0,64) |
 | `motion` | `vec2` | Shared damped camera rates in [-1,1] |
@@ -49,7 +57,7 @@ gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 80.0, 1.0);
 
 Keep horizontal coordinates, bottom anchoring, slot extent, and local depth unchanged. Require `abs(d) <= min(0.1, 0.25*fill, 0.25*(1-fill))` and zero discrete trapezoidal mean over the mesh samples. This preserves the represented area and forces zero deformation at empty/full fill. Prove the bound and mean analytically and sample every supported subdivision and boundary fill in tests. Clamping individual surface heights can bias area and is unsuitable as a substitute.
 
-The fragment shader writes only attachment zero as `vec4(color.rgb * color.a, color.a)`. Premultiply once; retain provider opacity and color. Do not write fragment depth or introduce side effects. Zero fill or alpha skips drawing; a provider's full-fill warning overlay remains full coverage even when the physical resource is empty.
+The fragment shader writes only attachment zero as `vec4(color.rgb * color.a, color.a)`. Premultiply once; retain provider opacity and color. Do not write fragment depth or introduce side effects. Default-mode zero fill or zero alpha skips drawing; bounded mode maps empty fill onto its minimum level and can still show a boundary cue; a provider's full-fill warning overlay remains full coverage even when the physical resource is empty.
 
 ## Animation, rendering, and ownership
 
@@ -69,12 +77,12 @@ Missing or invalid resources select the rectangle using the winning provider's o
 2. Prove surface containment, bottom anchoring, mean area, empty/full behavior, and clock periodicity; add focused boundary tests.
 3. Attach the definition to the intended registration without changing provider sampling or priority.
 4. Inspect the built ZIP for both assets, then validate engine compilation/linking and appearance in a user-run client.
-5. Test load failure, repeated shader reload, and shutdown in that graphics context; compare matched CPU/GPU workloads against the acceptance protocol in [ItemSlotIndicatorEffects.todo](ItemSlotIndicatorEffects.todo#performance-acceptance-protocol).
+5. Test load failure, repeated shader reload, and shutdown in that graphics context; compare matched CPU/GPU workloads using the matched workload described below.
 
 Built-in providers currently register no effects and render ordinary rectangles. The temporary demonstration declaration, environment override, shader assets, and shader-specific tests were removed after user-run animation validation. Actual item themes will be added separately; the registration and rendering infrastructure remains available.
 
 User-run acceptance covers inventory and hotbar placement, GUI scales 1.0/1.5, scrolling/scissor edges, overlays and notification jitter, returned fills 0/0.01/0.25/0.5/0.99/1, static/moving cameras, long gaps, and camera/world changes. Include warnings whose returned fill differs from physical resource level. Run valid and deliberately broken shader assets, reload repeatedly, restore valid assets, and shut down while checking logs and resource lifetime. Never interpret headless test results or ZIP inspection as runtime shader validation.
 
-The planning document defines the matched 10/100/250-visible-slot protocol, N=16/64, alternating plain/effect cases, warmup, repeated runs, asynchronous GPU measurements, independent CPU/GPU budgets, and structural compile/upload/allocation gates. Record machine/driver/build, workload conditions, shader switches, mesh uploads, and measurement uncertainty. The user confirmed visible demonstration animation on 2026-10-04. The detailed graphics acceptance matrix, reload/failure/shutdown cases, and matched performance budgets remain unverified until their results exist. Geometry shaders and production themes remain deferred.
+For matched measurements, compare 10/100/250 visible slots at GUI scales 1.0/1.5, N=16/64, plain/effect/mixed cases, and static/moving cameras. Warm up for 10 seconds, then collect three paired 30-second runs; report CPU median/p95 and asynchronous GPU measurements separately, with shader-switch and mesh-upload counts. The initial budgets were 0.05 ms maximum disabled-effects regression and 0.25 ms median / 0.5 ms p95 enabled-effects overhead for CPU and GPU independently; those measurements were waived at user acceptance and are not claimed as passing. Record machine/driver/build, workload conditions, shader switches, mesh uploads, and measurement uncertainty. The user confirmed visible demonstration animation on 2026-10-04. The detailed graphics acceptance matrix, reload/failure/shutdown cases, and matched performance budgets remain unverified until their results exist. Geometry shaders and production themes remain deferred.
 
 Implementation anchors: [system](../VanillaExpanded/src/ItemSlotIndicators/ItemSlotIndicatorSystem.cs), [definition](../VanillaExpanded/src/ItemSlotIndicators/Effects/ItemSlotIndicatorEffectDefinition.cs), [resources](../VanillaExpanded/src/ItemSlotIndicators/Rendering/ItemSlotIndicatorResources.cs), [draw backend](../VanillaExpanded/src/ItemSlotIndicators/Rendering/ItemSlotIndicatorDrawBackend.cs). Engine integration was inspected against Vintage Story 1.22.7.0; recheck it when updating engine versions.

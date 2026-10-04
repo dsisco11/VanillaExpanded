@@ -11,6 +11,19 @@ public sealed class AdaptiveSamplingTests
 {
     #region Public API
     #region Scheduling
+    /// <summary>Changing the drawable range activates polling even when resource fill and color stay unchanged.</summary>
+    [Fact]
+    public void DrawRangeChange_ActivatesSampling()
+    {
+        var f = new Fixture();
+        f.Query(0, 1);
+        f.Provider.DrawRange = new ItemSlotIndicatorDrawRange(0.2f, 0.8f);
+        f.Query(1000, 2);
+        f.Query(1100, 3);
+        Assert.True(f.System.TryGetRenderSelection(f.Slot, out var selection));
+        Assert.Equal(f.Provider.DrawRange, selection.Indicator.DrawRange);
+    }
+
     /// <summary>Invisible output changes do not activate an absent provider or accelerate a fallback registration.</summary>
     [Fact]
     public void Registrations_KeepIndependentActivity()
@@ -264,6 +277,7 @@ public sealed class AdaptiveSamplingTests
         internal int Calls;
         internal float Fill;
         internal Vector4 Color;
+        internal ItemSlotIndicatorDrawRange? DrawRange;
         internal bool Applicable = true;
 
         #region Public API
@@ -271,7 +285,7 @@ public sealed class AdaptiveSamplingTests
         public bool TryGetIndicator(ItemSlot slot, out ItemSlotIndicator indicator)
         {
             Calls++;
-            indicator = new ItemSlotIndicator(Fill, Color);
+            indicator = new ItemSlotIndicator(Fill, Color, DrawRange);
             return Applicable;
         }
         #endregion

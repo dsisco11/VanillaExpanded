@@ -112,7 +112,8 @@ internal sealed class ItemSlotIndicatorRegistration
         if (previous.Applicable != applicable) return true;
         if (!applicable) return false;
         var difference = System.Numerics.Vector4.Abs(current.Color - previous.Indicator.Color);
-        return Math.Abs(current.Fill - previous.Indicator.Fill) > options.FillChangeThreshold
+        return current.DrawRange != previous.Indicator.DrawRange
+            || Math.Abs(current.Fill - previous.Indicator.Fill) > options.FillChangeThreshold
             || difference.X > options.ColorChangeThreshold || difference.Y > options.ColorChangeThreshold
             || difference.Z > options.ColorChangeThreshold || difference.W > options.ColorChangeThreshold;
     }
