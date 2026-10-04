@@ -41,6 +41,30 @@ public sealed class ItemSlotIndicatorTests
     #endregion
 
     #region Provider Selection
+    /// <summary>Changing effect enablement preserves the cached liquid amount and applies without restarting.</summary>
+    [Fact]
+    public void LiquidEffectToggle_PreservesIndicatorAndAppliesImmediately()
+    {
+        var config = VanillaExpandedModSystem.Config;
+        bool previous = config.EnableLiquidSloshEffect;
+        try
+        {
+            var slot = new ItemSlot(null);
+            var indicator = new ItemSlotIndicator(0.4f, Vector4.One);
+            var system = new ItemSlotIndicatorSystem();
+            system.Register(CreateProvider(slot, true, indicator), effect: VanillaExpanded.ItemSlotIndicators.Effects.LiquidSloshIndicatorEffect.Definition);
+            config.EnableLiquidSloshEffect = false;
+            Assert.True(system.TryGetRenderSelection(slot, out var plain));
+            Assert.Equal(indicator, plain.Indicator);
+            Assert.Null(plain.Effect);
+            config.EnableLiquidSloshEffect = true;
+            Assert.True(system.TryGetRenderSelection(slot, out var animated));
+            Assert.NotNull(animated.Effect);
+            Assert.Equal(indicator, animated.Indicator);
+        }
+        finally { config.EnableLiquidSloshEffect = previous; }
+    }
+
     /// <summary>Overlay priority is independent and cannot replace the primary freshness presentation.</summary>
     [Fact]
     public void Selection_PreservesPrimaryAndAddsIndependentOverlay()

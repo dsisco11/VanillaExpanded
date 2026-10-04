@@ -64,7 +64,8 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
                 VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity));
         Register(new FoodContainerIndicatorProvider(),
             contextKey: static () => (VanillaExpandedModSystem.Config.EnablePerishableItemFreshnessIndicators,
-                VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity),
+                VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity,
+                VanillaExpandedModSystem.Config.EnableFoodGrainEffect),
             effect: FoodGrainIndicatorEffect.Definition, overlay: true, adaptiveSampling: new AdaptiveSamplingOptions());
         Register(new PreparationIndicatorProvider(), priority: -10,
             contextKey: static () => VanillaExpandedModSystem.Config.EnablePreparationIndicators);
@@ -153,7 +154,7 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
             if (entry.Overlay) continue;
             if (!entry.TryGetIndicator(slot, now, out ItemSlotIndicator indicator)) continue;
             // Attach the winning registration's effect after sampling, so animation never affects cache validity.
-            selection = new ItemSlotIndicatorRenderSelection(indicator, entry.Effect);
+            selection = new ItemSlotIndicatorRenderSelection(indicator, SelectEffect(entry.Effect));
             primaryFound = true;
             break;
         }
@@ -162,8 +163,8 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
         {
             if (!entry.Overlay || !entry.TryGetIndicator(slot, now, out var indicator)) continue;
             selection = primaryFound
-                ? selection with { OverlayIndicator = indicator, OverlayEffect = entry.Effect }
-                : new ItemSlotIndicatorRenderSelection(indicator, entry.Effect);
+                ? selection with { OverlayIndicator = indicator, OverlayEffect = SelectEffect(entry.Effect) }
+                : new ItemSlotIndicatorRenderSelection(indicator, SelectEffect(entry.Effect));
             return true;
         }
         return primaryFound;
@@ -176,5 +177,12 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
         NeedsCameraMotion = false;
     }
     #endregion
+    #endregion
+
+    #region Private
+    /// <summary>Applies live liquid effect configuration without invalidating resource-volume samples.</summary>
+    private static ItemSlotIndicatorEffectDefinition? SelectEffect(ItemSlotIndicatorEffectDefinition? effect) =>
+        effect?.ShaderName == LiquidSloshIndicatorEffect.Definition.ShaderName
+            && !VanillaExpandedModSystem.Config.EnableLiquidSloshEffect ? null : effect;
     #endregion
 }

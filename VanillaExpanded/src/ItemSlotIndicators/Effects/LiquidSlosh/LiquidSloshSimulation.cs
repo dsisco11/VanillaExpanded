@@ -83,7 +83,8 @@ internal sealed class LiquidSloshSimulation : IRenderer
         previousTime = now;
         bool first = !hasTime;
         hasTime = true;
-        bool enabled = VanillaExpandedModSystem.Config.EnableLiquidContainerIndicators;
+        bool enabled = VanillaExpandedModSystem.Config.EnableLiquidContainerIndicators
+            && VanillaExpandedModSystem.Config.EnableLiquidSloshEffect;
         if (!enabled)
         {
             if (wasEnabled) buffers.Reset();
@@ -156,8 +157,10 @@ internal sealed class LiquidSloshSimulation : IRenderer
                 TimeStep = (float)StepSeconds,
                 CellCount = LiquidSloshStateBuffers.CellCount,
                 CellSpacing = 1f / LiquidSloshStateBuffers.CellCount,
-                Gravity = 1, Damping = 3,
-                WallDamping = 6, WallDampingWidth = 0.2f,
+                Gravity = 1,
+                Damping = 3,
+                WallDamping = 6,
+                WallDampingWidth = 0.2f,
                 FeedbackObject = buffers.FeedbackObject,
                 VertexArray = buffers.VertexArray
             };

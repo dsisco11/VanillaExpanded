@@ -13,6 +13,30 @@ namespace VanillaExpanded.Tests.Unit.FoodContainerIndicators;
 public sealed class FoodContainerIndicatorProviderTests
 {
     #region Public API
+    /// <summary>Disabling grains hides only the amount layer, leaving meal freshness applicable.</summary>
+    [Fact]
+    public void FoodEffectToggle_DoesNotHideFreshness()
+    {
+        var config = VanillaExpandedModSystem.Config;
+        bool previous = config.EnableFoodGrainEffect;
+        try
+        {
+            var (world, api, inventory) = CreateInventory();
+            var item = new Mock<MockItem>(1, (byte)0, api);
+            item.Object.Attributes = JsonObject.FromJson("{\"mealContainer\":true}");
+            item.Setup(value => value.GetCollectibleInterface<IBlockMealContainer>()).Returns(CreateMeal(world));
+            item.Setup(value => value.UpdateAndGetTransitionState(world, inventory[0], EnumTransitionType.Perish))
+                .Returns(new TransitionState { FreshHours = 100, FreshHoursLeft = 50 });
+            inventory[0].Itemstack = new ItemStack(item.Object);
+            config.EnableFoodGrainEffect = false;
+            Assert.False(new FoodContainerIndicatorProvider().TryGetIndicator(inventory[0], out _));
+            Assert.True(new FreshnessIndicatorProvider().TryGetIndicator(inventory[0], out _));
+            config.EnableFoodGrainEffect = true;
+            Assert.True(new FoodContainerIndicatorProvider().TryGetIndicator(inventory[0], out _));
+        }
+        finally { config.EnableFoodGrainEffect = previous; }
+    }
+
     /// <summary>Food level follows servings and vessel capacity even when no perish state exists.</summary>
     [Theory]
     [InlineData(0, false, 0)]

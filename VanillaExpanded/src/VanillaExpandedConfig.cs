@@ -59,6 +59,10 @@ public class VanillaExpandedConfig
 
     /// <summary>Shows liquid volume indicators on container and watering-can item slots.</summary>
     public bool EnableLiquidContainerIndicators { get; set; } = true;
+    /// <summary>Animates liquid volume indicators; disabling retains plain volume fills.</summary>
+    public bool EnableLiquidSloshEffect { get; set; } = true;
+    /// <summary>Shows animated food-amount grains without disabling meal freshness backgrounds.</summary>
+    public bool EnableFoodGrainEffect { get; set; } = true;
 
     /// <summary>Shows night-vision fuel indicators on item slots.</summary>
     public bool EnableNightVisionFuelIndicators { get; set; } = true;

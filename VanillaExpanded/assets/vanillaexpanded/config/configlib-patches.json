@@ -103,6 +103,24 @@
         "weight": 1.74,
         "clientSide": true
       },
+      "EnableLiquidSloshEffect": {
+        "code": "EnableLiquidSloshEffect",
+        "name": "EnableLiquidSloshEffect",
+        "ingui": "vanillaexpanded:config-enable-liquid-slosh-effect",
+        "comment": "vanillaexpanded:config-enable-liquid-slosh-effect-tooltip",
+        "default": true,
+        "weight": 1.745,
+        "clientSide": true
+      },
+      "EnableFoodGrainEffect": {
+        "code": "EnableFoodGrainEffect",
+        "name": "EnableFoodGrainEffect",
+        "ingui": "vanillaexpanded:config-enable-food-grain-effect",
+        "comment": "vanillaexpanded:config-enable-food-grain-effect-tooltip",
+        "default": true,
+        "weight": 1.75,
+        "clientSide": true
+      },
       "EnableNightVisionFuelIndicators": {
         "code": "EnableNightVisionFuelIndicators",
         "name": "EnableNightVisionFuelIndicators",

@@ -84,7 +84,8 @@ internal sealed class FoodGrainSimulation : IRenderer
         previousTime = now;
         bool first = !hasTime;
         hasTime = true;
-        bool enabled = VanillaExpandedModSystem.Config.EnablePerishableItemFreshnessIndicators;
+        bool enabled = VanillaExpandedModSystem.Config.EnablePerishableItemFreshnessIndicators
+            && VanillaExpandedModSystem.Config.EnableFoodGrainEffect;
         if (!enabled)
         {
             if (wasEnabled) buffers.Reset();
