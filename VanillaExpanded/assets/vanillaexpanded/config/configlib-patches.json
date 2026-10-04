@@ -51,14 +51,6 @@
         "default": true,
         "weight": 1.4
       },
-      "EnableQuickTools": {
-        "code": "EnableQuickTools",
-        "name": "EnableQuickTools",
-        "ingui": "vanillaexpanded:config-enable-quick-tools",
-        "comment": "vanillaexpanded:config-enable-quick-tools-tooltip",
-        "default": true,
-        "weight": 1.5
-      },
       "QuickToolSelectOnRelease": {
         "code": "QuickToolSelectOnRelease",
         "name": "QuickToolSelectOnRelease",

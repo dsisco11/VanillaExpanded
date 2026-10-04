@@ -24,7 +24,7 @@ internal sealed class QuickToolClientOperations : IDisposable
     /// <summary>Binds the current client context and local player lifecycle.</summary>
     internal QuickToolClientOperations(ICoreClientAPI api)
         : this(api.Event,
-            () => VanillaExpandedModSystem.Config.EnableQuickTools && api.PlayerReadyFired
+            () => api.PlayerReadyFired
                 && api.World.Player?.Entity?.Alive == true,
             () => (api.World.Player?.InventoryManager, api.World.Player?.Entity?.LeftHandItemSlot),
             api.Network.SendPacketClient, tagRegistry: api.CollectibleTagRegistry)
@@ -110,7 +110,7 @@ internal sealed class QuickToolClientOperations : IDisposable
         return result;
     }
 
-    /// <summary>Requires a live local player and the enabled feature before movement.</summary>
+    /// <summary>Requires a live local player before movement.</summary>
     private bool Ready() => !disposed && ready();
 
     #endregion
@@ -147,7 +147,7 @@ internal sealed class QuickToolClientOperations : IDisposable
     #endregion
 
     #region Lifecycle
-    /// <summary>Discards session and player references on world exit or feature disablement.</summary>
+    /// <summary>Discards session and player references when the player context becomes unavailable.</summary>
     internal void Clear()
     {
         equipment?.Clear();

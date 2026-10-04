@@ -1,11 +1,10 @@
-using VanillaExpanded.ModSystems;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 
 namespace VanillaExpanded.QuickTools;
 
 /// <summary>Registers the client quick-tool owner using the game's ordinary inventory networking.</summary>
-internal sealed class QuickToolSystem : ModSystem, ILiveConfigurable
+internal sealed class QuickToolSystem : ModSystem
 {
     private QuickToolClientOperations? client;
     private QuickToolClientIntegration? integration;
@@ -20,12 +19,6 @@ internal sealed class QuickToolSystem : ModSystem, ILiveConfigurable
 
     /// <summary>Loads input and equipment integration only on the client.</summary>
     public override bool ShouldLoad(EnumAppSide forSide) => forSide == EnumAppSide.Client;
-
-    /// <summary>Clears transient restoration history when the feature is disabled.</summary>
-    public void OnConfigReloaded(ICoreAPI api)
-    {
-        integration?.ApplyConfig();
-    }
 
     /// <summary>Releases the client owner and its subscriptions on shutdown.</summary>
     public override void Dispose()

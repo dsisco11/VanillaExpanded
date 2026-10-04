@@ -45,6 +45,18 @@ public class ConfigLibIntegrationTests
     }
 
     [Fact]
+    public void ApplyConfigLibSettings_RemovedQuickToolsToggle_IsIgnored()
+    {
+        var config = new VanillaExpandedConfig();
+        var data = new StringAttribute("{\"EnableQuickTools\":\"false\"}");
+
+        int applied = ConfigLibIntegrationModSystem.ApplyConfigLibSettings(config, data);
+
+        Assert.Equal(0, applied);
+        Assert.Null(typeof(VanillaExpandedConfig).GetProperty("EnableQuickTools"));
+    }
+
+    [Fact]
     public void ApplyConfigLibSettings_SingleTreeUpdate_AppliesBoolean()
     {
         var config = new VanillaExpandedConfig { EnableAutoStash = true };

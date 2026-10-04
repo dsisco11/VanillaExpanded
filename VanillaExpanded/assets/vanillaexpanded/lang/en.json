@@ -1,7 +1,5 @@
 {
   "hotkey-quick-tool": "Quick tools (hold)",
-  "config-enable-quick-tools": "Quick Tools",
-  "config-enable-quick-tools-tooltip": "Enable the quick-tool radial menu. Assign its hold key in Controls.",
   "config-enable-tool-mode-radial-menu": "Tool-Mode Radial Menu",
   "config-enable-tool-mode-radial-menu-tooltip": "Replace base-game tool-mode grids with a radial menu.",
   "config-enable-perishable-item-freshness-indicators": "Perishable Item Freshness Indicators",
