@@ -26,7 +26,9 @@ internal sealed class ItemSlotIndicatorCameraSource(ICoreClientAPI api) : IItemS
         // local eye height so world travel is excluded and disabled/third-person bob contributes nothing.
         double? eyeHeight = mode == EnumCameraMode.FirstPerson && api.Settings.Bool["viewBobbing"]
             ? entity.LocalEyePos.Y : null;
-        return new(world, player, camera, mode, ItemSlotIndicatorCameraBasis.FromViewMatrix(matrix), eyeHeight);
+        var eye = camera.CameraEyePos;
+        return new(world, player, camera, mode, ItemSlotIndicatorCameraBasis.FromViewMatrix(matrix), eyeHeight,
+            new(eye.X, eye.Y, eye.Z));
     }
     #endregion
 }

@@ -16,6 +16,8 @@ internal sealed class ItemSlotIndicatorFrameUpdater : IRenderer
 
     /// <summary>Gets the shared animation owner consumed by every slot draw.</summary>
     internal ItemSlotIndicatorFrameState State { get; } = new();
+    /// <summary>Gets the copied camera pose captured once for this GUI frame, also consumed by liquid simulation.</summary>
+    internal ItemSlotIndicatorCameraSample? CameraSample { get; private set; }
     /// <summary>Runs immediately before the engine GUI manager at order one.</summary>
     public double RenderOrder => 0.99;
     /// <summary>Specifies no world-distance restriction for GUI animation updates.</summary>
@@ -38,7 +40,8 @@ internal sealed class ItemSlotIndicatorFrameUpdater : IRenderer
     {
         if (disposed || stage != EnumRenderStage.Ortho) return;
         bool needsMotion = needsCameraMotion();
-        State.Update(clock(), needsMotion, needsMotion ? camera.Capture() : null);
+        CameraSample = needsMotion ? camera.Capture() : null;
+        State.Update(clock(), needsMotion, CameraSample);
     }
 
     /// <summary>Removes the callback once; later engine callbacks cannot advance a disposed owner.</summary>
@@ -46,6 +49,7 @@ internal sealed class ItemSlotIndicatorFrameUpdater : IRenderer
     {
         if (disposed) return;
         disposed = true;
+        CameraSample = null;
         events.UnregisterRenderer(this, EnumRenderStage.Ortho);
     }
     #endregion

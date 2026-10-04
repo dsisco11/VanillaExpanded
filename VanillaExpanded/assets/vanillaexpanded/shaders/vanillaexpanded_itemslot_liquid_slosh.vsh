@@ -7,22 +7,19 @@ uniform mat4 modelViewMatrix;
 uniform vec4 slotBounds;
 uniform float fill;
 uniform float timeSeconds;
-uniform vec2 motion;
-uniform float cameraBob;
 uniform vec4 effectParameters;
 uniform int segmentCount;
+uniform samplerBuffer liquidSurface;
+uniform int surfaceCellCount;
 
-/* Oscillates the center against both sides and raises the edges without changing sampled fill area. */
-void main()
+/** Interpolates the shared cell-centered surface and adds small idle motion and edge wetting. */
+float rawSurface(float u)
 {
-    float u = vertex.x;
-    // Integral cycles over the shared clock period avoid a jump when time wraps.
-    float phase = 6.28318530718 * timeSeconds / 2.0 + 0.75 * cameraBob;
-    float activity = max(max(abs(motion.x), abs(motion.y)), abs(cameraBob));
-    float wave = -(effectParameters.x + effectParameters.y * activity)
-        * cos(6.28318530718 * u) * cos(phase);
-    // A quartic edge rise suggests a meniscus. Subtract its exact strip-sampled mean,
-    // then normalize its largest excursion so the parameter remains a displacement weight.
+    float cell = clamp(u * float(surfaceCellCount) - 0.5, 0.0, float(surfaceCellCount - 1));
+    int left = int(floor(cell));
+    int right = min(left + 1, surfaceCellCount - 1);
+    float displacement = mix(texelFetch(liquidSurface, left).r, texelFetch(liquidSurface, right).r, fract(cell));
+    float wave = -effectParameters.y * cos(6.28318530718 * u) * cos(6.28318530718 * timeSeconds / 2.0);
     float inverseSegmentsSquared = 1.0 / (float(segmentCount) * float(segmentCount));
     float edgeMean = 0.2 + (4.0 / 3.0) * inverseSegmentsSquared
         - (8.0 / 15.0) * inverseSegmentsSquared * inverseSegmentsSquared;
@@ -30,11 +27,27 @@ void main()
     float edgeShape = centered * centered;
     edgeShape *= edgeShape;
     float meniscus = effectParameters.w * (edgeShape - edgeMean) / (1.0 - edgeMean);
-    // Looking right raises the left edge, opposing the camera turn.
-    float tilt = -effectParameters.z * motion.x * (2.0 * u - 1.0);
-    // The weights total at most one. Bound the whole deformation instead of clipping individual heights.
+    return displacement * effectParameters.x * 8.0 + wave + meniscus;
+}
+
+/** Maps the shared fluid surface into the slot while retaining sampled area and a uniform displacement bound. */
+void main()
+{
+    float u = vertex.x;
+    float mean = 0.0;
+    float peak = 0.0;
+    // Cell centers and mesh vertices sample different grids. Correct the actual mesh's trapezoidal mean,
+    // then scale the entire profile uniformly rather than clipping peaks and changing represented fill.
+    for (int sample = 0; sample <= segmentCount; sample++)
+    {
+        float value = rawSurface(float(sample) / float(segmentCount));
+        mean += value * ((sample == 0 || sample == segmentCount) ? 0.5 : 1.0);
+        peak = max(peak, abs(value));
+    }
+    mean /= float(segmentCount);
+    float displacement = (rawSurface(u) - mean) / max(1.0, peak + abs(mean));
     float allowance = min(0.1, min(0.25 * fill, 0.25 * (1.0 - fill)));
-    float height = fill + allowance * (wave + tilt + meniscus);
+    float height = fill + allowance * displacement;
     vec2 position = vec2(slotBounds.x + u * slotBounds.z,
         slotBounds.y + slotBounds.w * (1.0 - vertex.y * height));
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 80.0, 1.0);

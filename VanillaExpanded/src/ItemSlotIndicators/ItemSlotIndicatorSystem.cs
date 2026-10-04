@@ -6,6 +6,7 @@ using HarmonyLib;
 using VanillaExpanded.ClothingIndicators;
 using VanillaExpanded.ItemSlotIndicators.Animation;
 using VanillaExpanded.ItemSlotIndicators.Effects;
+using VanillaExpanded.ItemSlotIndicators.Effects.LiquidSlosh;
 using VanillaExpanded.ItemSlotIndicators.Rendering;
 using VanillaExpanded.LiquidContainerIndicators;
 using VanillaExpanded.NightVisionIndicators;
@@ -24,6 +25,7 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
     private ImmutableArray<ItemSlotIndicatorRegistration> providers = [];
     private Harmony? harmony;
     private ItemSlotIndicatorFrameUpdater? frameUpdater;
+    private LiquidSloshSimulation? liquidSimulation;
 
     /// <summary>Gets the client-owned indicator renderer used by the GUI hook.</summary>
     internal ItemSlotIndicatorRenderer? Renderer { get; private set; }
@@ -71,9 +73,11 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
             effect: LiquidSloshIndicatorEffect.Definition);
         Register(new NightVisionFuelIndicatorProvider(), priority: 10, adaptiveSampling: adaptiveSampling,
             contextKey: static () => VanillaExpandedModSystem.Config.EnableNightVisionFuelIndicators);
-        Resources.Initialize();
-        Renderer = new ItemSlotIndicatorRenderer(Resources, new ItemSlotIndicatorDrawBackend(api));
         frameUpdater = new ItemSlotIndicatorFrameUpdater(api.Event, new ItemSlotIndicatorCameraSource(api), () => NeedsCameraMotion);
+        liquidSimulation = new LiquidSloshSimulation(api, () => frameUpdater.CameraSample);
+        Resources.Initialize();
+        Renderer = new ItemSlotIndicatorRenderer(Resources,
+            new ItemSlotIndicatorDrawBackend(api, () => liquidSimulation.SurfaceTexture));
         Active = this;
         harmony = new Harmony(Constants.ModId + ".itemslotindicators");
         new PatchClassProcessor(harmony, typeof(ItemSlotIndicatorPatch)).Patch();
@@ -84,6 +88,8 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
     {
         harmony?.UnpatchAll(harmony.Id);
         harmony = null;
+        liquidSimulation?.Dispose();
+        liquidSimulation = null;
         frameUpdater?.Dispose();
         frameUpdater = null;
         Renderer?.Dispose();

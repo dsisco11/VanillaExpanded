@@ -18,9 +18,9 @@ internal sealed class LiquidSloshSimulationShaderProgram : ShaderProgram
     internal const string ShaderName = "vanillaexpanded_itemslot_liquid_simulation";
     private static readonly string[] feedbackVaryings = ["nextHeight", "nextFlow"];
     private static readonly string[] requiredUniforms =
-        ["timeStep", "cameraAcceleration", "gravity", "damping", "cellCount", "cellSpacing", "state"];
+        ["timeStep", "containerAcceleration", "gravity", "damping", "cellCount", "cellSpacing", "state"];
     private float timeStep = 1f / 240;
-    private Vector2 cameraAcceleration;
+    private Vector2 containerAcceleration;
     private float gravity = 1, damping = 1, cellSpacing = 1f / 32;
     private int cellCount = 32;
     private int sourceStateTexture, feedbackBuffer, feedbackObject, vertexArray;
@@ -35,14 +35,14 @@ internal sealed class LiquidSloshSimulationShaderProgram : ShaderProgram
     }
 
     /// <summary>Gets or sets finite horizontal/vertical acceleration in the virtual container's coordinate system.</summary>
-    internal Vector2 CameraAcceleration
+    internal Vector2 ContainerAcceleration
     {
-        get => cameraAcceleration;
+        get => containerAcceleration;
         set
         {
             if (!float.IsFinite(value.X) || !float.IsFinite(value.Y))
-                throw new ArgumentOutOfRangeException(nameof(CameraAcceleration));
-            cameraAcceleration = value;
+                throw new ArgumentOutOfRangeException(nameof(ContainerAcceleration));
+            containerAcceleration = value;
         }
     }
 
@@ -125,6 +125,7 @@ internal sealed class LiquidSloshSimulationShaderProgram : ShaderProgram
         if (!compiled) return false;
         try
         {
+            ItemSlotIndicatorBufferSampler.Register(this, "state");
             foreach (string uniform in requiredUniforms)
                 if (!HasUniform(uniform))
                     throw new InvalidOperationException($"Liquid solver is missing uniform '{uniform}'.");
@@ -196,7 +197,7 @@ internal sealed class LiquidSloshSimulationShaderProgram : ShaderProgram
     private void ValidateSolverStep()
     {
         // Match the shader's effective gravity clamp. Double arithmetic avoids overflow in the guard.
-        double effectiveGravity = Math.Clamp((double)gravity + cameraAcceleration.Y, 0.1 * gravity, 4.0 * gravity);
+        double effectiveGravity = Math.Clamp((double)gravity + containerAcceleration.Y, 0.1 * gravity, 4.0 * gravity);
         double courant = timeStep * Math.Sqrt(effectiveGravity) / cellSpacing;
         if (courant > 0.45)
             throw new InvalidOperationException("Liquid solver timestep exceeds the wave-propagation stability limit.");
@@ -212,7 +213,7 @@ internal sealed class LiquidSloshSimulationShaderProgram : ShaderProgram
             ActiveUniformType? expected = name switch
             {
                 "timeStep" or "gravity" or "damping" or "cellSpacing" => ActiveUniformType.Float,
-                "cameraAcceleration" => ActiveUniformType.FloatVec2,
+                "containerAcceleration" => ActiveUniformType.FloatVec2,
                 "cellCount" => ActiveUniformType.Int,
                 "state" => ActiveUniformType.SamplerBuffer,
                 _ => null
@@ -237,7 +238,7 @@ internal sealed class LiquidSloshSimulationShaderProgram : ShaderProgram
     private void SubmitInputs()
     {
         Uniform("timeStep", timeStep);
-        Uniform("cameraAcceleration", cameraAcceleration.X, cameraAcceleration.Y);
+        Uniform("containerAcceleration", containerAcceleration.X, containerAcceleration.Y);
         Uniform("gravity", gravity);
         Uniform("damping", damping);
         Uniform("cellCount", cellCount);

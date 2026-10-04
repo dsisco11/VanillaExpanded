@@ -23,13 +23,13 @@ public sealed class LiquidSloshSimulationShaderProgramTests
     {
         var shader = new LiquidSloshSimulationShaderProgram
         {
-            TimeStep = 1f / 240, CameraAcceleration = new(-2, 3), Gravity = 4, Damping = 0,
+            TimeStep = 1f / 240, ContainerAcceleration = new(-2, 3), Gravity = 4, Damping = 0,
             CellCount = 16, CellSpacing = 0.125f, SourceStateTexture = 1,
             FeedbackBuffer = 2, FeedbackObject = 3, VertexArray = 4
         };
         Assert.IsAssignableFrom<ShaderProgram>(shader);
         Assert.Equal(1f / 240, shader.TimeStep);
-        Assert.Equal(new Vector2(-2, 3), shader.CameraAcceleration);
+        Assert.Equal(new Vector2(-2, 3), shader.ContainerAcceleration);
         Assert.Equal(4, shader.Gravity);
         Assert.Equal(0, shader.Damping);
         Assert.Equal(16, shader.CellCount);
@@ -57,8 +57,8 @@ public sealed class LiquidSloshSimulationShaderProgramTests
         if (invalid != 0) Assert.Throws<ArgumentOutOfRangeException>(() => shader.Damping = invalid);
         if (!float.IsFinite(invalid))
         {
-            Assert.Throws<ArgumentOutOfRangeException>(() => shader.CameraAcceleration = new(invalid, 0));
-            Assert.Throws<ArgumentOutOfRangeException>(() => shader.CameraAcceleration = new(0, invalid));
+            Assert.Throws<ArgumentOutOfRangeException>(() => shader.ContainerAcceleration = new(invalid, 0));
+            Assert.Throws<ArgumentOutOfRangeException>(() => shader.ContainerAcceleration = new(0, invalid));
         }
         Assert.Throws<ArgumentOutOfRangeException>(() => shader.TimeStep = 0.251f);
     }
@@ -110,7 +110,7 @@ public sealed class LiquidSloshSimulationShaderProgramTests
             Assert.Throws<InvalidOperationException>(() => shader.Advance()).Message);
         // At the same step/spacing, upward acceleration increases wave speed and can cross the bound.
         shader.TimeStep = 1f / 120;
-        shader.CameraAcceleration = new(0, 3);
+        shader.ContainerAcceleration = new(0, 3);
         Assert.Equal("Liquid solver timestep exceeds the wave-propagation stability limit.",
             Assert.Throws<InvalidOperationException>(() => shader.Advance()).Message);
         shader.TimeStep = 1f / 240;

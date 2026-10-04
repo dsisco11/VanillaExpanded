@@ -2,6 +2,9 @@ using System;
 
 using VanillaExpanded.ItemSlotIndicators.Animation;
 using VanillaExpanded.ItemSlotIndicators.Effects;
+using VanillaExpanded.ItemSlotIndicators.Effects.LiquidSlosh;
+
+using OpenTK.Graphics.OpenGL4;
 
 using Vintagestory.API.Client;
 
@@ -11,17 +14,19 @@ namespace VanillaExpanded.ItemSlotIndicators.Rendering;
 internal sealed class ItemSlotIndicatorDrawBackend : IItemSlotIndicatorDrawBackend
 {
     private readonly ICoreClientAPI api;
+    private readonly Func<int> liquidSurface;
     private readonly ItemSlotIndicatorDrawState drawState;
     private readonly float[] rectangleMatrix = new float[16];
     private IShaderProgram? gui;
-    private bool captured, rectangleDrawn, disposed, failureReported;
+    private bool captured, rectangleDrawn, liquidSurfaceBound, disposed, failureReported;
 
     #region Public API
     #region Lifetime
     /// <summary>Owns only scratch storage; programs and meshes remain with the resource caches.</summary>
-    internal ItemSlotIndicatorDrawBackend(ICoreClientAPI api)
+    internal ItemSlotIndicatorDrawBackend(ICoreClientAPI api, Func<int>? liquidSurface = null)
     {
         this.api = api;
+        this.liquidSurface = liquidSurface ?? (static () => 0);
         drawState = new(api.Render);
     }
 
@@ -46,6 +51,7 @@ internal sealed class ItemSlotIndicatorDrawBackend : IItemSlotIndicatorDrawBacke
     {
         gui = api.Render.CurrentActiveShader;
         rectangleDrawn = false;
+        liquidSurfaceBound = false;
         drawState.Capture();
         captured = true;
         drawState.Apply();
@@ -55,6 +61,9 @@ internal sealed class ItemSlotIndicatorDrawBackend : IItemSlotIndicatorDrawBacke
     public void Effect(IShaderProgram program, MeshRef mesh, ItemSlotIndicatorDrawInput input,
         ItemSlotIndicatorEffectDefinition definition, ItemSlotIndicatorFrameSnapshot frame)
     {
+        bool liquid = definition.ShaderName == LiquidSloshIndicatorEffect.Definition.ShaderName;
+        int surface = liquid ? liquidSurface() : 0;
+        if (liquid && surface == 0) throw new InvalidOperationException("Shared liquid simulation is unavailable.");
         gui!.Stop();
         program.Use();
         program.UniformMatrix("projectionMatrix", api.Render.CurrentProjectionMatrix);
@@ -72,6 +81,14 @@ internal sealed class ItemSlotIndicatorDrawBackend : IItemSlotIndicatorDrawBacke
             program.Uniform("effectParameters", parameters.X, parameters.Y, parameters.Z, parameters.W);
         }
         if (program.HasUniform("segmentCount")) program.Uniform("segmentCount", definition.SegmentCount);
+        if (liquid)
+        {
+            program.Uniform("liquidSurface", 0);
+            program.Uniform("surfaceCellCount", LiquidSloshStateBuffers.CellCount);
+            liquidSurfaceBound = true;
+            GL.ActiveTexture(TextureUnit.Texture0);
+            GL.BindTexture(TextureTarget.TextureBuffer, surface);
+        }
         api.Render.RenderMesh(mesh);
     }
 
@@ -99,6 +116,11 @@ internal sealed class ItemSlotIndicatorDrawBackend : IItemSlotIndicatorDrawBacke
         captured = false;
         try
         {
+            if (liquidSurfaceBound)
+            {
+                GL.ActiveTexture(TextureUnit.Texture0);
+                GL.BindTexture(TextureTarget.TextureBuffer, 0);
+            }
             if (!ReferenceEquals(api.Render.CurrentActiveShader, gui))
             {
                 api.Render.CurrentActiveShader?.Stop();

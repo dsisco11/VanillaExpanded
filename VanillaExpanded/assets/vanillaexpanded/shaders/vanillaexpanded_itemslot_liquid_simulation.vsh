@@ -2,7 +2,7 @@
 
 uniform samplerBuffer state;
 uniform float timeStep;
-uniform vec2 cameraAcceleration;
+uniform vec2 containerAcceleration;
 uniform float gravity;
 uniform float damping;
 uniform int cellCount;
@@ -22,8 +22,8 @@ float updatedFlow(int cell, float effectiveGravity, float decay)
     float facePosition = float(cell + 1) / float(cellCount);
     // Uniform lateral inertia moves liquid opposite acceleration. Vertical shaking also
     // seeds a zero-net-volume center/side disturbance; varying gravity alone cannot disturb a flat surface.
-    float shaking = -0.2 * cameraAcceleration.y * sin(6.28318530718 * facePosition);
-    float acceleration = pressure - cameraAcceleration.x + shaking;
+    float shaking = -0.2 * containerAcceleration.y * sin(6.28318530718 * facePosition);
+    float acceleration = pressure - containerAcceleration.x + shaking;
     return (left.y + timeStep * acceleration) * decay;
 }
 
@@ -32,7 +32,7 @@ void main()
 {
     int cell = gl_VertexID;
     // The reference depth is one; height stores signed displacement about that reference.
-    float effectiveGravity = clamp(gravity + cameraAcceleration.y, 0.1 * gravity, 4.0 * gravity);
+    float effectiveGravity = clamp(gravity + containerAcceleration.y, 0.1 * gravity, 4.0 * gravity);
     float decay = exp(-damping * timeStep);
     float incoming = updatedFlow(cell - 1, effectiveGravity, decay);
     nextFlow = updatedFlow(cell, effectiveGravity, decay);

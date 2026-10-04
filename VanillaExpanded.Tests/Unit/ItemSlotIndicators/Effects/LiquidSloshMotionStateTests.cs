@@ -1,0 +1,182 @@
+using System.Numerics;
+
+using VanillaExpanded.ItemSlotIndicators.Animation;
+using VanillaExpanded.ItemSlotIndicators.Effects.LiquidSlosh;
+
+using Vintagestory.API.Client;
+
+namespace VanillaExpanded.Tests.Unit.ItemSlotIndicators.Effects;
+
+/// <summary>Checks actual camera-force differentiation, signs, braking, and discontinuity resets without a GPU.</summary>
+[Trait("Category", "Unit")]
+public sealed class LiquidSloshMotionStateTests
+{
+    private readonly object world = new(), player = new(), camera = new();
+
+    #region Public API
+    #region Translation and Inertia
+    /// <summary>Translation acceleration and an abrupt stop produce opposite signed forces, even far from world origin.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TranslationAndBraking_ProduceOppositeForces(bool vertical)
+    {
+        var state = new LiquidSloshMotionState();
+        Assert.True(state.Update(0.02, Pose(0, 0)));
+        Assert.False(state.Update(0.02, Pose(0, 0)));
+        for (int step = 1; step <= 10; step++)
+            state.Update(0.02, Pose(vertical ? 0 : step * 0.02, vertical ? step * 0.02 : 0));
+        float driven = vertical ? state.ContainerAcceleration.Y : state.ContainerAcceleration.X;
+        Assert.True(driven > 0);
+        state.Update(0.02, Pose(vertical ? 0 : 0.2, vertical ? 0.2 : 0));
+        Assert.True((vertical ? state.ContainerAcceleration.Y : state.ContainerAcceleration.X) < 0);
+        Assert.InRange(state.ContainerAcceleration.X, -3, 3);
+        Assert.InRange(state.ContainerAcceleration.Y, -3, 3);
+    }
+
+    /// <summary>Rightward camera turns drive opposite-side fluid inertia and stopping the turn produces a reverse impulse.</summary>
+    [Fact]
+    public void TurnsAndStops_ProduceSignedInertia()
+    {
+        var state = new LiquidSloshMotionState();
+        state.Update(0.02, Pose(0, 0));
+        state.Update(0.02, Pose(0, 0));
+        for (int step = 1; step <= 10; step++) state.Update(0.02, Pose(0, 0, step * 0.04f));
+        Assert.True(state.ContainerAcceleration.X > 0);
+        state.Update(0.02, Pose(0, 0, 0.4f));
+        Assert.True(state.ContainerAcceleration.X < 0);
+    }
+
+    /// <summary>Constant straight-line speed loses its startup impulse instead of sustaining a procedural lean.</summary>
+    [Fact]
+    public void ConstantVelocity_SettlesToZeroAcceleration()
+    {
+        var state = new LiquidSloshMotionState();
+        state.Update(0.02, Pose(0, 0));
+        state.Update(0.02, Pose(0, 0));
+        for (int step = 1; step <= 150; step++) state.Update(0.02, Pose(step * 0.02, 0));
+        Assert.InRange(state.ContainerAcceleration.Length(), 0, 0.0001f);
+    }
+
+    #endregion
+
+    #region Container Geometry
+    /// <summary>Camera translation cancelling the rotated offset keeps the conceptual container still.</summary>
+    [Fact]
+    public void CombinedPose_WithStationaryContainer_HasNoAcceleration()
+    {
+        var state = new LiquidSloshMotionState();
+        state.Update(0.02, Pose(0, 0));
+        state.Update(0.02, Pose(0, 0));
+        for (int step = 1; step <= 30; step++)
+        {
+            float yaw = step * 0.02f;
+            var rotatedOffset = Vector3.Transform(new Vector3(0, -0.2f, -0.4f),
+                Quaternion.CreateFromAxisAngle(Vector3.UnitY, -yaw));
+            var pose = Pose(0, 0, yaw) with
+            {
+                Position = new(1_000_000_000d - rotatedOffset.X, 0, -0.4 - rotatedOffset.Z)
+            };
+            state.Update(0.02, pose);
+            Assert.InRange(state.ContainerAcceleration.Length(), 0, 0.0001f);
+        }
+    }
+
+    /// <summary>Both pitch and roll move the offset container and produce acceleration without separate rotation factors.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PitchAndRoll_MoveConceptualContainer(bool roll)
+    {
+        var state = new LiquidSloshMotionState();
+        state.Update(0.02, Pose(0, 0));
+        state.Update(0.02, Pose(0, 0));
+        var rotation = Quaternion.CreateFromAxisAngle(roll ? Vector3.UnitZ : Vector3.UnitX, 0.02f);
+        var pose = Pose(0, 0) with
+        {
+            Basis = new(Vector3.Transform(Vector3.UnitX, rotation), Vector3.Transform(Vector3.UnitY, rotation),
+                Vector3.Transform(Vector3.UnitZ, rotation))
+        };
+        state.Update(0.02, pose);
+        Assert.True((roll ? state.ContainerAcceleration.X : state.ContainerAcceleration.Y) > 0);
+    }
+
+    #endregion
+
+    #region Sampling and Limits
+    /// <summary>Time-normalized differentiation converges on the same acceleration at different sampling rates.</summary>
+    [Fact]
+    public void ConstantAcceleration_IsConsistentAcrossFrameRates()
+    {
+        var fast = SampleAcceleration(0.01);
+        var slow = SampleAcceleration(0.02);
+        Assert.InRange(fast.X, 0.39f, 0.41f);
+        Assert.InRange(Vector2.Distance(fast, slow), 0, 0.01f);
+    }
+
+    /// <summary>One magnitude limit retains the direction of a large combined translation impulse.</summary>
+    [Fact]
+    public void AccelerationLimit_PreservesCombinedDirection()
+    {
+        var state = new LiquidSloshMotionState();
+        state.Update(0.02, Pose(0, 0));
+        state.Update(0.02, Pose(0, 0));
+        state.Update(0.02, Pose(0.1, 0.2));
+        Assert.InRange(state.ContainerAcceleration.Length(), 2.999f, 3.001f);
+        Assert.InRange(state.ContainerAcceleration.Y / state.ContainerAcceleration.X, 1.999f, 2.001f);
+    }
+
+    #endregion
+
+    #region Discontinuities
+    /// <summary>Context replacement, teleportation, missing poses, and frame gaps discard force and derivative history.</summary>
+    [Theory]
+    [InlineData("context")]
+    [InlineData("teleport")]
+    [InlineData("missing")]
+    [InlineData("gap")]
+    public void Discontinuities_ResetSharedForce(string kind)
+    {
+        var state = new LiquidSloshMotionState();
+        state.Update(0.02, Pose(0, 0));
+        state.Update(0.02, Pose(0, 0));
+        state.Update(0.02, Pose(0.02, 0));
+        Assert.True(state.ContainerAcceleration.X > 0);
+        ItemSlotIndicatorCameraSample? next = kind switch
+        {
+            "context" => Pose(0.02, 0) with { Camera = new object() },
+            "teleport" => Pose(100, 0),
+            "missing" => null,
+            _ => Pose(0.02, 0)
+        };
+        Assert.True(state.Update(kind == "gap" ? 1 : 0.02, next));
+        Assert.Equal(Vector2.Zero, state.ContainerAcceleration);
+    }
+    #endregion
+    #endregion
+
+    #region Private
+    /// <summary>Samples a one-second trajectory with constant two-blocks-per-second-squared acceleration.</summary>
+    private Vector2 SampleAcceleration(double interval)
+    {
+        var state = new LiquidSloshMotionState();
+        state.Update(interval, Pose(0, 0));
+        for (int step = 1; step <= (int)(1 / interval); step++)
+        {
+            double time = step * interval;
+            state.Update(interval, Pose(time * time, 0));
+        }
+        return state.ContainerAcceleration;
+    }
+
+    /// <summary>Copies a world position and camera basis, with positive yaw representing looking right.</summary>
+    private ItemSlotIndicatorCameraSample Pose(double right, double up, float yaw = 0)
+    {
+        var rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitY, -yaw);
+        var basis = new ItemSlotIndicatorCameraBasis(Vector3.Transform(Vector3.UnitX, rotation),
+            Vector3.UnitY, Vector3.Transform(Vector3.UnitZ, rotation));
+        return new(world, player, camera, EnumCameraMode.FirstPerson, basis,
+            Position: new(1_000_000_000 + right, up, 0));
+    }
+    #endregion
+}
