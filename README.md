@@ -69,24 +69,25 @@ Without ConfigLib, settings can be edited manually in `ModConfig/VanillaExpanded
 
 ### Available Settings
 
-| Setting                  | Default | Description                                                    |
-| ------------------------ | ------- | -------------------------------------------------------------- |
-| EnableAutoStash          | true    | Enable auto-stashing items into containers by holding interact |
-| EnableIgnitionTools      | true    | Enable lighting fires using lanterns, candles, and oil lamps   |
-| EnableSpawnDecal         | true    | Show a glowing decal at the player's respawn point             |
-| EnableAlloyCalculator    | true    | Enable the alloy calculator GUI for crucibles                  |
-| EnableEquipLightHotkey   | true    | Enable the hotkey to equip light sources to offhand/hotbar     |
-| EnableToolModeRadialMenu | true    | Replace base-game tool-mode grids with a radial menu           |
-| EnableBackpackDecraft    | true    | Enable decrafting backpacks into leather                       |
-| EnableLinenSackDecraft   | true    | Enable decrafting linen sacks into flax fibers                 |
-| EnableMetalBitsRecycling | true    | Enable recycling metal tool heads into metal bits              |
-| EnableStickRecipes       | true    | Enable crafting sticks from planks and firewood                |
-| EnableWattleDecraft      | true    | Enable decrafting wattle blocks into sticks                    |
-| AutoStashDelay           | 0.5     | Time in seconds to hold interact before auto-stashing begins   |
-| IgnitionDelay            | 0.5     | Time in seconds to hold interact before igniting a fire        |
-| SpawnDecalSize           | 0.4     | Size of the spawn point decal (0.2 to 1.0)                     |
+| Setting                    | Default | Description                                                    |
+| -------------------------- | ------- | -------------------------------------------------------------- |
+| EnableAutoStash\*          | true    | Enable auto-stashing items into containers by holding interact |
+| EnableIgnitionTools\*      | true    | Enable lighting fires using lanterns, candles, and oil lamps   |
+| EnableSpawnDecal\*         | true    | Show a glowing decal at the player's respawn point             |
+| EnableAlloyCalculator\*    | true    | Enable the alloy calculator GUI for crucibles                  |
+| EnableEquipLightHotkey     | true    | Enable the hotkey to equip light sources to offhand/hotbar     |
+| EnableToolModeRadialMenu\* | true    | Replace base-game tool-mode grids with a radial menu           |
+| EnableBackpackDecraft\*    | true    | Enable decrafting backpacks into leather                       |
+| EnableLinenSackDecraft\*   | true    | Enable decrafting linen sacks into flax fibers                 |
+| EnableMetalBitsRecycling\* | true    | Enable recycling metal tool heads into metal bits              |
+| EnableStickRecipes\*       | true    | Enable crafting sticks from planks and firewood                |
+| EnableWattleDecraft\*      | true    | Enable decrafting wattle blocks into sticks                    |
+| AutoStashDelay             | 0.5     | Time in seconds to hold interact before auto-stashing begins   |
+| IgnitionDelay              | 0.5     | Time in seconds to hold interact before igniting a fire        |
+| SpawnDecalSize             | 0.4     | Size of the spawn point decal (0.2 to 1.0)                     |
 
-**Note:** Feature toggles (Enable\*) require a world reload to take effect.
+**Note:** Settings with an `*` require a world reload to take effect when changing them from `false` to `true`.
+This is due to the fact that Vanilla Expanded will skip patching the relevant system when the setting is `false`, in order to alleviate game updates which might break certain features, this allows you to disable a broken feature and continue playing without it until the mod gets updated!
 
 ## Testing
 

@@ -45,6 +45,9 @@ internal sealed class ToolModeRadialMenuSystem : ModSystem, ILiveConfigurable
 
     internal bool TryOpen()
     {
+        if (!VanillaExpandedModSystem.Config.EnableToolModeRadialMenu)
+            return false;
+
         if (menu?.IsOpen == true)
         {
             menu.Cancel();
