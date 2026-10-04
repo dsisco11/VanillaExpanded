@@ -41,6 +41,21 @@ public sealed class ItemSlotIndicatorTests
     #endregion
 
     #region Provider Selection
+    /// <summary>Overlay priority is independent and cannot replace the primary freshness presentation.</summary>
+    [Fact]
+    public void Selection_PreservesPrimaryAndAddsIndependentOverlay()
+    {
+        var slot = new ItemSlot(null);
+        var freshness = new ItemSlotIndicator(0.25f, Vector4.One);
+        var amount = new ItemSlotIndicator(0.75f, Vector4.One);
+        var system = new ItemSlotIndicatorSystem();
+        system.Register(CreateProvider(slot, true, amount), priority: 100, overlay: true);
+        system.Register(CreateProvider(slot, true, freshness));
+        Assert.True(system.TryGetRenderSelection(slot, out var selection));
+        Assert.Equal(freshness, selection.Indicator);
+        Assert.Equal(amount, selection.OverlayIndicator);
+    }
+
     /// <summary>An empty registry leaves the item unadorned.</summary>
     [Fact]
     public void NoProviders_ReturnsFalse()

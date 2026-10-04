@@ -20,7 +20,7 @@ internal sealed class ItemSlotIndicatorRegistration
     /// <summary>Creates a registration; zero interval samples every query, and context keys invalidate cached configuration.</summary>
     internal ItemSlotIndicatorRegistration(IItemSlotIndicatorProvider provider, int priority,
         long refreshIntervalMilliseconds, Func<object?>? contextKey, AdaptiveSamplingOptions? adaptiveSampling = null,
-        ItemSlotIndicatorEffectDefinition? effect = null)
+        ItemSlotIndicatorEffectDefinition? effect = null, bool overlay = false)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentOutOfRangeException.ThrowIfNegative(refreshIntervalMilliseconds);
@@ -32,12 +32,15 @@ internal sealed class ItemSlotIndicatorRegistration
         this.provider = provider;
         Priority = priority;
         Effect = effect;
+        Overlay = overlay;
         this.refreshIntervalMilliseconds = refreshIntervalMilliseconds;
         this.contextKey = contextKey;
     }
 
     /// <summary>Gets the selection priority of this registration.</summary>
     internal int Priority { get; }
+    /// <summary>Gets whether this registration selects an additional layer independently of the primary indicator.</summary>
+    internal bool Overlay { get; }
 
     /// <summary>Gets the optional rendering effect, independently of cached provider samples.</summary>
     internal ItemSlotIndicatorEffectDefinition? Effect { get; }

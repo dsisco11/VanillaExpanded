@@ -2,7 +2,7 @@ using VanillaExpanded.ItemSlotIndicators.Effects.FoodGrains;
 
 namespace VanillaExpanded.ItemSlotIndicators.Effects;
 
-/// <summary>Declares shared granular food rendering and persistent freshness bounds.</summary>
+/// <summary>Declares shared granular food rendering and persistent food-amount bounds.</summary>
 internal static class FoodGrainIndicatorEffect
 {
     #region Public API
@@ -10,8 +10,8 @@ internal static class FoodGrainIndicatorEffect
     internal static ItemSlotIndicatorEffectDefinition Definition { get; } = new(
         "vanillaexpanded:food-grains", Constants.ModId, "vanillaexpanded_itemslot_food_grains",
         topology: ItemSlotIndicatorTopology.GrainQuads, segmentCount: FoodGrainStateBuffers.ParticleCount,
-        needsCameraMotion: true, drawBackground: true);
-    /// <summary>Gets freshness bounds retaining grains and headroom at either endpoint.</summary>
+        needsCameraMotion: true);
+    /// <summary>Gets food-amount bounds retaining grains and headroom at either endpoint.</summary>
     internal static ItemSlotIndicatorDrawRange DrawRange { get; } = new(0.2f, 0.85f);
     #endregion
 }

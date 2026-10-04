@@ -20,6 +20,39 @@ internal sealed class ItemSlotIndicatorRenderer(ItemSlotIndicatorResources resou
     /// <summary>Draws prepared effects or equivalent rectangles, restoring state before fallback and normal item rendering.</summary>
     internal void Render(double posX, double posY, ItemSlotIndicatorRenderSelection selection, ItemSlotIndicatorFrameSnapshot frame)
     {
+        RenderLayer(posX, posY, selection, frame);
+        if (selection.OverlayIndicator is { } overlay)
+            RenderLayer(posX, posY, new(overlay, selection.OverlayEffect), frame);
+    }
+
+    /// <summary>Releases draw-adapter resources once; prepared mesh/program lifetime remains with the resource owner.</summary>
+    public void Dispose()
+    {
+        if (disposed) return;
+        disposed = true;
+        backend.Dispose();
+    }
+
+    /// <summary>Calculates a bottom-aligned fill using the slot's center and scaled size.</summary>
+    internal static (float X, float Y, float Width, float Height) CalculateBounds(
+        double posX, double posY, float slotSize, float fill)
+    {
+        float fillHeight = slotSize * Math.Clamp(float.IsFinite(fill) ? fill : 0, 0, 1);
+        return ((float)(posX - slotSize / 2), (float)(posY - slotSize / 2) + slotSize - fillHeight, slotSize, fillHeight);
+    }
+
+    /// <summary>Converts straight-alpha color to the format required by the render API.</summary>
+    internal static Vec4f PremultiplyColor(Vector4 color)
+    {
+        color *= new Vector4(color.W, color.W, color.W, 1);
+        return new Vec4f(color.X, color.Y, color.Z, color.W);
+    }
+    #endregion
+
+    #region Private
+    /// <summary>Submits one layer with isolated fallback and restoration before the next layer.</summary>
+    private void RenderLayer(double posX, double posY, ItemSlotIndicatorRenderSelection selection, ItemSlotIndicatorFrameSnapshot frame)
+    {
         try
         {
             if (disposed || !backend.Supported || !ItemSlotIndicatorDrawInput.TryCreate(posX, posY,
@@ -58,27 +91,5 @@ internal sealed class ItemSlotIndicatorRenderer(ItemSlotIndicatorResources resou
         catch (Exception exception) { backend.ReportFailure(exception); }
     }
 
-    /// <summary>Releases draw-adapter resources once; prepared mesh/program lifetime remains with the resource owner.</summary>
-    public void Dispose()
-    {
-        if (disposed) return;
-        disposed = true;
-        backend.Dispose();
-    }
-
-    /// <summary>Calculates a bottom-aligned fill using the slot's center and scaled size.</summary>
-    internal static (float X, float Y, float Width, float Height) CalculateBounds(
-        double posX, double posY, float slotSize, float fill)
-    {
-        float fillHeight = slotSize * Math.Clamp(float.IsFinite(fill) ? fill : 0, 0, 1);
-        return ((float)(posX - slotSize / 2), (float)(posY - slotSize / 2) + slotSize - fillHeight, slotSize, fillHeight);
-    }
-
-    /// <summary>Converts straight-alpha color to the format required by the render API.</summary>
-    internal static Vec4f PremultiplyColor(Vector4 color)
-    {
-        color *= new Vector4(color.W, color.W, color.W, 1);
-        return new Vec4f(color.X, color.Y, color.Z, color.W);
-    }
     #endregion
 }

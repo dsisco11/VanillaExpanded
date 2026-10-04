@@ -13,6 +13,25 @@ namespace VanillaExpanded.Tests.Unit.FoodContainerIndicators;
 public sealed class FoodContainerIndicatorProviderTests
 {
     #region Public API
+    /// <summary>Food level follows servings and vessel capacity even when no perish state exists.</summary>
+    [Theory]
+    [InlineData(0, false, 0)]
+    [InlineData(1, true, 0.25f)]
+    [InlineData(3, true, 0.75f)]
+    [InlineData(5, true, 1)]
+    public void FoodLevel_UsesServingCapacity(float servings, bool visible, float fill)
+    {
+        var (world, api, inventory) = CreateInventory();
+        var item = new Mock<MockItem>(1, (byte)0, api);
+        item.Object.Attributes = JsonObject.FromJson("{\"mealContainer\":true,\"servingCapacity\":4}");
+        var meal = new Mock<IBlockMealContainer>();
+        meal.Setup(value => value.GetQuantityServings(world, It.IsAny<ItemStack>())).Returns(servings);
+        item.Setup(value => value.GetCollectibleInterface<IBlockMealContainer>()).Returns(meal.Object);
+        inventory[0].Itemstack = new ItemStack(item.Object);
+        Assert.Equal(visible, new FoodContainerIndicatorProvider().TryGetIndicator(inventory[0], out var indicator));
+        if (visible) Assert.Equal(fill, indicator.Fill);
+    }
+
     /// <summary>Actual pie inheritance does not route its direct freshness into the vessel effect.</summary>
     [Fact]
     public void Pie_UsesOrdinaryFreshnessDespiteMealInterface()
@@ -37,38 +56,38 @@ public sealed class FoodContainerIndicatorProviderTests
     [InlineData("{\"emptiedBlockCode\":\"game:pot-fired\"}")]
     public void VesselMetadata_RequiresMealHandling(string metadata)
     {
-        var item = new Mock<MockItem>(1, (byte)0, null);
+        var item = new Mock<MockItem>(1, (byte)0, Mock.Of<ICoreAPI>());
         item.Object.Attributes = JsonObject.FromJson(metadata);
         Assert.False(FoodContainerClassification.IsFoodContainer(item.Object));
         item.Setup(value => value.GetCollectibleInterface<IBlockMealContainer>()).Returns(Mock.Of<IBlockMealContainer>());
         Assert.True(FoodContainerClassification.IsFoodContainer(item.Object));
     }
 
-    /// <summary>Only the matching provider accepts a direct perish state, including container states.</summary>
+    /// <summary>Freshness remains available on vessels alongside an independently sampled serving level.</summary>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void DirectPerishState_IsOwnedByExactlyOneProvider(bool foodContainer)
+    public void FreshnessAndServingLevel_AreIndependent(bool foodContainer)
     {
         var (world, api, inventory) = CreateInventory();
         var slot = inventory[0];
         var item = new Mock<MockItem>(1, (byte)0, api);
         if (foodContainer) item.Object.Attributes = JsonObject.FromJson("{\"mealContainer\":true}");
         item.Setup(value => value.GetCollectibleInterface<IBlockMealContainer>())
-            .Returns(foodContainer ? Mock.Of<IBlockMealContainer>() : null!);
+            .Returns(foodContainer ? CreateMeal(world) : null!);
         item.Setup(value => value.UpdateAndGetTransitionState(world, slot, EnumTransitionType.Perish))
             .Returns(new TransitionState { FreshHours = 100, FreshHoursLeft = 50 });
         slot.Itemstack = new ItemStack(item.Object);
 
-        Assert.Equal(!foodContainer, new FreshnessIndicatorProvider().TryGetIndicator(slot, out var ordinary));
+        Assert.True(new FreshnessIndicatorProvider().TryGetIndicator(slot, out var ordinary));
         Assert.Equal(foodContainer, new FoodContainerIndicatorProvider().TryGetIndicator(slot, out var contained));
         var actual = foodContainer ? contained : ordinary;
         Assert.Equal(0.5f, actual.Fill);
-        Assert.Equal(FreshnessIndicatorProvider.FreshnessColor(0.5f), actual.Color);
+        Assert.Equal(FreshnessIndicatorProvider.FreshnessColor(0.5f), ordinary.Color);
         item.Verify(value => value.UpdateAndGetTransitionState(world, slot, EnumTransitionType.Perish), Times.Once);
     }
 
-    /// <summary>Empty and nonperishable meals stay hidden; perishable contents inherit inventory spoilage rates.</summary>
+    /// <summary>Empty food stays hidden; nonperishable food still reports servings and freshness retains inventory rates.</summary>
     [Theory]
     [InlineData(false, false)]
     [InlineData(true, false)]
@@ -81,6 +100,7 @@ public sealed class FoodContainerIndicatorProviderTests
         container.Object.Attributes = JsonObject.FromJson("{\"mealContainer\":true}");
         var meal = new Mock<IBlockMealContainer>();
         container.Setup(value => value.GetCollectibleInterface<IBlockMealContainer>()).Returns(meal.Object);
+        meal.Setup(value => value.GetQuantityServings(world, It.IsAny<ItemStack>())).Returns(hasContents ? 1 : 0);
         slot.Itemstack = new ItemStack(container.Object);
         var content = new Mock<MockItem>(2, (byte)0, api);
         var contentStack = new ItemStack(content.Object);
@@ -98,13 +118,22 @@ public sealed class FoodContainerIndicatorProviderTests
                 return new TransitionState { FreshHours = 100, FreshHoursLeft = 25 };
             });
 
-        Assert.False(new FreshnessIndicatorProvider().TryGetIndicator(slot, out _));
-        Assert.Equal(hasContents && perishable, new FoodContainerIndicatorProvider().TryGetIndicator(slot, out var indicator));
-        if (hasContents && perishable) Assert.Equal(0.25f, indicator.Fill);
+        Assert.Equal(hasContents && perishable, new FreshnessIndicatorProvider().TryGetIndicator(slot, out var freshness));
+        Assert.Equal(hasContents, new FoodContainerIndicatorProvider().TryGetIndicator(slot, out var indicator));
+        if (hasContents) Assert.Equal(1, indicator.Fill);
+        if (hasContents && perishable) Assert.Equal(0.25f, freshness.Fill);
     }
     #endregion
 
     #region Private
+    /// <summary>Supplies a half-full single-serving vessel independently of its freshness.</summary>
+    private static IBlockMealContainer CreateMeal(IWorldAccessor world)
+    {
+        var meal = new Mock<IBlockMealContainer>();
+        meal.Setup(value => value.GetQuantityServings(world, It.IsAny<ItemStack>())).Returns(0.5f);
+        return meal.Object;
+    }
+
     /// <summary>Creates an attached inventory for transition-rate forwarding without graphics.</summary>
     private static (IWorldAccessor World, ICoreAPI Api, InventoryGeneric Inventory) CreateInventory()
     {

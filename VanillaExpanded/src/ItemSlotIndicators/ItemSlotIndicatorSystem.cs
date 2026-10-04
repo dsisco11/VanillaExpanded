@@ -21,7 +21,7 @@ using Vintagestory.API.Common;
 
 namespace VanillaExpanded.ItemSlotIndicators;
 
-/// <summary>Owns the client indicator lifecycle and selects one indicator in descending provider priority.</summary>
+/// <summary>Owns the client indicator lifecycle and selects primary and optional overlay indicators by independent provider priority.</summary>
 internal sealed class ItemSlotIndicatorSystem : ModSystem
 {
     private ImmutableArray<ItemSlotIndicatorRegistration> providers = [];
@@ -65,7 +65,7 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
         Register(new FoodContainerIndicatorProvider(),
             contextKey: static () => (VanillaExpandedModSystem.Config.EnablePerishableItemFreshnessIndicators,
                 VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity),
-            effect: FoodGrainIndicatorEffect.Definition);
+            effect: FoodGrainIndicatorEffect.Definition, overlay: true, adaptiveSampling: new AdaptiveSamplingOptions());
         Register(new PreparationIndicatorProvider(), priority: -10,
             contextKey: static () => VanillaExpandedModSystem.Config.EnablePreparationIndicators);
         Register(new ClothingIndicatorProvider(), priority: -10,
@@ -123,11 +123,12 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
     /// <param name="contextKey">Optional immutable configuration value compared by equality on each query to invalidate cached results.</param>
     /// <param name="adaptiveSampling">Optional fast sampling policy for changing indicators; ignored when caching is disabled.</param>
     /// <param name="effect">Optional immutable rendering description; omitted registrations use the ordinary rectangle.</param>
+    /// <param name="overlay">Whether the provider selects an additional layer after the primary indicator.</param>
     internal void Register(IItemSlotIndicatorProvider provider, int priority = 0,
         long refreshIntervalMilliseconds = 1_000, Func<object?>? contextKey = null,
-        AdaptiveSamplingOptions? adaptiveSampling = null, ItemSlotIndicatorEffectDefinition? effect = null)
+        AdaptiveSamplingOptions? adaptiveSampling = null, ItemSlotIndicatorEffectDefinition? effect = null, bool overlay = false)
     {
-        var registration = new ItemSlotIndicatorRegistration(provider, priority, refreshIntervalMilliseconds, contextKey, adaptiveSampling, effect);
+        var registration = new ItemSlotIndicatorRegistration(provider, priority, refreshIntervalMilliseconds, contextKey, adaptiveSampling, effect, overlay);
         // Validate metadata before insertion; a rejected registration cannot change selection or cached samples.
         if (effect is not null)
         {
@@ -141,20 +142,31 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
         NeedsCameraMotion |= effect?.NeedsCameraMotion == true;
     }
 
-    /// <summary>Returns the first applicable provider's presentation and registered effect, including zero fill.</summary>
+    /// <summary>Returns the first applicable primary and overlay presentations, including zero fill.</summary>
     internal bool TryGetRenderSelection(ItemSlot slot, out ItemSlotIndicatorRenderSelection selection)
     {
         long now = Clock();
+        selection = default;
+        bool primaryFound = false;
         foreach (var entry in providers)
         {
+            if (entry.Overlay) continue;
             if (!entry.TryGetIndicator(slot, now, out ItemSlotIndicator indicator)) continue;
             // Attach the winning registration's effect after sampling, so animation never affects cache validity.
             selection = new ItemSlotIndicatorRenderSelection(indicator, entry.Effect);
+            primaryFound = true;
+            break;
+        }
+        // Additional indicators have their own priority race and sampling; they cannot hide freshness.
+        foreach (var entry in providers)
+        {
+            if (!entry.Overlay || !entry.TryGetIndicator(slot, now, out var indicator)) continue;
+            selection = primaryFound
+                ? selection with { OverlayIndicator = indicator, OverlayEffect = entry.Effect }
+                : new ItemSlotIndicatorRenderSelection(indicator, entry.Effect);
             return true;
         }
-
-        selection = default;
-        return false;
+        return primaryFound;
     }
 
     /// <summary>Releases registrations and all system-owned provider samples.</summary>

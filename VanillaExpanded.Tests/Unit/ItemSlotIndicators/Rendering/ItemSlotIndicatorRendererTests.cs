@@ -18,6 +18,31 @@ public sealed class ItemSlotIndicatorRendererTests
 {
     #region Public API
     #region Bounded Drawing
+    /// <summary>Freshness restores before food particles draw using their independent fill.</summary>
+    [Fact]
+    public void IndependentLayers_DrawFreshnessBeforeFoodAmount()
+    {
+        using var context = new IndicatorResourceTestContext();
+        var effect = new ItemSlotIndicatorEffectDefinition("test:food", "test", "vanillaexpanded_itemslot_test");
+        context.Resources.Register(effect);
+        context.Resources.Initialize();
+        var backend = Backend();
+        var order = new List<string>();
+        backend.Setup(b => b.Rectangle(It.IsAny<MeshRef>(), It.Is<ItemSlotIndicatorDrawInput>(i => i.Fill == 0.25f)))
+            .Callback(() => order.Add("freshness"));
+        backend.Setup(b => b.Effect(It.IsAny<IShaderProgram>(), It.IsAny<MeshRef>(),
+            It.Is<ItemSlotIndicatorDrawInput>(i => i.Fill == 0.75f), effect, It.IsAny<ItemSlotIndicatorFrameSnapshot>()))
+            .Callback(() => order.Add("food"));
+        backend.Setup(b => b.Restore()).Callback(() => order.Add("restore"));
+        using var renderer = new ItemSlotIndicatorRenderer(context.Resources, backend.Object, () => 48);
+        renderer.Render(24, 24, new(new(0.25f, Vector4.One), null)
+        {
+            OverlayIndicator = new(0.75f, Vector4.One),
+            OverlayEffect = effect
+        }, default);
+        Assert.Equal(new[] { "freshness", "restore", "food", "restore" }, order);
+    }
+
     /// <summary>A layered effect draws its ordinary fill first and never duplicates it when the effect fails.</summary>
     [Theory]
     [InlineData(false)]

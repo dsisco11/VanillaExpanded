@@ -49,7 +49,7 @@ public sealed class FoodGrainIndicatorEffectTests
     {
         var definition = FoodGrainIndicatorEffect.Definition;
         Assert.True(definition.NeedsCameraMotion);
-        Assert.True(definition.DrawBackground);
+        Assert.False(definition.DrawBackground);
         var mesh = ItemSlotIndicatorMeshGeometry.Build(ItemSlotIndicatorMeshKey.From(definition));
         Assert.Equal(FoodGrainStateBuffers.ParticleCount * 4, mesh.VerticesCount);
         Assert.Equal(FoodGrainStateBuffers.ParticleCount * 6, mesh.IndicesCount);
