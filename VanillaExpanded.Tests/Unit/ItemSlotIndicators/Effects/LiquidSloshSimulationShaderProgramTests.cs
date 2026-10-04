@@ -96,6 +96,27 @@ public sealed class LiquidSloshSimulationShaderProgramTests
         Assert.Equal("Activate the liquid solver before advancing it.",
             Assert.Throws<InvalidOperationException>(() => shader.Advance()).Message);
     }
+
+    /// <summary>The explicit wave solver rejects unstable steps before activation checks or GPU work.</summary>
+    [Fact]
+    public void Advance_RejectsUnstableStepBeforeGpuSubmission()
+    {
+        var shader = new LiquidSloshSimulationShaderProgram
+        {
+            ProgramId = 1, SourceStateTexture = 1, FeedbackBuffer = 2, FeedbackObject = 3, VertexArray = 4,
+            TimeStep = 0.1f, CellSpacing = 1f / 32, Gravity = 1
+        };
+        Assert.Equal("Liquid solver timestep exceeds the wave-propagation stability limit.",
+            Assert.Throws<InvalidOperationException>(() => shader.Advance()).Message);
+        // At the same step/spacing, upward acceleration increases wave speed and can cross the bound.
+        shader.TimeStep = 1f / 120;
+        shader.CameraAcceleration = new(0, 3);
+        Assert.Equal("Liquid solver timestep exceeds the wave-propagation stability limit.",
+            Assert.Throws<InvalidOperationException>(() => shader.Advance()).Message);
+        shader.TimeStep = 1f / 240;
+        Assert.Equal("Activate the liquid solver before advancing it.",
+            Assert.Throws<InvalidOperationException>(() => shader.Advance()).Message);
+    }
     #endregion
 
     #region Engine Link Adaptation

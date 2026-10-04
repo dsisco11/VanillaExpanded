@@ -14,10 +14,12 @@ internal sealed class LiquidSloshSimulationShaderProgram : ShaderProgram
 {
     /// <summary>Size of an interleaved height/flow record in the caller-owned state buffers.</summary>
     internal const int StateStrideBytes = 2 * sizeof(float);
+    /// <summary>Engine file-program basename for the paired liquid simulation stages.</summary>
+    internal const string ShaderName = "vanillaexpanded_itemslot_liquid_simulation";
     private static readonly string[] feedbackVaryings = ["nextHeight", "nextFlow"];
     private static readonly string[] requiredUniforms =
         ["timeStep", "cameraAcceleration", "gravity", "damping", "cellCount", "cellSpacing", "state"];
-    private float timeStep = 1f / 120;
+    private float timeStep = 1f / 240;
     private Vector2 cameraAcceleration;
     private float gravity = 1, damping = 1, cellSpacing = 1f / 32;
     private int cellCount = 32;
@@ -89,7 +91,7 @@ internal sealed class LiquidSloshSimulationShaderProgram : ShaderProgram
         set => sourceStateTexture = RequireHandle(value, nameof(SourceStateTexture));
     }
 
-    /// <summary>Gets or sets the destination buffer, sized for CellCount interleaved height/flow records.</summary>
+    /// <summary>Gets or sets the destination buffer, sized for CellCount interleaved displacement/right-face-flow records.</summary>
     /// <remarks>It must not back SourceStateTexture; ping-pong ownership and capacity belong to the simulation.</remarks>
     internal int FeedbackBuffer
     {
@@ -149,6 +151,7 @@ internal sealed class LiquidSloshSimulationShaderProgram : ShaderProgram
         if (Disposed || ProgramId <= 0) throw new InvalidOperationException("Compile the liquid solver before advancing it.");
         if (sourceStateTexture == 0 || feedbackBuffer == 0 || feedbackObject == 0 || vertexArray == 0)
             throw new InvalidOperationException("The simulation must supply all borrowed GPU bindings before advancing.");
+        ValidateSolverStep();
         if (!ReferenceEquals(ShaderProgramBase.CurrentShaderProgram, this))
             throw new InvalidOperationException("Activate the liquid solver before advancing it.");
 
@@ -189,6 +192,16 @@ internal sealed class LiquidSloshSimulationShaderProgram : ShaderProgram
     #endregion
 
     #region Private
+    /// <summary>Rejects unstable explicit steps using the solver's reference-depth wave speed before submission.</summary>
+    private void ValidateSolverStep()
+    {
+        // Match the shader's effective gravity clamp. Double arithmetic avoids overflow in the guard.
+        double effectiveGravity = Math.Clamp((double)gravity + cameraAcceleration.Y, 0.1 * gravity, 4.0 * gravity);
+        double courant = timeStep * Math.Sqrt(effectiveGravity) / cellSpacing;
+        if (courant > 0.45)
+            throw new InvalidOperationException("Liquid solver timestep exceeds the wave-propagation stability limit.");
+    }
+
     /// <summary>Rejects linked inputs or captured records that cannot match the typed setters and eight-byte state layout.</summary>
     private void ValidateLinkedInputs()
     {
