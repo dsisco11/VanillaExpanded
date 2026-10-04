@@ -18,6 +18,7 @@ internal sealed class ItemSlotIndicatorResourceBackend(ICoreClientAPI api) : IIt
         ["slotBounds"] = ActiveUniformType.FloatVec4, ["fill"] = ActiveUniformType.Float,
         ["color"] = ActiveUniformType.FloatVec4, ["timeSeconds"] = ActiveUniformType.Float,
         ["motion"] = ActiveUniformType.FloatVec2, ["effectParameters"] = ActiveUniformType.FloatVec4,
+        ["cameraBob"] = ActiveUniformType.Float,
         ["segmentCount"] = ActiveUniformType.Int
     };
     #region Public API

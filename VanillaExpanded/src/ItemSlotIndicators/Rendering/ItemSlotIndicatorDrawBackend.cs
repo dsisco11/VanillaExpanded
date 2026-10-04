@@ -65,6 +65,7 @@ internal sealed class ItemSlotIndicatorDrawBackend : IItemSlotIndicatorDrawBacke
         if (program.HasUniform("color")) program.Uniform("color", input.Color.X, input.Color.Y, input.Color.Z, input.Color.W);
         if (program.HasUniform("timeSeconds")) program.Uniform("timeSeconds", frame.TimeSeconds);
         if (program.HasUniform("motion")) program.Uniform("motion", frame.Motion.X, frame.Motion.Y);
+        if (program.HasUniform("cameraBob")) program.Uniform("cameraBob", frame.CameraBob);
         if (program.HasUniform("effectParameters"))
         {
             var parameters = definition.Parameters;

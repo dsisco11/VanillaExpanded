@@ -23,7 +23,7 @@ public sealed class LiquidSloshIndicatorEffectTests
         Assert.InRange(weights.Z, 0, 1);
         Assert.InRange(weights.W, 0, 1);
         Assert.InRange(weights.X + weights.Y + weights.Z + weights.W, 0, 1);
-        Assert.True(weights.X >= 0.5f);
+        Assert.True(weights.X >= 0.625f);
         Assert.Equal(new VanillaExpanded.ItemSlotIndicators.ItemSlotIndicatorDrawRange(0.15f, 0.85f),
             LiquidSloshIndicatorEffect.DrawRange);
     }
@@ -38,13 +38,14 @@ public sealed class LiquidSloshIndicatorEffectTests
         for (int segments = 2; segments <= ItemSlotIndicatorEffectDefinition.MaximumSegmentCount; segments++)
         foreach (double fill in fills)
         foreach (var motion in motions)
+        foreach (float bob in new[] { -1f, 0, 1 })
         for (int phase = 0; phase < 16; phase++)
         {
             double integral = 0;
             double allowance = Math.Min(0.1, Math.Min(0.25 * fill, 0.25 * (1 - fill)));
             for (int sample = 0; sample <= segments; sample++)
             {
-                double displacement = Displacement((double)sample / segments, fill, phase / 4.0, motion, segments);
+                double displacement = Displacement((double)sample / segments, fill, phase / 4.0, motion, segments, bob);
                 Assert.InRange(Math.Abs(displacement), 0, allowance + 1e-12);
                 Assert.InRange(fill + displacement, -1e-12, 1 + 1e-12);
                 integral += displacement * (sample == 0 || sample == segments ? 0.5 : 1);
@@ -67,7 +68,7 @@ public sealed class LiquidSloshIndicatorEffectTests
         }
         Assert.True(Displacement(0.5, 0.5, 0, new(0, 1)) > Displacement(0.5, 0.5, 0, Vector2.Zero));
         Assert.True(Displacement(0, 0.5, 0, new(1, 0)) > Displacement(1, 0.5, 0, new(1, 0)));
-        Assert.NotEqual(Displacement(0, 0.5, 0, Vector2.Zero), Displacement(0, 0.5, 1, Vector2.Zero));
+        Assert.NotEqual(Displacement(0, 0.5, 0, Vector2.Zero), Displacement(0, 0.5, 0.5, Vector2.Zero));
     }
 
     /// <summary>The standing wave alternates center/side crests while a persistent meniscus raises both edges.</summary>
@@ -75,10 +76,10 @@ public sealed class LiquidSloshIndicatorEffectTests
     public void StandingWave_OscillatesSymmetricallyWithRaisedEdges()
     {
         Assert.True(Displacement(0.5, 0.5, 0, Vector2.Zero) > Displacement(0, 0.5, 0, Vector2.Zero));
-        Assert.True(Displacement(0.5, 0.5, 2, Vector2.Zero) < Displacement(0, 0.5, 2, Vector2.Zero));
+        Assert.True(Displacement(0.5, 0.5, 1, Vector2.Zero) < Displacement(0, 0.5, 1, Vector2.Zero));
         // At a quarter cycle the standing wave vanishes, exposing the meniscus alone.
-        Assert.True(Displacement(0, 0.5, 1, Vector2.Zero) > 0);
-        Assert.True(Displacement(0.5, 0.5, 1, Vector2.Zero) < 0);
+        Assert.True(Displacement(0, 0.5, 0.5, Vector2.Zero) > 0);
+        Assert.True(Displacement(0.5, 0.5, 0.5, Vector2.Zero) < 0);
         for (int sample = 0; sample <= 16; sample++)
         {
             double u = sample / 16.0;
@@ -86,16 +87,29 @@ public sealed class LiquidSloshIndicatorEffectTests
                 Displacement(1 - u, 0.5, 0.3, Vector2.Zero), 12);
         }
     }
+
+    /// <summary>Footstep bob changes the surface even without angular camera movement and remains clock-periodic.</summary>
+    [Fact]
+    public void CameraBob_AgitatesStandingWaveWithoutRotation()
+    {
+        double resting = Displacement(0.5, 0.5, 0.5, Vector2.Zero);
+        double rising = Displacement(0.5, 0.5, 0.5, Vector2.Zero, bob: 1);
+        double falling = Displacement(0.5, 0.5, 0.5, Vector2.Zero, bob: -1);
+        Assert.True(rising < resting);
+        Assert.True(falling > resting);
+        Assert.Equal(rising, Displacement(0.5, 0.5, 64.5, Vector2.Zero, bob: 1), 12);
+        Assert.Equal(resting, Displacement(0.5, 0.5, 2.5, Vector2.Zero), 12);
+    }
     #endregion
 
     #region Private
     /// <summary>Evaluates the documented mathematical surface as a double-precision reference, not a GPU execution.</summary>
-    private static double Displacement(double u, double fill, double seconds, Vector2 motion, int segments = 16)
+    private static double Displacement(double u, double fill, double seconds, Vector2 motion, int segments = 16, float bob = 0)
     {
         var parameters = LiquidSloshIndicatorEffect.Definition.Parameters;
-        double activity = Math.Max(Math.Abs(motion.X), Math.Abs(motion.Y));
+        double activity = Math.Max(Math.Max(Math.Abs(motion.X), Math.Abs(motion.Y)), Math.Abs(bob));
         double wave = -(parameters.X + parameters.Y * activity)
-            * Math.Cos(2 * Math.PI * u) * Math.Cos(2 * Math.PI * seconds / 4);
+            * Math.Cos(2 * Math.PI * u) * Math.Cos(2 * Math.PI * seconds / 2 + 0.75 * bob);
         double inverseSegmentsSquared = 1.0 / (segments * segments);
         double edgeMean = 0.2 + 4.0 / 3 * inverseSegmentsSquared
             - 8.0 / 15 * inverseSegmentsSquared * inverseSegmentsSquared;

@@ -16,11 +16,17 @@ internal sealed class ItemSlotIndicatorCameraSource(ICoreClientAPI api) : IItemS
     public ItemSlotIndicatorCameraSample? Capture()
     {
         var world = api.World;
-        if (world is not ClientMain client || world.Player is not { } player || client.MainCamera is not { } camera)
+        if (world is not ClientMain client || world.Player is not { Entity: { } entity } player
+            || client.MainCamera is not { } camera)
             return null;
         double[] matrix = api.Render.CameraMatrixOrigin;
         if (matrix is null) return null;
-        return new(world, player, camera, cameraMode(camera), ItemSlotIndicatorCameraBasis.FromViewMatrix(matrix));
+        var mode = cameraMode(camera);
+        // Footstep bob translates LocalEyePos rather than rotating the view basis. Copy the engine's
+        // local eye height so world travel is excluded and disabled/third-person bob contributes nothing.
+        double? eyeHeight = mode == EnumCameraMode.FirstPerson && api.Settings.Bool["viewBobbing"]
+            ? entity.LocalEyePos.Y : null;
+        return new(world, player, camera, mode, ItemSlotIndicatorCameraBasis.FromViewMatrix(matrix), eyeHeight);
     }
     #endregion
 }

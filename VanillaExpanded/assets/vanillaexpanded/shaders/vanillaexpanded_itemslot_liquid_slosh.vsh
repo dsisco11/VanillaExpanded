@@ -8,6 +8,7 @@ uniform vec4 slotBounds;
 uniform float fill;
 uniform float timeSeconds;
 uniform vec2 motion;
+uniform float cameraBob;
 uniform vec4 effectParameters;
 uniform int segmentCount;
 
@@ -16,8 +17,8 @@ void main()
 {
     float u = vertex.x;
     // Integral cycles over the shared clock period avoid a jump when time wraps.
-    float phase = 6.28318530718 * timeSeconds / 4.0;
-    float activity = max(abs(motion.x), abs(motion.y));
+    float phase = 6.28318530718 * timeSeconds / 2.0 + 0.75 * cameraBob;
+    float activity = max(max(abs(motion.x), abs(motion.y)), abs(cameraBob));
     float wave = -(effectParameters.x + effectParameters.y * activity)
         * cos(6.28318530718 * u) * cos(phase);
     // A quartic edge rise suggests a meniscus. Subtract its exact strip-sampled mean,

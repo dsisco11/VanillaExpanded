@@ -29,14 +29,18 @@ internal sealed class ItemSlotIndicatorFrameState
         // Bound both CPU accumulation and float publication; rounding must never publish the excluded value 64.
         float time = Math.Min((float)animationSeconds, MathF.BitDecrement(64));
         Vector2 motion = Vector2.Zero;
+        float bob = 0;
         if (needsCameraMotion && camera is { } current && current.Basis.IsValid())
         {
             if (accepted && previousCamera is { } previous && SameContext(previous, current))
+            {
                 motion = CalculateMotion(previous.Basis, current.Basis, elapsed, Snapshot.Motion);
+                bob = CalculateBob(previous.EyeHeight, current.EyeHeight, elapsed, Snapshot.CameraBob);
+            }
             previousCamera = current;
         }
         else previousCamera = null;
-        Snapshot = new(time, motion);
+        Snapshot = new(time, motion, bob);
     }
     #endregion
 
@@ -45,6 +49,18 @@ internal sealed class ItemSlotIndicatorFrameState
     private static bool SameContext(ItemSlotIndicatorCameraSample previous, ItemSlotIndicatorCameraSample current) =>
         ReferenceEquals(previous.World, current.World) && ReferenceEquals(previous.Player, current.Player)
         && ReferenceEquals(previous.Camera, current.Camera) && previous.Mode == current.Mode;
+
+    /// <summary>Normalizes actual local eye-height velocity and damps footstep bob independently of camera rotation.</summary>
+    private static float CalculateBob(double? previous, double? current, double elapsed, float priorBob)
+    {
+        // Missing/disabled bob and large eye-height discontinuities begin neutral, just like a changed camera.
+        if (previous is not { } before || current is not { } after
+            || !double.IsFinite(before) || !double.IsFinite(after) || Math.Abs(after - before) > 0.25)
+            return 0;
+        float target = (float)Math.Clamp((after - before) / elapsed / 0.5, -1, 1);
+        float weight = (float)(1 - Math.Exp(-elapsed / 0.06));
+        return float.Lerp(priorBob, target, weight);
+    }
 
     /// <summary>Computes shortest-arc rotation in previous camera-local axes, then normalizes and exponentially damps rates.</summary>
     private static Vector2 CalculateMotion(ItemSlotIndicatorCameraBasis previous, ItemSlotIndicatorCameraBasis current,

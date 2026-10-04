@@ -139,6 +139,52 @@ public sealed class ItemSlotIndicatorFrameStateTests
     #endregion
 
     #region Resets and Camera Input
+    /// <summary>Actual eye bob drives a signed response while the camera's angular basis stays unchanged.</summary>
+    [Fact]
+    public void EyeBobbing_ReactsWithoutRotationAndDecaysWhenStopped()
+    {
+        var state = new ItemSlotIndicatorFrameState();
+        state.Update(0, true, Sample(Identity) with { EyeHeight = 1.6 });
+        state.Update(0.1, true, Sample(Identity) with { EyeHeight = 1.65 });
+        float expected = (float)(1 - Math.Exp(-0.1 / 0.06));
+        Assert.Equal(expected, state.Snapshot.CameraBob, 5);
+        Assert.Equal(Vector2.Zero, state.Snapshot.Motion);
+        state.Update(0.2, true, Sample(Identity) with { EyeHeight = 1.65 });
+        Assert.Equal(expected * (float)Math.Exp(-0.1 / 0.06), state.Snapshot.CameraBob, 5);
+        state.Update(0.3, true, Sample(Identity) with { EyeHeight = 1.6 });
+        Assert.True(state.Snapshot.CameraBob < 0);
+    }
+
+    /// <summary>Disabled, invalid, discontinuous, or replaced camera inputs cannot inherit a previous bob impulse.</summary>
+    [Theory]
+    [InlineData("disabled")]
+    [InlineData("invalid")]
+    [InlineData("jump")]
+    [InlineData("context")]
+    [InlineData("gap")]
+    [InlineData("inactive")]
+    public void EyeBobbing_DiscontinuitiesResetAndRecoverNeutral(string kind)
+    {
+        var state = new ItemSlotIndicatorFrameState();
+        state.Update(0, true, Sample(Identity) with { EyeHeight = 1.6 });
+        state.Update(0.1, true, Sample(Identity) with { EyeHeight = 1.65 });
+        Assert.True(state.Snapshot.CameraBob > 0);
+        var next = Sample(Identity) with { EyeHeight = 1.65 };
+        next = kind switch
+        {
+            "disabled" => next with { EyeHeight = null },
+            "invalid" => next with { EyeHeight = double.NaN },
+            "jump" => next with { EyeHeight = 2 },
+            "context" => next with { Camera = new object() },
+            _ => next
+        };
+        double now = kind == "gap" ? 1 : 0.2;
+        state.Update(now, kind != "inactive", next);
+        Assert.Equal(0, state.Snapshot.CameraBob);
+        state.Update(now + 0.1, true, next with { EyeHeight = next.EyeHeight is { } h && double.IsFinite(h) ? h : 1.65 });
+        Assert.Equal(0, state.Snapshot.CameraBob);
+    }
+
     /// <summary>Every authoritative context replacement resets motion without suspending time-only animation.</summary>
     [Theory]
     [InlineData("world")]
