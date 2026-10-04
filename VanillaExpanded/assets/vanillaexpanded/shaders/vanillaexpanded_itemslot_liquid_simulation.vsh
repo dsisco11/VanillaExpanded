@@ -3,6 +3,7 @@
 uniform samplerBuffer state;
 uniform float timeStep;
 uniform vec2 containerAcceleration;
+uniform float verticalShapeVariation;
 uniform float gravity;
 uniform float damping;
 uniform float wallDamping;
@@ -30,7 +31,12 @@ float updatedFlow(int cell, float effectiveGravity)
     float decay = exp(-(damping + wallDamping * wallWeight) * timeStep);
     // Uniform lateral inertia moves liquid opposite acceleration. Vertical shaking also
     // seeds a zero-net-volume center/side disturbance; varying gravity alone cannot disturb a flat surface.
-    float shaking = -0.2 * containerAcceleration.y * sin(6.28318530718 * facePosition);
+    // Three broad modes vary the shoulders and left/right balance. The absolute weights
+    // sum to at most one, bounding input strength; all shapes vanish at both closed walls.
+    float shape = 0.8 * sin(6.28318530718 * facePosition)
+        + 0.12 * verticalShapeVariation * sin(3.14159265359 * facePosition)
+        + (0.04 + 0.04 * verticalShapeVariation) * sin(9.42477796077 * facePosition);
+    float shaking = -0.4 * containerAcceleration.y * shape;
     float acceleration = pressure - containerAcceleration.x + shaking;
     return (left.y + timeStep * acceleration) * decay;
 }
@@ -40,7 +46,9 @@ void main()
 {
     int cell = gl_VertexID;
     // The reference depth is one; height stores signed displacement about that reference.
-    float effectiveGravity = clamp(gravity + containerAcceleration.y, 0.1 * gravity, 4.0 * gravity);
+    // Keep propagation speed independent of a landing/braking impulse. Vertical movement
+    // still excites the surface through updatedFlow, without accelerating the wave clock.
+    float effectiveGravity = gravity;
     float incoming = updatedFlow(cell - 1, effectiveGravity);
     nextFlow = updatedFlow(cell, effectiveGravity);
     // Every interior face is computed identically by its neighboring cells, so fluxes

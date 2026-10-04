@@ -21,6 +21,9 @@ internal sealed class LiquidSloshMotionState
     /// <summary>Gets the unified acceleration projected onto container right/up axes in solver units.</summary>
     internal Vector2 ContainerAcceleration { get; private set; }
 
+    /// <summary>Gets the shared signed variation used to distribute vertical forcing across broad surface modes.</summary>
+    internal float VerticalShapeVariation { get; private set; }
+
     #region Public API
     /// <summary>Clears all differentiation history so replacement cameras cannot inherit an impulse.</summary>
     internal void Reset()
@@ -28,6 +31,7 @@ internal sealed class LiquidSloshMotionState
         previous = null;
         velocity = acceleration = Vector3.Zero;
         ContainerAcceleration = Vector2.Zero;
+        VerticalShapeVariation = 0;
         hasVelocity = false;
         jostle.Reset();
     }
@@ -67,6 +71,7 @@ internal sealed class LiquidSloshMotionState
         // Offsets remain small floats; the camera origin delta was already subtracted in double precision.
         var targetVelocity = (delta + WorldOffset(current.Basis) - WorldOffset(before.Basis)) / dt;
         float noise = jostle.Advance(elapsed);
+        VerticalShapeVariation = noise;
         // Establish velocity once; entering a moving camera must not look like an abrupt acceleration from zero.
         if (!hasVelocity)
         {

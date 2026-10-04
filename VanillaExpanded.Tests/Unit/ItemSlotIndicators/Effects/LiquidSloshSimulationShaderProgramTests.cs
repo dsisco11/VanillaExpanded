@@ -25,6 +25,7 @@ public sealed class LiquidSloshSimulationShaderProgramTests
         {
             TimeStep = 1f / 240, ContainerAcceleration = new(-2, 3), Gravity = 4, Damping = 0,
             WallDamping = 6, WallDampingWidth = 0.2f,
+            VerticalShapeVariation = 0.5f,
             CellCount = 16, CellSpacing = 0.125f, SourceStateTexture = 1,
             FeedbackBuffer = 2, FeedbackObject = 3, VertexArray = 4
         };
@@ -35,6 +36,7 @@ public sealed class LiquidSloshSimulationShaderProgramTests
         Assert.Equal(0, shader.Damping);
         Assert.Equal(6, shader.WallDamping);
         Assert.Equal(0.2f, shader.WallDampingWidth);
+        Assert.Equal(0.5f, shader.VerticalShapeVariation);
         Assert.Equal(16, shader.CellCount);
         Assert.Equal(0.125f, shader.CellSpacing);
         Assert.Equal(1, shader.SourceStateTexture);
@@ -117,9 +119,12 @@ public sealed class LiquidSloshSimulationShaderProgramTests
         };
         Assert.Equal("Liquid solver timestep exceeds the wave-propagation stability limit.",
             Assert.Throws<InvalidOperationException>(() => shader.Advance()).Message);
-        // At the same step/spacing, upward acceleration increases wave speed and can cross the bound.
+        // Reference gravity controls stability; a camera impulse does not change wave speed.
         shader.TimeStep = 1f / 120;
         shader.ContainerAcceleration = new(0, 3);
+        Assert.Equal("Activate the liquid solver before advancing it.",
+            Assert.Throws<InvalidOperationException>(() => shader.Advance()).Message);
+        shader.Gravity = 4;
         Assert.Equal("Liquid solver timestep exceeds the wave-propagation stability limit.",
             Assert.Throws<InvalidOperationException>(() => shader.Advance()).Message);
         shader.TimeStep = 1f / 240;
@@ -144,10 +149,25 @@ public sealed class LiquidSloshSimulationShaderProgramTests
             Assert.Throws<InvalidOperationException>(() => shader.Advance()).Message);
         if (vertical == 3)
         {
-            shader.TimeStep = 1f / 240;
+            shader.TimeStep = 1f / 120;
             Assert.Equal("Liquid solver timestep exceeds the wave-propagation stability limit.",
                 Assert.Throws<InvalidOperationException>(() => shader.Advance()).Message);
         }
+    }
+    #endregion
+
+    #region Shape Inputs
+    /// <summary>Invalid shape weights cannot amplify forcing beyond the shader's bounded blend contract.</summary>
+    [Theory]
+    [InlineData(float.NaN)]
+    [InlineData(float.PositiveInfinity)]
+    [InlineData(float.NegativeInfinity)]
+    [InlineData(-1.01f)]
+    [InlineData(1.01f)]
+    public void VerticalShapeVariation_RejectsInvalidWeights(float value)
+    {
+        var shader = new LiquidSloshSimulationShaderProgram();
+        Assert.Throws<ArgumentOutOfRangeException>(() => shader.VerticalShapeVariation = value);
     }
     #endregion
 

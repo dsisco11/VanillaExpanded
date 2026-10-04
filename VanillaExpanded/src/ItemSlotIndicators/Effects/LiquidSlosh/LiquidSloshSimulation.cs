@@ -115,6 +115,7 @@ internal sealed class LiquidSloshSimulation : IRenderer
             previousProgram?.Stop();
             shader.Use();
             shader.ContainerAcceleration = motion.ContainerAcceleration;
+            shader.VerticalShapeVariation = motion.VerticalShapeVariation;
             while (accumulator >= StepSeconds)
             {
                 shader.SourceStateTexture = buffers.ReadTexture;

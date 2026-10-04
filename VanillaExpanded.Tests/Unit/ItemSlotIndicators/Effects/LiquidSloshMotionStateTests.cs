@@ -175,6 +175,7 @@ public sealed class LiquidSloshMotionStateTests
         };
         Assert.True(state.Update(kind == "gap" ? 1 : 0.02, next));
         Assert.Equal(Vector2.Zero, state.ContainerAcceleration);
+        Assert.Equal(0, state.VerticalShapeVariation);
     }
     #endregion
     #endregion

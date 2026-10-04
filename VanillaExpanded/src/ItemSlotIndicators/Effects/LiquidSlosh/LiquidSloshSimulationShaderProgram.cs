@@ -18,9 +18,10 @@ internal sealed class LiquidSloshSimulationShaderProgram : ShaderProgram
     internal const string ShaderName = "vanillaexpanded_itemslot_liquid_simulation";
     private static readonly string[] feedbackVaryings = ["nextHeight", "nextFlow"];
     private static readonly string[] requiredUniforms =
-        ["timeStep", "containerAcceleration", "gravity", "damping", "wallDamping", "wallDampingWidth", "cellCount", "cellSpacing", "state"];
+        ["timeStep", "containerAcceleration", "verticalShapeVariation", "gravity", "damping", "wallDamping", "wallDampingWidth", "cellCount", "cellSpacing", "state"];
     private float timeStep = 1f / 480;
     private Vector2 containerAcceleration;
+    private float verticalShapeVariation;
     private float gravity = 1, damping = 1, cellSpacing = 1f / LiquidSloshStateBuffers.CellCount;
     private float wallDamping, wallDampingWidth = 0.2f;
     private int cellCount = LiquidSloshStateBuffers.CellCount;
@@ -48,7 +49,19 @@ internal sealed class LiquidSloshSimulationShaderProgram : ShaderProgram
         }
     }
 
-    /// <summary>Gets or sets positive effective gravity in solver units.</summary>
+    /// <summary>Gets or sets finite signed vertical-force shape variation between minus one and one.</summary>
+    internal float VerticalShapeVariation
+    {
+        get => verticalShapeVariation;
+        set
+        {
+            if (!float.IsFinite(value) || value < -1 || value > 1)
+                throw new ArgumentOutOfRangeException(nameof(VerticalShapeVariation));
+            verticalShapeVariation = value;
+        }
+    }
+
+    /// <summary>Gets or sets positive reference gravity controlling wave propagation in solver units.</summary>
     internal float Gravity
     {
         get => gravity;
@@ -228,9 +241,9 @@ internal sealed class LiquidSloshSimulationShaderProgram : ShaderProgram
     /// <summary>Rejects unstable explicit steps using the solver's reference-depth wave speed before submission.</summary>
     private void ValidateSolverStep()
     {
-        // Match the shader's effective gravity clamp. Double arithmetic avoids overflow in the guard.
-        double effectiveGravity = Math.Clamp((double)gravity + containerAcceleration.Y, 0.1 * gravity, 4.0 * gravity);
-        double courant = timeStep * Math.Sqrt(effectiveGravity) / cellSpacing;
+        // Camera acceleration excites the fluid but never changes its propagation speed.
+        // Double arithmetic avoids overflow in the reference-depth wave-speed guard.
+        double courant = timeStep * Math.Sqrt(gravity) / cellSpacing;
         if (courant > 0.45)
             throw new InvalidOperationException("Liquid solver timestep exceeds the wave-propagation stability limit.");
     }
@@ -244,7 +257,7 @@ internal sealed class LiquidSloshSimulationShaderProgram : ShaderProgram
             string name = GL.GetActiveUniform(ProgramId, index, out int size, out ActiveUniformType type);
             ActiveUniformType? expected = name switch
             {
-                "timeStep" or "gravity" or "damping" or "wallDamping" or "wallDampingWidth" or "cellSpacing" => ActiveUniformType.Float,
+                "timeStep" or "gravity" or "damping" or "wallDamping" or "wallDampingWidth" or "verticalShapeVariation" or "cellSpacing" => ActiveUniformType.Float,
                 "containerAcceleration" => ActiveUniformType.FloatVec2,
                 "cellCount" => ActiveUniformType.Int,
                 "state" => ActiveUniformType.SamplerBuffer,
@@ -271,6 +284,7 @@ internal sealed class LiquidSloshSimulationShaderProgram : ShaderProgram
     {
         Uniform("timeStep", timeStep);
         Uniform("containerAcceleration", containerAcceleration.X, containerAcceleration.Y);
+        Uniform("verticalShapeVariation", verticalShapeVariation);
         Uniform("gravity", gravity);
         Uniform("damping", damping);
         Uniform("wallDamping", wallDamping);
