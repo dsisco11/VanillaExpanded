@@ -166,7 +166,7 @@ internal sealed class LiquidSloshSimulationShaderProgram : ShaderProgram
         if (GeometryShader is not null)
             throw new InvalidOperationException("The liquid solver uses one vertex invocation per cell, without a geometry stage.");
         // The scoped adapter only changes linking for this concrete program and is removed even on failure.
-        bool compiled = LiquidSloshTransformFeedbackLink.Compile(this, () => base.Compile());
+        bool compiled = ItemSlotIndicatorTransformFeedbackLink.Compile(this, () => base.Compile());
         if (!compiled) return false;
         try
         {

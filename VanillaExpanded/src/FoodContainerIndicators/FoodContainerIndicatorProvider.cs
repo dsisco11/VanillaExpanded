@@ -1,4 +1,5 @@
 using VanillaExpanded.ItemSlotIndicators;
+using VanillaExpanded.ItemSlotIndicators.Effects;
 using VanillaExpanded.PerishableItemSlots;
 
 using Vintagestory.API.Common;
@@ -21,7 +22,8 @@ internal sealed class FoodContainerIndicatorProvider : IItemSlotIndicatorProvide
         TransitionState? state = ResolvePerishState(api.World, slot, container);
         if (state is null) return false;
         float freshness = FreshnessIndicatorProvider.CalculateFreshness(state);
-        indicator = new ItemSlotIndicator(freshness, FreshnessIndicatorProvider.FreshnessColor(freshness));
+        indicator = new ItemSlotIndicator(freshness, FreshnessIndicatorProvider.FreshnessColor(freshness),
+            FoodGrainIndicatorEffect.DrawRange);
         return true;
     }
     #endregion

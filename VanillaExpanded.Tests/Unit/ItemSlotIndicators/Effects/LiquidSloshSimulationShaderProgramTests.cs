@@ -6,6 +6,7 @@ using HarmonyLib;
 using OpenTK.Graphics.OpenGL4;
 
 using VanillaExpanded.ItemSlotIndicators.Effects.LiquidSlosh;
+using VanillaExpanded.ItemSlotIndicators.Effects;
 
 using Vintagestory.Client.NoObf;
 
@@ -180,10 +181,10 @@ public sealed class LiquidSloshSimulationShaderProgramTests
             [typeof(ShaderProgram)]);
         var original = PatchProcessor.GetOriginalInstructions(target).ToList();
         int count = original.Count;
-        var adapted = LiquidSloshTransformFeedbackLink.InsertConfiguration(original).ToList();
+        var adapted = ItemSlotIndicatorTransformFeedbackLink.InsertConfiguration(original).ToList();
         Assert.Equal(count + 3, adapted.Count);
         int callback = adapted.FindIndex(instruction => instruction.operand is System.Reflection.MethodInfo method
-            && method.DeclaringType == typeof(LiquidSloshTransformFeedbackLink) && method.Name == "Configure");
+            && method.DeclaringType == typeof(ItemSlotIndicatorTransformFeedbackLink) && method.Name == "Configure");
         int inserted = callback - 2;
         Assert.True(inserted >= 0);
         Assert.Equal(OpCodes.Dup, adapted[inserted].opcode);
@@ -198,7 +199,7 @@ public sealed class LiquidSloshSimulationShaderProgramTests
         var link = new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(GL), nameof(GL.LinkProgram), [typeof(int)]));
         var label = new DynamicMethod("test-label", typeof(void), Type.EmptyTypes).GetILGenerator().DefineLabel();
         link.labels.Add(label);
-        var adapted = LiquidSloshTransformFeedbackLink.InsertConfiguration([link]).ToList();
+        var adapted = ItemSlotIndicatorTransformFeedbackLink.InsertConfiguration([link]).ToList();
         Assert.Equal(OpCodes.Dup, adapted[0].opcode);
         Assert.Contains(label, adapted[0].labels);
         Assert.Empty(link.labels);
@@ -209,9 +210,9 @@ public sealed class LiquidSloshSimulationShaderProgramTests
     [Fact]
     public void UnsupportedLinkerBody_IsRejected()
     {
-        Assert.Throws<InvalidOperationException>(() => LiquidSloshTransformFeedbackLink.InsertConfiguration([]));
+        Assert.Throws<InvalidOperationException>(() => ItemSlotIndicatorTransformFeedbackLink.InsertConfiguration([]));
         var link = AccessTools.Method(typeof(GL), nameof(GL.LinkProgram), [typeof(int)]);
-        Assert.Throws<InvalidOperationException>(() => LiquidSloshTransformFeedbackLink.InsertConfiguration(
+        Assert.Throws<InvalidOperationException>(() => ItemSlotIndicatorTransformFeedbackLink.InsertConfiguration(
             [new(OpCodes.Call, link), new(OpCodes.Call, link)]));
     }
     #endregion

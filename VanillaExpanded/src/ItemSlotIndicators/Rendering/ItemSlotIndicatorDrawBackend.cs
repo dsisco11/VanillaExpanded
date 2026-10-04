@@ -15,18 +15,20 @@ internal sealed class ItemSlotIndicatorDrawBackend : IItemSlotIndicatorDrawBacke
 {
     private readonly ICoreClientAPI api;
     private readonly Func<int> liquidSurface;
+    private readonly Func<int> foodState;
     private readonly ItemSlotIndicatorDrawState drawState;
     private readonly float[] rectangleMatrix = new float[16];
     private IShaderProgram? gui;
-    private bool captured, rectangleDrawn, liquidSurfaceBound, disposed, failureReported;
+    private bool captured, rectangleDrawn, simulationStateBound, disposed, failureReported;
 
     #region Public API
     #region Lifetime
     /// <summary>Owns only scratch storage; programs and meshes remain with the resource caches.</summary>
-    internal ItemSlotIndicatorDrawBackend(ICoreClientAPI api, Func<int>? liquidSurface = null)
+    internal ItemSlotIndicatorDrawBackend(ICoreClientAPI api, Func<int>? liquidSurface = null, Func<int>? foodState = null)
     {
         this.api = api;
         this.liquidSurface = liquidSurface ?? (static () => 0);
+        this.foodState = foodState ?? (static () => 0);
         drawState = new(api.Render);
     }
 
@@ -51,7 +53,7 @@ internal sealed class ItemSlotIndicatorDrawBackend : IItemSlotIndicatorDrawBacke
     {
         gui = api.Render.CurrentActiveShader;
         rectangleDrawn = false;
-        liquidSurfaceBound = false;
+        simulationStateBound = false;
         drawState.Capture();
         captured = true;
         drawState.Apply();
@@ -62,8 +64,9 @@ internal sealed class ItemSlotIndicatorDrawBackend : IItemSlotIndicatorDrawBacke
         ItemSlotIndicatorEffectDefinition definition, ItemSlotIndicatorFrameSnapshot frame)
     {
         bool liquid = definition.ShaderName == LiquidSloshIndicatorEffect.Definition.ShaderName;
-        int surface = liquid ? liquidSurface() : 0;
-        if (liquid && surface == 0) throw new InvalidOperationException("Shared liquid simulation is unavailable.");
+        bool grains = definition.ShaderName == FoodGrainIndicatorEffect.Definition.ShaderName;
+        int surface = liquid ? liquidSurface() : grains ? foodState() : 0;
+        if ((liquid || grains) && surface == 0) throw new InvalidOperationException("Shared indicator simulation is unavailable.");
         gui!.Stop();
         program.Use();
         program.UniformMatrix("projectionMatrix", api.Render.CurrentProjectionMatrix);
@@ -81,11 +84,11 @@ internal sealed class ItemSlotIndicatorDrawBackend : IItemSlotIndicatorDrawBacke
             program.Uniform("effectParameters", parameters.X, parameters.Y, parameters.Z, parameters.W);
         }
         if (program.HasUniform("segmentCount")) program.Uniform("segmentCount", definition.SegmentCount);
-        if (liquid)
+        if (liquid || grains)
         {
-            program.Uniform("liquidSurface", 0);
-            program.Uniform("surfaceCellCount", LiquidSloshStateBuffers.CellCount);
-            liquidSurfaceBound = true;
+            program.Uniform(liquid ? "liquidSurface" : "grainState", 0);
+            if (liquid) program.Uniform("surfaceCellCount", LiquidSloshStateBuffers.CellCount);
+            simulationStateBound = true;
             GL.ActiveTexture(TextureUnit.Texture0);
             GL.BindTexture(TextureTarget.TextureBuffer, surface);
         }
@@ -116,7 +119,7 @@ internal sealed class ItemSlotIndicatorDrawBackend : IItemSlotIndicatorDrawBacke
         captured = false;
         try
         {
-            if (liquidSurfaceBound)
+            if (simulationStateBound)
             {
                 GL.ActiveTexture(TextureUnit.Texture0);
                 GL.BindTexture(TextureTarget.TextureBuffer, 0);

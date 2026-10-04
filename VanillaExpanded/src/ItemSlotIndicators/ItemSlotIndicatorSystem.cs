@@ -8,6 +8,7 @@ using VanillaExpanded.FoodContainerIndicators;
 using VanillaExpanded.ItemSlotIndicators.Animation;
 using VanillaExpanded.ItemSlotIndicators.Effects;
 using VanillaExpanded.ItemSlotIndicators.Effects.LiquidSlosh;
+using VanillaExpanded.ItemSlotIndicators.Effects.FoodGrains;
 using VanillaExpanded.ItemSlotIndicators.Rendering;
 using VanillaExpanded.LiquidContainerIndicators;
 using VanillaExpanded.NightVisionIndicators;
@@ -27,6 +28,7 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
     private Harmony? harmony;
     private ItemSlotIndicatorFrameUpdater? frameUpdater;
     private LiquidSloshSimulation? liquidSimulation;
+    private FoodGrainSimulation? foodSimulation;
 
     /// <summary>Gets the client-owned indicator renderer used by the GUI hook.</summary>
     internal ItemSlotIndicatorRenderer? Renderer { get; private set; }
@@ -62,7 +64,8 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
                 VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity));
         Register(new FoodContainerIndicatorProvider(),
             contextKey: static () => (VanillaExpandedModSystem.Config.EnablePerishableItemFreshnessIndicators,
-                VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity));
+                VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity),
+            effect: FoodGrainIndicatorEffect.Definition);
         Register(new PreparationIndicatorProvider(), priority: -10,
             contextKey: static () => VanillaExpandedModSystem.Config.EnablePreparationIndicators);
         Register(new ClothingIndicatorProvider(), priority: -10,
@@ -79,9 +82,10 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
             contextKey: static () => VanillaExpandedModSystem.Config.EnableNightVisionFuelIndicators);
         frameUpdater = new ItemSlotIndicatorFrameUpdater(api.Event, new ItemSlotIndicatorCameraSource(api), () => NeedsCameraMotion);
         liquidSimulation = new LiquidSloshSimulation(api, () => frameUpdater.CameraSample);
+        foodSimulation = new FoodGrainSimulation(api, () => frameUpdater.CameraSample);
         Resources.Initialize();
         Renderer = new ItemSlotIndicatorRenderer(Resources,
-            new ItemSlotIndicatorDrawBackend(api, () => liquidSimulation.SurfaceTexture));
+            new ItemSlotIndicatorDrawBackend(api, () => liquidSimulation.SurfaceTexture, () => foodSimulation.StateTexture));
         Active = this;
         harmony = new Harmony(Constants.ModId + ".itemslotindicators");
         new PatchClassProcessor(harmony, typeof(ItemSlotIndicatorPatch)).Patch();
@@ -94,6 +98,8 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
         harmony = null;
         liquidSimulation?.Dispose();
         liquidSimulation = null;
+        foodSimulation?.Dispose();
+        foodSimulation = null;
         frameUpdater?.Dispose();
         frameUpdater = null;
         Renderer?.Dispose();

@@ -26,10 +26,11 @@ internal sealed record ItemSlotIndicatorEffectDefinition
     /// <param name="parameters">Finite, copied values whose meaning is defined by the effect's shader contract.</param>
     /// <param name="needsCameraMotion">Whether the effect consumes the shared camera-motion signal.</param>
     /// <param name="abiVersion">Mesh and shader input contract version; only version one is supported.</param>
+    /// <param name="drawBackground">Whether to retain the ordinary sampled fill beneath the effect.</param>
     internal ItemSlotIndicatorEffectDefinition(string id, string shaderAssetDomain, string shaderName,
         ItemSlotIndicatorTopology topology = ItemSlotIndicatorTopology.FillStrip,
         int segmentCount = DefaultSegmentCount, Vector4 parameters = default, bool needsCameraMotion = false,
-        int abiVersion = CurrentAbiVersion)
+        int abiVersion = CurrentAbiVersion, bool drawBackground = false)
     {
         ValidateId(id);
         if (!IsCanonicalName(shaderAssetDomain))
@@ -43,6 +44,10 @@ internal sealed record ItemSlotIndicatorEffectDefinition
         // Reject unsupported geometry before it can become part of a provider registration.
         switch (topology)
         {
+            case ItemSlotIndicatorTopology.GrainQuads:
+                if (segmentCount != FoodGrains.FoodGrainStateBuffers.ParticleCount)
+                    throw new ArgumentOutOfRangeException(nameof(segmentCount), "Grain geometry requires the shared particle count.");
+                break;
             case ItemSlotIndicatorTopology.Quad:
                 if (segmentCount != 1)
                     throw new ArgumentOutOfRangeException(nameof(segmentCount), "A quad requires exactly one segment.");
@@ -66,6 +71,7 @@ internal sealed record ItemSlotIndicatorEffectDefinition
         SegmentCount = segmentCount;
         Parameters = parameters;
         NeedsCameraMotion = needsCameraMotion;
+        DrawBackground = drawBackground;
     }
 
     /// <summary>Gets the stable, canonical effect identifier.</summary>
@@ -84,6 +90,8 @@ internal sealed record ItemSlotIndicatorEffectDefinition
     internal Vector4 Parameters { get; }
     /// <summary>Gets whether shared camera-motion input is needed.</summary>
     internal bool NeedsCameraMotion { get; }
+    /// <summary>Gets whether the ordinary fill rectangle is drawn beneath this effect.</summary>
+    internal bool DrawBackground { get; }
 
     /// <summary>Rejects incompatible effect identities or engine shader-name reuse before registry mutation.</summary>
     internal void ValidateCompatibility(ItemSlotIndicatorEffectDefinition other)

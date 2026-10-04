@@ -25,11 +25,17 @@ internal sealed class ItemSlotIndicatorRenderer(ItemSlotIndicatorResources resou
             if (disposed || !backend.Supported || !ItemSlotIndicatorDrawInput.TryCreate(posX, posY,
                 scaledSlotSize(), selection.Indicator, out var input)) return;
             bool effectDrawn = false;
+            bool backgroundDrawn = false;
             if (selection.Effect is { } effect && resources.TryGet(effect, out var program, out var mesh))
             {
                 try
                 {
                     backend.Begin();
+                    if (effect.DrawBackground && resources.Rectangle is { } background)
+                    {
+                        backend.Rectangle(background, input);
+                        backgroundDrawn = true;
+                    }
                     backend.Effect(program!, mesh!, input, effect, frame);
                     effectDrawn = true;
                 }
@@ -38,12 +44,12 @@ internal sealed class ItemSlotIndicatorRenderer(ItemSlotIndicatorResources resou
             }
             // Fallback uses the same sampled fill/color after the effect scope has fully restored its caller.
             bool hasCue = input.TryCreateBoundaryCue(out var cue);
-            if (effectDrawn && !hasCue) return;
+            if ((effectDrawn || backgroundDrawn) && !hasCue) return;
             if (resources.Rectangle is not { } rectangle) return;
             try
             {
                 backend.Begin();
-                if (!effectDrawn && input.Fill > 0) backend.Rectangle(rectangle, input);
+                if (!effectDrawn && !backgroundDrawn && input.Fill > 0) backend.Rectangle(rectangle, input);
                 // Cue rendering follows shader restoration and shares the fallback's state scope when possible.
                 if (hasCue) backend.Rectangle(rectangle, cue);
             }

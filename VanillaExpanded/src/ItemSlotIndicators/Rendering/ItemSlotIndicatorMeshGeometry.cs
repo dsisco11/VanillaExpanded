@@ -13,6 +13,10 @@ internal static class ItemSlotIndicatorMeshGeometry
     /// <summary>Creates ABI-one geometry; bottom and surface vertices alternate at every sample.</summary>
     internal static MeshData Build(ItemSlotIndicatorMeshKey key)
     {
+        if (key.AbiVersion == ItemSlotIndicatorEffectDefinition.CurrentAbiVersion
+            && key.Topology == ItemSlotIndicatorTopology.GrainQuads
+            && key.SegmentCount == Effects.FoodGrains.FoodGrainStateBuffers.ParticleCount)
+            return FoodGrainMeshGeometry.Build();
         if (key.AbiVersion != ItemSlotIndicatorEffectDefinition.CurrentAbiVersion
             || (key.Topology == ItemSlotIndicatorTopology.Quad ? key.SegmentCount != 1
                 : key.Topology != ItemSlotIndicatorTopology.FillStrip || key.SegmentCount is < 2

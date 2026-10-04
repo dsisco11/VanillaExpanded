@@ -6,21 +6,23 @@ using System.Reflection.Emit;
 
 using HarmonyLib;
 
+using VanillaExpanded.ItemSlotIndicators.Effects.FoodGrains;
+using VanillaExpanded.ItemSlotIndicators.Effects.LiquidSlosh;
 using Vintagestory.Client;
 using Vintagestory.Client.NoObf;
 
-namespace VanillaExpanded.ItemSlotIndicators.Effects.LiquidSlosh;
+namespace VanillaExpanded.ItemSlotIndicators.Effects;
 
-/// <summary>Bridges the engine's missing pre-link callback only while compiling a liquid feedback program.</summary>
+/// <summary>Bridges the engine's missing pre-link callback only while compiling an indicator simulation feedback program.</summary>
 [HarmonyPatch]
-internal static class LiquidSloshTransformFeedbackLink
+internal static class ItemSlotIndicatorTransformFeedbackLink
 {
-    private const string PatchId = Constants.ModId + ".liquid-feedback-link";
+    private const string PatchId = Constants.ModId + ".indicator-feedback-link";
     private static readonly object compileLock = new();
 
     #region Public API
     /// <summary>Temporarily patches the active platform's linker while leaving compilation and diagnostics to the engine.</summary>
-    internal static bool Compile(LiquidSloshSimulationShaderProgram program, Func<bool> engineCompile)
+    internal static bool Compile(ShaderProgram program, Func<bool> engineCompile)
     {
         ArgumentNullException.ThrowIfNull(program);
         ArgumentNullException.ThrowIfNull(engineCompile);
@@ -31,7 +33,7 @@ internal static class LiquidSloshTransformFeedbackLink
             var harmony = new Harmony(PatchId);
             try
             {
-                new PatchClassProcessor(harmony, typeof(LiquidSloshTransformFeedbackLink)).Patch();
+                new PatchClassProcessor(harmony, typeof(ItemSlotIndicatorTransformFeedbackLink)).Patch();
                 return engineCompile();
             }
             finally { harmony.UnpatchAll(PatchId); }
@@ -58,7 +60,7 @@ internal static class LiquidSloshTransformFeedbackLink
         [
             duplicate,
             new CodeInstruction(OpCodes.Ldarg_1),
-            new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(LiquidSloshTransformFeedbackLink), nameof(Configure)))
+            new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(ItemSlotIndicatorTransformFeedbackLink), nameof(Configure)))
         ]);
         return body;
     }
@@ -82,10 +84,11 @@ internal static class LiquidSloshTransformFeedbackLink
         && method.ReturnType == typeof(void)
         && method.GetParameters() is [{ ParameterType: var argument }] && argument == typeof(int);
 
-    /// <summary>Applies feedback declarations exclusively to the typed liquid solver, leaving ordinary shaders untouched.</summary>
+    /// <summary>Applies feedback declarations exclusively to typed indicator solvers, leaving ordinary shaders untouched.</summary>
     private static void Configure(int programId, ShaderProgram program)
     {
         if (program is LiquidSloshSimulationShaderProgram liquid) liquid.ConfigureFeedback(programId);
+        if (program is FoodGrainSimulationShaderProgram grains) grains.ConfigureFeedback(programId);
     }
     #endregion
 }

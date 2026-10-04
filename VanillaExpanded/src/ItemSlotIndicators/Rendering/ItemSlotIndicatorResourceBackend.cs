@@ -40,11 +40,13 @@ internal sealed class ItemSlotIndicatorResourceBackend(ICoreClientAPI api) : IIt
         if (program.Disposed || program.LoadError || program.ProgramId <= 0)
             throw new InvalidOperationException("Indicator shader did not produce a live linked program.");
         bool liquid = program.PassName == LiquidSloshIndicatorEffect.Definition.ShaderName;
+        bool grains = program.PassName == FoodGrainIndicatorEffect.Definition.ShaderName;
         if (liquid) ItemSlotIndicatorBufferSampler.Register(program, "liquidSurface");
+        if (grains) ItemSlotIndicatorBufferSampler.Register(program, "grainState");
         foreach (string uniform in new[] { "projectionMatrix", "modelViewMatrix", "slotBounds", "fill" })
             if (!program.HasUniform(uniform))
                 throw new InvalidOperationException($"Indicator shader is missing required uniform '{uniform}'.");
-        // ABI one supplies only vec3 position at location zero; the built-in liquid surface is the sole sampler exception.
+        // ABI one supplies only vec3 position at location zero; built-in simulations own their buffer samplers.
         GL.GetProgram(program.ProgramId, GetProgramParameterName.ActiveAttributes, out int count);
         if (count != 1)
             throw new InvalidOperationException("Indicator shader requires exactly one active position attribute.");
@@ -53,6 +55,8 @@ internal sealed class ItemSlotIndicatorResourceBackend(ICoreClientAPI api) : IIt
             throw new InvalidOperationException("Indicator position must be a vec3 at attribute location zero.");
         if (program.GeometryShader is not null || program.UBOs.Count != 0)
             throw new InvalidOperationException("Indicator programs cannot use geometry stages or uniform buffers.");
+        if (grains && !program.HasUniform("grainState"))
+            throw new InvalidOperationException("Grain drawing requires shared particle state.");
         if (liquid && (!program.HasUniform("liquidSurface") || !program.HasUniform("surfaceCellCount")
             || !program.HasUniform("segmentCount")))
             throw new InvalidOperationException("Liquid drawing requires shared surface inputs and mesh subdivision count.");
@@ -61,6 +65,8 @@ internal sealed class ItemSlotIndicatorResourceBackend(ICoreClientAPI api) : IIt
         {
             string name = GL.GetActiveUniform(program.ProgramId, index, out int uniformSize, out ActiveUniformType uniformType);
             if (liquid && name == "liquidSurface" && uniformType == ActiveUniformType.SamplerBuffer && uniformSize == 1)
+                continue;
+            if (grains && name == "grainState" && uniformType == ActiveUniformType.SamplerBuffer && uniformSize == 1)
                 continue;
             if (liquid && name == "surfaceCellCount" && (uniformType != ActiveUniformType.Int || uniformSize != 1))
                 throw new InvalidOperationException("Liquid surface cell count must be one integer.");
