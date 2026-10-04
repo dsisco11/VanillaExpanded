@@ -135,12 +135,13 @@ internal sealed class FoodGrainSimulation : IRenderer
         }
     }
 
-    /// <summary>Scales physical container acceleration and preserves direction while bounding abrupt impacts.</summary>
+    /// <summary>Scales horizontal motion and compressive vertical impacts without lifting grains during falls.</summary>
     private Vector2 GetAcceleration()
     {
         var a = motion.LocalAcceleration;
-        var force = new Vector2(a.X, a.Y) * 0.6f;
-        return force / MathF.Max(1, force.Length() / 12);
+        // Falling acceleration must not cancel gravity or launch the food; upward braking still compresses it.
+        var force = new Vector2(a.X, MathF.Max(0, a.Y)) * 0.35f;
+        return force / MathF.Max(1, force.Length() / 7);
     }
 
     /// <summary>Submits one pass and publishes its output for the next dependent pass.</summary>

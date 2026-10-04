@@ -25,7 +25,7 @@ void main()
     float angle = seed*6.2831853;
     mat2 rotation = mat2(cos(angle), sin(angle), -sin(angle), cos(angle));
     grainLocal = position.xy;
-    float visualRadius = pr.z*1.6;
+    float visualRadius = pr.z*2.2;
     // A more elongated silhouette makes random rotation legible at inventory-slot sizes.
     vec2 offset = rotation*(position.xy*visualRadius*vec2(1.0,0.58));
     // Freshness maps the pile's center positions, never its physical simulation or individual grain size.
