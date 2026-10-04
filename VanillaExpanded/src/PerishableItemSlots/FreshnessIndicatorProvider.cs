@@ -2,6 +2,7 @@ using System;
 using System.Numerics;
 
 using VanillaExpanded.ItemSlotIndicators;
+using VanillaExpanded.FoodContainerIndicators;
 
 using Vintagestory.API.Common;
 using Vintagestory.GameContent;
@@ -25,7 +26,7 @@ internal sealed class FreshnessIndicatorProvider : IItemSlotIndicatorProvider
         ICoreAPI? api = slot.Inventory?.Api;
         if (stack is null || api is null) return false;
         // Meal containers belong to their own provider, including those exposing direct perish states.
-        if (stack.Collectible.GetCollectibleInterface<IBlockMealContainer>() is not null) return false;
+        if (FoodContainerClassification.IsFoodContainer(stack.Collectible)) return false;
 
         TransitionState? state = stack.Collectible.UpdateAndGetTransitionState(api.World, slot, EnumTransitionType.Perish);
         if (state is null) return false;

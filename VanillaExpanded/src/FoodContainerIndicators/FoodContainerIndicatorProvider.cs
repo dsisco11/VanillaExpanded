@@ -19,6 +19,7 @@ internal sealed class FoodContainerIndicatorProvider : IItemSlotIndicatorProvide
         indicator = default;
         if (!VanillaExpandedModSystem.Config.EnablePerishableItemFreshnessIndicators) return false;
         if (slot.Itemstack is not ItemStack stack || slot.Inventory?.Api is not ICoreAPI api) return false;
+        if (!FoodContainerClassification.IsFoodContainer(stack.Collectible)) return false;
         if (stack.Collectible.GetCollectibleInterface<IBlockMealContainer>() is not IBlockMealContainer container) return false;
 
         TransitionState? state = ResolvePerishState(api.World, slot, container);

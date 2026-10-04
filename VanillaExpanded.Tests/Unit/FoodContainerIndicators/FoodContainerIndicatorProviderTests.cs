@@ -4,6 +4,7 @@ using VanillaExpanded.PerishableItemSlots;
 using VanillaExpanded.Tests.Mocks;
 using Vintagestory.API.Common;
 using Vintagestory.GameContent;
+using Vintagestory.API.Datastructures;
 
 namespace VanillaExpanded.Tests.Unit.FoodContainerIndicators;
 
@@ -12,6 +13,37 @@ namespace VanillaExpanded.Tests.Unit.FoodContainerIndicators;
 public sealed class FoodContainerIndicatorProviderTests
 {
     #region Public API
+    /// <summary>Actual pie inheritance does not route its direct freshness into the vessel effect.</summary>
+    [Fact]
+    public void Pie_UsesOrdinaryFreshnessDespiteMealInterface()
+    {
+        var (world, _, inventory) = CreateInventory();
+        var pie = new Mock<BlockPie> { CallBase = true };
+        pie.Setup(value => value.UpdateAndGetTransitionState(world, inventory[0], EnumTransitionType.Perish))
+            .Returns(new TransitionState { FreshHours = 100, FreshHoursLeft = 50 });
+        inventory[0].Itemstack = new ItemStack(pie.Object);
+        Assert.NotNull(pie.Object.GetCollectibleInterface<IBlockMealContainer>());
+        Assert.False(new FoodContainerIndicatorProvider().TryGetIndicator(inventory[0], out _));
+        Assert.True(new FreshnessIndicatorProvider().TryGetIndicator(inventory[0], out var indicator));
+        Assert.Equal(0.5f, indicator.Fill);
+        Assert.Null(indicator.DrawRange);
+        Assert.Null(indicator.ParticlePalette);
+    }
+
+    /// <summary>Each game's vessel metadata route accepts meal containers while rejecting metadata on ordinary food.</summary>
+    [Theory]
+    [InlineData("{\"mealContainer\":true}")]
+    [InlineData("{\"eatenBlock\":\"game:bowl-fired\"}")]
+    [InlineData("{\"emptiedBlockCode\":\"game:pot-fired\"}")]
+    public void VesselMetadata_RequiresMealHandling(string metadata)
+    {
+        var item = new Mock<MockItem>(1, (byte)0, null);
+        item.Object.Attributes = JsonObject.FromJson(metadata);
+        Assert.False(FoodContainerClassification.IsFoodContainer(item.Object));
+        item.Setup(value => value.GetCollectibleInterface<IBlockMealContainer>()).Returns(Mock.Of<IBlockMealContainer>());
+        Assert.True(FoodContainerClassification.IsFoodContainer(item.Object));
+    }
+
     /// <summary>Only the matching provider accepts a direct perish state, including container states.</summary>
     [Theory]
     [InlineData(false)]
@@ -21,6 +53,7 @@ public sealed class FoodContainerIndicatorProviderTests
         var (world, api, inventory) = CreateInventory();
         var slot = inventory[0];
         var item = new Mock<MockItem>(1, (byte)0, api);
+        if (foodContainer) item.Object.Attributes = JsonObject.FromJson("{\"mealContainer\":true}");
         item.Setup(value => value.GetCollectibleInterface<IBlockMealContainer>())
             .Returns(foodContainer ? Mock.Of<IBlockMealContainer>() : null!);
         item.Setup(value => value.UpdateAndGetTransitionState(world, slot, EnumTransitionType.Perish))
@@ -45,6 +78,7 @@ public sealed class FoodContainerIndicatorProviderTests
         var (world, api, inventory) = CreateInventory();
         var slot = inventory[0];
         var container = new Mock<MockItem>(1, (byte)0, api);
+        container.Object.Attributes = JsonObject.FromJson("{\"mealContainer\":true}");
         var meal = new Mock<IBlockMealContainer>();
         container.Setup(value => value.GetCollectibleInterface<IBlockMealContainer>()).Returns(meal.Object);
         slot.Itemstack = new ItemStack(container.Object);
