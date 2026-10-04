@@ -53,6 +53,23 @@ public sealed class LiquidContainerIndicatorProviderTests
     #endregion
 
     #region Volume
+    /// <summary>Food-capable vessels display liquid only while they contain it, including after transfers empty them.</summary>
+    [Fact]
+    public void MealContainer_EmptyHidesIndicatorAndLiquidContentsRestoreIt()
+    {
+        var slot = CreateSlot(100, 100, 1);
+        var container = (BlockLiquidContainerBase)slot.Itemstack!.Collectible;
+        container.Attributes = JsonObject.FromJson("{\"mealContainer\":true}");
+        var provider = new LiquidContainerIndicatorProvider();
+        Assert.True(provider.TryGetIndicator(slot, out var full));
+        Assert.Equal(1, full.Fill);
+        var content = container.TryTakeContent(slot.Itemstack, 100);
+        Assert.False(provider.TryGetIndicator(slot, out _));
+        container.SetContent(slot.Itemstack, content);
+        Assert.True(provider.TryGetIndicator(slot, out var restored));
+        Assert.Equal(full, restored);
+    }
+
     /// <summary>Portion density and vessel capacity determine fill independently of vessel stack size.</summary>
     [Theory]
     [InlineData(250, 100, 10, 0.25f)]

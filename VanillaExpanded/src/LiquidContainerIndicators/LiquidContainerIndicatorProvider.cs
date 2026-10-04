@@ -28,6 +28,9 @@ internal sealed class LiquidContainerIndicatorProvider : IItemSlotIndicatorProvi
         // Let the owning container convert liquid portions to litres; stack count is not volume.
         float litres = container.GetCurrentLitres(stack);
         if (!float.IsFinite(litres)) return false;
+        // Food-capable vessels such as bowls have no liquid identity while empty. Use the game's
+        // serving-container metadata, rather than matching bowl names or hiding empty dedicated vessels.
+        if (container.Attributes?.IsTrue("mealContainer") == true && litres <= 0) return false;
         float fill = Math.Clamp(litres / capacity, 0, 1);
         // Keep actual volume in the sample; rendering retains a visible liquid surface even at empty.
         indicator = new ItemSlotIndicator(fill, IndicatorColorPallette.WithOpacity(
