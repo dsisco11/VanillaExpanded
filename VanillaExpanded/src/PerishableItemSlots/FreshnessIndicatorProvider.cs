@@ -8,7 +8,7 @@ using Vintagestory.GameContent;
 
 namespace VanillaExpanded.PerishableItemSlots;
 
-/// <summary>Supplies freshness indicators for perishable items and meal containers.</summary>
+/// <summary>Supplies freshness indicators for perishable items other than food containers.</summary>
 internal sealed class FreshnessIndicatorProvider : IItemSlotIndicatorProvider
 {
     private const float StaleOpacityMultiplier = 0.75f;
@@ -24,8 +24,10 @@ internal sealed class FreshnessIndicatorProvider : IItemSlotIndicatorProvider
         ItemStack? stack = slot.Itemstack;
         ICoreAPI? api = slot.Inventory?.Api;
         if (stack is null || api is null) return false;
+        // Meal containers belong to their own provider, including those exposing direct perish states.
+        if (stack.Collectible.GetCollectibleInterface<IBlockMealContainer>() is not null) return false;
 
-        TransitionState? state = ResolvePerishState(api.World, slot);
+        TransitionState? state = stack.Collectible.UpdateAndGetTransitionState(api.World, slot, EnumTransitionType.Perish);
         if (state is null) return false;
         float freshness = CalculateFreshness(state);
         indicator = new ItemSlotIndicator(freshness, FreshnessColor(freshness));
@@ -52,27 +54,4 @@ internal sealed class FreshnessIndicatorProvider : IItemSlotIndicatorProvider
     }
     #endregion
 
-    #region Private
-    /// <summary>Resolves direct perish states or the first perishable meal content using inventory transition rates.</summary>
-    private static TransitionState? ResolvePerishState(IWorldAccessor world, ItemSlot slot)
-    {
-        ItemStack stack = slot.Itemstack!;
-        TransitionState? state = stack.Collectible.UpdateAndGetTransitionState(world, slot, EnumTransitionType.Perish);
-        if (state is not null) return state;
-
-        IBlockMealContainer? mealContainer = stack.Collectible.GetCollectibleInterface<IBlockMealContainer>();
-        ItemStack[]? contents = mealContainer?.GetNonEmptyContents(world, stack);
-        if (contents is null || contents.Length == 0 || slot.Inventory?.Api is not ICoreAPI api) return null;
-
-        var dummyInventory = new DummyInventory(api);
-        dummyInventory.OnAcquireTransitionSpeed += (type, contentStack, multiplier) =>
-            type == EnumTransitionType.Perish
-                ? slot.Inventory.GetTransitionSpeedMul(type, contentStack)
-                : 0;
-
-        ItemSlot contentSlot = BlockCrock.GetDummySlotForFirstPerishableStack(world, contents, null, dummyInventory);
-        return contentSlot.Itemstack?.Collectible.UpdateAndGetTransitionState(world, contentSlot, EnumTransitionType.Perish);
-    }
-
-    #endregion
 }

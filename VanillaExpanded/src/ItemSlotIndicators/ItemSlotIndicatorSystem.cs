@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using HarmonyLib;
 
 using VanillaExpanded.ClothingIndicators;
+using VanillaExpanded.FoodContainerIndicators;
 using VanillaExpanded.ItemSlotIndicators.Animation;
 using VanillaExpanded.ItemSlotIndicators.Effects;
 using VanillaExpanded.ItemSlotIndicators.Effects.LiquidSlosh;
@@ -57,6 +58,9 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
         foreach (var registration in providers)
             if (registration.Effect is not null) Resources.Register(registration.Effect);
         Register(new FreshnessIndicatorProvider(),
+            contextKey: static () => (VanillaExpandedModSystem.Config.EnablePerishableItemFreshnessIndicators,
+                VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity));
+        Register(new FoodContainerIndicatorProvider(),
             contextKey: static () => (VanillaExpandedModSystem.Config.EnablePerishableItemFreshnessIndicators,
                 VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity));
         Register(new PreparationIndicatorProvider(), priority: -10,
