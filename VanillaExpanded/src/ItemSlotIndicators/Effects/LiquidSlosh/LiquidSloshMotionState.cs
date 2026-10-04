@@ -8,10 +8,11 @@ namespace VanillaExpanded.ItemSlotIndicators.Effects.LiquidSlosh;
 /// <summary>Derives unified container acceleration from a camera-attached point and its filtered world velocity history.</summary>
 internal sealed class LiquidSloshMotionState
 {
-    // A camera-local point 0.4 blocks ahead and 0.2 below the eye converts rotation into translation.
+    // A camera-local point 0.8 blocks ahead and 0.2 below the eye converts rotation into translation.
     // Differencing its trajectory includes tangential and centripetal acceleration, including camera roll.
-    private static readonly Vector3 containerOffset = new(0, -0.2f, -0.4f);
+    private static readonly Vector3 containerOffset = new(0, -0.2f, -0.8f);
     private const float SolverAccelerationScale = 0.2f;
+    private readonly LiquidSloshJostleNoise jostle = new();
     private ItemSlotIndicatorCameraSample? previous;
     private Vector3 velocity;
     private Vector3 acceleration;
@@ -28,6 +29,7 @@ internal sealed class LiquidSloshMotionState
         velocity = acceleration = Vector3.Zero;
         ContainerAcceleration = Vector2.Zero;
         hasVelocity = false;
+        jostle.Reset();
     }
 
     /// <summary>Updates shared forces and reports discontinuities requiring a flat GPU state reset.</summary>
@@ -64,6 +66,7 @@ internal sealed class LiquidSloshMotionState
         // Difference the conceptual point's world trajectory, rather than adding meters to rotation angles.
         // Offsets remain small floats; the camera origin delta was already subtracted in double precision.
         var targetVelocity = (delta + WorldOffset(current.Basis) - WorldOffset(before.Basis)) / dt;
+        float noise = jostle.Advance(elapsed);
         // Establish velocity once; entering a moving camera must not look like an abrupt acceleration from zero.
         if (!hasVelocity)
         {
@@ -79,6 +82,9 @@ internal sealed class LiquidSloshMotionState
         acceleration = Vector3.Lerp(acceleration, targetAcceleration, (float)(1 - Math.Exp(-elapsed / 0.045)));
         var projected = new Vector2(Vector3.Dot(acceleration, current.Basis.Right),
             Vector3.Dot(acceleration, current.Basis.Up)) * SolverAccelerationScale;
+        // Slightly imperfect handling couples vertical shaking into lateral forcing. Keep this
+        // artistic perturbation out of the differentiated history, and let vertical settling fade it.
+        projected.X += noise * MathF.Abs(projected.Y) * 0.08f;
         // Limit magnitude uniformly, preserving the combined direction rather than clipping each axis.
         ContainerAcceleration = projected / MathF.Max(1, projected.Length() / 3);
         return false;

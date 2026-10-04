@@ -18,15 +18,17 @@ internal sealed class LiquidSloshSimulationShaderProgram : ShaderProgram
     internal const string ShaderName = "vanillaexpanded_itemslot_liquid_simulation";
     private static readonly string[] feedbackVaryings = ["nextHeight", "nextFlow"];
     private static readonly string[] requiredUniforms =
-        ["timeStep", "containerAcceleration", "gravity", "damping", "cellCount", "cellSpacing", "state"];
-    private float timeStep = 1f / 240;
+        ["timeStep", "containerAcceleration", "gravity", "damping", "wallDamping", "wallDampingWidth", "cellCount", "cellSpacing", "state"];
+    private float timeStep = 1f / 480;
     private Vector2 containerAcceleration;
-    private float gravity = 1, damping = 1, cellSpacing = 1f / 32;
-    private int cellCount = 32;
+    private float gravity = 1, damping = 1, cellSpacing = 1f / LiquidSloshStateBuffers.CellCount;
+    private float wallDamping, wallDampingWidth = 0.2f;
+    private int cellCount = LiquidSloshStateBuffers.CellCount;
     private int sourceStateTexture, feedbackBuffer, feedbackObject, vertexArray;
 
     #region Public API
     #region Uniform Inputs
+    #region Solver Forcing
     /// <summary>Gets or sets the positive solver step in seconds, bounded to a quarter second.</summary>
     internal float TimeStep
     {
@@ -53,6 +55,9 @@ internal sealed class LiquidSloshSimulationShaderProgram : ShaderProgram
         set => gravity = RequirePositive(value, nameof(Gravity));
     }
 
+    #endregion
+
+    #region Flow Damping
     /// <summary>Gets or sets finite nonnegative damping per second.</summary>
     internal float Damping
     {
@@ -64,6 +69,32 @@ internal sealed class LiquidSloshSimulationShaderProgram : ShaderProgram
         }
     }
 
+    /// <summary>Gets or sets additional nonnegative flow damping per second at the walls; zero disables it.</summary>
+    internal float WallDamping
+    {
+        get => wallDamping;
+        set
+        {
+            if (!float.IsFinite(value) || value < 0) throw new ArgumentOutOfRangeException(nameof(WallDamping));
+            wallDamping = value;
+        }
+    }
+
+    /// <summary>Gets or sets the damping band width as a fraction of container width per wall, between zero and one half.</summary>
+    internal float WallDampingWidth
+    {
+        get => wallDampingWidth;
+        set
+        {
+            if (!float.IsFinite(value) || value < 0 || value > 0.5f)
+                throw new ArgumentOutOfRangeException(nameof(WallDampingWidth));
+            wallDampingWidth = value;
+        }
+    }
+
+    #endregion
+
+    #region Grid
     /// <summary>Gets or sets the fixed point count, between two and sixty-four cells.</summary>
     internal int CellCount
     {
@@ -81,6 +112,7 @@ internal sealed class LiquidSloshSimulationShaderProgram : ShaderProgram
         get => cellSpacing;
         set => cellSpacing = RequirePositive(value, nameof(CellSpacing));
     }
+    #endregion
     #endregion
 
     #region Borrowed GPU Inputs
@@ -212,7 +244,7 @@ internal sealed class LiquidSloshSimulationShaderProgram : ShaderProgram
             string name = GL.GetActiveUniform(ProgramId, index, out int size, out ActiveUniformType type);
             ActiveUniformType? expected = name switch
             {
-                "timeStep" or "gravity" or "damping" or "cellSpacing" => ActiveUniformType.Float,
+                "timeStep" or "gravity" or "damping" or "wallDamping" or "wallDampingWidth" or "cellSpacing" => ActiveUniformType.Float,
                 "containerAcceleration" => ActiveUniformType.FloatVec2,
                 "cellCount" => ActiveUniformType.Int,
                 "state" => ActiveUniformType.SamplerBuffer,
@@ -241,6 +273,8 @@ internal sealed class LiquidSloshSimulationShaderProgram : ShaderProgram
         Uniform("containerAcceleration", containerAcceleration.X, containerAcceleration.Y);
         Uniform("gravity", gravity);
         Uniform("damping", damping);
+        Uniform("wallDamping", wallDamping);
+        Uniform("wallDampingWidth", wallDampingWidth);
         Uniform("cellCount", cellCount);
         Uniform("cellSpacing", cellSpacing);
         Uniform("state", 0);

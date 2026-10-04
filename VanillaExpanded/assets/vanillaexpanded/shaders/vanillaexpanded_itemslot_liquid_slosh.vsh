@@ -6,20 +6,18 @@ uniform mat4 projectionMatrix;
 uniform mat4 modelViewMatrix;
 uniform vec4 slotBounds;
 uniform float fill;
-uniform float timeSeconds;
 uniform vec4 effectParameters;
 uniform int segmentCount;
 uniform samplerBuffer liquidSurface;
 uniform int surfaceCellCount;
 
-/** Interpolates the shared cell-centered surface and adds small idle motion and edge wetting. */
+/** Interpolates the shared cell-centered surface and adds edge wetting. */
 float rawSurface(float u)
 {
     float cell = clamp(u * float(surfaceCellCount) - 0.5, 0.0, float(surfaceCellCount - 1));
     int left = int(floor(cell));
     int right = min(left + 1, surfaceCellCount - 1);
     float displacement = mix(texelFetch(liquidSurface, left).r, texelFetch(liquidSurface, right).r, fract(cell));
-    float wave = -effectParameters.y * cos(6.28318530718 * u) * cos(6.28318530718 * timeSeconds / 2.0);
     float inverseSegmentsSquared = 1.0 / (float(segmentCount) * float(segmentCount));
     float edgeMean = 0.2 + (4.0 / 3.0) * inverseSegmentsSquared
         - (8.0 / 15.0) * inverseSegmentsSquared * inverseSegmentsSquared;
@@ -27,7 +25,7 @@ float rawSurface(float u)
     float edgeShape = centered * centered;
     edgeShape *= edgeShape;
     float meniscus = effectParameters.w * (edgeShape - edgeMean) / (1.0 - edgeMean);
-    return displacement * effectParameters.x * 8.0 + wave + meniscus;
+    return displacement * effectParameters.x * 8.0 + meniscus;
 }
 
 /** Maps the shared fluid surface into the slot while retaining sampled area and a uniform displacement bound. */

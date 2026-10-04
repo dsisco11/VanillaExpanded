@@ -71,11 +71,11 @@ public sealed class LiquidSloshMotionStateTests
         for (int step = 1; step <= 30; step++)
         {
             float yaw = step * 0.02f;
-            var rotatedOffset = Vector3.Transform(new Vector3(0, -0.2f, -0.4f),
+            var rotatedOffset = Vector3.Transform(new Vector3(0, -0.2f, -0.8f),
                 Quaternion.CreateFromAxisAngle(Vector3.UnitY, -yaw));
             var pose = Pose(0, 0, yaw) with
             {
-                Position = new(1_000_000_000d - rotatedOffset.X, 0, -0.4 - rotatedOffset.Z)
+                Position = new(1_000_000_000d - rotatedOffset.X, 0, -0.8 - rotatedOffset.Z)
             };
             state.Update(0.02, pose);
             Assert.InRange(state.ContainerAcceleration.Length(), 0, 0.0001f);
@@ -104,6 +104,29 @@ public sealed class LiquidSloshMotionStateTests
     #endregion
 
     #region Sampling and Limits
+    /// <summary>Vertical-only motion creates small varying lateral impulses which settle with vertical acceleration.</summary>
+    [Fact]
+    public void VerticalJostle_IsBoundedAndSettlesWithoutIdleForcing()
+    {
+        var state = new LiquidSloshMotionState();
+        state.Update(0.02, Pose(0, 0));
+        state.Update(0.02, Pose(0, 0));
+        float minimum = 0, maximum = 0;
+        double height = 0;
+        for (int step = 1; step <= 200; step++)
+        {
+            height = 0.02 * Math.Sin(step * 0.02 * 8);
+            state.Update(0.02, Pose(0, height));
+            var force = state.ContainerAcceleration;
+            Assert.True(MathF.Abs(force.X) <= 0.08001f * MathF.Abs(force.Y));
+            minimum = MathF.Min(minimum, force.X);
+            maximum = MathF.Max(maximum, force.X);
+        }
+        Assert.True(minimum < -0.001f && maximum > 0.001f);
+        for (int step = 0; step < 100; step++) state.Update(0.02, Pose(0, height));
+        Assert.InRange(state.ContainerAcceleration.Length(), 0, 0.0001f);
+    }
+
     /// <summary>Time-normalized differentiation converges on the same acceleration at different sampling rates.</summary>
     [Fact]
     public void ConstantAcceleration_IsConsistentAcrossFrameRates()
@@ -123,7 +146,8 @@ public sealed class LiquidSloshMotionStateTests
         state.Update(0.02, Pose(0, 0));
         state.Update(0.02, Pose(0.1, 0.2));
         Assert.InRange(state.ContainerAcceleration.Length(), 2.999f, 3.001f);
-        Assert.InRange(state.ContainerAcceleration.Y / state.ContainerAcceleration.X, 1.999f, 2.001f);
+        // The bounded vertical jostle changes the input direction by at most 8% of its vertical component.
+        Assert.InRange(state.ContainerAcceleration.Y / state.ContainerAcceleration.X, 1.72f, 2.39f);
     }
 
     #endregion

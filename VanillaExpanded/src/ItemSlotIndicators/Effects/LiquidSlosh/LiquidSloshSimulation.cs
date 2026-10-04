@@ -13,7 +13,8 @@ namespace VanillaExpanded.ItemSlotIndicators.Effects.LiquidSlosh;
 /// <summary>Runs one client-wide liquid grid before GUI dialogs, owning scheduling, programs, and lifecycle recovery.</summary>
 internal sealed class LiquidSloshSimulation : IRenderer
 {
-    private const double StepSeconds = 1.0 / 240;
+    // Halving cell spacing requires halving the step to retain the same worst-case Courant number.
+    private const double StepSeconds = 1.0 / 480;
     private readonly ICoreClientAPI api;
     private readonly Func<ItemSlotIndicatorCameraSample?> camera;
     private readonly LiquidSloshMotionState motion = new();
@@ -154,7 +155,8 @@ internal sealed class LiquidSloshSimulation : IRenderer
                 TimeStep = (float)StepSeconds,
                 CellCount = LiquidSloshStateBuffers.CellCount,
                 CellSpacing = 1f / LiquidSloshStateBuffers.CellCount,
-                Gravity = 1, Damping = 2,
+                Gravity = 1, Damping = 3,
+                WallDamping = 6, WallDampingWidth = 0.2f,
                 FeedbackObject = buffers.FeedbackObject,
                 VertexArray = buffers.VertexArray
             };

@@ -8,7 +8,7 @@ namespace VanillaExpanded.ItemSlotIndicators.Effects.LiquidSlosh;
 internal sealed class LiquidSloshStateBuffers : IDisposable
 {
     /// <summary>Defines the fixed resolution shared by simulation and surface drawing.</summary>
-    internal const int CellCount = 32;
+    internal const int CellCount = 64;
     private readonly int[] buffers = new int[2], textures = new int[2];
     private readonly float[] zeroState = new float[CellCount * 2];
     private int readIndex;

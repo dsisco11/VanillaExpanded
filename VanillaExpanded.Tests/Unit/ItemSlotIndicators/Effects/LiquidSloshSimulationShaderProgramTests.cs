@@ -24,6 +24,7 @@ public sealed class LiquidSloshSimulationShaderProgramTests
         var shader = new LiquidSloshSimulationShaderProgram
         {
             TimeStep = 1f / 240, ContainerAcceleration = new(-2, 3), Gravity = 4, Damping = 0,
+            WallDamping = 6, WallDampingWidth = 0.2f,
             CellCount = 16, CellSpacing = 0.125f, SourceStateTexture = 1,
             FeedbackBuffer = 2, FeedbackObject = 3, VertexArray = 4
         };
@@ -32,6 +33,8 @@ public sealed class LiquidSloshSimulationShaderProgramTests
         Assert.Equal(new Vector2(-2, 3), shader.ContainerAcceleration);
         Assert.Equal(4, shader.Gravity);
         Assert.Equal(0, shader.Damping);
+        Assert.Equal(6, shader.WallDamping);
+        Assert.Equal(0.2f, shader.WallDampingWidth);
         Assert.Equal(16, shader.CellCount);
         Assert.Equal(0.125f, shader.CellSpacing);
         Assert.Equal(1, shader.SourceStateTexture);
@@ -54,13 +57,19 @@ public sealed class LiquidSloshSimulationShaderProgramTests
         Assert.Throws<ArgumentOutOfRangeException>(() => shader.TimeStep = invalid);
         Assert.Throws<ArgumentOutOfRangeException>(() => shader.Gravity = invalid);
         Assert.Throws<ArgumentOutOfRangeException>(() => shader.CellSpacing = invalid);
-        if (invalid != 0) Assert.Throws<ArgumentOutOfRangeException>(() => shader.Damping = invalid);
+        if (invalid != 0)
+        {
+            Assert.Throws<ArgumentOutOfRangeException>(() => shader.Damping = invalid);
+            Assert.Throws<ArgumentOutOfRangeException>(() => shader.WallDamping = invalid);
+            Assert.Throws<ArgumentOutOfRangeException>(() => shader.WallDampingWidth = invalid);
+        }
         if (!float.IsFinite(invalid))
         {
             Assert.Throws<ArgumentOutOfRangeException>(() => shader.ContainerAcceleration = new(invalid, 0));
             Assert.Throws<ArgumentOutOfRangeException>(() => shader.ContainerAcceleration = new(0, invalid));
         }
         Assert.Throws<ArgumentOutOfRangeException>(() => shader.TimeStep = 0.251f);
+        Assert.Throws<ArgumentOutOfRangeException>(() => shader.WallDampingWidth = 0.501f);
     }
 
     /// <summary>Grid and borrowed handle limits cannot silently select absent resources or unsupported cell counts.</summary>
@@ -116,6 +125,29 @@ public sealed class LiquidSloshSimulationShaderProgramTests
         shader.TimeStep = 1f / 240;
         Assert.Equal("Activate the liquid solver before advancing it.",
             Assert.Throws<InvalidOperationException>(() => shader.Advance()).Message);
+    }
+    /// <summary>The doubled grid's default timestep remains stable at both extremes of bounded container acceleration.</summary>
+    [Theory]
+    [InlineData(-3)]
+    [InlineData(0)]
+    [InlineData(3)]
+    public void DoubledGrid_DefaultStepSupportsBoundedAcceleration(float vertical)
+    {
+        var shader = new LiquidSloshSimulationShaderProgram
+        {
+            ProgramId = 1, SourceStateTexture = 1, FeedbackBuffer = 2, FeedbackObject = 3, VertexArray = 4,
+            ContainerAcceleration = new(0, vertical)
+        };
+        Assert.Equal(64, shader.CellCount);
+        // Reaching the managed activation guard proves the real stability guard accepts the new default step.
+        Assert.Equal("Activate the liquid solver before advancing it.",
+            Assert.Throws<InvalidOperationException>(() => shader.Advance()).Message);
+        if (vertical == 3)
+        {
+            shader.TimeStep = 1f / 240;
+            Assert.Equal("Liquid solver timestep exceeds the wave-propagation stability limit.",
+                Assert.Throws<InvalidOperationException>(() => shader.Advance()).Message);
+        }
     }
     #endregion
 
