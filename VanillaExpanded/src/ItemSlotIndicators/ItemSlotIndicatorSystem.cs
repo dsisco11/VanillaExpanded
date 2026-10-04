@@ -64,9 +64,11 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
         // Preserve freshness when applicable; otherwise show the container's liquid volume.
         var adaptiveSampling = new AdaptiveSamplingOptions();
         Register(new LiquidContainerIndicatorProvider(), priority: -10, adaptiveSampling: adaptiveSampling,
-            contextKey: static () => VanillaExpandedModSystem.Config.EnableLiquidContainerIndicators);
+            contextKey: static () => VanillaExpandedModSystem.Config.EnableLiquidContainerIndicators,
+            effect: LiquidSloshIndicatorEffect.Definition);
         Register(new WateringCanIndicatorProvider(), priority: 10, adaptiveSampling: adaptiveSampling,
-            contextKey: static () => VanillaExpandedModSystem.Config.EnableLiquidContainerIndicators);
+            contextKey: static () => VanillaExpandedModSystem.Config.EnableLiquidContainerIndicators,
+            effect: LiquidSloshIndicatorEffect.Definition);
         Register(new NightVisionFuelIndicatorProvider(), priority: 10, adaptiveSampling: adaptiveSampling,
             contextKey: static () => VanillaExpandedModSystem.Config.EnableNightVisionFuelIndicators);
         Resources.Initialize();

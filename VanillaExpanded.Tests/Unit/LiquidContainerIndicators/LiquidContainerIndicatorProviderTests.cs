@@ -3,6 +3,8 @@ using System.Numerics;
 using Moq;
 
 using VanillaExpanded.ItemSlotIndicators;
+using VanillaExpanded.ItemSlotIndicators.Effects;
+using VanillaExpanded.ItemSlotIndicators.Rendering;
 using VanillaExpanded.LiquidContainerIndicators;
 using VanillaExpanded.Tests.Mocks;
 
@@ -63,6 +65,9 @@ public sealed class LiquidContainerIndicatorProviderTests
         slot.Itemstack!.StackSize = 4;
         Assert.True(new LiquidContainerIndicatorProvider().TryGetIndicator(slot, out var indicator));
         Assert.Equal(expected, indicator.Fill);
+        Assert.Equal(LiquidSloshIndicatorEffect.DrawRange, indicator.DrawRange);
+        Assert.True(ItemSlotIndicatorDrawInput.TryCreate(100, 100, 48, indicator, out var draw));
+        Assert.Equal(0.15f + expected * 0.7f, draw.Fill, 5);
         Assert.True(indicator.Color.Z > indicator.Color.Y && indicator.Color.Y > indicator.Color.X);
     }
 
@@ -75,6 +80,9 @@ public sealed class LiquidContainerIndicatorProviderTests
         container.SetContent(slot.Itemstack, null!);
         Assert.True(new LiquidContainerIndicatorProvider().TryGetIndicator(slot, out var indicator));
         Assert.Equal(0, indicator.Fill);
+        Assert.True(ItemSlotIndicatorDrawInput.TryCreate(100, 100, 48, indicator, out var draw));
+        Assert.Equal(0.15f, draw.Fill);
+        Assert.True(draw.TryCreateBoundaryCue(out _));
         Assert.True(indicator.Color.Z > indicator.Color.X);
     }
 
@@ -114,13 +122,13 @@ public sealed class LiquidContainerIndicatorProviderTests
         higher.Setup(provider => provider.TryGetIndicator(slot, out higherIndicator)).Returns(applicable);
         var liquid = new LiquidContainerIndicatorProvider();
         var system = new ItemSlotIndicatorSystem();
-        system.Register(liquid, -10);
+        system.Register(liquid, -10, effect: LiquidSloshIndicatorEffect.Definition);
         system.Register(higher.Object);
 
         Assert.True(liquid.TryGetIndicator(slot, out var liquidIndicator));
         Assert.True(system.TryGetRenderSelection(slot, out var selected));
         Assert.Equal(applicable ? higherIndicator : liquidIndicator, selected.Indicator);
-        Assert.Null(selected.Effect);
+        Assert.Same(applicable ? null : LiquidSloshIndicatorEffect.Definition, selected.Effect);
     }
     #endregion
     #endregion

@@ -1,4 +1,6 @@
 using VanillaExpanded.ItemSlotIndicators;
+using VanillaExpanded.ItemSlotIndicators.Effects;
+using VanillaExpanded.ItemSlotIndicators.Rendering;
 using VanillaExpanded.PerishableItemSlots;
 using VanillaExpanded.Tests.Mocks;
 using VanillaExpanded.WateringCanIndicators;
@@ -56,6 +58,9 @@ public sealed class WateringCanIndicatorProviderTests
         Assert.True(new WateringCanIndicatorProvider().TryGetIndicator(CreateCanSlot(remaining, capacity), out var indicator));
 
         Assert.Equal(expected, indicator.Fill);
+        Assert.Equal(LiquidSloshIndicatorEffect.DrawRange, indicator.DrawRange);
+        Assert.True(ItemSlotIndicatorDrawInput.TryCreate(100, 100, 48, indicator, out var draw));
+        Assert.Equal(0.15f + expected * 0.7f, draw.Fill, 5);
         Assert.True(indicator.Color.Z > indicator.Color.Y);
         Assert.True(indicator.Color.Y > indicator.Color.X);
     }
@@ -75,6 +80,10 @@ public sealed class WateringCanIndicatorProviderTests
         Assert.Equal(stale.Y, indicator.Color.Y);
         Assert.Equal(stale.Z, indicator.Color.Z);
         Assert.Equal(0.3f, indicator.Color.W);
+        Assert.Null(indicator.DrawRange);
+        Assert.True(ItemSlotIndicatorDrawInput.TryCreate(100, 100, 48, indicator, out var draw));
+        Assert.Equal(1, draw.Fill);
+        Assert.False(draw.TryCreateBoundaryCue(out _));
     }
 
     /// <summary>A newly created can without a water attribute is empty.</summary>

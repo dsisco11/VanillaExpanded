@@ -2,6 +2,7 @@ using System;
 using System.Numerics;
 
 using VanillaExpanded.ItemSlotIndicators;
+using VanillaExpanded.ItemSlotIndicators.Effects;
 
 using Vintagestory.API.Common;
 using Vintagestory.GameContent;
@@ -35,7 +36,9 @@ internal sealed class WateringCanIndicatorProvider : IItemSlotIndicatorProvider
             : IndicatorColorPallette.WithOpacity(
                 ColorUtilEx.MultiLerp(IndicatorColorPallette.WaterColors.AsSpan(), fill),
                 float.Lerp(LowWaterOpacity, FullWaterOpacity, fill));
-        indicator = new ItemSlotIndicator(fill <= 0 ? 1 : fill, color);
+        // Empty cans retain the full red warning; only actual water receives bounded liquid levels.
+        indicator = new ItemSlotIndicator(fill <= 0 ? 1 : fill, color,
+            fill <= 0 ? null : LiquidSloshIndicatorEffect.DrawRange);
         return true;
     }
     #endregion

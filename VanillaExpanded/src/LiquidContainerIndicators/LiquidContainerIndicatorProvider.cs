@@ -1,6 +1,7 @@
 using System;
 
 using VanillaExpanded.ItemSlotIndicators;
+using VanillaExpanded.ItemSlotIndicators.Effects;
 
 using Vintagestory.API.Common;
 using Vintagestory.GameContent;
@@ -28,9 +29,10 @@ internal sealed class LiquidContainerIndicatorProvider : IItemSlotIndicatorProvi
         float litres = container.GetCurrentLitres(stack);
         if (!float.IsFinite(litres)) return false;
         float fill = Math.Clamp(litres / capacity, 0, 1);
-        // Empty containers are useful collection vessels, so zero fill needs no warning overlay.
+        // Keep actual volume in the sample; rendering retains a visible liquid surface even at empty.
         indicator = new ItemSlotIndicator(fill, IndicatorColorPallette.WithOpacity(
-            ColorUtilEx.MultiLerp(IndicatorColorPallette.WaterColors.AsSpan(), fill), 0.5f));
+            ColorUtilEx.MultiLerp(IndicatorColorPallette.WaterColors.AsSpan(), fill), 0.5f),
+            LiquidSloshIndicatorEffect.DrawRange);
         return true;
     }
     #endregion
