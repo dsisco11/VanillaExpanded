@@ -7,6 +7,7 @@ namespace VanillaExpanded.ItemSlotIndicators.Rendering;
 /// <summary>Separates engine graphics operations from resource ownership for headless lifecycle verification.</summary>
 internal interface IItemSlotIndicatorResourceBackend
 {
+    #region Public API
     /// <summary>Creates an unregistered engine-owned program whose lifetime transfers to the caller.</summary>
     IShaderProgram CreateProgram();
     /// <summary>Configures and registers file stages under the definition's stable engine name.</summary>
@@ -17,4 +18,5 @@ internal interface IItemSlotIndicatorResourceBackend
     MeshRef UploadMesh(MeshData mesh);
     /// <summary>Reports one unavailable effect or rectangle resource per explicit load attempt.</summary>
     void ReportFailure(string identity, string reason);
+    #endregion
 }

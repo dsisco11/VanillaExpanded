@@ -22,7 +22,7 @@ public sealed class ItemSlotIndicatorRendererTests
     public void PreparedEffect_ReceivesSelectedPresentationAndSharedFrameWithoutResourceWork()
     {
         using var context = new IndicatorResourceTestContext();
-        var effect = ItemSlotIndicatorDemonstration.Create();
+        var effect = new ItemSlotIndicatorEffectDefinition("test:effect", "test", "vanillaexpanded_itemslot_test", parameters: new Vector4(1, 0, 0, 0), needsCameraMotion: true);
         context.Resources.Register(effect);
         context.Resources.Initialize();
         var backend = Backend();
@@ -43,7 +43,7 @@ public sealed class ItemSlotIndicatorRendererTests
     public void FailedDraw_RestoresBeforeFallbackAndDoesNotHideOrReplaceSelectedProvider()
     {
         using var context = new IndicatorResourceTestContext();
-        var effect = ItemSlotIndicatorDemonstration.Create();
+        var effect = new ItemSlotIndicatorEffectDefinition("test:effect", "test", "vanillaexpanded_itemslot_test", parameters: new Vector4(1, 0, 0, 0), needsCameraMotion: true);
         var variant = new ItemSlotIndicatorEffectDefinition("test:variant", effect.ShaderAssetDomain, effect.ShaderName);
         context.Resources.Register(effect);
         context.Resources.Register(variant);
@@ -79,7 +79,7 @@ public sealed class ItemSlotIndicatorRendererTests
     public void UnavailableEffect_UsesOrdinaryRectangle(string state)
     {
         using var context = new IndicatorResourceTestContext();
-        var effect = ItemSlotIndicatorDemonstration.Create();
+        var effect = new ItemSlotIndicatorEffectDefinition("test:effect", "test", "vanillaexpanded_itemslot_test", parameters: new Vector4(1, 0, 0, 0), needsCameraMotion: true);
         if (state == "compile")
         {
             context.Backend.CompileFailures.Add(effect.ShaderName);

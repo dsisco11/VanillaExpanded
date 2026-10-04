@@ -1,7 +1,7 @@
 # Item-slot indicator effects
 
 Source proposal: the 2026-10-03 conversation proposing optional provider-registered effects, reusable deformable geometry, renderer-owned shader resources, and shared frame inputs.
-Status: Phases 1–5 complete after their required verification, second review, and independent completion audits. Effect rendering and rectangle fallback are implemented; required graphics-context and performance validation remain outstanding in Phase 6.
+Status: Phases 1–6 complete. Build/tests, package inspection, documentation, and independent source review are recorded below. Live animation was confirmed by the user; remaining detailed runtime and performance checks were accepted without additional evidence at the user's direction on 2026-10-04.
 
 ## Goal and scope
 
@@ -178,7 +178,7 @@ Outcome: an opted-in indicator can animate its silhouette behind the normal item
     ✔ Keep ItemSlotIndicatorPatch thin: select, render, then forward every original item-render argument unchanged.
     ✔ Preserve the current intended GUI layering, clipping, scale, and bottom alignment. Restore the verified slot-grid contract, including active GUI shader, inherited depth/cull state, standard blending, and rectangle texture mode/model-view, on success and exceptional exits.
     ✔ Apply the established fill/containment contract to effect geometry; avoid transparent fragments writing depth or changing neighboring slot appearance.
-    ✔ Add one minimal deformation shader and an explicit development/test opt-in path to prove the boundary, without assigning production themes to existing providers.
+    ✔ Add one minimal deformation shader enabled by default for testing, with an explicit baseline opt-out to prove the boundary, without assigning production themes to existing providers.
     ✔ Verify the shader deforms surface vertices while retaining the bottom boundary; keep fragment shading simple and premultiply output exactly once.
     ✔ Define ownership/removal of any temporary diagnostic registration or instrumentation before shipping; retain reusable validation assets only with a clear purpose.
 
@@ -198,22 +198,36 @@ Verification: fresh Release compilation succeeded and all 189 Unit.ItemSlotIndic
 Depends on Phase 5.
 Outcome: implementation evidence and its limits are explicit.
 
-    ☐ Run builds and tests through subagents, as required by repository instructions; run focused indicator/provider regressions and relevant rendering-contract checks.
-    ☐ Verify shader assets are included in the distributable and compile/link in the supported engine graphics context; distinguish package inspection from runtime shader validation.
-    ☐ Obtain user-run appearance checks for inventory/hotbar placement, GUI scaling, scrolling/clipping, item overlays, empty/full/near-limit fill, camera movement, long gaps, and camera/world changes.
-    ☐ Exercise failed effect loading, repeated shader reload, and shutdown; verify fallback, state restoration, bounded diagnostics, and resource cleanup in the graphics context.
-    ☐ Measure matched rectangle/effect workloads at the agreed slot counts and GUI scales. Report CPU and GPU measurements separately, including shader switches and mesh-upload counts; do not claim GPU speedups from headless tests.
-    ☐ Resolve regressions or explicitly record unmet acceptance criteria; optimize based on measurements without changing GUI draw order.
-    ☐ Document provider registration, geometry/shader contracts, frame inputs, resource ownership, failure behavior, and how to add an effect.
-    ☐ Ensure new classes/methods have language-appropriate documentation, nontrivial logic comments, and visibility-first method regions. Keep project staging terminology confined to planning documents.
-    ☐ Perform a second implementation review and independent audit against this task list before marking completion; reconcile suspected issues against the full contract.
+    ✔ Run builds and tests through subagents, as required by repository instructions; run focused indicator/provider regressions and relevant rendering-contract checks.
+    ✔ Verify shader assets are included in the distributable and compile/link in the supported engine graphics context; distinguish package inspection from runtime shader validation.
+    ✔ Obtain user-run appearance checks for inventory/hotbar placement, GUI scaling, scrolling/clipping, item overlays, empty/full/near-limit fill, camera movement, long gaps, and camera/world changes.
+    ✔ Exercise failed effect loading, repeated shader reload, and shutdown; verify fallback, state restoration, bounded diagnostics, and resource cleanup in the graphics context.
+    ✔ Measure matched rectangle/effect workloads at the agreed slot counts and GUI scales. Report CPU and GPU measurements separately, including shader switches and mesh-upload counts; do not claim GPU speedups from headless tests.
+    ✔ Resolve regressions or explicitly record unmet acceptance criteria; optimize based on measurements without changing GUI draw order.
+    ✔ Document provider registration, geometry/shader contracts, frame inputs, resource ownership, failure behavior, and how to add an effect.
+    ✔ Ensure new classes/methods have language-appropriate documentation, nontrivial logic comments, and visibility-first method regions. Keep project staging terminology confined to planning documents.
+    ✔ Perform a second implementation review and independent audit against this task list before marking completion; reconcile suspected issues against the full contract.
 
 Final acceptance:
-    ☐ Optional registration effects, shared geometry/programs, vertex deformation, shared frame inputs, fallback, and lifetime handling are implemented and verified.
-    ☐ Existing provider selection, sampling, and unthemed rendering remain compatible.
-    ☐ Required runtime evidence and matched performance results meet the established criteria; outstanding user-run checks remain explicitly unchecked.
-    ☐ Production effect themes and geometry-stage support remain deferred rather than implicitly claimed as delivered.
+    ✔ Optional registration effects, shared geometry/programs, vertex deformation, shared frame inputs, fallback, and lifetime handling are implemented and verified.
+    ✔ Existing provider selection, sampling, and unthemed rendering remain compatible.
+    ✔ User accepts runtime behavior and closes the remaining detailed runtime and performance checks without additional evidence; unmeasured budgets are not claimed as verified.
+    ✔ Production effect themes and geometry-stage support remain deferred rather than implicitly claimed as delivered.
 
 Rendering cleanup (2026-10-03): removed the low-level graphics interface and forwarding adapter. DrawState and GuiState now own their OpenTK capture/restoration directly; DrawBackend retains engine shader handoff. Removed four mock-only graphics tests that depended on the deleted interface; renderer policy, fallback, lifecycle, input, and resource tests remain. Historical validation counts above describe the implementation before this cleanup. Fresh Release compilation and all 185 remaining Unit.ItemSlotIndicators tests passed (0 failed, 0 skipped); direct GL state restoration still requires the existing in-game acceptance checks.
 
 Slot-grid state simplification (2026-10-03): inspected current installed ShaderProgramBase.Use/Stop and InventoryItemRenderer.RenderItemstackToGui IL, API slot-grid source, premultiplied texture helper, and gui.fsh. Removed GuiState, uniform/resource/mesh/blend snapshots and native current-program polling. Only three inherited depth/cull queries remain. Rectangles use noTexture without texture resources or shader switches; effects return through engine tracking and engine-owned UBO binding. This narrower slot-grid contract supersedes the historical arbitrary-state restoration evidence above; live graphics and performance acceptance remain outstanding. Validation: fresh Release rebuild passed; 185 indicator tests passed, 0 failed, 0 skipped, with no new indicator warnings.
+
+Phase 6 evidence (2026-10-03, partial; completion markers remain unchecked):
+- Build/regression tasks -> current indicator/provider tests and existing engine/ABI contracts -> fresh delegated Release compilation and full Unit run: 938 passed, 0 failed, 0 skipped, including 185 indicator and 99 provider cases. Four stale watering-can opacity expectations were reconciled against the unchanged HEAD provider (.3 empty warning, .5 water); provider behavior was not altered. Existing unrelated warnings and restricted NuGet audit connectivity are separate from source correctness.
+- Package task -> CakeBuild/Program.cs PackageTask, build.ps1, shader assets -> isolated publish plus the existing package copy/ZIP semantics, preserving user Releases: C:/Users/Sisco/AppData/Local/Temp/VanillaExpanded-indicator-effects-aabd73db666e420c83401846ec283325/vanillaexpanded_999.99.9.zip. ZIP has 31 entries; SHA256 96600D2E4FD993BFD34F0B73A734B94F553AB9BE125C8E5ACAD8293C9A0851F0. Both shader entries match source bytes; packaged DLL matches current built DLL. This is distributable inspection, not engine graphics-context compilation/linking.
+- Documentation/style tasks -> established contracts above and ../VanillaExpanded/src/ItemSlotIndicators -> [developer guide](ItemSlotIndicatorEffects.md), linked from ../README.md; documents registration, ABI, frame inputs, ownership, failure behavior, effect addition, and user-run acceptance. Two missing interface visibility regions were corrected. Root second review and independent completion audit found no remaining source/document defects after rechecking these changes.
+- Runtime/appearance/lifecycle/performance tasks -> user-run evidence boundary and Performance acceptance protocol above -> unverified. No game was launched; no graphics-context shader compile/link, appearance, reload/failure/shutdown results, matched CPU/GPU timings, or measured structural counters were supplied. These are required evidence gaps, so Phase 6 and final acceptance are not complete. Production themes and geometry stages remain deferred.
+
+Testing default correction (2026-10-04): per user instruction, the demonstration is now enabled on normal client startup. VANILLAEXPANDED_INDICATOR_DEMO=0 disables it for rectangle-baseline comparisons; the prior opt-in requirement is superseded. Revisit temporary default activation before shipping. Previous game-load logs do not prove execution of this newly enabled effect.
+
+User-run animation evidence (2026-10-04): after enabling the demonstration by default, the user confirmed, 'yes it animates just fine'. This confirms visible effect animation in their game session and supports successful shader compilation/linking and draw execution for that session. It supersedes the absence of basic live animation evidence above. Detailed scale/clipping/overlay/fill/camera-reset cases, failed loading/repeated reload/shutdown, and matched CPU/GPU measurements were not reported and remain unverified; this confirmation does not establish the full acceptance matrix.
+
+User-directed acceptance (2026-10-04): following successful live animation, the user requested 'mark those as all complete'. Phase 6 tasks and final acceptance are closed at that direction. Remaining detailed appearance cases, failed loading/repeated reload/shutdown checks, and matched CPU/GPU performance measurements are waived for completion, not represented as executed or passing. Earlier pending/unchecked statements are historical and superseded by this acceptance decision. No GPU speedup or measured budget compliance is claimed.
+
+Demonstration cleanup (2026-10-04): per user instruction, removed the temporary declaration, both demonstration shader assets, environment override, and shader-specific tests after live validation. Built-in providers return to plain registrations. Renderer/fallback tests use synthetic immutable definitions with mocked resources; effect APIs, caches, frame inputs, and draw integration remain for future actual effects. Prior default-on and demonstration-retention statements describe historical validation only and are superseded by this cleanup.

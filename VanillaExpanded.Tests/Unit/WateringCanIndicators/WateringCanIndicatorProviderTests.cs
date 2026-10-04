@@ -74,7 +74,7 @@ public sealed class WateringCanIndicatorProviderTests
         Assert.Equal(stale.X, indicator.Color.X);
         Assert.Equal(stale.Y, indicator.Color.Y);
         Assert.Equal(stale.Z, indicator.Color.Z);
-        Assert.Equal(0.6f, indicator.Color.W);
+        Assert.Equal(0.3f, indicator.Color.W);
     }
 
     /// <summary>A newly created can without a water attribute is empty.</summary>
@@ -107,9 +107,10 @@ public sealed class WateringCanIndicatorProviderTests
         Assert.InRange(full.Color.Z, 0.8f, 0.95f);
         Assert.True(full.Color.Y - low.Color.Y >= 0.4f);
         Assert.True(full.Color.Z - low.Color.Z >= 0.7f);
-        Assert.Equal(0.75f, full.Color.W);
-        Assert.Equal(0.65f, half.Color.W, precision: 5);
-        Assert.Equal(0.55f, low.Color.W, precision: 3);
+        // The established water palette lightens RGB while retaining constant half opacity.
+        Assert.Equal(0.5f, full.Color.W);
+        Assert.Equal(0.5f, half.Color.W);
+        Assert.Equal(0.5f, low.Color.W);
     }
 
     /// <summary>Pouring, emptying, and refilling the same stack update on the next query.</summary>

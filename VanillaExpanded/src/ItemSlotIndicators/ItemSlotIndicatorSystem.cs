@@ -54,22 +54,21 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
         Resources = new ItemSlotIndicatorResources(api.Event, new ItemSlotIndicatorResourceBackend(api));
         foreach (var registration in providers)
             if (registration.Effect is not null) Resources.Register(registration.Effect);
-        var demonstration = ItemSlotIndicatorDemonstration.FromEnvironment();
         Register(new FreshnessIndicatorProvider(),
             contextKey: static () => (VanillaExpandedModSystem.Config.EnablePerishableItemFreshnessIndicators,
-                VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity), effect: demonstration);
+                VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity));
         Register(new PreparationIndicatorProvider(), priority: -10,
-            contextKey: static () => VanillaExpandedModSystem.Config.EnablePreparationIndicators, effect: demonstration);
+            contextKey: static () => VanillaExpandedModSystem.Config.EnablePreparationIndicators);
         Register(new ClothingIndicatorProvider(), priority: -10,
-            contextKey: static () => VanillaExpandedModSystem.Config.EnableClothingIndicators, effect: demonstration);
+            contextKey: static () => VanillaExpandedModSystem.Config.EnableClothingIndicators);
         // Preserve freshness when applicable; otherwise show the container's liquid volume.
         var adaptiveSampling = new AdaptiveSamplingOptions();
         Register(new LiquidContainerIndicatorProvider(), priority: -10, adaptiveSampling: adaptiveSampling,
-            contextKey: static () => VanillaExpandedModSystem.Config.EnableLiquidContainerIndicators, effect: demonstration);
+            contextKey: static () => VanillaExpandedModSystem.Config.EnableLiquidContainerIndicators);
         Register(new WateringCanIndicatorProvider(), priority: 10, adaptiveSampling: adaptiveSampling,
-            contextKey: static () => VanillaExpandedModSystem.Config.EnableLiquidContainerIndicators, effect: demonstration);
+            contextKey: static () => VanillaExpandedModSystem.Config.EnableLiquidContainerIndicators);
         Register(new NightVisionFuelIndicatorProvider(), priority: 10, adaptiveSampling: adaptiveSampling,
-            contextKey: static () => VanillaExpandedModSystem.Config.EnableNightVisionFuelIndicators, effect: demonstration);
+            contextKey: static () => VanillaExpandedModSystem.Config.EnableNightVisionFuelIndicators);
         Resources.Initialize();
         Renderer = new ItemSlotIndicatorRenderer(Resources, new ItemSlotIndicatorDrawBackend(api));
         frameUpdater = new ItemSlotIndicatorFrameUpdater(api.Event, new ItemSlotIndicatorCameraSource(api), () => NeedsCameraMotion);

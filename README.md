@@ -132,3 +132,7 @@ This project is licensed under the Creative Commons Attribution-NonCommercial-Sh
 
 Additional grant to Anego Studios:
 Anego Studios and its affiliates are granted a perpetual, worldwide, non-exclusive, royalty-free license to use, modify, sublicense, and distribute this code, or derivative works, as part of the official VintageStory game or related products, under any terms of their choosing, without the obligations of Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International Public License, provided that attribution to the original author (“David Sisco”) is given in the game credits or documentation.
+
+## Developer documentation
+
+See [item-slot indicator effects](docs/ItemSlotIndicatorEffects.md) for internal registration, shader and geometry contracts, resource ownership, and validation requirements.
