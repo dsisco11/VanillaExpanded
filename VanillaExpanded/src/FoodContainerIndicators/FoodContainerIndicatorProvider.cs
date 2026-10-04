@@ -3,6 +3,7 @@ using VanillaExpanded.ItemSlotIndicators.Effects;
 using VanillaExpanded.PerishableItemSlots;
 
 using Vintagestory.API.Common;
+using Vintagestory.API.Client;
 using Vintagestory.GameContent;
 
 namespace VanillaExpanded.FoodContainerIndicators;
@@ -10,6 +11,7 @@ namespace VanillaExpanded.FoodContainerIndicators;
 /// <summary>Supplies freshness indicators exclusively for perishable food in meal containers.</summary>
 internal sealed class FoodContainerIndicatorProvider : IItemSlotIndicatorProvider
 {
+    private readonly FoodContainerParticlePalette palettes = new();
     #region Public API
     /// <summary>Returns meal freshness using the existing setting, color scale, and inventory transition rates.</summary>
     public bool TryGetIndicator(ItemSlot slot, out ItemSlotIndicator indicator)
@@ -23,7 +25,10 @@ internal sealed class FoodContainerIndicatorProvider : IItemSlotIndicatorProvide
         if (state is null) return false;
         float freshness = FreshnessIndicatorProvider.CalculateFreshness(state);
         indicator = new ItemSlotIndicator(freshness, FreshnessIndicatorProvider.FreshnessColor(freshness),
-            FoodGrainIndicatorEffect.DrawRange);
+            FoodGrainIndicatorEffect.DrawRange)
+        {
+            ParticlePalette = api is ICoreClientAPI client ? palettes.Resolve(client, stack, container) : null
+        };
         return true;
     }
     #endregion

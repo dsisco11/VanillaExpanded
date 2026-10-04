@@ -84,6 +84,7 @@ internal sealed class ItemSlotIndicatorDrawBackend : IItemSlotIndicatorDrawBacke
             program.Uniform("effectParameters", parameters.X, parameters.Y, parameters.Z, parameters.W);
         }
         if (program.HasUniform("segmentCount")) program.Uniform("segmentCount", definition.SegmentCount);
+        if (grains) (input.ParticlePalette ?? ItemSlotIndicatorParticlePalette.Default).Submit(program);
         if (liquid || grains)
         {
             program.Uniform(liquid ? "liquidSurface" : "grainState", 0);

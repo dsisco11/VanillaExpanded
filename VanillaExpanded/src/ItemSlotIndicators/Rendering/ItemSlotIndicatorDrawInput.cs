@@ -10,6 +10,8 @@ internal readonly record struct ItemSlotIndicatorDrawInput(Vector4 SlotBounds, f
     internal float ResourceFill { get; init; }
     /// <summary>Gets the optional draw levels for shader containment and boundary cues.</summary>
     internal ItemSlotIndicatorDrawRange? DrawRange { get; init; }
+    /// <summary>Gets optional immutable food colors sampled by the provider.</summary>
+    internal ItemSlotIndicatorParticlePalette? ParticlePalette { get; init; }
 
     #region Public API
     /// <summary>Rejects invalid geometry and invisible results while retaining negative coordinates for inherited clipping.</summary>
@@ -24,7 +26,10 @@ internal readonly record struct ItemSlotIndicatorDrawInput(Vector4 SlotBounds, f
         float drawFill = indicator.DrawRange is { } range ? float.Lerp(range.Minimum, range.Maximum, fill) : fill;
         Vector4 color = new(Sanitize(indicator.Color.X), Sanitize(indicator.Color.Y), Sanitize(indicator.Color.Z), Sanitize(indicator.Color.W));
         if ((drawFill == 0 && indicator.DrawRange is null) || color.W == 0) return false;
-        input = new(new(left, top, size, size), drawFill, color) { ResourceFill = fill, DrawRange = indicator.DrawRange };
+        input = new(new(left, top, size, size), drawFill, color)
+        {
+            ResourceFill = fill, DrawRange = indicator.DrawRange, ParticlePalette = indicator.ParticlePalette
+        };
         return true;
     }
 

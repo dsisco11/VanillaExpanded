@@ -57,6 +57,8 @@ internal sealed class ItemSlotIndicatorResourceBackend(ICoreClientAPI api) : IIt
             throw new InvalidOperationException("Indicator programs cannot use geometry stages or uniform buffers.");
         if (grains && !program.HasUniform("grainState"))
             throw new InvalidOperationException("Grain drawing requires shared particle state.");
+        if (grains && !program.HasUniform("foodPalette"))
+            throw new InvalidOperationException("Grain drawing requires food particle colors.");
         if (liquid && (!program.HasUniform("liquidSurface") || !program.HasUniform("surfaceCellCount")
             || !program.HasUniform("segmentCount")))
             throw new InvalidOperationException("Liquid drawing requires shared surface inputs and mesh subdivision count.");
@@ -64,6 +66,12 @@ internal sealed class ItemSlotIndicatorResourceBackend(ICoreClientAPI api) : IIt
         for (int index = 0; index < uniforms; index++)
         {
             string name = GL.GetActiveUniform(program.ProgramId, index, out int uniformSize, out ActiveUniformType uniformType);
+            if (grains && name == "foodPalette[0]")
+            {
+                if (uniformType != ActiveUniformType.FloatVec4 || uniformSize != ItemSlotIndicatorParticlePalette.ColorCount)
+                    throw new InvalidOperationException("Food palette must contain sixteen vec4 colors.");
+                continue;
+            }
             if (liquid && name == "liquidSurface" && uniformType == ActiveUniformType.SamplerBuffer && uniformSize == 1)
                 continue;
             if (grains && name == "grainState" && uniformType == ActiveUniformType.SamplerBuffer && uniformSize == 1)

@@ -7,7 +7,8 @@ uniform float fill;
 uniform samplerBuffer grainState;
 out vec2 grainLocal;
 out vec2 slotLocal;
-flat out float shade;
+uniform vec4 foodPalette[16];
+flat out vec3 grainColor;
 
 /* Expands one cached quad per grain from shared state, preserving its screen-space size. */
 void main()
@@ -31,7 +32,8 @@ void main()
     vec2 center = vec2(clamp(pv.x,visualRadius,1.0-visualRadius),
         visualRadius+(pv.y-pr.z)*max(0.0,fill-2.0*visualRadius)/max(pr.w-2.0*pr.z,0.001));
     slotLocal = center+offset;
-    shade = 0.78+0.22*seed;
+    // Keep color selection independent of rotation; identity makes it stable as the grain moves.
+    grainColor = foodPalette[int((hash >> 4u) & 15u)].rgb;
     vec2 pixel = vec2(slotBounds.x+slotLocal.x*slotBounds.z, slotBounds.y+(1.0-slotLocal.y)*slotBounds.w);
     gl_Position = projectionMatrix*modelViewMatrix*vec4(pixel,80.0,1.0);
 }
