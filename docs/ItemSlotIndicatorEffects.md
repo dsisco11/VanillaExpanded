@@ -84,6 +84,22 @@ Missing or invalid resources select the rectangle using the winning provider's o
 
 ## Liquid sloshing
 
+### Typed GPU simulation program
+
+`Effects/LiquidSlosh/LiquidSloshSimulationShaderProgram` derives from the game's `ShaderProgram`. Its retained C# properties expose the solver's timestep, horizontal/vertical camera acceleration, effective gravity, damping, cell count, and cell spacing. GPU inputs are a source buffer texture, destination buffer, dedicated transform-feedback object, and solver vertex array. The simulation owns those objects and must provide distinct source/destination storage with enough capacity; the shader class borrows them and does not allocate or dispose them.
+
+The solver stage contract uses `gl_VertexID` to index cells, reads `samplerBuffer state` from texture unit zero, and emits two scalar floats named `nextHeight` and `nextFlow` per point. The other required uniforms are `timeStep`, `cameraAcceleration`, `gravity`, `damping`, `cellCount`, and `cellSpacing`. State records are interleaved height/flow pairs, eight bytes each. The caller supplies/registers stage assets through the engine and calls `Compile()` normally. Geometry stages are rejected. Property validation does not establish numerical stability; the eventual solver owner must choose timestep/subdivision limits appropriate to its equations.
+
+Compilation temporarily installs a narrow pre-link adapter on the active engine platform. It declares feedback varyings only for this concrete subclass, then lets the engine link and discover fresh uniform locations. The adapter is removed on success or failure and fails explicitly if the engine link sequence is unsupported. A dedicated feedback object requires OpenGL 4.0 or the corresponding transform-feedback extension.
+
+The simulation runs in a dedicated pass before GUI dialogs render, with no active feedback and rasterizer discard disabled on entry. Ortho order 0.99 is already inside the engine's GUI shader scope: the engine activates GUI before invoking the Ortho callbacks, not inside the GUI manager. Therefore the simulation owner retains the engine-managed current shader reference, stops it, activates the solver, and invokes `Advance()` for the required steps. In a finally block it stops the solver and re-uses the retained GUI program. This program handoff requires no GPU queries.
+
+`Advance()` checks activation through engine-managed state, publishes retained inputs, binds its borrowed resources, and performs a fixed-count point update. It ends feedback even on draw failure, disables discard, releases feedback/VAO/buffer-texture bindings to zero, and leaves texture unit zero selected. It neither queries GPU state nor snapshots/restores arbitrary preceding bindings. Subsequent GUI mesh draws bind their own VAO/index buffers, and the buffer-texture scratch binding is separate from their 2D texture bindings. Execution performs no CPU readback.
+
+This class defines the GPU execution boundary. The current liquid effect below still uses the procedural shader; solver stage assets, ping-pong allocation, camera-force derivation, fixed-step scheduling, and surface-profile rendering are not connected yet.
+
+### Current surface effect
+
 Liquid containers and watering cans share `LiquidSloshIndicatorEffect.Definition`, a sixteen-segment vertex effect enabled with their existing indicator setting. Normal liquid samples use average surface levels 0.15–0.85, preserving raw resource fill, color, opacity, sampling, and priority. Empty containers retain a small blue liquid surface and the minimum boundary cue. Empty watering cans instead retain their existing unbounded full red warning: mapped fill is one, deformation is zero, and no boundary cue is drawn. Other providers remain ordinary rectangles.
 
 With `u` measured left to right and `activity = max(abs(motion.x), abs(motion.y), abs(cameraBob))`, the standing wave is `-(0.625 + 0.125 * activity) * cos(2*pi*u) * cos(2*pi*timeSeconds/2 + 0.75*cameraBob)`. Its center rises as both sides fall, then the motion reverses, repeating every two seconds. Resting wave amplitude is 25% stronger than the previous standing wave. Actual eye bob both strengthens and shifts the wave phase, producing a signed response even when the camera is not turning. Camera tilt is `-0.0625 * motion.x * (2*u - 1)`: looking right raises the left edge. Shared damped camera signals control settling; there is no separate fluid simulation or inertial spring.

@@ -1,0 +1,146 @@
+using System.Numerics;
+using System.Reflection.Emit;
+
+using HarmonyLib;
+
+using OpenTK.Graphics.OpenGL4;
+
+using VanillaExpanded.ItemSlotIndicators.Effects.LiquidSlosh;
+
+using Vintagestory.Client.NoObf;
+
+namespace VanillaExpanded.Tests.Unit.ItemSlotIndicators.Effects;
+
+/// <summary>Checks typed solver inputs and pre-link adaptation without creating a graphics context.</summary>
+[Trait("Category", "Unit")]
+public sealed class LiquidSloshSimulationShaderProgramTests
+{
+    #region Public API
+    #region Input Contracts
+    /// <summary>Retained typed inputs can be configured independently of program activation or GPU allocation.</summary>
+    [Fact]
+    public void Properties_RetainCompleteSolverInputs()
+    {
+        var shader = new LiquidSloshSimulationShaderProgram
+        {
+            TimeStep = 1f / 240, CameraAcceleration = new(-2, 3), Gravity = 4, Damping = 0,
+            CellCount = 16, CellSpacing = 0.125f, SourceStateTexture = 1,
+            FeedbackBuffer = 2, FeedbackObject = 3, VertexArray = 4
+        };
+        Assert.IsAssignableFrom<ShaderProgram>(shader);
+        Assert.Equal(1f / 240, shader.TimeStep);
+        Assert.Equal(new Vector2(-2, 3), shader.CameraAcceleration);
+        Assert.Equal(4, shader.Gravity);
+        Assert.Equal(0, shader.Damping);
+        Assert.Equal(16, shader.CellCount);
+        Assert.Equal(0.125f, shader.CellSpacing);
+        Assert.Equal(1, shader.SourceStateTexture);
+        Assert.Equal(2, shader.FeedbackBuffer);
+        Assert.Equal(3, shader.FeedbackObject);
+        Assert.Equal(4, shader.VertexArray);
+        Assert.Equal(8, LiquidSloshSimulationShaderProgram.StateStrideBytes);
+    }
+
+    /// <summary>Invalid floating-point inputs are rejected before any uniform submission.</summary>
+    [Theory]
+    [InlineData(float.NaN)]
+    [InlineData(float.PositiveInfinity)]
+    [InlineData(float.NegativeInfinity)]
+    [InlineData(-1)]
+    [InlineData(0)]
+    public void InvalidScalars_AreRejected(float invalid)
+    {
+        var shader = new LiquidSloshSimulationShaderProgram();
+        Assert.Throws<ArgumentOutOfRangeException>(() => shader.TimeStep = invalid);
+        Assert.Throws<ArgumentOutOfRangeException>(() => shader.Gravity = invalid);
+        Assert.Throws<ArgumentOutOfRangeException>(() => shader.CellSpacing = invalid);
+        if (invalid != 0) Assert.Throws<ArgumentOutOfRangeException>(() => shader.Damping = invalid);
+        if (!float.IsFinite(invalid))
+        {
+            Assert.Throws<ArgumentOutOfRangeException>(() => shader.CameraAcceleration = new(invalid, 0));
+            Assert.Throws<ArgumentOutOfRangeException>(() => shader.CameraAcceleration = new(0, invalid));
+        }
+        Assert.Throws<ArgumentOutOfRangeException>(() => shader.TimeStep = 0.251f);
+    }
+
+    /// <summary>Grid and borrowed handle limits cannot silently select absent resources or unsupported cell counts.</summary>
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(0)]
+    public void InvalidGpuBindings_AreRejected(int invalid)
+    {
+        var shader = new LiquidSloshSimulationShaderProgram();
+        Assert.Throws<ArgumentOutOfRangeException>(() => shader.SourceStateTexture = invalid);
+        Assert.Throws<ArgumentOutOfRangeException>(() => shader.FeedbackBuffer = invalid);
+        Assert.Throws<ArgumentOutOfRangeException>(() => shader.FeedbackObject = invalid);
+        Assert.Throws<ArgumentOutOfRangeException>(() => shader.VertexArray = invalid);
+        Assert.Throws<ArgumentOutOfRangeException>(() => shader.CellCount = 1);
+        Assert.Throws<ArgumentOutOfRangeException>(() => shader.CellCount = 65);
+    }
+
+    /// <summary>Advance rejects missing program, resources, and activation using managed checks before touching GPU state.</summary>
+    [Fact]
+    public void Advance_RequiresPreparedInputsAndCallerActivation()
+    {
+        var shader = new LiquidSloshSimulationShaderProgram();
+        Assert.Equal("Compile the liquid solver before advancing it.",
+            Assert.Throws<InvalidOperationException>(() => shader.Advance()).Message);
+        // A synthetic handle lets the remaining guards run without allocating or binding a real program.
+        shader.ProgramId = 1;
+        Assert.Equal("The simulation must supply all borrowed GPU bindings before advancing.",
+            Assert.Throws<InvalidOperationException>(() => shader.Advance()).Message);
+        shader.SourceStateTexture = 1;
+        shader.FeedbackBuffer = 2;
+        shader.FeedbackObject = 3;
+        shader.VertexArray = 4;
+        Assert.Equal("Activate the liquid solver before advancing it.",
+            Assert.Throws<InvalidOperationException>(() => shader.Advance()).Message);
+    }
+    #endregion
+
+    #region Engine Link Adaptation
+    /// <summary>The installed engine linker remains compatible with the narrowly scoped pre-link adapter.</summary>
+    [Fact]
+    public void EngineLinker_ContainsSupportedPreLinkInsertionPoint()
+    {
+        var target = AccessTools.Method(typeof(ClientPlatformWindows), nameof(ClientPlatformWindows.CreateShaderProgram),
+            [typeof(ShaderProgram)]);
+        var original = PatchProcessor.GetOriginalInstructions(target).ToList();
+        int count = original.Count;
+        var adapted = LiquidSloshTransformFeedbackLink.InsertConfiguration(original).ToList();
+        Assert.Equal(count + 3, adapted.Count);
+        int callback = adapted.FindIndex(instruction => instruction.operand is System.Reflection.MethodInfo method
+            && method.DeclaringType == typeof(LiquidSloshTransformFeedbackLink) && method.Name == "Configure");
+        int inserted = callback - 2;
+        Assert.True(inserted >= 0);
+        Assert.Equal(OpCodes.Dup, adapted[inserted].opcode);
+        Assert.Equal(OpCodes.Ldarg_1, adapted[inserted + 1].opcode);
+        Assert.Equal("LinkProgram", ((System.Reflection.MethodInfo)adapted[inserted + 3].operand).Name);
+    }
+
+    /// <summary>Branches targeting the engine link also execute configuration without changing its stack argument.</summary>
+    [Fact]
+    public void PreLinkAdapter_MovesLabelsBeforeConfiguration()
+    {
+        var link = new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(GL), nameof(GL.LinkProgram), [typeof(int)]));
+        var label = new DynamicMethod("test-label", typeof(void), Type.EmptyTypes).GetILGenerator().DefineLabel();
+        link.labels.Add(label);
+        var adapted = LiquidSloshTransformFeedbackLink.InsertConfiguration([link]).ToList();
+        Assert.Equal(OpCodes.Dup, adapted[0].opcode);
+        Assert.Contains(label, adapted[0].labels);
+        Assert.Empty(link.labels);
+        Assert.Same(link, adapted[3]);
+    }
+
+    /// <summary>Missing or ambiguous engine links fail explicitly rather than silently producing an unconfigured program.</summary>
+    [Fact]
+    public void UnsupportedLinkerBody_IsRejected()
+    {
+        Assert.Throws<InvalidOperationException>(() => LiquidSloshTransformFeedbackLink.InsertConfiguration([]));
+        var link = AccessTools.Method(typeof(GL), nameof(GL.LinkProgram), [typeof(int)]);
+        Assert.Throws<InvalidOperationException>(() => LiquidSloshTransformFeedbackLink.InsertConfiguration(
+            [new(OpCodes.Call, link), new(OpCodes.Call, link)]));
+    }
+    #endregion
+    #endregion
+}
