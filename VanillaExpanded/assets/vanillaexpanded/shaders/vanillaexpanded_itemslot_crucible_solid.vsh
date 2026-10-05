@@ -12,6 +12,7 @@ out vec2 slotLocal;
 flat out float shade;
 flat out vec3 particleColor;
 flat out vec3 cellPlanes[6];
+flat out mat2 surfaceBasis;
 
 /** Produces stable shape samples independently of rotation and palette selection. */
 float shapeRandom(uint seed, uint index)
@@ -34,6 +35,7 @@ void main()
         slotLocal = vec2(2.0);
         shade = 1.0;
         particleColor = vec3(0.0);
+        surfaceBasis = mat2(1.0);
         for (int face = 0; face < 6; face++) cellPlanes[face] = vec3(1.0, 0.0, 2.0);
         gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
         return;
@@ -55,6 +57,8 @@ void main()
     }
     float angle = float(hash >> 8u) / 16777216.0 * 6.2831853;
     mat2 rotation = mat2(cos(angle), sin(angle), -sin(angle), cos(angle));
+    // Surface normals follow the same rotation and inverse aspect scale as the cellular silhouette.
+    surfaceBasis = rotation * mat2(1.0, 0.0, 0.0, 1.0/0.8);
     // Larger collision radii need less visual enlargement; keep pieces within the minimum 0.15 fill envelope.
     float radius = pr.z * 1.8;
     // Metal state publishes a conserved-area envelope, independent of individual airborne pieces.

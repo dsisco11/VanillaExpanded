@@ -11,6 +11,7 @@ out vec2 slotLocal;
 uniform vec4 foodPalette[16];
 flat out vec3 grainColor;
 flat out vec3 cellPlanes[6];
+flat out mat2 surfaceBasis;
 
 /** Produces stable Voronoi neighbor samples independently of orientation and food color. */
 float shapeRandom(uint seed, uint index)
@@ -32,6 +33,7 @@ void main()
         grainLocal = vec2(2.0);
         slotLocal = vec2(2.0);
         grainColor = vec3(0.0);
+        surfaceBasis = mat2(1.0);
         for (int face = 0; face < 6; face++) cellPlanes[face] = vec3(1.0, 0.0, 2.0);
         gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
         return;
@@ -58,6 +60,8 @@ void main()
     // Tiny two-pixel footprints cannot show cell corners; retain a minimum visible food-piece size.
     float visualRadius = max(0.05, pr.z*3.0);
     float aspect = mix(0.55, 0.9, shapeRandom(hash, 17u));
+    // Inverse-transpose the silhouette's aspect scaling before rotating its surface gradient.
+    surfaceBasis = rotation * mat2(1.0, 0.0, 0.0, 1.0/aspect);
     vec2 offset = rotation*(position.xy*visualRadius*vec2(1.0,aspect));
     // Contain the enlarged rotated quad, including corners outside its circular collision radius.
     vec2 extent = visualRadius*vec2(abs(cos(angle))+aspect*abs(sin(angle)), abs(sin(angle))+aspect*abs(cos(angle)));
