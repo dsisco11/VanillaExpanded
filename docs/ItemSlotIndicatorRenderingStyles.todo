@@ -25,9 +25,9 @@
         ☑ Ensure style switches do not resample freshness or trigger adaptive resource activity.
 
     3. Style layout:
-        ☐ Add a focused layout component for background bounds, four non-overlapping outline strips, and bar track/fill bounds.
-        ☐ Reuse the prepared rectangle mesh and engine GUI shader without per-slot resource allocation.
-        ☐ Make draw-input validation retain applicable zero-valued outlines and bar tracks.
+        ☑ Add a focused layout component for background bounds, four non-overlapping outline strips, and bar track/fill bounds.
+        ☑ Reuse the prepared rectangle mesh and engine GUI shader without per-slot resource allocation.
+        ☑ Make draw-input validation retain applicable zero-valued outlines and bar tracks.
 
     4. Renderer integration:
         ☐ Dispatch ordinary drawing by style while preserving clipping, depth masking, and engine shader/state ownership.

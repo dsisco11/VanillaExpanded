@@ -12,23 +12,28 @@ internal readonly record struct ItemSlotIndicatorDrawInput(Vector4 SlotBounds, f
     internal ItemSlotIndicatorDrawRange? DrawRange { get; init; }
     /// <summary>Gets optional immutable ingredient colors sampled by the provider.</summary>
     internal ItemSlotIndicatorParticlePalette? ParticlePalette { get; init; }
+    /// <summary>Gets whether adjoining style rectangles preserve fractional GUI coordinates rather than legacy truncation.</summary>
+    internal bool PreserveFractionalPosition { get; init; }
 
     #region Public API
     /// <summary>Rejects invalid geometry and invisible results while retaining negative coordinates for inherited clipping.</summary>
-    internal static bool TryCreate(double x, double y, float size, ItemSlotIndicator indicator, out ItemSlotIndicatorDrawInput input)
+    /// <remarks>Outline and bar tracks retain zero resource levels; draw ranges apply only to backgrounds.</remarks>
+    internal static bool TryCreate(double x, double y, float size, ItemSlotIndicator indicator, out ItemSlotIndicatorDrawInput input,
+        ItemSlotIndicatorRenderingStyle style = ItemSlotIndicatorRenderingStyle.SlotBackground)
     {
         input = default;
-        if (!double.IsFinite(x) || !double.IsFinite(y) || !float.IsFinite(size) || size <= 0) return false;
+        if (!Enum.IsDefined(style) || !double.IsFinite(x) || !double.IsFinite(y) || !float.IsFinite(size) || size <= 0) return false;
         float left = (float)(x - size / 2), top = (float)(y - size / 2);
         if (!float.IsFinite(left) || !float.IsFinite(top)) return false;
         float fill = Sanitize(indicator.Fill);
         if (indicator.DrawRange is { IsValid: false }) return false;
-        float drawFill = indicator.DrawRange is { } range ? float.Lerp(range.Minimum, range.Maximum, fill) : fill;
+        bool background = style == ItemSlotIndicatorRenderingStyle.SlotBackground;
+        float drawFill = background && indicator.DrawRange is { } range ? float.Lerp(range.Minimum, range.Maximum, fill) : fill;
         Vector4 color = new(Sanitize(indicator.Color.X), Sanitize(indicator.Color.Y), Sanitize(indicator.Color.Z), Sanitize(indicator.Color.W));
-        if ((drawFill == 0 && indicator.DrawRange is null) || color.W == 0) return false;
+        if ((background && drawFill == 0 && indicator.DrawRange is null) || color.W == 0) return false;
         input = new(new(left, top, size, size), drawFill, color)
         {
-            ResourceFill = fill, DrawRange = indicator.DrawRange, ParticlePalette = indicator.ParticlePalette
+            ResourceFill = fill, DrawRange = background ? indicator.DrawRange : null, ParticlePalette = indicator.ParticlePalette
         };
         return true;
     }
@@ -61,11 +66,12 @@ internal readonly record struct ItemSlotIndicatorDrawInput(Vector4 SlotBounds, f
         return true;
     }
 
-    /// <summary>Composes the legacy GUI rectangle transform in owned storage with integer truncation and inherited dialog depth.</summary>
+    /// <summary>Composes the GUI rectangle transform in owned storage with inherited dialog depth and optional legacy truncation.</summary>
     internal void RectangleMatrix(float[] modelView, float[] destination)
     {
         float width = SlotBounds.Z, height = SlotBounds.W * Fill;
-        float x = (int)SlotBounds.X, y = (int)(SlotBounds.Y + SlotBounds.W - height);
+        float x = SlotBounds.X, y = SlotBounds.Y + SlotBounds.W - height;
+        if (!PreserveFractionalPosition) { x = (int)x; y = (int)y; }
         // Algebraic composition of M * T(x,y,80) * S(w,h,0) * S(.5,.5,0) * T(1,1,0).
         for (int row = 0; row < 4; row++)
         {
