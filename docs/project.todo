@@ -1,15 +1,19 @@
 # Vanilla: Expanded TODO List:
     ## Issues:
         Item-Slot Indicators:
-            ☐ Perishable items freshness indicators shoudl be able to optionally render as a horizontal bar.
-            ☐ Perishable items freshness indicators shoudl be able to optionally render as an outline around the item-slot.
+            ☐ Perishable items freshness indicators should be able to optionally render as a horizontal bar.
+            ☐ Perishable items freshness indicators should be able to optionally render as an outline around the item-slot.
             ☐ Liquid container indicators should allow a min-bound of 0%
-            ☐ Liquid containe rindicators should stay the same color no matter their liquid-level.
+            ☐ Liquid container indicators should stay the same color no matter their liquid-level.
+            ☐ Food particles should be bigger and use voronoi cell shapes (like the metal bit particles do for the crucible).
+            ☐ Food particles shouldnt be so transparent.
+
         Radial Menus:
             ☐ Tool-mode radial menu needs to be able to be configured to allow interacting with the hotbar (e.g. for the chisel tools "add material" functionality).
             ☐ Reduce icon size for tool-mode radial menus.
             ☐ Increase center circle size for tool-mode radial menus.
             ☐ Implement mesh aware icon fitting for radial menus.
+            
         Other:
             ☐ Fix respawn decal looking obnoxious (too colorful).
 
