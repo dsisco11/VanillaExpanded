@@ -30,7 +30,7 @@ internal readonly struct IndicatorColorPallette
     /// <summary>Freshness colors ordered from stale to fresh.</summary>
     internal static readonly ImmutableArray<Vector4> FreshnessColors = [Red, Orange, Yellow, Green];
     /// <summary>Water colors ordered from nearly empty to full.</summary>
-    internal static readonly ImmutableArray<Vector4> WaterColors = [DarkBlue, LightBlue];
+    internal static readonly ImmutableArray<Vector4> WaterColors = [LightBlue, LightBlue];
     /// <summary>Preparation colors ordered from newly started to ready.</summary>
     internal static readonly ImmutableArray<Vector4> PreparationColors = [Slate, Teal];
     #endregion
