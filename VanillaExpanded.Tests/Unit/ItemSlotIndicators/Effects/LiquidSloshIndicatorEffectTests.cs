@@ -20,7 +20,7 @@ public sealed class LiquidSloshIndicatorEffectTests
         Assert.Equal(0, effect.Parameters.Y);
         Assert.Equal(0, effect.Parameters.Z);
         Assert.InRange(effect.Parameters.W, 0, 1);
-        Assert.Equal(new ItemSlotIndicatorDrawRange(0.15f, 0.85f), LiquidSloshIndicatorEffect.DrawRange);
+        Assert.Equal(new ItemSlotIndicatorDrawRange(0.0f, 0.85f), LiquidSloshIndicatorEffect.DrawRange);
     }
     #endregion
 }

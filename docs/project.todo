@@ -3,8 +3,7 @@
         Item-Slot Indicators:
             ☐ Perishable items freshness indicators should be able to optionally render as a horizontal bar.
             ☐ Perishable items freshness indicators should be able to optionally render as an outline around the item-slot.
-            ☐ Food particles should be bigger and use voronoi cell shapes (like the metal bit particles do for the crucible).
-            ☐ Food particles shouldnt be so transparent.
+            ☐ Food particle sim reacts too strongly to movement and is slightly too spongy.
 
         Radial Menus:
             ☐ Tool-mode radial menu needs to be able to be configured to allow interacting with the hotbar (e.g. for the chisel tools "add material" functionality).
