@@ -8,7 +8,7 @@ using Vintagestory.GameContent;
 
 namespace VanillaExpanded.PerishableItemSlots;
 
-/// <summary>Supplies freshness indicators for perishable items and food-container contents.</summary>
+/// <summary>Supplies freshness and active spoilage indicators for perishable items and food-container contents.</summary>
 internal sealed class FreshnessIndicatorProvider : IItemSlotIndicatorProvider
 {
     private const float StaleOpacityMultiplier = 0.9f;
@@ -27,8 +27,18 @@ internal sealed class FreshnessIndicatorProvider : IItemSlotIndicatorProvider
 
         TransitionState? state = ResolvePerishState(api.World, slot);
         if (state is null) return false;
-        float freshness = CalculateFreshness(state);
-        indicator = new ItemSlotIndicator(freshness, FreshnessColor(freshness));
+        if (state.TransitionLevel > 0)
+        {
+            // Once the fresh period ends, show progress toward rot rather than a shrinking fresh lifetime.
+            indicator = new ItemSlotIndicator(Math.Clamp(state.TransitionLevel, 0, 1),
+                IndicatorColorPallette.WithOpacity(IndicatorColorPallette.Purple,
+                    VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity));
+        }
+        else
+        {
+            float freshness = CalculateFreshness(state);
+            indicator = new ItemSlotIndicator(freshness, FreshnessColor(freshness));
+        }
         return true;
     }
 

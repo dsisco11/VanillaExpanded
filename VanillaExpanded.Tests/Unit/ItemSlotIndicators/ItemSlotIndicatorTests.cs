@@ -216,6 +216,36 @@ public sealed class ItemSlotIndicatorTests
     #endregion
 
     #region Freshness
+    /// <summary>Active spoilage grows toward rot using purple and the configured presentation style.</summary>
+    [Theory]
+    [InlineData(0.1f, 0)]
+    [InlineData(0.5f, 1)]
+    [InlineData(1f, 2)]
+    [InlineData(1.2f, 0)]
+    public void Freshness_ActiveSpoilage_GrowsPurple(float spoilage, int style)
+    {
+        var world = new Mock<IWorldAccessor>();
+        var api = new Mock<ICoreAPI>();
+        api.SetupGet(value => value.World).Returns(world.Object);
+        var inventory = CreateInventory(api.Object, "spoiling");
+        var slot = inventory[0];
+        var item = new Mock<MockItem>(1, (byte)0, api.Object);
+        item.Setup(value => value.UpdateAndGetTransitionState(world.Object, slot, EnumTransitionType.Perish))
+            .Returns(new TransitionState { FreshHours = 100, FreshHoursLeft = 0, TransitionHours = 20,
+                TransitionedHours = 100 + 20 * spoilage, TransitionLevel = spoilage });
+        slot.Itemstack = new ItemStack(item.Object);
+        var system = new ItemSlotIndicatorSystem();
+        system.Register(new FreshnessIndicatorProvider(),
+            supportedStyles: [ItemSlotIndicatorRenderingStyle.SlotBackground, ItemSlotIndicatorRenderingStyle.SlotOutline,
+                ItemSlotIndicatorRenderingStyle.HorizontalBar], styleSelector: () => (ItemSlotIndicatorRenderingStyle)style);
+
+        Assert.True(system.TryGetRenderSelection(slot, out var selection));
+        Assert.Equal(Math.Clamp(spoilage, 0, 1), selection.Indicator.Fill);
+        Assert.Equal(IndicatorColorPallette.WithOpacity(IndicatorColorPallette.Purple,
+            VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity), selection.Indicator.Color);
+        Assert.Equal((ItemSlotIndicatorRenderingStyle)style, selection.Style);
+    }
+
     /// <summary>Freshness does not decorate empty slots or stacks without inventory API access.</summary>
     [Fact]
     public void Freshness_EmptyOrDetachedSlot_ReturnsFalse()

@@ -10,6 +10,8 @@ internal readonly struct IndicatorColorPallette
     #region Color Definitions
     /// <summary>Shared red for stale states and empty-resource warnings.</summary>
     internal static readonly Vector4 Red = new(0.88f, 0.08f, 0.05f, 1);
+    /// <summary>Shared purple for active spoilage progressing toward rot.</summary>
+    internal static readonly Vector4 Purple = new(0.60f, 0.20f, 0.78f, 1);
     /// <summary>Shared orange for low or declining states.</summary>
     internal static readonly Vector4 Orange = new(0.95f, 0.38f, 0.05f, 1);
     /// <summary>Shared yellow for intermediate states.</summary>
