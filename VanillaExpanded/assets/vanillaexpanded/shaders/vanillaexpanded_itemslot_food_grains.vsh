@@ -64,6 +64,8 @@ void main()
     // Amount maps the remaining centers into the draw range, never individual grain dimensions.
     vec2 center = vec2(clamp(pv.x,extent.x,1.0-extent.x),
         extent.y+(pv.y-pr.z)*max(0.0,fill-2.0*extent.y)/max(pr.w-2.0*pr.z,0.001));
+    // Keep individual excursions inside the food effect's upper draw level without rescaling the pile.
+    center.y = min(center.y, 0.85-extent.y);
     slotLocal = center+offset;
     // Keep color selection independent of rotation; identity makes it stable as the grain moves.
     grainColor = foodPalette[int((hash >> 4u) & 15u)].rgb;

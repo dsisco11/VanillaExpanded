@@ -10,10 +10,10 @@ internal sealed record GrainSimulationProfile(string ShaderName, int ParticleCou
     #region Public API
     /// <summary>Gets vertical impulse gain independently of the horizontal movement response.</summary>
     internal float VerticalMotionGain { get; init; } = MotionGain;
-    /// <summary>Gets unchanged food particle sizes and movement response.</summary>
+    /// <summary>Gets food particle sizes with modest movement coupling independent of metal.</summary>
     internal static GrainSimulationProfile Food { get; } = new(
         FoodGrainSimulationShaderProgram.ShaderName, FoodGrainStateBuffers.ParticleCount, new(0.01f, 0.023f),
-        0.35f, 7, static () => VanillaExpandedModSystem.Config.EnablePerishableItemFreshnessIndicators
+        0.30f, 6, static () => VanillaExpandedModSystem.Config.EnablePerishableItemFreshnessIndicators
             && VanillaExpandedModSystem.Config.EnableFoodGrainEffect);
     /// <summary>Gets 128 larger chunks with restrained motion and independent high-friction contacts.</summary>
     internal static GrainSimulationProfile SolidMetal { get; } = new(

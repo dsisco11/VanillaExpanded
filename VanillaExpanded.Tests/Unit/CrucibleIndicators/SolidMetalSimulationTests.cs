@@ -33,13 +33,15 @@ public sealed class SolidMetalSimulationTests
         }
     }
 
-    /// <summary>Metal has independently tuned impulses, extreme motion is capped, and falls never lift particles.</summary>
+    /// <summary>Food and metal have independently tuned impulses, extreme motion is capped, and falls never lift particles.</summary>
     [Fact]
-    public void MaterialForcing_ControlsMetalWithoutChangingFood()
+    public void MaterialForcing_KeepsFoodAndMetalIndependent()
     {
         var food = GrainSimulationProfile.Food;
         var metal = GrainSimulationProfile.SolidMetal;
-        Assert.Equal(new Vector2(1.4f, 1.05f), food.ProjectAcceleration(new(4, 3, 0)));
+        var foodForce = food.ProjectAcceleration(new(4, 3, 0));
+        Assert.Equal(1.2f, foodForce.X, 5);
+        Assert.Equal(0.9f, foodForce.Y, 5);
         var metalForce = metal.ProjectAcceleration(new(4, 3, 0));
         Assert.Equal(2.4f, metalForce.X, 5);
         Assert.Equal(2.25f, metalForce.Y, 5);

@@ -4,6 +4,8 @@
             ☐ Perishable items freshness indicators should be able to optionally render as a horizontal bar.
             ☐ Perishable items freshness indicators should be able to optionally render as an outline around the item-slot.
             ☐ Food particle sim reacts too strongly to movement and is slightly too spongy.
+            ☐ Food particles are too bright, need simple lighting approximation.
+            ☐ Crucible metal particles are too bright, need simple lighting approximation.
 
         Radial Menus:
             ☐ Tool-mode radial menu needs to be able to be configured to allow interacting with the hotbar (e.g. for the chisel tools "add material" functionality).
