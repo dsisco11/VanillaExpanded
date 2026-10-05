@@ -48,7 +48,7 @@ public class VanillaExpandedConfig
     /// <summary>Replaces the base-game tool-mode grid with a radial menu.</summary>
     public bool EnableToolModeRadialMenu { get; set; } = true;
 
-    /// <summary>Shows freshness as a colored background overlay on perishable item slots.</summary>
+    /// <summary>Shows freshness in the selected presentation on perishable item slots.</summary>
     public bool EnablePerishableItemFreshnessIndicators { get; set; } = true;
 
     /// <summary>Shows preparation progress indicators on item slots.</summary>
@@ -61,7 +61,7 @@ public class VanillaExpandedConfig
     public bool EnableLiquidContainerIndicators { get; set; } = true;
     /// <summary>Animates liquid volume indicators; disabling retains plain volume fills.</summary>
     public bool EnableLiquidSloshEffect { get; set; } = true;
-    /// <summary>Shows animated food-amount grains without disabling meal freshness backgrounds.</summary>
+    /// <summary>Shows animated food-amount grains without disabling meal freshness indicators.</summary>
     public bool EnableFoodGrainEffect { get; set; } = true;
     /// <summary>Shows metal amount in filled crucibles and active firepit input crucibles.</summary>
     public bool EnableCrucibleIndicators { get; set; } = true;
@@ -131,7 +131,9 @@ public class VanillaExpandedConfig
     /// </summary>
     public bool AutoStashGuiRendersTopmost { get; set; } = true;
 
-    /// <summary>Opacity of perishable item freshness overlays (0.05 to 1.0).</summary>
+    /// <summary>Opacity of perishable item freshness indicators (0.05 to 1.0).</summary>
     public float PerishableItemFreshnessIndicatorIntensity { get; set; } = 0.35f;
+    /// <summary>Freshness presentation: zero for slot background (default), one for slot outline, or two for horizontal bar.</summary>
+    public int PerishableItemFreshnessIndicatorStyle { get; set; } = 0;
     #endregion
 }

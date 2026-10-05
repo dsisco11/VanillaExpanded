@@ -1,6 +1,14 @@
 # Item-slot indicator effects
 
-Effects attach to internal provider registrations. Providers still return `ItemSlotIndicator(Fill, Color)`; selection, priorities, and cached sampling remain independent of animation. Registrations without an effect use the ordinary rectangle. This is an internal extension mechanism, not a public third-party API.
+Effects attach to internal provider registrations. Providers still return `ItemSlotIndicator(Fill, Color)`; selection, priorities, and cached sampling remain independent of animation. Registrations without an effect use their selected ordinary presentation. This is an internal extension mechanism, not a public third-party API.
+
+## Rendering styles
+
+Freshness supports `SlotBackground` (the default bottom-up fill), `SlotOutline` (a complete border colored by freshness), and `HorizontalBar` (a bottom track with left-to-right fill proportional to freshness). Select **Freshness Indicator Style** in ConfigLib, or set `PerishableItemFreshnessIndicatorStyle` in `VanillaExpanded.json` to 0, 1, or 2 respectively. Invalid values fall back to the background. The choice takes effect on the next draw without resampling freshness, changing adaptive activity, rebuilding resources, or restarting shared simulations. Other providers retain their background presentation; meal-container food particles remain an independent overlay.
+
+Registrations declare `defaultStyle`, `supportedStyles`, and an optional live `styleSelector`. Layout uses GUI-scaled inset, outline thickness, and bar height, reusing the prepared rectangle mesh and engine GUI shader. Applicable zero-valued outlines and bar tracks remain visible, while zero-width bar fill is skipped. Absent providers and zero opacity remain hidden. Draw ranges and boundary cues apply only to backgrounds; bar length uses the actual resource fraction.
+
+Effects declare `supportedStyles`, defaulting to background only. Unsupported, unavailable, or failed effects fall back to the selected ordinary style without changing provider selection. An effect with `drawBackground: true` draws the selected ordinary presentation beneath it only when the effect supports that style. Style support is part of immutable effect identity; it does not change shared program or mesh keys. Existing liquid, food, and crucible effects remain background-only.
 
 ## Registering an effect
 
@@ -137,7 +145,7 @@ Updated 384-grain hidden GPU checks exercised the actual irregular initializatio
 
 ### Current surface effect
 
-Food containers combine an ordinary freshness background from FreshnessIndicatorProvider with a particle-only food-amount overlay from FoodContainerIndicatorProvider. Vessel classification requires meal handling plus mealContainer/eatenBlock/emptiedBlockCode metadata; pies retain only ordinary freshness. Serving count divided by capacity controls both particle count and height independently of food age.
+Food containers combine the selected freshness presentation from FreshnessIndicatorProvider with a particle-only food-amount overlay from FoodContainerIndicatorProvider. Vessel classification requires meal handling plus mealContainer/eatenBlock/emptiedBlockCode metadata; pies retain only ordinary freshness. Serving count divided by capacity controls both particle count and height independently of food age.
 
 Liquid containers and watering cans share `LiquidSloshIndicatorEffect.Definition`, a sixteen-segment vertex effect enabled with their existing indicator setting. Normal liquid samples use average surface levels 0.15–0.85, preserving raw resource fill, color, opacity, sampling, and priority. Empty dedicated liquid containers retain a small blue liquid surface and the minimum boundary cue. Food-capable vessels marked by the game's `mealContainer` attribute, such as bowls, show a liquid indicator only when they contain a positive liquid volume; empty bowls show none. Empty watering cans instead retain their existing unbounded full red warning: mapped fill is one, deformation is zero, and no boundary cue is drawn. Other providers remain ordinary rectangles.
 

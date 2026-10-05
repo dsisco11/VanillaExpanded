@@ -198,6 +198,22 @@
         "clientSide": true
       }
     },
+    "integer": {
+      "PerishableItemFreshnessIndicatorStyle": {
+        "code": "PerishableItemFreshnessIndicatorStyle",
+        "name": "PerishableItemFreshnessIndicatorStyle",
+        "ingui": "vanillaexpanded:config-perishable-item-freshness-indicator-style",
+        "comment": "vanillaexpanded:config-perishable-item-freshness-indicator-style-tooltip",
+        "default": "freshness-background",
+        "weight": 3.69,
+        "clientSide": true,
+        "mapping": {
+          "freshness-background": 0,
+          "freshness-outline": 1,
+          "freshness-bar": 2
+        }
+      }
+    },
     "float": {
       "CrucibleIndicatorCapacityUnits": {
         "code": "CrucibleIndicatorCapacityUnits",

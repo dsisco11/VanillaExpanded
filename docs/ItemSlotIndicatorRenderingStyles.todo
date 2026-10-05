@@ -39,11 +39,11 @@
         ☑ Switch styles without recreating prepared resources or shared simulations.
 
     5. Freshness configuration and documentation:
-        ☐ Add PerishableItemFreshnessIndicatorStyle with SlotBackground as its default.
-        ☐ Expose all three choices through ConfigLib with localized labels and descriptions.
-        ☐ Configure freshness registration to support all three styles and select from configuration.
-        ☐ Preserve other registrations' existing background behavior.
-        ☐ Update indicator documentation and link this checklist from relevant project.todo entries.
+        ☑ Add PerishableItemFreshnessIndicatorStyle with SlotBackground as its default.
+        ☑ Expose all three choices through ConfigLib with localized labels and descriptions.
+        ☑ Configure freshness registration to support all three styles and select from configuration.
+        ☑ Preserve other registrations' existing background behavior.
+        ☑ Update indicator documentation and link this checklist from relevant project.todo entries.
 
     6. Validation:
         ☐ Test defaults, invalid/unsupported selections, immediate switching with cached samples, and overlay independence.
