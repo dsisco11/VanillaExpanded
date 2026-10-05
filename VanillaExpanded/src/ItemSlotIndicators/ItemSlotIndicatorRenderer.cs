@@ -11,10 +11,11 @@ namespace VanillaExpanded.ItemSlotIndicators;
 
 /// <summary>Submits the selected presentation and isolates effect failure without changing provider selection or samples.</summary>
 internal sealed class ItemSlotIndicatorRenderer(ItemSlotIndicatorResources resources, IItemSlotIndicatorDrawBackend backend,
-    Func<float>? slotSize = null) : IDisposable
+    Func<float>? slotSize = null, Func<float>? guiScale = null) : IDisposable
 {
     private bool disposed;
     private readonly Func<float> scaledSlotSize = slotSize ?? (static () => (float)GuiElement.scaled(GuiElementPassiveItemSlot.unscaledSlotSize));
+    private readonly Func<float> currentGuiScale = guiScale ?? (static () => (float)GuiElement.scaled(1));
 
     #region Public API
     /// <summary>Draws prepared effects or equivalent rectangles, restoring state before fallback and normal item rendering.</summary>
@@ -56,17 +57,18 @@ internal sealed class ItemSlotIndicatorRenderer(ItemSlotIndicatorResources resou
         try
         {
             if (disposed || !backend.Supported || !ItemSlotIndicatorDrawInput.TryCreate(posX, posY,
-                scaledSlotSize(), selection.Indicator, out var input)) return;
+                scaledSlotSize(), selection.Indicator, out var input, selection.Style)) return;
             bool effectDrawn = false;
             bool backgroundDrawn = false;
-            if (selection.Effect is { } effect && resources.TryGet(effect, out var program, out var mesh))
+            if (selection.Effect is { } effect && effect.SupportsStyle(selection.Style)
+                && resources.TryGet(effect, out var program, out var mesh))
             {
                 try
                 {
                     backend.Begin();
                     if (effect.DrawBackground && resources.Rectangle is { } background)
                     {
-                        backend.Rectangle(background, input);
+                        DrawOrdinary(background, input, selection.Style);
                         backgroundDrawn = true;
                     }
                     backend.Effect(program!, mesh!, input, effect, frame);
@@ -82,13 +84,46 @@ internal sealed class ItemSlotIndicatorRenderer(ItemSlotIndicatorResources resou
             try
             {
                 backend.Begin();
-                if (!effectDrawn && !backgroundDrawn && input.Fill > 0) backend.Rectangle(rectangle, input);
+                if (!effectDrawn && !backgroundDrawn) DrawOrdinary(rectangle, input, selection.Style);
                 // Cue rendering follows shader restoration and shares the fallback's state scope when possible.
                 if (hasCue) backend.Rectangle(rectangle, cue);
             }
             finally { backend.Restore(); }
         }
         catch (Exception exception) { backend.ReportFailure(exception); }
+    }
+
+    /// <summary>Draws the selected ordinary presentation using one prepared rectangle and the inherited GUI state scope.</summary>
+    private void DrawOrdinary(MeshRef rectangle, ItemSlotIndicatorDrawInput input, ItemSlotIndicatorRenderingStyle style)
+    {
+        if (style == ItemSlotIndicatorRenderingStyle.SlotBackground)
+        {
+            if (input.Fill > 0) backend.Rectangle(rectangle, input);
+            return;
+        }
+        var layout = ItemSlotIndicatorStyleLayout.Create(input, currentGuiScale());
+        if (style == ItemSlotIndicatorRenderingStyle.SlotOutline)
+        {
+            DrawBounds(rectangle, layout.OutlineTop, input.Color);
+            DrawBounds(rectangle, layout.OutlineBottom, input.Color);
+            DrawBounds(rectangle, layout.OutlineLeft, input.Color);
+            DrawBounds(rectangle, layout.OutlineRight, input.Color);
+        }
+        else
+        {
+            // The muted full track communicates capacity even at zero; the sampled color overlays its actual fraction.
+            var trackColor = input.Color;
+            trackColor *= new Vector4(0.25f, 0.25f, 0.25f, 1);
+            DrawBounds(rectangle, layout.BarTrack, trackColor);
+            DrawBounds(rectangle, layout.BarFill, input.Color);
+        }
+    }
+
+    /// <summary>Skips zero-area pieces and submits explicit style bounds without legacy coordinate truncation.</summary>
+    private void DrawBounds(MeshRef rectangle, Vector4 bounds, Vector4 color)
+    {
+        if (bounds.Z <= 0 || bounds.W <= 0) return;
+        backend.Rectangle(rectangle, ItemSlotIndicatorStyleLayout.Rectangle(bounds, color));
     }
 
     #endregion

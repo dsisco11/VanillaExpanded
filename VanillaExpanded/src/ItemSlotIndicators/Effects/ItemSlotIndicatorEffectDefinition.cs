@@ -15,6 +15,7 @@ internal sealed record ItemSlotIndicatorEffectDefinition
     internal const int DefaultSegmentCount = 16;
     /// <summary>Maximum number of segments accepted by the shared geometry contract.</summary>
     internal const int MaximumSegmentCount = 64;
+    private readonly int supportedStyleMask;
 
     #region Public API
     /// <summary>Creates a validated effect description; shader assets may be unavailable until resource preparation.</summary>
@@ -27,10 +28,11 @@ internal sealed record ItemSlotIndicatorEffectDefinition
     /// <param name="needsCameraMotion">Whether the effect consumes the shared camera-motion signal.</param>
     /// <param name="abiVersion">Mesh and shader input contract version; only version one is supported.</param>
     /// <param name="drawBackground">Whether to retain the ordinary sampled fill beneath the effect.</param>
+    /// <param name="supportedStyles">Presentations implemented by the effect; omitted declarations support only slot backgrounds.</param>
     internal ItemSlotIndicatorEffectDefinition(string id, string shaderAssetDomain, string shaderName,
         ItemSlotIndicatorTopology topology = ItemSlotIndicatorTopology.FillStrip,
         int segmentCount = DefaultSegmentCount, Vector4 parameters = default, bool needsCameraMotion = false,
-        int abiVersion = CurrentAbiVersion, bool drawBackground = false)
+        int abiVersion = CurrentAbiVersion, bool drawBackground = false, ItemSlotIndicatorRenderingStyle[]? supportedStyles = null)
     {
         ValidateId(id);
         if (!IsCanonicalName(shaderAssetDomain))
@@ -63,6 +65,18 @@ internal sealed record ItemSlotIndicatorEffectDefinition
             || !float.IsFinite(parameters.Z) || !float.IsFinite(parameters.W))
             throw new ArgumentOutOfRangeException(nameof(parameters), "Effect parameters must be finite.");
 
+        // Store a value contract so equivalent declarations retain record equality and cannot be mutated by callers.
+        if (supportedStyles is null) supportedStyleMask = 1 << (int)ItemSlotIndicatorRenderingStyle.SlotBackground;
+        else
+        {
+            if (supportedStyles.Length == 0) throw new ArgumentException("An effect must support at least one style.", nameof(supportedStyles));
+            foreach (var style in supportedStyles)
+            {
+                if (!Enum.IsDefined(style)) throw new ArgumentOutOfRangeException(nameof(supportedStyles));
+                supportedStyleMask |= 1 << (int)style;
+            }
+        }
+
         Id = id;
         ShaderAssetDomain = shaderAssetDomain;
         ShaderName = shaderName;
@@ -92,6 +106,10 @@ internal sealed record ItemSlotIndicatorEffectDefinition
     internal bool NeedsCameraMotion { get; }
     /// <summary>Gets whether the ordinary fill rectangle is drawn beneath this effect.</summary>
     internal bool DrawBackground { get; }
+
+    /// <summary>Checks whether this effect implements the selected presentation without allocating per draw.</summary>
+    internal bool SupportsStyle(ItemSlotIndicatorRenderingStyle style) =>
+        Enum.IsDefined(style) && (supportedStyleMask & (1 << (int)style)) != 0;
 
     /// <summary>Rejects incompatible effect identities or engine shader-name reuse before registry mutation.</summary>
     internal void ValidateCompatibility(ItemSlotIndicatorEffectDefinition other)
