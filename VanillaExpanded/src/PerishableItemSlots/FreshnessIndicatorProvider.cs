@@ -11,7 +11,7 @@ namespace VanillaExpanded.PerishableItemSlots;
 /// <summary>Supplies freshness indicators for perishable items and food-container contents.</summary>
 internal sealed class FreshnessIndicatorProvider : IItemSlotIndicatorProvider
 {
-    private const float StaleOpacityMultiplier = 0.75f;
+    private const float StaleOpacityMultiplier = 0.9f;
     private const float FullyFreshFreshness = 0.75f;
 
     #region Public API
