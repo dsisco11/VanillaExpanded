@@ -1,6 +1,7 @@
 #version 330 core
 uniform vec4 color;
 uniform vec4 effectParameters;
+uniform float fill;
 in vec2 grainLocal;
 in vec2 slotLocal;
 flat in vec3 grainColor;
@@ -26,5 +27,9 @@ void main()
     float coverage = clamp(0.5-boundary/edge,0.0,1.0);
     if (coverage <= 0.0) discard;
     float alpha = clamp(color.a*effectParameters.x,0.0,1.0)*coverage;
-    fragColor = vec4(grainColor*alpha,alpha);
+    // Shade against the displayed pile height so low contents retain the same top-to-bottom lighting.
+    // Preserve ingredient hues and opacity; only RGB illumination changes with depth in the pile.
+    float relativeHeight = clamp(slotLocal.y/max(fill,0.001),0.0,1.0);
+    float light = mix(0.40,0.95,relativeHeight);
+    fragColor = vec4(grainColor*light*alpha,alpha);
 }
