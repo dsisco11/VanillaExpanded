@@ -20,9 +20,9 @@
         ☑ Fall back to the registration default for unsupported or invalid selections.
 
     2. Presentation selection:
-        ☐ Keep provider applicability, fraction, color, draw range, and palette responsibilities unchanged.
-        ☐ Resolve style independently of cached samples so configuration changes apply immediately.
-        ☐ Ensure style switches do not resample freshness or trigger adaptive resource activity.
+        ☑ Keep provider applicability, fraction, color, draw range, and palette responsibilities unchanged.
+        ☑ Resolve style independently of cached samples so configuration changes apply immediately.
+        ☑ Ensure style switches do not resample freshness or trigger adaptive resource activity.
 
     3. Style layout:
         ☐ Add a focused layout component for background bounds, four non-overlapping outline strips, and bar track/fill bounds.

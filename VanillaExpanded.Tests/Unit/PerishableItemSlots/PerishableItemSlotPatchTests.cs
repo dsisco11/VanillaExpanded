@@ -69,7 +69,7 @@ public sealed class PerishableItemSlotPatchTests
         var color = ItemSlotIndicatorRenderer.PremultiplyColor(FreshnessIndicatorProvider.FreshnessColor(0));
 
         Assert.True(color.R > color.G);
-        Assert.Equal(VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity * 0.75f, color.A, precision: 5);
+        Assert.Equal(VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity * 0.9f, color.A, precision: 5);
         Assert.True(color.R <= color.A && color.G <= color.A && color.B <= color.A);
     }
 
@@ -112,6 +112,6 @@ public sealed class PerishableItemSlotPatchTests
         var stale = FreshnessIndicatorProvider.FreshnessColor(0);
         var fresh = FreshnessIndicatorProvider.FreshnessColor(1);
 
-        Assert.Equal(fresh.W * 0.75f, stale.W, precision: 5);
+        Assert.Equal(fresh.W * 0.9f, stale.W, precision: 5);
     }
 }

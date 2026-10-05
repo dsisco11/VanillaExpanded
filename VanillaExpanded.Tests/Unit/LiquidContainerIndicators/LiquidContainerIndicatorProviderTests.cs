@@ -84,7 +84,7 @@ public sealed class LiquidContainerIndicatorProviderTests
         Assert.Equal(expected, indicator.Fill);
         Assert.Equal(LiquidSloshIndicatorEffect.DrawRange, indicator.DrawRange);
         Assert.True(ItemSlotIndicatorDrawInput.TryCreate(100, 100, 48, indicator, out var draw));
-        Assert.Equal(0.15f + expected * 0.7f, draw.Fill, 5);
+        Assert.Equal(expected * 0.85f, draw.Fill, 5);
         Assert.True(indicator.Color.Z > indicator.Color.Y && indicator.Color.Y > indicator.Color.X);
     }
 
@@ -98,7 +98,7 @@ public sealed class LiquidContainerIndicatorProviderTests
         Assert.True(new LiquidContainerIndicatorProvider().TryGetIndicator(slot, out var indicator));
         Assert.Equal(0, indicator.Fill);
         Assert.True(ItemSlotIndicatorDrawInput.TryCreate(100, 100, 48, indicator, out var draw));
-        Assert.Equal(0.15f, draw.Fill);
+        Assert.Equal(0f, draw.Fill);
         Assert.True(draw.TryCreateBoundaryCue(out _));
         Assert.True(indicator.Color.Z > indicator.Color.X);
     }
