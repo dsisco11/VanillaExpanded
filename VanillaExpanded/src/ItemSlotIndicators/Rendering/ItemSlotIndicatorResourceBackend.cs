@@ -17,6 +17,7 @@ internal sealed class ItemSlotIndicatorResourceBackend(ICoreClientAPI api) : IIt
     {
         ["projectionMatrix"] = ActiveUniformType.FloatMat4, ["modelViewMatrix"] = ActiveUniformType.FloatMat4,
         ["slotBounds"] = ActiveUniformType.FloatVec4, ["fill"] = ActiveUniformType.Float,
+        ["resourceFill"] = ActiveUniformType.Float,
         ["color"] = ActiveUniformType.FloatVec4, ["timeSeconds"] = ActiveUniformType.Float,
         ["motion"] = ActiveUniformType.FloatVec2, ["effectParameters"] = ActiveUniformType.FloatVec4,
         ["cameraBob"] = ActiveUniformType.Float,
@@ -60,6 +61,8 @@ internal sealed class ItemSlotIndicatorResourceBackend(ICoreClientAPI api) : IIt
             throw new InvalidOperationException("Indicator programs cannot use geometry stages or uniform buffers.");
         if (grains && !program.HasUniform("grainState"))
             throw new InvalidOperationException("Grain drawing requires shared particle state.");
+        if (grains && !program.HasUniform("resourceFill"))
+            throw new InvalidOperationException("Grain drawing requires the unmapped contents fraction.");
         if (food && !program.HasUniform("foodPalette"))
             throw new InvalidOperationException("Grain drawing requires food particle colors.");
         if (grains && !food && !program.HasUniform("metalPalette"))

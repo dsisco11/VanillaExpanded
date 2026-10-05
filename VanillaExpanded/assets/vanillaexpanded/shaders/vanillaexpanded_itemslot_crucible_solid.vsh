@@ -4,6 +4,7 @@ uniform mat4 projectionMatrix;
 uniform mat4 modelViewMatrix;
 uniform vec4 slotBounds;
 uniform float fill;
+uniform float resourceFill;
 uniform samplerBuffer grainState;
 uniform vec4 metalPalette[16];
 out vec2 fragmentLocal;
@@ -25,8 +26,9 @@ float shapeRandom(uint seed, uint index)
 void main()
 {
     int i = int(position.z + 0.5);
-    // Metal pieces are much coarser than food: one in three quads is visible.
-    if (i % 3 != 0)
+    // Metal uses one quad in three, then a stable prefix proportional to actual contents.
+    // Draw height has a minimum, but particle quantity must still reach zero for empty contents.
+    if (i % 3 != 0 || i / 3 >= int(ceil(clamp(resourceFill, 0.0, 1.0) * 128.0)))
     {
         fragmentLocal = vec2(2.0);
         slotLocal = vec2(2.0);

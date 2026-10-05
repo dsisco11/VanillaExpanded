@@ -82,6 +82,8 @@ internal sealed class ItemSlotIndicatorDrawBackend : IItemSlotIndicatorDrawBacke
         var bounds = input.SlotBounds;
         program.Uniform("slotBounds", bounds.X, bounds.Y, bounds.Z, bounds.W);
         program.Uniform("fill", input.Fill);
+        // Particle quantity follows contents, independently of the provider's bounded draw height.
+        if (grains) program.Uniform("resourceFill", input.ResourceFill);
         if (program.HasUniform("color")) program.Uniform("color", input.Color.X, input.Color.Y, input.Color.Z, input.Color.W);
         if (program.HasUniform("timeSeconds")) program.Uniform("timeSeconds", frame.TimeSeconds);
         if (program.HasUniform("motion")) program.Uniform("motion", frame.Motion.X, frame.Motion.Y);
