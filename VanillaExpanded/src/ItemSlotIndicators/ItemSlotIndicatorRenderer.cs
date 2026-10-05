@@ -22,7 +22,7 @@ internal sealed class ItemSlotIndicatorRenderer(ItemSlotIndicatorResources resou
     {
         RenderLayer(posX, posY, selection, frame);
         if (selection.OverlayIndicator is { } overlay)
-            RenderLayer(posX, posY, new(overlay, selection.OverlayEffect), frame);
+            RenderLayer(posX, posY, new(overlay, selection.OverlayEffect, selection.OverlayStyle), frame);
     }
 
     /// <summary>Releases draw-adapter resources once; prepared mesh/program lifetime remains with the resource owner.</summary>

@@ -13,11 +13,11 @@
         Absent provider results and zero-opacity indicators remain hidden.
 
     1. Presentation contract:
-        ☐ Add the rendering-style enum.
-        ☐ Let registrations declare default/supported styles and an optional selector.
-        ☐ Resolve styles independently for primary and overlay layers.
-        ☐ Carry the resolved style in ItemSlotIndicatorRenderSelection.
-        ☐ Fall back to the registration default for unsupported or invalid selections.
+        ☑ Add the rendering-style enum.
+        ☑ Let registrations declare default/supported styles and an optional selector.
+        ☑ Resolve styles independently for primary and overlay layers.
+        ☑ Carry the resolved style in ItemSlotIndicatorRenderSelection.
+        ☑ Fall back to the registration default for unsupported or invalid selections.
 
     2. Presentation selection:
         ☐ Keep provider applicability, fraction, color, draw range, and palette responsibilities unchanged.

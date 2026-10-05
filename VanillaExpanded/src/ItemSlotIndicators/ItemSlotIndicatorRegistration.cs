@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 using VanillaExpanded.ItemSlotIndicators.Effects;
@@ -13,6 +14,7 @@ internal sealed class ItemSlotIndicatorRegistration
     private readonly IItemSlotIndicatorProvider provider;
     private readonly long refreshIntervalMilliseconds;
     private readonly Func<object?>? contextKey;
+    private readonly Func<ItemSlotIndicatorRenderingStyle>? styleSelector;
     private readonly AdaptiveSamplingOptions? adaptiveSampling;
     private readonly ConditionalWeakTable<ItemStack, Sample> samples = new();
 
@@ -20,10 +22,20 @@ internal sealed class ItemSlotIndicatorRegistration
     /// <summary>Creates a registration; zero interval samples every query, and context keys invalidate cached configuration.</summary>
     internal ItemSlotIndicatorRegistration(IItemSlotIndicatorProvider provider, int priority,
         long refreshIntervalMilliseconds, Func<object?>? contextKey, AdaptiveSamplingOptions? adaptiveSampling = null,
-        ItemSlotIndicatorEffectDefinition? effect = null, bool overlay = false)
+        ItemSlotIndicatorEffectDefinition? effect = null, bool overlay = false,
+        ItemSlotIndicatorRenderingStyle defaultStyle = ItemSlotIndicatorRenderingStyle.SlotBackground,
+        ItemSlotIndicatorRenderingStyle[]? supportedStyles = null, Func<ItemSlotIndicatorRenderingStyle>? styleSelector = null)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentOutOfRangeException.ThrowIfNegative(refreshIntervalMilliseconds);
+        if (!Enum.IsDefined(defaultStyle)) throw new ArgumentOutOfRangeException(nameof(defaultStyle));
+        // Copy registration metadata so caller mutations cannot change the supported presentation contract.
+        var styles = supportedStyles is null ? new[] { defaultStyle } : (ItemSlotIndicatorRenderingStyle[])supportedStyles.Clone();
+        if (styles.Length == 0 || Array.Exists(styles, style => !Enum.IsDefined(style)) || !Array.Exists(styles, style => style == defaultStyle))
+            throw new ArgumentException("Supported styles must be valid and include the default.", nameof(supportedStyles));
+        DefaultStyle = defaultStyle;
+        SupportedStyles = Array.AsReadOnly(styles);
+        this.styleSelector = styleSelector;
         adaptiveSampling?.Validate();
         if (refreshIntervalMilliseconds > 0 && adaptiveSampling is { } options
             && options.ActiveIntervalMilliseconds >= refreshIntervalMilliseconds)
@@ -44,6 +56,20 @@ internal sealed class ItemSlotIndicatorRegistration
 
     /// <summary>Gets the optional rendering effect, independently of cached provider samples.</summary>
     internal ItemSlotIndicatorEffectDefinition? Effect { get; }
+
+    /// <summary>Gets the validated fallback presentation.</summary>
+    internal ItemSlotIndicatorRenderingStyle DefaultStyle { get; }
+    /// <summary>Gets an immutable snapshot of the supported presentations.</summary>
+    internal IReadOnlyList<ItemSlotIndicatorRenderingStyle> SupportedStyles { get; }
+
+    /// <summary>Resolves live presentation independently of samples, rejecting unsupported or unknown selector values.</summary>
+    internal ItemSlotIndicatorRenderingStyle ResolveStyle()
+    {
+        var selected = styleSelector?.Invoke() ?? DefaultStyle;
+        for (int index = 0; index < SupportedStyles.Count; index++)
+            if (selected == SupportedStyles[index]) return selected;
+        return DefaultStyle;
+    }
 
     /// <summary>Returns a current sample and discards output if sampling changes the item or its context.</summary>
     internal bool TryGetIndicator(ItemSlot slot, long now, out ItemSlotIndicator indicator)

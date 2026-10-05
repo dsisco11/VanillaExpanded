@@ -141,11 +141,17 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
     /// <param name="adaptiveSampling">Optional fast sampling policy for changing indicators; ignored when caching is disabled.</param>
     /// <param name="effect">Optional immutable rendering description; omitted registrations use the ordinary rectangle.</param>
     /// <param name="overlay">Whether the provider selects an additional layer after the primary indicator.</param>
+    /// <param name="defaultStyle">Fallback presentation for omitted, invalid, or unsupported selections.</param>
+    /// <param name="supportedStyles">Supported presentations, including the default; omitted metadata supports only the default.</param>
+    /// <param name="styleSelector">Optional live presentation selector independent of provider sampling.</param>
     internal void Register(IItemSlotIndicatorProvider provider, int priority = 0,
         long refreshIntervalMilliseconds = 1_000, Func<object?>? contextKey = null,
-        AdaptiveSamplingOptions? adaptiveSampling = null, ItemSlotIndicatorEffectDefinition? effect = null, bool overlay = false)
+        AdaptiveSamplingOptions? adaptiveSampling = null, ItemSlotIndicatorEffectDefinition? effect = null, bool overlay = false,
+        ItemSlotIndicatorRenderingStyle defaultStyle = ItemSlotIndicatorRenderingStyle.SlotBackground,
+        ItemSlotIndicatorRenderingStyle[]? supportedStyles = null, Func<ItemSlotIndicatorRenderingStyle>? styleSelector = null)
     {
-        var registration = new ItemSlotIndicatorRegistration(provider, priority, refreshIntervalMilliseconds, contextKey, adaptiveSampling, effect, overlay);
+        var registration = new ItemSlotIndicatorRegistration(provider, priority, refreshIntervalMilliseconds, contextKey, adaptiveSampling,
+            effect, overlay, defaultStyle, supportedStyles, styleSelector);
         // Validate metadata before insertion; a rejected registration cannot change selection or cached samples.
         if (effect is not null)
         {
@@ -170,7 +176,7 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
             if (entry.Overlay) continue;
             if (!entry.TryGetIndicator(slot, now, out ItemSlotIndicator indicator)) continue;
             // Attach the winning registration's effect after sampling, so animation never affects cache validity.
-            selection = new ItemSlotIndicatorRenderSelection(indicator, SelectEffect(entry.Effect));
+            selection = new ItemSlotIndicatorRenderSelection(indicator, SelectEffect(entry.Effect), entry.ResolveStyle());
             primaryFound = true;
             break;
         }
@@ -179,8 +185,8 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
         {
             if (!entry.Overlay || !entry.TryGetIndicator(slot, now, out var indicator)) continue;
             selection = primaryFound
-                ? selection with { OverlayIndicator = indicator, OverlayEffect = SelectEffect(entry.Effect) }
-                : new ItemSlotIndicatorRenderSelection(indicator, SelectEffect(entry.Effect));
+                ? selection with { OverlayIndicator = indicator, OverlayEffect = SelectEffect(entry.Effect), OverlayStyle = entry.ResolveStyle() }
+                : new ItemSlotIndicatorRenderSelection(indicator, SelectEffect(entry.Effect), entry.ResolveStyle());
             return true;
         }
         return primaryFound;
