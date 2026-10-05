@@ -14,6 +14,6 @@ internal static class LiquidSloshIndicatorEffect
         parameters: new Vector4(0.625f, 0, 0, 0.1875f), needsCameraMotion: true);
 
     /// <summary>Gets bottom-up average surface limits that retain liquid at empty and headroom at full.</summary>
-    internal static ItemSlotIndicatorDrawRange DrawRange { get; } = new(0.15f, 0.85f);
+    internal static ItemSlotIndicatorDrawRange DrawRange { get; } = new(0.0f, 0.85f);
     #endregion
 }
