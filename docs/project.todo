@@ -1,25 +1,19 @@
 # Vanilla: Expanded TODO List:
     ## Issues:
-        ☐ Liquid container indicators should allow a min-bound of 0%
-        ☐ Liquid containe rindicators should stay the same color no matter their liquid-level.
-        ☐ Tool-mode radial menu needs to be able to be configured to allow interacting with the hotbar (e.g. for the chisel tools "add material" functionality).
-        ☐ Fix respawn decal looking obnoxious (too colorful).
+        Item-Slot Indicators:
+            ☐ Perishable items freshness indicators shoudl be able to optionally render as a horizontal bar.
+            ☐ Perishable items freshness indicators shoudl be able to optionally render as an outline around the item-slot.
+            ☐ Liquid container indicators should allow a min-bound of 0%
+            ☐ Liquid containe rindicators should stay the same color no matter their liquid-level.
+        Radial Menus:
+            ☐ Tool-mode radial menu needs to be able to be configured to allow interacting with the hotbar (e.g. for the chisel tools "add material" functionality).
+            ☐ Reduce icon size for tool-mode radial menus.
+            ☐ Increase center circle size for tool-mode radial menus.
+            ☐ Implement mesh aware icon fitting for radial menus.
+        Other:
+            ☐ Fix respawn decal looking obnoxious (too colorful).
 
-    ## Recipes:
-        ✔ Decraft linen sacks back into string (knife = 3x string, shears = 4x string). @done(25-12-01 10:47)
-        ✔ Decraft leather backpacks back into leather (knife = 50% return, shears = 75% return). @done(25-12-01 10:47)
-        ✔ Decraft wattle gates/fences back into sticks (knife = 50% return, saw = 75% return). @done(25-12-01 10:47)
-        ✔ Saw firewood into sticks (saw = 2x sticks per firewood). @done(25-12-01 10:47)
-        ✔ Cut planks into sticks (knife = 2x sticks, saw[0.5x] = 2x sticks). @done(25-12-01 10:47)
-        ✔ Smelt tool heads back into metal nuggets (100% return). @done(25-12-01 12:39)
-
-    ## Functionality:
-        ☐ Perishable items freshness indicators shoudl be able to optionally render as a horizontal bar.
-        ☐ Perishable items freshness indicators shoudl be able to optionally render as an outline around the item-slot.
-        ✔ Add liquid-container fill indicators using current litres relative to capacity; existing freshness indicators take priority, empty containers show zero fill. Focused tests and independent review passed; in-game appearance remains unverified. @done(26-10-02)
-        ✔ Add clothing condition indicators using actual condition fill and green at the 50% full-warmth threshold; zero condition shows a red warning, armor and uninitialized condition are skipped. Focused tests and independent review passed; in-game appearance remains unverified. @done(26-10-03)
-        ✔ Add night-vision device fuel indicators using remaining fuel hours relative to each device's capacity via cached Harmony field access; empty fuel shows a red warning. Focused tests and independent review passed; in-game appearance remains unverified. @done(26-10-03)
-        ✔ Add drying/curing progress indicators for bowstaves, hides, and other Dry/Cure transitions; fill toward completion with a slate-to-teal palette using the game's inventory-aware transition progress. Focused tests and independent review passed; in-game appearance remains unverified. @done(26-10-03)
+    ## New Features:
         ☐ Add HUD indicator to show current arrow type and quantity when player is holding a bow.
         ☐ Add HUD indicator for current approximate time of day (becomes less accurate the longer the player is away from the sun).
         ☐ Add HUD indicator for current weather conditions (e.g., rain, snow, fog).
