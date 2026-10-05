@@ -1,6 +1,7 @@
 #version 330 core
 uniform vec4 color;
 uniform vec4 effectParameters;
+uniform float fill;
 in vec2 fragmentLocal;
 in vec2 slotLocal;
 flat in float shade;
@@ -30,5 +31,8 @@ void main()
     if (coverage <= 0.0) discard;
     float facet = mix(0.85, 1.2, step(fragmentLocal.x + fragmentLocal.y, 0.0));
     float alpha = clamp(color.a * effectParameters.x, 0.0, 1.0) * coverage;
-    fragColor = vec4(clamp(particleColor * shade * facet, 0.0, 1.0) * alpha, alpha);
+    // Normalize lighting by the displayed pile height, preserving the gradient at different quantities.
+    float relativeHeight = clamp(slotLocal.y / max(fill, 0.001), 0.0, 1.0);
+    float light = mix(0.70, 1.0, relativeHeight);
+    fragColor = vec4(clamp(particleColor * shade * facet, 0.0, 1.0) * light * alpha, alpha);
 }
