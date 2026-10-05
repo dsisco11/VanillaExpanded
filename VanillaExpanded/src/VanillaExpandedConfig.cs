@@ -63,6 +63,12 @@ public class VanillaExpandedConfig
     public bool EnableLiquidSloshEffect { get; set; } = true;
     /// <summary>Shows animated food-amount grains without disabling meal freshness backgrounds.</summary>
     public bool EnableFoodGrainEffect { get; set; } = true;
+    /// <summary>Shows metal amount in filled crucibles and active firepit input crucibles.</summary>
+    public bool EnableCrucibleIndicators { get; set; } = true;
+    /// <summary>Animates crucible metal; disabling retains the plain amount indicator.</summary>
+    public bool EnableCrucibleEffect { get; set; } = true;
+    /// <summary>Metal units represented by a full crucible indicator; a visual reference, not a game capacity limit.</summary>
+    public float CrucibleIndicatorCapacityUnits { get; set; } = 2560;
 
     /// <summary>Shows night-vision fuel indicators on item slots.</summary>
     public bool EnableNightVisionFuelIndicators { get; set; } = true;

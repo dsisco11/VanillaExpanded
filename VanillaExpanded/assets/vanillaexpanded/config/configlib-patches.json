@@ -121,6 +121,24 @@
         "weight": 1.75,
         "clientSide": true
       },
+      "EnableCrucibleIndicators": {
+        "code": "EnableCrucibleIndicators",
+        "name": "EnableCrucibleIndicators",
+        "ingui": "vanillaexpanded:config-enable-crucible-indicators",
+        "comment": "vanillaexpanded:config-enable-crucible-indicators-tooltip",
+        "default": true,
+        "weight": 1.755,
+        "clientSide": true
+      },
+      "EnableCrucibleEffect": {
+        "code": "EnableCrucibleEffect",
+        "name": "EnableCrucibleEffect",
+        "ingui": "vanillaexpanded:config-enable-crucible-effect",
+        "comment": "vanillaexpanded:config-enable-crucible-effect-tooltip",
+        "default": true,
+        "weight": 1.757,
+        "clientSide": true
+      },
       "EnableNightVisionFuelIndicators": {
         "code": "EnableNightVisionFuelIndicators",
         "name": "EnableNightVisionFuelIndicators",
@@ -181,6 +199,16 @@
       }
     },
     "float": {
+      "CrucibleIndicatorCapacityUnits": {
+        "code": "CrucibleIndicatorCapacityUnits",
+        "name": "CrucibleIndicatorCapacityUnits",
+        "ingui": "vanillaexpanded:config-crucible-indicator-capacity-units",
+        "comment": "vanillaexpanded:config-crucible-indicator-capacity-units-tooltip",
+        "default": 2560,
+        "weight": 1.759,
+        "clientSide": true,
+        "range": { "min": 100, "max": 25600, "step": 10 }
+      },
       "AutoStashDelay": {
         "code": "AutoStashDelay",
         "name": "AutoStashDelay",

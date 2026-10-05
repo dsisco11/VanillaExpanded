@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using HarmonyLib;
 
 using VanillaExpanded.ClothingIndicators;
+using VanillaExpanded.CrucibleIndicators;
 using VanillaExpanded.FoodContainerIndicators;
 using VanillaExpanded.ItemSlotIndicators.Animation;
 using VanillaExpanded.ItemSlotIndicators.Effects;
@@ -28,7 +29,9 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
     private Harmony? harmony;
     private ItemSlotIndicatorFrameUpdater? frameUpdater;
     private LiquidSloshSimulation? liquidSimulation;
+    private LiquidSloshSimulation? metalSimulation;
     private FoodGrainSimulation? foodSimulation;
+    private FoodGrainSimulation? metalChunksSimulation;
 
     /// <summary>Gets the client-owned indicator renderer used by the GUI hook.</summary>
     internal ItemSlotIndicatorRenderer? Renderer { get; private set; }
@@ -81,12 +84,21 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
             effect: LiquidSloshIndicatorEffect.Definition);
         Register(new NightVisionFuelIndicatorProvider(), priority: 10, adaptiveSampling: adaptiveSampling,
             contextKey: static () => VanillaExpandedModSystem.Config.EnableNightVisionFuelIndicators);
+        Register(new CrucibleIndicatorProvider(false), priority: 10, adaptiveSampling: adaptiveSampling,
+            contextKey: static () => (VanillaExpandedModSystem.Config.EnableCrucibleIndicators,
+                VanillaExpandedModSystem.Config.CrucibleIndicatorCapacityUnits), effect: CrucibleIndicatorEffect.Solid);
+        Register(new CrucibleIndicatorProvider(true), priority: 10, adaptiveSampling: adaptiveSampling,
+            contextKey: static () => (VanillaExpandedModSystem.Config.EnableCrucibleIndicators,
+                VanillaExpandedModSystem.Config.CrucibleIndicatorCapacityUnits), effect: CrucibleIndicatorEffect.Molten);
         frameUpdater = new ItemSlotIndicatorFrameUpdater(api.Event, new ItemSlotIndicatorCameraSource(api), () => NeedsCameraMotion);
         liquidSimulation = new LiquidSloshSimulation(api, () => frameUpdater.CameraSample);
+        metalSimulation = new LiquidSloshSimulation(api, () => frameUpdater.CameraSample, LiquidSloshSimulationProfile.Metal);
         foodSimulation = new FoodGrainSimulation(api, () => frameUpdater.CameraSample);
+        metalChunksSimulation = new FoodGrainSimulation(api, () => frameUpdater.CameraSample, GrainSimulationProfile.SolidMetal);
         Resources.Initialize();
         Renderer = new ItemSlotIndicatorRenderer(Resources,
-            new ItemSlotIndicatorDrawBackend(api, () => liquidSimulation.SurfaceTexture, () => foodSimulation.StateTexture));
+            new ItemSlotIndicatorDrawBackend(api, () => liquidSimulation.SurfaceTexture, () => foodSimulation.StateTexture,
+                () => metalSimulation.SurfaceTexture, () => metalChunksSimulation.StateTexture));
         Active = this;
         harmony = new Harmony(Constants.ModId + ".itemslotindicators");
         new PatchClassProcessor(harmony, typeof(ItemSlotIndicatorPatch)).Patch();
@@ -99,8 +111,12 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
         harmony = null;
         liquidSimulation?.Dispose();
         liquidSimulation = null;
+        metalSimulation?.Dispose();
+        metalSimulation = null;
         foodSimulation?.Dispose();
         foodSimulation = null;
+        metalChunksSimulation?.Dispose();
+        metalChunksSimulation = null;
         frameUpdater?.Dispose();
         frameUpdater = null;
         Renderer?.Dispose();
@@ -180,9 +196,11 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
     #endregion
 
     #region Private
-    /// <summary>Applies live liquid effect configuration without invalidating resource-volume samples.</summary>
+    /// <summary>Applies live effect configuration without invalidating resource-volume samples.</summary>
     private static ItemSlotIndicatorEffectDefinition? SelectEffect(ItemSlotIndicatorEffectDefinition? effect) =>
-        effect?.ShaderName == LiquidSloshIndicatorEffect.Definition.ShaderName
-            && !VanillaExpandedModSystem.Config.EnableLiquidSloshEffect ? null : effect;
+        (effect?.ShaderName == LiquidSloshIndicatorEffect.Definition.ShaderName
+            && !VanillaExpandedModSystem.Config.EnableLiquidSloshEffect)
+        || ((effect == CrucibleIndicatorEffect.Solid || effect == CrucibleIndicatorEffect.Molten)
+            && !VanillaExpandedModSystem.Config.EnableCrucibleEffect) ? null : effect;
     #endregion
 }

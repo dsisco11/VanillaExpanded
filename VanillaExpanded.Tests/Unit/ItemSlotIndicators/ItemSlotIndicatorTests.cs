@@ -41,6 +41,33 @@ public sealed class ItemSlotIndicatorTests
     #endregion
 
     #region Provider Selection
+    /// <summary>Disabling crucible animation immediately retains amount for both solid and molten registrations.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CrucibleEffectToggle_RetainsPlainAmount(bool molten)
+    {
+        var config = VanillaExpandedModSystem.Config;
+        bool previous = config.EnableCrucibleEffect;
+        try
+        {
+            var slot = new ItemSlot(null);
+            var indicator = new ItemSlotIndicator(0.4f, Vector4.One);
+            var system = new ItemSlotIndicatorSystem();
+            system.Register(CreateProvider(slot, true, indicator), effect: molten
+                ? VanillaExpanded.CrucibleIndicators.CrucibleIndicatorEffect.Molten
+                : VanillaExpanded.CrucibleIndicators.CrucibleIndicatorEffect.Solid);
+            config.EnableCrucibleEffect = false;
+            Assert.True(system.TryGetRenderSelection(slot, out var plain));
+            Assert.Equal(indicator, plain.Indicator);
+            Assert.Null(plain.Effect);
+            config.EnableCrucibleEffect = true;
+            Assert.True(system.TryGetRenderSelection(slot, out var animated));
+            Assert.NotNull(animated.Effect);
+        }
+        finally { config.EnableCrucibleEffect = previous; }
+    }
+
     /// <summary>Changing effect enablement preserves the cached liquid amount and applies without restarting.</summary>
     [Fact]
     public void LiquidEffectToggle_PreservesIndicatorAndAppliesImmediately()

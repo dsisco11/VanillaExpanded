@@ -10,7 +10,7 @@ internal readonly record struct ItemSlotIndicatorDrawInput(Vector4 SlotBounds, f
     internal float ResourceFill { get; init; }
     /// <summary>Gets the optional draw levels for shader containment and boundary cues.</summary>
     internal ItemSlotIndicatorDrawRange? DrawRange { get; init; }
-    /// <summary>Gets optional immutable food colors sampled by the provider.</summary>
+    /// <summary>Gets optional immutable ingredient colors sampled by the provider.</summary>
     internal ItemSlotIndicatorParticlePalette? ParticlePalette { get; init; }
 
     #region Public API

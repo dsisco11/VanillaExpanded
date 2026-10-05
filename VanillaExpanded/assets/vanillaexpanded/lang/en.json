@@ -1,4 +1,10 @@
 {
+  "config-enable-crucible-indicators": "Crucible metal indicators",
+  "config-enable-crucible-indicators-tooltip": "Show metal amount in filled crucibles and crucibles in the firepit input slot. Applies immediately.",
+  "config-enable-crucible-effect": "Crucible metal effects",
+  "config-enable-crucible-effect-tooltip": "Show angular solid metal and glowing molten sloshing. Disable to retain a plain amount indicator. Applies immediately.",
+  "config-crucible-indicator-capacity-units": "Crucible indicator full level (metal units)",
+  "config-crucible-indicator-capacity-units-tooltip": "Metal units represented by a full indicator. This is a visual reference, not a game capacity limit. Default: 2560 units (four stacks of 128 five-unit nuggets). Applies immediately.",
   "hotkey-quick-tool": "[VE] Quick-swap menu (hold)",
   "config-enable-tool-mode-radial-menu": "Tool-Mode Radial Menu",
   "config-enable-tool-mode-radial-menu-tooltip": "Replace base-game tool-mode grids with a radial menu.",

@@ -18,6 +18,7 @@ internal sealed class FoodGrainSimulation : IRenderer
     private const double StepSeconds = 1.0 / 120;
     private readonly ICoreClientAPI api;
     private readonly Func<ItemSlotIndicatorCameraSample?> camera;
+    private readonly GrainSimulationProfile profile;
     private readonly ContainerMotionState motion = new();
     private FoodGrainSimulationShaderProgram? shader;
     private FoodGrainStateBuffers? buffers;
@@ -33,13 +34,14 @@ internal sealed class FoodGrainSimulation : IRenderer
 
     #region Public API
     /// <summary>Prepares once and subscribes update/reload independently of slot drawing.</summary>
-    internal FoodGrainSimulation(ICoreClientAPI api, Func<ItemSlotIndicatorCameraSample?> camera)
+    internal FoodGrainSimulation(ICoreClientAPI api, Func<ItemSlotIndicatorCameraSample?> camera, GrainSimulationProfile? profile = null)
     {
         this.api = api;
         this.camera = camera;
+        this.profile = profile ?? GrainSimulationProfile.Food;
         Prepare();
         api.Event.ReloadShader += Reload;
-        api.Event.RegisterRenderer(this, EnumRenderStage.Ortho, "food-grain-simulation");
+        api.Event.RegisterRenderer(this, EnumRenderStage.Ortho, this.profile.ShaderName);
     }
 
     /// <summary>Advances at fixed timesteps once per GUI frame; additional item draws only read the published buffer.</summary>
@@ -84,8 +86,7 @@ internal sealed class FoodGrainSimulation : IRenderer
         previousTime = now;
         bool first = !hasTime;
         hasTime = true;
-        bool enabled = VanillaExpandedModSystem.Config.EnablePerishableItemFreshnessIndicators
-            && VanillaExpandedModSystem.Config.EnableFoodGrainEffect;
+        bool enabled = profile.Enabled();
         if (!enabled)
         {
             if (wasEnabled) buffers.Reset();
@@ -117,7 +118,7 @@ internal sealed class FoodGrainSimulation : IRenderer
             // Ortho already has GUI active. Use engine tracking, never GPU state queries, for this handoff.
             previousProgram?.Stop();
             shader.Use();
-            shader.ContainerAcceleration = GetAcceleration();
+            shader.ContainerAcceleration = profile.ProjectAcceleration(motion.LocalAcceleration);
             while (accumulator >= StepSeconds)
             {
                 shader.Pass = 0;
@@ -134,15 +135,6 @@ internal sealed class FoodGrainSimulation : IRenderer
             if (ReferenceEquals(api.Render.CurrentActiveShader, shader)) shader.Stop();
             previousProgram?.Use();
         }
-    }
-
-    /// <summary>Scales horizontal motion and compressive vertical impacts without lifting grains during falls.</summary>
-    private Vector2 GetAcceleration()
-    {
-        var a = motion.LocalAcceleration;
-        // Falling acceleration must not cancel gravity or launch the food; upward braking still compresses it.
-        var force = new Vector2(a.X, MathF.Max(0, a.Y)) * 0.35f;
-        return force / MathF.Max(1, force.Length() / 7);
     }
 
     /// <summary>Submits one pass and publishes its output for the next dependent pass.</summary>
@@ -169,17 +161,18 @@ internal sealed class FoodGrainSimulation : IRenderer
                     supported |= GL.GetString(StringNameIndexed.Extensions, index) == "GL_ARB_transform_feedback2";
             }
             if (!supported) throw new NotSupportedException("Grain simulation requires transform-feedback objects.");
-            buffers ??= new FoodGrainStateBuffers();
+            buffers ??= new FoodGrainStateBuffers(profile.ParticleCount, profile.RadiusRange.X, profile.RadiusRange.Y);
             shader = new FoodGrainSimulationShaderProgram
             {
                 AssetDomain = Constants.ModId,
                 VertexShader = (Shader)api.Shader.NewShader(EnumShaderType.VertexShader),
                 FragmentShader = (Shader)api.Shader.NewShader(EnumShaderType.FragmentShader),
                 TimeStep = (float)StepSeconds,
+                ParticleCount = profile.ParticleCount,
                 FeedbackObject = buffers.FeedbackObject,
                 VertexArray = buffers.VertexArray
             };
-            api.Shader.RegisterFileShaderProgram(FoodGrainSimulationShaderProgram.ShaderName, shader);
+            api.Shader.RegisterFileShaderProgram(profile.ShaderName, shader);
             if (!shader.Compile()) throw new InvalidOperationException("Engine grain-solver compilation failed.");
             buffers.Reset();
         }

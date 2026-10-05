@@ -3,6 +3,7 @@ using System;
 using VanillaExpanded.ItemSlotIndicators.Animation;
 using VanillaExpanded.ItemSlotIndicators.Effects;
 using VanillaExpanded.ItemSlotIndicators.Effects.LiquidSlosh;
+using VanillaExpanded.CrucibleIndicators;
 
 using OpenTK.Graphics.OpenGL4;
 
@@ -16,6 +17,8 @@ internal sealed class ItemSlotIndicatorDrawBackend : IItemSlotIndicatorDrawBacke
     private readonly ICoreClientAPI api;
     private readonly Func<int> liquidSurface;
     private readonly Func<int> foodState;
+    private readonly Func<int> metalSurface;
+    private readonly Func<int> metalChunks;
     private readonly ItemSlotIndicatorDrawState drawState;
     private readonly float[] rectangleMatrix = new float[16];
     private IShaderProgram? gui;
@@ -24,11 +27,14 @@ internal sealed class ItemSlotIndicatorDrawBackend : IItemSlotIndicatorDrawBacke
     #region Public API
     #region Lifetime
     /// <summary>Owns only scratch storage; programs and meshes remain with the resource caches.</summary>
-    internal ItemSlotIndicatorDrawBackend(ICoreClientAPI api, Func<int>? liquidSurface = null, Func<int>? foodState = null)
+    internal ItemSlotIndicatorDrawBackend(ICoreClientAPI api, Func<int>? liquidSurface = null, Func<int>? foodState = null,
+        Func<int>? metalSurface = null, Func<int>? metalChunks = null)
     {
         this.api = api;
         this.liquidSurface = liquidSurface ?? (static () => 0);
         this.foodState = foodState ?? (static () => 0);
+        this.metalSurface = metalSurface ?? (static () => 0);
+        this.metalChunks = metalChunks ?? (static () => 0);
         drawState = new(api.Render);
     }
 
@@ -63,9 +69,11 @@ internal sealed class ItemSlotIndicatorDrawBackend : IItemSlotIndicatorDrawBacke
     public void Effect(IShaderProgram program, MeshRef mesh, ItemSlotIndicatorDrawInput input,
         ItemSlotIndicatorEffectDefinition definition, ItemSlotIndicatorFrameSnapshot frame)
     {
-        bool liquid = definition.ShaderName == LiquidSloshIndicatorEffect.Definition.ShaderName;
-        bool grains = definition.ShaderName == FoodGrainIndicatorEffect.Definition.ShaderName;
-        int surface = liquid ? liquidSurface() : grains ? foodState() : 0;
+        bool metal = definition.ShaderName == CrucibleIndicatorEffect.Molten.ShaderName;
+        bool liquid = definition.ShaderName == LiquidSloshIndicatorEffect.Definition.ShaderName || metal;
+        bool food = definition.ShaderName == FoodGrainIndicatorEffect.Definition.ShaderName;
+        bool grains = food || definition.ShaderName == CrucibleIndicatorEffect.Solid.ShaderName;
+        int surface = metal ? metalSurface() : liquid ? liquidSurface() : food ? foodState() : grains ? metalChunks() : 0;
         if ((liquid || grains) && surface == 0) throw new InvalidOperationException("Shared indicator simulation is unavailable.");
         gui!.Stop();
         program.Use();
@@ -84,7 +92,10 @@ internal sealed class ItemSlotIndicatorDrawBackend : IItemSlotIndicatorDrawBacke
             program.Uniform("effectParameters", parameters.X, parameters.Y, parameters.Z, parameters.W);
         }
         if (program.HasUniform("segmentCount")) program.Uniform("segmentCount", definition.SegmentCount);
-        if (grains) (input.ParticlePalette ?? ItemSlotIndicatorParticlePalette.Default).Submit(program);
+        if (food) (input.ParticlePalette ?? ItemSlotIndicatorParticlePalette.Default).Submit(program);
+        if (grains && !food)
+            (input.ParticlePalette ?? throw new InvalidOperationException("Solid crucible particle colors are unavailable."))
+                .Submit(program, "metalPalette");
         if (liquid || grains)
         {
             program.Uniform(liquid ? "liquidSurface" : "grainState", 0);

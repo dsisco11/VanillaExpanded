@@ -15,6 +15,7 @@ internal sealed class FoodGrainSimulationShaderProgram : ShaderProgram
     private float timeStep = 1f / 120;
     private Vector2 acceleration;
     private int pass, source, destination, feedback, vertexArray;
+    private int particleCount = FoodGrainStateBuffers.ParticleCount;
 
     #region Public API
     #region Uniform Inputs
@@ -49,8 +50,16 @@ internal sealed class FoodGrainSimulationShaderProgram : ShaderProgram
             pass = value;
         }
     }
-    /// <summary>Gets the fixed particle count submitted in every pass.</summary>
-    internal int ParticleCount => FoodGrainStateBuffers.ParticleCount;
+    /// <summary>Gets or sets the fixed simulation count, bounded by the shared grain mesh capacity.</summary>
+    internal int ParticleCount
+    {
+        get => particleCount;
+        set
+        {
+            if (value is < 2 or > FoodGrainStateBuffers.ParticleCount) throw new ArgumentOutOfRangeException(nameof(ParticleCount));
+            particleCount = value;
+        }
+    }
     #endregion
     #region Borrowed GPU Inputs
     /// <summary>Gets or sets the readable state texture, distinct from the feedback destination.</summary>

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using OpenTK.Graphics.OpenGL4;
 
 using VanillaExpanded.ItemSlotIndicators.Effects;
+using VanillaExpanded.CrucibleIndicators;
 
 using Vintagestory.API.Client;
 
@@ -39,8 +40,10 @@ internal sealed class ItemSlotIndicatorResourceBackend(ICoreClientAPI api) : IIt
     {
         if (program.Disposed || program.LoadError || program.ProgramId <= 0)
             throw new InvalidOperationException("Indicator shader did not produce a live linked program.");
-        bool liquid = program.PassName == LiquidSloshIndicatorEffect.Definition.ShaderName;
-        bool grains = program.PassName == FoodGrainIndicatorEffect.Definition.ShaderName;
+        bool liquid = program.PassName == LiquidSloshIndicatorEffect.Definition.ShaderName
+            || program.PassName == CrucibleIndicatorEffect.Molten.ShaderName;
+        bool food = program.PassName == FoodGrainIndicatorEffect.Definition.ShaderName;
+        bool grains = food || program.PassName == CrucibleIndicatorEffect.Solid.ShaderName;
         if (liquid) ItemSlotIndicatorBufferSampler.Register(program, "liquidSurface");
         if (grains) ItemSlotIndicatorBufferSampler.Register(program, "grainState");
         foreach (string uniform in new[] { "projectionMatrix", "modelViewMatrix", "slotBounds", "fill" })
@@ -57,8 +60,10 @@ internal sealed class ItemSlotIndicatorResourceBackend(ICoreClientAPI api) : IIt
             throw new InvalidOperationException("Indicator programs cannot use geometry stages or uniform buffers.");
         if (grains && !program.HasUniform("grainState"))
             throw new InvalidOperationException("Grain drawing requires shared particle state.");
-        if (grains && !program.HasUniform("foodPalette"))
+        if (food && !program.HasUniform("foodPalette"))
             throw new InvalidOperationException("Grain drawing requires food particle colors.");
+        if (grains && !food && !program.HasUniform("metalPalette"))
+            throw new InvalidOperationException("Solid crucible drawing requires ingredient particle colors.");
         if (liquid && (!program.HasUniform("liquidSurface") || !program.HasUniform("surfaceCellCount")
             || !program.HasUniform("segmentCount")))
             throw new InvalidOperationException("Liquid drawing requires shared surface inputs and mesh subdivision count.");
@@ -66,7 +71,7 @@ internal sealed class ItemSlotIndicatorResourceBackend(ICoreClientAPI api) : IIt
         for (int index = 0; index < uniforms; index++)
         {
             string name = GL.GetActiveUniform(program.ProgramId, index, out int uniformSize, out ActiveUniformType uniformType);
-            if (grains && name == "foodPalette[0]")
+            if ((food && name == "foodPalette[0]") || (grains && !food && name == "metalPalette[0]"))
             {
                 if (uniformType != ActiveUniformType.FloatVec4 || uniformSize != ItemSlotIndicatorParticlePalette.ColorCount)
                     throw new InvalidOperationException("Food palette must contain sixteen vec4 colors.");

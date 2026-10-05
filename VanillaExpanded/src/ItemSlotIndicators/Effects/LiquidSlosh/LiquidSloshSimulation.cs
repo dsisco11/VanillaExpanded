@@ -17,7 +17,8 @@ internal sealed class LiquidSloshSimulation : IRenderer
     private const double StepSeconds = 1.0 / 480;
     private readonly ICoreClientAPI api;
     private readonly Func<ItemSlotIndicatorCameraSample?> camera;
-    private readonly LiquidSloshMotionState motion = new();
+    private readonly LiquidSloshSimulationProfile profile;
+    private readonly LiquidSloshMotionState motion;
     private LiquidSloshSimulationShaderProgram? shader;
     private LiquidSloshStateBuffers? buffers;
     private double previousTime, accumulator;
@@ -32,13 +33,16 @@ internal sealed class LiquidSloshSimulation : IRenderer
 
     #region Public API
     /// <summary>Prepares once and subscribes update/reload independently of slot drawing.</summary>
-    internal LiquidSloshSimulation(ICoreClientAPI api, Func<ItemSlotIndicatorCameraSample?> camera)
+    internal LiquidSloshSimulation(ICoreClientAPI api, Func<ItemSlotIndicatorCameraSample?> camera,
+        LiquidSloshSimulationProfile? profile = null)
     {
         this.api = api;
         this.camera = camera;
+        this.profile = profile ?? LiquidSloshSimulationProfile.Water;
+        motion = new LiquidSloshMotionState(this.profile);
         Prepare();
         api.Event.ReloadShader += Reload;
-        api.Event.RegisterRenderer(this, EnumRenderStage.Ortho, "liquid-slosh-simulation");
+        api.Event.RegisterRenderer(this, EnumRenderStage.Ortho, this.profile.ShaderName);
     }
 
     /// <summary>Advances at fixed timesteps once per GUI frame; additional item draws only read the published buffer.</summary>
@@ -83,8 +87,7 @@ internal sealed class LiquidSloshSimulation : IRenderer
         previousTime = now;
         bool first = !hasTime;
         hasTime = true;
-        bool enabled = VanillaExpandedModSystem.Config.EnableLiquidContainerIndicators
-            && VanillaExpandedModSystem.Config.EnableLiquidSloshEffect;
+        bool enabled = profile.Enabled();
         if (!enabled)
         {
             if (wasEnabled) buffers.Reset();
@@ -157,14 +160,14 @@ internal sealed class LiquidSloshSimulation : IRenderer
                 TimeStep = (float)StepSeconds,
                 CellCount = LiquidSloshStateBuffers.CellCount,
                 CellSpacing = 1f / LiquidSloshStateBuffers.CellCount,
-                Gravity = 1,
-                Damping = 3,
+                Gravity = profile.Gravity,
+                Damping = profile.Damping,
                 WallDamping = 6,
                 WallDampingWidth = 0.2f,
                 FeedbackObject = buffers.FeedbackObject,
                 VertexArray = buffers.VertexArray
             };
-            api.Shader.RegisterFileShaderProgram(LiquidSloshSimulationShaderProgram.ShaderName, shader);
+            api.Shader.RegisterFileShaderProgram(profile.ShaderName, shader);
             if (!shader.Compile()) throw new InvalidOperationException("Engine liquid-solver compilation failed.");
             buffers.Reset();
         }

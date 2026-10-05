@@ -15,6 +15,39 @@ public sealed class LiquidSloshMotionStateTests
 
     #region Public API
     #region Translation and Inertia
+    /// <summary>Metal retains signed inertia and braking while producing smaller, bounded impulses than water.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MetalProfile_RestrainsMotionAndBraking(bool vertical)
+    {
+        var water = new LiquidSloshMotionState();
+        var metal = new LiquidSloshMotionState(LiquidSloshSimulationProfile.Metal);
+        foreach (var state in new[] { water, metal })
+        {
+            state.Update(0.02, Pose(0, 0));
+            state.Update(0.02, Pose(0, 0));
+        }
+        for (int step = 1; step <= 10; step++)
+        {
+            var sample = Pose(vertical ? 0 : step * 0.02, vertical ? step * 0.02 : 0);
+            water.Update(0.02, sample);
+            metal.Update(0.02, sample);
+            Assert.InRange(metal.ContainerAcceleration.Length(), 0, 1.20001f);
+            Assert.Equal(water.VerticalShapeVariation * 0.15f, metal.VerticalShapeVariation, 6);
+        }
+        float drive = vertical ? metal.ContainerAcceleration.Y : metal.ContainerAcceleration.X;
+        float waterDrive = vertical ? water.ContainerAcceleration.Y : water.ContainerAcceleration.X;
+        Assert.True(drive > 0 && drive < waterDrive);
+        var stop = Pose(vertical ? 0 : 0.2, vertical ? 0.2 : 0);
+        water.Update(0.02, stop);
+        metal.Update(0.02, stop);
+        float braking = vertical ? metal.ContainerAcceleration.Y : metal.ContainerAcceleration.X;
+        float waterBraking = vertical ? water.ContainerAcceleration.Y : water.ContainerAcceleration.X;
+        Assert.True(braking < 0 && MathF.Abs(braking) < MathF.Abs(waterBraking));
+        Assert.InRange(metal.ContainerAcceleration.Length(), 0, 1.20001f);
+    }
+
     /// <summary>Translation acceleration and an abrupt stop produce opposite signed forces, even far from world origin.</summary>
     [Theory]
     [InlineData(false)]

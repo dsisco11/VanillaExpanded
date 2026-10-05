@@ -1,5 +1,8 @@
 # Vanilla: Expanded TODO List:
     ## Issues:
+        ☐ Liquid container indicators should allow a min-bound of 0%
+        ☐ Liquid containe rindicators should stay the same color no matter their liquid-level.
+        ☐ Tool-mode radial menu needs to be able to be configured to allow interacting with the hotbar (e.g. for the chisel tools "add material" functionality).
         ☐ Fix respawn decal looking obnoxious (too colorful).
 
     ## Recipes:
@@ -11,11 +14,19 @@
         ✔ Smelt tool heads back into metal nuggets (100% return). @done(25-12-01 12:39)
 
     ## Functionality:
-        ✔ Perishable items in inventory/hotbar render a vertical decay bar as their item slot background, indicating remaining freshness. @done(26-09-29)
+        ☐ Perishable items freshness indicators shoudl be able to optionally render as a horizontal bar.
+        ☐ Perishable items freshness indicators shoudl be able to optionally render as an outline around the item-slot.
         ✔ Add liquid-container fill indicators using current litres relative to capacity; existing freshness indicators take priority, empty containers show zero fill. Focused tests and independent review passed; in-game appearance remains unverified. @done(26-10-02)
         ✔ Add clothing condition indicators using actual condition fill and green at the 50% full-warmth threshold; zero condition shows a red warning, armor and uninitialized condition are skipped. Focused tests and independent review passed; in-game appearance remains unverified. @done(26-10-03)
         ✔ Add night-vision device fuel indicators using remaining fuel hours relative to each device's capacity via cached Harmony field access; empty fuel shows a red warning. Focused tests and independent review passed; in-game appearance remains unverified. @done(26-10-03)
         ✔ Add drying/curing progress indicators for bowstaves, hides, and other Dry/Cure transitions; fill toward completion with a slate-to-teal palette using the game's inventory-aware transition progress. Focused tests and independent review passed; in-game appearance remains unverified. @done(26-10-03)
+        ☐ Add HUD indicator to show current arrow type and quantity when player is holding a bow.
+        ☐ Add HUD indicator for current approximate time of day (becomes less accurate the longer the player is away from the sun).
+        ☐ Add HUD indicator for current weather conditions (e.g., rain, snow, fog).
+        ☐ Add HUD indicator for outside temperature when approaching a level outside the players comfort zone.
+        ☐ Add HUD indicator for player body temperature when approaching dangerous levels.
+        ☐ Temporal gear amulets should provide information about when the next storm is expected to occur (approximately, with increasing accuracy as the storm gets closer).
+        ☐ Wearing a temporal gear amulet should provide a subtle HUD indicator when a storm is approaching.
         ☐ Targeted items such as tools on toolracks have a subtle highlight to indicate that they are targeted.
         ☐ New "crafting menu" similar to minecraft: shows all craftable items with current inventory, allows searching. (Maybe this can just be added to the handbook?)
 

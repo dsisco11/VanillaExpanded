@@ -9,7 +9,7 @@ internal sealed class FoodGrainStateBuffers : IDisposable
     /// <summary>Number of grains shared by all food-container indicators.</summary>
     internal const int ParticleCount = 384;
     private readonly int[] buffers = new int[2], textures = new int[2];
-    private readonly float[] initial = CreateInitialState();
+    private readonly float[] initial;
     private int readIndex;
     /// <summary>Gets the completed particle state as two RGBA texels per grain.</summary>
     internal int ReadTexture => textures[readIndex];
@@ -22,8 +22,9 @@ internal sealed class FoodGrainStateBuffers : IDisposable
 
     #region Public API
     /// <summary>Allocates fixed buffers once, releasing partial allocations on failure.</summary>
-    internal FoodGrainStateBuffers()
+    internal FoodGrainStateBuffers(int particleCount = ParticleCount, float minimumRadius = 0.01f, float maximumRadius = 0.023f)
     {
+        initial = CreateInitialState(particleCount, minimumRadius, maximumRadius);
         try
         {
             FeedbackObject = GL.GenTransformFeedback();
@@ -63,15 +64,18 @@ internal sealed class FoodGrainStateBuffers : IDisposable
     }
 
     /// <summary>Creates a deterministic irregular bed of varied, nonoverlapping grains at rest.</summary>
-    internal static float[] CreateInitialState()
+    internal static float[] CreateInitialState(int particleCount = ParticleCount, float minimumRadius = 0.01f, float maximumRadius = 0.023f)
     {
-        var data = new float[ParticleCount * 8];
+        if (particleCount is < 2 or > ParticleCount || !float.IsFinite(minimumRadius) || !float.IsFinite(maximumRadius)
+            || minimumRadius <= 0 || maximumRadius < minimumRadius || maximumRadius > 0.035f)
+            throw new ArgumentOutOfRangeException(nameof(particleCount), "Unsupported granular initialization settings.");
+        var data = new float[particleCount * 8];
         uint random = 0x41C64E6D;
         float pileTop = 0;
-        for (int i = 0; i < ParticleCount; i++)
+        for (int i = 0; i < particleCount; i++)
         {
             int offset = i * 8;
-            float radius = 0.01f + 0.013f * NextUnit(ref random);
+            float radius = minimumRadius + (maximumRadius - minimumRadius) * NextUnit(ref random);
             float x = 0, y = 0;
             bool placed = false;
             // Rejection sampling removes lattice rows; broad radius variation also discourages crystallization.
@@ -93,7 +97,7 @@ internal sealed class FoodGrainStateBuffers : IDisposable
             data[offset + 6] = radius;
             pileTop = MathF.Max(pileTop, y + radius);
         }
-        for (int i = 0; i < ParticleCount; i++) data[i * 8 + 7] = pileTop;
+        for (int i = 0; i < particleCount; i++) data[i * 8 + 7] = pileTop;
         return data;
     }
 

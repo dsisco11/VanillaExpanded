@@ -3,7 +3,7 @@ using Vintagestory.API.Client;
 
 namespace VanillaExpanded.ItemSlotIndicators;
 
-/// <summary>Owns an immutable set of food-particle RGB samples for allocation-free shader submission.</summary>
+/// <summary>Owns an immutable set of particle RGB samples for allocation-free shader submission.</summary>
 internal sealed class ItemSlotIndicatorParticlePalette
 {
     /// <summary>Fixed palette length matching the grain shader's uniform array.</summary>
@@ -29,6 +29,6 @@ internal sealed class ItemSlotIndicatorParticlePalette
     }
 
     /// <summary>Submits retained palette storage through the engine without allocating a per-draw array.</summary>
-    internal void Submit(IShaderProgram program) => program.Uniforms4("foodPalette", ColorCount, values);
+    internal void Submit(IShaderProgram program, string uniformName = "foodPalette") => program.Uniforms4(uniformName, ColorCount, values);
     #endregion
 }
