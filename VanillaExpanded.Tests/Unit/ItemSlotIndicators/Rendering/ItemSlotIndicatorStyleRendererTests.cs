@@ -21,8 +21,8 @@ public sealed class ItemSlotIndicatorStyleRendererTests
     [InlineData(1, 0.5f, 4)]
     [InlineData(1, 1, 4)]
     [InlineData(2, 0, 1)]
-    [InlineData(2, 0.5f, 2)]
-    [InlineData(2, 1, 2)]
+    [InlineData(2, 0.5f, 1)]
+    [InlineData(2, 1, 1)]
     public void OrdinaryStyle_DrawsActualFractionWithoutCues(int selectedStyle, float fraction, int count)
     {
         using var context = new IndicatorResourceTestContext();
@@ -32,16 +32,16 @@ public sealed class ItemSlotIndicatorStyleRendererTests
         var drawn = new List<ItemSlotIndicatorDrawInput>();
         backend.Setup(b => b.Rectangle(It.IsAny<MeshRef>(), It.IsAny<ItemSlotIndicatorDrawInput>()))
             .Callback<MeshRef, ItemSlotIndicatorDrawInput>((_, input) => drawn.Add(input));
+        backend.Setup(b => b.DurabilityBar(It.IsAny<ItemSlotIndicatorDrawInput>(), It.IsAny<float>())).Callback<ItemSlotIndicatorDrawInput, float>((input, _) => drawn.Add(input));
         using var renderer = new ItemSlotIndicatorRenderer(context.Resources, backend.Object, () => 60, () => 1.25f);
         renderer.Render(-5, -10, new(new(fraction, Vector4.One, new(0.2f, 0.8f)), null,
             (ItemSlotIndicatorRenderingStyle)selectedStyle), default);
         Assert.Equal(count, drawn.Count);
-        Assert.All(drawn, input => { Assert.True(input.PreserveFractionalPosition); Assert.Null(input.DrawRange); });
+        Assert.All(drawn, input => { if (selectedStyle == 1) Assert.True(input.PreserveFractionalPosition); Assert.Null(input.DrawRange); });
         if (selectedStyle == 2)
         {
-            Assert.Equal(55, drawn[0].SlotBounds.Z);
-            Assert.Equal(5, drawn[0].SlotBounds.W);
-            if (fraction > 0) Assert.Equal(55 * fraction, drawn[1].SlotBounds.Z);
+            Assert.Equal(60, drawn[0].SlotBounds.Z);
+            Assert.Equal(fraction, drawn[0].ResourceFill);
         }
         backend.Verify(b => b.Begin(), Times.Once);
         backend.Verify(b => b.Restore(), Times.Once);
@@ -73,12 +73,13 @@ public sealed class ItemSlotIndicatorStyleRendererTests
         backend.SetupGet(b => b.Supported).Returns(true);
         var order = new List<string>();
         backend.Setup(b => b.Rectangle(It.IsAny<MeshRef>(), It.IsAny<ItemSlotIndicatorDrawInput>())).Callback(() => order.Add("rectangle"));
+        backend.Setup(b => b.DurabilityBar(It.IsAny<ItemSlotIndicatorDrawInput>(), It.IsAny<float>())).Callback(() => order.Add("rectangle"));
         backend.Setup(b => b.Restore()).Callback(() => order.Add("restore"));
         backend.Setup(b => b.Effect(It.IsAny<IShaderProgram>(), It.IsAny<MeshRef>(), It.IsAny<ItemSlotIndicatorDrawInput>(), effect,
             It.IsAny<ItemSlotIndicatorFrameSnapshot>())).Callback(() => { order.Add("effect"); throw new InvalidOperationException(); });
         using var renderer = new ItemSlotIndicatorRenderer(context.Resources, backend.Object, () => 48, () => 1);
         renderer.Render(24, 24, new(new(0.5f, Vector4.One), effect, style), default);
-        int rectangles = style == ItemSlotIndicatorRenderingStyle.SlotOutline ? 4 : 2;
+        int rectangles = style == ItemSlotIndicatorRenderingStyle.SlotOutline ? 4 : 1;
         Assert.Equal(rectangles, order.Count(value => value == "rectangle"));
         Assert.Equal("restore", order[^1]);
         if (state == "fail") Assert.Equal(new[] { "effect", "restore" }, order.Take(2));
@@ -108,12 +109,13 @@ public sealed class ItemSlotIndicatorStyleRendererTests
         backend.SetupGet(b => b.Supported).Returns(true);
         var order = new List<string>();
         backend.Setup(b => b.Rectangle(It.IsAny<MeshRef>(), It.IsAny<ItemSlotIndicatorDrawInput>())).Callback(() => order.Add("rectangle"));
+        backend.Setup(b => b.DurabilityBar(It.IsAny<ItemSlotIndicatorDrawInput>(), It.IsAny<float>())).Callback(() => order.Add("rectangle"));
         backend.Setup(b => b.Restore()).Callback(() => order.Add("restore"));
         backend.Setup(b => b.Effect(It.IsAny<IShaderProgram>(), It.IsAny<MeshRef>(), It.IsAny<ItemSlotIndicatorDrawInput>(), effect,
             It.IsAny<ItemSlotIndicatorFrameSnapshot>())).Callback(() => { order.Add("effect"); if (fail) throw new InvalidOperationException(); });
         using var renderer = new ItemSlotIndicatorRenderer(context.Resources, backend.Object, () => 48, () => 1);
         renderer.Render(24, 24, new(new(0.5f, Vector4.One, new(0.2f, 0.8f)), effect, style), default);
-        int count = selectedStyle == 1 ? 4 : 2;
+        int count = selectedStyle == 1 ? 4 : 1;
         Assert.Equal(Enumerable.Repeat("rectangle", count).Concat(new[] { "effect", "restore" }), order);
     }
 
@@ -132,6 +134,7 @@ public sealed class ItemSlotIndicatorStyleRendererTests
         backend.SetupGet(b => b.Supported).Returns(true);
         var order = new List<string>();
         backend.Setup(b => b.Rectangle(It.IsAny<MeshRef>(), It.IsAny<ItemSlotIndicatorDrawInput>())).Callback(() => order.Add("freshness"));
+        backend.Setup(b => b.DurabilityBar(It.IsAny<ItemSlotIndicatorDrawInput>(), It.IsAny<float>())).Callback(() => order.Add("freshness"));
         backend.Setup(b => b.Restore()).Callback(() => order.Add("restore"));
         var frame = new ItemSlotIndicatorFrameSnapshot(3, new(0.4f, -0.2f));
         backend.Setup(b => b.Effect(It.IsAny<IShaderProgram>(), It.IsAny<MeshRef>(),
@@ -144,7 +147,7 @@ public sealed class ItemSlotIndicatorStyleRendererTests
             var style = (ItemSlotIndicatorRenderingStyle)(draw % 3);
             renderer.Render(24, 24, new(new(0.25f, Vector4.One), null, style)
             { OverlayIndicator = new(0.75f, Vector4.One), OverlayEffect = effect }, frame);
-            int count = style == ItemSlotIndicatorRenderingStyle.SlotBackground ? 1 : style == ItemSlotIndicatorRenderingStyle.SlotOutline ? 4 : 2;
+            int count = style == ItemSlotIndicatorRenderingStyle.SlotBackground ? 1 : style == ItemSlotIndicatorRenderingStyle.SlotOutline ? 4 : 1;
             Assert.Equal(Enumerable.Repeat("freshness", count).Concat(new[] { "restore", "food", "restore" }), order);
         }
         Assert.Equal(uploads, context.Backend.UploadedData.Count);

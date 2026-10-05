@@ -23,10 +23,10 @@ public sealed class ItemSlotIndicatorStyleLayoutTests
         float height = 48 * (0.2f + fraction * 0.6f);
         Assert.Equal(height, layout.Background.W, 4);
         Assert.Equal(48 - height, layout.Background.Y, 4);
-        Assert.Equal(new Vector4(2, 42, 44, 4), layout.BarTrack);
-        Assert.Equal(new Vector4(2, 42, 44 * fraction, 4), layout.BarFill);
-        Assert.Equal(new Vector4(2, 2, 44, 1), layout.OutlineTop);
-        Assert.Equal(new Vector4(2, 45, 44, 1), layout.OutlineBottom);
+        Assert.Equal(new Vector4(4, 43, 40, 2), layout.BarTrack);
+        Assert.Equal(new Vector4(4, 43, 40 * fraction, 2), layout.BarFill);
+        Assert.Equal(new Vector4(0, 0, 48, 2.25f), layout.OutlineTop);
+        Assert.Equal(new Vector4(0, 45.75f, 48, 2.25f), layout.OutlineBottom);
     }
 
     /// <summary>All border strips remain inside the slot and share edges without overlapping translucent corners.</summary>
@@ -60,9 +60,9 @@ public sealed class ItemSlotIndicatorStyleLayoutTests
             strips.Sum(strip => strip.Z * strip.W), 4);
         if (size > 1)
         {
-            Assert.Equal(scale, layout.OutlineTop.W);
-            Assert.Equal(4 * scale, layout.BarTrack.W);
-            Assert.Equal(input.SlotBounds.X + 2 * scale, layout.BarTrack.X);
+            Assert.Equal(2.25f * scale, layout.OutlineTop.W);
+            Assert.Equal(2 * scale, layout.BarTrack.W);
+            Assert.Equal(input.SlotBounds.X + 4 * scale, layout.BarTrack.X);
         }
     }
 

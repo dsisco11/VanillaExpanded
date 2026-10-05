@@ -67,7 +67,7 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
                 VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity),
             supportedStyles: [ItemSlotIndicatorRenderingStyle.SlotBackground, ItemSlotIndicatorRenderingStyle.SlotOutline,
                 ItemSlotIndicatorRenderingStyle.HorizontalBar],
-            styleSelector: static () => (ItemSlotIndicatorRenderingStyle)VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorStyle);
+            styleSelector: static () => VanillaExpandedModSystem.Config.FreshnessRenderingStyle);
         Register(new FoodContainerIndicatorProvider(),
             contextKey: static () => (VanillaExpandedModSystem.Config.EnablePerishableItemFreshnessIndicators,
                 VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity,

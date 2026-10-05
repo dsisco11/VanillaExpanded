@@ -111,11 +111,7 @@ internal sealed class ItemSlotIndicatorRenderer(ItemSlotIndicatorResources resou
         }
         else
         {
-            // The muted full track communicates capacity even at zero; the sampled color overlays its actual fraction.
-            var trackColor = input.Color;
-            trackColor *= new Vector4(0.25f, 0.25f, 0.25f, 1);
-            DrawBounds(rectangle, layout.BarTrack, trackColor);
-            DrawBounds(rectangle, layout.BarFill, input.Color);
+            backend.DurabilityBar(input, currentGuiScale());
         }
     }
 

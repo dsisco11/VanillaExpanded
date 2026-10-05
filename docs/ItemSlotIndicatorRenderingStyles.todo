@@ -26,7 +26,7 @@
 
     3. Style layout:
         ☑ Add a focused layout component for background bounds, four non-overlapping outline strips, and bar track/fill bounds.
-        ☑ Reuse the prepared rectangle mesh and engine GUI shader without per-slot resource allocation.
+        ☑ Reuse the prepared rectangle mesh for backgrounds/outlines and the engine GUI shader; horizontal bars use cached engine-style Cairo compositions.
         ☑ Make draw-input validation retain applicable zero-valued outlines and bar tracks.
 
     4. Renderer integration:
@@ -36,7 +36,7 @@
         ☑ Declare effect-supported styles, defaulting existing effects to SlotBackground.
         ☑ Draw the selected ordinary style when effects are incompatible, unavailable, or fail.
         ☑ Keep optional effect backgrounds compatible with the selected presentation.
-        ☑ Switch styles without recreating prepared resources or shared simulations.
+        ☑ Switch styles without recreating prepared effect resources or shared simulations; cache bar compositions by sampled appearance.
 
     5. Freshness configuration and documentation:
         ☑ Add PerishableItemFreshnessIndicatorStyle with SlotBackground as its default.

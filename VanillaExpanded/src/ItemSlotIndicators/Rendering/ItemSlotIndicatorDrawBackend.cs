@@ -20,6 +20,7 @@ internal sealed class ItemSlotIndicatorDrawBackend : IItemSlotIndicatorDrawBacke
     private readonly Func<int> metalSurface;
     private readonly Func<int> metalChunks;
     private readonly ItemSlotIndicatorDrawState drawState;
+    private readonly ItemSlotIndicatorDurabilityBar durabilityBar;
     private readonly float[] rectangleMatrix = new float[16];
     private IShaderProgram? gui;
     private bool captured, rectangleDrawn, simulationStateBound, disposed, failureReported;
@@ -36,6 +37,7 @@ internal sealed class ItemSlotIndicatorDrawBackend : IItemSlotIndicatorDrawBacke
         this.metalSurface = metalSurface ?? (static () => 0);
         this.metalChunks = metalChunks ?? (static () => 0);
         drawState = new(api.Render);
+        durabilityBar = new(api);
     }
 
     /// <summary>Drops the borrowed GUI program safely on repeated cleanup.</summary>
@@ -43,6 +45,7 @@ internal sealed class ItemSlotIndicatorDrawBackend : IItemSlotIndicatorDrawBacke
     {
         if (disposed) return;
         disposed = true;
+        durabilityBar.Dispose();
         gui = null;
     }
     #endregion
@@ -69,6 +72,7 @@ internal sealed class ItemSlotIndicatorDrawBackend : IItemSlotIndicatorDrawBacke
     public void Effect(IShaderProgram program, MeshRef mesh, ItemSlotIndicatorDrawInput input,
         ItemSlotIndicatorEffectDefinition definition, ItemSlotIndicatorFrameSnapshot frame)
     {
+        if (input.DrawOverSlotGui) api.Render.GLDisableDepthTest();
         bool metal = definition.ShaderName == CrucibleIndicatorEffect.Molten.ShaderName;
         bool liquid = definition.ShaderName == LiquidSloshIndicatorEffect.Definition.ShaderName || metal;
         bool food = definition.ShaderName == FoodGrainIndicatorEffect.Definition.ShaderName;
@@ -113,6 +117,8 @@ internal sealed class ItemSlotIndicatorDrawBackend : IItemSlotIndicatorDrawBacke
     public void Rectangle(MeshRef mesh, ItemSlotIndicatorDrawInput input)
     {
         rectangleDrawn = true;
+        // Slot GUI already wrote depth; outline strips must overlay that border rather than compete with it.
+        if (input.DrawOverSlotGui) api.Render.GLDisableDepthTest();
         var color = input.Color;
         gui!.Uniform("rgbaIn", color.X * color.W, color.Y * color.W, color.Z * color.W, color.W);
         gui.Uniform("extraGlow", 0);
@@ -124,6 +130,15 @@ internal sealed class ItemSlotIndicatorDrawBackend : IItemSlotIndicatorDrawBacke
         gui.UniformMatrix("projectionMatrix", api.Render.CurrentProjectionMatrix);
         gui.UniformMatrix("modelViewMatrix", rectangleMatrix);
         api.Render.RenderMesh(mesh);
+    }
+
+    /// <summary>Draws the cached engine-style durability bar and retains restoration of the host GUI transform.</summary>
+    public void DurabilityBar(ItemSlotIndicatorDrawInput input, float guiScale)
+    {
+        rectangleDrawn = true;
+        // Like the game's quantity/durability overlay, the bar must remain above the item's depth buffer.
+        api.Render.GLDisableDepthTest();
+        durabilityBar.Draw(input, guiScale);
     }
 
     /// <summary>Returns to the engine GUI program and its slot-grid transform before restoring depth/cull and standard blending.</summary>

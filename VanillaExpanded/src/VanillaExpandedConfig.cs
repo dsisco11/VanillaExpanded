@@ -1,4 +1,5 @@
 using System;
+using VanillaExpanded.ItemSlotIndicators;
 
 namespace VanillaExpanded;
 
@@ -133,7 +134,14 @@ public class VanillaExpandedConfig
 
     /// <summary>Opacity of perishable item freshness indicators (0.05 to 1.0).</summary>
     public float PerishableItemFreshnessIndicatorIntensity { get; set; } = 0.35f;
-    /// <summary>Freshness presentation: zero for slot background (default), one for slot outline, or two for horizontal bar.</summary>
-    public int PerishableItemFreshnessIndicatorStyle { get; set; } = 0;
+    /// <summary>ConfigLib freshness mapping key: freshness-background (default), freshness-outline, or freshness-bar.</summary>
+    public string PerishableItemFreshnessIndicatorStyle { get; set; } = "freshness-background";
+    /// <summary>Resolves persisted ConfigLib keys and legacy numeric event values to the rendering contract.</summary>
+    internal ItemSlotIndicatorRenderingStyle FreshnessRenderingStyle => PerishableItemFreshnessIndicatorStyle switch
+    {
+        "freshness-outline" or "1" => ItemSlotIndicatorRenderingStyle.SlotOutline,
+        "freshness-bar" or "2" => ItemSlotIndicatorRenderingStyle.HorizontalBar,
+        _ => ItemSlotIndicatorRenderingStyle.SlotBackground
+    };
     #endregion
 }

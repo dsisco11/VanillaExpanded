@@ -14,6 +14,8 @@ internal readonly record struct ItemSlotIndicatorDrawInput(Vector4 SlotBounds, f
     internal ItemSlotIndicatorParticlePalette? ParticlePalette { get; init; }
     /// <summary>Gets whether adjoining style rectangles preserve fractional GUI coordinates rather than legacy truncation.</summary>
     internal bool PreserveFractionalPosition { get; init; }
+    /// <summary>Gets whether this presentation overlays the already rendered slot GUI and item depth.</summary>
+    internal bool DrawOverSlotGui { get; init; }
 
     #region Public API
     /// <summary>Rejects invalid geometry and invisible results while retaining negative coordinates for inherited clipping.</summary>
@@ -31,9 +33,11 @@ internal readonly record struct ItemSlotIndicatorDrawInput(Vector4 SlotBounds, f
         float drawFill = background && indicator.DrawRange is { } range ? float.Lerp(range.Minimum, range.Maximum, fill) : fill;
         Vector4 color = new(Sanitize(indicator.Color.X), Sanitize(indicator.Color.Y), Sanitize(indicator.Color.Z), Sanitize(indicator.Color.W));
         if ((background && drawFill == 0 && indicator.DrawRange is null) || color.W == 0) return false;
+        if (style == ItemSlotIndicatorRenderingStyle.HorizontalBar) color.W = 1;
         input = new(new(left, top, size, size), drawFill, color)
         {
-            ResourceFill = fill, DrawRange = background ? indicator.DrawRange : null, ParticlePalette = indicator.ParticlePalette
+            ResourceFill = fill, DrawRange = background ? indicator.DrawRange : null, ParticlePalette = indicator.ParticlePalette,
+            DrawOverSlotGui = !background
         };
         return true;
     }

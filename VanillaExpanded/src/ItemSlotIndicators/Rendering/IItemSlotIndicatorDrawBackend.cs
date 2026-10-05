@@ -20,6 +20,8 @@ internal interface IItemSlotIndicatorDrawBackend : IDisposable
         ItemSlotIndicatorEffectDefinition definition, ItemSlotIndicatorFrameSnapshot frame);
     /// <summary>Submits a texture-free ordinary rectangle using the host GUI program.</summary>
     void Rectangle(MeshRef mesh, ItemSlotIndicatorDrawInput input);
+    /// <summary>Draws a rounded, shaded bar using the engine durability-bar composition helpers.</summary>
+    void DurabilityBar(ItemSlotIndicatorDrawInput input, float guiScale);
     /// <summary>Restores the slot-grid GUI contract and inherited depth/cull state before fallback or engine item drawing.</summary>
     void Restore();
     /// <summary>Reports a host rectangle/state failure once without throwing into normal item rendering.</summary>

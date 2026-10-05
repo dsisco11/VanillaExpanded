@@ -12,6 +12,20 @@ namespace VanillaExpanded.Tests.Unit.ItemSlotIndicators.Rendering;
 public sealed class ItemSlotIndicatorDrawInputTests
 {
     #region Public API
+    /// <summary>UI styles overlay slot depth, while only horizontal bars override nonzero sampled opacity.</summary>
+    [Theory]
+    [InlineData(0, 0.35f, false)]
+    [InlineData(1, 0.35f, true)]
+    [InlineData(2, 1f, true)]
+    public void StyleInput_PreservesOutlineOpacityAndMakesBarsOpaque(int style, float alpha, bool overlays)
+    {
+        Assert.True(ItemSlotIndicatorDrawInput.TryCreate(24, 24, 48, new(0.5f, new(0.2f, 0.3f, 0.4f, 0.35f)),
+            out var input, (ItemSlotIndicatorRenderingStyle)style));
+        Assert.Equal(alpha, input.Color.W);
+        Assert.Equal(overlays, input.DrawOverSlotGui);
+        Assert.False(ItemSlotIndicatorDrawInput.TryCreate(24, 24, 48, new(0.5f, Vector4.Zero),
+            out _, (ItemSlotIndicatorRenderingStyle)style));
+    }
     /// <summary>Bounded mode maps resource endpoints while keeping empty visible and the resource fraction unchanged.</summary>
     [Theory]
     [InlineData(0, 0.2f)]
