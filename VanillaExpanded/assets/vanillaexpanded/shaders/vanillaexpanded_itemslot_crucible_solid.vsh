@@ -57,8 +57,12 @@ void main()
     mat2 rotation = mat2(cos(angle), sin(angle), -sin(angle), cos(angle));
     // Larger collision radii need less visual enlargement; keep pieces within the minimum 0.15 fill envelope.
     float radius = pr.z * 1.8;
+    // Metal state publishes a conserved-area envelope, independent of individual airborne pieces.
     vec2 center = vec2(clamp(pv.x, radius, 1.0 - radius),
         radius + (pv.y - pr.z) * max(0.0, fill - 2.0 * radius) / max(pr.w - 2.0 * pr.z, 0.001));
+    // Individual hops can rise above the current fill, but remain inside the crucible's 0.85 upper draw level.
+    float verticalExtent = radius * (abs(sin(angle)) + 0.8 * abs(cos(angle)));
+    center.y = min(center.y, 0.85 - verticalExtent);
     fragmentLocal = position.xy;
     slotLocal = center + rotation * (position.xy * radius * vec2(1.0, 0.8));
     shade = mix(0.85, 1.15, float(hash & 255u) / 255.0);

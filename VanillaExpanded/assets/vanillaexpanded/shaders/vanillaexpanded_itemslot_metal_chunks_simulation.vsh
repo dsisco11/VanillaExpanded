@@ -20,16 +20,18 @@ void main()
         pr.xy = p;
         // Strong settling and drag keep chunks in a compact pile rather than freely tumbling like food grains.
         pv.zw += (vec2(0.0, -6.0) - containerAcceleration) * timeStep;
-        // Soft inelastic contacts otherwise turn vertical impacts only into invisible compression.
-        // Redistribute a small part of the compressive shake into varied upward collision-like kicks.
-        // Cubing the stable sample gives most chunks little lift and a few visible hops, with no idle/fall forcing.
+        // A restrained, identity-stable shake releases a few pieces from the soft contact bed.
+        // Drawing uses a fixed volume envelope, so these hops cannot compress unrelated pieces.
         uint hash = uint(i) + 0x9e3779b9u;
         hash = (hash ^ (hash >> 16u)) * 0x85ebca6bu;
         hash = (hash ^ (hash >> 13u)) * 0xc2b2ae35u;
         float kick = float((hash ^ (hash >> 16u)) >> 8u) / 16777216.0;
-        pv.w += max(0.0, containerAcceleration.y) * 5.0 * kick * kick * kick * timeStep;
+        // Spread a smaller response across pieces instead of concentrating strong launches in a rare few.
+        pv.w += max(0.0, containerAcceleration.y) * 2.8 * mix(0.75, 1.0, kick) * timeStep;
         pv.zw *= exp(-5.0*timeStep);
         pv.zw /= max(1.0, length(pv.zw)/1.2);
+        // Metal lifts slowly but falls freely; keep strong pitch impulses from launching pieces high.
+        pv.w = min(pv.w, 0.25);
         p += pv.zw*timeStep;
     }
     else if (pass == 1)
@@ -66,11 +68,15 @@ void main()
     }
     else
     {
-        // Publish a common pile height once per substep, avoiding reductions in every slot draw.
-        float pileTop = 0.0;
+        // Estimate the resting envelope from conserved circle area at a loose packing fraction.
+        // Unlike the tallest airborne piece, this reference cannot stretch or squeeze the whole pile.
+        float circleArea = 0.0;
         for (int j = 0; j < particleCount; ++j)
-            pileTop = max(pileTop, texelFetch(state, 2*j).y + texelFetch(state, 2*j+1).z);
-        pr.w = pileTop;
+        {
+            float radius = texelFetch(state, 2*j+1).z;
+            circleArea += 3.14159265 * radius * radius;
+        }
+        pr.w = circleArea / 0.675;
         pv.zw = (p-pr.xy)/timeStep;
         // Closed walls are inelastic: remove outward velocity after positional projection.
         if (p.x <= r+0.00001) pv.z = max(0.0, pv.z);
@@ -78,6 +84,7 @@ void main()
         if (p.y <= r+0.00001) pv.w = max(0.0, pv.w);
         if (p.y >= 1.0-r-0.00001) pv.w = min(0.0, pv.w);
         pv.zw /= max(1.0, length(pv.zw)/1.2);
+        pv.w = min(pv.w, 0.25);
     }
     nextPositionVelocity = vec4(p, pv.zw);
     nextPreviousRadius = pr;
