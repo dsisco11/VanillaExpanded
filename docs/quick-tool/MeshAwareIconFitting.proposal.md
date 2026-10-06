@@ -109,6 +109,8 @@ Project valid positions from all children of the selected mesh and construct a 2
 
 Do not first reduce the geometry to a 3D axis-aligned box: its projected corners can include substantial empty space around diagonal tools. Retain the source positions for changes to the engine's GUI transform, and cache the projected hull when the geometry and orientation remain equivalent.
 
+Bounds calculations must use the SIMD-accelerated `System.Numerics` vector types and their component-wise `Min`/`Max` operations rather than custom scalar min/max accumulation. Choose the appropriate vector type for the coordinates being measured. This requirement governs bounds computation; it does not replace the projected convex hull or conservative containment test with an axis-aligned box. Verify performance from measurements rather than assuming a particular speedup.
+
 ### Conservative convex fit region
 
 The visible wedge is an annular sector with separators and rounded corners. Vertex-only testing against that non-convex shape is insufficient: an edge can cross the inner circle while its endpoints appear valid.
