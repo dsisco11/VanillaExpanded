@@ -119,6 +119,9 @@ public class VanillaExpandedConfig
     /// <summary>Size multiplier for the tool-mode radial menu (0.15 to 2.5; 1 preserves its default size).</summary>
     public float ToolModeMenuSize { get; set; } = 1f;
 
+    /// <summary>Icon size multiplier within tool-mode radial wedges (0.15 to 2.5; default 0.75).</summary>
+    public float ToolModeIconSize { get; set; } = 0.75f;
+
     /// <summary>Size multiplier for the quick-swap radial menu (0.15 to 2.5; 1 preserves its default size).</summary>
     public float QuickSwapMenuSize { get; set; } = 1f;
 

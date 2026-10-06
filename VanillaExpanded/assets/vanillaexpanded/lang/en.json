@@ -112,6 +112,8 @@
   "config-enable-night-vision-fuel-indicators": "Show night-vision fuel indicators",
   "config-enable-night-vision-fuel-indicators-tooltip": "Show night-vision fuel overlays on item slots. Changes take effect immediately.",
   "config-tool-mode-menu-size": "Tool-mode menu size",
+  "config-tool-mode-icon-size": "Tool-mode icon size",
+  "config-tool-mode-icon-size-tooltip": "Scale icons within the tool-mode radial menu from 0.15 to 2.5. Default: 0.75. 1 fills the available icon space; larger values may overlap wedges. Changes take effect immediately.",
   "config-tool-mode-menu-size-tooltip": "Scale the tool-mode radial menu from 0.15 to 2.5. 1 keeps the default size. Changes take effect immediately.",
   "config-quick-swap-menu-size": "Quick-swap menu size",
   "config-quick-swap-menu-size-tooltip": "Scale the quick-swap radial menu from 0.15 to 2.5. 1 keeps the default size. Changes take effect immediately."
