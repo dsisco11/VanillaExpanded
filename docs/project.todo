@@ -1,7 +1,6 @@
 # Vanilla: Expanded TODO List:
     ## Issues:
         Radial Menus:
-            ☐ Increase center circle size for tool-mode radial menus.
             ☐ Implement mesh aware icon fitting for radial menus.
             ☐ Tool-mode radial menu needs to be able to be configured to allow interacting with the hotbar (e.g. for the chisel tools "add material" functionality).
 

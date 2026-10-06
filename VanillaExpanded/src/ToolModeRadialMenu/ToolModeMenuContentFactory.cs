@@ -37,7 +37,7 @@ internal static class ToolModeMenuContentFactory
             ? modes[currentMode].Name
             : fallbackCurrentLabel;
         entries.Add(new RadialMenuEntry(CenterId, currentLabel, enabled: false));
-        var currentMenu = new RadialMenuLayout([CenterId], 0, 0.25);
+        var currentMenu = new RadialMenuLayout([CenterId], 0, 0.32);
         var context = new ToolModeMenuLayoutContext(modes, ids, entries, currentMenu);
         // A specialized strategy may decline an unexpected or modded mode set without losing the vanilla-compatible menu.
         if (!strategy.TryCreate(context, out RadialMenuLayout? layout))
