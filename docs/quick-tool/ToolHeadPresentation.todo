@@ -1,7 +1,7 @@
 # Asset-defined radial-menu tool presentation
 
 Source proposal: [ToolHeadPresentation.proposal.md](ToolHeadPresentation.proposal.md).
-Status: asset contracts, settings resolution, and dedicated rendering implemented. Tool-family patches are authored and technically verified; second review and independent stage-completion audit passed. User-run visual acceptance is outstanding.
+Status: complete. Implementation and authored patches have fresh technical validation, user-reported visual acceptance, second review, and independent stage-completion audit.
 
 ## Goal and constraints
 
@@ -13,7 +13,7 @@ Follow repository code practices: documented methods/classes, comments for nontr
 
 ## Open decisions
 
-The schema, matrix convention, initial coverage, and ordinary-mesh support are retained. The source proposal's Dedicated renderer and support section replaces the original hook boundary with public engine preparation and mesh submission. The shader/state contract and Selected state and post-preparation policy now define exact enclosing-state restoration and explicit cancellation after invalidating callbacks. Preserve single preparation; cancellation consumes the invocation, reports once per collectible, and reevaluates eligibility on the next invocation. Revalidate reusable engine behavior against versions other than the inspected 1.22.7.0. Numeric artwork tuning remains later work.
+The schema, matrix convention, initial coverage, and ordinary-mesh support are retained. The source proposal's Dedicated renderer and support section replaces the original hook boundary with public engine preparation and mesh submission. The shader/state contract and Selected state and post-preparation policy now define exact enclosing-state restoration and explicit cancellation after invalidating callbacks. Preserve single preparation; cancellation consumes the invocation, reports once per collectible, and reevaluates eligibility on the next invocation. Revalidate reusable engine behavior against versions other than the inspected 1.22.7.0. User-reported visual acceptance requires no further numeric artwork tuning.
 
 ## Phase 1: Establish asset and rendering contracts
 
@@ -199,13 +199,13 @@ The [tool presentation patches](../../VanillaExpanded/assets/vanillaexpanded/pat
 | wrench | 9 | 9 | Separate profile for each material's actual wrench geometry. |
 | Total | 238 | 79 | All tagged tool/weapon definitions in the initial inventory. |
 
-Bow has three GUI-selectable charge alternates per shape (12 total); sling has two. They retain the same grip/assembly anchor and family presentation, with intentional limb/string cropping. Inspection of installed `InventoryItemRenderer.GetItemStackRenderInfo` confirms temporary/persistent `renderVariant` selects alternate inventory meshes; [ItemBow](../../../vssurvivalmod/Item/ItemBow.cs) and [ItemSling](../../../vssurvivalmod/Item/ItemSling.cs) write those values during held interaction. [ItemTongs](../../../vssurvivalmod/Item/ItemTongs.cs) selects its narrow/medium/wide opening meshes only for `HandTpOff`; those openings are not GUI coverage gaps and no additional opening-specific settings are needed. Final appearance across selectable alternates remains visual acceptance work.
+Bow has three GUI-selectable charge alternates per shape (12 total); sling has two. They retain the same grip/assembly anchor and family presentation, with intentional limb/string cropping. Inspection of installed `InventoryItemRenderer.GetItemStackRenderInfo` confirms temporary/persistent `renderVariant` selects alternate inventory meshes; [ItemBow](../../../vssurvivalmod/Item/ItemBow.cs) and [ItemSling](../../../vssurvivalmod/Item/ItemSling.cs) write those values during held interaction. [ItemTongs](../../../vssurvivalmod/Item/ItemTongs.cs) selects its narrow/medium/wide opening meshes only for `HandTpOff`; those openings are not GUI coverage gaps and no additional opening-specific settings are needed. At patch completion, final appearance across selectable alternates remained visual acceptance work; the final user acceptance is recorded below.
 
 No tagged family is deferred or intentionally unpatched. Untagged definitions, shields, standalone heads, ammunition, healing entries, block items, and unknown/custom GUI delegates retain the proposal's fallback boundary. Future unmatched variants receive no presentation unless a selector explicitly covers them; no discovery tags or inventory transforms are changed.
 
 Historical local validation: 2026-10-06. The subagent ran 355 affected tests (0 failed/skipped) and a Release build (0 errors, 6 existing warnings). The former asset-patching test executed installed engine JSON patch operations, variant expansion, and recursive ByType resolution on in-memory copies. Every patch applies with zero errors/missing targets; every covered resolved variant passes the production resolver. The entire resolved JSON matches its original after removing only the new presentation attribute, including inventory transforms and tags; untagged tool definitions remain unchanged. Base and 14 alternate shape paths exist. Shared base geometry selects matching values; each authored pivot maps to the icon anchor across three effective sizes and eight wedge directions. This installation-dependent asset-patching test and its private patch-library reference were subsequently removed at user request because they cannot run under CI. These results remain historical local evidence, not maintained CI coverage. No game launch or installed asset edits were involved.
 
-- Patch authoring and framing -> proposal Asset settings / Schema and transform convention / Patch authoring example -> focused exact-file patches, geometry-specific origin/rotation/scale, zero model translation and wedge rotation tracking -> installed shape hierarchy inspection and resolver/matrix assertions. Head points are authored model-space pivots rather than automatic bounds or full-model fitting. Source review corrected the metal knife's parent rotation and wooden tongs' rotated forepiece positions; numeric tuning remains subject to user-run appearance checks.
+- Patch authoring and framing -> proposal Asset settings / Schema and transform convention / Patch authoring example -> focused exact-file patches, geometry-specific origin/rotation/scale, zero model translation and wedge rotation tracking -> installed shape hierarchy inspection and resolver/matrix assertions. Head points are authored model-space pivots rather than automatic bounds or full-model fitting. Source review corrected the metal knife's parent rotation and wooden tongs' rotated forepiece positions; numeric tuning was left subject to the subsequent user-run appearance checks recorded below.
 - Coverage and preservation -> proposal Coverage and fallback / Scope and ownership plus initial inventory -> all 23 files, 238 allowed variants, material sharing only where geometry agrees, unrelated data preserved -> executed engine patch/variant resolution and full JSON comparison above.
 - Authoring documentation -> proposal Patch authoring example -> final engine-owned schema, origin semantics, direct and ByType patch conventions, existing-parent preservation, ordinary/custom fallback -> working prospecting-pick patch example linked to the authored file.
 
@@ -215,19 +215,32 @@ Completion: 2026-10-06. Second review and independent stage-completion audit pas
 
 Depends on Phases 1–4. Outcome: technical validation and user-run visual results support the delivered behavior.
 
-- [ ] Run the appropriate build and affected focused checks through subagents; resolve failures and rerun affected checks after changes.
-- [ ] Review implementation and patches against the complete proposal for ownership, transform semantics, fallback, and scope preservation.
-- [ ] Obtain user-run visual checks across representative heads, model/material variants, menu sizes, GUI scales, wedge positions, and resting/intermediate/full hover states.
-  - [ ] Confirm readable heads, useful face orientation, intentional handle cropping, halo appearance, and stable placement.
-  - [ ] Tune asset settings where needed and repeat affected technical/visual checks; do not introduce automatic full-model fitting as a correction.
-  - [ ] Leave visual acceptance outstanding until user-run results are supplied; headless checks cannot close it.
-- [ ] Update proposal status and this plan with actual coverage, validation results, remaining limitations, and unresolved work.
+- [x] Run the appropriate build and affected focused checks through subagents; resolve failures and rerun affected checks after changes.
+- [x] Review implementation and patches against the complete proposal for ownership, transform semantics, fallback, and scope preservation.
+- [x] Obtain user-run visual checks across representative heads, model/material variants, menu sizes, GUI scales, wedge positions, and resting/intermediate/full hover states.
+  - [x] Confirm readable heads, useful face orientation, intentional handle cropping, halo appearance, and stable placement.
+  - [x] Tune asset settings where needed and repeat affected technical/visual checks; do not introduce automatic full-model fitting as a correction.
+  - [x] Leave visual acceptance outstanding until user-run results are supplied; headless checks cannot close it.
+- [x] Update proposal status and this plan with actual coverage, validation results, remaining limitations, and unresolved work.
+
+### Final validation and acceptance traceability
+
+Validation: 2026-10-06. Through a subagent, a fresh Release rebuild passed with 0 errors and 6 existing warnings; 354 affected tests passed with 0 failed/skipped, including the standalone actual OpenGL state-restoration fixture. Commands used `VINTAGE_STORY=G:/Vintagestory` and `G:/Vintagestory/Lib` on PATH: `dotnet build VanillaExpanded/VanillaExpanded.csproj -c Release --no-restore --target:Rebuild --verbosity minimal` and `dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj -c ToolHeadPhase5Validation --filter "FullyQualifiedName~ItemRendering|FullyQualifiedName~RadialMenu|FullyQualifiedName~QuickTool" --no-restore --verbosity minimal`. Existing Cake JSON validation passed via `dotnet run --project CakeBuild.csproj --no-restore -- --target=ValidateJson` from `CakeBuild`. Local inspection confirmed all 23 separate patch files contain one expected add operation each, matching 23 unique installed item targets. The removed installation-dependent asset-patching test and its dependency remain absent; prior executed engine patch-resolution results remain the historical evidence recorded above.
+
+User-reported visual acceptance: 2026-10-06. Asked for results after loading the latest mod build across representative heads (including stone/metal and ruined variants), menu sizes, GUI scales, wedge positions, and resting/partial/full hover, covering readability, orientation, intentional handle cropping, halo appearance, stable placement, and glow/overlay/damage effects. The user replied: "its fine". This is acceptance of the requested visual scope, not an agent observation or a measurement report. No issue or tuning request was reported, so no asset adjustment or repeat visual check was required. No game was launched by the agent.
+
+- Build and focused checks -> proposal Validation / Rendering behavior -> independent presentation, single preparation/lifecycle, fallback/cancellation, GUI effects, borrowed ownership and exceptional/nested cleanup -> fresh affected tests, actual GL restoration fixture, Release rebuild and existing JSON validation above.
+- Complete implementation/patch review -> full proposal Asset settings / Schema and transform convention / Dedicated renderer and support / Coverage and fallback / Scope and ownership -> engine-owned decoding and preparation, exact caller restoration, thin lifetime owner, geometry-specific per-file metadata, retained menu capture/halo/stencil/context and ordinary rendering -> direct source/patch review plus second review; no new technical defect identified.
+- Visual acceptance and tuning -> proposal Purpose / Validation plus authored coverage -> readable working heads, orientation, intentional cropping, halo, placement and representative effects across the requested contexts -> explicit user acceptance above; no tuning needed and no automatic fitting introduced.
+- Documentation and final acceptance -> proposal Evidence and remaining validation -> current coverage, separate historical/local/graphics/user evidence, accurate custom-renderer and lifecycle limits -> updated proposal and this record; independent final audit passed.
+
+Completion: 2026-10-06. Second review and independent stage-completion audit passed; no unresolved findings remain. Compatibility outside the inspected engine version remains unverified; user acceptance provides no quantified performance measurements. Registered custom GUI delegates retain fallback, and post-preparation invalidation retains the documented no-retry cancellation policy.
 
 ## Final acceptance
 
-- [ ] Proposal requirements are covered by implemented behavior and authored assets, with supported and fallback cases accurately documented.
-- [ ] Focused build/test evidence confirms independent radial presentation, safe cleanup, valid patch application, and preserved ordinary rendering.
-- [ ] User-run results establish readable tool-head framing across the agreed visual coverage.
-- [ ] Completion claims distinguish technical evidence from visual acceptance; all remaining work stays unchecked.
+- [x] Proposal requirements are covered by implemented behavior and authored assets, with supported and fallback cases accurately documented.
+- [x] Focused build/test evidence confirms independent radial presentation, safe cleanup, valid patch application, and preserved ordinary rendering.
+- [x] User-run results establish readable tool-head framing across the agreed visual coverage.
+- [x] Completion claims distinguish technical evidence from visual acceptance; all remaining work stays unchecked.
 
 Schema-check removal validation: 2026-10-06. Engine typed deserialization owns accepted fields and conversions. Updated focused tests passed 155 cases (0 failed/skipped), covering unknown fields, numeric strings, engine transform fields, null input fallback, and rendering safety. Release build passed (0 errors, 6 existing warnings); diff checks passed.
