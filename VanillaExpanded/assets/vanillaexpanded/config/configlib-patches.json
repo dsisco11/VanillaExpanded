@@ -57,7 +57,7 @@
         "ingui": "vanillaexpanded:config-quick-tool-select-on-release",
         "comment": "vanillaexpanded:config-quick-tool-select-on-release-tooltip",
         "default": true,
-        "weight": 1.6
+        "weight": 5.4
       },
       "EnableToolModeRadialMenu": {
         "code": "EnableToolModeRadialMenu",
@@ -65,7 +65,7 @@
         "ingui": "vanillaexpanded:config-enable-tool-mode-radial-menu",
         "comment": "vanillaexpanded:config-enable-tool-mode-radial-menu-tooltip",
         "default": true,
-        "weight": 1.7
+        "weight": 5.1
       },
       "EnablePerishableItemFreshnessIndicators": {
         "code": "EnablePerishableItemFreshnessIndicators",
@@ -249,7 +249,7 @@
         "ingui": "vanillaexpanded:config-tool-mode-menu-size",
         "comment": "vanillaexpanded:config-tool-mode-menu-size-tooltip",
         "default": 1.0,
-        "weight": 3.8,
+        "weight": 5.2,
         "range": { "min": 0.15, "max": 2.5, "step": 0.05 },
         "clientSide": true
       },
@@ -259,7 +259,7 @@
         "ingui": "vanillaexpanded:config-tool-mode-icon-size",
         "comment": "vanillaexpanded:config-tool-mode-icon-size-tooltip",
         "default": 0.75,
-        "weight": 3.85,
+        "weight": 5.3,
         "range": { "min": 0.15, "max": 2.5, "step": 0.05 },
         "clientSide": true
       },
@@ -269,7 +269,7 @@
         "ingui": "vanillaexpanded:config-quick-swap-menu-size",
         "comment": "vanillaexpanded:config-quick-swap-menu-size-tooltip",
         "default": 1.0,
-        "weight": 3.9,
+        "weight": 5.5,
         "range": { "min": 0.15, "max": 2.5, "step": 0.05 },
         "clientSide": true
       },
@@ -300,6 +300,7 @@
     { "type": "separator", "title": "vanillaexpanded:config-section-timing", "weight": 1.8 },
     { "type": "separator", "title": "vanillaexpanded:config-section-recipes", "weight": 2.5 },
     { "type": "separator", "title": "vanillaexpanded:config-section-visual", "weight": 3.5 },
-    { "type": "separator", "title": "vanillaexpanded:config-section-item-slot-indicators", "weight": 4.0 }
+    { "type": "separator", "title": "vanillaexpanded:config-section-item-slot-indicators", "weight": 4.0 },
+    { "type": "separator", "title": "vanillaexpanded:config-section-radial-menus", "weight": 5.0 }
   ]
 }
