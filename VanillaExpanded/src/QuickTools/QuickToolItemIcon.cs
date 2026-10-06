@@ -1,20 +1,27 @@
 using VanillaExpanded.RadialMenu;
+using VanillaExpanded.ItemRendering;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 
 namespace VanillaExpanded.QuickTools;
 
-/// <summary>Renders the cached winning stack through the game's item GUI renderer.</summary>
-public sealed class QuickToolItemIcon(ItemStack stack, string entryId) : IRadialMenuIcon
+/// <summary>Renders configured winning stacks directly and delegates ordinary presentation to the game.</summary>
+public sealed class QuickToolItemIcon(ItemStack stack, string entryId) : IRadialMenuContextIcon
 {
     #region Rendering
     /// <summary>Draws the current snapshot item at the requested menu position.</summary>
     public void Render(ICoreClientAPI api, double centerX, double centerY, float sizePixels, bool enabled)
+        => Render(api, centerX, centerY, sizePixels, enabled, 0);
+
+    /// <summary>Uses independent presentation or ordinary category positioning selected before preparation.</summary>
+    public void Render(ICoreClientAPI api, double centerX, double centerY, float sizePixels, bool enabled, double wedgeDegrees)
     {
         // A detached slot keeps the selected stack reference separate from later slot replacement.
+        var slot = new DummySlot(stack);
+        if (ToolHeadPresentationSystem.Renderer?.TryRender(api, slot, centerX, centerY, sizePixels, wedgeDegrees) == true) return;
         (float x, float y) = GetHeadCenteringOffset(entryId, sizePixels);
-        api.Render.RenderItemstackToGui(new DummySlot(stack), centerX + x, centerY + y, 100, sizePixels,
-            unchecked((int)0xffffffff), showStackSize: false);
+        api.Render.RenderItemstackToGui(slot, centerX + x, centerY + y, 100, sizePixels,
+            unchecked((int)0xffffffff), rotate: false, showStackSize: false);
     }
     #endregion
 

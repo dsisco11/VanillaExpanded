@@ -1,7 +1,7 @@
 # Asset-defined radial-menu tool presentation
 
 Source proposal: [ToolHeadPresentation.proposal.md](ToolHeadPresentation.proposal.md).
-Status: asset contracts and settings resolution implemented; rendering integration, asset patches, and visual acceptance are outstanding.
+Status: asset contracts, settings resolution, and dedicated rendering implemented. Replacement validation, second review, and independent stage-completion audit passed. Asset patches and user-run visual acceptance are outstanding.
 
 ## Goal and constraints
 
@@ -13,11 +13,13 @@ Follow repository code practices: documented methods/classes, comments for nontr
 
 ## Open decisions
 
-The schema, matrix convention, hook boundary, initial coverage, and conservative renderer eligibility are settled in the source proposal's Asset settings, Rendering behavior, and Evidence sections. Numeric artwork tuning and executed hook/renderer validation remain future work, not unresolved foundational decisions. Revalidate the hook against engine versions other than the inspected 1.22.7.0.
+The schema, matrix convention, initial coverage, and ordinary-mesh support are retained. The source proposal's Dedicated renderer and support section replaces the original hook boundary with public engine preparation and mesh submission. The shader/state contract and Selected state and post-preparation policy now define exact enclosing-state restoration and explicit cancellation after invalidating callbacks. Preserve single preparation; cancellation consumes the invocation, reports once per collectible, and reevaluates eligibility on the next invocation. Revalidate reusable engine behavior against versions other than the inspected 1.22.7.0. Numeric artwork tuning remains later work.
 
 ## Phase 1: Establish asset and rendering contracts
 
 Outcome: implementation and patch authors have a verified integration point and one documented presentation convention.
+
+Historical completion applies to the original hook-based integration decision. Asset/schema/coverage findings remain reusable; the hook boundary is superseded by the approved dedicated renderer. Its replacement contracts and verification are now Phase 3 work.
 
 - [x] Inspect relevant repository instructions, asset patch conventions, existing transform types, `QuickToolItemIcon`, and the radial-menu rendering pipeline.
 - [x] Inspect current base-game item rendering to identify how mesh/texture selection, callbacks, GUI transforms, lighting, and depth are applied.
@@ -63,7 +65,7 @@ Shields/round shields have no root category tags in the inspected assets and are
 Completion: 2026-10-06. Second review and independent stage-completion audit passed. Fresh source/assembly inspection, 23-file asset coverage, Markdown link/anchor checks, and `git diff --check` support the contract. No production code, asset patches, executed rendering hook, or visual acceptance is claimed.
 
 - Phase 1 asset/schema tasks -> proposal Asset settings -> collectible attributes, explicit independent defaults, default pivot, engine matrix order, and reference size, optional wedge angle -> current `ModelTransform`/`JsonObject`/collectible source, installed pickaxe transforms and attribute patches; contract recorded in the proposal.
-- Phase 1 engine/eligibility tasks -> proposal Rendering behavior and Evidence -> one callback preparation, scoped matrix replacement, no shared mutation, ordinary-mesh eligibility and fallback -> fresh Mono.Cecil inspection of installed 1.22.7.0, exact method/hash/IL landmarks recorded in the proposal; runtime execution belongs to Phase 3.
+- Phase 1 engine/eligibility tasks -> original rendering decision, now superseded -> one callback preparation, scoped matrix replacement, no shared mutation, ordinary-mesh eligibility and fallback -> Mono.Cecil inspection of installed 1.22.7.0 informed the original hook. Public preparation/submission findings in the revised proposal govern the replacement Phase 3 work.
 - Phase 1 coverage/ownership tasks -> proposal Coverage and fallback / Scope and ownership -> patch current families, keep unrelated entries unchanged, directional ownership -> current discovery/layout/icon/capture source and 23-file installed asset inventory above. Source inspection is not visual acceptance.
 
 ## Phase 2: Resolve and validate asset presentation settings
@@ -94,27 +96,61 @@ Typed-deserialization refactor validation: 2026-10-06. The same commands passed 
 
 ## Phase 3: Apply dedicated transforms to radial-menu draws
 
-Depends on Phases 1–2. Outcome: supported configured tools render through the existing menu pipeline with independent presentation.
+Depends on Phases 1–2. Outcome: supported configured tools render through a dedicated method using engine preparation and mesh submission, with independent presentation and no item-renderer patch.
 
-- [ ] Supply wedge icon position, size, direction, and hover context to the focused item-rendering component without forcing unrelated artwork to opt in.
-- [ ] Preserve ordinary item mesh, texture, and applicable rendering-state preparation while replacing the inventory presentation transform for the scoped draw.
-  - [ ] Apply the agreed model rotation, scale, translation, and pivot, then optional wedge-relative screen rotation in the documented order.
-  - [ ] Apply menu size and hover consistently without double scaling or fixed screen placement.
-  - [ ] Validate the final presentation matrix after applying menu size, placement, and wedge rotation; use fallback if the composed matrix is non-finite.
-  - [ ] Omit the category head-centering offset for configured supported draws.
-  - [ ] Preserve lighting, depth, engine render-state cleanup, and single callback execution.
-- [ ] Make the override exception-safe and nested-call safe without mutating shared collectible GUI transforms.
-- [ ] Retain existing icon capture, halo, hover, and wedge-stencil processing; allow intentional handle cropping.
-- [ ] Route missing/invalid properties, unsupported renderers, and unavailable integration through existing rendering including the category offset.
-- [ ] Through a subagent, validate configured-transform independence from differing inventory GUI settings, ordinary inventory behavior, callback counts, nested/failing scope restoration, and every fallback condition.
-- [ ] Through a subagent, validate transform composition for different wedge directions, menu sizes, GUI scales, and hover values against the documented convention.
+Reopened on 2026-10-06 after approval to replace the hook design. Replacement drawing, cleanup, and integration completed on 2026-10-06 after fresh validation, second review, and independent stage-completion audit.
+
+- [x] Supply wedge icon position, size, direction, and hover context to the focused item-rendering component without forcing unrelated artwork to opt in.
+- [x] Resolve the proposal's required renderer decisions before dependent implementation.
+  - [x] Document shader/state entry, applicable callback-prepared state, nested-draw behavior, and exception-safe exit/reset ownership.
+  - [x] Select and document post-preparation behavior for changed stack, projection, renderer registration, or rendering support. Preserve the explicitly revised cancellation contract; never repeat preparation through an ordinary GUI retry.
+- [x] Implement the dedicated prepared-item draw through public engine APIs.
+  - [x] Select missing/invalid settings, known custom delegates, unsupported projections, and unavailable support through ordinary engine rendering before preparation, including the existing category offset.
+  - [x] Call `GetItemStackRenderInfo(slot, Gui, dt)` once, preserving engine model selection, overlays, slot callbacks, and collectible callbacks. Match the current `dt = 0` convention.
+  - [x] Check for a drawable prepared mesh and issue `InGuiIdle` once in the engine's documented order. Supersede inventory-transform changes with the authored matrix while preserving the lifecycle notification's other behavior.
+  - [x] Recheck support and selected stack after callbacks/lifecycle notification, then follow the documented post-preparation policy without a second preparation or draw retry.
+  - [x] Apply the agreed model rotation, scale, translation, and pivot, then optional wedge-relative screen rotation in the documented order.
+  - [x] Apply menu size and hover consistently without double scaling or fixed screen placement.
+  - [x] Validate the final presentation matrix after applying menu size, placement, and wedge rotation.
+  - [x] Connect the existing matrix builder to the dedicated draw; omit the category head-centering offset for supported configured draws and retain it for ordinary fallback.
+  - [x] Obtain the engine GUI shader; submit model, current projection, and current-model-view-composed matrices without applying inventory GUI presentation.
+  - [x] Apply ordinary GUI shader settings for normal shading, color, alpha test, temperature/glow, damage, and overlays. Use public atlas-position lookup for overlay UV origin and preserve applicable GUI culling, blending, and depth behavior.
+  - [x] Submit the borrowed prepared mesh with `RenderMultiTextureMesh(info.ModelRef, "tex2d", 0)`; do not add mesh uploads, retained geometry, or disposal of borrowed resources.
+  - [x] Implement the agreed shader/state contract with `try/finally`, local owned matrices, and safe nested/failing draws. The renderer itself must not mutate collectible GUI transforms; item-owned lifecycle side effects remain allowed.
+- [x] Retain existing icon capture, halo, hover, and wedge-stencil processing; allow intentional handle cropping.
+- [x] Replace `QuickToolItemIcon`'s scoped request with direct routing to the dedicated renderer; preserve unrelated artwork and ordinary inventory behavior.
+- [x] Remove `ToolHeadPresentationHook`, `ToolHeadPresentationScope`, patch installation/disposal and availability state, and hook-specific tests. Retain registry-access metadata caching where needed and keep the client composition root thin.
+- [x] Through a subagent, validate one preparation and one applicable `InGuiIdle`, callback-selected mesh/settings, configured-transform independence from differing inventory GUI settings, preserved ordinary inventory, and every before/after-preparation fallback branch.
+- [x] Through a subagent, validate shader settings and state restoration after nested calls and failures, plus absence of glow/overlay/damage/model state leaking to later icons or labels.
+- [x] Through a subagent, rerun retained transform-composition coverage for wedge directions, authored pivots, menu sizes, GUI scales, and hover values with the dedicated integration.
+- [x] Through a subagent, run the affected checks and Release build; review the complete revised contract twice and perform the independent stage-completion audit before marking replacement work complete.
 
 Completion criteria:
 
-- [ ] Configured supported draws use the dedicated transform without compounding inventory GUI transforms or category offsets.
-- [ ] Ordinary inventory and unrelated menu artwork retain their behavior; fallback and state restoration have focused evidence.
-- [ ] Clipping remains intentional rather than triggering automatic shrinking or fitting.
+- [x] Configured supported draws use public preparation/submission and the dedicated transform without inventory GUI transforms, category offsets, or item-renderer patching.
+- [x] Both required renderer decisions are recorded and executed tests prove their single-preparation and state-cleanup contracts.
+- [x] Ordinary inventory and unrelated menu artwork retain their behavior; all fallback conditions, GUI effects, and nested/failing cleanup have fresh focused evidence.
+- [x] Superseded patch/scope code and tests are removed, while reusable settings/matrix/context coverage remains.
+- [x] Clipping remains intentional rather than triggering automatic shrinking or fitting. Full GPU appearance remains separate user-run acceptance work in Phase 5.
 
+### Historical hook implementation traceability
+
+Historical validation: 2026-10-06. Subagent checks passed 349 affected ItemRendering, RadialMenu, and QuickTool tests; Release build passed (0 errors, 6 existing warnings); diff checks passed. Commands used VINTAGE_STORY=G:/Vintagestory: `dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj -c ToolHeadValidation --filter "FullyQualifiedName~ItemRendering|FullyQualifiedName~RadialMenu|FullyQualifiedName~QuickTool" --no-restore --verbosity minimal` and `dotnet build VanillaExpanded/VanillaExpanded.csproj -c Release --no-restore --verbosity minimal`. A headless installed-target test executed injected matrix instructions and Harmony lifecycle hooks with engine GL work replaced by a callback/upload surrogate. Second review and independent stage-completion audit passed for the original hook implementation. That completion is superseded: these receipts do not validate the approved dedicated renderer or close the reopened phase, and never established full GPU execution or appearance.
+
+- Wedge context and unchanged clipping -> proposal Scope and ownership / Rendering behavior -> [IRadialMenuContextIcon](../../VanillaExpanded/src/RadialMenu/IRadialMenuContextIcon.cs), [RadialMenuRenderer](../../VanillaExpanded/src/RadialMenu/RadialMenuRenderer.cs), and [RadialMenuIconHalo](../../VanillaExpanded/src/RadialMenu/RadialMenuIconHalo.cs) convey actual clockwise wedge direction with existing effective position/size and keep capture, halo, stencil, and unrelated artwork paths.
+- Independent transform and final validation -> proposal Schema and transform convention -> [ToolHeadPresentationMatrix](../../VanillaExpanded/src/ItemRendering/ToolHeadPresentationMatrix.cs) composes the documented column-vector matrix once, including authored pivot and optional screen rotation, and rejects non-finite results. [QuickToolItemIcon](../../VanillaExpanded/src/QuickTools/QuickToolItemIcon.cs) supplies the unoffset anchor separately from ordinary category-offset fallback coordinates.
+- Historical single preparation, nesting, and fallback -> superseded hook contract -> `VanillaExpanded/src/ItemRendering/ToolHeadPresentationScope.cs` and `ToolHeadPresentationHook.cs` formerly bound a slot and replaced the engine local matrix. These files and their hook-specific tests are now removed.
+- Historical live renderer support and lifecycle -> superseded hook contract -> [ToolHeadRendererEligibility](../../VanillaExpanded/src/ItemRendering/ToolHeadRendererEligibility.cs) contains reusable registry/projection checks. [ToolHeadPresentationRenderer](../../VanillaExpanded/src/ItemRendering/ToolHeadPresentationRenderer.cs) and [ToolHeadPresentationSystem](../../VanillaExpanded/src/ItemRendering/ToolHeadPresentationSystem.cs) now perform direct drawing and client lifetime ownership without patch installation or availability state.
+
+### Replacement rendering traceability
+
+Validation: 2026-10-06. Subagent checks passed 354 affected tests (0 failed/skipped), including a standalone hidden OpenGL context executing production cleanup; Release build passed (0 errors, 6 existing warnings). Commands used VINTAGE_STORY=G:/Vintagestory and G:/Vintagestory/Lib on PATH: dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj -c ToolHeadValidation --filter "FullyQualifiedName~ItemRendering|FullyQualifiedName~RadialMenu|FullyQualifiedName~QuickTool" --no-restore --verbosity quiet and dotnet build VanillaExpanded/VanillaExpanded.csproj -c Release --no-restore --verbosity minimal. Second review and independent stage-completion audit passed; no unresolved findings remain. The game was not launched. These receipts establish submission contracts and graphics-state restoration, not rendered artwork or in-game appearance.
+
+- Preparation/lifecycle -> proposal Dedicated renderer and support -> [ToolHeadPresentationRenderer](../../VanillaExpanded/src/ItemRendering/ToolHeadPresentationRenderer.cs) prepares once at dt = 0, checks geometry before one applicable lifecycle notification, rechecks support, and submits the borrowed mesh through public APIs. [Integration tests](../../VanillaExpanded.Tests/Unit/ItemRendering/ToolHeadPresentationIntegrationTests.cs) cover callback counts, selected meshes, independent transforms, ordinary fallback, missing geometry, invalidating callbacks, and exceptions.
+- Matrix/context/capture -> proposal Schema and transform convention / Scope and ownership -> [ToolHeadPresentationMatrix](../../VanillaExpanded/src/ItemRendering/ToolHeadPresentationMatrix.cs), optional radial context, and existing capture/halo/stencil processing retain wedge rotation, size/hover, pivot, finiteness, and intentional cropping. Retained matrix and affected radial/quick-tool tests passed with the dedicated route.
+- GUI effects -> proposal Dedicated renderer and support -> [ToolHeadGuiShaderSettings](../../VanillaExpanded/src/ItemRendering/ToolHeadGuiShaderSettings.cs) applies engine-compatible shading, alpha, color, temperature/glow, damage, overlay dimensions/UV and model/view/projection values. Integration assertions exercise these settings without extra uploads or disposal of borrowed meshes/textures.
+- State/nesting/failure -> proposal Selected state contract -> [ToolHeadShaderUniformState](../../VanillaExpanded/src/ItemRendering/ToolHeadShaderUniformState.cs) restores exact enclosing uniform values; [ToolHeadRenderState](../../VanillaExpanded/src/ItemRendering/ToolHeadRenderState.cs) restores graphics bindings, UBO mappings/ranges, flags and matrix-stack top/depth. [Uniform tests](../../VanillaExpanded.Tests/Unit/ItemRendering/ToolHeadShaderUniformStateTests.cs) exercise all saved uniform families under nesting and failure; [actual GL tests](../../VanillaExpanded.Tests/Unit/ItemRendering/ToolHeadRenderStateGlTests.cs) execute production exceptional cleanup and check GL errors. Callback-owned resource contents and lower caller-owned stack entries remain under the documented ownership contract.
+- Fallback/removal -> proposal Selected state and post-preparation policy / Coverage and fallback / Scope and ownership -> pre-preparation rejection returns ordinary fallback with category offset; post-preparation invalidation consumes the draw with bounded diagnostics and no retry. Integration tests exercise these branches. [QuickToolItemIcon](../../VanillaExpanded/src/QuickTools/QuickToolItemIcon.cs) routes directly; [ToolHeadPresentationSystem](../../VanillaExpanded/src/ItemRendering/ToolHeadPresentationSystem.cs) only owns client lifetime. Obsolete hook/scope code and tests are removed; live registry metadata access remains in eligibility.
 ## Phase 4: Author tool-family patches and verify coverage
 
 Depends on Phase 3. Outcome: the agreed quick-swap tool families have authored head-focused presentation settings.

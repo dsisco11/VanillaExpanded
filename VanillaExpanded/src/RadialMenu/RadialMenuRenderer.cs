@@ -255,7 +255,9 @@ internal sealed class RadialMenuRenderer : IDisposable
                     string? hoveredId = interaction.HoveredId;
                     bool showingHoveredLabel = hoveredId is not null && hoveredId != single.Id;
                     RadialMenuEntry label = showingHoveredLabel ? interaction.GetEntry(hoveredId!) : single;
-                    single.Icon?.Render(capi, centerX, centerY, radiusPixels * (float)ring.OuterRadius, single.Enabled);
+                    if (single.Icon is IRadialMenuContextIcon contextual)
+                        contextual.Render(capi, centerX, centerY, radiusPixels * (float)ring.OuterRadius, single.Enabled, 0);
+                    else single.Icon?.Render(capi, centerX, centerY, radiusPixels * (float)ring.OuterRadius, single.Enabled);
                     DrawCenterLabel(single.Id, label.Label, ring, centerX, centerY, radiusPixels);
                 }
                 else
@@ -268,7 +270,7 @@ internal sealed class RadialMenuRenderer : IDisposable
                         float scale = 1f + (RadialMenuWedgeStyle.HoverScale - 1f) * hoverAnimation.VisualProgress(entry.Id);
                         (double x, double y) = ring.GetWedgeCenter(i, centerX, centerY, radiusPixels, midRadius * scale);
                         DrawClippedEntry(entry, entryOffset + i, ring, meshes[meshIndex], entryOffset, x, y,
-                            iconSize * scale, guiShader);
+                            iconSize * scale, guiShader, ring.StartAngleDegrees + (ring.Clockwise ? 1 : -1) * i * ring.StepDegrees);
                     }
                 }
                 entryOffset += ring.EntryIds.Count;
@@ -292,7 +294,7 @@ internal sealed class RadialMenuRenderer : IDisposable
 
     /// <summary>Clips a depth-correct icon capture and its pixel-distance halo to the wedge stencil.</summary>
     private void DrawClippedEntry(RadialMenuEntry entry, int index, RadialMenuLayout ring, MeshRef ringMesh,
-        int entryOffset, double x, double y, float iconSize, IShaderProgram guiShader)
+        int entryOffset, double x, double y, float iconSize, IShaderProgram guiShader, double wedgeDegrees)
     {
         if (entry.Icon is null)
         {
@@ -310,7 +312,7 @@ internal sealed class RadialMenuRenderer : IDisposable
         int oldClearValue = GL.GetInteger(GetPName.StencilClearValue);
         try
         {
-            iconHalo.Capture(entry.Icon, x, y, iconSize, entry.Enabled);
+            iconHalo.Capture(entry.Icon, x, y, iconSize, entry.Enabled, wedgeDegrees);
             // Reserve only the wedge bit; the unscaled icon mask lives in its own texture.
             GL.Enable(EnableCap.StencilTest);
             GL.StencilMask(0x80);

@@ -47,7 +47,7 @@ internal sealed class RadialMenuIconHalo : IDisposable
     }
 
     /// <summary>Captures the original icon with the same projection and pixel density as the destination.</summary>
-    public void Capture(IRadialMenuIcon icon, double x, double y, float size, bool enabled)
+    public void Capture(IRadialMenuIcon icon, double x, double y, float size, bool enabled, double wedgeDegrees = 0)
     {
         GL.GetInteger(GetPName.Viewport, viewport);
         int oldDraw = GL.GetInteger(GetPName.DrawFramebufferBinding);
@@ -73,7 +73,9 @@ internal sealed class RadialMenuIconHalo : IDisposable
             GL.ClearColor(0, 0, 0, 0);
             GL.ClearDepth(1);
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-            icon.Render(capi, x, y, size, enabled);
+            if (icon is IRadialMenuContextIcon contextual)
+                contextual.Render(capi, x, y, size, enabled, wedgeDegrees);
+            else icon.Render(capi, x, y, size, enabled);
         }
         finally
         {
