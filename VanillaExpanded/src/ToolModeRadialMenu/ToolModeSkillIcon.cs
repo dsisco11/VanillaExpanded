@@ -6,9 +6,15 @@ namespace VanillaExpanded.ToolModeRadialMenu;
 /// <summary>Renders either form of artwork supported by a vanilla skill item.</summary>
 internal sealed class ToolModeSkillIcon(SkillItem skillItem) : IRadialMenuIcon
 {
+    private const float IconSizeMultiplier = 0.75f;
+
+    #region Public API
+
     /// <inheritdoc />
     public void Render(ICoreClientAPI api, double centerX, double centerY, float sizePixels, bool enabled)
     {
+        // Apply the same centered reduction to textures and custom skill render handlers.
+        sizePixels *= IconSizeMultiplier;
         float offset = sizePixels / 2f;
         float x = (float)centerX - offset;
         float y = (float)centerY - offset;
@@ -38,4 +44,6 @@ internal sealed class ToolModeSkillIcon(SkillItem skillItem) : IRadialMenuIcon
             }
         }
     }
+
+    #endregion
 }
