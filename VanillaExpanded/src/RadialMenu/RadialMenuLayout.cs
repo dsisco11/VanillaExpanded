@@ -13,7 +13,7 @@ public sealed class RadialMenuLayout
     /// <summary>Creates one concentric menu ring with an optional inner menu and live size multiplier bounded to 0.15–2.5.</summary>
     public RadialMenuLayout(IReadOnlyList<string> entryIds, double innerRadius, double outerRadius,
         RadialMenuLayout? innerMenu = null, double startAngleDegrees = 0, bool clockwise = true,
-        double separatorDegrees = 0.3, double radiusScale = 1, bool renderAsCenter = false, Func<float>? sizeMultiplier = null)
+        double separatorDegrees = 0.3, double radiusScale = 1, bool renderAsCenter = false, Func<float>? sizeMultiplier = null, double labelFontScale = 1)
     {
         ArgumentNullException.ThrowIfNull(entryIds);
         bool singleOptionLeaf = entryIds.Count == 1 && innerMenu is null;
@@ -21,6 +21,7 @@ public sealed class RadialMenuLayout
         if (entryIds.Count is 0 or > 63 || entryIds.Count + (innerMenu?.EntryCount ?? 0) > 64
             || !double.IsFinite(innerRadius) || !double.IsFinite(outerRadius)
             || !double.IsFinite(startAngleDegrees) || !double.IsFinite(separatorDegrees) || !double.IsFinite(radiusScale)
+            || !double.IsFinite(labelFontScale) || labelFontScale <= 0
             || innerRadius < 0 || outerRadius <= innerRadius || separatorDegrees < 0 || radiusScale <= 0
             || (centerMenu && (innerRadius != 0 || innerMenu is not null))
             || (!centerMenu && innerRadius <= 0)
@@ -45,6 +46,7 @@ public sealed class RadialMenuLayout
         this.radiusScale = radiusScale;
         this.sizeMultiplier = sizeMultiplier;
         RenderAsCenter = centerMenu;
+        LabelFontScale = labelFontScale;
         WedgeIds = EntryIds;
         CenterId = InnerMenu?.IsSingleOption == true ? InnerMenu.EntryIds[0] : IsSingleOption ? EntryIds[0] : string.Empty;
         CenterRadius = InnerMenu?.IsSingleOption == true ? InnerMenu.OuterRadius : IsSingleOption ? OuterRadius : 0;
@@ -62,6 +64,9 @@ public sealed class RadialMenuLayout
         CenterId = centerId;
         CenterRadius = centerRadius;
     }
+
+    /// <summary>Gets the preferred text size relative to the standard GUI label, before circle fitting.</summary>
+    public double LabelFontScale { get; }
 
     /// <summary>Gets immutable identifiers in this ring's supplied position order.</summary>
     public IReadOnlyList<string> EntryIds { get; }

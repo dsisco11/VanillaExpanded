@@ -289,7 +289,7 @@ internal sealed class RadialMenuRenderer : IDisposable
     {
         int usableDiameter = (int)Math.Max(1d,
             radiusPixels * layout.OuterRadius * 2d - CenterLabelInsetPixels * 2d);
-        DrawLabel(id, text, centerX, centerY, usableDiameter);
+        DrawLabel(id, text, centerX, centerY, usableDiameter, layout.LabelFontScale);
     }
 
     /// <summary>Clips a depth-correct icon capture and its pixel-distance halo to the wedge stencil.</summary>
@@ -346,9 +346,9 @@ internal sealed class RadialMenuRenderer : IDisposable
     }
 
     /// <summary>Caches a text-only entry label and centers its texture at the entry position.</summary>
-    private void DrawLabel(string id, string text, double x, double y, int circleDiameter = 0)
+    private void DrawLabel(string id, string text, double x, double y, int circleDiameter = 0, double fontScale = 1)
     {
-        string cacheKey = text + '\0' + circleDiameter;
+        string cacheKey = text + '\0' + circleDiameter + '\0' + fontScale;
         if (!renderedLabels.TryGetValue(id, out string? previous) || previous != cacheKey)
         {
             if (labels.Remove(id, out LoadedTexture? old)) old.Dispose();
@@ -356,6 +356,8 @@ internal sealed class RadialMenuRenderer : IDisposable
             if (!string.IsNullOrEmpty(text))
             {
                 labelFont ??= CairoFont.WhiteSmallText().WithStroke([0, 0, 0, 0.65], 1.5);
+                // Use the owning ring's preferred font size; long labels still fit the circle.
+                labelFont.WithFontSize((float)(GuiStyle.SmallFontSize * fontScale));
                 if (circleDiameter > 0)
                 {
                     double lineHeight = labelFont.GetFontExtents().Height;
