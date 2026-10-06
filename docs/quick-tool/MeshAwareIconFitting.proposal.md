@@ -6,7 +6,7 @@ Date: 2026-10-03.
 
 ## Purpose
 
-Fit complete quick-swap item models inside their radial menu wedges. Measure mesh vertices in the engine's GUI projection, preserve the normal orientation when it fits, and otherwise calculate a screen-space rotation, uniform scale, and translation.
+Fit complete quick-swap item models inside their radial menu wedges. Measure mesh vertices in the engine's GUI projection, preserve the normal orientation when it fits, and otherwise calculate a screen-space rotation, uniform scale, and translation. For long models, the intended response is rotation to preserve nominal size; shrinking is a last resort when rotation and placement cannot fit the complete model.
 
 The user requires geometry-based measurement. Pixel scanning, alpha-mask readback, and framebuffer analysis must not determine bounds. The existing framebuffer remains responsible for rendering the icon and its halo only.
 
@@ -42,6 +42,8 @@ For a supported mesh and valid wedge:
 3. If necessary, search rotations and placements at that size.
 4. If no tested orientation fits, reduce uniform scale and select the best feasible result from the bounded search.
 5. Render with the resulting transform before halo generation.
+
+Long models must not be shrunk merely because their normal orientation does not fit. Search rotation and placement at nominal size first, including alignment of their long axis with the available wedge space. A feasible rotated full-size result takes precedence over any smaller result with less rotation.
 
 Do not enlarge beyond the nominal size initially. Prefer the smallest absolute rotation among equally sized feasible results, then the placement nearest the wedge midpoint. Use deterministic tie breaking and tolerances so nearly equal solutions do not alternate between frames.
 
@@ -178,7 +180,7 @@ Implementation is acceptable only when the supported path demonstrates complete 
 - Projection: compare measured coordinates and applied transforms using item/block origins, GUI translations, nonuniform base scale, and rotated models; reject invalid homogeneous coordinates.
 - Geometry: include asymmetric tools, diagonal thin meshes, multi-part models, transparent-plane geometry, unused buffer capacity, and point/line degeneracies.
 - Containment: exercise angular boundaries, separators, inner-circle edge crossings, outer arcs, rounded corners, and halo/border clearance. Check independent contour samples along edges/interiors as well as the solver's own predicate.
-- Search: cover unrotated fits, placement-only fits, rotation preserving full size, necessary shrinking, deterministic ties, bounded search, and empty safe regions.
+- Search: cover unrotated fits, placement-only fits, long models that require rotation and retain nominal size instead of shrinking, necessary shrinking when no tested full-size orientation fits, deterministic ties, bounded search, and empty safe regions.
 - Lifecycle: verify copied-array ownership, partial position updates, color-only updates, invalid ranges, mesh replacement, child updates, disposal, handle reuse, reloads, and enabling after initial loading.
 - Integration: prove the fit uses the draw's final replacement mesh and invokes rendering callbacks only once; verify scope cleanup on failure/nesting and no changes to ordinary inventory rendering.
 - Layout: cover supported wedge counts, menu-size limits, GUI scales, viewport changes, and intermediate hover states. Explicitly exercise unsupported geometry fallbacks.
