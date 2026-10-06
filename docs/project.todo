@@ -1,10 +1,10 @@
 # Vanilla: Expanded TODO List:
     ## Issues:
         Radial Menus:
-            ☐ Tool-mode radial menu needs to be able to be configured to allow interacting with the hotbar (e.g. for the chisel tools "add material" functionality).
             ☐ Reduce icon size for tool-mode radial menus.
             ☐ Increase center circle size for tool-mode radial menus.
             ☐ Implement mesh aware icon fitting for radial menus.
+            ☐ Tool-mode radial menu needs to be able to be configured to allow interacting with the hotbar (e.g. for the chisel tools "add material" functionality).
 
         Other:
             ☐ Fix respawn decal looking obnoxious (too colorful).
