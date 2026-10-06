@@ -1,6 +1,6 @@
 # Asset-defined radial-menu tool presentation
 
-Status: settings resolution and dedicated rendering implemented and technically validated. The superseded hook is removed. Second review and independent stage-completion audit passed. Asset authoring and user-run visual acceptance are outstanding.
+Status: settings resolution and dedicated rendering implemented and technically validated. The superseded hook is removed. Initial tool-family patches are authored; patch verification, second review, and independent stage-completion audit passed. User-run visual acceptance remains outstanding.
 
 ## Purpose
 
@@ -58,6 +58,33 @@ At scale one, one model unit spans `sizePixels` screen pixels before projection.
 If `wedgeRotationDegrees` is omitted, `screenAngle` is zero and the authored view stays screen-fixed. If supplied, `screenAngle` equals the actual wedge center angle plus that value. Angles are clockwise from screen up, matching `RadialMenuLayout`; supplied zero tracks the outward direction. For a center disc without a radial direction, use zero as the reference angle. Wedge rotation acts around the icon anchor on the completed presentation; it is not an extra model-space Z rotation.
 
 Placement is anchored to the wedge's icon position. Menu size and hover supply the overall presentation scale; asset values must not encode fixed screen coordinates. Wedge-relative rotation lets a long tool follow its wedge's direction as the layout changes.
+
+## Patch authoring example
+
+The authored patches live in [toolheadpresentation](../../VanillaExpanded/assets/vanillaexpanded/patches/toolheadpresentation), with one JSON patch file per targeted item definition, named after its source file. A single-shape family can add its presentation directly; families with different shapes use `ve-radial-menu-propertiesByType` inside `attributes`. The engine resolves the suffix and variant selectors into the same `ve-radial-menu-properties` object before our resolver reads it. Do not add a second variant-selection implementation.
+
+This working example is the [prospecting-pick patch](../../VanillaExpanded/assets/vanillaexpanded/patches/toolheadpresentation/prospectingpick.json):
+
+```json
+{
+  "op": "add",
+  "file": "game:itemtypes/tool/prospectingpick.json",
+  "path": "/attributes/ve-radial-menu-properties",
+  "value": {
+    "transform": {
+      "origin": { "x": 1, "y": 0.04375, "z": 0.5 },
+      "rotation": { "x": 90, "y": 90, "z": 0 },
+      "translation": { "x": 0, "y": 0, "z": 0 },
+      "scale": 2.3
+    },
+    "wedgeRotationDegrees": 0
+  }
+}
+```
+
+Here the engine-supported `origin` field places the pivot at the working head, using normalized model coordinates derived from the shape's `(16, 0.7, 8)` point. Zero translation anchors that point at the wedge icon position. Rotation exposes the head's X/Z plane and sends the shaft inward; supplied wedge rotation zero tracks the wedge's outward direction. Scale enlarges the head without fitting the full handle. Translation can provide further framing adjustments after rotation/scale. These are authored starting values; final appearance and tuning require user-run checks.
+
+All current targets already have an attributes object, so the patches add only the new child. For a future target without that parent, create it before adding the child; never replace existing attributes. Missing/unmatched metadata retains ordinary rendering, and registered custom GUI delegates remain unsupported even when metadata exists.
 
 ## Rendering behavior
 
@@ -124,4 +151,6 @@ The contracts above were established on 2026-10-06 from current repository sourc
 | Draw/shading/eligibility | Model/model-view submissions at GUI `IL_03EC`/`IL_041C`; custom registry lookup at `IL_0439`–`IL_0459`, delegate call `IL_0472`, ordinary mesh draw `IL_04E1`. `ClientEventAPI.itemStackRenderersByTarget` indexes collectible class, GUI target, and ID. Installed `assets/game/shaders/gui.vsh` transforms positions with model-view and normals with model matrix. |
 | Menu size, direction, capture and fallback | [RadialMenuLayout](../../VanillaExpanded/src/RadialMenu/RadialMenuLayout.cs), [RadialMenuRenderer](../../VanillaExpanded/src/RadialMenu/RadialMenuRenderer.cs), [RadialMenuIconHalo](../../VanillaExpanded/src/RadialMenu/RadialMenuIconHalo.cs), and [QuickToolItemIcon](../../VanillaExpanded/src/QuickTools/QuickToolItemIcon.cs); angles are clockwise from up, hover scales size/placement once, capture owns depth, fallback has a category offset. |
 
-These establish reusable engine behavior, not a requirement to patch the inspected instruction offsets. Initial coverage and implementation records are in [ToolHeadPresentation.todo](ToolHeadPresentation.todo#initial-asset-coverage). The dedicated renderer passed 354 affected tests and the Release build with 0 errors and 6 existing warnings. A standalone hidden OpenGL context executed production state restoration, including uniforms, UBO ranges, texture/sampler bindings, flags, and matrix-stack cleanup after failure. Integration checks cover single preparation, lifecycle ordering, shader effects, nesting, and pre-preparation fallback/post-preparation cancellation. Second review and independent stage-completion audit passed. Numeric artwork transforms and user-run visual acceptance remain outstanding; technical checks do not establish in-game appearance.
+These establish reusable engine behavior, not a requirement to patch the inspected instruction offsets. Initial coverage and implementation records are in [ToolHeadPresentation.todo](ToolHeadPresentation.todo#initial-asset-coverage). The dedicated renderer passed 354 affected tests and the Release build with 0 errors and 6 existing warnings. A standalone hidden OpenGL context executed production state restoration, including uniforms, UBO ranges, texture/sampler bindings, flags, and matrix-stack cleanup after failure. Integration checks cover single preparation, lifecycle ordering, shader effects, nesting, and pre-preparation fallback/post-preparation cancellation. Second review and independent stage-completion audit passed for rendering.
+
+The authored patches cover 23 item files, 238 allowed variants, 79 base shape paths, and 14 GUI-selectable alternate paths. Historical local verification passed 355 affected tests and the Release build with 0 errors and 6 existing warnings. The former asset-patching test executed the installed engine's patch loader and variant resolver, confirmed valid presentation settings, and compared complete resolved definitions to prove unrelated values remained unchanged. That installation-dependent test and its patch-library reference were removed at user request because they cannot run under CI; these receipts remain historical local evidence. See [authored coverage and traceability](ToolHeadPresentation.todo#authored-asset-coverage-and-traceability). Patch second review and independent stage-completion audit passed. Authored numeric transforms are starting values; tuning and user-run visual acceptance remain outstanding. Technical checks do not establish in-game appearance.

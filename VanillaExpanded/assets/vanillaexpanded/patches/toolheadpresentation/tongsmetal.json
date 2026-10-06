@@ -1,0 +1,28 @@
+[
+  {
+    "op": "add",
+    "file": "game:itemtypes/tool/tongsmetal.json",
+    "path": "/attributes/ve-radial-menu-properties",
+    "value": {
+      "transform": {
+        "origin": {
+          "x": 0.875,
+          "y": 0.0,
+          "z": 0.5
+        },
+        "rotation": {
+          "x": 90.0,
+          "y": 90.0,
+          "z": 0.0
+        },
+        "translation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": 2.1
+      },
+      "wedgeRotationDegrees": 0
+    }
+  }
+]

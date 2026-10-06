@@ -1,0 +1,51 @@
+[
+  {
+    "op": "add",
+    "file": "game:itemtypes/tool/crowbar.json",
+    "path": "/attributes/ve-radial-menu-propertiesByType",
+    "value": {
+      "@crowbar-(iron|meteoriciron|steel)": {
+        "transform": {
+          "origin": {
+            "x": 1.0,
+            "y": 0.03125,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 90.0,
+            "y": 90.0,
+            "z": 0.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.5
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "@crowbar-(copper|tinbronze|bismuthbronze|blackbronze|gold|silver)": {
+        "transform": {
+          "origin": {
+            "x": 1.0,
+            "y": 0.01875,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 90.0,
+            "y": 90.0,
+            "z": 0.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.6
+        },
+        "wedgeRotationDegrees": 0
+      }
+    }
+  }
+]

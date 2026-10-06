@@ -1,7 +1,7 @@
 # Asset-defined radial-menu tool presentation
 
 Source proposal: [ToolHeadPresentation.proposal.md](ToolHeadPresentation.proposal.md).
-Status: asset contracts, settings resolution, and dedicated rendering implemented. Replacement validation, second review, and independent stage-completion audit passed. Asset patches and user-run visual acceptance are outstanding.
+Status: asset contracts, settings resolution, and dedicated rendering implemented. Tool-family patches are authored and technically verified; second review and independent stage-completion audit passed. User-run visual acceptance is outstanding.
 
 ## Goal and constraints
 
@@ -155,18 +155,61 @@ Validation: 2026-10-06. Subagent checks passed 354 affected tests (0 failed/skip
 
 Depends on Phase 3. Outcome: the agreed quick-swap tool families have authored head-focused presentation settings.
 
-- [ ] Add `ve-radial-menu-properties` through item asset patches at the confirmed location.
-  - [ ] Share patches among variants with compatible geometry and introduce individual overrides where models differ.
-  - [ ] Choose orientation to expose the useful head face, scale for readability, and translation to anchor the head within its wedge.
-  - [ ] Use wedge-relative rotation where appropriate; keep all authored settings consistent with menu resizing and hover.
-- [ ] Record covered families/variants and any explicitly unsupported cases in this plan; reconcile coverage with the Phase 1 inventory.
-- [ ] Through a subagent, verify patch targets and resolved settings for representative model/material variants, including absence of unintended changes to unrelated assets.
-- [ ] Document the final schema and a working authoring example in the proposal, including fallback and custom-renderer limits.
+- [x] Add `ve-radial-menu-properties` through item asset patches at the confirmed location.
+  - [x] Share patches among variants with compatible geometry and introduce individual overrides where models differ.
+  - [x] Choose orientation to expose the useful head face, scale for readability, and translation to anchor the head within its wedge.
+  - [x] Use wedge-relative rotation where appropriate; keep all authored settings consistent with menu resizing and hover.
+- [x] Record covered families/variants and any explicitly unsupported cases in this plan; reconcile coverage with the Phase 1 inventory.
+- [x] Through a subagent, verify patch targets and resolved settings for representative model/material variants, including absence of unintended changes to unrelated assets.
+- [x] Document the final schema and a working authoring example in the proposal, including fallback and custom-renderer limits.
 
 Completion criteria:
 
-- [ ] Every agreed tool family has a valid targeted patch or an explicitly documented unresolved coverage item; unresolved items remain unchecked.
-- [ ] Patch-resolution evidence establishes intended asset coverage; appearance remains pending user-run acceptance.
+- [x] Every agreed tool family has a valid targeted patch or an explicitly documented unresolved coverage item; unresolved items remain unchecked.
+- [x] Patch-resolution evidence establishes intended asset coverage; appearance remains pending user-run acceptance.
+
+### Authored asset coverage and traceability
+
+The [tool presentation patches](../../VanillaExpanded/assets/vanillaexpanded/patches/toolheadpresentation) contain one JSON patch file per targeted item definition, named after its source file, and add one dedicated attribute per definition. Single-shape files use the direct property; multi-shape files use nested `ve-radial-menu-propertiesByType` selectors resolved by the engine. All 23 installed targets already have an attributes parent; unrelated attributes are preserved. Allowed/skipped variants determine actual coverage, so unavailable combinations mentioned in the initial inventory do not become additional targets.
+
+| Target file | Resolved variants | Base shape groups | Authored framing |
+| --- | ---: | ---: | --- |
+| axe-metal | 14 | 7 | Scrap, copper/bronze and iron felling, four ruined heads. |
+| axe-stone | 14 | 1 | Shared stone geometry, distinct from metal axes. |
+| blade | 17 | 9 | Falx, blackguard, admin longsword, forlorn, scrap, and four allowed ruined sword shapes. |
+| bow | 4 | 4 | Separate simple/crude/long/recurve profiles anchored at the grip and working limbs. |
+| chisel | 7 | 1 | Cutting end; shared texture-only materials. |
+| cleaver | 9 | 1 | Blade face with handle extending inward. |
+| club | 7 | 7 | Wooden, scrap, scrapmace, and four ruined striking heads. |
+| crowbar | 9 | 2 | Separate copper and iron geometry groups. |
+| hammer | 9 | 1 | Hammer head with slight volumetric tilt. |
+| hoe | 16 | 2 | Separate stone and metal heads. |
+| knife | 27 | 6 | Stone/bone, metal, and four ruined blade profiles. |
+| pickaxe | 9 | 2 | Separate base and iron head profiles. |
+| prospectingpick | 9 | 1 | Own head profile, shared compatible materials. |
+| saw | 9 | 1 | Toothed working edge. |
+| scythe | 9 | 1 | Blade section near its attachment; full shaft may be cropped. |
+| shears | 9 | 1 | Paired cutting blades. |
+| shovel | 16 | 2 | Separate stone and metal shovel heads. |
+| sling | 1 | 1 | Folded working assembly, shared with selectable charge alternates. |
+| solderingiron | 1 | 1 | Working tip. |
+| spear | 23 | 17 | Stone, seven separate metal shapes, scrap, hacking, gold/silver ornate, erel, and four ruined heads. |
+| tongs | 1 | 1 | Wooden gripping ends; pivot accounts for rotated forepieces, handles extend inward. |
+| tongsmetal | 9 | 1 | Metal jaws in the ordinary GUI shape. |
+| wrench | 9 | 9 | Separate profile for each material's actual wrench geometry. |
+| Total | 238 | 79 | All tagged tool/weapon definitions in the initial inventory. |
+
+Bow has three GUI-selectable charge alternates per shape (12 total); sling has two. They retain the same grip/assembly anchor and family presentation, with intentional limb/string cropping. Inspection of installed `InventoryItemRenderer.GetItemStackRenderInfo` confirms temporary/persistent `renderVariant` selects alternate inventory meshes; [ItemBow](../../../vssurvivalmod/Item/ItemBow.cs) and [ItemSling](../../../vssurvivalmod/Item/ItemSling.cs) write those values during held interaction. [ItemTongs](../../../vssurvivalmod/Item/ItemTongs.cs) selects its narrow/medium/wide opening meshes only for `HandTpOff`; those openings are not GUI coverage gaps and no additional opening-specific settings are needed. Final appearance across selectable alternates remains visual acceptance work.
+
+No tagged family is deferred or intentionally unpatched. Untagged definitions, shields, standalone heads, ammunition, healing entries, block items, and unknown/custom GUI delegates retain the proposal's fallback boundary. Future unmatched variants receive no presentation unless a selector explicitly covers them; no discovery tags or inventory transforms are changed.
+
+Historical local validation: 2026-10-06. The subagent ran 355 affected tests (0 failed/skipped) and a Release build (0 errors, 6 existing warnings). The former asset-patching test executed installed engine JSON patch operations, variant expansion, and recursive ByType resolution on in-memory copies. Every patch applies with zero errors/missing targets; every covered resolved variant passes the production resolver. The entire resolved JSON matches its original after removing only the new presentation attribute, including inventory transforms and tags; untagged tool definitions remain unchanged. Base and 14 alternate shape paths exist. Shared base geometry selects matching values; each authored pivot maps to the icon anchor across three effective sizes and eight wedge directions. This installation-dependent asset-patching test and its private patch-library reference were subsequently removed at user request because they cannot run under CI. These results remain historical local evidence, not maintained CI coverage. No game launch or installed asset edits were involved.
+
+- Patch authoring and framing -> proposal Asset settings / Schema and transform convention / Patch authoring example -> focused exact-file patches, geometry-specific origin/rotation/scale, zero model translation and wedge rotation tracking -> installed shape hierarchy inspection and resolver/matrix assertions. Head points are authored model-space pivots rather than automatic bounds or full-model fitting. Source review corrected the metal knife's parent rotation and wooden tongs' rotated forepiece positions; numeric tuning remains subject to user-run appearance checks.
+- Coverage and preservation -> proposal Coverage and fallback / Scope and ownership plus initial inventory -> all 23 files, 238 allowed variants, material sharing only where geometry agrees, unrelated data preserved -> executed engine patch/variant resolution and full JSON comparison above.
+- Authoring documentation -> proposal Patch authoring example -> final engine-owned schema, origin semantics, direct and ByType patch conventions, existing-parent preservation, ordinary/custom fallback -> working prospecting-pick patch example linked to the authored file.
+
+Completion: 2026-10-06. Second review and independent stage-completion audit passed; no unresolved findings remain. These receipts establish patch resolution and mathematical framing, not artwork quality or in-game appearance.
 
 ## Phase 5: Validate tool-head framing and complete documentation
 
