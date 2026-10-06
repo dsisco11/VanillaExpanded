@@ -1,0 +1,113 @@
+# Asset-defined radial-menu tool presentation
+
+Source proposal: [ToolHeadPresentation.proposal.md](ToolHeadPresentation.proposal.md).
+Status: planned; implementation and visual acceptance are outstanding.
+
+## Goal and constraints
+
+Display readable, deliberately oriented tool heads using asset-defined radial-menu transforms. Handles may extend outside the wedge and be clipped intentionally. Configured presentation replaces the inventory GUI transform and category head offset for supported radial-menu draws.
+
+The proposal governs this plan. Preserve ordinary inventory rendering, candidate selection, ordering, equipment operations, input, and hit testing. Non-tool entries, tool-mode artwork, and center labels retain their existing presentation. Automatic bounds calculation, geometry retention, containment searches, and automatic rotation/shrinking are outside scope.
+
+Follow repository code practices: documented methods/classes, comments for nontrivial logic, visibility-first regions, focused files, directional dependencies, and thin composition roots. Run all build and test tools through subagents. User-run visual acceptance remains separate from source and headless evidence; this plan does not authorize launching the game.
+
+## Open decisions
+
+- Confirm `attributes.ve-radial-menu-properties` as the asset location and identify a suitable existing engine transform data model.
+- Define field names/defaults, units, pivot, transform order, reference size, and the wedge-relative angle convention before patch authoring.
+- Identify the engine boundary that separates item-specific mesh preparation from GUI presentation; the public GUI call is not assumed to expose it.
+- Establish initial quick-swap tool-family coverage and supported renderer behavior. Unsupported custom renderers retain fallback until a concrete extension is needed.
+
+## Phase 1: Establish asset and rendering contracts
+
+Outcome: implementation and patch authors have a verified integration point and one documented presentation convention.
+
+- [ ] Inspect relevant repository instructions, asset patch conventions, existing transform types, `QuickToolItemIcon`, and the radial-menu rendering pipeline.
+- [ ] Inspect current base-game item rendering to identify how mesh/texture selection, callbacks, GUI transforms, lighting, and depth are applied.
+  - [ ] Select a scoped override boundary that replaces GUI presentation while preserving applicable item-specific preparation and a single callback invocation.
+  - [ ] Define renderer eligibility and safe fallback when the override is unavailable or a custom renderer cannot honor it.
+- [ ] Resolve and document the asset schema in the proposal.
+  - [ ] Define model-space rotation in degrees, positive uniform scale, model-space translation, and optional screen-space wedge-relative rotation.
+  - [ ] Define defaults independent of inventory GUI transforms, a consistent pivot, transform order, reference scale, and the meaning of omitted wedge rotation.
+  - [ ] Specify placement relative to the wedge icon position and how menu size/hover apply once; prohibit fixed screen coordinates in asset values.
+  - [ ] Reuse the engine transform data model where suitable and document any concrete gap requiring additional fields.
+- [ ] Inventory the quick-swap tool families and representative model/material variants; record intended shared patches and necessary model-specific overrides in this plan.
+- [ ] Assign ownership: assets provide settings, a focused item-rendering component resolves/applies them, and the menu supplies wedge context and existing capture/halo/clipping.
+
+Completion criteria:
+
+- [ ] Schema and integration decisions have current source or installed-engine evidence and are recorded before dependent code or patches are authored.
+- [ ] Coverage and unsupported-renderer boundaries are explicit; no decision requires changing inventory policy or shared GUI transforms.
+
+## Phase 2: Resolve and validate asset presentation settings
+
+Depends on Phase 1. Outcome: tools can expose valid dedicated presentation settings with predictable fallback.
+
+- [ ] Implement settings resolution from the selected tool's asset attributes using the agreed data model and defaults.
+- [ ] Validate malformed values, non-finite rotation/translation/scale values, and non-positive uniform scales.
+- [ ] Distinguish usable settings from missing/invalid settings so the rendering owner can select the existing fallback.
+- [ ] Emit bounded diagnostics for invalid settings without repeated per-frame logging.
+- [ ] Through a subagent, run focused checks for complete/partial configurations, defaults, malformed/non-finite inputs, invalid scales, and bounded diagnostics.
+
+Completion criteria:
+
+- [ ] Valid settings follow the documented convention without inheriting inventory GUI presentation.
+- [ ] Missing or invalid settings reliably select fallback and cannot inject invalid transforms into rendering.
+
+## Phase 3: Apply dedicated transforms to radial-menu draws
+
+Depends on Phases 1–2. Outcome: supported configured tools render through the existing menu pipeline with independent presentation.
+
+- [ ] Supply wedge icon position, size, direction, and hover context to the focused item-rendering component without forcing unrelated artwork to opt in.
+- [ ] Preserve ordinary item mesh, texture, and applicable rendering-state preparation while replacing the inventory presentation transform for the scoped draw.
+  - [ ] Apply the agreed model rotation, scale, translation, and pivot, then optional wedge-relative screen rotation in the documented order.
+  - [ ] Apply menu size and hover consistently without double scaling or fixed screen placement.
+  - [ ] Omit the category head-centering offset for configured supported draws.
+  - [ ] Preserve lighting, depth, engine render-state cleanup, and single callback execution.
+- [ ] Make the override exception-safe and nested-call safe without mutating shared collectible GUI transforms.
+- [ ] Retain existing icon capture, halo, hover, and wedge-stencil processing; allow intentional handle cropping.
+- [ ] Route missing/invalid properties, unsupported renderers, and unavailable integration through existing rendering including the category offset.
+- [ ] Through a subagent, validate configured-transform independence from differing inventory GUI settings, ordinary inventory behavior, callback counts, nested/failing scope restoration, and every fallback condition.
+- [ ] Through a subagent, validate transform composition for different wedge directions, menu sizes, GUI scales, and hover values against the documented convention.
+
+Completion criteria:
+
+- [ ] Configured supported draws use the dedicated transform without compounding inventory GUI transforms or category offsets.
+- [ ] Ordinary inventory and unrelated menu artwork retain their behavior; fallback and state restoration have focused evidence.
+- [ ] Clipping remains intentional rather than triggering automatic shrinking or fitting.
+
+## Phase 4: Author tool-family patches and verify coverage
+
+Depends on Phase 3. Outcome: the agreed quick-swap tool families have authored head-focused presentation settings.
+
+- [ ] Add `ve-radial-menu-properties` through item asset patches at the confirmed location.
+  - [ ] Share patches among variants with compatible geometry and introduce individual overrides where models differ.
+  - [ ] Choose orientation to expose the useful head face, scale for readability, and translation to anchor the head within its wedge.
+  - [ ] Use wedge-relative rotation where appropriate; keep all authored settings consistent with menu resizing and hover.
+- [ ] Record covered families/variants and any explicitly unsupported cases in this plan; reconcile coverage with the Phase 1 inventory.
+- [ ] Through a subagent, verify patch targets and resolved settings for representative model/material variants, including absence of unintended changes to unrelated assets.
+- [ ] Document the final schema and a working authoring example in the proposal, including fallback and custom-renderer limits.
+
+Completion criteria:
+
+- [ ] Every agreed tool family has a valid targeted patch or an explicitly documented unresolved coverage item; unresolved items remain unchecked.
+- [ ] Patch-resolution evidence establishes intended asset coverage; appearance remains pending user-run acceptance.
+
+## Phase 5: Validate tool-head framing and complete documentation
+
+Depends on Phases 1–4. Outcome: technical validation and user-run visual results support the delivered behavior.
+
+- [ ] Run the appropriate build and affected focused checks through subagents; resolve failures and rerun affected checks after changes.
+- [ ] Review implementation and patches against the complete proposal for ownership, transform semantics, fallback, and scope preservation.
+- [ ] Obtain user-run visual checks across representative heads, model/material variants, menu sizes, GUI scales, wedge positions, and resting/intermediate/full hover states.
+  - [ ] Confirm readable heads, useful face orientation, intentional handle cropping, halo appearance, and stable placement.
+  - [ ] Tune asset settings where needed and repeat affected technical/visual checks; do not introduce automatic full-model fitting as a correction.
+  - [ ] Leave visual acceptance outstanding until user-run results are supplied; headless checks cannot close it.
+- [ ] Update proposal status and this plan with actual coverage, validation results, remaining limitations, and unresolved work.
+
+## Final acceptance
+
+- [ ] Proposal requirements are covered by implemented behavior and authored assets, with supported and fallback cases accurately documented.
+- [ ] Focused build/test evidence confirms independent radial presentation, safe cleanup, valid patch application, and preserved ordinary rendering.
+- [ ] User-run results establish readable tool-head framing across the agreed visual coverage.
+- [ ] Completion claims distinguish technical evidence from visual acceptance; all remaining work stays unchecked.
