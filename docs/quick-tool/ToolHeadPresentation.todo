@@ -1,7 +1,7 @@
 # Asset-defined radial-menu tool presentation
 
 Source proposal: [ToolHeadPresentation.proposal.md](ToolHeadPresentation.proposal.md).
-Status: asset and rendering contracts established; production implementation and visual acceptance are outstanding.
+Status: asset contracts and settings resolution implemented; rendering integration, asset patches, and visual acceptance are outstanding.
 
 ## Goal and constraints
 
@@ -62,7 +62,7 @@ Shields/round shields have no root category tags in the inspected assets and are
 
 Completion: 2026-10-06. Second review and independent stage-completion audit passed. Fresh source/assembly inspection, 23-file asset coverage, Markdown link/anchor checks, and `git diff --check` support the contract. No production code, asset patches, executed rendering hook, or visual acceptance is claimed.
 
-- Phase 1 asset/schema tasks -> proposal Asset settings -> collectible attributes, explicit independent defaults, fixed pivot/order/reference size, optional wedge angle -> current `ModelTransform`/`JsonObject`/collectible source, installed pickaxe transforms and attribute patches; contract recorded in the proposal.
+- Phase 1 asset/schema tasks -> proposal Asset settings -> collectible attributes, explicit independent defaults, default pivot, engine matrix order, and reference size, optional wedge angle -> current `ModelTransform`/`JsonObject`/collectible source, installed pickaxe transforms and attribute patches; contract recorded in the proposal.
 - Phase 1 engine/eligibility tasks -> proposal Rendering behavior and Evidence -> one callback preparation, scoped matrix replacement, no shared mutation, ordinary-mesh eligibility and fallback -> fresh Mono.Cecil inspection of installed 1.22.7.0, exact method/hash/IL landmarks recorded in the proposal; runtime execution belongs to Phase 3.
 - Phase 1 coverage/ownership tasks -> proposal Coverage and fallback / Scope and ownership -> patch current families, keep unrelated entries unchanged, directional ownership -> current discovery/layout/icon/capture source and 23-file installed asset inventory above. Source inspection is not visual acceptance.
 
@@ -70,16 +70,27 @@ Completion: 2026-10-06. Second review and independent stage-completion audit pas
 
 Depends on Phase 1. Outcome: tools can expose valid dedicated presentation settings with predictable fallback.
 
-- [ ] Implement settings resolution from the selected tool's asset attributes using the agreed data model and defaults.
-- [ ] Validate malformed values, non-finite rotation/translation/scale values, and non-positive uniform scales.
-- [ ] Distinguish usable settings from missing/invalid settings so the rendering owner can select the existing fallback.
-- [ ] Emit bounded diagnostics for invalid settings without repeated per-frame logging.
-- [ ] Through a subagent, run focused checks for complete/partial configurations, defaults, malformed/non-finite inputs, invalid scales, and bounded diagnostics.
+- [x] Implement settings resolution from the selected tool's asset attributes using the agreed data model and defaults.
+- [x] Validate malformed values, non-finite rotation/translation/scale values, and non-positive scale components.
+- [x] Distinguish usable settings from missing/invalid settings so the rendering owner can select the existing fallback.
+- [x] Emit bounded diagnostics for invalid settings without repeated per-frame logging.
+- [x] Through a subagent, run focused checks for complete/partial configurations, defaults, malformed/non-finite inputs, invalid scales, and bounded diagnostics.
 
 Completion criteria:
 
-- [ ] Valid settings follow the documented convention without inheriting inventory GUI presentation.
-- [ ] Missing or invalid settings reliably select fallback and cannot inject invalid transforms into rendering.
+- [x] Valid settings follow the documented convention without inheriting inventory GUI presentation.
+- [x] Missing or invalid settings reliably select fallback and cannot inject invalid transforms into rendering.
+
+### Settings implementation traceability
+
+Completion: 2026-10-06. Second review and independent stage-completion audit passed. Subagent validation: 120 focused cases passed (0 failed/skipped); Release build passed (0 errors, 6 existing warnings); diff checks passed. An executed regression demonstrated matrix overflow from finite authored values before the fix and passed after composed-matrix validation. Commands used VINTAGE_STORY=G:/Vintagestory: `dotnet build VanillaExpanded/VanillaExpanded.csproj -c Release --no-restore --verbosity minimal` and `dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj -c ToolHeadValidation --filter FullyQualifiedName~ToolHeadPresentationResolverTests --no-restore --verbosity minimal`. Rendering integration and visual acceptance remain outstanding.
+
+- Settings resolution/defaults -> proposal Asset settings / Schema and transform convention -> [ToolHeadPresentationResolver](../../VanillaExpanded/src/ItemRendering/ToolHeadPresentationResolver.cs) reads only resolved collectible attributes, initializes `ModelTransform.ItemDefaultGui()`, and populates a seeded `ModelTransformNoDefaults` through engine `JsonUtil.PopulateObject` typed deserialization; the engine determines accepted fields and numeric conversions. [ToolHeadPresentationProperties](../../VanillaExpanded/src/ItemRendering/ToolHeadPresentationProperties.cs) owns the values and supplies independent draw copies.
+
+Typed-deserialization refactor validation: 2026-10-06. The same commands passed 121 focused tests and the Release build (0 errors, 6 existing warnings). The added authored-sentinel regression reproduced unwanted default substitution before the input-type correction and passed afterward. Diff checks passed.
+- Validation/fallback -> the same schema contract and proposal Coverage and fallback -> [ToolHeadPresentationResolution](../../VanillaExpanded/src/ItemRendering/ToolHeadPresentationResolution.cs) distinguishes missing, invalid, and valid configuration; typed deserialization failures, finite-value and positive-scale checks, and composed model-matrix finiteness checks prevent unusable configuration from returning usable properties.
+- Bounded diagnostics -> proposal Coverage and fallback -> the client-thread resolver uses weak collectible identity and reports once per collectible for its lifetime, marking before invoking the diagnostic sink to prevent reentrant repeats. Current attributes are read again on resolution, so corrected configuration is not permanently cached as invalid.
+- Focused verification -> proposal Validation and Phase 2 checks -> unit checks are run through a subagent; rendering integration and visual evidence belong to later tasks.
 
 ## Phase 3: Apply dedicated transforms to radial-menu draws
 
@@ -89,6 +100,7 @@ Depends on Phases 1–2. Outcome: supported configured tools render through the 
 - [ ] Preserve ordinary item mesh, texture, and applicable rendering-state preparation while replacing the inventory presentation transform for the scoped draw.
   - [ ] Apply the agreed model rotation, scale, translation, and pivot, then optional wedge-relative screen rotation in the documented order.
   - [ ] Apply menu size and hover consistently without double scaling or fixed screen placement.
+  - [ ] Validate the final presentation matrix after applying menu size, placement, and wedge rotation; use fallback if the composed matrix is non-finite.
   - [ ] Omit the category head-centering offset for configured supported draws.
   - [ ] Preserve lighting, depth, engine render-state cleanup, and single callback execution.
 - [ ] Make the override exception-safe and nested-call safe without mutating shared collectible GUI transforms.
@@ -138,3 +150,5 @@ Depends on Phases 1–4. Outcome: technical validation and user-run visual resul
 - [ ] Focused build/test evidence confirms independent radial presentation, safe cleanup, valid patch application, and preserved ordinary rendering.
 - [ ] User-run results establish readable tool-head framing across the agreed visual coverage.
 - [ ] Completion claims distinguish technical evidence from visual acceptance; all remaining work stays unchecked.
+
+Schema-check removal validation: 2026-10-06. Engine typed deserialization owns accepted fields and conversions. Updated focused tests passed 155 cases (0 failed/skipped), covering unknown fields, numeric strings, engine transform fields, null input fallback, and rendering safety. Release build passed (0 errors, 6 existing warnings); diff checks passed.

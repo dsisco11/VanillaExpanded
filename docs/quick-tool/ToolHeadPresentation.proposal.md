@@ -34,11 +34,13 @@ The object defines a dedicated presentation transform with:
 }
 ```
 
-This is a schema example, not tuned artwork. A present empty properties object is valid identity presentation. Missing transform/vector components default to zero rotation/translation and scale one. An absent properties object selects fallback. Null or malformed supplied fields, non-finite numbers, and non-positive scales are invalid. Reject unsupported fields such as `origin`, `scaleXYZ`, and `rotate` rather than silently accepting a different transform contract.
+This is a schema example, not tuned artwork. A present empty properties object is valid identity presentation. Missing transform/vector components default to zero rotation/translation and scale one. An absent properties object selects fallback. Accepted fields and numeric conversions follow engine typed deserialization; unknown fields are ignored. Deserialization failures, a null transform, non-finite values, and non-positive scale components select fallback.
 
-Reuse `ModelTransform` with explicitly initialized identity values, fixed origin `(0.5, 0.5, 0.5)`, uniform positive scale, and `Rotate = false`. Its `AsMatrix` provides the existing translation/rotation/scale math. The enclosing properties object adds the optional wedge angle, which that engine type does not provide.
+Reuse `ModelTransform` with explicitly initialized identity values, default origin `(0.5, 0.5, 0.5)`, positive scale, and default `Rotate = false`. Its `AsMatrix` provides the existing translation/rotation/scale math. The enclosing properties object adds the optional wedge angle, which that engine type does not provide.
 
-Coordinates are normalized uploaded model units, with one unit corresponding to 16 shape-coordinate units for ordinary shape meshes. Model X points right and Y up before authored rotation; positive Z follows the engine model convention. The fixed pivot is the model-space point `(0.5, 0.5, 0.5)`. Translation is in model units, after local rotation/scale, independent of GUI scale; authors use it to bring the working head to the anchor. Rotation follows the engine's degree-based X/Y/Z matrix composition.
+Initialize these values with `ModelTransform.ItemDefaultGui()` and populate the engine's `ModelTransformNoDefaults` input type, seeded with those defaults, through `JsonUtil.PopulateObject` typed deserialization. Transfer its decoded transform fields to the owned `ModelTransform`. This avoids `ModelTransform`'s deserialization callback treating an explicitly authored sentinel vector as omitted. Retain only rendering validation around that operation; do not independently decode vector components or implement transform defaults.
+
+Coordinates are normalized uploaded model units, with one unit corresponding to 16 shape-coordinate units for ordinary shape meshes. Model X points right and Y up before authored rotation; positive Z follows the engine model convention. The default pivot is the model-space point `(0.5, 0.5, 0.5)`; engine transform fields may override it. Translation is in model units, after local rotation/scale, independent of GUI scale; authors use it to bring the working head to the anchor. Rotation follows the engine's degree-based X/Y/Z matrix composition.
 
 For column vectors, define the dedicated model matrix as:
 
@@ -49,7 +51,7 @@ M = T(iconX, iconY, depth) * Rz(screenAngle)
     * S(sizePixels, -sizePixels, sizePixels) * T(-o) * A
 ```
 
-Here `o` is the fixed pivot and `t` the authored translation. The rightmost operation applies first. `T(-o) * A` simplifies to `T(t) * Rx * Ry * Rz * S(assetScale) * T(-o)`, so the pivot maps to the icon anchor at identity and stays there under rotation when translation is zero. Do not subtract the pivot on the opposite side of `A`.
+Here `o` is the resolved engine transform pivot and `t` the authored translation. The rightmost operation applies first. `T(-o) * A` simplifies to `T(t) * Rx * Ry * Rz * S(assetScale) * T(-o)`, so the pivot maps to the icon anchor at identity and stays there under rotation when translation is zero. Do not subtract the pivot on the opposite side of `A`.
 
 At scale one, one model unit spans `sizePixels` screen pixels before projection. This is a reference size, not full-model fitting. The menu already supplies effective size including GUI/menu sizing and hover; do not call `GuiElement.scaled` again. Negative Y scale converts model-up to screen-up in the engine's Y-down GUI coordinates. Retain the existing icon depth argument (`100`) and capture depth policy.
 
@@ -82,7 +84,7 @@ Start with the tool families displayed by quick-swap, tuning their patches again
 
 Items without valid properties use the current rendering behavior, including its existing category offset. Custom renderers that cannot honor the dedicated transform also fall back. Registration and support for those renderers can be extended when a concrete need is established.
 
-Validate configuration values and reject malformed or non-finite transforms and non-positive scales. Report invalid configuration with bounded diagnostics rather than repeatedly logging during rendering.
+Validate configuration values and reject deserialization failures, non-finite transforms, and non-positive scale components. Also reject settings whose composed `ModelTransform.AsMatrix` contains non-finite components, since individually finite inputs can overflow when combined. The later rendering boundary must validate its final matrix after applying menu size, placement, and wedge rotation. Report invalid configuration with bounded diagnostics rather than repeatedly logging during rendering.
 
 ## Scope and ownership
 
