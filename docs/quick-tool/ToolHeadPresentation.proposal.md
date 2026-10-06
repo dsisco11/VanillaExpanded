@@ -10,7 +10,7 @@ Tool assets define this presentation through a `ve-radial-menu-properties` objec
 
 ## Asset settings
 
-Use asset patches to add `ve-radial-menu-properties` under the tool item's `attributes`, subject to confirming the existing asset-loading conventions during implementation. Share patches across tool variants where their geometry permits it; use individual overrides for different models.
+Use asset patches to add `ve-radial-menu-properties` under the tool item's `attributes`. Read the resolved collectible's `Attributes`, not stack attributes or its inventory GUI transform. Share patches across variants with matching geometry; use the existing asset variant-resolution conventions for different shapes. Preserve unrelated attributes and create a missing attributes parent without replacing existing data.
 
 The object defines a dedicated presentation transform with:
 
@@ -19,7 +19,41 @@ The object defines a dedicated presentation transform with:
 - **Translation:** model-space placement used to bring the head to the presentation origin.
 - **Wedge-relative rotation:** an optional screen-space angle relative to the wedge's outward radial direction, applied after model orientation and projection.
 
-Use the engine's existing transform data model where its contract is suitable. Final field names, coordinate conventions, transform order, and reference size must be documented before authoring patches. Defaults must be independent of the item's inventory GUI transform. Translation, rotation, and scale must have a consistent pivot so authors can position a head without compensating for unrelated item-slot settings.
+### Schema and transform convention
+
+```json
+{
+  "ve-radial-menu-properties": {
+    "transform": {
+      "rotation": { "x": 0, "y": 0, "z": 0 },
+      "translation": { "x": 0, "y": 0, "z": 0 },
+      "scale": 1
+    },
+    "wedgeRotationDegrees": 0
+  }
+}
+```
+
+This is a schema example, not tuned artwork. A present empty properties object is valid identity presentation. Missing transform/vector components default to zero rotation/translation and scale one. An absent properties object selects fallback. Null or malformed supplied fields, non-finite numbers, and non-positive scales are invalid. Reject unsupported fields such as `origin`, `scaleXYZ`, and `rotate` rather than silently accepting a different transform contract.
+
+Reuse `ModelTransform` with explicitly initialized identity values, fixed origin `(0.5, 0.5, 0.5)`, uniform positive scale, and `Rotate = false`. Its `AsMatrix` provides the existing translation/rotation/scale math. The enclosing properties object adds the optional wedge angle, which that engine type does not provide.
+
+Coordinates are normalized uploaded model units, with one unit corresponding to 16 shape-coordinate units for ordinary shape meshes. Model X points right and Y up before authored rotation; positive Z follows the engine model convention. The fixed pivot is the model-space point `(0.5, 0.5, 0.5)`. Translation is in model units, after local rotation/scale, independent of GUI scale; authors use it to bring the working head to the anchor. Rotation follows the engine's degree-based X/Y/Z matrix composition.
+
+For column vectors, define the dedicated model matrix as:
+
+```text
+A = ModelTransform.AsMatrix
+  = T(t) * T(o) * Rx * Ry * Rz * S(assetScale) * T(-o)
+M = T(iconX, iconY, depth) * Rz(screenAngle)
+    * S(sizePixels, -sizePixels, sizePixels) * T(-o) * A
+```
+
+Here `o` is the fixed pivot and `t` the authored translation. The rightmost operation applies first. `T(-o) * A` simplifies to `T(t) * Rx * Ry * Rz * S(assetScale) * T(-o)`, so the pivot maps to the icon anchor at identity and stays there under rotation when translation is zero. Do not subtract the pivot on the opposite side of `A`.
+
+At scale one, one model unit spans `sizePixels` screen pixels before projection. This is a reference size, not full-model fitting. The menu already supplies effective size including GUI/menu sizing and hover; do not call `GuiElement.scaled` again. Negative Y scale converts model-up to screen-up in the engine's Y-down GUI coordinates. Retain the existing icon depth argument (`100`) and capture depth policy.
+
+If `wedgeRotationDegrees` is omitted, `screenAngle` is zero and the authored view stays screen-fixed. If supplied, `screenAngle` equals the actual wedge center angle plus that value. Angles are clockwise from screen up, matching `RadialMenuLayout`; supplied zero tracks the outward direction. For a center disc without a radial direction, use zero as the reference angle. Wedge rotation acts around the icon anchor on the completed presentation; it is not an extra model-space Z rotation.
 
 Placement is anchored to the wedge's icon position. Menu size and hover supply the overall presentation scale; asset values must not encode fixed screen coordinates. Wedge-relative rotation lets a long tool follow its wedge's direction as the layout changes.
 
@@ -30,7 +64,15 @@ Placement is anchored to the wedge's icon position. Menu size and hover supply t
 3. For a supported configured draw, replace the inventory GUI presentation transform with the dedicated radial-menu transform. Do not compound it with the inventory GUI transform or the existing category-specific head-centering offset.
 4. Render through the existing icon capture, halo, hover, and wedge-stencil pipeline. Cropping outside the wedge is intentional.
 
-The integration must distinguish item-specific mesh preparation from the inventory presentation transform. Inspect the engine's draw boundary before choosing an adapter; do not assume that the public GUI rendering call exposes the required override. Preserve lighting, depth behavior, and render-state cleanup, and avoid repeating item callbacks for measurement or rendering setup.
+### Selected engine boundary and support
+
+Use a narrowly validated Harmony transpiler on the installed `InventoryItemRenderer.RenderItemstackToGui(ItemSlot, double, double, double, float, int, float, bool, bool, bool)` overload. Replace its completed local model matrix after ordinary GUI construction, before temperature/shader preparation. Keep the existing model/model-view uploads and draw path. Overriding only `ItemRenderInfo.Transform` is insufficient: the ordinary construction additionally applies GUI-scaled translation, item pixel offsets, and item/block-specific conventions.
+
+Scope the request to the exact detached slot and intended GUI invocation. Bind it once on entry; nested GUI calls during callbacks cannot inherit it. Store the unoffset wedge anchor separately and continue passing the existing fallback position to the engine. At the matrix boundary, an eligible draw uses `M` with the unoffset anchor; an ineligible draw retains the original matrix and category offset without a second draw or callback retry. Recheck eligibility after callbacks because renderer registration can change there.
+
+Initially support the ordinary inventory mesh path under the engine's orthographic GUI projection, including callbacks replacing the mesh or preparing textures/rendering state. Callback changes to `ItemRenderInfo.Transform` are presentation overrides and are deliberately superseded by configured radial settings; mesh and other preparation remain intact. Registered custom GUI delegates are unsupported even if they appear to consume the supplied matrix. Inspect their registration through a cached accessor to the engine's GUI renderer registry, query it live, and fail closed if access, projection support, or hook validation fails. Do not infer support from a non-null mesh. This does not guarantee compatibility with other mods changing shader/draw behavior outside these boundaries.
+
+Pass `rotate: false` and `showStackSize: false`. Preserve callback-selected mesh, textures, culling, alpha test, color, overlays, temperature/damage effects, lighting submission, depth behavior, and render-state cleanup. Authored orientation naturally changes normal-based shading; preserve the engine's shading pipeline rather than freezing the inventory view's brightness.
 
 Keep any override scoped to the intended radial-menu draw and restore it safely after nested calls or failures. Do not mutate shared collectible GUI transforms or affect ordinary inventory rendering.
 
@@ -46,6 +88,8 @@ Validate configuration values and reject malformed or non-finite transforms and 
 
 The item asset owns its presentation settings. A focused item-rendering component reads and applies them; the radial-menu renderer supplies wedge placement, size, direction, hover, capture, halo, and clipping. Keep composition roots thin and preserve candidate selection, entry ordering, equipment operations, input, and hit testing.
 
+Use focused files in an item-rendering domain for property resolution, presentation matrix construction, scoped invocation state, and the engine hook/eligibility adapter. `QuickToolItemIcon` owns opt-in and fallback placement; an optional radial-icon context capability conveys wedge direction without changing unrelated `IRadialMenuIcon` implementations. The mod composition root installs/disposes the adapter and performs no transform or patch-selection policy.
+
 Automatic bounds calculation, retained mesh geometry, containment searches, and automatic rotation or shrinking are outside this design. The acceptance criterion is readable tool-head framing, not full-model visibility.
 
 ## Validation
@@ -55,9 +99,16 @@ Automatic bounds calculation, retained mesh geometry, containment searches, and 
 - Obtain user-run visual checks across representative tool heads, model/material variants, menu sizes, GUI scales, wedge positions, and hover states. Confirm readable heads, intentional handle cropping, suitable orientation, halo appearance, and stable placement.
 - Run build and test tools through subagents under repository instructions. Source and headless checks do not establish visual acceptance; no game launch is authorized by this proposal.
 
-## Decisions to resolve before implementation
+## Evidence and remaining validation
 
-- Confirm the asset property location and reusable engine transform type.
-- Define exact transform units, pivot, order, reference scale, and wedge-relative angle convention.
-- Identify a rendering integration point that replaces GUI presentation while retaining applicable mesh preparation and shading behavior.
-- Establish initial tool-family patch coverage and explicit custom-renderer support boundaries.
+The contracts above were established on 2026-10-06 from current repository source, installed assets, and Mono.Cecil inspection of `G:/Vintagestory/VintagestoryLib.dll`, assembly version `1.22.7.0`, SHA256 `E08F22B493B92FEAF0AAEB79D22437EA0F7EFC38AA7F72A04A47F98BC0E40DF0`.
+
+| Decision | Evidence |
+| --- | --- |
+| Attribute location and patch conventions | [CollectibleObject.Attributes](../../../vsapi/Common/Collectible/Collectible.cs); [JsonObject indexer/AsObject](../../../vsapi/Datastructures/JsonObject.cs); installed [pickaxe attributes](G:/Vintagestory/assets/survival/itemtypes/tool/pickaxe.json); repository [healing-item patches](../../VanillaExpanded/assets/vanillaexpanded/patches/healingitems.json) and installed survival attribute patches. |
+| Reused transform math | [ModelTransform](../../../vsapi/Common/Collectible/ModelTransform.cs): `AsMatrix`, `ItemDefaultGui`, `EnsureDefaultValues`, and degree rotations. Explicit identity values avoid sentinel/default ambiguity. |
+| Single preparation and matrix hook | Installed `InventoryItemRenderer`: GUI method calls `GetItemStackRenderInfo` at `IL_0011`; preparation calls slot/collectible callbacks at `IL_0352`/`IL_0367`; local model matrix construction ends at `IL_0238`, before preparation at `IL_0239`. Offsets identify this inspected version, not a portable hook signature. Match semantic instruction structure during installation and reject incompatible layouts. |
+| Draw/shading/eligibility | Model/model-view submissions at GUI `IL_03EC`/`IL_041C`; custom registry lookup at `IL_0439`–`IL_0459`, delegate call `IL_0472`, ordinary mesh draw `IL_04E1`. `ClientEventAPI.itemStackRenderersByTarget` indexes collectible class, GUI target, and ID. Installed `assets/game/shaders/gui.vsh` transforms positions with model-view and normals with model matrix. |
+| Menu size, direction, capture and fallback | [RadialMenuLayout](../../VanillaExpanded/src/RadialMenu/RadialMenuLayout.cs), [RadialMenuRenderer](../../VanillaExpanded/src/RadialMenu/RadialMenuRenderer.cs), [RadialMenuIconHalo](../../VanillaExpanded/src/RadialMenu/RadialMenuIconHalo.cs), and [QuickToolItemIcon](../../VanillaExpanded/src/QuickTools/QuickToolItemIcon.cs); angles are clockwise from up, hover scales size/placement once, capture owns depth, fallback has a category offset. |
+
+These are source/assembly findings and design decisions, not an executed hook or visual acceptance. Initial asset coverage and shape-specific authoring groups are recorded in [ToolHeadPresentation.todo](ToolHeadPresentation.todo#initial-asset-coverage). Numeric transforms, hook verification, and renderer tests remain implementation work.

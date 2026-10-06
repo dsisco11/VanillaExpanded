@@ -1,7 +1,7 @@
 # Asset-defined radial-menu tool presentation
 
 Source proposal: [ToolHeadPresentation.proposal.md](ToolHeadPresentation.proposal.md).
-Status: planned; implementation and visual acceptance are outstanding.
+Status: asset and rendering contracts established; production implementation and visual acceptance are outstanding.
 
 ## Goal and constraints
 
@@ -13,31 +13,58 @@ Follow repository code practices: documented methods/classes, comments for nontr
 
 ## Open decisions
 
-- Confirm `attributes.ve-radial-menu-properties` as the asset location and identify a suitable existing engine transform data model.
-- Define field names/defaults, units, pivot, transform order, reference size, and the wedge-relative angle convention before patch authoring.
-- Identify the engine boundary that separates item-specific mesh preparation from GUI presentation; the public GUI call is not assumed to expose it.
-- Establish initial quick-swap tool-family coverage and supported renderer behavior. Unsupported custom renderers retain fallback until a concrete extension is needed.
+The schema, matrix convention, hook boundary, initial coverage, and conservative renderer eligibility are settled in the source proposal's Asset settings, Rendering behavior, and Evidence sections. Numeric artwork tuning and executed hook/renderer validation remain future work, not unresolved foundational decisions. Revalidate the hook against engine versions other than the inspected 1.22.7.0.
 
 ## Phase 1: Establish asset and rendering contracts
 
 Outcome: implementation and patch authors have a verified integration point and one documented presentation convention.
 
-- [ ] Inspect relevant repository instructions, asset patch conventions, existing transform types, `QuickToolItemIcon`, and the radial-menu rendering pipeline.
-- [ ] Inspect current base-game item rendering to identify how mesh/texture selection, callbacks, GUI transforms, lighting, and depth are applied.
-  - [ ] Select a scoped override boundary that replaces GUI presentation while preserving applicable item-specific preparation and a single callback invocation.
-  - [ ] Define renderer eligibility and safe fallback when the override is unavailable or a custom renderer cannot honor it.
-- [ ] Resolve and document the asset schema in the proposal.
-  - [ ] Define model-space rotation in degrees, positive uniform scale, model-space translation, and optional screen-space wedge-relative rotation.
-  - [ ] Define defaults independent of inventory GUI transforms, a consistent pivot, transform order, reference scale, and the meaning of omitted wedge rotation.
-  - [ ] Specify placement relative to the wedge icon position and how menu size/hover apply once; prohibit fixed screen coordinates in asset values.
-  - [ ] Reuse the engine transform data model where suitable and document any concrete gap requiring additional fields.
-- [ ] Inventory the quick-swap tool families and representative model/material variants; record intended shared patches and necessary model-specific overrides in this plan.
-- [ ] Assign ownership: assets provide settings, a focused item-rendering component resolves/applies them, and the menu supplies wedge context and existing capture/halo/clipping.
+- [x] Inspect relevant repository instructions, asset patch conventions, existing transform types, `QuickToolItemIcon`, and the radial-menu rendering pipeline.
+- [x] Inspect current base-game item rendering to identify how mesh/texture selection, callbacks, GUI transforms, lighting, and depth are applied.
+  - [x] Select a scoped override boundary that replaces GUI presentation while preserving applicable item-specific preparation and a single callback invocation.
+  - [x] Define renderer eligibility and safe fallback when the override is unavailable or a custom renderer cannot honor it.
+- [x] Resolve and document the asset schema in the proposal.
+  - [x] Define model-space rotation in degrees, positive uniform scale, model-space translation, and optional screen-space wedge-relative rotation.
+  - [x] Define defaults independent of inventory GUI transforms, a consistent pivot, transform order, reference scale, and the meaning of omitted wedge rotation.
+  - [x] Specify placement relative to the wedge icon position and how menu size/hover apply once; prohibit fixed screen coordinates in asset values.
+  - [x] Reuse the engine transform data model where suitable and document any concrete gap requiring additional fields.
+- [x] Inventory the quick-swap tool families and representative model/material variants; record intended shared patches and necessary model-specific overrides in this plan.
+- [x] Assign ownership: assets provide settings, a focused item-rendering component resolves/applies them, and the menu supplies wedge context and existing capture/halo/clipping.
 
 Completion criteria:
 
-- [ ] Schema and integration decisions have current source or installed-engine evidence and are recorded before dependent code or patches are authored.
-- [ ] Coverage and unsupported-renderer boundaries are explicit; no decision requires changing inventory policy or shared GUI transforms.
+- [x] Schema and integration decisions have current source or installed-engine evidence and are recorded before dependent code or patches are authored.
+- [x] Coverage and unsupported-renderer boundaries are explicit; no decision requires changing inventory policy or shared GUI transforms.
+
+### Initial asset coverage
+
+Inspected the installed survival item definitions on 2026-10-06: all 23 files with root `tool-*` or `weapon-*` tags are under `game:itemtypes/tool/`. These tags feed `QuickToolCandidateCache.DiscoverSlot`; production grouping is dynamic and includes combined tags, not just the legacy `EnumTool` table. The inventory below is the initial patch scope. Paths are relative to that asset directory; material variants can share a transform only when their selected geometry and prepared model behavior agree.
+
+| Asset file(s) | Shared patch groups and model-specific overrides to author |
+| --- | --- |
+| `pickaxe.json` | Separate base and iron/meteoriciron/steel shapes; represent copper, bronze, and iron/steel. |
+| `prospectingpick.json` | Own head framing; share material variants of the same prospecting-pick geometry. Its combined pickaxe/prospecting tags do not justify reusing pickaxe framing. |
+| `axe-stone.json`, `axe-metal.json` | Separate stone, scrap, copper/bronze felling, iron-shaped felling (including gold/silver), and each ruined head type: bearded, battle, bardiche, double. |
+| `shovel.json`, `hoe.json` | Separate stone and metal head geometry in each file; represent flint, copper/bronze, iron/steel. |
+| `hammer.json`, `scythe.json`, `saw.json`, `chisel.json`, `shears.json`, `cleaver.json`, `solderingiron.json` | Separate transform per file/model; share compatible material variants. Shears/cleaver must retain their complete resolved tag groups. |
+| `knife.json` | Separate stone/bone, standard metal, and ruined dagger/stiletto/khanjar/baselard shapes; verify any type sharing against resolved geometry. |
+| `blade.json` | Separate falx, blackguard, longsword, forlorn, scrap, gladius, arming, claymore, sabre, corresponding ruined shapes, and admin longsword; share texture-only metals within each actual shape. |
+| `spear.json` | Separate stone, metal shape variants, scrap, hacking, ornate gold/silver, erel projectile-shaped spear, and ruined boar/voulge/fork/ranseur heads. |
+| `club.json` | Separate generic wooden, scrap, scrapmace, and ruined flanged/morningstar/spiked/warhammer heads; `weapon-melee` alone still qualifies in current discovery. |
+| `bow.json` | Separate simple/crude/long/recurve geometry; check callback-selected/alternate meshes before sharing. Frame the recognisable working section rather than inventing a tool head. |
+| `sling.json` | Own working-section framing; check folded and charge variants only where selectable by GUI preparation. |
+| `wrench.json`, `crowbar.json` | Separate actual shape families: wrench model groups and copper versus iron crowbar. Share material variants only after shape comparison. |
+| `tongs.json`, `tongsmetal.json` | Separate wooden and metal models; verify narrow/medium/wide callback-selected openings remain readable with the selected file's transform. If one transform cannot cover the opening range, retain fallback for that asset until a concrete extension is designed. |
+
+Shields/round shields have no root category tags in the inspected assets and are not initial patch targets merely because the legacy enum table includes Shield. Untagged tools, standalone tool heads, ammunition, mod-added definitions, block items, and non-tool entries (including this mod's healing-item patches and the virtual light entry) retain existing presentation. Do not add discovery tags to expand coverage. Unknown or registered custom GUI renderers retain fallback regardless of asset metadata.
+
+### Documentation traceability and evidence
+
+Completion: 2026-10-06. Second review and independent stage-completion audit passed. Fresh source/assembly inspection, 23-file asset coverage, Markdown link/anchor checks, and `git diff --check` support the contract. No production code, asset patches, executed rendering hook, or visual acceptance is claimed.
+
+- Phase 1 asset/schema tasks -> proposal Asset settings -> collectible attributes, explicit independent defaults, fixed pivot/order/reference size, optional wedge angle -> current `ModelTransform`/`JsonObject`/collectible source, installed pickaxe transforms and attribute patches; contract recorded in the proposal.
+- Phase 1 engine/eligibility tasks -> proposal Rendering behavior and Evidence -> one callback preparation, scoped matrix replacement, no shared mutation, ordinary-mesh eligibility and fallback -> fresh Mono.Cecil inspection of installed 1.22.7.0, exact method/hash/IL landmarks recorded in the proposal; runtime execution belongs to Phase 3.
+- Phase 1 coverage/ownership tasks -> proposal Coverage and fallback / Scope and ownership -> patch current families, keep unrelated entries unchanged, directional ownership -> current discovery/layout/icon/capture source and 23-file installed asset inventory above. Source inspection is not visual acceptance.
 
 ## Phase 2: Resolve and validate asset presentation settings
 
