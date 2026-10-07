@@ -117,7 +117,7 @@
         "name": "EnableFoodGrainEffect",
         "ingui": "vanillaexpanded:config-enable-food-grain-effect",
         "comment": "vanillaexpanded:config-enable-food-grain-effect-tooltip",
-        "default": true,
+        "default": false,
         "weight": 4.25,
         "clientSide": true
       },

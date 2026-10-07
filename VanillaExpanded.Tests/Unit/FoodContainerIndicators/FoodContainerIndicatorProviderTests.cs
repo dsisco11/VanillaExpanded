@@ -10,9 +10,23 @@ namespace VanillaExpanded.Tests.Unit.FoodContainerIndicators;
 
 /// <summary>Checks exclusive container routing and preservation of contained freshness.</summary>
 [Trait("Category", "Unit")]
-public sealed class FoodContainerIndicatorProviderTests
+public sealed class FoodContainerIndicatorProviderTests : System.IDisposable
 {
+    private readonly bool previousFoodEffect = VanillaExpandedModSystem.Config.EnableFoodGrainEffect;
+
     #region Public API
+    /// <summary>Enables the optional effect explicitly for provider capability checks.</summary>
+    public FoodContainerIndicatorProviderTests()
+    {
+        VanillaExpandedModSystem.Config.EnableFoodGrainEffect = true;
+    }
+
+    /// <summary>Restores the caller's effect setting after each test.</summary>
+    public void Dispose()
+    {
+        VanillaExpandedModSystem.Config.EnableFoodGrainEffect = previousFoodEffect;
+    }
+
     /// <summary>Disabling grains hides only the amount layer, leaving meal freshness applicable.</summary>
     [Fact]
     public void FoodEffectToggle_DoesNotHideFreshness()

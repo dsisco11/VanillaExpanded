@@ -63,7 +63,7 @@ public class VanillaExpandedConfig
     /// <summary>Animates liquid volume indicators; disabling retains plain volume fills.</summary>
     public bool EnableLiquidSloshEffect { get; set; } = true;
     /// <summary>Shows animated food-amount grains without disabling meal freshness indicators.</summary>
-    public bool EnableFoodGrainEffect { get; set; } = true;
+    public bool EnableFoodGrainEffect { get; set; } = false;
     /// <summary>Shows metal amount in filled crucibles and active firepit input crucibles.</summary>
     public bool EnableCrucibleIndicators { get; set; } = true;
     /// <summary>Animates crucible metal; disabling retains the plain amount indicator.</summary>
