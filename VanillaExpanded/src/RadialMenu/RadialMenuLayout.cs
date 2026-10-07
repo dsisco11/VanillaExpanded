@@ -176,10 +176,13 @@ public sealed class RadialMenuLayout
         if (radiusPixels <= 0 || insetPixels < 0) throw new ArgumentOutOfRangeException(nameof(radiusPixels));
         if (IsSingleOption) return (float)Math.Max(1d, OuterRadius * radiusPixels * 2d - insetPixels * 2d);
         double midRadius = (InnerRadius + OuterRadius) / 2d;
-        double halfAngle = Math.Max(0d, StepDegrees / 2d - SeparatorDegrees) * Math.PI / 180d;
-        double radialCapacity = (OuterRadius - InnerRadius) * radiusPixels;
-        double angularCapacity = 2d * midRadius * radiusPixels * Math.Sin(halfAngle);
-        return (float)Math.Max(1d, Math.Min(radialCapacity, angularCapacity) - insetPixels * 2d);
+        double halfAngle = Math.Clamp(StepDegrees / 2d - SeparatorDegrees, 0d, 90d) * Math.PI / 180d;
+        // A circle centered in the wedge fits both arcs and side boundaries. Inscribe the icon square
+        // in that circle so every corner fits regardless of wedge direction or authored icon rotation.
+        double radialClearance = (OuterRadius - InnerRadius) * radiusPixels / 2d;
+        double angularClearance = midRadius * radiusPixels * Math.Sin(halfAngle);
+        double clearance = Math.Min(radialClearance, angularClearance) - insetPixels;
+        return (float)Math.Max(1d, Math.Sqrt(2d) * clearance);
     }
 
     /// <summary>Gets the rendered center for an entry anywhere in this nested menu.</summary>

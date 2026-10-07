@@ -196,6 +196,29 @@ public sealed class RadialMenuTests
         Assert.True(denseSize > 0);
     }
 
+    /// <summary>Every icon corner stays inside its wedge across sparse and dense menus and screen directions.</summary>
+    [Theory]
+    [InlineData(2)]
+    [InlineData(4)]
+    [InlineData(8)]
+    [InlineData(16)]
+    [InlineData(32)]
+    public void IconCornersRemainWithinTheirWedges(int count)
+    {
+        string[] ids = [.. Enumerable.Range(0, count).Select(index => index.ToString())];
+        var layout = new RadialMenuLayout(ids, 0.40, 0.90, separatorDegrees: 1.5);
+        const double radius = 600;
+        double halfSize = layout.GetIconSizePixels(radius, 9) / 2d;
+        for (int index = 0; index < count; index++)
+        {
+            (double x, double y) = layout.GetWedgeCenter(index, 0, 0, radius, 0.65);
+            foreach (int horizontal in new[] { -1, 1 })
+                foreach (int vertical in new[] { -1, 1 })
+                    Assert.Equal(ids[index], layout.HitTest(x + horizontal * halfSize,
+                        y + vertical * halfSize, 0, 0, radius));
+        }
+    }
+
     [Theory]
     [InlineData("2x2x2", "2x2x2")]
     [InlineData("Andesite Cobblestone", "Andesite\nCobblestone")]
