@@ -10,37 +10,45 @@ This plan does not add proximity searches, open containers automatically, introd
 
 ## Assumptions and decisions to resolve
 
-    ☐ Establish which opened inventories qualify using installed engine/source contracts before coding selection.
-        ☐ Recommended initial scope: ordinary storage containers; exclude the target firepit, unrelated player inventories, creative inventories, and other processing inventories.
-        ☐ Inspect storage inventory classes and existing container owning APIs; do not assume InventoryGeneric alone identifies ordinary storage, or introduce a broad type/name heuristic without evidence.
-        ☐ Record support for vanilla storage variants and the boundary for modded storage; document any unsupported cases explicitly.
-    ☐ Confirm transfer priority, using these recommended defaults unless the user changes them:
-        ☐ Withdraw from smallest matching stacks first across the whole pool; break ties by backpack, hotbar, then stable opened-container order.
-        ☐ Return to compatible existing stacks before empty slots; within each group prefer backpack, hotbar, then stable opened-container order.
-        ☐ Do not track original provenance or promise return to the original container.
+    ☑ Establish which opened inventories qualify using installed engine/source contracts before coding selection.
+        ☑ Recommended initial scope: ordinary storage containers; exclude the target firepit, unrelated player inventories, creative inventories, and other processing inventories.
+        ☑ Inspect storage inventory classes and existing container owning APIs; do not assume InventoryGeneric alone identifies ordinary storage, or introduce a broad type/name heuristic without evidence.
+        ☑ Record support for vanilla storage variants and the boundary for modded storage; document any unsupported cases explicitly.
+    ☑ Confirm transfer priority, using these recommended defaults unless the user changes them:
+        ☑ Withdraw from smallest matching stacks first across the whole pool; break ties by backpack, hotbar, then stable opened-container order.
+        ☑ Return to compatible existing stacks before empty slots; within each group prefer backpack, hotbar, then stable opened-container order.
+        ☑ Do not track original provenance or promise return to the original container.
+
+Resolved implementation decisions (2026-10-07):
+
+- Initial storage eligibility resolves InventoryBase.Pos through the world's block accessor, accepts BlockEntityGenericContainer, BlockEntityGenericTypedContainer (including labeled chests), or BlockEntityCrate owners, and requires reference identity with the owner's current Inventory. The inventory must appear in OpenedInventories. This supports generic chests/baskets and typed storage variants; crates qualify only when their inventory is actually opened. Closed crates are not opened automatically.
+- Modded subclasses of these storage owners inherit eligibility and retain their slot restrictions. Other modded storage owners, entity-attached storage, racks, liquid-only owners, and processing owners are outside the initial support boundary. InventoryGeneric alone and inventory class-name strings do not establish eligibility.
+- Pool order is backpack, hotbar, then the current OpenedInventories list order. Withdrawal consumers retain stable smallest-stack-first ordering; returns retain existing-stack-first ordering with pool order as the tie breaker. InventoriesOrdered is not used to broaden eligibility or enumerate unopened inventories. No source provenance is retained.
+- Phase 1 provides selection and live directional probes only; services remain unchanged until their integration tasks. Slot collection includes empty and locked slots so source and destination eligibility can be evaluated separately at use time.
+- Source contracts: D:/CODE/VintageStory/vssurvivalmod/BlockEntity/{BEContainer,BEGenericContainer,BEGenericTypedContainer,BELabeledChest,BECrate}.cs; D:/CODE/VintageStory/vsapi/Common/Entity/Player/IPlayerInventoryManager.cs and D:/CODE/VintageStory/vsapi/Common/Inventory/{IInventory,InventoryBase,ItemSlot}.cs. Existing AutoStashing container targets, crate policy, planner, and transfer executor supply reuse-boundary evidence, not calculator policy.
 
 ## Phase 1: Establish the eligible inventory pool
 
 Outcome: ingredient and fuel services can obtain one consistently ordered, duplicate-free pool without changing deposit behavior yet.
 
-    ☐ Inventory reusable APIs and implementation boundaries.
-        ☐ Inspect IPlayerInventoryManager.OpenedInventories, InventoriesOrdered, ItemSlot.CanTake, CanTakeFrom, CanHold, and inventory CanContain contracts.
-        ☐ Inspect specialized container slot/transfer behavior and the existing AutoStashing policies for reusable contracts; avoid coupling calculator logic to unrelated stash policy.
-        ☐ Resolve the storage eligibility and ordering assumptions above and record the concrete rule here.
-    ☐ Add one narrowly responsible inventory-selection component under src/AlloyCalculator.
-        ☐ Preserve backpack/hotbar selection and existing missing-inventory error behavior.
-        ☐ Append only eligible inventories currently in OpenedInventories, excluding the entire target firepit inventory.
-        ☐ Deduplicate inventory and slot identities so availability cannot be counted twice and a slot cannot transfer to itself.
-        ☐ Keep source and destination eligibility directional: take restrictions govern withdrawal; put restrictions govern returns.
-        ☐ Obtain fresh eligible inventories for each planning/execution operation; do not keep an inventory cache across clicks.
-        ☐ Add XML documentation and logical-process comments; organize methods by visibility and responsibility.
-    ☐ Verify pool ordering, duplicate exclusion, target exclusion, storage eligibility, and closed/unrelated inventory exclusion with focused unit tests.
+    ☑ Inventory reusable APIs and implementation boundaries.
+        ☑ Inspect IPlayerInventoryManager.OpenedInventories, InventoriesOrdered, ItemSlot.CanTake, CanTakeFrom, CanHold, and inventory CanContain contracts.
+        ☑ Inspect specialized container slot/transfer behavior and the existing AutoStashing policies for reusable contracts; avoid coupling calculator logic to unrelated stash policy.
+        ☑ Resolve the storage eligibility and ordering assumptions above and record the concrete rule here.
+    ☑ Add the narrowly responsible AlloyTransferInventoryPolicy component under src/AlloyCalculator.
+        ☑ Preserve backpack/hotbar selection and existing missing-inventory error behavior.
+        ☑ Append only eligible inventories currently in OpenedInventories, excluding the entire target firepit inventory.
+        ☑ Deduplicate inventory and slot identities so availability cannot be counted twice and a slot cannot transfer to itself.
+        ☑ Keep source and destination eligibility directional: take restrictions govern withdrawal; put restrictions govern returns.
+        ☑ Obtain fresh eligible inventories for each planning/execution operation; do not keep an inventory cache across clicks.
+        ☑ Add XML documentation and logical-process comments; organize methods by visibility and responsibility.
+    ☑ Verify pool ordering, duplicate exclusion, target exclusion, storage eligibility, and closed/unrelated inventory exclusion with focused unit tests.
 
 Completion criteria:
 
-    ☐ Eligibility has an evidenced engine contract and an explicit supported-storage boundary.
-    ☐ Pool tests demonstrate stable ordering and no duplicate availability.
-    ☐ Existing player-only behavior remains the default when no qualifying container is open.
+    ☑ Eligibility has an evidenced engine contract and an explicit supported-storage boundary.
+    ☑ Pool tests demonstrate stable ordering and no duplicate availability.
+    ☑ Existing player-only behavior remains the default when no qualifying container is open.
 
 ## Phase 2: Integrate ingredient deposits and restricted transfers
 
@@ -95,7 +103,7 @@ Completion criteria:
 Outcome: implementation is reviewable with automated receipts and clearly separated live-runtime acceptance.
 
     ☐ Run build/test tools through subagents as required by repository instructions.
-        ☐ Run the AlloyCalculator unit suite, including new inventory-pool, service, and reconciler cases.
+        ☐ Run the AlloyCalculator unit suite, including new inventory-policy, service, and reconciler cases.
         ☐ Run additional affected tests only if shared code beyond AlloyCalculator changed.
         ☐ Record the command, result counts, and material warnings in the completion report; avoid adding unsolicited receipt files.
     ☐ Review the implementation against this complete plan and the source proposal a second time.
