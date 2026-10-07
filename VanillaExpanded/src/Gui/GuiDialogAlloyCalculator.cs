@@ -121,6 +121,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     }
 
     // TODO: There has to be a better way to calculate/cache these item-stack variants, ideally we should be capable of leveraging the cache that the handbook already has internally.
+    /// <summary>Caches handbook variants and derives the maximum smelting temperature from burning fuels.</summary>
     private void BuildHandbookStacksCache()
     {
         var stacks = new List<ItemStack>();
@@ -143,8 +144,8 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                 }
 
                 // Collect fuels
-                var combustProps = stack.Collectible.CombustibleProps;
-                if (combustProps?.BurnDuration is not null || combustProps?.BurnTemperature is not null)
+                var combustProps = stack.Collectible.GetCombustibleProperties(capi.World, stack, null);
+                if (combustProps is { BurnDuration: > 0, BurnTemperature: > 0 })
                 {
                     smeltingFuels.Add(stack);
                 }
@@ -155,8 +156,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
         // Calculate max fuel temperature
         maxFuelTemperature = smeltingFuels
-            .Where(static f => f.Collectible.CombustibleProps?.BurnTemperature is not null)
-            .Select(static f => f.Collectible.CombustibleProps!.BurnTemperature)
+            .Select(f => f.Collectible.GetCombustibleProperties(capi.World, f, null)!.BurnTemperature)
             .DefaultIfEmpty(0)
             .Max();
     }

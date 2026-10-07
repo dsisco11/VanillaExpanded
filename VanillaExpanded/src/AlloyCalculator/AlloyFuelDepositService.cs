@@ -11,6 +11,7 @@ using Vintagestory.GameContent;
 
 namespace VanillaExpanded.AlloyCalculator;
 
+/// <summary>Plans and applies fuel inventory corrections for the metals in a firepit.</summary>
 internal static class AlloyFuelDepositService
 {
     internal static AlloyDepositResultCode Execute(
@@ -66,12 +67,12 @@ internal static class AlloyFuelDepositService
 
         List<ItemSlot> suitablePlayerSlots = playerSlots
             .Where(static slot => slot.Itemstack is not null)
-            .Where(slot => IsSuitableFuel(world, slot.Itemstack!, meltingPoint))
+            .Where(slot => IsSuitableFuel(world, slot.Itemstack!, meltingPoint, firepit.HeatModifier))
             .ToList();
         List<ItemStack> candidates = suitablePlayerSlots
             .Select(static slot => slot.Itemstack!)
             .ToList();
-        if (queuedFuel is not null && IsSuitableFuel(world, queuedFuel, meltingPoint))
+        if (queuedFuel is not null && IsSuitableFuel(world, queuedFuel, meltingPoint, firepit.HeatModifier))
         {
             candidates.Insert(0, queuedFuel);
         }
@@ -80,7 +81,7 @@ internal static class AlloyFuelDepositService
         int bestAmount = 0;
         foreach (ItemStack stack in candidates)
         {
-            if (!IsSuitableFuel(world, stack, meltingPoint)) continue;
+            if (!IsSuitableFuel(world, stack, meltingPoint, firepit.HeatModifier)) continue;
             if (bestStack is not null && SameStack(world, bestStack, stack)) continue;
 
             CombustibleProperties properties = stack.Collectible.GetCombustibleProperties(world, stack, null)!;
@@ -188,11 +189,13 @@ internal static class AlloyFuelDepositService
         return MapResult(addResult);
     }
 
-    private static bool IsSuitableFuel(IWorldAccessor world, ItemStack stack, float meltingPoint)
+    /// <summary>Requires burning fuel that reaches the metals' melting point under the firepit's heat modifier.</summary>
+    private static bool IsSuitableFuel(IWorldAccessor world, ItemStack stack, float meltingPoint, float heatModifier)
     {
         CombustibleProperties? properties = stack.Collectible.GetCombustibleProperties(world, stack, null);
         return properties is { BurnDuration: > 0 }
-            && properties.BurnTemperature >= meltingPoint;
+            && properties.BurnTemperature > 0
+            && (int)(properties.BurnTemperature * heatModifier) >= meltingPoint;
     }
 
     /// <summary>Maps a slot-correction result to the alloy calculator's user-facing result contract.</summary>

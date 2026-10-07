@@ -14,6 +14,27 @@ namespace VanillaExpanded.Tests.Unit.AlloyCalculator;
 [Trait("Category", "Unit")]
 public class AlloyFuelDepositServiceTests
 {
+    /// <summary>Verifies fuel eligibility against metal temperature, burn duration, and effective firepit heat.</summary>
+    [Theory]
+    [InlineData(900, 40, 1, false)]
+    [InlineData(1000, 40, 1, true)]
+    [InlineData(1300, 0, 1, false)]
+    [InlineData(1300, 40, 0.5f, false)]
+    [InlineData(900, 40, 1.5f, true)]
+    public void CreatePlan_FuelProperties_DetermineSuitability(int temperature, float duration, float heatModifier, bool suitable)
+    {
+        TestContext context = CreateContext(backpackFuelAmount: 64);
+        context.Fuel.CombustibleProps.BurnTemperature = temperature;
+        context.Fuel.CombustibleProps.BurnDuration = duration;
+        Assert.IsType<TestFirepit>(context.Firepit).TestHeatModifier = heatModifier;
+
+        AlloyDepositResultCode result = AlloyFuelDepositService.CreatePlan(
+            context.Fixture.ClientApi, context.Firepit, context.Fixture.Player, out AlloyFuelDepositPlan? plan);
+
+        Assert.Equal(suitable ? AlloyDepositResultCode.Success : AlloyDepositResultCode.InsufficientItems, result);
+        Assert.Equal(suitable, plan is not null);
+    }
+
     /// <summary>Verifies that planning requires smeltable input in the firepit.</summary>
     [Fact]
     public void CreatePlan_NoInput_ReturnsInvalidRequest()
@@ -184,7 +205,7 @@ public class AlloyFuelDepositServiceTests
         var blockAccessor = new Mock<IBlockAccessor>();
         fixture.WorldMock.SetupGet(world => world.BlockAccessor).Returns(blockAccessor.Object);
         MockItem fuel = CreateFuel(fixture, 1, "fuel");
-        var firepit = new BlockEntityFirepit
+        var firepit = new TestFirepit
         {
             Api = fixture.Api,
             Pos = new BlockPos(0)
@@ -228,6 +249,13 @@ public class AlloyFuelDepositServiceTests
         VsTestFixture Fixture,
         BlockEntityFirepit Firepit,
         MockItem Fuel);
+
+    /// <summary>Allows fuel planning to exercise the engine's firepit heat modifier contract.</summary>
+    private sealed class TestFirepit : BlockEntityFirepit
+    {
+        public float TestHeatModifier { get; set; } = 1;
+        public override float HeatModifier => TestHeatModifier;
+    }
 
     /// <summary>Provides deterministic melting properties for fuel-plan tests.</summary>
     private sealed class TestSmeltingContainer : BlockSmeltingContainer
