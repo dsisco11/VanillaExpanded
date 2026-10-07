@@ -12,27 +12,27 @@ namespace VanillaExpanded.Tests.Unit.FoodContainerIndicators;
 [Trait("Category", "Unit")]
 public sealed class FoodContainerIndicatorProviderTests : System.IDisposable
 {
-    private readonly bool previousFoodEffect = VanillaExpandedModSystem.Config.EnableFoodGrainEffect;
+    private readonly string previousFoodEffect = VanillaExpandedModSystem.Config.FoodLevelIndicatorStyle;
 
     #region Public API
     /// <summary>Enables the optional effect explicitly for provider capability checks.</summary>
     public FoodContainerIndicatorProviderTests()
     {
-        VanillaExpandedModSystem.Config.EnableFoodGrainEffect = true;
+        VanillaExpandedModSystem.Config.FoodLevelIndicatorStyle = "slot-background";
     }
 
     /// <summary>Restores the caller's effect setting after each test.</summary>
     public void Dispose()
     {
-        VanillaExpandedModSystem.Config.EnableFoodGrainEffect = previousFoodEffect;
+        VanillaExpandedModSystem.Config.FoodLevelIndicatorStyle = previousFoodEffect;
     }
 
-    /// <summary>Disabling grains hides only the amount layer, leaving meal freshness applicable.</summary>
+    /// <summary>Both food styles retain amount and freshness; only the background uses particle framing.</summary>
     [Fact]
-    public void FoodEffectToggle_DoesNotHideFreshness()
+    public void FoodStyles_PreserveAmountAndFreshness()
     {
         var config = VanillaExpandedModSystem.Config;
-        bool previous = config.EnableFoodGrainEffect;
+        string previous = config.FoodLevelIndicatorStyle;
         try
         {
             var (world, api, inventory) = CreateInventory();
@@ -42,13 +42,14 @@ public sealed class FoodContainerIndicatorProviderTests : System.IDisposable
             item.Setup(value => value.UpdateAndGetTransitionState(world, inventory[0], EnumTransitionType.Perish))
                 .Returns(new TransitionState { FreshHours = 100, FreshHoursLeft = 50 });
             inventory[0].Itemstack = new ItemStack(item.Object);
-            config.EnableFoodGrainEffect = false;
-            Assert.False(new FoodContainerIndicatorProvider().TryGetIndicator(inventory[0], out _));
+            config.FoodLevelIndicatorStyle = "progress-bar";
+            Assert.True(new FoodContainerIndicatorProvider().TryGetIndicator(inventory[0], out var bar));
+            Assert.Null(bar.DrawRange);
             Assert.True(new FreshnessIndicatorProvider().TryGetIndicator(inventory[0], out _));
-            config.EnableFoodGrainEffect = true;
+            config.FoodLevelIndicatorStyle = "slot-background";
             Assert.True(new FoodContainerIndicatorProvider().TryGetIndicator(inventory[0], out _));
         }
-        finally { config.EnableFoodGrainEffect = previous; }
+        finally { config.FoodLevelIndicatorStyle = previous; }
     }
 
     /// <summary>Food level follows servings and vessel capacity even when no perish state exists.</summary>

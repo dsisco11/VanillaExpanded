@@ -71,8 +71,11 @@ internal sealed class ItemSlotIndicatorSystem : ModSystem
         Register(new FoodContainerIndicatorProvider(),
             contextKey: static () => (VanillaExpandedModSystem.Config.EnablePerishableItemFreshnessIndicators,
                 VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity,
-                VanillaExpandedModSystem.Config.EnableFoodGrainEffect),
-            effect: FoodGrainIndicatorEffect.Definition, overlay: true, adaptiveSampling: new AdaptiveSamplingOptions());
+                VanillaExpandedModSystem.Config.FoodLevelIndicatorStyle),
+            effect: FoodGrainIndicatorEffect.Definition, overlay: true, adaptiveSampling: new AdaptiveSamplingOptions(),
+            defaultStyle: ItemSlotIndicatorRenderingStyle.HorizontalBar,
+            supportedStyles: [ItemSlotIndicatorRenderingStyle.HorizontalBar, ItemSlotIndicatorRenderingStyle.SlotBackground],
+            styleSelector: static () => VanillaExpandedModSystem.Config.FoodLevelRenderingStyle);
         Register(new PreparationIndicatorProvider(), priority: -10,
             contextKey: static () => VanillaExpandedModSystem.Config.EnablePreparationIndicators);
         Register(new ClothingIndicatorProvider(), priority: -10,

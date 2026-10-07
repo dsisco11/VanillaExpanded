@@ -14,7 +14,7 @@ internal sealed record GrainSimulationProfile(string ShaderName, int ParticleCou
     internal static GrainSimulationProfile Food { get; } = new(
         FoodGrainSimulationShaderProgram.ShaderName, FoodGrainStateBuffers.ParticleCount, new(0.01f, 0.023f),
         0.30f, 6, static () => VanillaExpandedModSystem.Config.EnablePerishableItemFreshnessIndicators
-            && VanillaExpandedModSystem.Config.EnableFoodGrainEffect);
+            && VanillaExpandedModSystem.Config.FoodGrainEffectEnabled);
     /// <summary>Gets 128 larger chunks with restrained motion and independent high-friction contacts.</summary>
     internal static GrainSimulationProfile SolidMetal { get; } = new(
         "vanillaexpanded_itemslot_metal_chunks_simulation", 128, new(0.018f, 0.035f),

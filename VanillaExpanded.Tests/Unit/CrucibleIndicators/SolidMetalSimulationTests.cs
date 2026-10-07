@@ -56,23 +56,24 @@ public sealed class SolidMetalSimulationTests
     public void Enablement_IsIndependent()
     {
         var config = VanillaExpandedModSystem.Config;
-        bool oldFood = config.EnableFoodGrainEffect, oldMetal = config.EnableCrucibleEffect;
+        string oldFood = config.FoodLevelIndicatorStyle;
+        bool oldMetal = config.EnableCrucibleEffect;
         bool oldFreshness = config.EnablePerishableItemFreshnessIndicators, oldCrucible = config.EnableCrucibleIndicators;
         try
         {
             config.EnablePerishableItemFreshnessIndicators = config.EnableCrucibleIndicators = true;
-            config.EnableFoodGrainEffect = false;
+            config.FoodLevelIndicatorStyle = "progress-bar";
             config.EnableCrucibleEffect = true;
             Assert.False(GrainSimulationProfile.Food.Enabled());
             Assert.True(GrainSimulationProfile.SolidMetal.Enabled());
-            config.EnableFoodGrainEffect = true;
+            config.FoodLevelIndicatorStyle = "slot-background";
             config.EnableCrucibleEffect = false;
             Assert.True(GrainSimulationProfile.Food.Enabled());
             Assert.False(GrainSimulationProfile.SolidMetal.Enabled());
         }
         finally
         {
-            config.EnableFoodGrainEffect = oldFood;
+            config.FoodLevelIndicatorStyle = oldFood;
             config.EnableCrucibleEffect = oldMetal;
             config.EnablePerishableItemFreshnessIndicators = oldFreshness;
             config.EnableCrucibleIndicators = oldCrucible;

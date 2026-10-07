@@ -8,7 +8,7 @@ using Vintagestory.GameContent;
 
 namespace VanillaExpanded.FoodContainerIndicators;
 
-/// <summary>Supplies serving-level particles for food vessels independently of freshness.</summary>
+/// <summary>Supplies serving-level indicators for food vessels independently of freshness.</summary>
 internal sealed class FoodContainerIndicatorProvider : IItemSlotIndicatorProvider
 {
     private readonly FoodContainerParticlePalette palettes = new();
@@ -18,7 +18,6 @@ internal sealed class FoodContainerIndicatorProvider : IItemSlotIndicatorProvide
     {
         indicator = default;
         if (!VanillaExpandedModSystem.Config.EnablePerishableItemFreshnessIndicators) return false;
-        if (!VanillaExpandedModSystem.Config.EnableFoodGrainEffect) return false;
         if (slot.Itemstack is not ItemStack stack || slot.Inventory?.Api is not ICoreAPI api) return false;
         if (!FoodContainerClassification.IsFoodContainer(stack.Collectible)) return false;
         if (stack.Collectible.GetCollectibleInterface<IBlockMealContainer>() is not IBlockMealContainer container) return false;
@@ -28,9 +27,9 @@ internal sealed class FoodContainerIndicatorProvider : IItemSlotIndicatorProvide
         // Resource amount controls grain height; freshness only controls the independently selected background.
         float opacity = Math.Clamp(VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity, 0, 1);
         indicator = new ItemSlotIndicator(Math.Clamp(servings / capacity, 0, 1), new Vector4(1, 1, 1, opacity),
-            FoodGrainIndicatorEffect.DrawRange)
+            VanillaExpandedModSystem.Config.FoodGrainEffectEnabled ? FoodGrainIndicatorEffect.DrawRange : null)
         {
-            ParticlePalette = api is ICoreClientAPI client ? palettes.Resolve(client, stack, container) : null
+            ParticlePalette = VanillaExpandedModSystem.Config.FoodGrainEffectEnabled && api is ICoreClientAPI client ? palettes.Resolve(client, stack, container) : null
         };
         return true;
     }

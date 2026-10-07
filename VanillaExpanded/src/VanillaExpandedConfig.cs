@@ -62,8 +62,13 @@ public class VanillaExpandedConfig
     public bool EnableLiquidContainerIndicators { get; set; } = true;
     /// <summary>Animates liquid volume indicators; disabling retains plain volume fills.</summary>
     public bool EnableLiquidSloshEffect { get; set; } = true;
-    /// <summary>Shows animated food-amount grains without disabling meal freshness indicators.</summary>
-    public bool EnableFoodGrainEffect { get; set; } = false;
+    /// <summary>Selects progress-bar (default) or animated slot-background food levels.</summary>
+    public string FoodLevelIndicatorStyle { get; set; } = "progress-bar";
+    /// <summary>Resolves persisted style keys and ConfigLib numeric selections.</summary>
+    internal ItemSlotIndicatorRenderingStyle FoodLevelRenderingStyle => FoodLevelIndicatorStyle is "slot-background" or "1"
+        ? ItemSlotIndicatorRenderingStyle.SlotBackground : ItemSlotIndicatorRenderingStyle.HorizontalBar;
+    /// <summary>Runs the food simulation only for the animated background style.</summary>
+    internal bool FoodGrainEffectEnabled => FoodLevelRenderingStyle == ItemSlotIndicatorRenderingStyle.SlotBackground;
     /// <summary>Shows metal amount in filled crucibles and active firepit input crucibles.</summary>
     public bool EnableCrucibleIndicators { get; set; } = true;
     /// <summary>Animates crucible metal; disabling retains the plain amount indicator.</summary>

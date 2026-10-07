@@ -112,15 +112,6 @@
         "weight": 4.45,
         "clientSide": true
       },
-      "EnableFoodGrainEffect": {
-        "code": "EnableFoodGrainEffect",
-        "name": "EnableFoodGrainEffect",
-        "ingui": "vanillaexpanded:config-enable-food-grain-effect",
-        "comment": "vanillaexpanded:config-enable-food-grain-effect-tooltip",
-        "default": false,
-        "weight": 4.25,
-        "clientSide": true
-      },
       "EnableCrucibleIndicators": {
         "code": "EnableCrucibleIndicators",
         "name": "EnableCrucibleIndicators",
@@ -199,6 +190,16 @@
       }
     },
     "integer": {
+      "FoodLevelIndicatorStyle": {
+        "code": "FoodLevelIndicatorStyle",
+        "name": "FoodLevelIndicatorStyle",
+        "ingui": "vanillaexpanded:config-food-level-indicator-style",
+        "comment": "vanillaexpanded:config-food-level-indicator-style-tooltip",
+        "default": "progress-bar",
+        "weight": 4.25,
+        "clientSide": true,
+        "mapping": { "progress-bar": 0, "slot-background": 1 }
+      },
       "PerishableItemFreshnessIndicatorStyle": {
         "code": "PerishableItemFreshnessIndicatorStyle",
         "name": "PerishableItemFreshnessIndicatorStyle",

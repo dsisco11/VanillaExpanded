@@ -24,7 +24,7 @@ public sealed class FreshnessIndicatorStyleConfigTests
         float sectionWeight = heading.GetProperty("weight").GetSingle();
         var indicatorSettings = document.RootElement.GetProperty("settings").EnumerateObject()
             .SelectMany(category => category.Value.EnumerateObject()).Where(setting =>
-                setting.Name.Contains("Indicator") || setting.Name is "EnableLiquidSloshEffect" or "EnableFoodGrainEffect" or "EnableCrucibleEffect");
+                setting.Name.Contains("Indicator") || setting.Name is "EnableLiquidSloshEffect" or "EnableCrucibleEffect");
         Assert.Equal(12, indicatorSettings.Count());
         Assert.All(indicatorSettings, setting => Assert.InRange(setting.Value.GetProperty("weight").GetSingle(),
             sectionWeight + 0.01f, sectionWeight + 0.99f));
