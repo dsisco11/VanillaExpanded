@@ -84,19 +84,19 @@ Completion criteria:
 
 Outcome: fuel selection and correction use the same opened-container pool as ingredients.
 
-    ☐ Replace backpack/hotbar assembly in AlloyFuelDepositService.CreatePlan and ExecutePlan with shared selection.
-        ☐ Include suitable, withdrawable container fuel in candidate quantities.
-        ☐ Continue accounting separately for queued fuel; preserve the expected-current-fuel guard.
-        ☐ Preserve positive burn-duration requirements, effective burn-temperature eligibility, heat/burn-duration modifiers, minimum required-fuel selection, and stack-size limits.
-        ☐ Permit incompatible/excess queued fuel to return to eligible containers through the same reconciler.
-    ☐ Verify that GuiDialogAlloyCalculator continues to run ingredient correction followed by fuel correction using current inventory state; avoid moving inventory policy into the GUI.
-    ☐ Add focused fuel tests for container-only fuel, combined availability, replacement/excess returns, locked sources, closure after planning, and too-cold container fuel.
+    ☑ Replace backpack/hotbar assembly in AlloyFuelDepositService.CreatePlan and ExecutePlan with shared selection.
+        ☑ Include suitable, withdrawable container fuel in candidate quantities.
+        ☑ Continue accounting separately for queued fuel; preserve the expected-current-fuel guard.
+        ☑ Preserve positive burn-duration requirements, effective burn-temperature eligibility, heat/burn-duration modifiers, minimum required-fuel selection, and stack-size limits.
+        ☑ Permit incompatible/excess queued fuel to return to eligible containers through the same reconciler.
+    ☑ Verify that GuiDialogAlloyCalculator continues to run ingredient correction followed by fuel correction using current inventory state; avoid moving inventory policy into the GUI.
+    ☑ Add focused fuel tests for container-only fuel, combined availability, replacement/excess returns, locked sources, closure after planning, and too-cold container fuel.
 
 Completion criteria:
 
-    ☐ Ingredient and fuel deposits share eligibility and transfer-order rules.
-    ☐ Existing fuel-temperature and fuel-quantity regressions continue to pass.
-    ☐ Closed/restricted container fuel does not yield a successful unavailable-fuel plan.
+    ☑ Ingredient and fuel deposits share eligibility and transfer-order rules.
+    ☑ Existing fuel-temperature and fuel-quantity regressions continue to pass.
+    ☑ Closed/restricted container fuel does not yield a successful unavailable-fuel plan.
 
 ## Phase 4: Validation and acceptance
 
