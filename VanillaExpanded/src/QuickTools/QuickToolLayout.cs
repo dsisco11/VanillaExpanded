@@ -78,11 +78,11 @@ public static class QuickToolLayout
         {
             if (string.IsNullOrWhiteSpace(id) || !seen.Add(id)) throw new ArgumentException("Expected distinct nonempty identifiers.", nameof(availableIds));
         }
-        var innerMenu = new RadialMenuLayout([RestoreId], 0, 0.34,
+        var innerMenu = new RadialMenuLayout([RestoreId], 0, 0.34, radiusScale: 0.9,
             sizeMultiplier: static () => VanillaExpandedModSystem.Config.QuickSwapMenuSize);
         return availableIds.Count == 0
             ? innerMenu
-            : new RadialMenuLayout(availableIds, 0.40, 0.9, innerMenu, separatorDegrees: 1.5,
+            : new RadialMenuLayout(availableIds, 0.40, 0.9, innerMenu, separatorDegrees: 1.5, radiusScale: 0.9,
                 sizeMultiplier: static () => VanillaExpandedModSystem.Config.QuickSwapMenuSize);
     }
 
