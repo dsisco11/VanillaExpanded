@@ -102,21 +102,27 @@ Completion criteria:
 
 Outcome: implementation is reviewable with automated receipts and clearly separated live-runtime acceptance.
 
-    ☐ Run build/test tools through subagents as required by repository instructions.
-        ☐ Run the AlloyCalculator unit suite, including new inventory-policy, service, and reconciler cases.
-        ☐ Run additional affected tests only if shared code beyond AlloyCalculator changed.
-        ☐ Record the command, result counts, and material warnings in the completion report; avoid adding unsolicited receipt files.
-    ☐ Review the implementation against this complete plan and the source proposal a second time.
-        ☐ Verify supported-container coverage, source/destination restrictions, current-open-state checks, packet authority, conservation, ordering, and preserved partial-failure semantics.
-        ☐ Obtain an independent completion audit before checking completion markers; do not treat unexecuted live checks as passed.
-    ☐ Request user-run live acceptance without launching the game automatically.
-        ☐ Deposit metals and fuel from an opened supported storage container.
-        ☐ Return incorrect/excess items to storage with full player inventories.
-        ☐ Confirm client/server inventory agreement and normal behavior after the container closes.
-    ☐ Summarize supported containers, priority, partial-failure behavior, automated results, and any outstanding live acceptance.
+Validation status (2026-10-07): automated validation and second review passed; independent audit found no implementation defects. The AlloyCalculator suite passed 206 tests with 0 failures or skips (exit 0). Existing unrelated nullable/unused-field warnings remain; no AlloyCalculator warnings were reported. Shared production callers remain within AlloyCalculator, so no additional suite is required. User confirmed the requested live acceptance checks on 2026-10-07 ("its good"): storage deposits, full-inventory returns, and inventory agreement after container closure are accepted as user-reported runtime results. Independent review rechecked this final evidence gap and confirmed completion.
+
+Validation command: `dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --no-restore -p:VINTAGE_STORY=G:/Vintagestory -p:NuGetPackageRoot=C:/Users/Sisco/.nuget/packages -p:UseSharedCompilation=false --filter FullyQualifiedName~AlloyCalculator --verbosity quiet -p:GenerateRuntimeConfigDevFile=true -p:CopyLocalLockFileAssemblies=true`.
+
+Behavior summary: supported opened generic/typed storage owners (including labeled chests) and actually opened crate inventories participate alongside backpack and hotbar. Withdrawal consumes smaller matching stacks first, with pool order breaking ties; returns merge before using empty slots. Current ownership/open-state and slot restrictions are rechecked before movement. Completed movements remain applied when a subsequent move fails; deposits are not atomic.
+
+    ☑ Run build/test tools through subagents as required by repository instructions.
+        ☑ Run the AlloyCalculator unit suite, including new inventory-policy, service, and reconciler cases.
+        ☑ Run additional affected tests only if shared code beyond AlloyCalculator changed.
+        ☑ Record the command, result counts, and material warnings in the completion report; avoid adding unsolicited receipt files.
+    ☑ Review the implementation against this complete plan and the source proposal a second time.
+        ☑ Verify supported-container coverage, source/destination restrictions, current-open-state checks, packet authority, conservation, ordering, and preserved partial-failure semantics.
+        ☑ Obtain an independent completion audit before checking completion markers; do not treat unexecuted live checks as passed.
+    ☑ Request user-run live acceptance without launching the game automatically.
+        ☑ Deposit metals and fuel from an opened supported storage container.
+        ☑ Return incorrect/excess items to storage with full player inventories.
+        ☑ Confirm client/server inventory agreement and normal behavior after the container closes.
+    ☑ Summarize supported containers, priority, partial-failure behavior, automated results, and any outstanding live acceptance.
 
 Final acceptance:
 
-    ☐ Every source-proposal requirement maps to implemented behavior or an explicit approved deferral.
-    ☐ Required automated validation, second review, and independent audit are complete.
-    ☐ Live acceptance is complete or clearly recorded as outstanding; headless tests do not establish multiplayer/runtime acceptance.
+    ☑ Every source-proposal requirement maps to implemented behavior or an explicit approved deferral.
+    ☑ Required automated validation, second review, and independent audit are complete.
+    ☑ Live acceptance is complete or clearly recorded as outstanding; headless tests do not establish multiplayer/runtime acceptance.
