@@ -4,6 +4,7 @@ using VanillaExpanded.ItemSlotIndicators;
 using VanillaExpanded.ItemSlotIndicators.Effects;
 
 using Vintagestory.API.Common;
+using Vintagestory.API.Client;
 using Vintagestory.GameContent;
 
 namespace VanillaExpanded.LiquidContainerIndicators;
@@ -11,6 +12,8 @@ namespace VanillaExpanded.LiquidContainerIndicators;
 /// <summary>Shows the fraction of a liquid container's capacity currently occupied.</summary>
 internal sealed class LiquidContainerIndicatorProvider : IItemSlotIndicatorProvider
 {
+    private readonly LiquidContainerParticleColor particleColors = new();
+
     #region Public API
     /// <summary>Reads current litres on each query so transfers are reflected immediately.</summary>
     public bool TryGetIndicator(ItemSlot slot, out ItemSlotIndicator indicator)
@@ -33,9 +36,14 @@ internal sealed class LiquidContainerIndicatorProvider : IItemSlotIndicatorProvi
         if (container.Attributes?.IsTrue("mealContainer") == true && litres <= 0) return false;
         float fill = Math.Clamp(litres / capacity, 0, 1);
         // Keep actual volume in the sample; rendering retains a visible liquid surface even at empty.
-        indicator = new ItemSlotIndicator(fill, IndicatorColorPallette.WithOpacity(
-            ColorUtilEx.MultiLerp(IndicatorColorPallette.WaterColors.AsSpan(), fill), 0.5f),
-            LiquidSloshIndicatorEffect.DrawRange);
+        var color = IndicatorColorPallette.WithOpacity(
+            ColorUtilEx.MultiLerp(IndicatorColorPallette.WaterColors.AsSpan(), fill), 0.5f);
+        ItemStack? liquid = container.GetContent(stack);
+        if (liquid is not null && slot.Inventory?.Api is ICoreClientAPI client
+            && !(liquid.Collectible.Code?.Domain == "game"
+                && liquid.Collectible.Code.Path is "waterportion" or "saltwaterportion" or "boilingwaterportion"))
+            color = particleColors.Resolve(client, stack, liquid, color);
+        indicator = new ItemSlotIndicator(fill, color, LiquidSloshIndicatorEffect.DrawRange);
         return true;
     }
     #endregion
