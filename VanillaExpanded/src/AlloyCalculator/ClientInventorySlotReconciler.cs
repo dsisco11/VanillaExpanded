@@ -17,12 +17,15 @@ internal static class ClientInventorySlotReconciler
         ICoreClientAPI api,
         IPlayerInventoryManager inventoryManager,
         ItemSlot targetSlot,
-        IReadOnlyList<ItemSlot> playerSlots,
+        IReadOnlyList<ItemSlot> externalSlots,
         System.Func<ItemStack, bool> matchesDesired,
         int desiredAmount,
-        out int retainedAmount)
+        out int retainedAmount,
+        System.Func<bool>? isTargetOpen = null,
+        System.Func<ItemSlot, bool>? isExternalSlotEligible = null)
     {
         retainedAmount = 0;
+        if (isTargetOpen?.Invoke() == false) return InventorySlotCorrectionResult.InventoryClosed;
         if (desiredAmount < 0)
         {
             return InventorySlotCorrectionResult.TransferFailed;
@@ -44,12 +47,16 @@ internal static class ClientInventorySlotReconciler
         }
 
         int remaining = removeAmount;
-        IEnumerable<ItemSlot> destinations = playerSlots
-            .Where(slot => !slot.Empty && slot.CanTakeFrom(targetSlot))
-            .Concat(playerSlots.Where(slot => slot.Empty && slot.CanTakeFrom(targetSlot)));
+        // Stable ordering prefers existing stacks, retaining the policy pool order within each group.
+        ItemSlot[] destinations = externalSlots.OrderBy(static slot => slot.Empty).ToArray();
         foreach (ItemSlot destination in destinations)
         {
-            remaining -= Transfer(api, inventoryManager, targetSlot, destination, remaining);
+            if (isTargetOpen?.Invoke() == false) return InventorySlotCorrectionResult.InventoryClosed;
+            if (isExternalSlotEligible?.Invoke(destination) == false) continue;
+            remaining -= Transfer(api, inventoryManager, targetSlot, destination, remaining,
+                () => isTargetOpen?.Invoke() != false && isExternalSlotEligible?.Invoke(destination) != false);
+            // Transfer callbacks may close the target; preserve the movement but stop the operation immediately.
+            if (isTargetOpen?.Invoke() == false) return InventorySlotCorrectionResult.InventoryClosed;
             if (remaining <= 0) break;
         }
 
@@ -63,16 +70,28 @@ internal static class ClientInventorySlotReconciler
         ICoreClientAPI api,
         IPlayerInventoryManager inventoryManager,
         ItemSlot targetSlot,
-        IReadOnlyList<ItemSlot> playerSlots,
+        IReadOnlyList<ItemSlot> externalSlots,
         System.Func<ItemStack, bool> matchesDesired,
-        int amount)
+        int amount,
+        System.Func<bool>? isTargetOpen = null,
+        System.Func<ItemSlot, bool>? isExternalSlotEligible = null)
     {
+        if (isTargetOpen?.Invoke() == false) return InventorySlotCorrectionResult.InventoryClosed;
+        if (amount < 0) return InventorySlotCorrectionResult.TransferFailed;
+        if (amount == 0) return InventorySlotCorrectionResult.Success;
         int remaining = amount;
-        foreach (ItemSlot source in playerSlots
+        foreach (ItemSlot source in externalSlots
             .Where(slot => !slot.Empty && matchesDesired(slot.Itemstack))
-            .OrderBy(static slot => slot.StackSize))
+            // LINQ sorting is stable, so equal sizes retain backpack, hotbar, then opened-container order.
+            .OrderBy(static slot => slot.StackSize).ToArray())
         {
-            remaining -= Transfer(api, inventoryManager, source, targetSlot, remaining);
+            if (isTargetOpen?.Invoke() == false) return InventorySlotCorrectionResult.InventoryClosed;
+            if (isExternalSlotEligible?.Invoke(source) == false) continue;
+            if (source.Empty || !matchesDesired(source.Itemstack)) continue;
+            remaining -= Transfer(api, inventoryManager, source, targetSlot, remaining,
+                () => isTargetOpen?.Invoke() != false && isExternalSlotEligible?.Invoke(source) != false);
+            // Transfer callbacks may close the target; preserve the movement but stop the operation immediately.
+            if (isTargetOpen?.Invoke() == false) return InventorySlotCorrectionResult.InventoryClosed;
             if (remaining <= 0) break;
         }
 
@@ -91,9 +110,10 @@ internal static class ClientInventorySlotReconciler
         IPlayerInventoryManager inventoryManager,
         ItemSlot source,
         ItemSlot target,
-        int amount)
+        int amount,
+        System.Func<bool> isTransferEligible)
     {
-        if (amount <= 0) return 0;
+        if (amount <= 0 || !AlloyTransferInventoryPolicy.CanReturnTo(target, source)) return 0;
 
         var operation = new ItemStackMoveOperation(
             api.World,
@@ -104,6 +124,8 @@ internal static class ClientInventorySlotReconciler
         {
             ActingPlayer = api.World.Player
         };
+        // Specialized permission probes may invoke callbacks too; verify live ownership immediately before moving.
+        if (!isTransferEligible()) return 0;
         object? packet = inventoryManager.TryTransferTo(source, target, ref operation);
         if (packet is not null)
         {

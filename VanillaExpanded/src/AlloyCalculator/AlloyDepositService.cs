@@ -10,8 +10,12 @@ using Vintagestory.GameContent;
 
 namespace VanillaExpanded.AlloyCalculator;
 
+/// <summary>Plans and executes metal ingredient correction through the current alloy inventory policy.</summary>
 internal static class AlloyDepositService
 {
+    #region Public API
+
+    /// <summary>Plans and executes ingredient deposits against current inventory state.</summary>
     internal static AlloyDepositResultCode Execute(
         ICoreClientAPI api,
         BlockEntityFirepit firepit,
@@ -29,6 +33,7 @@ internal static class AlloyDepositService
             : result;
     }
 
+    /// <summary>Creates an ingredient plan using the current player inventory manager.</summary>
     internal static AlloyDepositResultCode CreatePlan(
         ICoreClientAPI api,
         BlockEntityFirepit firepit,
@@ -70,16 +75,14 @@ internal static class AlloyDepositService
             return AlloyDepositResultCode.InvalidRequest;
         }
 
-        IInventory? backpack = inventoryManager.GetOwnInventory(GlobalConstants.backpackInvClassName);
-        IInventory? hotbar = inventoryManager.GetOwnInventory(GlobalConstants.hotBarInvClassName);
-        if (backpack is null || hotbar is null)
+        if (!AlloyTransferInventoryPolicy.TryCollect(api.World, inventoryManager, inventory, out IReadOnlyList<ItemSlot> externalSlots))
         {
             return AlloyDepositResultCode.InvalidRequest;
         }
 
-        List<ItemSlot> playerSlots = [.. backpack, .. hotbar];
+        // Existing cooking contents are counted separately; take locks only restrict external availability here.
         bool hasAllIngredients = ingredients.All(ingredient =>
-            playerSlots.Concat(inventory.CookingSlots)
+            externalSlots.Where(AlloyTransferInventoryPolicy.CanWithdraw).Concat(inventory.CookingSlots)
                 .Where(slot => !slot.Empty && SmeltsInto(api.World, slot.Itemstack, ingredient.ResolvedStack))
                 .Sum(static slot => slot.StackSize)
             >= createdPlan.Targets.Where(target => target.Ingredient == ingredient).Sum(static target => target.Amount));
@@ -92,6 +95,7 @@ internal static class AlloyDepositService
         return AlloyDepositResultCode.Success;
     }
 
+    /// <summary>Executes ingredient correction using the current player inventory manager.</summary>
     internal static AlloyDepositResultCode ExecutePlan(
         ICoreClientAPI api,
         BlockEntityFirepit firepit,
@@ -113,19 +117,17 @@ internal static class AlloyDepositService
             return AlloyDepositResultCode.InventoryClosed;
         }
 
-        IInventory? backpack = inventoryManager.GetOwnInventory(GlobalConstants.backpackInvClassName);
-        IInventory? hotbar = inventoryManager.GetOwnInventory(GlobalConstants.hotBarInvClassName);
-        if (backpack is null || hotbar is null
+        if (!AlloyTransferInventoryPolicy.TryCollect(api.World, inventoryManager, inventory, out IReadOnlyList<ItemSlot> externalSlots)
             || plan.Targets.Any(target => target.SlotIndex < 0
                 || target.SlotIndex >= inventory.CookingSlots.Length))
         {
             return AlloyDepositResultCode.InvalidRequest;
         }
 
-        List<ItemSlot> playerSlots = [.. backpack, .. hotbar];
+        // Recollect at execution instead of retaining a planning snapshot of opened containers.
         bool hasAllIngredients = plan.Targets
             .GroupBy(static target => target.Ingredient)
-            .All(group => playerSlots.Concat(inventory.CookingSlots)
+            .All(group => externalSlots.Where(AlloyTransferInventoryPolicy.CanWithdraw).Concat(inventory.CookingSlots)
                 .Where(slot => !slot.Empty && SmeltsInto(api.World, slot.Itemstack, group.Key.ResolvedStack))
                 .Sum(static slot => slot.StackSize)
                 >= group.Sum(static target => target.Amount));
@@ -142,10 +144,12 @@ internal static class AlloyDepositService
                 api,
                 inventoryManager,
                 inventory.CookingSlots[slotIndex],
-                playerSlots,
+                externalSlots,
                 stack => target is not null && SmeltsInto(api.World, stack, target.Ingredient.ResolvedStack),
                 target?.Amount ?? 0,
-                out retainedAmounts[slotIndex]);
+                out retainedAmounts[slotIndex],
+                () => inventoryManager.OpenedInventories.Contains(inventory),
+                slot => AlloyTransferInventoryPolicy.IsCurrentExternalSlot(api.World, inventoryManager, inventory, slot));
             if (removeResult != InventorySlotCorrectionResult.Success)
             {
                 return MapResult(removeResult);
@@ -158,9 +162,11 @@ internal static class AlloyDepositService
                 api,
                 inventoryManager,
                 inventory.CookingSlots[target.SlotIndex],
-                playerSlots,
+                externalSlots,
                 stack => SmeltsInto(api.World, stack, target.Ingredient.ResolvedStack),
-                target.Amount - retainedAmounts[target.SlotIndex]);
+                target.Amount - retainedAmounts[target.SlotIndex],
+                () => inventoryManager.OpenedInventories.Contains(inventory),
+                slot => AlloyTransferInventoryPolicy.IsCurrentExternalSlot(api.World, inventoryManager, inventory, slot));
             if (addResult != InventorySlotCorrectionResult.Success)
             {
                 return MapResult(addResult);
@@ -169,6 +175,10 @@ internal static class AlloyDepositService
 
         return AlloyDepositResultCode.Success;
     }
+
+    #endregion
+
+    #region Private
 
     /// <summary>Determines whether a source stack smelts into the desired metal ingredient.</summary>
     private static bool SmeltsInto(IWorldAccessor world, ItemStack source, ItemStack target)
@@ -185,6 +195,7 @@ internal static class AlloyDepositService
     {
         return result switch
         {
+            InventorySlotCorrectionResult.InventoryClosed => AlloyDepositResultCode.InventoryClosed,
             InventorySlotCorrectionResult.Success => AlloyDepositResultCode.Success,
             InventorySlotCorrectionResult.InsufficientSpace => AlloyDepositResultCode.InsufficientSpace,
             InventorySlotCorrectionResult.InsufficientItems => AlloyDepositResultCode.InsufficientItems,
@@ -192,4 +203,5 @@ internal static class AlloyDepositService
         };
     }
 
+    #endregion
 }

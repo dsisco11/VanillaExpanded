@@ -6,5 +6,6 @@ internal enum InventorySlotCorrectionResult
     Success,
     InsufficientSpace,
     InsufficientItems,
+    InventoryClosed,
     TransferFailed
 }

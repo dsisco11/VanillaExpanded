@@ -54,31 +54,31 @@ Completion criteria:
 
 Outcome: ingredient planning and corrections operate across the expanded pool with consistent transfer restrictions.
 
-    ☐ Replace backpack/hotbar assembly in AlloyDepositService.CreatePlan and ExecutePlan with the shared selection component.
-        ☐ Preserve separate counting of existing target cooking-slot contents; never add the target inventory to the external pool.
-        ☐ Count external matching items only when withdrawable under applicable source-slot rules.
-        ☐ Re-evaluate availability and currently opened inventories at execution rather than retaining stale container references from planning.
-    ☐ Update ClientInventorySlotReconciler for the expanded pool.
-        ☐ Rename playerSlots parameters to reflect their broader responsibility.
-        ☐ Preserve smallest-stack-first withdrawal with documented tie ordering.
-        ☐ Check applicable source and destination slot/inventory restrictions, including CanContain, before attempting transfers; continue using TryTransferTo and actual MovedQuantity as authoritative results.
-        ☐ Preserve existing-stack-first returns and documented tie ordering without bypassing specialized slot behavior.
-        ☐ If an external container closes during correction, stop using its slots; preserve completed transfers and report any remaining deficit/space failure through existing result codes.
-        ☐ Preserve the requirement that the target firepit remains open; establish where to recheck it before subsequent movements if an operation callback changes inventory state.
-        ☐ Do not add rollback or broad capacity simulation as part of this change.
-    ☐ Add focused ingredient/reconciler tests.
-        ☐ Ingredients available only in an opened container and split across player/container inventories.
-        ☐ Incorrect/excess metals returned to an opened container when player inventories are full.
-        ☐ Locked or specialized source/destination slots, incompatible contents, and exhausted return capacity.
-        ☐ Container closed between planning and execution, and closure during a transfer callback.
-        ☐ Duplicate references and target-firepit contents cannot inflate availability or create self-transfers.
-        ☐ Priority, quantities, item conservation, packets, and partial-failure accounting remain correct.
+    ☑ Replace backpack/hotbar assembly in AlloyDepositService.CreatePlan and ExecutePlan with the shared selection component.
+        ☑ Preserve separate counting of existing target cooking-slot contents; never add the target inventory to the external pool.
+        ☑ Count external matching items only when withdrawable under applicable source-slot rules.
+        ☑ Re-evaluate availability and currently opened inventories at execution rather than retaining stale container references from planning.
+    ☑ Update ClientInventorySlotReconciler for the expanded pool.
+        ☑ Rename playerSlots parameters to reflect their broader responsibility.
+        ☑ Preserve smallest-stack-first withdrawal with documented tie ordering.
+        ☑ Check applicable source and destination slot/inventory restrictions, including CanContain, before attempting transfers; continue using TryTransferTo and actual MovedQuantity as authoritative results.
+        ☑ Preserve existing-stack-first returns and documented tie ordering without bypassing specialized slot behavior.
+        ☑ If an external container closes during correction, stop using its slots; preserve completed transfers and report any remaining deficit/space failure through existing result codes.
+        ☑ Preserve the requirement that the target firepit remains open; establish where to recheck it before subsequent movements if an operation callback changes inventory state.
+        ☑ Do not add rollback or broad capacity simulation as part of this change.
+    ☑ Add focused ingredient/reconciler tests.
+        ☑ Ingredients available only in an opened container and split across player/container inventories.
+        ☑ Incorrect/excess metals returned to an opened container when player inventories are full.
+        ☑ Locked or specialized source/destination slots, incompatible contents, and exhausted return capacity.
+        ☑ Container closed between planning and execution, and closure during a transfer callback.
+        ☑ Duplicate references and target-firepit contents cannot inflate availability or create self-transfers.
+        ☑ Priority, quantities, item conservation, packets, and partial-failure accounting remain correct.
 
 Completion criteria:
 
-    ☐ Both planning and execution use the same pool policy and current opened-container state.
-    ☐ Restricted items are not counted as freely available, and invalid destinations are not used.
-    ☐ Focused ingredient and reconciler tests pass without changing metal matching or slot allocation.
+    ☑ Both planning and execution use the same pool policy and current opened-container state.
+    ☑ Restricted items are not counted as freely available, and invalid destinations are not used.
+    ☑ Focused ingredient and reconciler tests pass without changing metal matching or slot allocation.
 
 ## Phase 3: Integrate fuel deposits
 

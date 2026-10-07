@@ -54,7 +54,26 @@ internal static class AlloyTransferInventoryPolicy
         return !ReferenceEquals(destination, source)
             && CanWithdraw(source)
             && destination.CanTakeFrom(source)
-            && destination.CanHold(source);
+            && destination.CanHold(source)
+            && destination.Inventory?.CanContain(destination, source) != false;
+    }
+
+    /// <summary>Checks that an external slot still belongs to a current player inventory or opened supported storage owner.</summary>
+    internal static bool IsCurrentExternalSlot(
+        IWorldAccessor world,
+        IPlayerInventoryManager manager,
+        IInventory target,
+        ItemSlot slot)
+    {
+        IInventory inventory = slot.Inventory;
+        if (inventory is null || ReferenceEquals(inventory, target)
+            || !inventory.Any(candidate => ReferenceEquals(candidate, slot))) return false;
+
+        // Resolve ownership at movement time so closing or replacing a container cannot leave stale eligible slots.
+        if (ReferenceEquals(inventory, manager.GetOwnInventory(GlobalConstants.backpackInvClassName))
+            || ReferenceEquals(inventory, manager.GetOwnInventory(GlobalConstants.hotBarInvClassName))) return true;
+        return manager.OpenedInventories.Any(candidate => ReferenceEquals(candidate, inventory))
+            && IsOpenedStorage(world, inventory);
     }
 
     #endregion
