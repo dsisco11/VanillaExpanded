@@ -2,6 +2,7 @@
     ## Issues:
         Radial Menus:
             ☐ Tool-mode radial menu needs to be able to be configured to allow interacting with the hotbar (e.g. for the chisel tools "add material" functionality).
+                Implementation plan: [ToolModeRadialMenuInventoryInteraction.todo](ToolModeRadialMenuInventoryInteraction.todo).
 
         Other:
             ☐ Fix respawn decal looking obnoxious (too colorful).
