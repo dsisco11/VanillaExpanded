@@ -7,6 +7,7 @@ using VanillaExpanded.ItemRendering;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
+using Vintagestory.API.MathTools;
 
 namespace VanillaExpanded.Tests.Unit.ItemRendering;
 
@@ -145,7 +146,7 @@ public sealed class ToolHeadPresentationIntegrationTests
             {
                 submitted = true;
                 Assert.NotNull(light);
-                Assert.Equal([0.5773503f, -0.5773503f, 0.5773503f], light);
+                Assert.Equal([0.6f, -0.6f, 1.811077f], light);
                 var model = f.Matrices["modelMatrix"];
                 double length = Math.Sqrt(model[8] * model[8] + model[9] * model[9] + model[10] * model[10]);
                 double nx = model[8] / length, ny = model[9] / length, nz = model[10] / length;
@@ -168,6 +169,40 @@ public sealed class ToolHeadPresentationIntegrationTests
         fixture.Info.NormalShaded = false;
         Assert.True(fixture.Renderer.TryRender(fixture.Api.Object, fixture.Slot, 100, 200, 40, 0));
         fixture.Shader.Verify(shader => shader.Uniform("normalShaded", 0), Times.Once);
+        fixture.Shader.Verify(shader => shader.Uniform("rgbaIn", It.Is<Vec4f>(value => value.X == 1 && value.Y == 1 && value.Z == 1 && value.W == 1)), Times.Once);
+    }
+
+    /// <summary>The stock shader receives half ambient terms while preserving directional strength and opacity.</summary>
+    [Theory]
+    [InlineData(1d, 0d, 0d)]
+    [InlineData(-1d, 0d, 0d)]
+    [InlineData(0d, 1d, 0d)]
+    [InlineData(0d, -1d, 0d)]
+    [InlineData(0d, 0d, 1d)]
+    [InlineData(0d, 0d, -1d)]
+    public void ShadedDrawHalvesAmbientWithoutDimmingDirectLight(double nx, double ny, double nz)
+    {
+        var fixture = new Fixture();
+        float[]? light = null;
+        Vec4f? tint = null;
+        fixture.Shader.Setup(shader => shader.Uniform("lightPosition", It.IsAny<float>(), It.IsAny<float>(), It.IsAny<float>()))
+            .Callback<string, float, float, float>((name, x, y, z) => light = [x, y, z]);
+        fixture.Shader.Setup(shader => shader.Uniform("rgbaIn", It.IsAny<Vec4f>()))
+            .Callback<string, Vec4f>((name, value) => tint = value);
+        Assert.True(fixture.Renderer.TryRender(fixture.Api.Object, fixture.Slot, 100, 200, 40, 0));
+        Assert.NotNull(light);
+        Assert.NotNull(tint);
+        Assert.Equal(.5f, tint.X);
+        Assert.Equal(.5f, tint.Y);
+        Assert.Equal(.5f, tint.Z);
+        Assert.Equal(1f, tint.W);
+        double shaderDot = nx * light[0] + ny * light[1] + nz * light[2];
+        // Evaluate the installed stock equation separately from the requested half-ambient/direct model.
+        double actual = tint.X * (Math.Max(Math.Max(.45, .5 + .5 * shaderDot), .95 * ny) + .2 * Math.Max(0, -nz));
+        double directDot = nx * .3 - ny * .3 + nz * Math.Sqrt(.82);
+        double expected = Math.Max(Math.Max(.225, .25 + .5 * directDot), .475 * ny) + .1 * Math.Max(0, -nz);
+        Assert.InRange(Math.Abs(actual - expected), 0, .000001);
+        if (nz == 1) Assert.True(directDot > 1 / Math.Sqrt(3), "The new light must face the viewer more directly than the old diagonal light.");
     }
 
     /// <summary>Shader submissions preserve prepared shading, temperature, damage, and transition overlay settings.</summary>
@@ -188,6 +223,9 @@ public sealed class ToolHeadPresentationIntegrationTests
         f.Shader.Verify(s => s.Uniform("alphaTest",0.05f), Times.Once);
         f.Shader.Verify(s => s.Uniform("extraGlow",125), Times.Once);
         f.Shader.Verify(s => s.Uniform("tempGlowMode",1), Times.Once);
+        float[] incandescent = Vintagestory.API.MathTools.ColorUtil.GetIncandescenceColorAsColor4f(800);
+        f.Shader.Verify(shader => shader.Uniform("rgbaGlowIn", It.Is<Vec4f>(value =>
+            value.X == incandescent[0] * .5f && value.Y == incandescent[1] * .5f && value.Z == incandescent[2] * .5f && value.W == 125 / 255f)), Times.Once);
         f.Shader.Verify(s => s.Uniform("damageEffect",0.4f), Times.Once);
         f.Shader.Verify(s => s.Uniform("overlayOpacity",0.7f), Times.Once);
         f.Shader.Verify(s => s.BindTexture2D("tex2dOverlay",13,1), Times.Once);

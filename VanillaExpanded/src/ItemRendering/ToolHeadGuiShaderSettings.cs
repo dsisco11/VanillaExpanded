@@ -16,15 +16,18 @@ internal static class ToolHeadGuiShaderSettings
         bool temperatureMode = stack.Attributes.HasAttribute("temperature");
         float[] incandescent = ColorUtil.GetIncandescenceColorAsColor4f(temperature);
         shader.Uniform("normalShaded", info.NormalShaded ? 1 : 0);
-        // GUI positive Z faces the viewer; transformed normals need a fixed light from screen-right, screen-up and in front.
-        shader.Uniform("lightPosition", 0.5773503f, -0.5773503f, 0.5773503f);
-        shader.Uniform("rgbaIn", new Vec4f(1, 1, 1, 1));
+        // Halve the stock shader's ambient/fill terms. Doubling its light vector retains directional strength.
+        float lightingTint = info.NormalShaded ? 0.4f : 1f;
+        // Direction (0.3, -0.3, sqrt(0.82)) favors the GUI front (+Z) while remaining above and to the right.
+        shader.Uniform("lightPosition", 0.6f, -0.6f, 1.811077f);
+        shader.Uniform("rgbaIn", new Vec4f(lightingTint, lightingTint, lightingTint, 1));
         shader.Uniform("applyColor", info.ApplyColor ? 1 : 0);
         shader.Uniform("alphaTest", info.AlphaTest);
         shader.Uniform("extraGlow", glow);
         shader.Uniform("tempGlowMode", temperatureMode ? 1 : 0);
-        shader.Uniform("rgbaGlowIn", new Vec4f(temperatureMode ? incandescent[0] : 1,
-            temperatureMode ? incandescent[1] : 1, temperatureMode ? incandescent[2] : 1, glow / 255f));
+        // Temperature glow is added before shading, so give it the same lighting scale without changing alpha.
+        shader.Uniform("rgbaGlowIn", new Vec4f(temperatureMode ? incandescent[0] * lightingTint : 1,
+            temperatureMode ? incandescent[1] * lightingTint : 1, temperatureMode ? incandescent[2] * lightingTint : 1, glow / 255f));
         shader.Uniform("damageEffect", info.DamageEffect);
         shader.Uniform("overlayOpacity", info.OverlayTexture is not null ? info.OverlayOpacity : 0);
         if (info.OverlayTexture is { } overlay && info.OverlayOpacity > 0)
