@@ -1,12 +1,7 @@
 # Vanilla: Expanded TODO List:
     ## Issues:
-        Radial Menus:
-            ☐ Chisel Add Material should open a radial picker of eligible carried inventory items, using the existing tool-mode operation.
-                Implementation plan: [ChiselMaterialRadialMenu.todo](ChiselMaterialRadialMenu.todo).
-
-        Other:
-            ☐ Fix respawn decal looking obnoxious (too colorful).
-            ☐ When the "allow moving water" world-option is disabled, guard against the player shift clicking with a bucket and destroying source water blocks.
+        ☐ Fix respawn decal looking obnoxious (too colorful).
+        ☐ When the "allow moving water" world-option is disabled, guard against the player shift clicking with a bucket and destroying source water blocks.
 
     ## New Features:
         ☐ Add HUD indicator to show current arrow type and quantity when player is holding a bow.
