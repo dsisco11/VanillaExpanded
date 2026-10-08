@@ -1,4 +1,8 @@
 {
+  "chisel-material-empty": "No eligible materials in your inventory",
+  "chisel-material-back": "Back",
+  "chisel-material-previous": "Previous page",
+  "chisel-material-next": "Next page",
   "config-enable-crucible-indicators": "Crucible metal indicators",
   "config-enable-crucible-indicators-tooltip": "Show metal amount in filled crucibles and crucibles in the firepit input slot. Applies immediately.",
   "config-enable-crucible-effect": "Crucible metal effects",

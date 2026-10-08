@@ -70,18 +70,22 @@ Supersedes the chisel workflow proposed in [ToolModeRadialMenuInventoryInteracti
 
 ## Phase 2: Build eligible material content
     Outcome: the picker represents every supported eligible source stack with readable native item icons.
-    ☐ Add a small chisel-owned candidate enumerator using current player-owned inventories and stable slot addresses.
-        ☐ Require a block-bearing, nonempty stack and use the native IsValidChiselingMaterial rules at the captured target.
-        ☐ Investigate the validator's in-game error side effects and conditional interfaces; avoid emitting rejection messages while scanning an inventory. Document any necessary quiet validation boundary without silently changing eligibility.
-        ☐ Preserve composite chiseled-block attributes and exclude malformed/noncontributing compositions safely.
-        ☐ Define target-capacity eligibility using the verified native behavior, including replenishment of existing materials; do not call AddMaterial to test eligibility or invent different consumption semantics.
-    ☐ Build paged radial content with item name/count, native stack icon, Back, and page navigation.
-        ☐ Keep candidate IDs distinct from numeric tool-mode IDs. Keep ordering deterministic across pages.
-        ☐ Handle zero candidates with a clear message and Back; handle one candidate without accidentally replacing Back with a full-screen selection disc.
-        ☐ Keep the existing ToolModeMenuSize setting and shared geometry limits. Confirm all candidates remain accessible beyond 63 entries.
-    ☐ Verification: eligibility/config/conditional blocks, ordinary and composite stacks, offhand/backpack scope, zero/one/many choices, and page coverage.
+    Eligibility boundary: ChiselMaterialCandidates.IsValidMaterial mirrors ItemChisel.IsValidChiselingMaterial rule order, including its two short-circuit conditional calls at the captured position, but omits TriggerIngameError during scanning. Conditional interfaces receive the real world/player/position and retain their own behavior. Native SetToolMode remains the execution authority.
+    Capacity boundary: ordinary contributions use the native collision-box ushort voxel amount; existing supply below 4096 can be replenished. Composite stacks retain their attributes, require matching safe arrays and resolved positive contributions, and are offered when at least one contribution has remaining capacity. No AddMaterial preview is invoked.
+    ☑ Add a small chisel-owned candidate enumerator using current player-owned inventories and stable slot addresses.
+        ☑ Require a block-bearing, nonempty stack and use the native IsValidChiselingMaterial rules at the captured target.
+        ☑ Investigate the validator's in-game error side effects and conditional interfaces; avoid emitting rejection messages while scanning an inventory. Document any necessary quiet validation boundary without silently changing eligibility.
+        ☑ Preserve composite chiseled-block attributes and exclude malformed/noncontributing compositions safely.
+        ☑ Define target-capacity eligibility using the verified native behavior, including replenishment of existing materials; do not call AddMaterial to test eligibility or invent different consumption semantics.
+    ☑ Build paged radial content with item name/count, native stack icon, Back, and page navigation.
+        ☑ Keep candidate IDs distinct from numeric tool-mode IDs. Keep ordering deterministic across pages.
+        ☑ Handle zero candidates with a clear message and Back; handle one candidate without accidentally replacing Back with a full-screen selection disc.
+        ☑ Keep the existing ToolModeMenuSize setting and shared geometry limits. Confirm all candidates remain accessible beyond 63 entries.
+    ☑ Verification: eligibility/config/conditional blocks, ordinary and composite stacks, offhand/backpack scope, zero/one/many choices, and page coverage.
     Completion criteria:
-        ☐ Every eligible carried stack is reachable, with no external-container candidates or quiet truncation; enumeration neither moves items nor mutates the target.
+        ☑ Every eligible carried stack is reachable, with no external-container candidates or quiet truncation; enumeration neither moves items nor mutates the target.
+
+    Verification receipt (2026-10-07): production Release build passed; 91 focused ToolModeRadialMenu/RadialMenu tests passed, including 22 new candidate/content cases. Second review and independent completion audit passed. These headless checks do not establish picker integration, visual acceptance or server conservation.
 
 ## Phase 3: Integrate selection with the existing tool-mode operation
     Outcome: Add Material transitions to the picker and selecting a stack executes the verified native sequence.
