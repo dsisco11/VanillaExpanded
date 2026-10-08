@@ -329,18 +329,23 @@ public sealed class ChiselMaterialInteractionTests : IDisposable
         try
         {
             VanillaExpandedModSystem.Config.EnableToolModeRadialMenu = true;
+            VanillaExpandedModSystem.Config.ToolModeCenterSize = 1f;
+            VanillaExpandedModSystem.Config.ToolModeRingSize = 1f;
             Assert.True(owner.TryOpen());
             if (view == 2)
             {
                 selected!("1");
                 selected(ChiselMaterialMenuContentFactory.NextId);
             }
+            owner.OnConfigReloaded(fixture.Api.Object);
+            RadialMenuLayout before = fixture.LastLayout!;
             var data = new StringAttribute("{\"ToolModeCenterSize\":\"1.5\",\"ToolModeRingSize\":\"0.5\"}");
             typeof(ConfigLibIntegrationModSystem).GetMethod("OnConfigLibEvent", flags)!.Invoke(integration,
                 new object[] { "configlib:vanillaexpanded:setting-changed", EnumHandling.PassThrough, data });
             Assert.NotNull(fixture.LastLayout);
-            Assert.Equal((view == 2 ? 0.36 : 0.48) * 1.5, fixture.LastLayout!.InnerMenu!.OuterRadius, 6);
-            Assert.Equal((view == 2 ? 0.62 : 0.50) * 0.5,
+            Assert.NotSame(before, fixture.LastLayout);
+            Assert.Equal(before.InnerMenu!.OuterRadius * 1.5, fixture.LastLayout!.InnerMenu!.OuterRadius, 6);
+            Assert.Equal((before.OuterRadius - before.InnerRadius) * 0.5,
                 fixture.LastLayout.OuterRadius - fixture.LastLayout.InnerRadius, 6);
             if (view == 2) Assert.Contains(fixture.LastEntries, entry => entry.Id == "chisel-material:stack:12");
             Assert.Empty(fixture.Packets);

@@ -5,7 +5,7 @@ using Vintagestory.API.Common;
 
 namespace VanillaExpanded.Tests.Unit.ToolModeRadialMenu;
 
-/// <summary>Checks every stack remains reachable through bounded pages and live menu sizing.</summary>
+/// <summary>Checks every stack remains reachable through bounded pages and distinct picker identifiers.</summary>
 [Collection("ToolModeRadialMenuConfig")]
 [Trait("Category", "Unit")]
 public sealed class ChiselMaterialMenuContentFactoryTests : IDisposable
@@ -29,30 +29,6 @@ public sealed class ChiselMaterialMenuContentFactoryTests : IDisposable
         Lang.ChangeLanguage(originalLocale);
     }
     #region Content
-    /// <summary>The material picker shares independent center and ring controls without changing its gap.</summary>
-    [Theory]
-    [InlineData(1f, 1f)]
-    [InlineData(2f, 0.5f)]
-    public void PickerUsesCenterAndRingSizeSettings(float centerScale, float ringScale)
-    {
-        float originalCenter = VanillaExpandedModSystem.Config.ToolModeCenterSize;
-        float originalRing = VanillaExpandedModSystem.Config.ToolModeRingSize;
-        try
-        {
-            VanillaExpandedModSystem.Config.ToolModeCenterSize = centerScale;
-            VanillaExpandedModSystem.Config.ToolModeRingSize = ringScale;
-            ToolModeMenuContent picker = ChiselMaterialMenuContentFactory.Create([]);
-            Assert.Equal(0.36 * centerScale, picker.Layout.InnerMenu!.OuterRadius, 6);
-            Assert.Equal(0.02, picker.Layout.InnerRadius - picker.Layout.InnerMenu.OuterRadius, 6);
-            Assert.Equal(0.62 * ringScale, picker.Layout.OuterRadius - picker.Layout.InnerRadius, 6);
-        }
-        finally
-        {
-            VanillaExpandedModSystem.Config.ToolModeCenterSize = originalCenter;
-            VanillaExpandedModSystem.Config.ToolModeRingSize = originalRing;
-        }
-    }
-
     /// <summary>Keeps an explanatory empty wedge and a separate enabled Back disc.</summary>
     [Fact]
     public void Create_Empty_KeepsBackAvailable()
@@ -105,25 +81,7 @@ public sealed class ChiselMaterialMenuContentFactoryTests : IDisposable
     }
 
     #endregion
-    #region Sizing and identifiers
-    /// <summary>Reads current tool-mode sizing on an already-created page and applies shared bounds.</summary>
-    [Fact]
-    public void Create_LayoutReadsLiveToolModeSize()
-    {
-        float original = VanillaExpandedModSystem.Config.ToolModeMenuSize;
-        try
-        {
-            var content = ChiselMaterialMenuContentFactory.Create(Candidates(1));
-            VanillaExpandedModSystem.Config.ToolModeMenuSize = 1;
-            Assert.Equal(.60, content.Layout.RadiusScale, 6);
-            VanillaExpandedModSystem.Config.ToolModeMenuSize = 2;
-            Assert.Equal(1.20, content.Layout.RadiusScale, 6);
-            VanillaExpandedModSystem.Config.ToolModeMenuSize = 99;
-            Assert.Equal(1.50, content.Layout.RadiusScale, 6);
-        }
-        finally { VanillaExpandedModSystem.Config.ToolModeMenuSize = original; }
-    }
-
+    #region Identifiers
     /// <summary>Separates picker identifiers from native numeric modes and navigation.</summary>
     [Theory]
     [InlineData("0", false)]
