@@ -219,6 +219,47 @@ public sealed class RadialMenuTests
         }
     }
 
+    /// <summary>Wedge-aligned allowances expand beyond the circle fit while retaining arc and side padding.</summary>
+    [Theory]
+    [InlineData(2)]
+    [InlineData(4)]
+    [InlineData(8)]
+    [InlineData(16)]
+    [InlineData(32)]
+    public void WedgeAlignedIconFitsRotatedSquare(int count)
+    {
+        string[] ids = [.. Enumerable.Range(0, count).Select(index => index.ToString())];
+        var layout = new RadialMenuLayout(ids, 0.40, 0.90, startAngleDegrees: 13, separatorDegrees: 1.5);
+        const double radius = 600;
+        const double inset = 7.5;
+        double size = layout.GetWedgeAlignedIconSizePixels(radius, inset);
+        Assert.True(size > layout.GetIconSizePixels(radius, inset));
+        double midRadius = 0.65 * radius;
+        double halfSize = size / 2d;
+        Assert.True(midRadius - halfSize >= 0.40 * radius + inset - 0.001);
+        for (int index = 0; index < count; index++)
+        {
+            double angle = (13 + index * layout.StepDegrees) * Math.PI / 180d;
+            double halfAngle = (layout.StepDegrees / 2d - layout.SeparatorDegrees) * Math.PI / 180d;
+            foreach (int radial in new[] { -1, 1 })
+                foreach (int tangent in new[] { -1, 1 })
+                {
+                    double r = midRadius + radial * halfSize;
+                    double t = tangent * halfSize;
+                    double x = Math.Sin(angle) * r + Math.Cos(angle) * t;
+                    double y = -Math.Cos(angle) * r + Math.Sin(angle) * t;
+                    double distance = Math.Sqrt(r * r + t * t);
+                    Assert.True(distance <= 0.90 * radius - inset + 0.001);
+                    Assert.True(distance * Math.Sin(halfAngle - Math.Abs(Math.Atan2(t, r))) >= inset - 0.001);
+                    Assert.Equal(ids[index], layout.HitTest(x, y, 0, 0, radius));
+                }
+        }
+        // A changed viewport or padding must replace the cached value.
+        Assert.True(layout.GetWedgeAlignedIconSizePixels(radius / 2d, inset) < size);
+        Assert.True(layout.GetWedgeAlignedIconSizePixels(radius, inset * 2d) < size);
+        Assert.Equal((float)size, layout.GetWedgeAlignedIconSizePixels(radius, inset));
+    }
+
     /// <summary>Cached sizes refresh for screen-radius and padding changes without retaining stale entry values.</summary>
     [Fact]
     public void UprightIconCacheRefreshesForScreenSpaceChanges()

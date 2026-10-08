@@ -9,6 +9,9 @@ namespace VanillaExpanded.QuickTools;
 public sealed class QuickToolItemIcon(ItemStack stack, string entryId) : IRadialMenuContextIcon
 {
     #region Rendering
+    /// <inheritdoc />
+    public RadialMenuIconSizing Sizing => RadialMenuIconSizing.WedgeAligned;
+
     /// <summary>Draws the current snapshot item at the requested menu position.</summary>
     public void Render(ICoreClientAPI api, double centerX, double centerY, float sizePixels, bool enabled)
         => Render(api, centerX, centerY, sizePixels, enabled, 0);

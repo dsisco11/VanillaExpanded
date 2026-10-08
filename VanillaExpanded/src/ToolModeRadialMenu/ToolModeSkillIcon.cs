@@ -10,7 +10,7 @@ internal sealed class ToolModeSkillIcon(SkillItem skillItem) : IRadialMenuIcon
     #region Public API
 
     /// <inheritdoc />
-    public bool UsesScreenAlignedSizing => true;
+    public RadialMenuIconSizing Sizing => RadialMenuIconSizing.ScreenAligned;
 
     /// <inheritdoc />
     public void Render(ICoreClientAPI api, double centerX, double centerY, float sizePixels, bool enabled)

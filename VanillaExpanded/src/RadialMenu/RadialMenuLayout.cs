@@ -8,6 +8,9 @@ public sealed class RadialMenuLayout
 {
     private readonly double radiusScale;
     private readonly Func<float>? sizeMultiplier;
+    private float wedgeAlignedIconSize;
+    private double wedgeIconRadiusPixels;
+    private double wedgeIconInsetPixels;
     private float[]? screenAlignedIconSizes;
     private double iconSizeRadiusPixels;
     private double iconSizeInsetPixels;
@@ -186,6 +189,32 @@ public sealed class RadialMenuLayout
         double angularClearance = midRadius * radiusPixels * Math.Sin(halfAngle);
         double clearance = Math.Min(radialClearance, angularClearance) - insetPixels;
         return (float)Math.Max(1d, Math.Sqrt(2d) * clearance);
+    }
+
+    /// <summary>Fits a wedge-aligned square directly between the arcs and sides, caching its screen-space allowance.</summary>
+    internal float GetWedgeAlignedIconSizePixels(double radiusPixels, double insetPixels)
+    {
+        if (radiusPixels <= 0 || insetPixels < 0) throw new ArgumentOutOfRangeException(nameof(radiusPixels));
+        if (wedgeAlignedIconSize > 0f && radiusPixels == wedgeIconRadiusPixels && insetPixels == wedgeIconInsetPixels)
+            return wedgeAlignedIconSize;
+
+        if (IsSingleOption) wedgeAlignedIconSize = GetIconSizePixels(radiusPixels, insetPixels);
+        else
+        {
+            double midRadius = (InnerRadius + OuterRadius) * radiusPixels / 2d;
+            double outerRadius = Math.Max(0d, OuterRadius * radiusPixels - insetPixels);
+            double halfAngle = Math.Clamp(StepDegrees / 2d - SeparatorDegrees, 0d, 90d) * Math.PI / 180d;
+            // In wedge-local coordinates the square is centered at (0, midRadius). Its inner
+            // edge, farthest outer corner, and side-normal support give three exact limits.
+            double innerHalfSize = midRadius - InnerRadius * radiusPixels - insetPixels;
+            double outerHalfSize = (Math.Sqrt(Math.Max(0d, 2d * outerRadius * outerRadius - midRadius * midRadius)) - midRadius) / 2d;
+            double sideHalfSize = (midRadius * Math.Sin(halfAngle) - insetPixels)
+                / (Math.Sin(halfAngle) + Math.Cos(halfAngle));
+            wedgeAlignedIconSize = (float)Math.Max(1d, 2d * Math.Min(innerHalfSize, Math.Min(outerHalfSize, sideHalfSize)));
+        }
+        wedgeIconRadiusPixels = radiusPixels;
+        wedgeIconInsetPixels = insetPixels;
+        return wedgeAlignedIconSize;
     }
 
     /// <summary>Fits an upright icon square to one wedge's arcs and sides, retaining the requested padding.</summary>
