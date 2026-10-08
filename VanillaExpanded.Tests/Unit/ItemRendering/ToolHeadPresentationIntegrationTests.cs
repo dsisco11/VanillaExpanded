@@ -146,7 +146,7 @@ public sealed class ToolHeadPresentationIntegrationTests
             {
                 submitted = true;
                 Assert.NotNull(light);
-                Assert.Equal([0.6f, -0.6f, 1.811077f], light);
+                Assert.Equal([0.9f, -0.9f, 2.7166154f], light);
                 var model = f.Matrices["modelMatrix"];
                 double length = Math.Sqrt(model[8] * model[8] + model[9] * model[9] + model[10] * model[10]);
                 double nx = model[8] / length, ny = model[9] / length, nz = model[10] / length;
@@ -172,7 +172,7 @@ public sealed class ToolHeadPresentationIntegrationTests
         fixture.Shader.Verify(shader => shader.Uniform("rgbaIn", It.Is<Vec4f>(value => value.X == 1 && value.Y == 1 && value.Z == 1 && value.W == 1)), Times.Once);
     }
 
-    /// <summary>The stock shader receives half ambient terms while preserving directional strength and opacity.</summary>
+    /// <summary>The stock shader receives half ambient terms with stronger directional light and unchanged opacity.</summary>
     [Theory]
     [InlineData(1d, 0d, 0d)]
     [InlineData(-1d, 0d, 0d)]
@@ -180,7 +180,7 @@ public sealed class ToolHeadPresentationIntegrationTests
     [InlineData(0d, -1d, 0d)]
     [InlineData(0d, 0d, 1d)]
     [InlineData(0d, 0d, -1d)]
-    public void ShadedDrawHalvesAmbientWithoutDimmingDirectLight(double nx, double ny, double nz)
+    public void ShadedDrawHalvesAmbientAndStrengthensDirectLight(double nx, double ny, double nz)
     {
         var fixture = new Fixture();
         float[]? light = null;
@@ -200,9 +200,13 @@ public sealed class ToolHeadPresentationIntegrationTests
         // Evaluate the installed stock equation separately from the requested half-ambient/direct model.
         double actual = tint.X * (Math.Max(Math.Max(.45, .5 + .5 * shaderDot), .95 * ny) + .2 * Math.Max(0, -nz));
         double directDot = nx * .3 - ny * .3 + nz * Math.Sqrt(.82);
-        double expected = Math.Max(Math.Max(.225, .25 + .5 * directDot), .475 * ny) + .1 * Math.Max(0, -nz);
+        double expected = Math.Max(Math.Max(.225, .25 + .75 * directDot), .475 * ny) + .1 * Math.Max(0, -nz);
         Assert.InRange(Math.Abs(actual - expected), 0, .000001);
-        if (nz == 1) Assert.True(directDot > 1 / Math.Sqrt(3), "The new light must face the viewer more directly than the old diagonal light.");
+        if (nz == 1)
+        {
+            Assert.True(directDot > 1 / Math.Sqrt(3), "The new light must face the viewer more directly than the old diagonal light.");
+            Assert.True(actual > .25 + .5 * directDot, "The directional contribution must exceed the previous strength while ambient remains halved.");
+        }
     }
 
     /// <summary>Shader submissions preserve prepared shading, temperature, damage, and transition overlay settings.</summary>
