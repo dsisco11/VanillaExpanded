@@ -73,6 +73,7 @@ public sealed class ToolHeadPresentationIntegrationTests
     [InlineData("custom")]
     [InlineData("projection")]
     [InlineData("shader")]
+    [InlineData("light-uniform")]
     [InlineData("overflow")]
     [InlineData("active-shader")]
     public void EarlyUnsupportedDrawReturnsFalse(string scenario)
@@ -85,6 +86,7 @@ public sealed class ToolHeadPresentationIntegrationTests
             case "custom": f.RegisterCustom(); break;
             case "projection": f.Projection[5] = 1; break;
             case "shader": f.Shader.Setup(s => s.HasUniform("alphaTest")).Returns(false); break;
+            case "light-uniform": f.Shader.Setup(s => s.HasUniform("lightPosition")).Returns(false); break;
             case "active-shader": f.Render.SetupGet(r => r.CurrentActiveShader).Returns(new Mock<IShaderProgram>().Object); break;
         }
         Assert.False(f.Renderer.TryRender(f.Api.Object, f.Slot, 100, 200, scenario == "overflow" ? float.PositiveInfinity : 40, 0));
@@ -125,6 +127,31 @@ public sealed class ToolHeadPresentationIntegrationTests
 
     #endregion
     #region Effects and restoration
+    /// <summary>Screen-space lighting remains toward the upper right as the tool presentation rotates.</summary>
+    [Theory]
+    [InlineData(0f)]
+    [InlineData(90f)]
+    [InlineData(180f)]
+    [InlineData(270f)]
+    public void DedicatedDrawUsesFixedUpperRightLight(float rotation)
+    {
+        var f = new Fixture();
+        float[]? light = null;
+        f.Shader.Setup(shader => shader.Uniform("lightPosition", It.IsAny<float>(), It.IsAny<float>(), It.IsAny<float>()))
+            .Callback<string, float, float, float>((name, x, y, z) => light = [x, y, z]);
+        bool submitted = false;
+        f.Render.Setup(render => render.RenderMultiTextureMesh(It.IsAny<MultiTextureMeshRef>(), "tex2d", 0))
+            .Callback(() =>
+            {
+                submitted = true;
+                Assert.NotNull(light);
+                Assert.Equal([0.5773503f, -0.5773503f, -0.5773503f], light);
+            });
+        Assert.True(f.Renderer.TryRender(f.Api.Object, f.Slot, 100, 200, 40, rotation));
+        Assert.True(submitted);
+        Assert.Equal(1, f.Restores);
+    }
+
     /// <summary>Shader submissions preserve prepared shading, temperature, damage, and transition overlay settings.</summary>
     [Fact]
     public void PreparedShaderEffectsAndOverlayAreSubmitted()

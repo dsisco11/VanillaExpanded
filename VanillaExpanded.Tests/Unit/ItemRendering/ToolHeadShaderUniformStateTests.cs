@@ -48,6 +48,8 @@ public sealed class ToolHeadShaderUniformStateTests
         Assert.Contains("damageEffect",initial.Keys);
         Assert.Contains("overlayOpacity",initial.Keys);
         Assert.Contains("applyAnimation",initial.Keys);
+        Assert.Contains("lightPosition", initial.Keys);
+        Assert.Equal(3, initial["lightPosition"].Length);
     }
     #endregion
 }

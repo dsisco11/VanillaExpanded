@@ -79,7 +79,7 @@ internal sealed class ToolHeadPresentationRenderer
         foreach (float component in view)
             if (!float.IsFinite(component)) return false;
         foreach (string name in new[] { "modelMatrix", "modelViewMatrix", "projectionMatrix", "applyModelMat", "applyAnimation",
-            "normalShaded", "rgbaIn", "applyColor", "alphaTest", "extraGlow", "tempGlowMode", "rgbaGlowIn",
+            "normalShaded", "lightPosition", "rgbaIn", "applyColor", "alphaTest", "extraGlow", "tempGlowMode", "rgbaGlowIn",
             "damageEffect", "overlayOpacity", "tex2d", "tex2dOverlay", "baseUvOrigin", "baseTextureSize",
             "overlayTextureSize", "noTexture", "darkEdges", "transparentCenter", "sepiaLevel" })
             if (!shader.HasUniform(name)) return false;
