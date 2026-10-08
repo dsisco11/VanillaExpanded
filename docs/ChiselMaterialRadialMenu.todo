@@ -8,7 +8,7 @@ Supersedes the chisel workflow proposed in [ToolModeRadialMenuInventoryInteracti
     Selecting the chisel's Add Material option opens a material-picker radial containing eligible items from the player's carried inventory.
     Reuse the existing modal radial dialog, native inventory operations, ItemChisel.SetToolMode, and ToolModeSelection.Apply with its existing tool-mode packet.
     No new server packet, server handler, packet format, general inventory-input routing, synthetic inventory clicks, or stack-tracking framework.
-    Planning only: no implementation or completion is claimed; every task below is unchecked.
+    Phase 1 documents the native contract. Picker implementation and runtime acceptance remain separate unchecked work.
 
 ## Interaction and proposed boundaries
     Resolve Add Material by the vanilla SkillItem code addmat, retaining the original tool-mode array index.
@@ -34,23 +34,39 @@ Supersedes the chisel workflow proposed in [ToolModeRadialMenuInventoryInteracti
     Inspect installed client/server assemblies for inventory packet handling and ordering absent from the reference source. Record version and distinguish source observations from installed behavior.
     Existing tests: ../VanillaExpanded.Tests/Unit/ToolModeRadialMenu and ../VanillaExpanded.Tests/RadialMenu.
 
-## Phase 1: Establish the native addition sequence
-    Outcome: a verified native operation sequence that can add from carried inventory without a custom server protocol.
-    ☐ Inspect the complete ItemChisel.SetToolMode material branch, including invalid material, ordinary block, composite chiseled-block item, creative, full material supply, dirty marking, and keep-open event behavior.
-        ☐ Verify that the addmat index remains appropriate for invoking the existing operation and is resolved again if the target's tool-mode list changes.
-        ☐ Inspect BEChisel.AddMaterial without using it as a speculative preview; it mutates quantities even in cases reported as full.
-    ☐ Identify and verify a native packet-producing one-item transfer between each supported carried inventory and MouseItemSlot.
-        ☐ Verify native accessibility, destination capacity, dirty marking, and packet generation for hotbar, backpack contents, and offhand.
-        ☐ Do not assign Itemstack manually, use a detached slot as the operation source, or emulate inventory GUI clicks.
-    ☐ Establish exact client prediction and server packet order: stage one item, ToolModeSelection.Apply, return any locally remaining item.
-        ☐ Verify native packet timestamp/revision checks after SetToolMode changes MouseItemSlot, and ordering between inventory and tool-mode packets.
-        ☐ Determine how server rejection/correction and pending restoration are observed through existing synchronization. Specify behavior for delayed updates, focus loss, closing, and disconnect without assuming an acknowledgement exists.
-        ☐ Prove creative and invalid/full cases return the unconsumed item; survival success consumes one item, not the source stack.
-    ☐ Record the bounded sequence and failure rules in this document with source/installed-engine evidence.
-    ☐ Verification: use a focused native operation probe and client/server evidence appropriate to packet-order claims; a mock packet list alone does not prove server processing.
+## Phase 1: Establish the native addition contract
+    Outcome: document the native APIs, call sequence and implementation guards. Implementation and live rejection/restoration validation belong to Phases 3 and 4; this investigation does not claim a working picker or atomic server acceptance.
+    Scope correction (2026-10-07): the original phase unnecessarily required implementation-level recovery proof before implementation. That verification is retained in Phase 4, where the actual picker can be tested. The existing-tool-mode/no-new-server-handler requirement is unchanged.
+    ☑ Inspect ItemChisel.GetToolModes/SetToolMode and BEChisel.AddMaterial for material identity, consumption, full/invalid/creative cases, composite stacks, dirty marking and keep-open behavior.
+    ☑ Identify the native one-item transfer API and its ownership, capacity and packet-return requirements.
+    ☑ Specify the caller sequence and guards using native inventory operations and the existing ToolModeSelection.Apply.
+    ☑ Record native correction limits and the cases that must be verified against the implemented picker in Phase 4.
+    ☑ Perform a second source review and independent completion audit of this investigation contract.
     Completion criteria:
-        ☐ The verified sequence leaves the source and cursor correct for success, rejection, creative, and full-material cases using only existing packets.
-        ☐ Any unverified prerequisite blocks the dependent operation implementation; propose a revision within the existing-protocol constraint rather than adding a server handler.
+        ☑ The source-backed contract names the owning APIs and gives an actionable sequence without new server handling or manual stack assignment.
+        ☑ Source conclusions are distinguished from runtime validation; all runtime acceptance requirements remain in Phase 4.
+
+    Native operation contract:
+        1. Resolve addmat by code from fresh vanilla modes. Validate the captured chisel and target, current selected source stack, eligible material and empty MouseItemSlot. Resolve source slots from the player's owned hotbar/backpack inventories; include eligible offhand storage and exclude bag equipment slots/external containers.
+        2. Create ItemStackMoveOperation with RequestedQuantity = 1, Left mouse button, no modifiers and DirectMerge. Call InventoryManager.TryTransferTo(source, MouseItemSlot, ref operation). Require a returned packet and exactly one moved item before proceeding; send that existing inventory packet first. CanTake/CanTakeFrom, storage flags, capacity and CanContain remain native-owned.
+        3. Call ToolModeSelection.Apply with the current addmat index and cloned opening BlockSelection. Apply calls native SetToolMode, sends existing tool-mode packet 27 and marks the chisel slot dirty.
+        4. Return a locally unconsumed staged item using TryTransferTo(MouseItemSlot, originalSource, ref operation), then send the returned native inventory packet. Validate the current source and cursor contents before returning; stop on transfer failure. Do not overwrite a changed cursor/source, manufacture a replacement stack or guess a retry.
+        ItemChisel.SetToolMode prioritizes a block on MouseItemSlot over the supplied mode index. Ordinary survival consumes one item when the previous material supply is not full. Creative, invalid and already-full ordinary materials retain it. The normal local call order is therefore inventory transfer, tool-mode application, then inventory return if needed; send packets in that order.
+        Valid material addition marks the target dirty and emits keepopentoolmodedlg; survival consumption also marks MouseItemSlot dirty. MarkDirty does not replace sending the native client packet.
+        Composite BlockChisel items add their stored constituent quantities and consume one in survival when a materials array exists, irrespective of individual full flags. Validate matching arrays, resolved materials and positive contributions before invoking vanilla; missing targets or malformed arrays can throw.
+        BEChisel.AddMaterial mutates quantities even when it reports an ordinary material already full. It is not a capacity-preview API. Exclude noncontributing/full choices through read-only candidate checks, while preserving native execution semantics.
+        Resolve addmat again when rebuilding the parent menu because its index changes with the target material list. When the cursor is empty, SetToolMode follows its ordinary mode/material-selection branch; do not invoke it after failed local staging.
+
+    Evidence and limits:
+        Material behavior -> ../../vssurvivalmod/Item/ItemChisel.cs GetToolModes, IsValidChiselingMaterial and SetToolMode; ../../vssurvivalmod/Systems/Microblock/BEChisel.cs AddMaterial.
+        Transfer ownership -> ../../vsapi/Common/Entity/Player/IPlayerInventoryManager.cs TryTransferTo; ../../vsapi/Common/Inventory/ItemSlot.cs CanTakeFrom/CanHold/TryPutInto/MarkDirty; QuickToolInventoryView/QuickToolMovementPlan demonstrate current owned-slot/native-packet conventions.
+        Tool application -> ../VanillaExpanded/src/ToolModeRadialMenu/ToolModeSelection.cs Apply/CreatePacket and ToolModeRadialMenuSystem.cs captured target; ChiselToolModeMenuLayoutStrategy.cs identifies addmat by code.
+        Source inspection establishes these APIs and branches. Prior installed-engine inspection of version 1.22.7.0 found that inventory and tool-mode packets are separate operations, native revision checks can reject inventory movement, and the tool-mode operation has no transaction acknowledgement. Those observations are limits, not a claim of validated picker recovery.
+        Local consumption, SlotModified and an empty predicted cursor do not prove server acceptance. Use existing authoritative synchronization; do not introduce an acknowledgement protocol or an inventory-tracking framework. Server-only rejection can leave a cursor remainder that local prediction did not retain. This must be exercised with the implemented picker in Phase 4.
+        Closing the last dialog can drop a visible cursor remainder when mouse grab resumes; closing is not source restoration. Finish the synchronous local return before normal closure where possible, and leave disconnect/correction to native authority rather than sending guessed operations after leaving the world.
+        No reverted probe sources/results are claimed as current validation. No source/test changes are needed to complete this documentation investigation.
+
+    Review receipt (2026-10-07): second source review and independent completion audit passed for this documentation contract. Runtime acceptance remains unchecked below.
 
 ## Phase 2: Build eligible material content
     Outcome: the picker represents every supported eligible source stack with readable native item icons.
@@ -87,6 +103,9 @@ Supersedes the chisel workflow proposed in [ToolModeRadialMenuInventoryInteracti
     Outcome: focused receipts and user-run game checks establish inventory conservation and usable material picking.
     ☐ Use a subagent for focused tests and the production Release build; perform a second review and independent completion audit before checking completion markers.
     ☐ Run focused tests for candidate enumeration, pagination, native operation/failure sequence, and existing tool-mode/radial behavior. Separate mocks from installed-native and server evidence.
+    ☐ Verify the implemented native staging/application/return sequence, including packet send order, native accessibility/capacity and equipped-backpack persistence.
+        ☐ Exercise server-only staging/addition/return rejection, a corrected cursor remainder, revision rejection and delayed updates. Establish supported failure/closure behavior before claiming acceptance; an empty predicted cursor is not proof of server consumption.
+        ☐ Verify any necessary native backpack reload after authoritative correction through the owning inventory API. Do not manually reconstruct inventory state.
     ☐ Complete user-run singleplayer and multiplayer checks: hotbar/backpack/offhand sources, invalid/full materials, composite stacks, creative, ordinary survival consumption, repeated additions, and delayed server corrections.
         ☐ Check source/cursor/target state after cancellation and failure; verify no item duplication, loss, unintended tool-mode changes, or changes to a newly aimed block.
         ☐ Check readable icons/pages, zero-candidate feedback, Back, occupied-cursor feedback, application focus loss, and disconnect.
