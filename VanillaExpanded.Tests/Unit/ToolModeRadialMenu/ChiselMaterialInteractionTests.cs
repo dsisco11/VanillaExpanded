@@ -1,5 +1,6 @@
 using Moq;
 using VanillaExpanded.RadialMenu;
+using VanillaExpanded.ModSystems;
 using VanillaExpanded.ToolModeRadialMenu;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -295,6 +296,71 @@ public sealed class ChiselMaterialInteractionTests : IDisposable
         Assert.Equal(27, Assert.IsType<Packet_Client>(Assert.Single(fixture.Packets)).Id);
         Assert.Empty(fixture.Transfers);
     }
+    /// <summary>ConfigLib setting-change callbacks rebuild open geometry and retain the material picker's current page.</summary>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void Owner_ConfigLibChangeRefreshesCurrentLayout(int view)
+    {
+        var fixture = new Fixture();
+        for (int index = 2; index < 16; index++) fixture.Hotbar[index].Itemstack = fixture.Source.Itemstack!.Clone();
+        System.Func<string, RadialMenuSelectionResult>? selected = null;
+        Action? cancelled = null;
+        bool open = false;
+        if (view > 0) fixture.Player.Setup(value => value.CurrentBlockSelection).Returns(fixture.Selection);
+        fixture.Radial.SetupGet(value => value.IsOpen).Returns(() => open);
+        fixture.Radial.Setup(value => value.Open(It.IsAny<RadialMenuLayout>(), It.IsAny<IEnumerable<RadialMenuEntry>>(),
+            It.IsAny<System.Func<string, RadialMenuSelectionResult>>(), It.IsAny<Action>(), "toolmodeselect"))
+            .Callback<RadialMenuLayout, IEnumerable<RadialMenuEntry>, System.Func<string, RadialMenuSelectionResult>, Action, string>(
+                (layout, entries, selection, cancel, toggleCode) => { selected = selection; cancelled = cancel; open = true; }).Returns(true);
+        var owner = new ToolModeRadialMenuSystem();
+        var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        typeof(ToolModeRadialMenuSystem).GetField("api", flags)!.SetValue(owner, fixture.Api.Object);
+        typeof(ToolModeRadialMenuSystem).GetField("menu", flags)!.SetValue(owner, fixture.Radial.Object);
+        var loader = new Mock<IModLoader>();
+        loader.Setup(value => value.Systems).Returns(new ModSystem[] { owner });
+        fixture.Api.As<ICoreAPI>().Setup(value => value.ModLoader).Returns(loader.Object);
+        var integration = new ConfigLibIntegrationModSystem();
+        typeof(ConfigLibIntegrationModSystem).GetField("api", flags)!.SetValue(integration, fixture.Api.Object);
+        bool enabled = VanillaExpandedModSystem.Config.EnableToolModeRadialMenu;
+        float center = VanillaExpandedModSystem.Config.ToolModeCenterSize;
+        float ring = VanillaExpandedModSystem.Config.ToolModeRingSize;
+        try
+        {
+            VanillaExpandedModSystem.Config.EnableToolModeRadialMenu = true;
+            Assert.True(owner.TryOpen());
+            if (view == 2)
+            {
+                selected!("1");
+                selected(ChiselMaterialMenuContentFactory.NextId);
+            }
+            var data = new StringAttribute("{\"ToolModeCenterSize\":\"1.5\",\"ToolModeRingSize\":\"0.5\"}");
+            typeof(ConfigLibIntegrationModSystem).GetMethod("OnConfigLibEvent", flags)!.Invoke(integration,
+                new object[] { "configlib:vanillaexpanded:setting-changed", EnumHandling.PassThrough, data });
+            Assert.NotNull(fixture.LastLayout);
+            Assert.Equal((view == 2 ? 0.36 : 0.48) * 1.5, fixture.LastLayout!.InnerMenu!.OuterRadius, 6);
+            Assert.Equal((view == 2 ? 0.62 : 0.50) * 0.5,
+                fixture.LastLayout.OuterRadius - fixture.LastLayout.InnerRadius, 6);
+            if (view == 2) Assert.Contains(fixture.LastEntries, entry => entry.Id == "chisel-material:stack:12");
+            Assert.Empty(fixture.Packets);
+            fixture.Radial.Verify(value => value.Cancel(), Times.Never);
+            // A later menu using the shared dialog must not receive the closed owner's refresh.
+            if (view == 0) Assert.Equal(RadialMenuSelectionResult.Close, selected!("0"));
+            else cancelled!();
+            fixture.Radial.Invocations.Clear();
+            owner.OnConfigReloaded(fixture.Api.Object);
+            fixture.Radial.Verify(value => value.UpdateLayout(It.IsAny<RadialMenuLayout>(),
+                It.IsAny<IEnumerable<RadialMenuEntry>>()), Times.Never);
+        }
+        finally
+        {
+            VanillaExpandedModSystem.Config.EnableToolModeRadialMenu = enabled;
+            VanillaExpandedModSystem.Config.ToolModeCenterSize = center;
+            VanillaExpandedModSystem.Config.ToolModeRingSize = ring;
+        }
+    }
+
     /// <summary>The actual opening owner routes addmat into the picker and cancels safely on world departure.</summary>
     [Fact]
     public void Owner_OpenRoutesPickerAndLeaveWorldStopsSelections()
@@ -381,6 +447,7 @@ public sealed class ChiselMaterialInteractionTests : IDisposable
         public Mock<IPlayerInventoryManager> Manager { get; } = new();
         public Mock<IRadialMenu> Radial { get; } = new();
         public Mock<IBlockAccessor> Blocks { get; } = new();
+        public RadialMenuLayout? LastLayout { get; private set; }
         public List<RadialMenuEntry> LastEntries { get; private set; } = [];
         public Action<object>? OnSend { get; set; }
         public InventoryGeneric Hotbar { get; } = new(20, "hotbar", "interaction", null!, (index, inventory) => new ItemSlotSurvival(inventory));
@@ -444,7 +511,7 @@ public sealed class ChiselMaterialInteractionTests : IDisposable
                     return ReferenceEquals(source, Cursor) && NullReturnPacket ? null! : packet;
                 }));
             Radial.Setup(value => value.UpdateLayout(It.IsAny<RadialMenuLayout>(), It.IsAny<IEnumerable<RadialMenuEntry>>()))
-                .Callback<RadialMenuLayout, IEnumerable<RadialMenuEntry>>((layout, entries) => LastEntries = entries.ToList());
+                .Callback<RadialMenuLayout, IEnumerable<RadialMenuEntry>>((layout, entries) => { LastLayout = layout; LastEntries = entries.ToList(); });
             Hotbar.Api = Api.Object;
             Mouse.Api = Api.Object;
             Tool.Itemstack = new ItemStack(Chisel);

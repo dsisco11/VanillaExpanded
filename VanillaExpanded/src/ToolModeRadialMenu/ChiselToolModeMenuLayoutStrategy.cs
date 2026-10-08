@@ -46,9 +46,11 @@ internal sealed class ChiselToolModeMenuLayoutStrategy : IToolModeMenuLayoutStra
         }
 
         // The four carving sizes surround the current-mode disc; every other option remains easy to reach outside.
-        var sizeMenu = new RadialMenuLayout(sizeIds, context.CurrentMenu.OuterRadius + 0.02, 0.74, context.CurrentMenu,
+        var sizeMenu = new RadialMenuLayout(sizeIds, context.CurrentMenu.OuterRadius + RadialMenuWedgeStyle.RingGapFraction,
+            ToolModeMenuGeometry.GetOuterRadius(context.CurrentMenu.OuterRadius + RadialMenuWedgeStyle.RingGapFraction, 0.24), context.CurrentMenu,
             separatorDegrees: 1.5);
-        layout = new RadialMenuLayout(outerIds, 0.76, 1, sizeMenu,
+        layout = new RadialMenuLayout(outerIds, sizeMenu.OuterRadius + RadialMenuWedgeStyle.RingGapFraction,
+            ToolModeMenuGeometry.GetOuterRadius(sizeMenu.OuterRadius + RadialMenuWedgeStyle.RingGapFraction, 0.24), sizeMenu,
             separatorDegrees: 1.5, radiusScale: 0.60,
             sizeMultiplier: static () => VanillaExpandedModSystem.Config.ToolModeMenuSize);
         return true;

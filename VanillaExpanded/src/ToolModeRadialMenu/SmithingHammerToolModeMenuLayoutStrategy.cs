@@ -49,7 +49,8 @@ internal sealed class SmithingHammerToolModeMenuLayoutStrategy : IToolModeMenuLa
         }
 
         layout = new RadialMenuLayout(Array.ConvertAll(slots, static id => id!),
-            context.CurrentMenu.OuterRadius + 0.02, 1, context.CurrentMenu,
+            context.CurrentMenu.OuterRadius + RadialMenuWedgeStyle.RingGapFraction,
+            ToolModeMenuGeometry.GetOuterRadius(context.CurrentMenu.OuterRadius + RadialMenuWedgeStyle.RingGapFraction, 0.50), context.CurrentMenu,
             separatorDegrees: 1.5, radiusScale: 0.60,
             sizeMultiplier: static () => VanillaExpandedModSystem.Config.ToolModeMenuSize);
         return true;

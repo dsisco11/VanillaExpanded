@@ -2,9 +2,11 @@ using Vintagestory.API.MathTools;
 
 namespace VanillaExpanded.RadialMenu;
 
-/// <summary>Shares screen-space wedge shape and appearance settings between rendering and hit testing.</summary>
+/// <summary>Shares radial spacing, screen-space wedge shape, and appearance settings.</summary>
 internal static class RadialMenuWedgeStyle
 {
+    /// <summary>Gap between adjacent tool-mode rings, as a fraction of the rendered menu radius.</summary>
+    internal const double RingGapFraction = 0.02;
     /// <summary>Thickness of the wedge outline in screen pixels.</summary>
     internal const float BorderWidthPixels = 2.5f;
     /// <summary>Radius of rounded wedge corners in screen pixels, shared with pointer hit testing.</summary>

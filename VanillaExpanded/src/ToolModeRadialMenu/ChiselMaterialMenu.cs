@@ -64,6 +64,21 @@ internal sealed class ChiselMaterialMenu
         return cursorMaterial ? ShowParent() : RadialMenuSelectionResult.Close;
     }
 
+    /// <summary>Rebuilds the displayed geometry from live settings without resetting picker navigation or applying a mode.</summary>
+    internal void RefreshLayout()
+    {
+        if (closed || busy) return;
+        if (!ContextCurrent()) { menu.Cancel(); return; }
+        if (candidates is not null)
+        {
+            var content = ChiselMaterialMenuContentFactory.Create(candidates, page);
+            menu.UpdateLayout(content.Layout, content.Entries);
+        }
+        else if (ToolModeMenuContentFactory.TryCreate(modes, chisel.GetToolMode(toolSlot, player, selection),
+            Lang.Get("Current mode"), ToolModeMenuLayoutStrategyRegistry.Resolve(chisel), out ToolModeMenuContent? content))
+            menu.UpdateLayout(content!.Layout, content.Entries);
+    }
+
     /// <summary>Clears picker state on cancellation; native synchronous return is independent of this flag.</summary>
     internal void Cancel()
     {

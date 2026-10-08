@@ -1,3 +1,4 @@
+using System;
 using VanillaExpanded.ModSystems;
 using VanillaExpanded.RadialMenu;
 using Vintagestory.API.Client;
@@ -13,6 +14,7 @@ internal sealed class ToolModeRadialMenuSystem : ModSystem, ILiveConfigurable
     private ICoreClientAPI? api;
     private IRadialMenu? menu;
     private bool worldAvailable;
+    private Action? refreshOpenLayout;
 
     #region Public API
 
@@ -35,12 +37,14 @@ internal sealed class ToolModeRadialMenuSystem : ModSystem, ILiveConfigurable
     public void OnConfigReloaded(ICoreAPI api)
     {
         if (!VanillaExpandedModSystem.Config.EnableToolModeRadialMenu) menu?.Cancel();
+        else if (menu?.IsOpen == true) refreshOpenLayout?.Invoke();
     }
 
     /// <inheritdoc />
     public override void Dispose()
     {
         worldAvailable = false;
+        refreshOpenLayout = null;
         if (api is not null) api.Event.LeaveWorld -= OnLeaveWorld;
         menu?.Cancel();
         if (Active == this) Active = null;
@@ -80,9 +84,31 @@ internal sealed class ToolModeRadialMenuSystem : ModSystem, ILiveConfigurable
         var chiselMenu = collectible is ItemChisel chisel && blockSelection is not null
             && api.World.BlockAccessor.GetBlockEntity(blockSelection.Position) is BlockEntityChisel
             ? new ChiselMaterialMenu(api, menu, player, chisel, slot, blockSelection, modes!, () => worldAvailable) : null;
-        return menu.Open(content!.Layout, content.Entries,
-            id => chiselMenu is not null ? chiselMenu.Select(id) : SelectMode(id, collectible, slot, player, blockSelection),
-            () => chiselMenu?.Cancel(), "toolmodeselect");
+        // Rebuild presentation without applying a mode; chisel navigation owns its current page.
+        refreshOpenLayout = () =>
+        {
+            if (chiselMenu is not null) chiselMenu.RefreshLayout();
+            else
+            {
+                SkillItem[]? refreshedModes = collectible.GetToolModes(slot, player, blockSelection!);
+                int refreshedMode = collectible.GetToolMode(slot, player, blockSelection!);
+                if (ToolModeMenuContentFactory.TryCreate(refreshedModes, refreshedMode, Lang.Get("Current mode"), strategy,
+                    out ToolModeMenuContent? refreshed))
+                    menu.UpdateLayout(refreshed!.Layout, refreshed.Entries);
+                else menu.Cancel();
+            }
+        };
+        bool opened = menu.Open(content!.Layout, content.Entries,
+            id =>
+            {
+                RadialMenuSelectionResult result = chiselMenu is not null
+                    ? chiselMenu.Select(id) : SelectMode(id, collectible, slot, player, blockSelection);
+                if (result == RadialMenuSelectionResult.Close) refreshOpenLayout = null;
+                return result;
+            },
+            () => { refreshOpenLayout = null; chiselMenu?.Cancel(); }, "toolmodeselect");
+        if (!opened) refreshOpenLayout = null;
+        return opened;
     }
 
     #endregion
@@ -92,6 +118,7 @@ internal sealed class ToolModeRadialMenuSystem : ModSystem, ILiveConfigurable
     private void OnLeaveWorld()
     {
         worldAvailable = false;
+        refreshOpenLayout = null;
         menu?.Cancel();
     }
 

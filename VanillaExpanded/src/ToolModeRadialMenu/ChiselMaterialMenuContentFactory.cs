@@ -51,8 +51,9 @@ internal static class ChiselMaterialMenuContentFactory
             entries.Add(new RadialMenuEntry(NextId, Lang.Get("vanillaexpanded:chisel-material-next"), true));
         }
         entries.Add(new RadialMenuEntry(BackId, Lang.Get("vanillaexpanded:chisel-material-back"), true));
-        var back = new RadialMenuLayout([BackId], 0, 0.36);
-        var layout = new RadialMenuLayout(ids, 0.38, 1, back, separatorDegrees: 1.5, radiusScale: 0.60,
+        var back = new RadialMenuLayout([BackId], 0, ToolModeMenuGeometry.GetCenterRadius(0.36));
+        var layout = new RadialMenuLayout(ids, back.OuterRadius + RadialMenuWedgeStyle.RingGapFraction,
+            ToolModeMenuGeometry.GetOuterRadius(back.OuterRadius + RadialMenuWedgeStyle.RingGapFraction, 0.62), back, separatorDegrees: 1.5, radiusScale: 0.60,
             sizeMultiplier: static () => VanillaExpandedModSystem.Config.ToolModeMenuSize);
         return new ToolModeMenuContent(layout, entries);
     }

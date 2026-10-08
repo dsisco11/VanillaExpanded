@@ -29,6 +29,30 @@ public sealed class ChiselMaterialMenuContentFactoryTests : IDisposable
         Lang.ChangeLanguage(originalLocale);
     }
     #region Content
+    /// <summary>The material picker shares independent center and ring controls without changing its gap.</summary>
+    [Theory]
+    [InlineData(1f, 1f)]
+    [InlineData(2f, 0.5f)]
+    public void PickerUsesCenterAndRingSizeSettings(float centerScale, float ringScale)
+    {
+        float originalCenter = VanillaExpandedModSystem.Config.ToolModeCenterSize;
+        float originalRing = VanillaExpandedModSystem.Config.ToolModeRingSize;
+        try
+        {
+            VanillaExpandedModSystem.Config.ToolModeCenterSize = centerScale;
+            VanillaExpandedModSystem.Config.ToolModeRingSize = ringScale;
+            ToolModeMenuContent picker = ChiselMaterialMenuContentFactory.Create([]);
+            Assert.Equal(0.36 * centerScale, picker.Layout.InnerMenu!.OuterRadius, 6);
+            Assert.Equal(0.02, picker.Layout.InnerRadius - picker.Layout.InnerMenu.OuterRadius, 6);
+            Assert.Equal(0.62 * ringScale, picker.Layout.OuterRadius - picker.Layout.InnerRadius, 6);
+        }
+        finally
+        {
+            VanillaExpandedModSystem.Config.ToolModeCenterSize = originalCenter;
+            VanillaExpandedModSystem.Config.ToolModeRingSize = originalRing;
+        }
+    }
+
     /// <summary>Keeps an explanatory empty wedge and a separate enabled Back disc.</summary>
     [Fact]
     public void Create_Empty_KeepsBackAvailable()
