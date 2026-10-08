@@ -121,6 +121,12 @@ public class VanillaExpandedConfig
     #endregion
 
     #region Visual Settings (Client-Side)
+    /// <summary>Opacity of the screen backdrop behind radial menus (0 to 1; default 0.2).</summary>
+    public float RadialMenuBackdropOpacity { get; set; } = 0.2f;
+
+    /// <summary>Background opacity of enabled radial-menu entries (0 to 1; default 0.5).</summary>
+    public float RadialMenuOpacity { get; set; } = 0.5f;
+
     /// <summary>Size multiplier for the tool-mode radial menu (0.15 to 2.5; 1 preserves its default size).</summary>
     public float ToolModeMenuSize { get; set; } = 1f;
 

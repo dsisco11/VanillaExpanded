@@ -1,3 +1,4 @@
+using System;
 using Vintagestory.API.MathTools;
 
 namespace VanillaExpanded.RadialMenu;
@@ -15,12 +16,12 @@ internal static class RadialMenuWedgeStyle
     internal const float HoverDurationSeconds = 0.1f;
     /// <summary>Maximum size multiplier applied to a hovered wedge and its icon.</summary>
     internal const float HoverScale = 1.135f;
-    /// <summary>Background opacity of enabled entries; hovered enabled entries become fully opaque.</summary>
-    internal const float EnabledOpacity = 0.5f;
+    /// <summary>Live background opacity of enabled entries; hovered entries use up to twice this opacity.</summary>
+    internal static float EnabledOpacity => GetOpacity(VanillaExpandedModSystem.Config.RadialMenuOpacity, 0.5f);
     /// <summary>Background opacity of disabled entries, making unavailable choices less prominent.</summary>
-    internal const float DisabledOpacity = 0.4f;
+    internal static float DisabledOpacity => EnabledOpacity * 0.8f;
     /// <summary>Opacity of the screen-darkening backdrop behind the modal menu; zero is transparent and one is opaque.</summary>
-    internal const float BackdropOpacity = 0.2f;
+    internal static float BackdropOpacity => GetOpacity(VanillaExpandedModSystem.Config.RadialMenuBackdropOpacity, 0.2f);
     /// <summary>Amplitude of the subtle procedural grain added to wedge background colors.</summary>
     internal const float DefaultGrainStrength = 0.035f;
     /// <summary>Space reserved around icons for their halo, the wedge border, and additional padding.</summary>
@@ -41,4 +42,9 @@ internal static class RadialMenuWedgeStyle
     internal static readonly Vec3f Border = new(0.62f, 0.38f, 0.17f);
     /// <summary>Highlighted outline color blended in as an enabled entry is hovered.</summary>
     internal static readonly Vec3f HoverBorder = new(0.94f, 0.60f, 0.22f);
+    #region Private
+    /// <summary>Bounds hand-edited opacity settings and preserves the default for non-finite inputs.</summary>
+    private static float GetOpacity(float value, float defaultValue) =>
+        float.IsFinite(value) ? Math.Clamp(value, 0f, 1f) : defaultValue;
+    #endregion
 }
