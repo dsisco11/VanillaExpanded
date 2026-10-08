@@ -219,6 +219,79 @@ public sealed class RadialMenuTests
         }
     }
 
+    /// <summary>Cached sizes refresh for screen-radius and padding changes without retaining stale entry values.</summary>
+    [Fact]
+    public void UprightIconCacheRefreshesForScreenSpaceChanges()
+    {
+        string[] ids = ["a", "b", "c", "d"];
+        var layout = new RadialMenuLayout(ids, 0.50, 0.74, startAngleDegrees: 13);
+        foreach ((double radius, double inset) in new[] { (600d, 7.5d), (300d, 7.5d), (300d, 15d), (600d, 7.5d) })
+        {
+            var fresh = new RadialMenuLayout(ids, 0.50, 0.74, startAngleDegrees: 13);
+            for (int index = 0; index < ids.Length; index++)
+            {
+                float expected = fresh.GetScreenAlignedIconSizePixels(index, radius, inset);
+                Assert.Equal(expected, layout.GetScreenAlignedIconSizePixels(index, radius, inset));
+                Assert.Equal(expected, layout.GetScreenAlignedIconSizePixels(index, radius, inset));
+            }
+        }
+        Assert.Throws<ArgumentOutOfRangeException>(() => layout.GetScreenAlignedIconSizePixels(4, 600, 7.5));
+        Assert.Throws<ArgumentOutOfRangeException>(() => layout.GetScreenAlignedIconSizePixels(0, 0, 7.5));
+    }
+
+    /// <summary>Upright widget artwork uses more of cardinal wedges than the rotation-safe fit.</summary>
+    [Fact]
+    public void UprightIconUsesAvailableRingThickness()
+    {
+        var layout = new RadialMenuLayout(["a", "b", "c", "d"], 0.50, 0.74, separatorDegrees: 1.5);
+        Assert.True(layout.GetScreenAlignedIconSizePixels(0, 600, 7.5)
+            > layout.GetIconSizePixels(600, 7.5) * 1.25f);
+    }
+
+    /// <summary>Upright squares retain padding along their entire edges, including the concave inner arc.</summary>
+    [Theory]
+    [InlineData(2, 0, true, 0.50, 1.0)]
+    [InlineData(4, 0, true, 0.50, 0.74)]
+    [InlineData(4, 45, false, 0.50, 0.74)]
+    [InlineData(8, 13, false, 0.76, 1.0)]
+    [InlineData(16, 0, true, 0.50, 1.0)]
+    [InlineData(32, 7, true, 0.50, 1.0)]
+    public void UprightIconEdgesRetainWedgePadding(int count, double startAngle, bool clockwise,
+        double innerRadius, double outerRadius)
+    {
+        string[] ids = [.. Enumerable.Range(0, count).Select(index => index.ToString())];
+        var layout = new RadialMenuLayout(ids, innerRadius, outerRadius,
+            startAngleDegrees: startAngle, clockwise: clockwise, separatorDegrees: 1.5);
+        const double radius = 600;
+        const double inset = 7.5;
+        for (int index = 0; index < count; index++)
+        {
+            double halfSize = layout.GetScreenAlignedIconSizePixels(index, radius, inset) / 2d;
+            (double x, double y) = layout.GetWedgeCenter(index, 0, 0, radius, (innerRadius + outerRadius) / 2d);
+            double angle = (startAngle + (clockwise ? 1 : -1) * index * layout.StepDegrees) * Math.PI / 180d;
+            double halfAngle = (layout.StepDegrees / 2d - layout.SeparatorDegrees) * Math.PI / 180d;
+            // Check the exact nearest point as well as sampled perimeter points: corner-only
+            // checks can miss an upright edge cutting through the inner circular boundary.
+            double nearestX = Math.Max(0d, Math.Abs(x) - halfSize);
+            double nearestY = Math.Max(0d, Math.Abs(y) - halfSize);
+            Assert.True(Math.Sqrt(nearestX * nearestX + nearestY * nearestY) >= innerRadius * radius + inset - 0.001);
+            for (int sample = 0; sample <= 8; sample++)
+                foreach (int side in new[] { -1, 1 })
+                    foreach (bool horizontal in new[] { false, true })
+                    {
+                        double along = halfSize * (sample / 4d - 1d);
+                        double px = x + (horizontal ? along : side * halfSize);
+                        double py = y + (horizontal ? side * halfSize : along);
+                        double distance = Math.Sqrt(px * px + py * py);
+                        double delta = Math.Atan2(px * Math.Cos(angle) + py * Math.Sin(angle),
+                            px * Math.Sin(angle) - py * Math.Cos(angle));
+                        Assert.True(distance <= outerRadius * radius - inset + 0.001);
+                        Assert.True(distance * Math.Sin(halfAngle - Math.Abs(delta)) >= inset - 0.001);
+                        Assert.Equal(ids[index], layout.HitTest(px, py, 0, 0, radius));
+                    }
+        }
+    }
+
     [Theory]
     [InlineData("2x2x2", "2x2x2")]
     [InlineData("Andesite Cobblestone", "Andesite\nCobblestone")]
