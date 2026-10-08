@@ -304,9 +304,9 @@ public sealed class ChiselMaterialInteractionTests : IDisposable
         Action? cancelled = null;
         fixture.Player.Setup(value => value.CurrentBlockSelection).Returns(fixture.Selection);
         fixture.Radial.Setup(value => value.Open(It.IsAny<RadialMenuLayout>(), It.IsAny<IEnumerable<RadialMenuEntry>>(),
-            It.IsAny<System.Func<string, RadialMenuSelectionResult>>(), It.IsAny<Action>()))
-            .Callback<RadialMenuLayout, IEnumerable<RadialMenuEntry>, System.Func<string, RadialMenuSelectionResult>, Action>(
-                (layout, entries, selection, cancel) => { selected = selection; cancelled = cancel; }).Returns(true);
+            It.IsAny<System.Func<string, RadialMenuSelectionResult>>(), It.IsAny<Action>(), "toolmodeselect"))
+            .Callback<RadialMenuLayout, IEnumerable<RadialMenuEntry>, System.Func<string, RadialMenuSelectionResult>, Action, string>(
+                (layout, entries, selection, cancel, toggleCode) => { selected = selection; cancelled = cancel; }).Returns(true);
         fixture.Radial.Setup(value => value.Cancel()).Callback(() => cancelled?.Invoke());
         var owner = new ToolModeRadialMenuSystem();
         var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;

@@ -82,7 +82,7 @@ internal sealed class ToolModeRadialMenuSystem : ModSystem, ILiveConfigurable
             ? new ChiselMaterialMenu(api, menu, player, chisel, slot, blockSelection, modes!, () => worldAvailable) : null;
         return menu.Open(content!.Layout, content.Entries,
             id => chiselMenu is not null ? chiselMenu.Select(id) : SelectMode(id, collectible, slot, player, blockSelection),
-            () => chiselMenu?.Cancel());
+            () => chiselMenu?.Cancel(), "toolmodeselect");
     }
 
     #endregion

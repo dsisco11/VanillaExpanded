@@ -16,6 +16,7 @@ internal sealed class RadialMenuDialog : GuiDialog
     private RadialMenuInteraction? interaction;
     private bool closing;
     private bool waitForMouseUp;
+    private string toggleKeyCode = string.Empty;
     #endregion
 
     #region Dialog contract
@@ -26,7 +27,13 @@ internal sealed class RadialMenuDialog : GuiDialog
     }
 
     /// <inheritdoc />
-    public override string ToggleKeyCombinationCode => string.Empty;
+    public override string ToggleKeyCombinationCode => toggleKeyCode;
+
+    /// <summary>Keeps opening-hotkey registration with the caller while using its binding for dismissal.</summary>
+    public override void OnBlockTexturesLoaded()
+    {
+        // The base implementation would replace the caller's hotkey handler with this shared dialog.
+    }
     /// <inheritdoc />
     public override double InputOrder => 0;
     /// <inheritdoc />
@@ -115,6 +122,9 @@ internal sealed class RadialMenuDialog : GuiDialog
     public override void OnKeyDown(KeyEvent args)
     {
         if (!IsOpened()) return;
+        // Let the native dialog match the caller's current hotkey binding before swallowing modal input.
+        base.OnKeyDown(args);
+        if (args.Handled) return;
         // Escape remains unhandled so the engine routes it through OnEscapePressed.
         if (args.KeyCode != (int)GlKeys.Escape) args.Handled = true;
     }
@@ -145,6 +155,7 @@ internal sealed class RadialMenuDialog : GuiDialog
             bool closed = base.TryClose();
             interaction = null;
             layout = null;
+            toggleKeyCode = string.Empty;
             return closed;
         }
         finally
@@ -166,11 +177,12 @@ internal sealed class RadialMenuDialog : GuiDialog
     #endregion
 
     #region Caller interaction
-    /// <summary>Opens a complete fixed layout and reports its selection and cancellation.</summary>
+    /// <summary>Opens a complete layout with optional native hotkey dismissal and selection/cancellation callbacks.</summary>
     public bool Open(RadialMenuLayout nextLayout, IEnumerable<RadialMenuEntry> entries,
-        System.Func<string, RadialMenuSelectionResult> selected, Action cancelled)
+        System.Func<string, RadialMenuSelectionResult> selected, Action cancelled, string toggleKeyCode = "")
     {
         if (IsOpened() || !renderer.IsReady) return false;
+        this.toggleKeyCode = toggleKeyCode;
         renderer.ResetInteraction();
         layout = nextLayout ?? throw new ArgumentNullException(nameof(nextLayout));
         renderer.PrepareLayout(layout);
@@ -190,6 +202,7 @@ internal sealed class RadialMenuDialog : GuiDialog
         interaction.Cancel();
         interaction = null;
         layout = null;
+        this.toggleKeyCode = string.Empty;
         return false;
     }
 
