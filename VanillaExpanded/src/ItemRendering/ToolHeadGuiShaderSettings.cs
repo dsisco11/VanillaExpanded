@@ -17,7 +17,7 @@ internal static class ToolHeadGuiShaderSettings
         float[] incandescent = ColorUtil.GetIncandescenceColorAsColor4f(temperature);
         shader.Uniform("normalShaded", info.NormalShaded ? 1 : 0);
         // Halve the stock shader's ambient/fill terms. Doubling its light vector retains directional strength.
-        float lightingTint = info.NormalShaded ? 0.4f : 1f;
+        float lightingTint = info.NormalShaded ? 0.5f : 1f;
         // Direction (0.3, -0.3, sqrt(0.82)) favors the GUI front (+Z) while remaining above and to the right.
         shader.Uniform("lightPosition", 0.6f, -0.6f, 1.811077f);
         shader.Uniform("rgbaIn", new Vec4f(lightingTint, lightingTint, lightingTint, 1));
