@@ -50,7 +50,7 @@ Supersedes the chisel workflow proposed in [ToolModeRadialMenuInventoryInteracti
         1. Resolve addmat by code from fresh vanilla modes. Validate the captured chisel and target, current selected source stack, eligible material and empty MouseItemSlot. Resolve source slots from the player's owned hotbar/backpack inventories; include eligible offhand storage and exclude bag equipment slots/external containers.
         2. Create ItemStackMoveOperation with RequestedQuantity = 1, Left mouse button, no modifiers and DirectMerge. Call InventoryManager.TryTransferTo(source, MouseItemSlot, ref operation). Require a returned packet and exactly one moved item before proceeding; send that existing inventory packet first. CanTake/CanTakeFrom, storage flags, capacity and CanContain remain native-owned.
         3. Call ToolModeSelection.Apply with the current addmat index and cloned opening BlockSelection. Apply calls native SetToolMode, sends existing tool-mode packet 27 and marks the chisel slot dirty.
-        4. Return a locally unconsumed staged item using TryTransferTo(MouseItemSlot, originalSource, ref operation), then send the returned native inventory packet. Validate the current source and cursor contents before returning; stop on transfer failure. Do not overwrite a changed cursor/source, manufacture a replacement stack or guess a retry.
+        4. Return a locally unconsumed staged item using TryTransferTo(MouseItemSlot, originalSource, ref operation), then send the returned native inventory packet. Validate the current source and cursor contents before returning. If return fails or the original source is no longer safe, drop only the unchanged known single cursor item through InventoryManager.DropMouseSlotItems(false), while still in the current world. Do not overwrite a changed cursor/source, manufacture a replacement stack or guess a retry.
         ItemChisel.SetToolMode prioritizes a block on MouseItemSlot over the supplied mode index. Ordinary survival consumes one item when the previous material supply is not full. Creative, invalid and already-full ordinary materials retain it. The normal local call order is therefore inventory transfer, tool-mode application, then inventory return if needed; send packets in that order.
         Valid material addition marks the target dirty and emits keepopentoolmodedlg; survival consumption also marks MouseItemSlot dirty. MarkDirty does not replace sending the native client packet.
         Composite BlockChisel items add their stored constituent quantities and consume one in survival when a materials array exists, irrespective of individual full flags. Validate matching arrays, resolved materials and positive contributions before invoking vanilla; missing targets or malformed arrays can throw.
@@ -89,19 +89,23 @@ Supersedes the chisel workflow proposed in [ToolModeRadialMenuInventoryInteracti
 
 ## Phase 3: Integrate selection with the existing tool-mode operation
     Outcome: Add Material transitions to the picker and selecting a stack executes the verified native sequence.
-    ☐ Intercept only the chisel addmat action before ordinary ToolModeSelection.Apply; enter the picker with UpdateLayout and KeepOpen.
-    ☐ Keep the selection owner thin; place candidate/content building and the native material operation in chisel-specific responsibilities, without adding a general interaction framework.
-    ☐ Before staging, revalidate the active chisel, captured target, current source slot/stack identity and relevant attributes, count, eligibility, and empty cursor.
-        ☐ Refresh or decline stale candidates; do not consume a replacement stack that merely occupies the same slot.
-        ☐ Resolve the current addmat index from fresh vanilla modes while retaining the captured target.
-    ☐ Execute the Phase 1 sequence through native inventory APIs and existing ToolModeSelection.Apply. Prevent overlapping additions while native reconciliation is pending.
-        ☐ Follow verified failure/restoration rules; never delete a remainder, overwrite another cursor stack, or report success solely from local prediction.
-        ☐ Keep any operation lifetime independent of picker closure only as required to finish verified native restoration; clear world-local state on disconnect.
-    ☐ Return Back to the parent menu without applying a tool mode. After the addition sequence settles, regenerate parent modes from current target data and preserve the current carving mode.
-    ☐ Preserve ordinary tool-mode selection, chisel cursor-drop behavior outside the picker where applicable, and quick-swap menus.
-    ☐ Verification: callback transitions, captured target/tool guards, one-item staging, exact existing packet sequence, restoration cases, repeated selection, cancellation, and refreshed modes.
+    Remainder fallback (2026-10-08): at the user's request, a known single staged item that cannot be returned is dropped through the existing native mouse-slot API. Changed cursor contents and disconnect never trigger an automatic drop.
+    Native boundary (2026-10-07): installed VintagestoryLib 1.22.7.0 InventoryNetworkUtil has no pending-transaction/acknowledgement API. PauseInventoryUpdates buffers incoming packets and cannot establish acceptance. The local operation is serialized synchronously; delayed server corrections and rejection remain Phase 4 validation. No acknowledgement or inventory-tracking framework is introduced.
+    ☑ Intercept only the chisel addmat action before ordinary ToolModeSelection.Apply; enter the picker with UpdateLayout and KeepOpen.
+    ☑ Keep the selection owner thin; place candidate/content building and the native material operation in chisel-specific responsibilities, without adding a general interaction framework.
+    ☑ Before staging, revalidate the active chisel, captured target, current source slot/stack identity and relevant attributes, count, eligibility, and empty cursor.
+        ☑ Refresh or decline stale candidates; do not consume a replacement stack that merely occupies the same slot.
+        ☑ Resolve the current addmat index from fresh vanilla modes while retaining the captured target.
+    ☑ Execute the Phase 1 sequence through native inventory APIs and existing ToolModeSelection.Apply. Prevent reentrant/overlapping local additions and require an empty cursor before each sequence; native reconciliation remains authoritative.
+        ☑ Follow verified failure/restoration rules; never delete a remainder, overwrite another cursor stack, or report success solely from local prediction.
+        ☑ Keep any operation lifetime independent of picker closure only as required to finish verified native restoration; clear world-local state on disconnect.
+    ☑ Return Back to the parent menu without applying a tool mode. After the addition sequence settles, regenerate parent modes from current target data and preserve the current carving mode.
+    ☑ Preserve ordinary tool-mode selection, chisel cursor-drop behavior outside the picker where applicable, and quick-swap menus.
+    ☑ Verification: callback transitions, captured target/tool guards, one-item staging, exact existing packet sequence, restoration cases, repeated selection, cancellation, and refreshed modes.
     Completion criteria:
-        ☐ The special action uses the existing native operation end to end, without new server code or changes to shared GUI input ownership.
+        ☑ The special action uses the existing native operation end to end, without new server code or changes to shared GUI input ownership.
+
+    Verification receipt (2026-10-07): production Release build passed; 115 focused ToolModeRadialMenu/RadialMenu tests passed, including 24 new interaction cases. Second review and independent completion audit passed. Native inventory prediction is exercised through real ItemSlot.TryPutInto; network delivery and chisel consumption are controlled test boundaries. Server acceptance, multiplayer conservation and in-game appearance remain unchecked Phase 4 requirements.
 
 ## Phase 4: Validate and reconcile documentation
     Outcome: focused receipts and user-run game checks establish inventory conservation and usable material picking.

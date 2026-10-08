@@ -1,4 +1,7 @@
 {
+  "chisel-material-dropped": "Material return failed. The item was dropped.",
+  "chisel-material-cursor": "Put away the item held by your mouse before choosing a material.",
+  "chisel-material-return": "Material selection failed. The item could not be returned to your inventory.",
   "chisel-material-empty": "No eligible materials in your inventory",
   "chisel-material-back": "Back",
   "chisel-material-previous": "Previous page",

@@ -12,6 +12,9 @@ internal sealed class ToolModeRadialMenuSystem : ModSystem, ILiveConfigurable
 {
     private ICoreClientAPI? api;
     private IRadialMenu? menu;
+    private bool worldAvailable;
+
+    #region Public API
 
     /// <summary>Gets the initialized client owner used by the base-dialog Harmony prefix.</summary>
     internal static ToolModeRadialMenuSystem? Active { get; private set; }
@@ -25,6 +28,7 @@ internal sealed class ToolModeRadialMenuSystem : ModSystem, ILiveConfigurable
         this.api = api;
         menu = api.ModLoader.GetModSystem<RadialMenuSystem>();
         Active = this;
+        api.Event.LeaveWorld += OnLeaveWorld;
     }
 
     /// <inheritdoc />
@@ -36,6 +40,8 @@ internal sealed class ToolModeRadialMenuSystem : ModSystem, ILiveConfigurable
     /// <inheritdoc />
     public override void Dispose()
     {
+        worldAvailable = false;
+        if (api is not null) api.Event.LeaveWorld -= OnLeaveWorld;
         menu?.Cancel();
         if (Active == this) Active = null;
         menu = null;
@@ -43,6 +49,7 @@ internal sealed class ToolModeRadialMenuSystem : ModSystem, ILiveConfigurable
         base.Dispose();
     }
 
+    /// <summary>Opens current tool modes and captures a chisel-specific picker when applicable.</summary>
     internal bool TryOpen()
     {
         if (!VanillaExpandedModSystem.Config.EnableToolModeRadialMenu)
@@ -69,10 +76,26 @@ internal sealed class ToolModeRadialMenuSystem : ModSystem, ILiveConfigurable
             out ToolModeMenuContent? content);
         if (!created)
             return false;
+        worldAvailable = true;
+        var chiselMenu = collectible is ItemChisel chisel && blockSelection is not null
+            && api.World.BlockAccessor.GetBlockEntity(blockSelection.Position) is BlockEntityChisel
+            ? new ChiselMaterialMenu(api, menu, player, chisel, slot, blockSelection, modes!, () => worldAvailable) : null;
         return menu.Open(content!.Layout, content.Entries,
-            id => SelectMode(id, collectible, slot, player, blockSelection), static () => { });
+            id => chiselMenu is not null ? chiselMenu.Select(id) : SelectMode(id, collectible, slot, player, blockSelection),
+            () => chiselMenu?.Cancel());
     }
 
+    #endregion
+
+    #region Private
+    /// <summary>Cancels the open menu before any further native operation can run in a departed world.</summary>
+    private void OnLeaveWorld()
+    {
+        worldAvailable = false;
+        menu?.Cancel();
+    }
+
+    /// <summary>Preserves the ordinary native tool-mode selection path.</summary>
     private RadialMenuSelectionResult SelectMode(string id, CollectibleObject collectible, ItemSlot slot,
         IClientPlayer player, BlockSelection? blockSelection)
     {
@@ -90,4 +113,5 @@ internal sealed class ToolModeRadialMenuSystem : ModSystem, ILiveConfigurable
             menu!.UpdateLayout(refreshed!.Layout, refreshed.Entries);
         return RadialMenuSelectionResult.KeepOpen;
     }
+    #endregion
 }
