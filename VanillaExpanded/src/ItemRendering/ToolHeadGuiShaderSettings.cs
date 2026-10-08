@@ -16,8 +16,8 @@ internal static class ToolHeadGuiShaderSettings
         bool temperatureMode = stack.Attributes.HasAttribute("temperature");
         float[] incandescent = ColorUtil.GetIncandescenceColorAsColor4f(temperature);
         shader.Uniform("normalShaded", info.NormalShaded ? 1 : 0);
-        // Normals already include radial rotation. Keep a normalized light toward screen-right, screen-up and the viewer.
-        shader.Uniform("lightPosition", 0.5773503f, -0.5773503f, -0.5773503f);
+        // GUI positive Z faces the viewer; transformed normals need a fixed light from screen-right, screen-up and in front.
+        shader.Uniform("lightPosition", 0.5773503f, -0.5773503f, 0.5773503f);
         shader.Uniform("rgbaIn", new Vec4f(1, 1, 1, 1));
         shader.Uniform("applyColor", info.ApplyColor ? 1 : 0);
         shader.Uniform("alphaTest", info.AlphaTest);

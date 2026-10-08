@@ -145,11 +145,29 @@ public sealed class ToolHeadPresentationIntegrationTests
             {
                 submitted = true;
                 Assert.NotNull(light);
-                Assert.Equal([0.5773503f, -0.5773503f, -0.5773503f], light);
+                Assert.Equal([0.5773503f, -0.5773503f, 0.5773503f], light);
+                var model = f.Matrices["modelMatrix"];
+                double length = Math.Sqrt(model[8] * model[8] + model[9] * model[9] + model[10] * model[10]);
+                double nx = model[8] / length, ny = model[9] / length, nz = model[10] / length;
+                double dot = nx * light[0] + ny * light[1] + nz * light[2];
+                // Match the installed GUI shader's diffuse, sky and north-facing terms for opposite face normals.
+                double front = Math.Max(Math.Max(.45, .5 + .5 * dot), ny * .95) + Math.Max(0, -nz) * .2;
+                double rear = Math.Max(Math.Max(.45, .5 - .5 * dot), -ny * .95) + Math.Max(0, nz) * .2;
+                Assert.True(front > rear, "The viewer-facing surface must be brighter than its rear-facing inverse.");
             });
         Assert.True(f.Renderer.TryRender(f.Api.Object, f.Slot, 100, 200, 40, rotation));
         Assert.True(submitted);
         Assert.Equal(1, f.Restores);
+    }
+
+    /// <summary>The dedicated draw retains prepared unshaded material semantics.</summary>
+    [Fact]
+    public void PreparedUnshadedMaterialRemainsUnshaded()
+    {
+        var fixture = new Fixture();
+        fixture.Info.NormalShaded = false;
+        Assert.True(fixture.Renderer.TryRender(fixture.Api.Object, fixture.Slot, 100, 200, 40, 0));
+        fixture.Shader.Verify(shader => shader.Uniform("normalShaded", 0), Times.Once);
     }
 
     /// <summary>Shader submissions preserve prepared shading, temperature, damage, and transition overlay settings.</summary>
