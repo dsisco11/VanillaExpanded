@@ -48,7 +48,8 @@ internal static class AutoStashService
         ItemStack? stack = attachment.Itemstack;
         IHeldBag? bag = stack?.Collectible.GetCollectibleInterface<IHeldBag>();
         if (stack is null || bag is null) return AutoStashAssessment.Empty;
-        var policy = MatchingContentsPolicy.ForAssessment(bag.GetContents(stack, world));
+        // Stock bags without persisted backpack data return null and have no matching contents.
+        var policy = MatchingContentsPolicy.ForAssessment(bag.GetContents(stack, world) ?? []);
         return AutoStashAssessor.Assess(policy, null,
             owner.GetOwnInventory(GlobalConstants.backpackInvClassName), owner.GetOwnInventory(GlobalConstants.hotBarInvClassName));
     }

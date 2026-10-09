@@ -36,8 +36,8 @@ internal sealed class AttachedBagAutoStashTarget : AutoStashTarget
         return count > 0 ? new AttachedBagAutoStashTarget(world, host, attachable, index, attachment, stack, bag, count) : null;
     }
 
-    /// <summary>Reads persisted contents through the bag API without preparing a mutable server workspace.</summary>
-    public override IEnumerable<ItemStack?> GetContents() => bag.GetContents(stack, world);
+    /// <summary>Reads persisted contents, treating absent bag data as empty without preparing a mutable server workspace.</summary>
+    public override IEnumerable<ItemStack?> GetContents() => bag.GetContents(stack, world) ?? [];
 
     /// <summary>Loads current bag slots while preserving vanilla wrapper identity and modification callbacks.</summary>
     public override bool TryPrepare()
