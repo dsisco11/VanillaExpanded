@@ -1,0 +1,156 @@
+[
+  {
+    "op": "add",
+    "file": "game:itemtypes/tool/axe-metal.json",
+    "path": "/attributes/ve-radial-menu-propertiesByType",
+    "value": {
+      "axe-scrap-scrap": {
+        "transform": {
+          "origin": {
+            "x": 1.0,
+            "y": 0.0,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.31
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "@axe-felling-(copper|tinbronze|bismuthbronze|blackbronze)": {
+        "transform": {
+          "origin": {
+            "x": 1.0625,
+            "y": 0.04375,
+            "z": 0.40625
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.2
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "@axe-felling-(gold|silver|iron|meteoriciron|steel)": {
+        "transform": {
+          "origin": {
+            "x": 1.03125,
+            "y": 0.04375,
+            "z": 0.375
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.09
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "axe-bearded-ruined": {
+        "transform": {
+          "origin": {
+            "x": 0.78125,
+            "y": 0.0,
+            "z": 0.3125
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 1.98
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "axe-battle-ruined": {
+        "transform": {
+          "origin": {
+            "x": 1.25,
+            "y": 0.0,
+            "z": 0.375
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 1.87
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "axe-bardiche-ruined": {
+        "transform": {
+          "origin": {
+            "x": 0.6875,
+            "y": 0.0,
+            "z": 0.21875
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 1.76
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "axe-double-ruined": {
+        "transform": {
+          "origin": {
+            "x": 1.25,
+            "y": 0.0,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 1.76
+        },
+        "wedgeRotationDegrees": 0
+      }
+    }
+  }
+]

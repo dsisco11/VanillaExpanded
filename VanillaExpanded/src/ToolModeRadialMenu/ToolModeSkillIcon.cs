@@ -1,3 +1,4 @@
+using System;
 using VanillaExpanded.RadialMenu;
 using Vintagestory.API.Client;
 
@@ -6,9 +7,17 @@ namespace VanillaExpanded.ToolModeRadialMenu;
 /// <summary>Renders either form of artwork supported by a vanilla skill item.</summary>
 internal sealed class ToolModeSkillIcon(SkillItem skillItem) : IRadialMenuIcon
 {
+    #region Public API
+
+    /// <inheritdoc />
+    public RadialMenuIconSizing Sizing => RadialMenuIconSizing.ScreenAligned;
+
     /// <inheritdoc />
     public void Render(ICoreClientAPI api, double centerX, double centerY, float sizePixels, bool enabled)
     {
+        // Read live configuration and apply the same centered scale to both artwork paths.
+        float iconScale = VanillaExpandedModSystem.Config.ToolModeIconSize;
+        sizePixels *= float.IsFinite(iconScale) ? Math.Clamp(iconScale, 0.15f, 2.5f) : 0.75f;
         float offset = sizePixels / 2f;
         float x = (float)centerX - offset;
         float y = (float)centerY - offset;
@@ -38,4 +47,6 @@ internal sealed class ToolModeSkillIcon(SkillItem skillItem) : IRadialMenuIcon
             }
         }
     }
+
+    #endregion
 }

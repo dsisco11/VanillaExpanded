@@ -1,0 +1,135 @@
+[
+  {
+    "op": "add",
+    "file": "game:itemtypes/tool/knife.json",
+    "path": "/attributes/ve-radial-menu-propertiesByType",
+    "value": {
+      "@knife-generic-(chert|granite|andesite|basalt|obsidian|peridotite|flint|bone.*)": {
+        "transform": {
+          "origin": {
+            "x": 0.8125,
+            "y": 0.04375,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 10.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.5
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "knife-dagger-ruined": {
+        "transform": {
+          "origin": {
+            "x": 0.6875,
+            "y": 0.0,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.6
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "knife-stiletto-ruined": {
+        "transform": {
+          "origin": {
+            "x": 0.6875,
+            "y": 0.0,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.7
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "knife-khanjar-ruined": {
+        "transform": {
+          "origin": {
+            "x": 0.75,
+            "y": 0.0,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.4
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "knife-baselard-ruined": {
+        "transform": {
+          "origin": {
+            "x": 0.75,
+            "y": 0.0,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.4
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "*": {
+        "transform": {
+          "origin": {
+            "x": 0.5625,
+            "y": 0.0625,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 10.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.5
+        },
+        "wedgeRotationDegrees": 0
+      }
+    }
+  }
+]

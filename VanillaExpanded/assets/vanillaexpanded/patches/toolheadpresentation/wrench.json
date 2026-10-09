@@ -1,0 +1,198 @@
+[
+  {
+    "op": "add",
+    "file": "game:itemtypes/tool/wrench.json",
+    "path": "/attributes/ve-radial-menu-propertiesByType",
+    "value": {
+      "wrench-copper": {
+        "transform": {
+          "origin": {
+            "x": 0.8125,
+            "y": 0.03125,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.6
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "wrench-tinbronze": {
+        "transform": {
+          "origin": {
+            "x": 0.8125,
+            "y": 0.03125,
+            "z": 0.5625
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.3
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "wrench-bismuthbronze": {
+        "transform": {
+          "origin": {
+            "x": 0.75,
+            "y": 0.03125,
+            "z": 0.53125
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.3
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "wrench-blackbronze": {
+        "transform": {
+          "origin": {
+            "x": 0.3125,
+            "y": 0.03125,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.3
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "wrench-gold": {
+        "transform": {
+          "origin": {
+            "x": 0.8125,
+            "y": 0.03125,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.1
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "wrench-silver": {
+        "transform": {
+          "origin": {
+            "x": 0.75,
+            "y": 0.03125,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.3
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "wrench-iron": {
+        "transform": {
+          "origin": {
+            "x": 0.875,
+            "y": 0.03125,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.4
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "wrench-meteoriciron": {
+        "transform": {
+          "origin": {
+            "x": 0.6875,
+            "y": 0.03125,
+            "z": 0.53125
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.3
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "wrench-steel": {
+        "transform": {
+          "origin": {
+            "x": 0.875,
+            "y": 0.03125,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.3
+        },
+        "wedgeRotationDegrees": 0
+      }
+    }
+  }
+]

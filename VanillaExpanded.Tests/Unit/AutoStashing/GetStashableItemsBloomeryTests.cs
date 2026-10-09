@@ -12,21 +12,19 @@ namespace VanillaExpanded.Tests.Unit.AutoStashing;
 /// Tests bloomery-specific validation: burning state, output slot, and item acceptance (fuel vs ore).
 /// </summary>
 [Trait("Category", "Unit")]
-public class GetStashableItemsBloomeryTests
+[Collection("AutoStash")]
+public class GetStashableItemsBloomeryTests : IDisposable
 {
-    /// <summary>
-    /// Creates a mock API with World for stack comparisons.
-    /// </summary>
-    private static ICoreAPI CreateMockApi()
-    {
-        var worldMock = new Mock<IWorldAccessor>();
-        var apiMock = new Mock<ICoreAPI>();
-        apiMock.Setup(a => a.World).Returns(worldMock.Object);
-        return apiMock.Object;
-    }
+    private readonly VanillaExpanded.Tests.Unit.AutoStashing.Support.AutoStashTestScope scope = new();
+
+    /// <summary>Restores AutoStash settings after each test.</summary>
+    public void Dispose() => scope.Dispose();
+
+    #region Public API
 
     #region Null/Empty Tests
 
+    /// <summary>Verifies GetStashableItems NullBloomery ReturnsEmptySet.</summary>
     [Fact]
     public void GetStashableItems_NullBloomery_ReturnsEmptySet()
     {
@@ -42,6 +40,7 @@ public class GetStashableItemsBloomeryTests
         Assert.Empty(result);
     }
 
+    /// <summary>Verifies GetStashableItems EmptyPlayerInventory ReturnsEmptySet.</summary>
     [Fact]
     public void GetStashableItems_EmptyPlayerInventory_ReturnsEmptySet()
     {
@@ -62,6 +61,7 @@ public class GetStashableItemsBloomeryTests
 
     #region Bloomery State Validation Tests
 
+    /// <summary>Verifies GetStashableItems BloomeryIsBurning ReturnsEmptySet.</summary>
     [Fact]
     public void GetStashableItems_BloomeryIsBurning_ReturnsEmptySet()
     {
@@ -72,6 +72,9 @@ public class GetStashableItemsBloomeryTests
             .WithHotbar(MockInventory.Empty());
         var bloomery = MockBlockEntityBloomery.Empty().AsBurning(true);
 
+        // Seed contents so the active-item gate cannot mask the rejection under test.
+        bloomery.WithFuel(fuel);
+
         // Act
         var result = BlockBehaviorAutoStashable.GetStashableItems(player.Object, bloomery.Object);
 
@@ -79,6 +82,7 @@ public class GetStashableItemsBloomeryTests
         Assert.Empty(result);
     }
 
+    /// <summary>Verifies GetStashableItems BloomeryOutputNotEmpty ReturnsEmptySet.</summary>
     [Fact]
     public void GetStashableItems_BloomeryOutputNotEmpty_ReturnsEmptySet()
     {
@@ -90,6 +94,9 @@ public class GetStashableItemsBloomeryTests
             .WithHotbar(MockInventory.Empty());
         var bloomery = MockBlockEntityBloomery.Empty().WithOutput(output);
 
+        // Seed contents so the active-item gate cannot mask the rejection under test.
+        bloomery.WithFuel(fuel);
+
         // Act
         var result = BlockBehaviorAutoStashable.GetStashableItems(player.Object, bloomery.Object);
 
@@ -97,6 +104,7 @@ public class GetStashableItemsBloomeryTests
         Assert.Empty(result);
     }
 
+    /// <summary>Verifies GetStashableItems BloomeryNotBurningAndOutputEmpty ReturnsStashableItems.</summary>
     [Fact]
     public void GetStashableItems_BloomeryNotBurningAndOutputEmpty_ReturnsStashableItems()
     {
@@ -120,6 +128,7 @@ public class GetStashableItemsBloomeryTests
 
     #region Fuel Item Tests
 
+    /// <summary>Verifies GetStashableItems PlayerHasValidFuel ReturnsFuelId.</summary>
     [Fact]
     public void GetStashableItems_PlayerHasValidFuel_ReturnsFuelId()
     {
@@ -139,6 +148,7 @@ public class GetStashableItemsBloomeryTests
         Assert.Contains(1, result);
     }
 
+    /// <summary>Verifies GetStashableItems PlayerHasMultipleFuelStacks ReturnsUniqueFuelId.</summary>
     [Fact]
     public void GetStashableItems_PlayerHasMultipleFuelStacks_ReturnsUniqueFuelId()
     {
@@ -159,6 +169,7 @@ public class GetStashableItemsBloomeryTests
         Assert.Contains(1, result);
     }
 
+    /// <summary>Verifies GetStashableItems BloomeryFuelSlotFull ReturnsEmptySet.</summary>
     [Fact]
     public void GetStashableItems_BloomeryFuelSlotFull_ReturnsEmptySet()
     {
@@ -178,6 +189,7 @@ public class GetStashableItemsBloomeryTests
         Assert.Empty(result);
     }
 
+    /// <summary>Verifies GetStashableItems BloomeryFuelSlotPartiallyFull ReturnsFuelId.</summary>
     [Fact]
     public void GetStashableItems_BloomeryFuelSlotPartiallyFull_ReturnsFuelId()
     {
@@ -202,6 +214,7 @@ public class GetStashableItemsBloomeryTests
 
     #region Ore Item Tests
 
+    /// <summary>Verifies GetStashableItems PlayerHasValidOre ReturnsOreId.</summary>
     [Fact]
     public void GetStashableItems_PlayerHasValidOre_ReturnsOreId()
     {
@@ -221,6 +234,7 @@ public class GetStashableItemsBloomeryTests
         Assert.Contains(2, result);
     }
 
+    /// <summary>Verifies GetStashableItems BloomeryOreSlotHasDifferentOre ReturnsEmptySet.</summary>
     [Fact]
     public void GetStashableItems_BloomeryOreSlotHasDifferentOre_ReturnsEmptySet()
     {
@@ -240,6 +254,7 @@ public class GetStashableItemsBloomeryTests
         Assert.Empty(result);
     }
 
+    /// <summary>Verifies GetStashableItems BloomeryOreSlotHasSameOre ReturnsOreId.</summary>
     [Fact]
     public void GetStashableItems_BloomeryOreSlotHasSameOre_ReturnsOreId()
     {
@@ -264,6 +279,7 @@ public class GetStashableItemsBloomeryTests
 
     #region Mixed Fuel and Ore Tests
 
+    /// <summary>Verifies GetStashableItems PlayerHasBothFuelAndOre ReturnsBothIds.</summary>
     [Fact]
     public void GetStashableItems_PlayerHasBothFuelAndOre_ReturnsBothIds()
     {
@@ -285,6 +301,7 @@ public class GetStashableItemsBloomeryTests
         Assert.Contains(2, result);
     }
 
+    /// <summary>Verifies GetStashableItems PlayerHasFuelInBackpackOreInHotbar ReturnsBothIds.</summary>
     [Fact]
     public void GetStashableItems_PlayerHasFuelInBackpackOreInHotbar_ReturnsBothIds()
     {
@@ -310,6 +327,7 @@ public class GetStashableItemsBloomeryTests
 
     #region Invalid Item Tests
 
+    /// <summary>Verifies GetStashableItems PlayerHasNonCombustibleItems ReturnsEmptySet.</summary>
     [Fact]
     public void GetStashableItems_PlayerHasNonCombustibleItems_ReturnsEmptySet()
     {
@@ -320,13 +338,21 @@ public class GetStashableItemsBloomeryTests
             .WithHotbar(MockInventory.Empty());
         var bloomery = MockBlockEntityBloomery.Empty();
 
+        // Seed contents so the active-item gate cannot mask the rejection under test.
+        bloomery.WithFuel(MockItem.CreateBloomeryFuel(50));
+
         // Act
         var result = BlockBehaviorAutoStashable.GetStashableItems(player.Object, bloomery.Object);
 
         // Assert
         Assert.Empty(result);
+
+        // Change only the candidate's invalid property; the same target and source must now pass.
+        nonCombustible.CombustibleProps = MockItem.CreateBloomeryOre(1).CombustibleProps;
+        Assert.Contains(1, BlockBehaviorAutoStashable.GetStashableItems(player.Object, bloomery.Object));
     }
 
+    /// <summary>Verifies GetStashableItems PlayerHasLowTempCombustible ReturnsEmptySet.</summary>
     [Fact]
     public void GetStashableItems_PlayerHasLowTempCombustible_ReturnsEmptySet()
     {
@@ -337,13 +363,21 @@ public class GetStashableItemsBloomeryTests
             .WithHotbar(MockInventory.Empty());
         var bloomery = MockBlockEntityBloomery.Empty();
 
+        // Seed contents so the active-item gate cannot mask the rejection under test.
+        bloomery.WithFuel(MockItem.CreateBloomeryFuel(50));
+
         // Act
         var result = BlockBehaviorAutoStashable.GetStashableItems(player.Object, bloomery.Object);
 
         // Assert
         Assert.Empty(result);
+
+        // Change only the candidate's invalid property; the same target and source must now pass.
+        lowTemp.CombustibleProps = MockItem.CreateBloomeryOre(1).CombustibleProps;
+        Assert.Contains(1, BlockBehaviorAutoStashable.GetStashableItems(player.Object, bloomery.Object));
     }
 
+    /// <summary>Verifies GetStashableItems PlayerHasMixedValidAndInvalidItems ReturnsOnlyValidIds.</summary>
     [Fact]
     public void GetStashableItems_PlayerHasMixedValidAndInvalidItems_ReturnsOnlyValidIds()
     {
@@ -369,5 +403,19 @@ public class GetStashableItemsBloomeryTests
         Assert.DoesNotContain(3, result); // Low temp
     }
 
+    #endregion
+    #endregion
+
+    #region Private
+    /// <summary>
+    /// Creates a mock API with World for stack comparisons.
+    /// </summary>
+    private static ICoreAPI CreateMockApi()
+    {
+        var worldMock = new Mock<IWorldAccessor>();
+        var apiMock = new Mock<ICoreAPI>();
+        apiMock.Setup(a => a.World).Returns(worldMock.Object);
+        return apiMock.Object;
+    }
     #endregion
 }

@@ -6,11 +6,20 @@ namespace VanillaExpanded.RadialMenu;
 /// <summary>Defines one circular entry arrangement and its shared pointer hit test.</summary>
 public sealed class RadialMenuLayout
 {
+    private readonly double radiusScale;
+    private readonly Func<float>? sizeMultiplier;
+    private float wedgeAlignedIconSize;
+    private double wedgeIconRadiusPixels;
+    private double wedgeIconInsetPixels;
+    private float[]? screenAlignedIconSizes;
+    private double iconSizeRadiusPixels;
+    private double iconSizeInsetPixels;
+
     #region Public API
-    /// <summary>Creates one concentric menu ring with an optional menu occupying its center.</summary>
+    /// <summary>Creates one concentric menu ring with an optional inner menu and live size multiplier bounded to 0.15–2.5.</summary>
     public RadialMenuLayout(IReadOnlyList<string> entryIds, double innerRadius, double outerRadius,
         RadialMenuLayout? innerMenu = null, double startAngleDegrees = 0, bool clockwise = true,
-        double separatorDegrees = 0.3, double radiusScale = 1, bool renderAsCenter = false)
+        double separatorDegrees = 0.3, double radiusScale = 1, bool renderAsCenter = false, Func<float>? sizeMultiplier = null, double labelFontScale = 1)
     {
         ArgumentNullException.ThrowIfNull(entryIds);
         bool singleOptionLeaf = entryIds.Count == 1 && innerMenu is null;
@@ -18,6 +27,7 @@ public sealed class RadialMenuLayout
         if (entryIds.Count is 0 or > 63 || entryIds.Count + (innerMenu?.EntryCount ?? 0) > 64
             || !double.IsFinite(innerRadius) || !double.IsFinite(outerRadius)
             || !double.IsFinite(startAngleDegrees) || !double.IsFinite(separatorDegrees) || !double.IsFinite(radiusScale)
+            || !double.IsFinite(labelFontScale) || labelFontScale <= 0
             || innerRadius < 0 || outerRadius <= innerRadius || separatorDegrees < 0 || radiusScale <= 0
             || (centerMenu && (innerRadius != 0 || innerMenu is not null))
             || (!centerMenu && innerRadius <= 0)
@@ -39,8 +49,10 @@ public sealed class RadialMenuLayout
         StartAngleDegrees = startAngleDegrees;
         Clockwise = clockwise;
         SeparatorDegrees = separatorDegrees;
-        RadiusScale = radiusScale;
+        this.radiusScale = radiusScale;
+        this.sizeMultiplier = sizeMultiplier;
         RenderAsCenter = centerMenu;
+        LabelFontScale = labelFontScale;
         WedgeIds = EntryIds;
         CenterId = InnerMenu?.IsSingleOption == true ? InnerMenu.EntryIds[0] : IsSingleOption ? EntryIds[0] : string.Empty;
         CenterRadius = InnerMenu?.IsSingleOption == true ? InnerMenu.OuterRadius : IsSingleOption ? OuterRadius : 0;
@@ -58,6 +70,9 @@ public sealed class RadialMenuLayout
         CenterId = centerId;
         CenterRadius = centerRadius;
     }
+
+    /// <summary>Gets the preferred text size relative to the standard GUI label, before circle fitting.</summary>
+    public double LabelFontScale { get; }
 
     /// <summary>Gets immutable identifiers in this ring's supplied position order.</summary>
     public IReadOnlyList<string> EntryIds { get; }
@@ -95,8 +110,16 @@ public sealed class RadialMenuLayout
     public bool Clockwise { get; }
     /// <summary>Gets the angular half-gap at each wedge boundary.</summary>
     public double SeparatorDegrees { get; }
-    /// <summary>Gets this caller's scale relative to the shared screen-space menu radius.</summary>
-    public double RadiusScale { get; }
+    /// <summary>Gets this caller's scale relative to the shared screen-space menu radius, including its current size multiplier.</summary>
+    public double RadiusScale
+    {
+        get
+        {
+            // Read live settings for both rendering and hit testing, with safe bounds for hand-edited configuration.
+            float multiplier = sizeMultiplier?.Invoke() ?? 1f;
+            return radiusScale * (float.IsFinite(multiplier) ? Math.Clamp(multiplier, 0.15f, 2.5f) : 1f);
+        }
+    }
     /// <summary>Gets the angular width of one wedge in degrees.</summary>
     public double StepDegrees => IsSingleOption ? 360 : 360d / EntryIds.Count;
 
@@ -159,10 +182,59 @@ public sealed class RadialMenuLayout
         if (radiusPixels <= 0 || insetPixels < 0) throw new ArgumentOutOfRangeException(nameof(radiusPixels));
         if (IsSingleOption) return (float)Math.Max(1d, OuterRadius * radiusPixels * 2d - insetPixels * 2d);
         double midRadius = (InnerRadius + OuterRadius) / 2d;
-        double halfAngle = Math.Max(0d, StepDegrees / 2d - SeparatorDegrees) * Math.PI / 180d;
-        double radialCapacity = (OuterRadius - InnerRadius) * radiusPixels;
-        double angularCapacity = 2d * midRadius * radiusPixels * Math.Sin(halfAngle);
-        return (float)Math.Max(1d, Math.Min(radialCapacity, angularCapacity) - insetPixels * 2d);
+        double halfAngle = Math.Clamp(StepDegrees / 2d - SeparatorDegrees, 0d, 90d) * Math.PI / 180d;
+        // A circle centered in the wedge fits both arcs and side boundaries. Inscribe the icon square
+        // in that circle so every corner fits regardless of wedge direction or authored icon rotation.
+        double radialClearance = (OuterRadius - InnerRadius) * radiusPixels / 2d;
+        double angularClearance = midRadius * radiusPixels * Math.Sin(halfAngle);
+        double clearance = Math.Min(radialClearance, angularClearance) - insetPixels;
+        return (float)Math.Max(1d, Math.Sqrt(2d) * clearance);
+    }
+
+    /// <summary>Fits a wedge-aligned square directly between the arcs and sides, caching its screen-space allowance.</summary>
+    internal float GetWedgeAlignedIconSizePixels(double radiusPixels, double insetPixels)
+    {
+        if (radiusPixels <= 0 || insetPixels < 0) throw new ArgumentOutOfRangeException(nameof(radiusPixels));
+        if (wedgeAlignedIconSize > 0f && radiusPixels == wedgeIconRadiusPixels && insetPixels == wedgeIconInsetPixels)
+            return wedgeAlignedIconSize;
+
+        if (IsSingleOption) wedgeAlignedIconSize = GetIconSizePixels(radiusPixels, insetPixels);
+        else
+        {
+            double midRadius = (InnerRadius + OuterRadius) * radiusPixels / 2d;
+            double outerRadius = Math.Max(0d, OuterRadius * radiusPixels - insetPixels);
+            double halfAngle = Math.Clamp(StepDegrees / 2d - SeparatorDegrees, 0d, 90d) * Math.PI / 180d;
+            // In wedge-local coordinates the square is centered at (0, midRadius). Its inner
+            // edge, farthest outer corner, and side-normal support give three exact limits.
+            double innerHalfSize = midRadius - InnerRadius * radiusPixels - insetPixels;
+            double outerHalfSize = (Math.Sqrt(Math.Max(0d, 2d * outerRadius * outerRadius - midRadius * midRadius)) - midRadius) / 2d;
+            double sideHalfSize = (midRadius * Math.Sin(halfAngle) - insetPixels)
+                / (Math.Sin(halfAngle) + Math.Cos(halfAngle));
+            wedgeAlignedIconSize = (float)Math.Max(1d, 2d * Math.Min(innerHalfSize, Math.Min(outerHalfSize, sideHalfSize)));
+        }
+        wedgeIconRadiusPixels = radiusPixels;
+        wedgeIconInsetPixels = insetPixels;
+        return wedgeAlignedIconSize;
+    }
+
+    /// <summary>Fits an upright icon square to one wedge's arcs and sides, retaining the requested padding.</summary>
+    internal float GetScreenAlignedIconSizePixels(int index, double radiusPixels, double insetPixels)
+    {
+        if ((uint)index >= (uint)EntryIds.Count) throw new ArgumentOutOfRangeException(nameof(index));
+        if (radiusPixels <= 0 || insetPixels < 0) throw new ArgumentOutOfRangeException(nameof(radiusPixels));
+
+        // Geometry is immutable for this layout. Reuse its per-entry values until a screen-space
+        // input changes; configuration scaling is applied later by the icon renderer.
+        screenAlignedIconSizes ??= new float[EntryIds.Count];
+        if (radiusPixels != iconSizeRadiusPixels || insetPixels != iconSizeInsetPixels)
+        {
+            Array.Clear(screenAlignedIconSizes);
+            iconSizeRadiusPixels = radiusPixels;
+            iconSizeInsetPixels = insetPixels;
+        }
+        if (screenAlignedIconSizes[index] == 0f)
+            screenAlignedIconSizes[index] = CalculateScreenAlignedIconSizePixels(index, radiusPixels, insetPixels);
+        return screenAlignedIconSizes[index];
     }
 
     /// <summary>Gets the rendered center for an entry anywhere in this nested menu.</summary>
@@ -183,6 +255,36 @@ public sealed class RadialMenuLayout
     #endregion
 
     #region Geometry helpers
+    /// <summary>Calculates the padded upright square fit when a cached entry size is unavailable.</summary>
+    private float CalculateScreenAlignedIconSizePixels(int index, double radiusPixels, double insetPixels)
+    {
+        if (IsSingleOption) return GetIconSizePixels(radiusPixels, insetPixels);
+
+        double angle = (StartAngleDegrees + (Clockwise ? 1 : -1) * index * StepDegrees) * Math.PI / 180d;
+        double midRadius = (InnerRadius + OuterRadius) * radiusPixels / 2d;
+        double x = Math.Abs(Math.Sin(angle) * midRadius);
+        double y = Math.Abs(Math.Cos(angle) * midRadius);
+        double outer = Math.Max(0d, OuterRadius * radiusPixels - insetPixels);
+        double inner = InnerRadius * radiusPixels + insetPixels;
+
+        // The farthest corner limits the outer arc. The nearest point of the square (which can
+        // lie on an edge rather than a corner) limits the inner arc.
+        double difference = Math.Abs(x - y);
+        double outerHalfSize = (Math.Sqrt(Math.Max(0d, 2d * outer * outer - difference * difference)) - x - y) / 2d;
+        double innerHalfSize = difference >= inner
+            ? Math.Max(x, y) - inner
+            : (x + y - Math.Sqrt(Math.Max(0d, 2d * inner * inner - difference * difference))) / 2d;
+
+        // Project the square's half extent onto both side normals. Their screen orientation
+        // determines how much space an upright square uses, unlike the rotation-safe circle fit.
+        double halfAngle = Math.Clamp(StepDegrees / 2d - SeparatorDegrees, 0d, 90d) * Math.PI / 180d;
+        double sideExtent = Math.Max(
+            Math.Abs(Math.Cos(angle - halfAngle)) + Math.Abs(Math.Sin(angle - halfAngle)),
+            Math.Abs(Math.Cos(angle + halfAngle)) + Math.Abs(Math.Sin(angle + halfAngle)));
+        double sideHalfSize = (midRadius * Math.Sin(halfAngle) - insetPixels) / sideExtent;
+        return (float)Math.Max(1d, 2d * Math.Min(sideHalfSize, Math.Min(innerHalfSize, outerHalfSize)));
+    }
+
     /// <summary>Wraps an angle into the positive full circle.</summary>
     private static double NormalizeDegrees(double degrees) => (degrees % 360d + 360d) % 360d;
     #endregion

@@ -4,7 +4,6 @@ using System.Collections.Immutable;
 using System.Linq;
 
 using VanillaExpanded.AlloyCalculator;
-using VanillaExpanded.ModSystems;
 using VanillaExpanded.Network;
 
 using Vintagestory.API.Client;
@@ -28,7 +27,15 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private const double RowHeight = 35;
     private const double DropdownWidth = 150;
     private const double InputWidth = 70;
+    private const double TargetUnitsButtonWidth = 20;
+    private const double TargetUnitsControlGap = 5;
+    private const double TargetUnitsButtonHeight = 13;
+    private const double TargetUnitsButtonVerticalGap = 3;
+    private const float TargetUnitsButtonFontSize = 12;
     private const int DefaultTargetUnits = 100;
+    private const int TargetUnitsInputStep = 100;
+    private const double WasteWarningHeight = 32;
+    private const double WasteWarningGap = 6;
     private const double TitlebarHeight = 20;
     private const double SlotSize = 40;
     private const double ButtonHeight = 25;
@@ -66,8 +73,6 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private List<ItemStack>? smeltingContainers;
     private List<ItemStack>? smeltingFuels;
     private int maxFuelTemperature;
-    private AlloyDepositSystem? depositSystem;
-    private string? pendingDepositRequestId;
     #endregion
 
     #region Properties
@@ -116,6 +121,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     }
 
     // TODO: There has to be a better way to calculate/cache these item-stack variants, ideally we should be capable of leveraging the cache that the handbook already has internally.
+    /// <summary>Caches handbook variants and derives the maximum smelting temperature from burning fuels.</summary>
     private void BuildHandbookStacksCache()
     {
         var stacks = new List<ItemStack>();
@@ -138,8 +144,8 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                 }
 
                 // Collect fuels
-                var combustProps = stack.Collectible.CombustibleProps;
-                if (combustProps?.BurnDuration is not null || combustProps?.BurnTemperature is not null)
+                var combustProps = stack.Collectible.GetCombustibleProperties(capi.World, stack, null);
+                if (combustProps is { BurnDuration: > 0, BurnTemperature: > 0 })
                 {
                     smeltingFuels.Add(stack);
                 }
@@ -150,8 +156,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
         // Calculate max fuel temperature
         maxFuelTemperature = smeltingFuels
-            .Where(static f => f.Collectible.CombustibleProps?.BurnTemperature is not null)
-            .Select(static f => f.Collectible.CombustibleProps!.BurnTemperature)
+            .Select(f => f.Collectible.GetCombustibleProperties(capi.World, f, null)!.BurnTemperature)
             .DefaultIfEmpty(0)
             .Max();
     }
@@ -169,7 +174,8 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         // Width: either slider row or slot row, whichever is wider
         var sliderRowWidth = showRatioControls ? LabelWidth + SliderWidth : 0;
         var slotRowWidth = ingredientCount * SlotSize;
-        var controlsWidth = DropdownWidth + 10 + InputWidth;
+        var controlsWidth = DropdownWidth + 10 + InputWidth
+            + TargetUnitsControlGap + TargetUnitsButtonWidth;
         var contentWidth = Math.Max(controlsWidth, Math.Max(sliderRowWidth, slotRowWidth));
         
         // Height: titlebar + dropdown row + sliders + slot row + button row
@@ -181,7 +187,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                 contentHeight += ingredientCount * RowHeight;
             }
             contentHeight += 15 + SlotSize; // gap + slot row
-            contentHeight += 10 + ButtonHeight; // gap + button
+            contentHeight += 18 + WasteWarningHeight + WasteWarningGap + ButtonHeight;
         }
         var contentBounds = ElementBounds.Fixed(0, 0, contentWidth, contentHeight);
 
@@ -205,6 +211,16 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         // Define element bounds
         var dropdownBounds = ElementBounds.Fixed(0, yOffset, DropdownWidth, 25);
         var inputBounds = ElementBounds.Fixed(DropdownWidth + 10, yOffset, InputWidth, 25);
+        var incrementBounds = ElementBounds.Fixed(
+            DropdownWidth + 10 + InputWidth + TargetUnitsControlGap,
+            yOffset,
+            TargetUnitsButtonWidth,
+            TargetUnitsButtonHeight);
+        var decrementBounds = ElementBounds.Fixed(
+            DropdownWidth + 10 + InputWidth + TargetUnitsControlGap,
+            yOffset + TargetUnitsButtonHeight + TargetUnitsButtonVerticalGap,
+            TargetUnitsButtonWidth,
+            TargetUnitsButtonHeight);
         yOffset += 30;
 
         var alloyValues = depositOptions.Select(static (_, i) => i.ToString());
@@ -233,7 +249,11 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                 CairoFont.WhiteSmallText()), "alloyDropdown")
             .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-dropdown-tooltip"), CairoFont.WhiteDetailText(), 250, dropdownBounds.FlatCopy(), "dropdownTooltip")
             .AddNumberInput(inputBounds, OnTargetUnitsChanged, CairoFont.WhiteDetailText(), "targetUnits")
-            .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-targetunits-tooltip"), CairoFont.WhiteDetailText(), 250, inputBounds.FlatCopy(), "targetUnitsTooltip");
+            .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-targetunits-tooltip"), CairoFont.WhiteDetailText(), 250, inputBounds.FlatCopy(), "targetUnitsTooltip")
+            .AddButton("+", () => StepTargetUnits(true), incrementBounds, CairoFont.WhiteDetailText().WithFontSize(TargetUnitsButtonFontSize).WithOrientation(EnumTextOrientation.Center), EnumButtonStyle.Small, "incrementTargetUnits")
+            .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-increment-tooltip"), CairoFont.WhiteDetailText(), 250, incrementBounds.FlatCopy(), "incrementTargetUnitsTooltip")
+            .AddButton("-", () => StepTargetUnits(false), decrementBounds, CairoFont.WhiteDetailText().WithFontSize(TargetUnitsButtonFontSize).WithOrientation(EnumTextOrientation.Center), EnumButtonStyle.Small, "decrementTargetUnits")
+            .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-decrement-tooltip"), CairoFont.WhiteDetailText(), 250, decrementBounds.FlatCopy(), "decrementTargetUnitsTooltip");
 
         // Add ingredient sliders if an alloy is selected
         if (selectedOption is not null && ingredientCount > 0)
@@ -310,10 +330,22 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                 .WithAlignment(EnumDialogArea.CenterFixed);
             composer.AddRichtext(richTextComponents.ToArray(), slotBounds, "ingredientSlots");
 
-            // Add deposit button
             yOffset += (int)SlotSize + 18;
+            var warningBounds = ElementBounds
+                .Fixed(0, yOffset, contentWidth, WasteWarningHeight)
+                .WithParent(contentBounds);
+            composer.AddDynamicText(
+                string.Empty,
+                CairoFont.WhiteDetailText()
+                    .WithFontSize(12)
+                    .WithColor([1, 0.75, 0.3, 1])
+                    .WithOrientation(EnumTextOrientation.Center),
+                warningBounds,
+                "wasteWarning");
+
+            yOffset += WasteWarningHeight + WasteWarningGap;
             var buttonBounds = ElementBounds
-                .Fixed(0, yOffset, 80, ButtonHeight)
+                .Fixed(0, yOffset, 100, ButtonHeight)
                 .WithParent(contentBounds)
                 .WithAlignment(EnumDialogArea.CenterFixed);
             composer
@@ -325,6 +357,11 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
         // Set target units value
         var targetInput = SingleComposer?.GetNumberInput("targetUnits");
+        if (targetInput is not null)
+        {
+            targetInput.Interval = TargetUnitsInputStep;
+            targetInput.IntMode = false;
+        }
         targetInput?.SetValue(targetUnits.ToString());
 
         // Initialize slider values after composition
@@ -472,13 +509,13 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         if (selectedOption is null || SingleComposer is null) return;
 
         calculatedStacks.Clear();
+        var nuggetCounts = AlloyCalculatorLogic.CalculateAllNuggetsRequired(
+            targetUnits, sliderValues, selectedIngredients);
 
         for (var i = 0; i < selectedIngredients.Length; i++)
         {
             var ingredient = selectedIngredients[i];
-            var percent = sliderValues.TryGetValue(i, out var val) ? val : 0;
-            var units = targetUnits * percent / 100.0;
-            var nuggets = (int)Math.Ceiling(units / 5.0); // 1 nugget = 5 units, round up
+            var nuggets = nuggetCounts.GetValueOrDefault(i);
 
             // Update slideshow component with new stack size
             if (i < slideshowComponents.Count)
@@ -497,6 +534,12 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                 }
             }
         }
+
+        long wastedUnits = AlloyCalculatorLogic.CalculateWastedMetalUnits(
+            targetUnits, sliderValues, selectedIngredients);
+        SingleComposer.GetDynamicText("wasteWarning")?.SetNewText(wastedUnits > 0
+            ? Lang.Get($"{Constants.ModId}:gui-alloycalculator-waste-warning", wastedUnits)
+            : string.Empty);
     }
 
     /// <summary>
@@ -588,6 +631,18 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         }
     }
 
+    /// <summary>
+    /// Moves the target field to the nearest whole-nugget batch within the recipe ratios.
+    /// </summary>
+    private bool StepTargetUnits(bool increase)
+    {
+        int updatedUnits = AlloyCalculatorLogic.FindAdjacentWasteFreeTarget(
+            targetUnits, sliderValues, increase, selectedIngredients);
+        SingleComposer?.GetNumberInput("targetUnits")?.SetValue(updatedUnits.ToString());
+        OnTargetUnitsChanged(updatedUnits.ToString());
+        return true;
+    }
+
     private void OnTitleBarClose()
     {
         TryClose();
@@ -595,111 +650,43 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
     private bool OnDepositButtonClicked()
     {
-        DepositIngredientsIntoCrucible();
+        BlockEntityFirepit? firepit = capi.World.BlockAccessor
+            .GetBlockEntity<BlockEntityFirepit>(BlockEntityPosition);
+        AlloyDepositResultCode ingredientResult = firepit is null || selectedOption is null
+            ? AlloyDepositResultCode.InvalidRequest
+            : AlloyDepositService.Execute(capi, firepit, selectedIngredients, calculatedStacks);
+        ShowDepositError(ingredientResult, fuel: false);
+        if (ingredientResult != AlloyDepositResultCode.Success || firepit is null)
+        {
+            return true;
+        }
+
+        AlloyDepositResultCode fuelResult = AlloyFuelDepositService.Execute(capi, firepit);
+        ShowDepositError(fuelResult, fuel: true);
         return true;
     }
     #endregion
 
     #region Deposit Logic
-    /// <summary>
-    /// Requests an atomic, server-authoritative deposit of the calculated ingredients.
-    /// </summary>
-    private void DepositIngredientsIntoCrucible()
+
+    private void ShowDepositError(AlloyDepositResultCode result, bool fuel)
     {
-        if (pendingDepositRequestId is not null || selectedOption is null) return;
-        BlockEntityFirepit? firepit = capi.World.BlockAccessor
-            .GetBlockEntity<BlockEntityFirepit>(BlockEntityPosition);
-        if (firepit?.Inventory is not InventorySmelting inventory || inventory.CookingSlots.Length == 0) return;
+        if (result == AlloyDepositResultCode.Success) return;
 
-        var ingredients = new List<(string Code, int Amount)>();
-        for (int index = 0; index < selectedIngredients.Length; index++)
+        string resultKey = result switch
         {
-            if (!calculatedStacks.TryGetValue(index, out ItemStack? targetStack)
-                || targetStack.StackSize <= 0)
-            {
-                return;
-            }
-
-            ingredients.Add((selectedIngredients[index].Code.ToString(), targetStack.StackSize));
-        }
-
-        ingredients.Sort(static (left, right) => right.Amount.CompareTo(left.Amount));
-        int[] allocations = AlloyCalculatorLogic.AllocateSlotsProportionally(
-            ingredients.Select(static ingredient => ingredient.Amount).ToArray(),
-            inventory.CookingSlots.Length);
-        var slotIndices = new List<int>();
-        var slotIngredientCodes = new List<string>();
-        var slotAmounts = new List<int>();
-        int slotIndex = 0;
-
-        for (int ingredientIndex = 0; ingredientIndex < ingredients.Count; ingredientIndex++)
-        {
-            (string code, int amount) = ingredients[ingredientIndex];
-            int allocatedSlots = allocations[ingredientIndex];
-            int itemsPerSlot = amount / allocatedSlots;
-            int remainder = amount % allocatedSlots;
-
-            for (int offset = 0; offset < allocatedSlots; offset++, slotIndex++)
-            {
-                int slotAmount = itemsPerSlot + (offset < remainder ? 1 : 0);
-                if (slotAmount <= 0) continue;
-
-                slotIndices.Add(slotIndex);
-                slotIngredientCodes.Add(code);
-                slotAmounts.Add(slotAmount);
-            }
-        }
-
-        string requestId = Guid.NewGuid().ToString("N");
-        var request = new Packet_RequestAlloyDeposit
-        {
-            RequestId = requestId,
-            Position = BlockEntityPosition.Copy(),
-            AlloyCode = selectedOption.OutputCode.ToString(),
-            SlotIndices = [.. slotIndices],
-            SlotIngredientCodes = [.. slotIngredientCodes],
-            SlotAmounts = [.. slotAmounts]
+            AlloyDepositResultCode.InventoryClosed => "inventory-closed",
+            AlloyDepositResultCode.InvalidRecipe => "invalid-recipe",
+            AlloyDepositResultCode.InsufficientItems => "insufficient-items",
+            AlloyDepositResultCode.InsufficientSpace => "insufficient-space",
+            AlloyDepositResultCode.TransferFailed => "transfer-failed",
+            _ => "invalid-request"
         };
-
-        depositSystem ??= capi.ModLoader.GetModSystem<AlloyDepositSystem>();
-        if (depositSystem?.RequestDeposit(request) != true) return;
-
-        pendingDepositRequestId = requestId;
-        SetDepositButtonEnabled(false);
-    }
-
-    private void OnDepositCompleted(Packet_AlloyDepositResult result)
-    {
-        if (result.RequestId != pendingDepositRequestId) return;
-
-        pendingDepositRequestId = null;
-        SetDepositButtonEnabled(true);
-
-        if (result.ResultCode != AlloyDepositResultCode.Success)
-        {
-            string resultKey = result.ResultCode switch
-            {
-                AlloyDepositResultCode.InventoryClosed => "inventory-closed",
-                AlloyDepositResultCode.InvalidRecipe => "invalid-recipe",
-                AlloyDepositResultCode.InsufficientItems => "insufficient-items",
-                AlloyDepositResultCode.InsufficientSpace => "insufficient-space",
-                AlloyDepositResultCode.TransferFailed => "transfer-failed",
-                _ => "invalid-request"
-            };
-            capi.TriggerIngameError(
-                this,
-                $"alloy-deposit-{resultKey}",
-                Lang.Get($"{Constants.ModId}:gui-alloycalculator-deposit-{resultKey}"));
-        }
-    }
-
-    private void SetDepositButtonEnabled(bool enabled)
-    {
-        GuiElementTextButton? button = SingleComposer?.GetButton("depositButton");
-        if (button is not null)
-        {
-            button.Enabled = enabled;
-        }
+        string keyPrefix = fuel ? "deposit-fuel" : "deposit";
+        capi.TriggerIngameError(
+            this,
+            $"alloy-{keyPrefix}-{resultKey}",
+            Lang.Get($"{Constants.ModId}:gui-alloycalculator-{keyPrefix}-{resultKey}"));
     }
     #endregion
 
@@ -708,13 +695,11 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     {
         base.OnGuiOpened();
 
-        depositSystem = capi.ModLoader.GetModSystem<AlloyDepositSystem>();
-        depositSystem.DepositCompleted += OnDepositCompleted;
-
-        MetalDepositOption? detectedOption = DetectOptionFromCrucible();
+        MetalDepositOption? detectedOption = DetectOptionFromCrucible(out ItemStack[] contents);
         if (detectedOption is not null)
         {
             OnAlloySelected(depositOptions.IndexOf(detectedOption).ToString(), true);
+            ApplyDetectedRatios(contents);
             return;
         }
 
@@ -733,13 +718,14 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         }
     }
 
-    private MetalDepositOption? DetectOptionFromCrucible()
+    private MetalDepositOption? DetectOptionFromCrucible(out ItemStack[] contents)
     {
+        contents = [];
         BlockEntityFirepit? firepit = capi.World.BlockAccessor
             .GetBlockEntity<BlockEntityFirepit>(BlockEntityPosition);
         if (firepit?.Inventory is not InventorySmelting inventory) return null;
 
-        ItemStack[] contents = [.. inventory.CookingSlots
+        contents = [.. inventory.CookingSlots
             .Where(static slot => !slot.Empty)
             .Select(static slot => slot.Itemstack)
             .OfType<ItemStack>()];
@@ -749,14 +735,45 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             capi.GetMetalAlloys());
     }
 
-    public override void OnGuiClosed()
+    private void ApplyDetectedRatios(IReadOnlyList<ItemStack> contents)
     {
-        if (depositSystem is not null)
+        if (SingleComposer is null || selectedOption is null) return;
+
+        var composition = AlloyCalculatorLogic.CalculateContentComposition(
+            contents,
+            selectedIngredients);
+        Dictionary<int, int> percentages = composition.Percentages;
+        if (percentages.Count == 0) return;
+
+        SingleComposer.GetNumberInput("targetUnits")?.SetValue(composition.TotalUnits.ToString());
+        OnTargetUnitsChanged(composition.TotalUnits.ToString());
+
+        isAdjustingSliders = true;
+        try
         {
-            depositSystem.DepositCompleted -= OnDepositCompleted;
+            foreach (var (index, percentage) in percentages)
+            {
+                MetalDepositIngredient ingredient = selectedIngredients[index];
+                int minPercent = (int)Math.Round(ingredient.MinRatio * 100);
+                int maxPercent = (int)Math.Round(ingredient.MaxRatio * 100);
+                int clampedPercentage = Math.Clamp(percentage, minPercent, maxPercent);
+
+                sliderValues[index] = clampedPercentage;
+                SingleComposer.GetSlider($"slider_{index}")
+                    ?.SetValues(clampedPercentage, minPercent, maxPercent, 1, "%");
+            }
+        }
+        finally
+        {
+            isAdjustingSliders = false;
         }
 
-        pendingDepositRequestId = null;
+        SaveSliderValues();
+        UpdateResultsDisplay();
+    }
+
+    public override void OnGuiClosed()
+    {
         capi.Gui.PlaySound(CloseSound);
     }
 

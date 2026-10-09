@@ -4,6 +4,7 @@ using HarmonyLib;
 
 using VanillaExpanded.AlloyCalculator;
 using VanillaExpanded.AutoStashing;
+using VanillaExpanded.Fishing;
 using VanillaExpanded.IgnitionTools;
 using VanillaExpanded.SpawnDecal;
 using VanillaExpanded.src.AutoStashing;
@@ -11,6 +12,7 @@ using VanillaExpanded.src.IgnitionTools;
 using VanillaExpanded.ToolModeRadialMenu;
 
 using Vintagestory.API.Common;
+using Vintagestory.API.Client;
 
 namespace VanillaExpanded;
 
@@ -88,8 +90,6 @@ public class VanillaExpandedModSystem : ModSystem
         var channel = api.Network.RegisterChannel(Mod.Info.ModID)
             .RegisterMessageType<Network.Packet_RequestAutoStash>()
             .RegisterMessageType<Network.Packet_RequestEntityAutoStash>()
-            .RegisterMessageType<Network.Packet_RequestAlloyDeposit>()
-            .RegisterMessageType<Network.Packet_AlloyDepositResult>()
             .RegisterMessageType<Network.Packet_TemporalSpawn>();
 
         EnsureHarmonyPatched();
@@ -100,6 +100,8 @@ public class VanillaExpandedModSystem : ModSystem
     /// </summary>
     private static void ApplySelectivePatches(Harmony harmony)
     {
+        new PatchClassProcessor(harmony, typeof(FishingBiteSoundPatch)).Patch();
+
         // Patch the firepit GUI open/close hooks unless explicitly disabled.
         // Users can disable this as a safety valve if it ever breaks or conflicts.
         if (!Config.DisableAlloyCalculatorPatch)

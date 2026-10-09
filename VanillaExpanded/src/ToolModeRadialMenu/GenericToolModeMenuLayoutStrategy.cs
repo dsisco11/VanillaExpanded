@@ -12,8 +12,11 @@ internal sealed class GenericToolModeMenuLayoutStrategy : IToolModeMenuLayoutStr
     /// <inheritdoc />
     public bool TryCreate(in ToolModeMenuLayoutContext context, out RadialMenuLayout? layout)
     {
-        layout = new RadialMenuLayout(context.ModeIds, 0.27, 1, context.CurrentMenu,
-            separatorDegrees: 1.0, radiusScale: 0.77);
+        // Keep a small radial gap around the current-mode disc.
+        layout = new RadialMenuLayout(context.ModeIds, context.CurrentMenu.OuterRadius + RadialMenuWedgeStyle.RingGapFraction,
+            ToolModeMenuGeometry.GetOuterRadius(context.CurrentMenu.OuterRadius + RadialMenuWedgeStyle.RingGapFraction), context.CurrentMenu,
+            separatorDegrees: ToolModeMenuGeometry.GenericSeparatorDegrees, radiusScale: ToolModeMenuGeometry.DefaultRadiusScale,
+            sizeMultiplier: static () => VanillaExpandedModSystem.Config.ToolModeMenuSize);
         return true;
     }
 }

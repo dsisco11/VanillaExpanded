@@ -1,0 +1,28 @@
+[
+  {
+    "op": "add",
+    "file": "game:itemtypes/tool/axe-stone.json",
+    "path": "/attributes/ve-radial-menu-properties",
+    "value": {
+      "transform": {
+        "origin": {
+          "x": 1.0625,
+          "y": 0.05,
+          "z": 0.53125
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 100.0,
+          "z": 90.0
+        },
+        "translation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": 2.53
+      },
+      "wedgeRotationDegrees": 0
+    }
+  }
+]

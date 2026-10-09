@@ -15,6 +15,9 @@ namespace VanillaExpanded.AlloyCalculator;
 /// </summary>
 internal static class AlloyCalculatorLogic
 {
+    private const int AlloyRatioPrecision = 10_000;
+    private const int PercentageUnitsPerNugget = 500;
+
     #region Deposit Options
 
     internal static bool ShouldShowRatioControls(MetalDepositOption option)
@@ -56,6 +59,56 @@ internal static class AlloyCalculatorLogic
         return options.FirstOrDefault(option =>
             option.Ingredients.Length == 1
             && option.OutputCode.Equals(outputCode));
+    }
+
+    internal static (Dictionary<int, int> Percentages, int TotalUnits) CalculateContentComposition(
+        IReadOnlyList<ItemStack> contents,
+        IReadOnlyList<MetalDepositIngredient> ingredients)
+    {
+        var amounts = new double[ingredients.Count];
+
+        foreach (ItemStack stack in contents)
+        {
+            ItemStack comparableStack = stack;
+            double amount = stack.StackSize;
+            CombustibleProperties? properties = stack.Collectible.GetCombustibleProperties(null, stack, null);
+            if (properties?.SmeltedStack?.ResolvedItemstack is ItemStack smeltedStack)
+            {
+                amount *= smeltedStack.StackSize;
+                amount /= Math.Max(1, properties.SmeltedRatio);
+                comparableStack = smeltedStack;
+            }
+
+            for (var i = 0; i < ingredients.Count; i++)
+            {
+                ItemStack ingredientStack = ingredients[i].ResolvedStack;
+                if (ingredientStack.Class == comparableStack.Class && ingredientStack.Id == comparableStack.Id)
+                {
+                    amounts[i] += amount;
+                    break;
+                }
+            }
+        }
+
+        double totalAmount = amounts.Sum();
+    if (totalAmount <= 0) return ([], 0);
+
+        double[] exactPercentages = [.. amounts.Select(amount => amount * 100 / totalAmount)];
+        int[] percentages = [.. exactPercentages.Select(static percentage => (int)Math.Floor(percentage))];
+        int remaining = 100 - percentages.Sum();
+
+        foreach (int index in Enumerable.Range(0, percentages.Length)
+            .OrderByDescending(index => exactPercentages[index] - percentages[index])
+            .ThenBy(static index => index)
+            .Take(remaining))
+        {
+            percentages[index]++;
+        }
+
+        Dictionary<int, int> result = Enumerable.Range(0, percentages.Length)
+            .ToDictionary(static index => index, index => percentages[index]);
+        int totalUnits = (int)Math.Round(totalAmount * 100);
+        return (result, totalUnits);
     }
 
     internal static MetalDepositOption FromAlloyRecipe(AlloyRecipe recipe)
@@ -196,6 +249,104 @@ internal static class AlloyCalculatorLogic
 
     #endregion
 
+    #region Fuel Calculation
+
+    internal static int CalculateFuelRequired(
+        int stackSize,
+        float meltingPoint,
+        float meltingDuration,
+        float furnaceTemperature,
+        float inputTemperature,
+        float cookingTime,
+        float activeFuelBurnTime,
+        int activeFuelTemperature,
+        float fuelBurnDuration,
+        int fuelTemperature)
+    {
+        if (stackSize <= 0
+            || meltingPoint <= 0
+            || meltingDuration < 0
+            || fuelBurnDuration <= 0
+            || fuelTemperature < meltingPoint)
+        {
+            return 0;
+        }
+
+        const float tickDuration = 0.1f;
+        const int maximumTicks = 10_000_000;
+        int fuelConsumed = 0;
+        float burnTime = Math.Max(0, activeFuelBurnTime);
+        int maximumTemperature = activeFuelTemperature;
+
+        for (int tick = 0; tick < maximumTicks; tick++)
+        {
+            if (burnTime > 0)
+            {
+                burnTime = Math.Max(0, burnTime - tickDuration);
+                furnaceTemperature = ChangeTemperature(
+                    furnaceTemperature,
+                    maximumTemperature,
+                    tickDuration);
+            }
+
+            if (inputTemperature < furnaceTemperature)
+            {
+                float heatingRate = (1 + Math.Clamp(
+                    (furnaceTemperature - inputTemperature) / 30,
+                    0,
+                    1.6f)) * tickDuration;
+                if (inputTemperature >= meltingPoint)
+                {
+                    heatingRate /= 11;
+                }
+
+                float heatedTemperature = ChangeTemperature(
+                    inputTemperature,
+                    furnaceTemperature,
+                    heatingRate);
+                inputTemperature = (heatedTemperature + (stackSize - 1) * inputTemperature) / stackSize;
+            }
+
+            if (inputTemperature >= meltingPoint)
+            {
+                int speed = Math.Clamp((int)(inputTemperature / meltingPoint), 1, 30);
+                cookingTime += speed * tickDuration;
+                if (cookingTime > meltingDuration)
+                {
+                    return fuelConsumed;
+                }
+            }
+            else if (cookingTime > 0)
+            {
+                cookingTime--;
+            }
+
+            if (burnTime <= 0)
+            {
+                burnTime = fuelBurnDuration;
+                maximumTemperature = fuelTemperature;
+                fuelConsumed++;
+            }
+        }
+
+        return 0;
+    }
+
+    private static float ChangeTemperature(float fromTemperature, float toTemperature, float deltaTime)
+    {
+        float difference = Math.Abs(fromTemperature - toTemperature);
+        deltaTime += deltaTime * (difference / 28);
+
+        if (difference < deltaTime || difference < 1)
+        {
+            return toTemperature;
+        }
+
+        return fromTemperature + (fromTemperature > toTemperature ? -deltaTime : deltaTime);
+    }
+
+    #endregion
+
     #region Percentage Normalization
 
     /// <summary>
@@ -288,6 +439,86 @@ internal static class AlloyCalculatorLogic
     #region Nugget Calculation
 
     /// <summary>
+    /// Finds the adjacent maximum-yield target for each count of the least-percentage ingredient.
+    /// Recipe bounds still constrain the resulting whole-nugget mixture.
+    /// Without recipe bounds, the configured percentages must be matched exactly.
+    /// Leaves the target unchanged when no adjacent target fits in a positive integer.
+    /// </summary>
+    internal static int FindAdjacentWasteFreeTarget(
+        int targetUnits,
+        IReadOnlyDictionary<int, int> percentages,
+        bool increase,
+        IReadOnlyList<MetalDepositIngredient>? ingredients = null)
+    {
+        if (ingredients is not null)
+        {
+            var limitingIngredient = percentages
+                .Where(static entry => entry.Value > 0)
+                .OrderBy(static entry => entry.Value)
+                .ThenBy(static entry => entry.Key)
+                .FirstOrDefault();
+            if (limitingIngredient.Value <= 0) return targetUnits;
+
+            long candidate = increase
+                ? ((long)Math.Max(0, targetUnits) / 5 + 1) * 5
+                : ((long)targetUnits - 1) / 5 * 5;
+            for (int offset = 0; offset < AlloyRatioPrecision * 5;
+                offset += 5, candidate += increase ? 5 : -5)
+            {
+                if (candidate <= 0 || candidate > int.MaxValue) break;
+                long totalNuggets = candidate / 5;
+                long limitingNuggets = (totalNuggets * limitingIngredient.Value + 99) / 100;
+                long maximumYield = limitingNuggets * 100 / limitingIngredient.Value;
+                if (totalNuggets != maximumYield) continue;
+
+                if (TryCalculateWasteFreeNuggets((int)candidate, percentages, ingredients) is { } counts
+                    && counts.GetValueOrDefault(limitingIngredient.Key) == limitingNuggets)
+                {
+                    return (int)candidate;
+                }
+            }
+
+            return targetUnits;
+        }
+
+        int divisor = PercentageUnitsPerNugget;
+        bool hasIngredient = false;
+        foreach (int percentage in percentages.Values)
+        {
+            if (percentage <= 0) continue;
+            hasIngredient = true;
+            int remainder = percentage;
+            while (remainder != 0)
+            {
+                (divisor, remainder) = (remainder, divisor % remainder);
+            }
+        }
+
+        if (!hasIngredient) return targetUnits;
+
+        int interval = PercentageUnitsPerNugget / divisor;
+        long nextTarget = increase
+            ? ((long)Math.Max(0, targetUnits) / interval + 1) * interval
+            : ((long)targetUnits - 1) / interval * interval;
+        return nextTarget is > 0 and <= int.MaxValue ? (int)nextTarget : targetUnits;
+    }
+
+    /// <summary>
+    /// Gets the metal units exceeding the target after rounding each ingredient to whole nuggets.
+    /// </summary>
+    internal static long CalculateWastedMetalUnits(
+        int targetUnits,
+        IReadOnlyDictionary<int, int> percentages,
+        IReadOnlyList<MetalDepositIngredient>? ingredients = null)
+    {
+        if (targetUnits <= 0) return 0;
+
+        long roundedUnits = CalculateAllNuggetsRequired(targetUnits, percentages, ingredients)
+            .Values.Sum(static count => (long)count * 5);
+        return Math.Max(0, roundedUnits - targetUnits);
+    }
+
+    /// <summary>
     /// Calculates the number of nuggets required for a given percentage of target units.
     /// Uses 5 units per nugget and rounds up.
     /// </summary>
@@ -298,7 +529,7 @@ internal static class AlloyCalculatorLogic
     {
         if (targetUnits <= 0 || percentage <= 0) return 0;
 
-        var units = targetUnits * percentage / 100.0;
+        var units = (double)targetUnits * percentage / 100.0;
         return (int)Math.Ceiling(units / 5.0); // 1 nugget = 5 units, round up
     }
 
@@ -308,8 +539,17 @@ internal static class AlloyCalculatorLogic
     /// <param name="targetUnits">Total units of alloy to create.</param>
     /// <param name="percentages">Percentages for each ingredient by index.</param>
     /// <returns>Dictionary of nugget counts by ingredient index.</returns>
-    public static Dictionary<int, int> CalculateAllNuggetsRequired(int targetUnits, IReadOnlyDictionary<int, int> percentages)
+    public static Dictionary<int, int> CalculateAllNuggetsRequired(
+        int targetUnits,
+        IReadOnlyDictionary<int, int> percentages,
+        IReadOnlyList<MetalDepositIngredient>? ingredients = null)
     {
+        if (ingredients is not null
+            && TryCalculateWasteFreeNuggets(targetUnits, percentages, ingredients) is { } exactNuggets)
+        {
+            return exactNuggets;
+        }
+
         var result = new Dictionary<int, int>();
 
         foreach (var (index, percentage) in percentages)
@@ -322,6 +562,75 @@ internal static class AlloyCalculatorLogic
         }
 
         return result;
+    }
+
+    #endregion
+
+    #region Private Nugget Allocation
+
+    /// <summary>
+    /// Fits whole nuggets to the target, choosing counts close to the sliders within recipe bounds.
+    /// Uses the game's rounded ratio precision to include valid boundary mixtures.
+    /// </summary>
+    private static Dictionary<int, int>? TryCalculateWasteFreeNuggets(
+        int targetUnits,
+        IReadOnlyDictionary<int, int> percentages,
+        IReadOnlyList<MetalDepositIngredient> ingredients)
+    {
+        if (targetUnits <= 0 || targetUnits % 5 != 0 || ingredients.Count == 0) return null;
+
+        int totalNuggets = targetUnits / 5;
+        var minimums = new int[ingredients.Count];
+        var maximums = new int[ingredients.Count];
+        var desiredCounts = new double[ingredients.Count];
+        var counts = new int[ingredients.Count];
+
+        for (int index = 0; index < ingredients.Count; index++)
+        {
+            int minRatio = (int)Math.Round(ingredients[index].MinRatio * AlloyRatioPrecision);
+            int maxRatio = (int)Math.Round(ingredients[index].MaxRatio * AlloyRatioPrecision);
+            int minimum = Math.Max(1, (int)Math.Ceiling(
+                (minRatio - 0.5) * totalNuggets / AlloyRatioPrecision));
+            int maximum = Math.Min(totalNuggets, (int)Math.Floor(
+                (maxRatio + 0.5) * totalNuggets / AlloyRatioPrecision));
+            if (Math.Round((double)minimum / totalNuggets * AlloyRatioPrecision) < minRatio) minimum++;
+            if (Math.Round((double)maximum / totalNuggets * AlloyRatioPrecision) > maxRatio) maximum--;
+            if (minimum > maximum) return null;
+
+            minimums[index] = minimum;
+            maximums[index] = maximum;
+            desiredCounts[index] = (double)totalNuggets * percentages.GetValueOrDefault(index) / 100;
+            counts[index] = (int)Math.Clamp(Math.Floor(desiredCounts[index]), minimum, maximum);
+        }
+
+        if (minimums.Sum(static count => (long)count) > totalNuggets
+            || maximums.Sum(static count => (long)count) < totalNuggets)
+        {
+            return null;
+        }
+
+        long remaining = totalNuggets - counts.Sum(static count => (long)count);
+        while (remaining != 0)
+        {
+            bool increase = remaining > 0;
+            int index = Enumerable.Range(0, ingredients.Count)
+                .Where(index => increase ? counts[index] < maximums[index] : counts[index] > minimums[index])
+                .OrderByDescending(index => increase
+                    ? desiredCounts[index] - counts[index]
+                    : counts[index] - desiredCounts[index])
+                .First();
+            int capacity = increase ? maximums[index] - counts[index] : counts[index] - minimums[index];
+            double deficit = increase
+                ? desiredCounts[index] - counts[index]
+                : counts[index] - desiredCounts[index];
+            int adjustment = (int)Math.Min(Math.Abs(remaining), Math.Min(capacity,
+                deficit > 0 ? Math.Ceiling(deficit) : capacity));
+            counts[index] += increase ? adjustment : -adjustment;
+            remaining += increase ? -adjustment : adjustment;
+        }
+
+        return Enumerable.Range(0, ingredients.Count)
+            .ToDictionary(static index => index, index => counts[index]);
     }
 
     #endregion

@@ -1,0 +1,28 @@
+[
+  {
+    "op": "add",
+    "file": "game:itemtypes/tool/solderingiron.json",
+    "path": "/attributes/ve-radial-menu-properties",
+    "value": {
+      "transform": {
+        "origin": {
+          "x": 0.8125,
+          "y": 0.0375,
+          "z": 0.5
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 100.0,
+          "z": 90.0
+        },
+        "translation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": 3.0
+      },
+      "wedgeRotationDegrees": 0
+    }
+  }
+]

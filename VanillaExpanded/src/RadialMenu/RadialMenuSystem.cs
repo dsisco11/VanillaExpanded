@@ -44,12 +44,12 @@ public sealed class RadialMenuSystem : ModSystem, IRadialMenu
     #region Public API
     /// <summary>Opens caller-supplied generic entries at the supplied circular positions.</summary>
     public bool Open(RadialMenuLayout layout, IEnumerable<RadialMenuEntry> entries,
-        System.Func<string, RadialMenuSelectionResult> selected, Action cancelled)
+        System.Func<string, RadialMenuSelectionResult> selected, Action cancelled, string toggleKeyCode = "")
     {
         ArgumentNullException.ThrowIfNull(selected);
         ArgumentNullException.ThrowIfNull(cancelled);
         if (dialog is null) return false;
-        return dialog.Open(layout, entries, selected, cancelled);
+        return dialog.Open(layout, entries, selected, cancelled, toggleKeyCode);
     }
 
     /// <summary>Refreshes entry content without moving wedges or uploading geometry.</summary>

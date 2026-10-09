@@ -78,8 +78,8 @@ internal sealed class QuickToolClientIntegration : IRenderer
     #endregion
 
     #region Context and lifecycle
-    /// <summary>Requires an enabled feature and a living, initialized local player.</summary>
-    private bool IsReady() => !disposed && contextAvailable && VanillaExpandedModSystem.Config.EnableQuickTools
+    /// <summary>Requires a living, initialized local player.</summary>
+    private bool IsReady() => !disposed && contextAvailable
         && api.PlayerReadyFired && api.World.Player?.Entity?.Alive == true;
 
     /// <summary>Defers one coalesced dirty burst until the native inventory operation has returned.</summary>
@@ -124,13 +124,6 @@ internal sealed class QuickToolClientIntegration : IRenderer
         contextAvailable = false;
         controller.ClearContext();
     }
-    /// <summary>Applies feature availability while retaining the registered hotkey for re-enablement.</summary>
-    internal void ApplyConfig()
-    {
-        if (IsReady()) controller.RefreshContext();
-        else controller.ClearContext();
-    }
-
     /// <summary>Releases every host subscription and all menu/cache state before the equipment owner is disposed.</summary>
     public void Dispose()
     {

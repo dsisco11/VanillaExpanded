@@ -1,0 +1,156 @@
+[
+  {
+    "op": "add",
+    "file": "game:itemtypes/tool/club.json",
+    "path": "/attributes/ve-radial-menu-propertiesByType",
+    "value": {
+      "club-generic-wood": {
+        "transform": {
+          "origin": {
+            "x": 0.6875,
+            "y": 0.53125,
+            "z": 0.53125
+          },
+          "rotation": {
+            "x": 15.220741,
+            "y": 9.655936,
+            "z": 87.387018
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 1.9
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "club-scrap-scrap": {
+        "transform": {
+          "origin": {
+            "x": 0.875,
+            "y": 0.0,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 15.220741,
+            "y": 9.655936,
+            "z": 87.387018
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 1.8
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "club-scrapmace-scrap": {
+        "transform": {
+          "origin": {
+            "x": 1.0625,
+            "y": 0.0,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 15.220741,
+            "y": 9.655936,
+            "z": 87.387018
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 1.7
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "club-flanged-ruined": {
+        "transform": {
+          "origin": {
+            "x": 0.875,
+            "y": 0.0,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 15.220741,
+            "y": 9.655936,
+            "z": 87.387018
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 1.9
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "club-morningstar-ruined": {
+        "transform": {
+          "origin": {
+            "x": 1.5625,
+            "y": 0.0,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 15.220741,
+            "y": 9.655936,
+            "z": 87.387018
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 1.7
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "club-spiked-ruined": {
+        "transform": {
+          "origin": {
+            "x": 1.5,
+            "y": 0.0,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 15.220741,
+            "y": 9.655936,
+            "z": 87.387018
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 1.7
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "club-warhammer-ruined": {
+        "transform": {
+          "origin": {
+            "x": 1.4375,
+            "y": 0.0,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 15.220741,
+            "y": 9.655936,
+            "z": 87.387018
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 1.8
+        },
+        "wedgeRotationDegrees": 0
+      }
+    }
+  }
+]

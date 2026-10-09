@@ -1,0 +1,366 @@
+[
+  {
+    "op": "add",
+    "file": "game:itemtypes/tool/spear.json",
+    "path": "/attributes/ve-radial-menu-propertiesByType",
+    "value": {
+      "@spear-generic-(chert|granite|andesite|basalt|obsidian|peridotite|flint)": {
+        "transform": {
+          "origin": {
+            "x": 1.4375,
+            "y": 0.05,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 190.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.415
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "spear-scrap-scrap": {
+        "transform": {
+          "origin": {
+            "x": 0.9375,
+            "y": 0.03125,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 190.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.07
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "spear-generic-hacking": {
+        "transform": {
+          "origin": {
+            "x": 0.9375,
+            "y": 0.03125,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 190.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.07
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "spear-generic-ornategold": {
+        "transform": {
+          "origin": {
+            "x": 1.5,
+            "y": 0.05,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.07
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "spear-generic-ornatesilver": {
+        "transform": {
+          "origin": {
+            "x": 1.5,
+            "y": 0.05,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.07
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "spear-generic-erel": {
+        "transform": {
+          "origin": {
+            "x": 0.375,
+            "y": 0.03125,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 190.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 1.84
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "spear-boar-ruined": {
+        "transform": {
+          "origin": {
+            "x": 1.5,
+            "y": 0.0,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 190.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.07
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "spear-voulge-ruined": {
+        "transform": {
+          "origin": {
+            "x": 1.8125,
+            "y": 0.0,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 190.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 1.84
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "spear-fork-ruined": {
+        "transform": {
+          "origin": {
+            "x": 1.5,
+            "y": 0.0,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 190.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.07
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "spear-ranseur-ruined": {
+        "transform": {
+          "origin": {
+            "x": 1.25,
+            "y": 0.0,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 190.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.07
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "spear-generic-copper": {
+        "transform": {
+          "origin": {
+            "x": 1.375,
+            "y": 0.046875,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 190.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.53
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "spear-generic-tinbronze": {
+        "transform": {
+          "origin": {
+            "x": 1.375,
+            "y": 0.046875,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 190.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.53
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "spear-generic-bismuthbronze": {
+        "transform": {
+          "origin": {
+            "x": 1.375,
+            "y": 0.046875,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 190.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.415
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "spear-generic-blackbronze": {
+        "transform": {
+          "origin": {
+            "x": 1.4375,
+            "y": 0.046875,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 190.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.185
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "spear-generic-iron": {
+        "transform": {
+          "origin": {
+            "x": 1.4375,
+            "y": 0.046875,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 190.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.3
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "spear-generic-meteoriciron": {
+        "transform": {
+          "origin": {
+            "x": 1.4375,
+            "y": 0.046875,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 190.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.3
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "spear-generic-steel": {
+        "transform": {
+          "origin": {
+            "x": 1.4375,
+            "y": 0.046875,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 190.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.3
+        },
+        "wedgeRotationDegrees": 0
+      }
+    }
+  }
+]

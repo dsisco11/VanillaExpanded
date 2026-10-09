@@ -1,301 +1,207 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 
 using VanillaExpanded.Network;
 
+using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.GameContent;
 
 namespace VanillaExpanded.AlloyCalculator;
 
+/// <summary>Plans and executes metal ingredient correction through the current alloy inventory policy.</summary>
 internal static class AlloyDepositService
 {
-    private const int MaxIngredientAmount = 100_000;
+    #region Public API
 
+    /// <summary>Plans and executes ingredient deposits against current inventory state.</summary>
     internal static AlloyDepositResultCode Execute(
-        IWorldAccessor world,
-        IPlayerInventoryManager playerInventory,
+        ICoreClientAPI api,
         BlockEntityFirepit firepit,
-        Packet_RequestAlloyDeposit request)
+        IReadOnlyList<MetalDepositIngredient> ingredients,
+        IReadOnlyDictionary<int, ItemStack> calculatedStacks)
     {
-        return Execute(world, playerInventory, firepit, request, world.Api.GetMetalAlloys());
+        AlloyDepositResultCode result = CreatePlan(
+            api,
+            firepit,
+            ingredients,
+            calculatedStacks,
+            out AlloyDepositPlan? plan);
+        return result == AlloyDepositResultCode.Success
+            ? ExecutePlan(api, firepit, plan!)
+            : result;
     }
 
-    internal static AlloyDepositResultCode Execute(
-        IWorldAccessor world,
-        IPlayerInventoryManager playerInventory,
+    /// <summary>Creates an ingredient plan using the current player inventory manager.</summary>
+    internal static AlloyDepositResultCode CreatePlan(
+        ICoreClientAPI api,
         BlockEntityFirepit firepit,
-        Packet_RequestAlloyDeposit request,
-        IReadOnlyList<AlloyRecipe> recipes)
+        IReadOnlyList<MetalDepositIngredient> ingredients,
+        IReadOnlyDictionary<int, ItemStack> calculatedStacks,
+        out AlloyDepositPlan? plan)
     {
-        if (firepit.Inventory is not InventorySmelting inventory
-            || request.SlotIndices is null
-            || request.SlotIngredientCodes is null
-            || request.SlotAmounts is null
-            || request.SlotIndices.Length == 0
-            || request.SlotIndices.Length != request.SlotIngredientCodes.Length
-            || request.SlotIndices.Length != request.SlotAmounts.Length
-            || request.SlotAmounts.Any(static amount => amount <= 0 || amount > MaxIngredientAmount))
-        {
-            return AlloyDepositResultCode.InvalidRequest;
-        }
+        return CreatePlan(
+            api,
+            firepit,
+            ingredients,
+            calculatedStacks,
+            api.World.Player.InventoryManager,
+            out plan);
+    }
 
-        if (!playerInventory.OpenedInventories.Contains(inventory))
+    /// <summary>Creates and validates an ingredient plan against the supplied inventory manager.</summary>
+    internal static AlloyDepositResultCode CreatePlan(
+        ICoreClientAPI api,
+        BlockEntityFirepit firepit,
+        IReadOnlyList<MetalDepositIngredient> ingredients,
+        IReadOnlyDictionary<int, ItemStack> calculatedStacks,
+        IPlayerInventoryManager inventoryManager,
+        out AlloyDepositPlan? plan)
+    {
+        plan = null;
+        if (firepit.Inventory is not InventorySmelting inventory
+            || !inventoryManager.OpenedInventories.Contains(inventory))
         {
             return AlloyDepositResultCode.InventoryClosed;
         }
 
-        AlloyRecipe? registeredRecipe = recipes.FirstOrDefault(recipe =>
-            recipe.Enabled
-            && recipe.Output?.Code?.ToString() == request.AlloyCode);
-        MetalDepositOption? option = registeredRecipe is null
-            ? TryCreatePureMetalOption(world, request)
-            : AlloyCalculatorLogic.FromAlloyRecipe(registeredRecipe);
-
-        IInventory? backpack = playerInventory.GetOwnInventory(GlobalConstants.backpackInvClassName);
-        IInventory? hotbar = playerInventory.GetOwnInventory(GlobalConstants.hotBarInvClassName);
-        if (backpack is null || hotbar is null)
+        AlloyDepositPlan? createdPlan = AlloyDepositPlan.Create(
+            ingredients,
+            calculatedStacks,
+            inventory.CookingSlots.Length);
+        if (createdPlan is null)
         {
             return AlloyDepositResultCode.InvalidRequest;
         }
 
-        ItemSlot[] cookingSlots = inventory.CookingSlots;
-        if (cookingSlots.Length == 0)
+        if (!AlloyTransferInventoryPolicy.TryCollect(api.World, inventoryManager, inventory, out IReadOnlyList<ItemSlot> externalSlots))
         {
             return AlloyDepositResultCode.InvalidRequest;
         }
 
-        if (option is null || !TryBuildPlan(option, request, cookingSlots.Length, out List<SlotTarget> targets))
+        // Existing cooking contents are counted separately; take locks only restrict external availability here.
+        bool hasAllIngredients = ingredients.All(ingredient =>
+            externalSlots.Where(AlloyTransferInventoryPolicy.CanWithdraw).Concat(inventory.CookingSlots)
+                .Where(slot => !slot.Empty && SmeltsInto(api.World, slot.Itemstack, ingredient.ResolvedStack))
+                .Sum(static slot => slot.StackSize)
+            >= createdPlan.Targets.Where(target => target.Ingredient == ingredient).Sum(static target => target.Amount));
+        if (!hasAllIngredients)
         {
-            return AlloyDepositResultCode.InvalidRecipe;
+            return AlloyDepositResultCode.InsufficientItems;
         }
 
-        List<ItemSlot> playerSlots = [.. backpack, .. hotbar];
-        List<ItemSlot> allSlots = [.. playerSlots, .. cookingSlots];
-        List<SlotSnapshot> snapshot = allSlots
-            .Select(static slot => new SlotSnapshot(
-                slot.Inventory,
-                slot.Inventory.GetSlotId(slot),
-                slot.Itemstack?.Clone()))
-            .DistinctBy(static item => (item.Inventory, item.SlotIndex))
-            .ToList();
-
-        try
-        {
-            foreach (ItemSlot cookingSlot in cookingSlots)
-            {
-                if (!MoveEntireStack(world, playerInventory, cookingSlot, playerSlots))
-                {
-                    Restore(snapshot);
-                    return AlloyDepositResultCode.InsufficientSpace;
-                }
-            }
-
-            foreach (SlotTarget target in targets)
-            {
-                if (!MoveIngredient(
-                    world,
-                    playerInventory,
-                    playerSlots,
-                    cookingSlots[target.SlotIndex],
-                    target.Ingredient,
-                    target.Amount))
-                {
-                    Restore(snapshot);
-                    return AlloyDepositResultCode.InsufficientItems;
-                }
-            }
-
-            MarkDirty(snapshot);
-
-            firepit.MarkDirty(true);
-            return AlloyDepositResultCode.Success;
-        }
-        catch
-        {
-            Restore(snapshot);
-            return AlloyDepositResultCode.TransferFailed;
-        }
+        plan = createdPlan;
+        return AlloyDepositResultCode.Success;
     }
 
-    private static bool TryBuildPlan(
-        MetalDepositOption option,
-        Packet_RequestAlloyDeposit request,
-        int cookingSlotCount,
-        out List<SlotTarget> targets)
+    /// <summary>Executes ingredient correction using the current player inventory manager.</summary>
+    internal static AlloyDepositResultCode ExecutePlan(
+        ICoreClientAPI api,
+        BlockEntityFirepit firepit,
+        AlloyDepositPlan plan)
     {
-        targets = [];
-        var ingredientsByCode = option.Ingredients
-            .ToDictionary(static ingredient => ingredient.Code.ToString(), StringComparer.Ordinal);
-        if (ingredientsByCode.Count != option.Ingredients.Length)
-        {
-            return false;
-        }
-
-        var usedSlots = new HashSet<int>();
-        var requestedAmounts = new Dictionary<string, int>(StringComparer.Ordinal);
-        for (int index = 0; index < request.SlotIndices.Length; index++)
-        {
-            int slotIndex = request.SlotIndices[index];
-            string code = request.SlotIngredientCodes[index];
-            if (slotIndex < 0
-                || slotIndex >= cookingSlotCount
-                || !usedSlots.Add(slotIndex)
-                || string.IsNullOrWhiteSpace(code)
-                || !ingredientsByCode.TryGetValue(code, out MetalDepositIngredient? ingredient))
-            {
-                return false;
-            }
-
-            requestedAmounts[code] = requestedAmounts.GetValueOrDefault(code) + request.SlotAmounts[index];
-            targets.Add(new SlotTarget(slotIndex, ingredient, request.SlotAmounts[index]));
-        }
-
-        foreach (MetalDepositIngredient ingredient in option.Ingredients)
-        {
-            if (!requestedAmounts.ContainsKey(ingredient.Code.ToString()))
-            {
-                return false;
-            }
-        }
-
-        if (requestedAmounts.Count != option.Ingredients.Length)
-        {
-            return false;
-        }
-
-        long totalAmount = requestedAmounts.Values.Sum(static amount => (long)amount);
-        return totalAmount > 0 && option.Ingredients.All(ingredient =>
-        {
-            double ratio = requestedAmounts[ingredient.Code.ToString()] / (double)totalAmount;
-            int scaledRatio = (int)Math.Round(ratio * 10_000);
-            int scaledMinimum = (int)Math.Round(ingredient.MinRatio * 10_000);
-            int scaledMaximum = (int)Math.Round(ingredient.MaxRatio * 10_000);
-            return scaledRatio >= scaledMinimum && scaledRatio <= scaledMaximum;
-        });
+        return ExecutePlan(api, firepit, plan, api.World.Player.InventoryManager);
     }
 
-    private static MetalDepositOption? TryCreatePureMetalOption(
-        IWorldAccessor world,
-        Packet_RequestAlloyDeposit request)
+    /// <summary>Executes an ingredient plan through the supplied inventory manager using vanilla client packets.</summary>
+    internal static AlloyDepositResultCode ExecutePlan(
+        ICoreClientAPI api,
+        BlockEntityFirepit firepit,
+        AlloyDepositPlan plan,
+        IPlayerInventoryManager inventoryManager)
     {
-        if (request.SlotIngredientCodes.Length == 0
-            || request.SlotIngredientCodes.Any(code => code != request.AlloyCode))
+        if (firepit.Inventory is not InventorySmelting inventory
+            || !inventoryManager.OpenedInventories.Contains(inventory))
         {
-            return null;
+            return AlloyDepositResultCode.InventoryClosed;
         }
 
-        Item? output = world.GetItem(new AssetLocation(request.AlloyCode));
-        return output is null
-            ? null
-            : AlloyCalculatorLogic.CreatePureMetalOption(new ItemStack(output));
-    }
-
-    private static bool MoveEntireStack(
-        IWorldAccessor world,
-        IPlayerInventoryManager playerInventory,
-        ItemSlot source,
-        IReadOnlyList<ItemSlot> targets)
-    {
-        ItemSlot[] orderedTargets = [
-            .. targets.Where(static target => !target.Empty),
-            .. targets.Where(static target => target.Empty)
-        ];
-
-        while (!source.Empty)
+        if (!AlloyTransferInventoryPolicy.TryCollect(api.World, inventoryManager, inventory, out IReadOnlyList<ItemSlot> externalSlots)
+            || plan.Targets.Any(target => target.SlotIndex < 0
+                || target.SlotIndex >= inventory.CookingSlots.Length))
         {
-            int before = source.StackSize;
-            foreach (ItemSlot target in orderedTargets)
+            return AlloyDepositResultCode.InvalidRequest;
+        }
+
+        // Recollect at execution instead of retaining a planning snapshot of opened containers.
+        bool hasAllIngredients = plan.Targets
+            .GroupBy(static target => target.Ingredient)
+            .All(group => externalSlots.Where(AlloyTransferInventoryPolicy.CanWithdraw).Concat(inventory.CookingSlots)
+                .Where(slot => !slot.Empty && SmeltsInto(api.World, slot.Itemstack, group.Key.ResolvedStack))
+                .Sum(static slot => slot.StackSize)
+                >= group.Sum(static target => target.Amount));
+        if (!hasAllIngredients)
+        {
+            return AlloyDepositResultCode.InsufficientItems;
+        }
+
+        var retainedAmounts = new int[inventory.CookingSlots.Length];
+        for (int slotIndex = 0; slotIndex < inventory.CookingSlots.Length; slotIndex++)
+        {
+            AlloyDepositSlotTarget? target = plan.Targets.FirstOrDefault(item => item.SlotIndex == slotIndex);
+            InventorySlotCorrectionResult removeResult = ClientInventorySlotReconciler.RemoveIncorrectOrExcess(
+                api,
+                inventoryManager,
+                inventory.CookingSlots[slotIndex],
+                externalSlots,
+                stack => target is not null && SmeltsInto(api.World, stack, target.Ingredient.ResolvedStack),
+                target?.Amount ?? 0,
+                out retainedAmounts[slotIndex],
+                () => inventoryManager.OpenedInventories.Contains(inventory),
+                slot => AlloyTransferInventoryPolicy.IsCurrentExternalSlot(api.World, inventoryManager, inventory, slot));
+            if (removeResult != InventorySlotCorrectionResult.Success)
             {
-                if (!target.CanTakeFrom(source)) continue;
-
-                Move(world, playerInventory, source, target, before);
-                if (source.Empty) return true;
-                if (source.StackSize < before) break;
-            }
-
-            if (source.StackSize == before)
-            {
-                return false;
+                return MapResult(removeResult);
             }
         }
 
-        return true;
-    }
-
-    private static bool MoveIngredient(
-        IWorldAccessor world,
-        IPlayerInventoryManager playerInventory,
-        IReadOnlyList<ItemSlot> sourceSlots,
-        ItemSlot targetSlot,
-        MetalDepositIngredient ingredient,
-        int amount)
-    {
-        int remaining = amount;
-        IEnumerable<ItemSlot> eligibleSources = sourceSlots
-            .Where(sourceSlot => !sourceSlot.Empty
-                && SmeltsInto(world, sourceSlot.Itemstack, ingredient.ResolvedStack))
-            .OrderBy(static sourceSlot => sourceSlot.StackSize);
-
-        foreach (ItemSlot sourceSlot in eligibleSources)
+        foreach (AlloyDepositSlotTarget target in plan.Targets)
         {
-            if (remaining <= 0) break;
-            remaining -= Move(world, playerInventory, sourceSlot, targetSlot, remaining);
+            InventorySlotCorrectionResult addResult = ClientInventorySlotReconciler.AddMissing(
+                api,
+                inventoryManager,
+                inventory.CookingSlots[target.SlotIndex],
+                externalSlots,
+                stack => SmeltsInto(api.World, stack, target.Ingredient.ResolvedStack),
+                target.Amount - retainedAmounts[target.SlotIndex],
+                () => inventoryManager.OpenedInventories.Contains(inventory),
+                slot => AlloyTransferInventoryPolicy.IsCurrentExternalSlot(api.World, inventoryManager, inventory, slot));
+            if (addResult != InventorySlotCorrectionResult.Success)
+            {
+                return MapResult(addResult);
+            }
         }
 
-        return remaining == 0;
+        return AlloyDepositResultCode.Success;
     }
 
+    #endregion
+
+    #region Private
+
+    /// <summary>Determines whether a source stack smelts into the desired metal ingredient.</summary>
     private static bool SmeltsInto(IWorldAccessor world, ItemStack source, ItemStack target)
     {
         ItemStack? smelted = source.Collectible
             .GetCombustibleProperties(world, source, null)?
             .SmeltedStack?
             .ResolvedItemstack;
-
         return target.Equals(world, smelted, GlobalConstants.IgnoredStackAttributes);
     }
 
-    private static int Move(
-        IWorldAccessor world,
-        IPlayerInventoryManager playerInventory,
-        ItemSlot source,
-        ItemSlot target,
-        int quantity)
+    /// <summary>Maps a slot-correction result to the alloy calculator's user-facing result contract.</summary>
+    private static AlloyDepositResultCode MapResult(InventorySlotCorrectionResult result)
     {
-        var operation = new ItemStackMoveOperation(
-            world,
-            EnumMouseButton.Left,
-            EnumModifierKey.SHIFT,
-            EnumMergePriority.AutoMerge,
-            quantity);
-
-        _ = playerInventory.TryTransferTo(source, target, ref operation);
-        return operation.MovedQuantity;
-    }
-
-    private static void Restore(IEnumerable<SlotSnapshot> snapshot)
-    {
-        foreach (SlotSnapshot item in snapshot)
+        return result switch
         {
-            ItemSlot? currentSlot = item.Inventory[item.SlotIndex];
-            if (currentSlot is null) continue;
-
-            currentSlot.Itemstack = item.Stack?.Clone();
-            item.Inventory.MarkSlotDirty(item.SlotIndex);
-        }
+            InventorySlotCorrectionResult.InventoryClosed => AlloyDepositResultCode.InventoryClosed,
+            InventorySlotCorrectionResult.Success => AlloyDepositResultCode.Success,
+            InventorySlotCorrectionResult.InsufficientSpace => AlloyDepositResultCode.InsufficientSpace,
+            InventorySlotCorrectionResult.InsufficientItems => AlloyDepositResultCode.InsufficientItems,
+            _ => AlloyDepositResultCode.TransferFailed
+        };
     }
 
-    private static void MarkDirty(IEnumerable<SlotSnapshot> snapshot)
-    {
-        foreach (SlotSnapshot item in snapshot)
-        {
-            item.Inventory.MarkSlotDirty(item.SlotIndex);
-        }
-    }
-
-    private sealed record SlotTarget(int SlotIndex, MetalDepositIngredient Ingredient, int Amount);
-    private sealed record SlotSnapshot(IInventory Inventory, int SlotIndex, ItemStack? Stack);
+    #endregion
 }

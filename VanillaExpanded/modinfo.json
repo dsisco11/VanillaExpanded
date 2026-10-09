@@ -13,6 +13,6 @@
         "game": "1.22.0"
     },
     "requiredOnClient": true,
-    "requiredOnServer": true,
+    "requiredOnServer": false,
     "website": "https://github.com/dsisco11/VanillaExpanded"
 }

@@ -11,297 +11,204 @@ using Vintagestory.GameContent;
 
 namespace VanillaExpanded.Tests.Unit.AlloyCalculator;
 
+/// <summary>Verifies client-side execution of planned ingredient-slot corrections.</summary>
 [Trait("Category", "Unit")]
 public class AlloyDepositServiceTests
 {
+    /// <summary>Verifies that planning rejects a firepit inventory that is not open.</summary>
     [Fact]
-    public void ResultCodes_HaveStableIntegerValues()
+    public void CreatePlan_InventoryClosed_ReturnsInventoryClosed()
     {
-        Assert.Equal(typeof(int), Enum.GetUnderlyingType(typeof(AlloyDepositResultCode)));
-        Assert.Equal(0, (int)AlloyDepositResultCode.Success);
-        Assert.Equal(1, (int)AlloyDepositResultCode.InvalidRequest);
-        Assert.Equal(2, (int)AlloyDepositResultCode.InventoryClosed);
-        Assert.Equal(3, (int)AlloyDepositResultCode.InvalidRecipe);
-        Assert.Equal(4, (int)AlloyDepositResultCode.InsufficientItems);
-        Assert.Equal(5, (int)AlloyDepositResultCode.InsufficientSpace);
-        Assert.Equal(6, (int)AlloyDepositResultCode.TransferFailed);
-    }
-
-    [Fact]
-    public void Execute_ValidRequest_DepositsCompleteAlloy()
-    {
-        // Arrange
-        TestContext context = CreateContext(copperCount: 9, tinCount: 1);
-
-        // Act
-        AlloyDepositResultCode result = AlloyDepositService.Execute(
-            context.Fixture.World,
-            context.Fixture.Player,
-            context.Firepit,
-            context.Request,
-            [context.Recipe]);
-
-        // Assert
-        Assert.Equal(AlloyDepositResultCode.Success, result);
-        Assert.True(context.Fixture.BackpackInventory[0].Empty);
-        Assert.True(context.Fixture.BackpackInventory[1].Empty);
-        Assert.Equal([3, 3, 3, 1], context.Inventory.CookingSlots.Select(static slot => slot.StackSize));
-        Assert.True(context.Recipe.Matches(context.Inventory.CookingSlots.Select(static slot => slot.Itemstack).ToArray()));
-    }
-
-    [Fact]
-    public void Execute_ReturningCookingStack_PrefersMatchingPlayerStack()
-    {
-        // Arrange
-        TestContext context = CreateContext(copperCount: 9, tinCount: 1);
-        context.Fixture.WithBackpackSlot(2, context.CopperSource, 5);
-        context.Inventory.CookingSlots[0].Itemstack = new ItemStack(context.CopperSource, 2);
-
-        // Act
-        AlloyDepositResultCode result = AlloyDepositService.Execute(
-            context.Fixture.World,
-            context.Fixture.Player,
-            context.Firepit,
-            context.Request,
-            [context.Recipe]);
-
-        // Assert
-        Assert.Equal(AlloyDepositResultCode.Success, result);
-        ItemSlot firstReturnTarget = context.Fixture.InventoryManagerMock.Invocations
-            .Select(static invocation => invocation.Arguments)
-            .Where(arguments => arguments.Count >= 2)
-            .Where(arguments => arguments[0] is ItemSlot source && source.Inventory == context.Inventory)
-            .Select(arguments => Assert.IsAssignableFrom<ItemSlot>(arguments[1]))
-            .First();
-        Assert.Same(context.Fixture.BackpackInventory, firstReturnTarget.Inventory);
-        Assert.Equal(context.CopperSource.Code, firstReturnTarget.Itemstack?.Collectible.Code);
-        Assert.Equal(7, firstReturnTarget.StackSize);
-    }
-
-    [Fact]
-    public void Execute_TakingIngredients_UsesSmallestMatchingStackFirst()
-    {
-        // Arrange
-        TestContext context = CreateContext(copperCount: 12, tinCount: 1);
-        context.Fixture.WithBackpackSlot(2, context.CopperSource, 3);
-
-        // Act
-        AlloyDepositResultCode result = AlloyDepositService.Execute(
-            context.Fixture.World,
-            context.Fixture.Player,
-            context.Firepit,
-            context.Request,
-            [context.Recipe]);
-
-        // Assert
-        Assert.Equal(AlloyDepositResultCode.Success, result);
-        Assert.Equal(6, context.Fixture.BackpackInventory[0].StackSize);
-        Assert.True(context.Fixture.BackpackInventory[2].Empty);
-    }
-
-    [Fact]
-    public void Execute_IngredientMissing_RestoresAllSlots()
-    {
-        // Arrange
-        TestContext context = CreateContext(copperCount: 9, tinCount: 0);
-        context.Inventory.CookingSlots[0].Itemstack = new ItemStack(context.CopperSource, 2);
-        ItemStack?[] beforePlayer = context.Fixture.BackpackInventory
-            .Select(static slot => slot.Itemstack?.Clone())
-            .ToArray();
-        ItemStack?[] beforeCooking = context.Inventory.CookingSlots
-            .Select(static slot => slot.Itemstack?.Clone())
-            .ToArray();
-
-        // Act
-        AlloyDepositResultCode result = AlloyDepositService.Execute(
-            context.Fixture.World,
-            context.Fixture.Player,
-            context.Firepit,
-            context.Request,
-            [context.Recipe]);
-
-        // Assert
-        Assert.Equal(AlloyDepositResultCode.InsufficientItems, result);
-        AssertStacksEqual(beforePlayer, context.Fixture.BackpackInventory.Select(static slot => slot.Itemstack).ToArray());
-        AssertStacksEqual(beforeCooking, context.Inventory.CookingSlots.Select(static slot => slot.Itemstack).ToArray());
-    }
-
-    [Fact]
-    public void Execute_TransferReplacesPlayerSlot_RollbackUsesCurrentInventorySlot()
-    {
-        // Arrange
-        TestContext context = CreateContext(copperCount: 9, tinCount: 0);
-        context.Inventory.CookingSlots[0].Itemstack = new ItemStack(context.CopperSource, 2);
-        ItemStack?[] beforePlayer = context.Fixture.BackpackInventory
-            .Select(static slot => slot.Itemstack?.Clone())
-            .ToArray();
-        ItemStack?[] beforeCooking = context.Inventory.CookingSlots
-            .Select(static slot => slot.Itemstack?.Clone())
-            .ToArray();
-        bool replacedSlot = false;
-
-        context.Fixture.InventoryManagerMock
-            .Setup(manager => manager.TryTransferTo(
-                It.IsAny<ItemSlot>(),
-                It.IsAny<ItemSlot>(),
-                ref It.Ref<ItemStackMoveOperation>.IsAny))
-            .Returns((ItemSlot source, ItemSlot target, ref ItemStackMoveOperation operation) =>
-            {
-                if (!replacedSlot && target.Inventory == context.Fixture.BackpackInventory)
-                {
-                    int targetIndex = target.Inventory.GetSlotId(target);
-                    var replacement = new ItemSlotSurvival(context.Fixture.BackpackInventory)
-                    {
-                        Itemstack = target.Itemstack
-                    };
-                    context.Fixture.BackpackInventory[targetIndex] = replacement;
-                    target = replacement;
-                    replacedSlot = true;
-                }
-
-                if (source.Empty || (!target.Empty && target.Itemstack?.Collectible.Code != source.Itemstack?.Collectible.Code))
-                {
-                    operation.MovedQuantity = 0;
-                    return null;
-                }
-
-                int moved = Math.Min(operation.RequestedQuantity, source.StackSize);
-                if (target.Empty)
-                {
-                    target.Itemstack = source.TakeOut(moved);
-                }
-                else
-                {
-                    target.Itemstack!.StackSize += moved;
-                    source.TakeOut(moved);
-                }
-
-                operation.MovedQuantity = moved;
-                return new object();
-            });
-
-        // Act
-        AlloyDepositResultCode result = AlloyDepositService.Execute(
-            context.Fixture.World,
-            context.Fixture.Player,
-            context.Firepit,
-            context.Request,
-            [context.Recipe]);
-
-        // Assert
-        Assert.True(replacedSlot);
-        Assert.Equal(AlloyDepositResultCode.InsufficientItems, result);
-        AssertStacksEqual(beforePlayer, context.Fixture.BackpackInventory.Select(static slot => slot.Itemstack).ToArray());
-        AssertStacksEqual(beforeCooking, context.Inventory.CookingSlots.Select(static slot => slot.Itemstack).ToArray());
-    }
-
-    [Fact]
-    public void Execute_InvalidRatio_DoesNotMutateInventory()
-    {
-        // Arrange
-        TestContext context = CreateContext(copperCount: 9, tinCount: 1);
-        context.Request.SlotAmounts = [2, 2, 1, 5];
-        ItemStack?[] beforePlayer = context.Fixture.BackpackInventory
-            .Select(static slot => slot.Itemstack?.Clone())
-            .ToArray();
-
-        // Act
-        AlloyDepositResultCode result = AlloyDepositService.Execute(
-            context.Fixture.World,
-            context.Fixture.Player,
-            context.Firepit,
-            context.Request,
-            [context.Recipe]);
-
-        // Assert
-        Assert.Equal(AlloyDepositResultCode.InvalidRecipe, result);
-        AssertStacksEqual(beforePlayer, context.Fixture.BackpackInventory.Select(static slot => slot.Itemstack).ToArray());
-        Assert.All(context.Inventory.CookingSlots, static slot => Assert.True(slot.Empty));
-    }
-
-    [Fact]
-    public void Execute_InventoryNotOpen_ReturnsInventoryClosed()
-    {
-        // Arrange
-        TestContext context = CreateContext(copperCount: 9, tinCount: 1);
+        TestContext context = CreateContext();
         context.Fixture.InventoryManagerMock
             .SetupGet(manager => manager.OpenedInventories)
             .Returns([]);
 
-        // Act
-        AlloyDepositResultCode result = AlloyDepositService.Execute(
-            context.Fixture.World,
-            context.Fixture.Player,
+        AlloyDepositResultCode result = AlloyDepositService.CreatePlan(
+            context.Fixture.ClientApi,
             context.Firepit,
-            context.Request,
-            [context.Recipe]);
+            [context.Ingredient],
+            new Dictionary<int, ItemStack> { [0] = new(context.Ingot, 5) },
+            context.Fixture.Player,
+            out AlloyDepositPlan? plan);
 
-        // Assert
+        Assert.Equal(AlloyDepositResultCode.InventoryClosed, result);
+        Assert.Null(plan);
+    }
+
+    /// <summary>Verifies that planning rejects missing desired ingredient amounts.</summary>
+    [Fact]
+    public void CreatePlan_MissingCalculatedStack_ReturnsInvalidRequest()
+    {
+        TestContext context = CreateContext();
+
+        AlloyDepositResultCode result = AlloyDepositService.CreatePlan(
+            context.Fixture.ClientApi,
+            context.Firepit,
+            [context.Ingredient],
+            new Dictionary<int, ItemStack>(),
+            context.Fixture.Player,
+            out AlloyDepositPlan? plan);
+
+        Assert.Equal(AlloyDepositResultCode.InvalidRequest, result);
+        Assert.Null(plan);
+    }
+
+    /// <summary>Verifies that planning rejects a desired state unavailable across player and cooking slots.</summary>
+    [Fact]
+    public void CreatePlan_IngredientUnavailable_ReturnsInsufficientItems()
+    {
+        TestContext context = CreateContext();
+
+        AlloyDepositResultCode result = AlloyDepositService.CreatePlan(
+            context.Fixture.ClientApi,
+            context.Firepit,
+            [context.Ingredient],
+            new Dictionary<int, ItemStack> { [0] = new(context.Ingot, 5) },
+            context.Fixture.Player,
+            out AlloyDepositPlan? plan);
+
+        Assert.Equal(AlloyDepositResultCode.InsufficientItems, result);
+        Assert.Null(plan);
+    }
+
+    /// <summary>Verifies that planning returns immutable desired slot targets when ingredients are available.</summary>
+    [Fact]
+    public void CreatePlan_IngredientAvailable_ReturnsPlan()
+    {
+        TestContext context = CreateContext(backpackAmount: 5);
+
+        AlloyDepositResultCode result = AlloyDepositService.CreatePlan(
+            context.Fixture.ClientApi,
+            context.Firepit,
+            [context.Ingredient],
+            new Dictionary<int, ItemStack> { [0] = new(context.Ingot, 5) },
+            context.Fixture.Player,
+            out AlloyDepositPlan? plan);
+
+        Assert.Equal(AlloyDepositResultCode.Success, result);
+        AlloyDepositPlan createdPlan = Assert.IsType<AlloyDepositPlan>(plan);
+        Assert.Equal([0, 1, 2, 3], createdPlan.Targets.Select(static target => target.SlotIndex));
+        Assert.Equal([2, 1, 1, 1], createdPlan.Targets.Select(static target => target.Amount));
+        Assert.Equal(5, createdPlan.Targets.Sum(static target => target.Amount));
+    }
+
+    /// <summary>Verifies that execution rejects targets outside the crucible cooking-slot range.</summary>
+    [Fact]
+    public void ExecutePlan_InvalidTargetSlot_ReturnsInvalidRequest()
+    {
+        TestContext context = CreateContext(backpackAmount: 5);
+        var plan = new AlloyDepositPlan([new AlloyDepositSlotTarget(99, context.Ingredient, 5)]);
+
+        AlloyDepositResultCode result = AlloyDepositService.ExecutePlan(
+            context.Fixture.ClientApi,
+            context.Firepit,
+            plan,
+            context.Fixture.Player);
+
+        Assert.Equal(AlloyDepositResultCode.InvalidRequest, result);
+    }
+
+    /// <summary>Verifies that execution rejects a plan after the crucible inventory closes.</summary>
+    [Fact]
+    public void ExecutePlan_InventoryClosed_ReturnsInventoryClosed()
+    {
+        TestContext context = CreateContext(backpackAmount: 5);
+        context.Fixture.InventoryManagerMock
+            .SetupGet(manager => manager.OpenedInventories)
+            .Returns([]);
+        var plan = new AlloyDepositPlan([new AlloyDepositSlotTarget(0, context.Ingredient, 5)]);
+
+        AlloyDepositResultCode result = AlloyDepositService.ExecutePlan(
+            context.Fixture.ClientApi,
+            context.Firepit,
+            plan,
+            context.Fixture.Player);
+
         Assert.Equal(AlloyDepositResultCode.InventoryClosed, result);
     }
 
+    /// <summary>Verifies that execution rejects a plan when required ingredients are no longer available.</summary>
     [Fact]
-    public void Execute_DuplicateSlotIndex_ReturnsInvalidRecipe()
+    public void ExecutePlan_IngredientBecameUnavailable_ReturnsInsufficientItems()
     {
-        // Arrange
-        TestContext context = CreateContext(copperCount: 9, tinCount: 1);
-        context.Request.SlotIndices = [0, 0, 2, 3];
+        TestContext context = CreateContext(backpackAmount: 4);
+        var plan = new AlloyDepositPlan([new AlloyDepositSlotTarget(0, context.Ingredient, 5)]);
 
-        // Act
-        AlloyDepositResultCode result = AlloyDepositService.Execute(
-            context.Fixture.World,
-            context.Fixture.Player,
+        AlloyDepositResultCode result = AlloyDepositService.ExecutePlan(
+            context.Fixture.ClientApi,
             context.Firepit,
-            context.Request,
-            [context.Recipe]);
+            plan,
+            context.Fixture.Player);
 
-        // Assert
-        Assert.Equal(AlloyDepositResultCode.InvalidRecipe, result);
+        Assert.Equal(AlloyDepositResultCode.InsufficientItems, result);
     }
 
+    /// <summary>Verifies that execution evacuates a different ingredient before inserting the desired one.</summary>
     [Fact]
-    public void Execute_PureMetalWithoutRegisteredRecipe_DepositsSuccessfully()
+    public void ExecutePlan_DifferentIngredient_ReplacesStack()
     {
-        // Arrange
-        TestContext context = CreateContext(copperCount: 4, tinCount: 0);
-        string copperCode = context.Recipe.Ingredients[0].Code.ToString();
-        context.Request.AlloyCode = copperCode;
-        context.Request.SlotIndices = [0];
-        context.Request.SlotIngredientCodes = [copperCode];
-        context.Request.SlotAmounts = [4];
-        context.Fixture.WorldMock
-            .Setup(world => world.GetItem(It.Is<AssetLocation>(code => code.ToString() == copperCode)))
-            .Returns(context.Recipe.Ingredients[0].ResolvedItemstack!.Item);
+        TestContext context = CreateContext(backpackAmount: 5);
+        MockItem ironIngot = CreateItem(context.Fixture, 20, "ingot-iron");
+        MockItem ironBit = CreateItem(context.Fixture, 21, "metalbit-iron");
+        ironBit.CombustibleProps = new CombustibleProperties
+        {
+            SmeltedRatio = 1,
+            SmeltedStack = new JsonItemStack
+            {
+                Code = ironIngot.Code,
+                ResolvedItemstack = new ItemStack(ironIngot)
+            }
+        };
+        context.Inventory.CookingSlots[0].Itemstack = new ItemStack(ironBit, 3);
+        var plan = new AlloyDepositPlan([new AlloyDepositSlotTarget(0, context.Ingredient, 5)]);
 
-        // Act
-        AlloyDepositResultCode result = AlloyDepositService.Execute(
-            context.Fixture.World,
-            context.Fixture.Player,
+        AlloyDepositResultCode result = AlloyDepositService.ExecutePlan(
+            context.Fixture.ClientApi,
             context.Firepit,
-            context.Request,
-            []);
+            plan,
+            context.Fixture.Player);
 
-        // Assert
         Assert.Equal(AlloyDepositResultCode.Success, result);
-        Assert.Equal(4, context.Inventory.CookingSlots[0].StackSize);
-        Assert.All(context.Inventory.CookingSlots.Skip(1), static slot => Assert.True(slot.Empty));
+        Assert.Equal("metalbit-copper", context.Inventory.CookingSlots[0].Itemstack!.Collectible.Code.Path);
+        Assert.Equal(5, context.Inventory.CookingSlots[0].StackSize);
+        Assert.Contains(context.Fixture.BackpackInventory, slot => slot.Itemstack?.Collectible.Code == ironBit.Code);
     }
 
-    private static TestContext CreateContext(int copperCount, int tinCount)
+    /// <summary>Verifies that execution adds only the missing quantity to a matching cooking slot.</summary>
+    [Fact]
+    public void ExecutePlan_MatchingDeficit_AddsOnlyDeficit()
     {
-        var fixture = VsTestFixture.Server();
-        var blockAccessor = new Mock<IBlockAccessor>();
-        fixture.WorldMock.Setup(world => world.BlockAccessor).Returns(blockAccessor.Object);
+        TestContext context = CreateContext(cookingAmount: 2, backpackAmount: 6);
+        var plan = new AlloyDepositPlan([new AlloyDepositSlotTarget(0, context.Ingredient, 5)]);
 
-        MockItem copperIngot = CreateItem(10, "ingot-copper", fixture.Api);
-        MockItem tinIngot = CreateItem(11, "ingot-tin", fixture.Api);
-        MockItem outputIngot = CreateItem(12, "ingot-bronze", fixture.Api);
-        MockItem copperSource = CreateSmeltable(20, "metalbit-copper", copperIngot, fixture.Api);
-        MockItem tinSource = CreateSmeltable(21, "metalbit-tin", tinIngot, fixture.Api);
+        AlloyDepositResultCode result = AlloyDepositService.ExecutePlan(
+            context.Fixture.ClientApi,
+            context.Firepit,
+            plan,
+            context.Fixture.Player);
 
-        if (copperCount > 0) fixture.WithBackpackSlot(0, copperSource, copperCount);
-        if (tinCount > 0) fixture.WithBackpackSlot(1, tinSource, tinCount);
+        Assert.Equal(AlloyDepositResultCode.Success, result);
+        Assert.Equal(5, context.Inventory.CookingSlots[0].StackSize);
+        Assert.Equal(3, context.Fixture.BackpackInventory[0].StackSize);
+    }
 
+    /// <summary>Verifies that a matching cooking-slot excess is returned without rebuilding the slot.</summary>
+    [Fact]
+    public void ExecutePlan_ExcessMatchingIngredient_RemovesOnlyExcess()
+    {
+        VsTestFixture fixture = VsTestFixture.Client();
+        MockItem ingot = CreateItem(fixture, 1, "ingot-copper");
+        MockItem metalBit = CreateItem(fixture, 2, "metalbit-copper");
+        metalBit.CombustibleProps = new CombustibleProperties
+        {
+            SmeltedRatio = 1,
+            SmeltedStack = new JsonItemStack
+            {
+                Code = ingot.Code,
+                ResolvedItemstack = new ItemStack(ingot)
+            }
+        };
         var firepit = new BlockEntityFirepit
         {
             Api = fixture.Api,
@@ -310,79 +217,49 @@ public class AlloyDepositServiceTests
         var inventory = Assert.IsType<InventorySmelting>(firepit.Inventory);
         inventory.Api = fixture.Api;
         inventory.InvNetworkUtil = fixture.InvNetworkUtilMock.Object;
-
-        MockItem crucible = CreateItem(30, "crucible", fixture.Api);
+        MockItem crucible = CreateItem(fixture, 3, "crucible");
         crucible.Attributes = JsonObject.FromJson("{\"cookingContainerSlots\":4,\"maxContainerSlotStackSize\":64}");
         inventory[1].Itemstack = new ItemStack(crucible);
-        foreach (ItemSlot slot in inventory.CookingSlots)
-        {
-            slot.MaxSlotStackSize = 64;
-        }
-
+        inventory.CookingSlots[0].Itemstack = new ItemStack(metalBit, 8);
         fixture.InventoryManagerMock
             .SetupGet(manager => manager.OpenedInventories)
             .Returns([inventory]);
+        var ingredient = new MetalDepositIngredient(ingot.Code, new ItemStack(ingot), 1, 1);
+        var plan = new AlloyDepositPlan([new AlloyDepositSlotTarget(0, ingredient, 5)]);
 
-        var recipe = new AlloyRecipe
-        {
-            Enabled = true,
-            Output = new JsonItemStack
-            {
-                Code = outputIngot.Code,
-                ResolvedItemstack = new ItemStack(outputIngot)
-            },
-            Ingredients =
-            [
-                new MetalAlloyIngredient
-                {
-                    Code = copperIngot.Code,
-                    MinRatio = 0.88f,
-                    MaxRatio = 0.92f,
-                    ResolvedItemstack = new ItemStack(copperIngot)
-                },
-                new MetalAlloyIngredient
-                {
-                    Code = tinIngot.Code,
-                    MinRatio = 0.08f,
-                    MaxRatio = 0.12f,
-                    ResolvedItemstack = new ItemStack(tinIngot)
-                }
-            ]
-        };
+        AlloyDepositResultCode result = AlloyDepositService.ExecutePlan(
+            fixture.ClientApi,
+            firepit,
+            plan,
+            fixture.Player);
 
-        var request = new Packet_RequestAlloyDeposit
-        {
-            RequestId = "request-1",
-            Position = firepit.Pos.Copy(),
-            AlloyCode = outputIngot.Code.ToString(),
-            SlotIndices = [0, 1, 2, 3],
-            SlotIngredientCodes =
-            [
-                copperIngot.Code.ToString(),
-                copperIngot.Code.ToString(),
-                copperIngot.Code.ToString(),
-                tinIngot.Code.ToString()
-            ],
-            SlotAmounts = [3, 3, 3, 1]
-        };
-
-        return new TestContext(fixture, firepit, inventory, recipe, request, copperSource);
+        Assert.Equal(AlloyDepositResultCode.Success, result);
+        Assert.Equal(5, inventory.CookingSlots[0].StackSize);
+        Assert.Equal(3, fixture.BackpackInventory[0].StackSize);
+        fixture.ClientNetworkMock!.Verify(
+            network => network.SendPacketClient(It.IsAny<object>()),
+            Times.Once);
     }
 
-    private static MockItem CreateItem(int id, string path, ICoreAPI api)
+    /// <summary>Creates a stackable test item with a stable game asset code.</summary>
+    private static MockItem CreateItem(VsTestFixture fixture, int id, string path)
     {
-        var item = MockItem.CreateNonLightSource(id, api);
+        MockItem item = fixture.CreateNonLightSource(id);
         item.Code = new AssetLocation("game", path);
         item.MaxStackSize = 64;
         return item;
     }
 
-    private static MockItem CreateSmeltable(int id, string path, MockItem ingot, ICoreAPI api)
+    /// <summary>Creates a client firepit context containing one pure-metal ingredient.</summary>
+    private static TestContext CreateContext(int cookingAmount = 0, int backpackAmount = 0)
     {
-        MockItem item = CreateItem(id, path, api);
-        item.CombustibleProps = new CombustibleProperties
+        VsTestFixture fixture = VsTestFixture.Client();
+        var blockAccessor = new Mock<IBlockAccessor>();
+        fixture.WorldMock.SetupGet(world => world.BlockAccessor).Returns(blockAccessor.Object);
+        MockItem ingot = CreateItem(fixture, 10, "ingot-copper");
+        MockItem metalBit = CreateItem(fixture, 11, "metalbit-copper");
+        metalBit.CombustibleProps = new CombustibleProperties
         {
-            MeltingPoint = 1000,
             SmeltedRatio = 1,
             SmeltedStack = new JsonItemStack
             {
@@ -390,24 +267,30 @@ public class AlloyDepositServiceTests
                 ResolvedItemstack = new ItemStack(ingot)
             }
         };
-        return item;
-    }
-
-    private static void AssertStacksEqual(IReadOnlyList<ItemStack?> expected, IReadOnlyList<ItemStack?> actual)
-    {
-        Assert.Equal(expected.Count, actual.Count);
-        for (int index = 0; index < expected.Count; index++)
+        var firepit = new BlockEntityFirepit
         {
-            Assert.Equal(expected[index]?.Collectible.Code, actual[index]?.Collectible.Code);
-            Assert.Equal(expected[index]?.StackSize, actual[index]?.StackSize);
-        }
+            Api = fixture.Api,
+            Pos = new BlockPos(0)
+        };
+        var inventory = Assert.IsType<InventorySmelting>(firepit.Inventory);
+        inventory.Api = fixture.Api;
+        inventory.InvNetworkUtil = fixture.InvNetworkUtilMock.Object;
+        MockItem crucible = CreateItem(fixture, 12, "crucible");
+        crucible.Attributes = JsonObject.FromJson("{\"cookingContainerSlots\":4,\"maxContainerSlotStackSize\":64}");
+        inventory[1].Itemstack = new ItemStack(crucible);
+        if (cookingAmount > 0) inventory.CookingSlots[0].Itemstack = new ItemStack(metalBit, cookingAmount);
+        if (backpackAmount > 0) fixture.BackpackInventory[0].Itemstack = new ItemStack(metalBit, backpackAmount);
+        fixture.InventoryManagerMock
+            .SetupGet(manager => manager.OpenedInventories)
+            .Returns([inventory]);
+        var ingredient = new MetalDepositIngredient(ingot.Code, new ItemStack(ingot), 1, 1);
+        return new TestContext(fixture, firepit, inventory, ingot, ingredient);
     }
 
     private sealed record TestContext(
         VsTestFixture Fixture,
         BlockEntityFirepit Firepit,
         InventorySmelting Inventory,
-        AlloyRecipe Recipe,
-        Packet_RequestAlloyDeposit Request,
-        MockItem CopperSource);
+        MockItem Ingot,
+        MetalDepositIngredient Ingredient);
 }

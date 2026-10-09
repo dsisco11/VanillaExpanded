@@ -19,6 +19,7 @@ internal sealed class ConfigLibIntegrationModSystem : ModSystem
     internal const string ConfigReloadEvent = "configlib:config-reload";
 
     private ICoreAPI? api;
+    private ConfigLibSavedSelectionRestore? savedSelectionRestore;
 
     public override double ExecuteOrder() => 0.0;
 
@@ -36,6 +37,15 @@ internal sealed class ConfigLibIntegrationModSystem : ModSystem
         api.Event.RegisterEventBusListener(OnConfigLibEvent, filterByEventName: string.Format(ConfigChangedEvent, Constants.ModId));
         api.Event.RegisterEventBusListener(OnConfigLibEvent, filterByEventName: string.Format(ConfigLoadedEvent, Constants.ModId));
         api.Event.RegisterEventBusListener(OnConfigLibEvent, filterByEventName: ConfigReloadEvent);
+        savedSelectionRestore = ConfigLibSavedSelectionRestore.Attach(api);
+    }
+
+    /// <summary>Releases the optional ConfigLib initialization subscription.</summary>
+    public override void Dispose()
+    {
+        savedSelectionRestore?.Dispose();
+        savedSelectionRestore = null;
+        base.Dispose();
     }
 
     private void OnConfigLibEvent(string eventName, ref EnumHandling handling, IAttribute data)

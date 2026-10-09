@@ -5,36 +5,11 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Launch Client (Debug)",
-            "type": "coreclr",
-            "request": "launch",
-            "program": "${env:VINTAGE_STORY}/Vintagestory.exe",
-            "linux": {
-                "program": "${env:VINTAGE_STORY}/Vintagestory"
-            },
-            "osx": {
-                "program": "${env:VINTAGE_STORY}/Vintagestory"
-            },
-            "preLaunchTask": "build",
-            "args": [
-                // "--playStyle" , "preset-surviveandbuild",
-                // "--openWorld" , "modding test world",
-                "--tracelog",
-                "--addModPath",
-                "${workspaceFolder}/VanillaExpanded/bin/Debug/Mods",
-                "--addOrigin",
-                "${workspaceFolder}/VanillaExpanded/assets"
-            ],
-            "console": "internalConsole",
-            "stopAtEntry": false
-        },
-        {
             "name": "Launch Client (RenderDoc)",
             "type": "coreclr",
             "request": "launch",
             "program": "${config:vanillaExpanded.renderdocPath}/renderdoccmd.exe",
-            // "preLaunchTask": "build + tail (RenderDoc)",
-            // "postDebugTask": "stop + scan: VintageStory client-debug.log",
+            "preLaunchTask": "Build (Cake)",
             "args": [
                 "capture",
                 "--wait-for-exit",
@@ -44,6 +19,8 @@
                 "${workspaceFolder}/VanillaExpanded/bin/Debug/Mods",
                 "--addOrigin",
                 "${workspaceFolder}/VanillaExpanded/assets"
+                // "--playStyle" , "preset-surviveandbuild",
+                // "--openWorld" , "modding test world",
             ],
             "cwd": "${env:VINTAGE_STORY}",
             "console": "internalConsole",

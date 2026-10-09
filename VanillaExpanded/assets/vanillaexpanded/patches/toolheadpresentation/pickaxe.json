@@ -1,0 +1,51 @@
+[
+  {
+    "op": "add",
+    "file": "game:itemtypes/tool/pickaxe.json",
+    "path": "/attributes/ve-radial-menu-propertiesByType",
+    "value": {
+      "@pickaxe-(iron|meteoriciron|steel)": {
+        "transform": {
+          "origin": {
+            "x": 1.0,
+            "y": 0.04375,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 1.89
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "*": {
+        "transform": {
+          "origin": {
+            "x": 0.98125,
+            "y": 0.04375,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 1.98
+        },
+        "wedgeRotationDegrees": 0
+      }
+    }
+  }
+]

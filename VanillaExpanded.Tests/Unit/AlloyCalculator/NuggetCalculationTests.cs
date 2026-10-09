@@ -8,6 +8,215 @@ namespace VanillaExpanded.Tests.Unit.AlloyCalculator;
 [Trait("Category", "Unit")]
 public class NuggetCalculationTests
 {
+    #region Waste-Free Target Stepping
+
+    /// <summary>
+    /// Checks strict adjacent targets, off-grid input, and the smallest positive batch.
+    /// </summary>
+    [Theory]
+    [InlineData(100, 90, true, 150)]
+    [InlineData(100, 90, false, 50)]
+    [InlineData(101, 90, true, 150)]
+    [InlineData(101, 90, false, 100)]
+    [InlineData(100, 88, true, 125)]
+    [InlineData(250, 88, false, 125)]
+    [InlineData(125, 88, false, 125)]
+    [InlineData(100, 88, false, 100)]
+    [InlineData(100, 100, true, 105)]
+    [InlineData(100, 100, false, 95)]
+    [InlineData(0, 90, true, 50)]
+    [InlineData(int.MaxValue, 90, true, int.MaxValue)]
+    public void FindAdjacentWasteFreeTarget_ReturnsNearestPositiveTarget(
+        int targetUnits, int percentage, bool increase, int expected)
+    {
+        var percentages = new Dictionary<int, int> { [0] = percentage, [1] = 100 - percentage };
+
+        int result = AlloyCalculatorLogic.FindAdjacentWasteFreeTarget(targetUnits, percentages, increase);
+
+        Assert.Equal(expected, result);
+    }
+
+    /// <summary>
+    /// Verifies all ingredients contribute to the interval and none need rounding.
+    /// </summary>
+    [Fact]
+    public void FindAdjacentWasteFreeTarget_ThreeIngredients_ProducesExactNuggets()
+    {
+        var percentages = new Dictionary<int, int> { [0] = 67, [1] = 22, [2] = 11, [3] = 0 };
+
+        int result = AlloyCalculatorLogic.FindAdjacentWasteFreeTarget(100, percentages, true);
+        var nuggets = AlloyCalculatorLogic.CalculateAllNuggetsRequired(result, percentages);
+
+        Assert.Equal(500, result);
+        Assert.Equal(result, nuggets.Values.Sum() * 5);
+        foreach (var (index, count) in nuggets)
+        {
+            Assert.Equal(result * percentages[index], count * 500);
+        }
+    }
+
+    /// <summary>
+    /// Leaves manual targets intact when there is no configured ingredient ratio.
+    /// </summary>
+    [Fact]
+    public void FindAdjacentWasteFreeTarget_NoPositiveRatios_LeavesTargetUnchanged()
+    {
+        Assert.Equal(100, AlloyCalculatorLogic.FindAdjacentWasteFreeTarget(
+            100, new Dictionary<int, int>(), true));
+        Assert.Equal(100, AlloyCalculatorLogic.FindAdjacentWasteFreeTarget(
+            100, new Dictionary<int, int> { [0] = 0 }, false));
+    }
+
+    #endregion
+
+    #region Recipe-Bounded Targets
+
+    /// <summary>
+    /// Verifies exact-ratio recipes still require exact whole-nugget mixtures.
+    /// </summary>
+    [Fact]
+    public void FindAdjacentWasteFreeTarget_ExactRecipe_RequiresExactMixture()
+    {
+        var percentages = new Dictionary<int, int> { [0] = 12, [1] = 88 };
+        MetalDepositIngredient[] ingredients =
+        [
+            new(new("game:ingot-tin"), null!, 0.12f, 0.12f),
+            new(new("game:ingot-copper"), null!, 0.88f, 0.88f)
+        ];
+
+        int result = AlloyCalculatorLogic.FindAdjacentWasteFreeTarget(100, percentages, true, ingredients);
+
+        Assert.Equal(125, result);
+        Assert.Equal(0, AlloyCalculatorLogic.CalculateWastedMetalUnits(result, percentages, ingredients));
+    }
+
+    /// <summary>
+    /// Checks that three-ingredient allocations remain within all recipe bounds.
+    /// </summary>
+    [Fact]
+    public void CalculateAllNuggetsRequired_ThreeIngredients_RespectsBoundsWithoutExcess()
+    {
+        var percentages = new Dictionary<int, int> { [0] = 67, [1] = 22, [2] = 11 };
+        MetalDepositIngredient[] ingredients =
+        [
+            new(new("game:ingot-copper"), null!, 0.5f, 0.7f),
+            new(new("game:ingot-zinc"), null!, 0.2f, 0.3f),
+            new(new("game:ingot-bismuth"), null!, 0.1f, 0.2f)
+        ];
+
+        var nuggets = AlloyCalculatorLogic.CalculateAllNuggetsRequired(50, percentages, ingredients);
+
+        Assert.Equal(10, nuggets.Values.Sum());
+        foreach (var (index, count) in nuggets)
+        {
+            double ratio = Math.Round((double)count / 10, 4);
+            Assert.InRange(ratio,
+                Math.Round(ingredients[index].MinRatio, 4),
+                Math.Round(ingredients[index].MaxRatio, 4));
+        }
+    }
+
+    /// <summary>
+    /// Checks that the minimum tin-bronze batch is reachable even at the copper slider maximum.
+    /// </summary>
+    [Theory]
+    [InlineData(125, false, 60)]
+    [InlineData(65, false, 60)]
+    [InlineData(60, false, 60)]
+    [InlineData(45, false, 45)]
+    [InlineData(55, true, 60)]
+    [InlineData(60, true, 125)]
+    [InlineData(125, true, 185)]
+    [InlineData(185, true, 250)]
+    [InlineData(250, false, 185)]
+    [InlineData(185, false, 125)]
+    [InlineData(100, true, 125)]
+    [InlineData(100, false, 60)]
+    [InlineData(126, false, 125)]
+    public void FindAdjacentWasteFreeTarget_TinBronzeBounds_ReachesSmallestBatch(
+        int targetUnits, bool increase, int expected)
+    {
+        var percentages = new Dictionary<int, int> { [0] = 92, [1] = 8 };
+        MetalDepositIngredient[] ingredients =
+        [
+            new(new("game:ingot-copper"), null!, 0.88f, 0.92f),
+            new(new("game:ingot-tin"), null!, 0.08f, 0.12f)
+        ];
+
+        int result = AlloyCalculatorLogic.FindAdjacentWasteFreeTarget(
+            targetUnits, percentages, increase, ingredients);
+
+        Assert.Equal(expected, result);
+    }
+
+    /// <summary>
+    /// Verifies the displayed minimum batch uses all its metal and respects the recipe.
+    /// </summary>
+    [Fact]
+    public void CalculateAllNuggetsRequired_TinBronzeMinimumYieldTarget_UsesElevenCopperAndOneTin()
+    {
+        var percentages = new Dictionary<int, int> { [0] = 92, [1] = 8 };
+        MetalDepositIngredient[] ingredients =
+        [
+            new(new("game:ingot-copper"), null!, 0.88f, 0.92f),
+            new(new("game:ingot-tin"), null!, 0.08f, 0.12f)
+        ];
+
+        var nuggets = AlloyCalculatorLogic.CalculateAllNuggetsRequired(60, percentages, ingredients);
+
+        Assert.Equal(11, nuggets[0]);
+        Assert.Equal(1, nuggets[1]);
+        Assert.Equal(0, AlloyCalculatorLogic.CalculateWastedMetalUnits(60, percentages, ingredients));
+        int target = 125;
+        while (target > 60)
+        {
+            int nextTarget = AlloyCalculatorLogic.FindAdjacentWasteFreeTarget(
+                target, percentages, false, ingredients);
+            Assert.True(nextTarget < target);
+            target = nextTarget;
+        }
+        Assert.Equal(60, target);
+    }
+
+    #endregion
+
+    #region Wasted Metal
+
+    /// <summary>
+    /// Checks excess units for clean targets, off-grid targets, and pure metals.
+    /// </summary>
+    [Theory]
+    [InlineData(100, 88, 5)]
+    [InlineData(125, 88, 0)]
+    [InlineData(100, 90, 0)]
+    [InlineData(101, 90, 9)]
+    [InlineData(100, 100, 0)]
+    [InlineData(101, 100, 4)]
+    [InlineData(0, 90, 0)]
+    [InlineData(-100, 90, 0)]
+    [InlineData(int.MaxValue, 100, 3)]
+    public void CalculateWastedMetalUnits_ReturnsRoundedExcess(
+        int targetUnits, int percentage, long expected)
+    {
+        var percentages = new Dictionary<int, int> { [0] = percentage, [1] = 100 - percentage };
+
+        long result = AlloyCalculatorLogic.CalculateWastedMetalUnits(targetUnits, percentages);
+
+        Assert.Equal(expected, result);
+    }
+
+    /// <summary>
+    /// Verifies there is no excess when no ingredients are configured.
+    /// </summary>
+    [Fact]
+    public void CalculateWastedMetalUnits_NoIngredients_ReturnsZero()
+    {
+        Assert.Equal(0, AlloyCalculatorLogic.CalculateWastedMetalUnits(
+            100, new Dictionary<int, int>()));
+    }
+
+    #endregion
+
     #region CalculateNuggetsRequired - Basic Cases
 
     [Fact]

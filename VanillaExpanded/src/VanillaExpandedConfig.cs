@@ -1,4 +1,5 @@
 using System;
+using VanillaExpanded.ItemSlotIndicators;
 
 namespace VanillaExpanded;
 
@@ -10,6 +11,9 @@ namespace VanillaExpanded;
 public class VanillaExpandedConfig
 {
     #region Feature Toggles
+    /// <summary>Protects water sources from bucket spills when source transport is disabled.</summary>
+    public bool EnableBucketSourceProtectionPatch { get; set; } = true;
+
     /// <summary>
     /// Enable auto-stashing items into containers by holding the interact key.
     /// </summary>
@@ -42,14 +46,41 @@ public class VanillaExpandedConfig
     /// </summary>
     public bool EnableEquipLightHotkey { get; set; } = true;
 
-    /// <summary>Enables client-owned temporary quick-tool selections through native inventory flips.</summary>
-    public bool EnableQuickTools { get; set; } = true;
-
     /// <summary>Selects the hovered quick-tool menu entry when its activation key is released.</summary>
     public bool QuickToolSelectOnRelease { get; set; } = true;
 
     /// <summary>Replaces the base-game tool-mode grid with a radial menu.</summary>
     public bool EnableToolModeRadialMenu { get; set; } = true;
+
+    /// <summary>Shows freshness in the selected presentation on perishable item slots.</summary>
+    public bool EnablePerishableItemFreshnessIndicators { get; set; } = true;
+
+    /// <summary>Shows preparation progress indicators on item slots.</summary>
+    public bool EnablePreparationIndicators { get; set; } = true;
+
+    /// <summary>Shows clothing condition indicators on item slots.</summary>
+    public bool EnableClothingIndicators { get; set; } = true;
+
+    /// <summary>Shows liquid volume indicators on container and watering-can item slots.</summary>
+    public bool EnableLiquidContainerIndicators { get; set; } = true;
+    /// <summary>Animates liquid volume indicators; disabling retains plain volume fills.</summary>
+    public bool EnableLiquidSloshEffect { get; set; } = true;
+    /// <summary>Selects progress-bar (default) or animated slot-background food levels.</summary>
+    public string FoodLevelIndicatorStyle { get; set; } = "progress-bar";
+    /// <summary>Resolves persisted style keys and ConfigLib numeric selections.</summary>
+    internal ItemSlotIndicatorRenderingStyle FoodLevelRenderingStyle => FoodLevelIndicatorStyle is "slot-background" or "1"
+        ? ItemSlotIndicatorRenderingStyle.SlotBackground : ItemSlotIndicatorRenderingStyle.HorizontalBar;
+    /// <summary>Runs the food simulation only for the animated background style.</summary>
+    internal bool FoodGrainEffectEnabled => FoodLevelRenderingStyle == ItemSlotIndicatorRenderingStyle.SlotBackground;
+    /// <summary>Shows metal amount in filled crucibles and active firepit input crucibles.</summary>
+    public bool EnableCrucibleIndicators { get; set; } = true;
+    /// <summary>Animates crucible metal; disabling retains the plain amount indicator.</summary>
+    public bool EnableCrucibleEffect { get; set; } = true;
+    /// <summary>Metal units represented by a full crucible indicator; a visual reference, not a game capacity limit.</summary>
+    public float CrucibleIndicatorCapacityUnits { get; set; } = 2560;
+
+    /// <summary>Shows night-vision fuel indicators on item slots.</summary>
+    public bool EnableNightVisionFuelIndicators { get; set; } = true;
 
     #endregion
 
@@ -93,6 +124,27 @@ public class VanillaExpandedConfig
     #endregion
 
     #region Visual Settings (Client-Side)
+    /// <summary>Opacity of the screen backdrop behind radial menus (0 to 1; default 0.2).</summary>
+    public float RadialMenuBackdropOpacity { get; set; } = 0.2f;
+
+    /// <summary>Background opacity of enabled radial-menu entries (0 to 1; default 0.5).</summary>
+    public float RadialMenuOpacity { get; set; } = 0.5f;
+
+    /// <summary>Size multiplier for the tool-mode radial menu (0.15 to 2.5; 1 preserves its default size).</summary>
+    public float ToolModeMenuSize { get; set; } = 1f;
+
+    /// <summary>Option-ring thickness multiplier for tool-mode radial menus (0.15 to 2.5; 1 preserves the default thickness).</summary>
+    public float ToolModeRingSize { get; set; } = 1f;
+
+    /// <summary>Center-circle size multiplier for tool-mode radial menus (0.15 to 2.5; 1 preserves the default size).</summary>
+    public float ToolModeCenterSize { get; set; } = 1f;
+
+    /// <summary>Icon size multiplier within tool-mode radial wedges (0.15 to 2.5; default 0.75).</summary>
+    public float ToolModeIconSize { get; set; } = 0.75f;
+
+    /// <summary>Size multiplier for the quick-swap radial menu (0.15 to 2.5; 1 preserves its default size).</summary>
+    public float QuickSwapMenuSize { get; set; } = 1f;
+
     /// <summary>
     /// Size of the spawn point decal (0.2 to 1.0).
     /// </summary>
@@ -102,5 +154,17 @@ public class VanillaExpandedConfig
     /// Render the auto-stash progress bar above all other base game UI (dialogs, HUD, etc.) instead of behind it.
     /// </summary>
     public bool AutoStashGuiRendersTopmost { get; set; } = true;
+
+    /// <summary>Opacity of perishable item freshness indicators (0.05 to 1.0).</summary>
+    public float PerishableItemFreshnessIndicatorIntensity { get; set; } = 0.35f;
+    /// <summary>ConfigLib freshness mapping key: freshness-background (default), freshness-outline, or freshness-bar.</summary>
+    public string PerishableItemFreshnessIndicatorStyle { get; set; } = "freshness-background";
+    /// <summary>Resolves persisted ConfigLib keys and legacy numeric event values to the rendering contract.</summary>
+    internal ItemSlotIndicatorRenderingStyle FreshnessRenderingStyle => PerishableItemFreshnessIndicatorStyle switch
+    {
+        "freshness-outline" or "1" => ItemSlotIndicatorRenderingStyle.SlotOutline,
+        "freshness-bar" or "2" => ItemSlotIndicatorRenderingStyle.HorizontalBar,
+        _ => ItemSlotIndicatorRenderingStyle.SlotBackground
+    };
     #endregion
 }

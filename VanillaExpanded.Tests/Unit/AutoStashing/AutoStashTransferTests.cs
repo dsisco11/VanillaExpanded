@@ -1,7 +1,10 @@
+using VanillaExpanded.AutoStashing.Planning;
+using VanillaExpanded.AutoStashing.Targets;
 using Moq;
 
 using VanillaExpanded.AutoStashing;
 using VanillaExpanded.Tests.Mocks;
+using VanillaExpanded.Tests.Unit.AutoStashing.Support;
 
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -15,8 +18,16 @@ namespace VanillaExpanded.Tests.Unit.AutoStashing;
 /// Covers scenarios for stashing items from player inventory to containers/crates.
 /// </summary>
 [Trait("Category", "Unit")]
-public class AutoStashTransferTests
+[Collection("AutoStash")]
+public class AutoStashTransferTests : IDisposable
 {
+    private readonly VanillaExpanded.Tests.Unit.AutoStashing.Support.AutoStashTestScope scope = new();
+
+    #region Public API
+
+    /// <summary>Restores AutoStash settings after each test.</summary>
+    public void Dispose() => scope.Dispose();
+    /// <summary>Verifies the session or capacity contract.</summary>
     [Theory]
     [InlineData(true, false, 1)]
     [InlineData(true, true, 0)]
@@ -33,10 +44,17 @@ public class AutoStashTransferTests
         fixture.InventoryManagerMock.Setup(manager => manager.OpenedInventories)
             .Returns(alreadyOpen ? new List<IInventory> { container.Inventory } : new List<IInventory>());
 
-        int moved = AutoStashTransferService.AutoStashToInventory(
-            fixture.World, fixture.Player, "test-player", container.Inventory,
-            new BlockPos(0), "test-container", _ => true,
-            manageInventorySession: manageSession);
+        var before = new InventorySnapshot(fixture.BackpackInventory, fixture.HotbarInventory, container.Inventory);
+
+        var target = new Mock<InventoryAutoStashTarget>(container.Inventory) { CallBase = true };
+        if (!manageSession)
+        {
+            target.Setup(value => value.Acquire(It.IsAny<IPlayerInventoryManager>()));
+            target.Setup(value => value.Release(It.IsAny<IPlayerInventoryManager>()));
+        }
+        int moved = AutoStashService.Execute(
+            fixture.World, fixture.Player, "test-player", target.Object,
+            new BlockPos(0), "test-container", new MatchingContentsPolicy(_ => true)).MovedQuantity;
 
         Assert.Equal(10, moved);
         Assert.Equal(initialQuantity + 10, container.Inventory[0].StackSize);
@@ -44,8 +62,11 @@ public class AutoStashTransferTests
         Assert.True(fixture.HotbarInventory[0].Empty);
         fixture.InventoryManagerMock.Verify(manager => manager.OpenInventory(container.Inventory), Times.Exactly(expectedLifecycleCalls));
         fixture.InventoryManagerMock.Verify(manager => manager.CloseInventoryAndSync(container.Inventory), Times.Exactly(expectedLifecycleCalls));
+        before.AssertUnchangedExcept(fixture.BackpackInventory[0], fixture.HotbarInventory[0], container.Inventory[0]);
+        before.AssertConserved();
     }
 
+    /// <summary>Verifies the session or capacity contract.</summary>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -62,16 +83,22 @@ public class AutoStashTransferTests
             container.Inventory[0].Itemstack!.StackSize = 64;
         }
 
-        int moved = AutoStashTransferService.AutoStashToInventory(
-            fixture.World, fixture.Player, "test-player", container.Inventory,
-            new BlockPos(0), "test-container", _ => full);
+        var before = new InventorySnapshot(fixture.BackpackInventory, fixture.HotbarInventory, container.Inventory);
+
+        int moved = AutoStashService.Execute(
+            fixture.World, fixture.Player, "test-player", new InventoryAutoStashTarget(container.Inventory),
+            new BlockPos(0), "test-container", new MatchingContentsPolicy(_ => full)).MovedQuantity;
 
         Assert.Equal(0, moved);
         Assert.Equal(7, fixture.BackpackInventory[0].StackSize);
         fixture.InventoryManagerMock.Verify(manager => manager.OpenInventory(container.Inventory), Times.Never);
         fixture.InventoryManagerMock.Verify(manager => manager.CloseInventoryAndSync(container.Inventory), Times.Never);
+        before.AssertUnchangedExcept();
+        before.AssertConserved();
+        container.BlockEntityMock.Verify(entity => entity.MarkDirty(It.IsAny<bool>(), It.IsAny<IPlayer>()), Times.Never);
     }
 
+    /// <summary>Verifies RefreshWorkspaceSlots RepeatedReloads UpdateContentsWithoutReplacingSlots.</summary>
     [Fact]
     public void RefreshWorkspaceSlots_RepeatedReloads_UpdateContentsWithoutReplacingSlots()
     {
@@ -83,7 +110,7 @@ public class AutoStashTransferTests
         firstSlot.Itemstack = originalStack;
         secondSlot.Itemstack = originalStack.Clone();
 
-        EntityAttachedContainerAutoStash.RefreshWorkspaceSlots(inventory,
+        AttachedBagAutoStashTarget.RefreshWorkspaceSlots(inventory,
             new ItemSlot[] { new DummySlot(updatedStack), new DummySlot(null) });
 
         Assert.Same(firstSlot, inventory[0]);
@@ -91,7 +118,7 @@ public class AutoStashTransferTests
         Assert.Same(updatedStack, firstSlot.Itemstack);
         Assert.True(secondSlot.Empty);
 
-        EntityAttachedContainerAutoStash.RefreshWorkspaceSlots(inventory,
+        AttachedBagAutoStashTarget.RefreshWorkspaceSlots(inventory,
             new ItemSlot[] { new DummySlot(null), new DummySlot(originalStack) });
 
         Assert.Same(firstSlot, inventory[0]);
@@ -100,38 +127,10 @@ public class AutoStashTransferTests
         Assert.Same(originalStack, secondSlot.Itemstack);
     }
 
-    #region Test Infrastructure
-
-    /// <summary>
-    /// Creates a VsTestFixture configured for server-side AutoStashing tests.
-    /// </summary>
-    private static VsTestFixture CreateFixture(
-        MockItem[]? backpackItems = null,
-        MockItem[]? hotbarItems = null)
-    {
-        var fixture = VsTestFixture.Server();
-
-        if (backpackItems is not null)
-        {
-            fixture.WithBackpackItems(backpackItems);
-        }
-
-        if (hotbarItems is not null)
-        {
-            // AutoStash tests use hotbar slots starting at 0 (unlike EquipLightSource which uses slot 0 as active)
-            for (int i = 0; i < hotbarItems.Length && i < fixture.HotbarInventory.Count; i++)
-            {
-                fixture.WithHotbarSlot(i, hotbarItems[i]);
-            }
-        }
-
-        return fixture;
-    }
-
-    #endregion
 
     #region Timing Constants Tests
 
+    /// <summary>Verifies StashDelaySeconds HasExpectedDefaultValue.</summary>
     [Fact]
     public void StashDelaySeconds_HasExpectedDefaultValue()
     {
@@ -142,6 +141,7 @@ public class AutoStashTransferTests
         Assert.Equal(0.5f, behavior.StashDelaySeconds);
     }
 
+    /// <summary>Verifies PreStashGracePeriodSeconds HasExpectedValue.</summary>
     [Fact]
     public void PreStashGracePeriodSeconds_HasExpectedValue()
     {
@@ -149,6 +149,7 @@ public class AutoStashTransferTests
         Assert.Equal(0.1f, BlockBehaviorAutoStashable.PreStashGracePeriodSeconds);
     }
 
+    /// <summary>Verifies PostStashGracePeriodSeconds HasExpectedValue.</summary>
     [Fact]
     public void PostStashGracePeriodSeconds_HasExpectedValue()
     {
@@ -156,6 +157,7 @@ public class AutoStashTransferTests
         Assert.Equal(0.4f, BlockBehaviorAutoStashable.PostStashGracePeriodSeconds);
     }
 
+    /// <summary>Verifies TotalStashDuration SumOfDelayAndGracePeriods.</summary>
     [Fact]
     public void TotalStashDuration_SumOfDelayAndGracePeriods()
     {
@@ -167,6 +169,7 @@ public class AutoStashTransferTests
         Assert.Equal(0.9f, expectedTotal);
     }
 
+    /// <summary>Verifies PreStashGracePeriod IsLessThanStashDelay.</summary>
     [Fact]
     public void PreStashGracePeriod_IsLessThanStashDelay()
     {
@@ -178,6 +181,7 @@ public class AutoStashTransferTests
         Assert.True(BlockBehaviorAutoStashable.PreStashGracePeriodSeconds < behavior.StashDelaySeconds);
     }
 
+    /// <summary>Verifies TimingConstants ArePositive.</summary>
     [Fact]
     public void TimingConstants_ArePositive()
     {
@@ -194,6 +198,7 @@ public class AutoStashTransferTests
 
     #region AutoStashToGenericContainer - Empty/No Match Tests
 
+    /// <summary>Verifies AutoStashToGenericContainer EmptyContainer ReturnsFalse.</summary>
     [Fact]
     public void AutoStashToGenericContainer_EmptyContainer_ReturnsFalse()
     {
@@ -203,6 +208,8 @@ public class AutoStashTransferTests
 
         var container = MockBlockEntityContainer.Empty();
 
+        var before = new InventorySnapshot(fixture.BackpackInventory, fixture.HotbarInventory, container.Inventory);
+
         // Act
         bool result = BlockBehaviorAutoStashable.AutoStashToGenericContainer(
             fixture.World,
@@ -211,8 +218,14 @@ public class AutoStashTransferTests
 
         // Assert - Should return false (empty container has no item types to match)
         Assert.False(result);
+        before.AssertUnchangedExcept();
+        before.AssertConserved();
+        container.BlockEntityMock.Verify(entity => entity.MarkDirty(It.IsAny<bool>(), It.IsAny<IPlayer>()), Times.Never);
+        fixture.InventoryManagerMock.Verify(manager => manager.OpenInventory(container.Inventory), Times.Never);
+        fixture.InventoryManagerMock.Verify(manager => manager.CloseInventoryAndSync(container.Inventory), Times.Never);
     }
 
+    /// <summary>Verifies AutoStashToGenericContainer NoMatchingItems ReturnsFalse.</summary>
     [Fact]
     public void AutoStashToGenericContainer_NoMatchingItems_ReturnsFalse()
     {
@@ -228,6 +241,8 @@ public class AutoStashTransferTests
 
         var container = MockBlockEntityContainer.WithItems(fixture.Api, containerItem);
 
+        var before = new InventorySnapshot(fixture.BackpackInventory, fixture.HotbarInventory, container.Inventory);
+
         // Act
         bool result = BlockBehaviorAutoStashable.AutoStashToGenericContainer(
             fixture.World,
@@ -236,8 +251,14 @@ public class AutoStashTransferTests
 
         // Assert - Should return false (no matching item types)
         Assert.False(result);
+        before.AssertUnchangedExcept();
+        before.AssertConserved();
+        container.BlockEntityMock.Verify(entity => entity.MarkDirty(It.IsAny<bool>(), It.IsAny<IPlayer>()), Times.Never);
+        fixture.InventoryManagerMock.Verify(manager => manager.OpenInventory(container.Inventory), Times.Never);
+        fixture.InventoryManagerMock.Verify(manager => manager.CloseInventoryAndSync(container.Inventory), Times.Never);
     }
 
+    /// <summary>Verifies GetStashableItems FullMatchingContainer ReturnsEmptySet.</summary>
     [Fact]
     public void GetStashableItems_FullMatchingContainer_ReturnsEmptySet()
     {
@@ -254,6 +275,8 @@ public class AutoStashTransferTests
             api: fixture.Api);
         container.Inventory[0].Itemstack!.StackSize = sharedItem.MaxStackSize;
 
+        var before = new InventorySnapshot(fixture.BackpackInventory, fixture.HotbarInventory, container.Inventory);
+
         // Act
         HashSet<int> result = BlockBehaviorAutoStashable.GetStashableItems(
             fixture.Player,
@@ -264,8 +287,12 @@ public class AutoStashTransferTests
         fixture.InventoryManagerMock.Verify(
             inventoryManager => inventoryManager.OpenInventory(container.Inventory),
             Times.Never);
+        before.AssertUnchangedExcept();
+        before.AssertConserved();
+        container.BlockEntityMock.Verify(entity => entity.MarkDirty(It.IsAny<bool>(), It.IsAny<IPlayer>()), Times.Never);
     }
 
+    /// <summary>Verifies AutoStashToGenericContainer PlayerInventoryEmpty ReturnsFalse.</summary>
     [Fact]
     public void AutoStashToGenericContainer_PlayerInventoryEmpty_ReturnsFalse()
     {
@@ -277,6 +304,8 @@ public class AutoStashTransferTests
 
         var container = MockBlockEntityContainer.WithItems(fixture.Api, containerItem);
 
+        var before = new InventorySnapshot(fixture.BackpackInventory, fixture.HotbarInventory, container.Inventory);
+
         // Act
         bool result = BlockBehaviorAutoStashable.AutoStashToGenericContainer(
             fixture.World,
@@ -285,12 +314,18 @@ public class AutoStashTransferTests
 
         // Assert - Should return false (player has no items to stash)
         Assert.False(result);
+        before.AssertUnchangedExcept();
+        before.AssertConserved();
+        container.BlockEntityMock.Verify(entity => entity.MarkDirty(It.IsAny<bool>(), It.IsAny<IPlayer>()), Times.Never);
+        fixture.InventoryManagerMock.Verify(manager => manager.OpenInventory(container.Inventory), Times.Never);
+        fixture.InventoryManagerMock.Verify(manager => manager.CloseInventoryAndSync(container.Inventory), Times.Never);
     }
 
     #endregion
 
     #region AutoStashToGenericContainer - Successful Stash Tests
 
+    /// <summary>Verifies AutoStashToGenericContainer MatchingItemsInBackpack StashesToContainer.</summary>
     [Fact]
     public void AutoStashToGenericContainer_MatchingItemsInBackpack_StashesToContainer()
     {
@@ -302,7 +337,9 @@ public class AutoStashTransferTests
             backpackItems: [sharedItem]);
 
         var container = MockBlockEntityContainer.WithItems(fixture.Api, sharedItem);
-        int initialContainerCount = container.GetNonEmptyStacks().Length;
+
+
+        var before = new InventorySnapshot(fixture.BackpackInventory, fixture.HotbarInventory, container.Inventory);
 
         // Act
         bool result = BlockBehaviorAutoStashable.AutoStashToGenericContainer(
@@ -320,8 +357,14 @@ public class AutoStashTransferTests
         fixture.InventoryManagerMock.Verify(
             inventoryManager => inventoryManager.CloseInventoryAndSync(container.Inventory),
             Times.Once);
+        before.AssertUnchangedExcept(fixture.BackpackInventory[0], container.Inventory[0]);
+        before.AssertConserved();
+        InventorySnapshot.AssertStack(container.Inventory[0], sharedItem, 2);
+        fixture.InventoryManagerMock.Verify(manager => manager.OpenInventory(container.Inventory), Times.Once);
+        fixture.InventoryManagerMock.Verify(manager => manager.CloseInventoryAndSync(container.Inventory), Times.Once);
     }
 
+    /// <summary>Verifies AutoStashToGenericContainer DoesNotUseClientTransferApi.</summary>
     [Fact]
     public void AutoStashToGenericContainer_DoesNotUseClientTransferApi()
     {
@@ -339,6 +382,8 @@ public class AutoStashTransferTests
                 It.IsAny<ItemSlot>(),
                 ref It.Ref<ItemStackMoveOperation>.IsAny))
             .Throws(new InvalidOperationException("Client transfer API must not be used server-side."));
+
+        var before = new InventorySnapshot(fixture.BackpackInventory, fixture.HotbarInventory, container.Inventory);
 
         // Act
         bool result = BlockBehaviorAutoStashable.AutoStashToGenericContainer(
@@ -358,8 +403,15 @@ public class AutoStashTransferTests
         fixture.InventoryManagerMock.Verify(
             inventoryManager => inventoryManager.CloseInventoryAndSync(container.Inventory),
             Times.Once);
+        before.AssertUnchangedExcept(fixture.BackpackInventory[0], container.Inventory[0]);
+        before.AssertConserved();
+        InventorySnapshot.AssertStack(container.Inventory[0], sharedItem, 2);
+        fixture.InventoryManagerMock.Verify(manager => manager.OpenInventory(container.Inventory), Times.Once);
+        fixture.InventoryManagerMock.Verify(manager => manager.CloseInventoryAndSync(container.Inventory), Times.Once);
+        container.BlockEntityMock.Verify(entity => entity.MarkDirty(false, null!), Times.Once);
     }
 
+    /// <summary>Verifies AutoStashToGenericContainer MatchingItemsInHotbar StashesToContainer.</summary>
     [Fact]
     public void AutoStashToGenericContainer_MatchingItemsInHotbar_StashesToContainer()
     {
@@ -372,6 +424,8 @@ public class AutoStashTransferTests
 
         var container = MockBlockEntityContainer.WithItems(fixture.Api, sharedItem);
 
+        var before = new InventorySnapshot(fixture.BackpackInventory, fixture.HotbarInventory, container.Inventory);
+
         // Act
         bool result = BlockBehaviorAutoStashable.AutoStashToGenericContainer(
             fixture.World,
@@ -381,8 +435,15 @@ public class AutoStashTransferTests
         // Assert
         Assert.True(result);
         Assert.True(fixture.HotbarInventory[0].Empty);
+        before.AssertUnchangedExcept(fixture.HotbarInventory[0], container.Inventory[0]);
+        before.AssertConserved();
+        InventorySnapshot.AssertStack(container.Inventory[0], sharedItem, 2);
+        fixture.InventoryManagerMock.Verify(manager => manager.OpenInventory(container.Inventory), Times.Once);
+        fixture.InventoryManagerMock.Verify(manager => manager.CloseInventoryAndSync(container.Inventory), Times.Once);
+        container.BlockEntityMock.Verify(entity => entity.MarkDirty(false, null!), Times.Once);
     }
 
+    /// <summary>Verifies AutoStashToGenericContainer ItemsInBothInventories StashesBoth.</summary>
     [Fact]
     public void AutoStashToGenericContainer_ItemsInBothInventories_StashesBoth()
     {
@@ -390,17 +451,18 @@ public class AutoStashTransferTests
         var sharedItem1 = MockItem.CreateNonLightSource(id: 1);
         sharedItem1.Code = new AssetLocation("game", "shared-item");
 
-        var sharedItem2 = MockItem.CreateNonLightSource(id: 2);
+        var sharedItem2 = sharedItem1;
         sharedItem2.Code = new AssetLocation("game", "shared-item"); // Same code
 
         var fixture = CreateFixture(
             backpackItems: [sharedItem1],
             hotbarItems: [sharedItem2]);
 
-        var containerItem = MockItem.CreateNonLightSource(id: 3);
-        containerItem.Code = new AssetLocation("game", "shared-item");
+        var containerItem = sharedItem1;
 
         var container = MockBlockEntityContainer.WithItems(fixture.Api, containerItem);
+
+        var before = new InventorySnapshot(fixture.BackpackInventory, fixture.HotbarInventory, container.Inventory);
 
         // Act
         bool result = BlockBehaviorAutoStashable.AutoStashToGenericContainer(
@@ -412,8 +474,15 @@ public class AutoStashTransferTests
         Assert.True(result);
         Assert.True(fixture.BackpackInventory[0].Empty);
         Assert.True(fixture.HotbarInventory[0].Empty);
+        before.AssertUnchangedExcept(fixture.BackpackInventory[0], fixture.HotbarInventory[0], container.Inventory[0]);
+        before.AssertConserved();
+        InventorySnapshot.AssertStack(container.Inventory[0], sharedItem1, 3);
+        fixture.InventoryManagerMock.Verify(manager => manager.OpenInventory(container.Inventory), Times.Once);
+        fixture.InventoryManagerMock.Verify(manager => manager.CloseInventoryAndSync(container.Inventory), Times.Once);
+        container.BlockEntityMock.Verify(entity => entity.MarkDirty(false, null!), Times.Once);
     }
 
+    /// <summary>Verifies AutoStashToGenericContainer FirstSlotPartiallyFull UsesAdditionalSlot.</summary>
     [Fact]
     public void AutoStashToGenericContainer_FirstSlotPartiallyFull_UsesAdditionalSlot()
     {
@@ -431,6 +500,8 @@ public class AutoStashTransferTests
             api: fixture.Api);
         container.Inventory[0].Itemstack!.StackSize = 63;
 
+        var before = new InventorySnapshot(fixture.BackpackInventory, fixture.HotbarInventory, container.Inventory);
+
         // Act
         bool result = BlockBehaviorAutoStashable.AutoStashToGenericContainer(
             fixture.World,
@@ -442,8 +513,14 @@ public class AutoStashTransferTests
         Assert.Equal(64, container.Inventory[0].StackSize);
         Assert.Equal(9, container.Inventory[1].StackSize);
         Assert.True(fixture.BackpackInventory[0].Empty);
+        before.AssertUnchangedExcept(fixture.BackpackInventory[0], container.Inventory[0], container.Inventory[1]);
+        before.AssertConserved();
+        fixture.InventoryManagerMock.Verify(manager => manager.OpenInventory(container.Inventory), Times.Once);
+        fixture.InventoryManagerMock.Verify(manager => manager.CloseInventoryAndSync(container.Inventory), Times.Once);
+        container.BlockEntityMock.Verify(entity => entity.MarkDirty(false, null!), Times.Once);
     }
 
+    /// <summary>Verifies AutoStashToGenericContainer FirstMatchingSlotFull UsesAvailableMatchingSlot.</summary>
     [Fact]
     public void AutoStashToGenericContainer_FirstMatchingSlotFull_UsesAvailableMatchingSlot()
     {
@@ -462,6 +539,8 @@ public class AutoStashTransferTests
         container.Inventory[0].Itemstack!.StackSize = 64;
         container.Inventory[1].Itemstack!.StackSize = 60;
 
+        var before = new InventorySnapshot(fixture.BackpackInventory, fixture.HotbarInventory, container.Inventory);
+
         // Act
         bool result = BlockBehaviorAutoStashable.AutoStashToGenericContainer(
             fixture.World,
@@ -474,8 +553,14 @@ public class AutoStashTransferTests
         Assert.Equal(64, container.Inventory[1].StackSize);
         Assert.Equal(6, container.Inventory[2].StackSize);
         Assert.True(fixture.BackpackInventory[0].Empty);
+        before.AssertUnchangedExcept(fixture.BackpackInventory[0], container.Inventory[0], container.Inventory[1], container.Inventory[2]);
+        before.AssertConserved();
+        fixture.InventoryManagerMock.Verify(manager => manager.OpenInventory(container.Inventory), Times.Once);
+        fixture.InventoryManagerMock.Verify(manager => manager.CloseInventoryAndSync(container.Inventory), Times.Once);
+        container.BlockEntityMock.Verify(entity => entity.MarkDirty(false, null!), Times.Once);
     }
 
+    /// <summary>Verifies AutoStashToGenericContainer MultipleMatchingTypes StashesAll.</summary>
     [Fact]
     public void AutoStashToGenericContainer_MultipleMatchingTypes_StashesAll()
     {
@@ -486,10 +571,10 @@ public class AutoStashTransferTests
         var itemB = MockItem.CreateNonLightSource(id: 2);
         itemB.Code = new AssetLocation("game", "item-b");
 
-        var playerItemA = MockItem.CreateNonLightSource(id: 3);
+        var playerItemA = itemA;
         playerItemA.Code = new AssetLocation("game", "item-a");
 
-        var playerItemB = MockItem.CreateNonLightSource(id: 4);
+        var playerItemB = itemB;
         playerItemB.Code = new AssetLocation("game", "item-b");
 
         var fixture = CreateFixture(
@@ -497,6 +582,8 @@ public class AutoStashTransferTests
 
         var container = MockBlockEntityContainer.WithItems(
             new Dictionary<int, MockItem> { { 0, itemA }, { 1, itemB } }, api: fixture.Api);
+
+        var before = new InventorySnapshot(fixture.BackpackInventory, fixture.HotbarInventory, container.Inventory);
 
         // Act
         bool result = BlockBehaviorAutoStashable.AutoStashToGenericContainer(
@@ -508,8 +595,16 @@ public class AutoStashTransferTests
         Assert.True(result);
         Assert.True(fixture.BackpackInventory[0].Empty);
         Assert.True(fixture.BackpackInventory[1].Empty);
+        before.AssertUnchangedExcept(fixture.BackpackInventory[0], fixture.BackpackInventory[1], container.Inventory[0], container.Inventory[1]);
+        before.AssertConserved();
+        InventorySnapshot.AssertStack(container.Inventory[0], itemA, 2);
+        InventorySnapshot.AssertStack(container.Inventory[1], itemB, 2);
+        fixture.InventoryManagerMock.Verify(manager => manager.OpenInventory(container.Inventory), Times.Once);
+        fixture.InventoryManagerMock.Verify(manager => manager.CloseInventoryAndSync(container.Inventory), Times.Once);
+        container.BlockEntityMock.Verify(entity => entity.MarkDirty(false, null!), Times.Once);
     }
 
+    /// <summary>Verifies AutoStashToGenericContainer OnlyMatchingTypesStashed NonMatchingRemains.</summary>
     [Fact]
     public void AutoStashToGenericContainer_OnlyMatchingTypesStashed_NonMatchingRemains()
     {
@@ -523,10 +618,11 @@ public class AutoStashTransferTests
         var fixture = CreateFixture(
             backpackItems: [matchingItem, nonMatchingItem]);
 
-        var containerItem = MockItem.CreateNonLightSource(id: 3);
-        containerItem.Code = new AssetLocation("game", "matching-item");
+        var containerItem = matchingItem;
 
         var container = MockBlockEntityContainer.WithItems(fixture.Api, containerItem);
+
+        var before = new InventorySnapshot(fixture.BackpackInventory, fixture.HotbarInventory, container.Inventory);
 
         // Act
         bool result = BlockBehaviorAutoStashable.AutoStashToGenericContainer(
@@ -539,12 +635,19 @@ public class AutoStashTransferTests
         Assert.True(fixture.BackpackInventory[0].Empty); // Matching item stashed
         Assert.False(fixture.BackpackInventory[1].Empty); // Non-matching item remains
         Assert.Equal("non-matching-item", fixture.BackpackInventory[1].Itemstack.Collectible.Code.Path);
+        before.AssertUnchangedExcept(fixture.BackpackInventory[0], container.Inventory[0]);
+        before.AssertConserved();
+        InventorySnapshot.AssertStack(container.Inventory[0], matchingItem, 2);
+        fixture.InventoryManagerMock.Verify(manager => manager.OpenInventory(container.Inventory), Times.Once);
+        fixture.InventoryManagerMock.Verify(manager => manager.CloseInventoryAndSync(container.Inventory), Times.Once);
+        container.BlockEntityMock.Verify(entity => entity.MarkDirty(false, null!), Times.Once);
     }
 
     #endregion
 
     #region AutoStashToCrate - Empty/No Match Tests
 
+    /// <summary>Verifies AutoStashToCrate EmptyCrate ReturnsFalse.</summary>
     [Fact]
     public void AutoStashToCrate_EmptyCrate_ReturnsFalse()
     {
@@ -554,6 +657,8 @@ public class AutoStashTransferTests
 
         var crate = MockBlockEntityCrate.Empty(api: fixture.Api);
 
+        var before = new InventorySnapshot(fixture.BackpackInventory, fixture.HotbarInventory, crate.Inventory);
+
         // Act
         bool result = BlockBehaviorAutoStashable.AutoStashToCrate(
             fixture.World,
@@ -562,8 +667,14 @@ public class AutoStashTransferTests
 
         // Assert - Should return false (empty crate has no accepted item type)
         Assert.False(result);
+        before.AssertUnchangedExcept();
+        before.AssertConserved();
+        crate.BlockEntityMock.Verify(entity => entity.MarkDirty(It.IsAny<bool>(), It.IsAny<IPlayer>()), Times.Never);
+        fixture.InventoryManagerMock.Verify(manager => manager.OpenInventory(crate.Inventory), Times.Never);
+        fixture.InventoryManagerMock.Verify(manager => manager.CloseInventoryAndSync(crate.Inventory), Times.Never);
     }
 
+    /// <summary>Verifies AutoStashToCrate PlayerHasDifferentItems ReturnsFalse.</summary>
     [Fact]
     public void AutoStashToCrate_PlayerHasDifferentItems_ReturnsFalse()
     {
@@ -579,6 +690,8 @@ public class AutoStashTransferTests
 
         var crate = MockBlockEntityCrate.WithSingleItemType(crateItem, api: fixture.Api);
 
+        var before = new InventorySnapshot(fixture.BackpackInventory, fixture.HotbarInventory, crate.Inventory);
+
         // Act
         bool result = BlockBehaviorAutoStashable.AutoStashToCrate(
             fixture.World,
@@ -587,12 +700,18 @@ public class AutoStashTransferTests
 
         // Assert
         Assert.False(result);
+        before.AssertUnchangedExcept();
+        before.AssertConserved();
+        crate.BlockEntityMock.Verify(entity => entity.MarkDirty(It.IsAny<bool>(), It.IsAny<IPlayer>()), Times.Never);
+        fixture.InventoryManagerMock.Verify(manager => manager.OpenInventory(crate.Inventory), Times.Never);
+        fixture.InventoryManagerMock.Verify(manager => manager.CloseInventoryAndSync(crate.Inventory), Times.Never);
     }
 
     #endregion
 
     #region AutoStashToCrate - Successful Stash Tests
 
+    /// <summary>Verifies AutoStashToCrate MatchingItems StashesToCrate.</summary>
     [Fact]
     public void AutoStashToCrate_MatchingItems_StashesToCrate()
     {
@@ -600,13 +719,14 @@ public class AutoStashTransferTests
         var sharedItem = MockItem.CreateNonLightSource(id: 1);
         sharedItem.Code = new AssetLocation("game", "shared-item");
 
-        var playerItem = MockItem.CreateNonLightSource(id: 2);
-        playerItem.Code = new AssetLocation("game", "shared-item"); // Same code
+        var playerItem = sharedItem;
 
         var fixture = CreateFixture(
             backpackItems: [playerItem]);
 
         var crate = MockBlockEntityCrate.WithSingleItemType(sharedItem, api: fixture.Api);
+
+        var before = new InventorySnapshot(fixture.BackpackInventory, fixture.HotbarInventory, crate.Inventory);
 
         // Act
         bool result = BlockBehaviorAutoStashable.AutoStashToCrate(
@@ -620,8 +740,14 @@ public class AutoStashTransferTests
         crate.BlockEntityMock.Verify(
             blockEntity => blockEntity.MarkDirty(false, null!),
             Times.Once);
+        before.AssertUnchangedExcept(fixture.BackpackInventory[0], crate.Inventory[0]);
+        before.AssertConserved();
+        InventorySnapshot.AssertStack(crate.Inventory[0], sharedItem, 2);
+        fixture.InventoryManagerMock.Verify(manager => manager.OpenInventory(crate.Inventory), Times.Once);
+        fixture.InventoryManagerMock.Verify(manager => manager.CloseInventoryAndSync(crate.Inventory), Times.Once);
     }
 
+    /// <summary>Verifies AutoStashToCrate MultipleItemTypes OnlyMatchingTypeStashed.</summary>
     [Fact]
     public void AutoStashToCrate_MultipleItemTypes_OnlyMatchingTypeStashed()
     {
@@ -629,8 +755,7 @@ public class AutoStashTransferTests
         var crateItem = MockItem.CreateNonLightSource(id: 1);
         crateItem.Code = new AssetLocation("game", "crate-accepted");
 
-        var matchingItem = MockItem.CreateNonLightSource(id: 2);
-        matchingItem.Code = new AssetLocation("game", "crate-accepted");
+        var matchingItem = crateItem;
 
         var nonMatchingItem = MockItem.CreateNonLightSource(id: 3);
         nonMatchingItem.Code = new AssetLocation("game", "not-accepted");
@@ -639,6 +764,8 @@ public class AutoStashTransferTests
             backpackItems: [matchingItem, nonMatchingItem]);
 
         var crate = MockBlockEntityCrate.WithSingleItemType(crateItem, api: fixture.Api);
+
+        var before = new InventorySnapshot(fixture.BackpackInventory, fixture.HotbarInventory, crate.Inventory);
 
         // Act
         bool result = BlockBehaviorAutoStashable.AutoStashToCrate(
@@ -650,12 +777,19 @@ public class AutoStashTransferTests
         Assert.True(result);
         Assert.True(fixture.BackpackInventory[0].Empty); // Matching stashed
         Assert.False(fixture.BackpackInventory[1].Empty); // Non-matching remains
+        before.AssertUnchangedExcept(fixture.BackpackInventory[0], crate.Inventory[0]);
+        before.AssertConserved();
+        InventorySnapshot.AssertStack(crate.Inventory[0], crateItem, 2);
+        fixture.InventoryManagerMock.Verify(manager => manager.OpenInventory(crate.Inventory), Times.Once);
+        fixture.InventoryManagerMock.Verify(manager => manager.CloseInventoryAndSync(crate.Inventory), Times.Once);
+        crate.BlockEntityMock.Verify(entity => entity.MarkDirty(false, null!), Times.Once);
     }
 
     #endregion
 
     #region Bloomery Transfer Tests
 
+    /// <summary>Verifies AutoStashToBloomery EmptyFuelSlot MovesUpToFuelCapacity.</summary>
     [Fact]
     public void AutoStashToBloomery_EmptyFuelSlot_MovesUpToFuelCapacity()
     {
@@ -679,6 +813,7 @@ public class AutoStashTransferTests
         Assert.Equal(4, fixture.BackpackInventory[0].StackSize);
     }
 
+    /// <summary>Verifies AutoStashToBloomery OreWithRatioTwo MovesTwelveItems.</summary>
     [Fact]
     public void AutoStashToBloomery_OreWithRatioTwo_MovesTwelveItems()
     {
@@ -702,6 +837,7 @@ public class AutoStashTransferTests
         Assert.Equal(8, fixture.BackpackInventory[0].StackSize);
     }
 
+    /// <summary>Verifies AutoStashToBloomery ExistingOreHasZeroRatio UsesMinimumRatio.</summary>
     [Fact]
     public void AutoStashToBloomery_ExistingOreHasZeroRatio_UsesMinimumRatio()
     {
@@ -732,6 +868,7 @@ public class AutoStashTransferTests
 
     #region GetStashableItems Tests
 
+    /// <summary>Verifies GetStashableItems NullContainer ReturnsEmptySet.</summary>
     [Fact]
     public void GetStashableItems_NullContainer_ReturnsEmptySet()
     {
@@ -748,6 +885,7 @@ public class AutoStashTransferTests
         Assert.Empty(result);
     }
 
+    /// <summary>Verifies GetStashableItems EmptyContainer ReturnsEmptySet.</summary>
     [Fact]
     public void GetStashableItems_EmptyContainer_ReturnsEmptySet()
     {
@@ -766,6 +904,7 @@ public class AutoStashTransferTests
         Assert.Empty(result);
     }
 
+    /// <summary>Verifies GetStashableItems MatchingItems ReturnsIntersection.</summary>
     [Fact]
     public void GetStashableItems_MatchingItems_ReturnsIntersection()
     {
@@ -788,6 +927,7 @@ public class AutoStashTransferTests
         Assert.Contains(1, result);
     }
 
+    /// <summary>Verifies GetStashableItems NoOverlap ReturnsEmptySet.</summary>
     [Fact]
     public void GetStashableItems_NoOverlap_ReturnsEmptySet()
     {
@@ -809,6 +949,7 @@ public class AutoStashTransferTests
         Assert.Empty(result);
     }
 
+    /// <summary>Verifies GetStashableItems ItemsInHotbar IncludedInResult.</summary>
     [Fact]
     public void GetStashableItems_ItemsInHotbar_IncludedInResult()
     {
@@ -835,12 +976,15 @@ public class AutoStashTransferTests
 
     #region Edge Case Tests
 
+    /// <summary>Verifies AutoStashToGenericContainer NoExceptionOnEmptyInventories.</summary>
     [Fact]
     public void AutoStashToGenericContainer_NoExceptionOnEmptyInventories()
     {
         // Arrange - All inventories empty
         var fixture = CreateFixture();
         var container = MockBlockEntityContainer.Empty(api: fixture.Api);
+
+        var before = new InventorySnapshot(fixture.BackpackInventory, fixture.HotbarInventory, container.Inventory);
 
         // Act & Assert - Should not throw
         var exception = Record.Exception(() =>
@@ -850,14 +994,22 @@ public class AutoStashTransferTests
                 container.Object));
 
         Assert.Null(exception);
+        before.AssertUnchangedExcept();
+        before.AssertConserved();
+        container.BlockEntityMock.Verify(entity => entity.MarkDirty(It.IsAny<bool>(), It.IsAny<IPlayer>()), Times.Never);
+        fixture.InventoryManagerMock.Verify(manager => manager.OpenInventory(container.Inventory), Times.Never);
+        fixture.InventoryManagerMock.Verify(manager => manager.CloseInventoryAndSync(container.Inventory), Times.Never);
     }
 
+    /// <summary>Verifies AutoStashToCrate NoExceptionOnEmptyInventories.</summary>
     [Fact]
     public void AutoStashToCrate_NoExceptionOnEmptyInventories()
     {
         // Arrange
         var fixture = CreateFixture();
         var crate = MockBlockEntityCrate.Empty(api: fixture.Api);
+
+        var before = new InventorySnapshot(fixture.BackpackInventory, fixture.HotbarInventory, crate.Inventory);
 
         // Act & Assert
         var exception = Record.Exception(() =>
@@ -867,6 +1019,42 @@ public class AutoStashTransferTests
                 crate.Object));
 
         Assert.Null(exception);
+        before.AssertUnchangedExcept();
+        before.AssertConserved();
+        crate.BlockEntityMock.Verify(entity => entity.MarkDirty(It.IsAny<bool>(), It.IsAny<IPlayer>()), Times.Never);
+        fixture.InventoryManagerMock.Verify(manager => manager.OpenInventory(crate.Inventory), Times.Never);
+        fixture.InventoryManagerMock.Verify(manager => manager.CloseInventoryAndSync(crate.Inventory), Times.Never);
+    }
+
+    #endregion
+    #endregion
+
+    #region Private
+
+    /// <summary>
+    /// Creates a VsTestFixture configured for server-side AutoStashing tests.
+    /// </summary>
+    private static VsTestFixture CreateFixture(
+        MockItem[]? backpackItems = null,
+        MockItem[]? hotbarItems = null)
+    {
+        var fixture = VsTestFixture.Server();
+
+        if (backpackItems is not null)
+        {
+            fixture.WithBackpackItems(backpackItems);
+        }
+
+        if (hotbarItems is not null)
+        {
+            // AutoStash tests use hotbar slots starting at 0 (unlike EquipLightSource which uses slot 0 as active)
+            for (int i = 0; i < hotbarItems.Length && i < fixture.HotbarInventory.Count; i++)
+            {
+                fixture.WithHotbarSlot(i, hotbarItems[i]);
+            }
+        }
+
+        return fixture;
     }
 
     #endregion

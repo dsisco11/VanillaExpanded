@@ -1,0 +1,198 @@
+[
+  {
+    "op": "add",
+    "file": "game:itemtypes/tool/blade.json",
+    "path": "/attributes/ve-radial-menu-propertiesByType",
+    "value": {
+      "blade-falx-*": {
+        "transform": {
+          "origin": {
+            "x": 0.875,
+            "y": 0.0625,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 1.7
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "blade-blackguard-iron": {
+        "transform": {
+          "origin": {
+            "x": 0.75,
+            "y": 0.0625,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 1.8
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "blade-longsword-admin": {
+        "transform": {
+          "origin": {
+            "x": 0.8125,
+            "y": 0.0625,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 1.7
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "blade-forlorn-iron": {
+        "transform": {
+          "origin": {
+            "x": 0.75,
+            "y": 0.0,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 1.6
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "blade-scrap-scrap": {
+        "transform": {
+          "origin": {
+            "x": 0.9375,
+            "y": 0.0,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 1.7
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "blade-gladius-ruined": {
+        "transform": {
+          "origin": {
+            "x": 0.8125,
+            "y": 0.0,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 1.9
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "blade-arming-ruined": {
+        "transform": {
+          "origin": {
+            "x": 0.9375,
+            "y": 0.0,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 1.7
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "blade-claymore-ruined": {
+        "transform": {
+          "origin": {
+            "x": 1.3125,
+            "y": 0.0,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 1.5
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "blade-sabre-ruined": {
+        "transform": {
+          "origin": {
+            "x": 1.125,
+            "y": 0.0,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 1.7
+        },
+        "wedgeRotationDegrees": 0
+      }
+    }
+  }
+]

@@ -1,0 +1,28 @@
+[
+  {
+    "op": "add",
+    "file": "game:itemtypes/tool/saw.json",
+    "path": "/attributes/ve-radial-menu-properties",
+    "value": {
+      "transform": {
+        "origin": {
+          "x": 0.5,
+          "y": 0.475,
+          "z": 0.625
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 100.0,
+          "z": 90.0
+        },
+        "translation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": 1.5
+      },
+      "wedgeRotationDegrees": 0
+    }
+  }
+]

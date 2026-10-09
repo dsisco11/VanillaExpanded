@@ -9,6 +9,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="VanillaExpanded.Tests" />
+    <!-- Allow Moq to observe internal lifecycle boundaries without making them public mod APIs. -->
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
   </ItemGroup>
 
   <ItemGroup>

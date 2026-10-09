@@ -119,7 +119,7 @@ internal sealed class RadialMenuRenderer : IDisposable
             var guiShader = capi.Render.GetEngineShader(EnumShaderProgram.Gui);
             guiShader.Use();
             capi.Render.Render2DTexture(dimTexture.TextureId, 0, 0, capi.Render.FrameWidth, capi.Render.FrameHeight,
-                35, new Vec4f(0.025f, 0.02f, 0.015f, 0.70f));
+                35, new Vec4f(0.025f, 0.02f, 0.015f, RadialMenuWedgeStyle.BackdropOpacity));
             guiShader.Stop();
             shader.Use();
             try
@@ -255,7 +255,9 @@ internal sealed class RadialMenuRenderer : IDisposable
                     string? hoveredId = interaction.HoveredId;
                     bool showingHoveredLabel = hoveredId is not null && hoveredId != single.Id;
                     RadialMenuEntry label = showingHoveredLabel ? interaction.GetEntry(hoveredId!) : single;
-                    single.Icon?.Render(capi, centerX, centerY, radiusPixels * (float)ring.OuterRadius, single.Enabled);
+                    if (single.Icon is IRadialMenuContextIcon contextual)
+                        contextual.Render(capi, centerX, centerY, radiusPixels * (float)ring.OuterRadius, single.Enabled, 0);
+                    else single.Icon?.Render(capi, centerX, centerY, radiusPixels * (float)ring.OuterRadius, single.Enabled);
                     DrawCenterLabel(single.Id, label.Label, ring, centerX, centerY, radiusPixels);
                 }
                 else
@@ -265,10 +267,18 @@ internal sealed class RadialMenuRenderer : IDisposable
                     for (int i = 0; i < ring.EntryIds.Count; i++)
                     {
                         RadialMenuEntry entry = interaction.GetEntry(ring.EntryIds[i]);
+                        float entryIconSize = entry.Icon?.Sizing switch
+                        {
+                            RadialMenuIconSizing.ScreenAligned => ring.GetScreenAlignedIconSizePixels(i,
+                                radiusPixels, RadialMenuWedgeStyle.IconInsetPixels),
+                            RadialMenuIconSizing.WedgeAligned => ring.GetWedgeAlignedIconSizePixels(
+                                radiusPixels, RadialMenuWedgeStyle.IconInsetPixels),
+                            _ => iconSize
+                        };
                         float scale = 1f + (RadialMenuWedgeStyle.HoverScale - 1f) * hoverAnimation.VisualProgress(entry.Id);
                         (double x, double y) = ring.GetWedgeCenter(i, centerX, centerY, radiusPixels, midRadius * scale);
                         DrawClippedEntry(entry, entryOffset + i, ring, meshes[meshIndex], entryOffset, x, y,
-                            iconSize * scale, guiShader);
+                            entryIconSize * scale, guiShader, ring.StartAngleDegrees + (ring.Clockwise ? 1 : -1) * i * ring.StepDegrees);
                     }
                 }
                 entryOffset += ring.EntryIds.Count;
@@ -287,12 +297,12 @@ internal sealed class RadialMenuRenderer : IDisposable
     {
         int usableDiameter = (int)Math.Max(1d,
             radiusPixels * layout.OuterRadius * 2d - CenterLabelInsetPixels * 2d);
-        DrawLabel(id, text, centerX, centerY, usableDiameter);
+        DrawLabel(id, text, centerX, centerY, usableDiameter, layout.LabelFontScale);
     }
 
     /// <summary>Clips a depth-correct icon capture and its pixel-distance halo to the wedge stencil.</summary>
     private void DrawClippedEntry(RadialMenuEntry entry, int index, RadialMenuLayout ring, MeshRef ringMesh,
-        int entryOffset, double x, double y, float iconSize, IShaderProgram guiShader)
+        int entryOffset, double x, double y, float iconSize, IShaderProgram guiShader, double wedgeDegrees)
     {
         if (entry.Icon is null)
         {
@@ -310,7 +320,7 @@ internal sealed class RadialMenuRenderer : IDisposable
         int oldClearValue = GL.GetInteger(GetPName.StencilClearValue);
         try
         {
-            iconHalo.Capture(entry.Icon, x, y, iconSize, entry.Enabled);
+            iconHalo.Capture(entry.Icon, x, y, iconSize, entry.Enabled, wedgeDegrees);
             // Reserve only the wedge bit; the unscaled icon mask lives in its own texture.
             GL.Enable(EnableCap.StencilTest);
             GL.StencilMask(0x80);
@@ -344,9 +354,9 @@ internal sealed class RadialMenuRenderer : IDisposable
     }
 
     /// <summary>Caches a text-only entry label and centers its texture at the entry position.</summary>
-    private void DrawLabel(string id, string text, double x, double y, int circleDiameter = 0)
+    private void DrawLabel(string id, string text, double x, double y, int circleDiameter = 0, double fontScale = 1)
     {
-        string cacheKey = text + '\0' + circleDiameter;
+        string cacheKey = text + '\0' + circleDiameter + '\0' + fontScale;
         if (!renderedLabels.TryGetValue(id, out string? previous) || previous != cacheKey)
         {
             if (labels.Remove(id, out LoadedTexture? old)) old.Dispose();
@@ -354,6 +364,8 @@ internal sealed class RadialMenuRenderer : IDisposable
             if (!string.IsNullOrEmpty(text))
             {
                 labelFont ??= CairoFont.WhiteSmallText().WithStroke([0, 0, 0, 0.65], 1.5);
+                // Use the owning ring's preferred font size; long labels still fit the circle.
+                labelFont.WithFontSize((float)(GuiStyle.SmallFontSize * fontScale));
                 if (circleDiameter > 0)
                 {
                     double lineHeight = labelFont.GetFontExtents().Height;

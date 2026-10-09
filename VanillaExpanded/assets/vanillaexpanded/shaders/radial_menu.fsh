@@ -96,6 +96,6 @@ void main()
         fill = mix(fill, bronze, border);
     }
     float opacity = mix(disabledOpacity, enabledOpacity, enabled);
-    if (hover > 0.0 && enabled > 0.0) opacity = 1.0;
+    if (hover > 0.0 && enabled > 0.0) opacity = min(1.0, enabledOpacity * 2.0);
     fragColor = vec4(fill, coverage * opacity);
 }

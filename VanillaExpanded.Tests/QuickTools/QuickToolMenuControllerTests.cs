@@ -260,9 +260,9 @@ public sealed class QuickToolMenuControllerTests
         Assert.Empty(f.Packets);
     }
 
-    /// <summary>Disablement and player-context replacement discard the old session and menu references.</summary>
+    /// <summary>Unavailable or replaced player context discards the old session and menu references.</summary>
     [Theory]
-    [InlineData("disabled")]
+    [InlineData("unavailable")]
     [InlineData("replacement")]
     [InlineData("entity")]
     [InlineData("world")]
@@ -271,7 +271,7 @@ public sealed class QuickToolMenuControllerTests
         using var f = new Fixture();
         f.EquipPick();
         f.Open();
-        if (reason == "disabled") { f.Ready = false; f.Controller.PollInput(); }
+        if (reason == "unavailable") { f.Ready = false; f.Controller.PollInput(); }
         if (reason == "replacement") { f.CurrentManager = new Mock<IPlayerInventoryManager>().Object; f.Controller.RefreshContext(); }
         if (reason == "entity") { f.PlayerIdentity = new object(); f.Controller.PollInput(); }
         if (reason == "world") f.Controller.ClearContext();
@@ -458,6 +458,7 @@ public sealed class QuickToolMenuControllerTests
             Down.Add(Binding.Primary);
             Assert.True(Controller.Press());
             Assert.True(Menu.IsOpen);
+            Assert.Equal(string.Empty, Menu.ToggleKeyCode);
         }
         /// <summary>Observes physical release before the next independent press.</summary>
         internal void Release()
@@ -492,12 +493,14 @@ public sealed class QuickToolMenuControllerTests
         internal RadialMenuLayout? Layout;
         internal int OpenCount;
         internal int LayoutUpdateCount;
+        internal string ToggleKeyCode = string.Empty;
         /// <inheritdoc />
         public bool IsOpen => Interaction?.IsOpen == true;
         /// <inheritdoc />
         public bool Open(RadialMenuLayout layout, IEnumerable<RadialMenuEntry> entries,
-            System.Func<string, RadialMenuSelectionResult> selected, Action cancelled)
+            System.Func<string, RadialMenuSelectionResult> selected, Action cancelled, string toggleKeyCode = "")
         {
+            ToggleKeyCode = toggleKeyCode;
             Layout = layout;
             Interaction = new RadialMenuInteraction(layout, entries);
             Interaction.Selected += selected;

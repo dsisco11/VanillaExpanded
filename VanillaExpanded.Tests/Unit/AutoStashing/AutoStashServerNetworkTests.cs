@@ -9,6 +9,7 @@ using Vintagestory.API.Server;
 namespace VanillaExpanded.Tests.Unit.AutoStashing;
 
 [Trait("Category", "Unit")]
+[Collection("AutoStash")]
 public class AutoStashServerNetworkTests
 {
     [Fact]

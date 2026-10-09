@@ -14,24 +14,8 @@ namespace VanillaExpanded.SpawnDecal;
 /// </summary>
 public class SpawnDecalRenderer : IRenderer
 {
-    #region GL State
-    private const int OitAccumulationColorAttachmentIndex = 0;
-
-    private static void RestoreOitBuf0BlendState()
-    {
-        // In Vintage Story's OIT pass, buf0 is the accumulation target and expects additive blending.
-        GL.BlendEquation(OitAccumulationColorAttachmentIndex, BlendEquationMode.FuncAdd);
-        GL.BlendFuncSeparate(OitAccumulationColorAttachmentIndex, BlendingFactorSrc.One, BlendingFactorDest.One, BlendingFactorSrc.One, BlendingFactorDest.One);
-    }
-
-    private static void ApplyDecalBuf0BlendState()
-    {
-        // Only touch buf0. Do not modify other MRT targets.
-        // Standard alpha blending for the decal texture.
-        GL.BlendEquation(OitAccumulationColorAttachmentIndex, BlendEquationMode.FuncAdd);
-        GL.BlendFuncSeparate(OitAccumulationColorAttachmentIndex, BlendingFactorSrc.SrcAlpha, BlendingFactorDest.OneMinusSrcAlpha, BlendingFactorSrc.One, BlendingFactorDest.One);
-    }
-    #endregion
+    /// <summary>The standard shader writes scene color, glow, and SSAO outputs in the opaque pass.</summary>
+    internal const EnumRenderStage RenderStage = EnumRenderStage.Opaque;
 
     #region Constants
     private float DecalSize => VanillaExpandedModSystem.Config.SpawnDecalSize;
@@ -63,55 +47,35 @@ public class SpawnDecalRenderer : IRenderer
     private Vec4f DefaultRenderGlow = ColorUtilEx.TransparentWhiteRgbaVec;
     #endregion
 
-    #region IRenderer Properties
-    public double RenderOrder => 0.7f; // Decal render stage
+    #region Public API
+    #region Rendering
+    /// <summary>Draws after terrain alongside the engine's decals.</summary>
+    public double RenderOrder => 0.5;
+
+    /// <summary>Declares the intended world rendering range to the engine.</summary>
     public int RenderRange => 32;
+
     #endregion
 
-    #region Constructor
+    #region Lifecycle
+    /// <summary>Creates the quad and registers it in the scene decal pass.</summary>
     public SpawnDecalRenderer(ICoreClientAPI capi)
     {
         this.capi = capi;
-        capi.Event.RegisterRenderer(this, EnumRenderStage.OIT, "spawndecal");
+        capi.Event.RegisterRenderer(this, RenderStage, "spawndecal");
         InitializeMesh();
         LoadTexture();
     }
-    #endregion
 
-    #region Initialization
-    private void InitializeMesh()
-    {
-        decalMeshRef?.Dispose();
-
-        // Create a flat quad mesh for the decal (lying on the ground)
-        var meshData = QuadMeshUtil.GetCustomQuadHorizontal(0.5f, Z_OFFSET, -0.5f, -1f, 1f, 255, 255, 255, 255);
-        // multiply all vertex coords by DecalSize
-        float[] verticies = meshData.GetXyz();
-        float decalSize = DecalSize;
-        for (int i = 0; i < meshData.VerticesCount; i++)
-        {
-            verticies[i * 3 + 0] *= decalSize;
-            verticies[i * 3 + 1] *= decalSize;
-            verticies[i * 3 + 2] *= decalSize;
-        }
-        meshData.SetXyz(verticies);
-        decalMeshRef = capi.Render.UploadMesh(meshData);
-    }
-
+    /// <summary>Rebuilds the quad after a live size change.</summary>
     public void ReloadMesh()
     {
         InitializeMesh();
     }
 
-    private void LoadTexture()
-    {
-        // Use the block breaking overlay texture
-        var textureLoc = new AssetLocation(Constants.ModId, "textures/respawnpoint.png");
-        decalTextureId = capi.Render.GetOrLoadTexture(textureLoc);
-    }
     #endregion
 
-    #region Public Methods
+    #region Spawn Updates
     /// <summary>
     /// Sets the spawn position to render the decal at.
     /// </summary>
@@ -132,12 +96,14 @@ public class SpawnDecalRenderer : IRenderer
             isFading = true;
         }
     }
+
     #endregion
 
-    #region IRenderer Implementation
+    #region Frame Rendering
+    /// <summary>Advances the pulse and fade, then draws the decal with scoped render state.</summary>
     public void OnRenderFrame(float deltaTime, EnumRenderStage stage)
     {
-        if (spawnPosition is null || decalMeshRef is null)
+        if (stage != RenderStage || spawnPosition is null || decalMeshRef is null)
             return;
 
         // Handle fade animation
@@ -179,11 +145,13 @@ public class SpawnDecalRenderer : IRenderer
             (float)(spawnPosition.Z - camPos.Z)
         );
 
+        using var renderState = new SpawnDecalRenderState(rapi);
         bool debugGroupPushed = TryPushGlDebugGroup("VanillaExpanded: SpawnDecalRenderer");
+        IStandardShaderProgram? shader = null;
         try
         {
             // Render using standard shader
-            IStandardShaderProgram shader = rapi.PreparedStandardShader(spawnPosition.XInt, spawnPosition.YInt, spawnPosition.ZInt);
+            shader = rapi.PreparedStandardShader(spawnPosition.XInt, spawnPosition.YInt, spawnPosition.ZInt);
             shader.Use();
             shader.Tex2D = decalTextureId;
             shader.ModelMatrix = modelMatrix.Values;
@@ -191,22 +159,71 @@ public class SpawnDecalRenderer : IRenderer
             shader.RgbaGlowIn = FinalRenderGlow;
             shader.ExtraGlow = (int)strength;
 
-            ApplyDecalBuf0BlendState();
+            // Blend into scene color while leaving terrain depth available to later transparent geometry.
+            GL.Enable(IndexedEnableCap.Blend, 0);
+            GL.BlendEquation(0, BlendEquationMode.FuncAdd);
+            GL.BlendFuncSeparate(0, BlendingFactorSrc.SrcAlpha, BlendingFactorDest.OneMinusSrcAlpha,
+                BlendingFactorSrc.One, BlendingFactorDest.OneMinusSrcAlpha);
+            GL.DepthMask(false);
+            GL.Disable(EnableCap.CullFace);
             rapi.RenderMesh(decalMeshRef);
-
-            // Reset shader inputs to defaults to prevent affecting subsequent renders (e.g., particles)
-            shader.RgbaTint = ColorUtil.WhiteArgbVec;  // Reset tint to white
-            shader.RgbaGlowIn = DefaultRenderGlow;  // No glow
-            shader.ExtraGlow = 0;  // No extra glow
-            shader.Stop();
         }
         finally
         {
-            RestoreOitBuf0BlendState();
+            if (shader is not null)
+            {
+                // Clear decal-specific shared inputs even when mesh drawing fails.
+                shader.RgbaTint = ColorUtil.WhiteArgbVec;
+                shader.RgbaGlowIn = DefaultRenderGlow;
+                shader.ExtraGlow = 0;
+                shader.Stop();
+            }
             if (debugGroupPushed) TryPopGlDebugGroup();
         }
     }
 
+    #endregion
+
+    #region Disposal
+    /// <summary>Releases the owned decal mesh.</summary>
+    public void Dispose()
+    {
+        decalMeshRef?.Dispose();
+        decalMeshRef = null;
+    }
+    #endregion
+    #endregion
+
+    #region Private
+    /// <summary>Builds the horizontal decal quad using the configured world size.</summary>
+    private void InitializeMesh()
+    {
+        decalMeshRef?.Dispose();
+
+        // Create a flat quad mesh for the decal (lying on the ground)
+        var meshData = QuadMeshUtil.GetCustomQuadHorizontal(0.5f, Z_OFFSET, -0.5f, -1f, 1f, 255, 255, 255, 255);
+        // multiply all vertex coords by DecalSize
+        float[] verticies = meshData.GetXyz();
+        float decalSize = DecalSize;
+        for (int i = 0; i < meshData.VerticesCount; i++)
+        {
+            verticies[i * 3 + 0] *= decalSize;
+            verticies[i * 3 + 1] *= decalSize;
+            verticies[i * 3 + 2] *= decalSize;
+        }
+        meshData.SetXyz(verticies);
+        decalMeshRef = capi.Render.UploadMesh(meshData);
+    }
+
+    /// <summary>Loads the temporal spawn texture through the engine texture cache.</summary>
+    private void LoadTexture()
+    {
+        // Use the block breaking overlay texture
+        var textureLoc = new AssetLocation(Constants.ModId, "textures/respawnpoint.png");
+        decalTextureId = capi.Render.GetOrLoadTexture(textureLoc);
+    }
+
+    /// <summary>Labels the decal draw when debug markers are supported.</summary>
     private static bool TryPushGlDebugGroup(string message)
     {
         #if DEBUG
@@ -224,6 +241,7 @@ public class SpawnDecalRenderer : IRenderer
         #endif
     }
 
+    /// <summary>Closes the debug marker without interrupting rendering.</summary>
     private static void TryPopGlDebugGroup()
     {
         #if DEBUG
@@ -239,17 +257,8 @@ public class SpawnDecalRenderer : IRenderer
         return;
         #endif
     }
-    #endregion
 
-    #region IDisposable
-    public void Dispose()
-    {
-        decalMeshRef?.Dispose();
-        decalMeshRef = null;
-    }
-    #endregion
-
-    #region Private Methods
+    /// <summary>Ends the fade and clears the world position.</summary>
     private void RemoveDecal()
     {
         spawnPosition = null;

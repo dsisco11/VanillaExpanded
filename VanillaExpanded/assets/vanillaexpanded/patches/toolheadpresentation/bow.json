@@ -1,0 +1,93 @@
+[
+  {
+    "op": "add",
+    "file": "game:itemtypes/tool/bow.json",
+    "path": "/attributes/ve-radial-menu-propertiesByType",
+    "value": {
+      "bow-simple": {
+        "transform": {
+          "origin": {
+            "x": 0.5,
+            "y": 0.0,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 1.4
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "bow-crude": {
+        "transform": {
+          "origin": {
+            "x": 0.5,
+            "y": 0.0,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 1.5
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "bow-long": {
+        "transform": {
+          "origin": {
+            "x": 0.5,
+            "y": 0.0,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 1.3
+        },
+        "wedgeRotationDegrees": 0
+      },
+      "bow-recurve": {
+        "transform": {
+          "origin": {
+            "x": 0.5,
+            "y": 0.0,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 100.0,
+            "z": 90.0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 1.4
+        },
+        "wedgeRotationDegrees": 0
+      }
+    }
+  }
+]
