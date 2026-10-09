@@ -11,6 +11,9 @@ namespace VanillaExpanded;
 public class VanillaExpandedConfig
 {
     #region Feature Toggles
+    /// <summary>Protects water sources from bucket spills when source transport is disabled.</summary>
+    public bool EnableBucketSourceProtectionPatch { get; set; } = true;
+
     /// <summary>
     /// Enable auto-stashing items into containers by holding the interact key.
     /// </summary>

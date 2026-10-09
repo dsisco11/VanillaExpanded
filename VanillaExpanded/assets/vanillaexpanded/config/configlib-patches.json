@@ -3,6 +3,14 @@
   "file": "VanillaExpanded.json",
   "settings": {
     "boolean": {
+      "EnableBucketSourceProtectionPatch": {
+        "code": "EnableBucketSourceProtectionPatch",
+        "name": "EnableBucketSourceProtectionPatch",
+        "ingui": "vanillaexpanded:config-enable-bucket-source-protection",
+        "comment": "vanillaexpanded:config-enable-bucket-source-protection-tooltip",
+        "default": true,
+        "weight": 1.15
+      },
       "EnableAutoStash": {
         "code": "EnableAutoStash",
         "name": "EnableAutoStash",

@@ -1,4 +1,6 @@
 {
+  "config-enable-bucket-source-protection": "Protect water sources from bucket spills",
+  "config-enable-bucket-source-protection-tooltip": "Enables the bucket spill patch. When liquid source transport is disabled in the world options, pouring water from a bucket onto an existing water block will not destroy the water block.",
   "chisel-material-dropped": "Material return failed. The item was dropped.",
   "chisel-material-cursor": "Put away the item held by your mouse before choosing a material.",
   "chisel-material-return": "Material selection failed. The item could not be returned to your inventory.",

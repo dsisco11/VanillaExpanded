@@ -71,6 +71,7 @@ Without ConfigLib, settings can be edited manually in `ModConfig/VanillaExpanded
 
 | Setting                    | Default | Description                                                    |
 | -------------------------- | ------- | -------------------------------------------------------------- |
+| EnableBucketSourceProtectionPatch | true | Protect existing water sources from temporary bucket spills when source transport is disabled; supports live toggling |
 | EnableAutoStash\*          | true    | Enable auto-stashing items into containers by holding interact |
 | EnableIgnitionTools\*      | true    | Enable lighting fires using lanterns, candles, and oil lamps   |
 | EnableSpawnDecal\*         | true    | Show a glowing decal at the player's respawn point             |
