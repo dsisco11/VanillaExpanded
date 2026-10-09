@@ -19,6 +19,8 @@ public class SpawnDecalClientSystem : ModSystem, ILiveConfigurable
     private ICoreClientAPI? capi;
     private SpawnDecalRenderer? renderer;
     private float? lastDecalSize;
+    // Server spawn state outlives the optional rendering resources.
+    private Vec3d? spawnPosition;
     #endregion
 
     #region ModSystem Overrides
@@ -45,6 +47,7 @@ public class SpawnDecalClientSystem : ModSystem, ILiveConfigurable
     {
         DisposeRenderer();
 
+        spawnPosition = null;
         capi = null;
         base.Dispose();
     }
@@ -59,18 +62,20 @@ public class SpawnDecalClientSystem : ModSystem, ILiveConfigurable
 
     #region Public Methods
     /// <summary>
-    /// Sets the spawn position for the decal.
+    /// Retains the latest spawn position and updates the decal when rendering is enabled.
     /// </summary>
     public void SetSpawnPosition(Vec3d position)
     {
-        renderer?.SetSpawnPosition(position);
+        spawnPosition = position.Clone();
+        renderer?.SetSpawnPosition(spawnPosition);
     }
 
     /// <summary>
-    /// Clears the spawn position, triggering fade-out.
+    /// Clears the retained spawn position and triggers fade-out on an existing decal.
     /// </summary>
     public void ClearSpawnPosition()
     {
+        spawnPosition = null;
         renderer?.ClearSpawnPosition();
     }
     #endregion
@@ -88,6 +93,7 @@ public class SpawnDecalClientSystem : ModSystem, ILiveConfigurable
         if (renderer is null)
         {
             renderer = new SpawnDecalRenderer(api);
+            if (spawnPosition is not null) renderer.SetSpawnPosition(spawnPosition);
             lastDecalSize = VanillaExpandedModSystem.Config.SpawnDecalSize;
             return;
         }
@@ -116,8 +122,7 @@ public class SpawnDecalClientSystem : ModSystem, ILiveConfigurable
     /// <summary>Updates the decal position or starts its fade from server spawn data.</summary>
     private void OnTemporalSpawnPacket(Packet_TemporalSpawn packet)
     {
-        if (!VanillaExpandedModSystem.Config.EnableSpawnDecal) return;
-
+        // Keep authoritative updates even while the decal is hidden, so re-enabling uses current state.
         if (packet.HasSpawn)
         {
             SetSpawnPosition(new Vec3d(packet.X, packet.Y, packet.Z));
