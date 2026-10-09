@@ -18,6 +18,7 @@ public sealed class AttachedHelpCoverageTests
     [InlineData("body")]
     [InlineData("unmapped")]
     [InlineData("empty")]
+    [InlineData("nullcontents")]
     [InlineData("nonbag")]
     [InlineData("unmatched")]
     public void HelpAppend_PreservesExistingInteractionsAndGates(string condition)
@@ -31,6 +32,10 @@ public sealed class AttachedHelpCoverageTests
             if (condition == "body") test.Selection.SelectionBoxIndex = 0;
             if (condition == "unmapped") test.SlotConfigurations[1].AttachmentPointCode = "not-present";
             if (condition == "empty") test.Attachable.Inventory[1].Itemstack = null;
+            if (condition == "nullcontents")
+                Moq.Mock.Get(originalAttachment!.Collectible.GetCollectibleInterface<IHeldBag>())
+                    .Setup(bag => bag.GetContents(Moq.It.IsAny<ItemStack>(), Moq.It.IsAny<IWorldAccessor>()))
+                    .Returns((ItemStack[])null!);
             if (condition == "nonbag") test.Attachable.Inventory[1].Itemstack = test.Fixture.BackpackInventory[0].Itemstack!.Clone();
             if (condition == "unmatched") test.Fixture.BackpackInventory[0].Itemstack = null;
             var before = new InventorySnapshot(test.Fixture.BackpackInventory, test.Fixture.HotbarInventory, test.Attachable.Inventory);
