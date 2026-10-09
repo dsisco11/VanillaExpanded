@@ -10,7 +10,7 @@ internal sealed class RadialMenuDialog : GuiDialog
 {
     #region State
     private const float ScreenRadiusFraction = 0.25f;
-    private const float HoverSoundVolume = 0.7f;
+    private const float HoverSoundVolume = 1.0f;
     private readonly RadialMenuRenderer renderer;
     private RadialMenuLayout? layout;
     private RadialMenuInteraction? interaction;
