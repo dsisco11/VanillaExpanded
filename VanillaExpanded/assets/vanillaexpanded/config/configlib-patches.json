@@ -9,7 +9,7 @@
         "ingui": "vanillaexpanded:config-enable-bucket-source-protection",
         "comment": "vanillaexpanded:config-enable-bucket-source-protection-tooltip",
         "default": true,
-        "weight": 1.15
+        "weight": 5.1
       },
       "EnableAutoStash": {
         "code": "EnableAutoStash",
@@ -17,7 +17,7 @@
         "ingui": "vanillaexpanded:config-enable-auto-stash",
         "comment": "vanillaexpanded:config-enable-auto-stash-tooltip",
         "default": true,
-        "weight": 1.0
+        "weight": 1.1
       },
       "EnableIgnitionTools": {
         "code": "EnableIgnitionTools",
@@ -25,7 +25,7 @@
         "ingui": "vanillaexpanded:config-enable-ignition-tools",
         "comment": "vanillaexpanded:config-enable-ignition-tools-tooltip",
         "default": true,
-        "weight": 1.1
+        "weight": 2.1
       },
       "EnableSpawnDecal": {
         "code": "EnableSpawnDecal",
@@ -33,7 +33,7 @@
         "ingui": "vanillaexpanded:config-enable-spawn-decal",
         "comment": "vanillaexpanded:config-enable-spawn-decal-tooltip",
         "default": true,
-        "weight": 1.2
+        "weight": 3.1
       },
       "EnableAlloyCalculator": {
         "code": "EnableAlloyCalculator",
@@ -41,7 +41,7 @@
         "ingui": "vanillaexpanded:config-enable-alloy-calculator",
         "comment": "vanillaexpanded:config-enable-alloy-calculator-tooltip",
         "default": true,
-        "weight": 1.3
+        "weight": 4.1
       },
       "DisableAlloyCalculatorPatch": {
         "code": "DisableAlloyCalculatorPatch",
@@ -49,7 +49,7 @@
         "ingui": "vanillaexpanded:config-disable-alloy-calculator-patch",
         "comment": "vanillaexpanded:config-disable-alloy-calculator-patch-tooltip",
         "default": false,
-        "weight": 1.31
+        "weight": 4.2
       },
       "EnableEquipLightHotkey": {
         "code": "EnableEquipLightHotkey",
@@ -57,7 +57,7 @@
         "ingui": "vanillaexpanded:config-enable-equip-light-hotkey",
         "comment": "vanillaexpanded:config-enable-equip-light-hotkey-tooltip",
         "default": true,
-        "weight": 1.4
+        "weight": 5.2
       },
       "QuickToolSelectOnRelease": {
         "code": "QuickToolSelectOnRelease",
@@ -65,7 +65,7 @@
         "ingui": "vanillaexpanded:config-quick-tool-select-on-release",
         "comment": "vanillaexpanded:config-quick-tool-select-on-release-tooltip",
         "default": true,
-        "weight": 5.4
+        "weight": 8.4
       },
       "EnableToolModeRadialMenu": {
         "code": "EnableToolModeRadialMenu",
@@ -73,7 +73,7 @@
         "ingui": "vanillaexpanded:config-enable-tool-mode-radial-menu",
         "comment": "vanillaexpanded:config-enable-tool-mode-radial-menu-tooltip",
         "default": true,
-        "weight": 5.1
+        "weight": 8.1
       },
       "EnablePerishableItemFreshnessIndicators": {
         "code": "EnablePerishableItemFreshnessIndicators",
@@ -81,7 +81,7 @@
         "ingui": "vanillaexpanded:config-enable-perishable-item-freshness-indicators",
         "comment": "vanillaexpanded:config-enable-perishable-item-freshness-indicators-tooltip",
         "default": true,
-        "weight": 4.10,
+        "weight": 7.1,
         "clientSide": true
       },
       "EnablePreparationIndicators": {
@@ -90,7 +90,7 @@
         "ingui": "vanillaexpanded:config-enable-preparation-indicators",
         "comment": "vanillaexpanded:config-enable-preparation-indicators-tooltip",
         "default": true,
-        "weight": 4.30,
+        "weight": 7.15,
         "clientSide": true
       },
       "EnableClothingIndicators": {
@@ -99,7 +99,7 @@
         "ingui": "vanillaexpanded:config-enable-clothing-indicators",
         "comment": "vanillaexpanded:config-enable-clothing-indicators-tooltip",
         "default": true,
-        "weight": 4.35,
+        "weight": 7.2,
         "clientSide": true
       },
       "EnableLiquidContainerIndicators": {
@@ -108,7 +108,7 @@
         "ingui": "vanillaexpanded:config-enable-liquid-container-indicators",
         "comment": "vanillaexpanded:config-enable-liquid-container-indicators-tooltip",
         "default": true,
-        "weight": 4.40,
+        "weight": 7.25,
         "clientSide": true
       },
       "EnableLiquidSloshEffect": {
@@ -117,7 +117,7 @@
         "ingui": "vanillaexpanded:config-enable-liquid-slosh-effect",
         "comment": "vanillaexpanded:config-enable-liquid-slosh-effect-tooltip",
         "default": true,
-        "weight": 4.45,
+        "weight": 7.55,
         "clientSide": true
       },
       "EnableCrucibleIndicators": {
@@ -126,7 +126,7 @@
         "ingui": "vanillaexpanded:config-enable-crucible-indicators",
         "comment": "vanillaexpanded:config-enable-crucible-indicators-tooltip",
         "default": true,
-        "weight": 4.50,
+        "weight": 7.3,
         "clientSide": true
       },
       "EnableCrucibleEffect": {
@@ -135,7 +135,7 @@
         "ingui": "vanillaexpanded:config-enable-crucible-effect",
         "comment": "vanillaexpanded:config-enable-crucible-effect-tooltip",
         "default": true,
-        "weight": 4.55,
+        "weight": 7.6,
         "clientSide": true
       },
       "EnableNightVisionFuelIndicators": {
@@ -144,7 +144,7 @@
         "ingui": "vanillaexpanded:config-enable-night-vision-fuel-indicators",
         "comment": "vanillaexpanded:config-enable-night-vision-fuel-indicators-tooltip",
         "default": true,
-        "weight": 4.65,
+        "weight": 7.35,
         "clientSide": true
       },
       "EnableBackpackDecraft": {
@@ -153,7 +153,7 @@
         "ingui": "vanillaexpanded:config-enable-backpack-decraft",
         "comment": "vanillaexpanded:config-enable-backpack-decraft-tooltip",
         "default": true,
-        "weight": 3.0
+        "weight": 6.1
       },
       "EnableLinenSackDecraft": {
         "code": "EnableLinenSackDecraft",
@@ -161,7 +161,7 @@
         "ingui": "vanillaexpanded:config-enable-linensack-decraft",
         "comment": "vanillaexpanded:config-enable-linensack-decraft-tooltip",
         "default": true,
-        "weight": 3.1
+        "weight": 6.2
       },
       "EnableMetalBitsRecycling": {
         "code": "EnableMetalBitsRecycling",
@@ -169,7 +169,7 @@
         "ingui": "vanillaexpanded:config-enable-metalbits-recycling",
         "comment": "vanillaexpanded:config-enable-metalbits-recycling-tooltip",
         "default": true,
-        "weight": 3.2
+        "weight": 6.3
       },
       "EnableStickRecipes": {
         "code": "EnableStickRecipes",
@@ -177,7 +177,7 @@
         "ingui": "vanillaexpanded:config-enable-stick-recipes",
         "comment": "vanillaexpanded:config-enable-stick-recipes-tooltip",
         "default": true,
-        "weight": 3.3
+        "weight": 6.4
       },
       "EnableWattleDecraft": {
         "code": "EnableWattleDecraft",
@@ -185,7 +185,7 @@
         "ingui": "vanillaexpanded:config-enable-wattle-decraft",
         "comment": "vanillaexpanded:config-enable-wattle-decraft-tooltip",
         "default": true,
-        "weight": 3.4
+        "weight": 6.5
       },
       "AutoStashGuiRendersTopmost": {
         "code": "AutoStashGuiRendersTopmost",
@@ -193,7 +193,7 @@
         "ingui": "vanillaexpanded:config-auto-stash-gui-renders-topmost",
         "comment": "vanillaexpanded:config-auto-stash-gui-renders-topmost-tooltip",
         "default": true,
-        "weight": 3.6,
+        "weight": 1.3,
         "clientSide": true
       }
     },
@@ -204,7 +204,7 @@
         "ingui": "vanillaexpanded:config-food-level-indicator-style",
         "comment": "vanillaexpanded:config-food-level-indicator-style-tooltip",
         "default": "progress-bar",
-        "weight": 4.25,
+        "weight": 7.5,
         "clientSide": true,
         "mapping": { "progress-bar": 0, "slot-background": 1 }
       },
@@ -214,7 +214,7 @@
         "ingui": "vanillaexpanded:config-perishable-item-freshness-indicator-style",
         "comment": "vanillaexpanded:config-perishable-item-freshness-indicator-style-tooltip",
         "default": "freshness-background",
-        "weight": 4.15,
+        "weight": 7.4,
         "clientSide": true,
         "mapping": {
           "freshness-background": 0,
@@ -230,7 +230,7 @@
         "ingui": "vanillaexpanded:config-crucible-indicator-capacity-units",
         "comment": "vanillaexpanded:config-crucible-indicator-capacity-units-tooltip",
         "default": 2560,
-        "weight": 4.60,
+        "weight": 7.65,
         "clientSide": true,
         "range": { "min": 100, "max": 25600, "step": 10 }
       },
@@ -240,7 +240,7 @@
         "ingui": "vanillaexpanded:config-auto-stash-delay",
         "comment": "vanillaexpanded:config-auto-stash-delay-tooltip",
         "default": 0.5,
-        "weight": 2.0,
+        "weight": 1.2,
         "range": { "min": 0.1, "max": 2.0, "step": 0.1 }
       },
       "IgnitionDelay": {
@@ -249,7 +249,7 @@
         "ingui": "vanillaexpanded:config-ignition-delay",
         "comment": "vanillaexpanded:config-ignition-delay-tooltip",
         "default": 0.5,
-        "weight": 2.1,
+        "weight": 2.2,
         "range": { "min": 0.1, "max": 2.0, "step": 0.1 }
       },
       "RadialMenuBackdropOpacity": {
@@ -258,7 +258,7 @@
         "ingui": "vanillaexpanded:config-radial-menu-backdrop-opacity",
         "comment": "vanillaexpanded:config-radial-menu-backdrop-opacity-tooltip",
         "default": 0.2,
-        "weight": 5.05,
+        "weight": 8.05,
         "range": { "min": 0.0, "max": 1.0, "step": 0.05 },
         "clientSide": true
       },
@@ -268,7 +268,7 @@
         "ingui": "vanillaexpanded:config-radial-menu-opacity",
         "comment": "vanillaexpanded:config-radial-menu-opacity-tooltip",
         "default": 0.5,
-        "weight": 5.06,
+        "weight": 8.06,
         "range": { "min": 0.0, "max": 1.0, "step": 0.05 },
         "clientSide": true
       },
@@ -278,7 +278,7 @@
         "ingui": "vanillaexpanded:config-tool-mode-menu-size",
         "comment": "vanillaexpanded:config-tool-mode-menu-size-tooltip",
         "default": 1.0,
-        "weight": 5.2,
+        "weight": 8.2,
         "range": { "min": 0.15, "max": 2.5, "step": 0.05 },
         "clientSide": true
       },
@@ -288,7 +288,7 @@
         "ingui": "vanillaexpanded:config-tool-mode-ring-size",
         "comment": "vanillaexpanded:config-tool-mode-ring-size-tooltip",
         "default": 1.0,
-        "weight": 5.21,
+        "weight": 8.21,
         "range": { "min": 0.15, "max": 2.5, "step": 0.05 },
         "clientSide": true
       },
@@ -298,7 +298,7 @@
         "ingui": "vanillaexpanded:config-tool-mode-center-size",
         "comment": "vanillaexpanded:config-tool-mode-center-size-tooltip",
         "default": 1.0,
-        "weight": 5.22,
+        "weight": 8.22,
         "range": { "min": 0.15, "max": 2.5, "step": 0.05 },
         "clientSide": true
       },
@@ -308,7 +308,7 @@
         "ingui": "vanillaexpanded:config-tool-mode-icon-size",
         "comment": "vanillaexpanded:config-tool-mode-icon-size-tooltip",
         "default": 0.75,
-        "weight": 5.3,
+        "weight": 8.3,
         "range": { "min": 0.15, "max": 2.5, "step": 0.05 },
         "clientSide": true
       },
@@ -318,7 +318,7 @@
         "ingui": "vanillaexpanded:config-quick-swap-menu-size",
         "comment": "vanillaexpanded:config-quick-swap-menu-size-tooltip",
         "default": 1.0,
-        "weight": 5.5,
+        "weight": 8.5,
         "range": { "min": 0.15, "max": 2.5, "step": 0.05 },
         "clientSide": true
       },
@@ -328,7 +328,7 @@
         "ingui": "vanillaexpanded:config-spawn-decal-size",
         "comment": "vanillaexpanded:config-spawn-decal-size-tooltip",
         "default": 0.4,
-        "weight": 2.2,
+        "weight": 3.2,
         "range": { "min": 0.2, "max": 1.0, "step": 0.1 },
         "clientSide": true
       },
@@ -338,18 +338,52 @@
         "ingui": "vanillaexpanded:config-perishable-item-freshness-indicator-intensity",
         "comment": "vanillaexpanded:config-perishable-item-freshness-indicator-intensity-tooltip",
         "default": 0.35,
-        "weight": 4.20,
+        "weight": 7.45,
         "range": { "min": 0.05, "max": 1.0, "step": 0.05 },
         "clientSide": true
       }
     }
   },
   "formatting": [
-    { "type": "separator", "title": "vanillaexpanded:config-section-features", "weight": 0.5 },
-    { "type": "separator", "title": "vanillaexpanded:config-section-timing", "weight": 1.8 },
-    { "type": "separator", "title": "vanillaexpanded:config-section-recipes", "weight": 2.5 },
-    { "type": "separator", "title": "vanillaexpanded:config-section-visual", "weight": 3.5 },
-    { "type": "separator", "title": "vanillaexpanded:config-section-item-slot-indicators", "weight": 4.0 },
-    { "type": "separator", "title": "vanillaexpanded:config-section-radial-menus", "weight": 5.0 }
+    {
+      "type": "separator",
+      "title": "vanillaexpanded:config-section-auto-stash",
+      "weight": 1
+    },
+    {
+      "type": "separator",
+      "title": "vanillaexpanded:config-section-ignition-tools",
+      "weight": 2
+    },
+    {
+      "type": "separator",
+      "title": "vanillaexpanded:config-section-spawn-decal",
+      "weight": 3
+    },
+    {
+      "type": "separator",
+      "title": "vanillaexpanded:config-section-alloy-calculator",
+      "weight": 4
+    },
+    {
+      "type": "separator",
+      "title": "vanillaexpanded:config-section-gameplay",
+      "weight": 5
+    },
+    {
+      "type": "separator",
+      "title": "vanillaexpanded:config-section-recipes",
+      "weight": 6
+    },
+    {
+      "type": "separator",
+      "title": "vanillaexpanded:config-section-item-slot-indicators",
+      "weight": 7
+    },
+    {
+      "type": "separator",
+      "title": "vanillaexpanded:config-section-radial-menus",
+      "weight": 8
+    }
   ]
 }
