@@ -22,11 +22,13 @@ public class SpawnDecalClientSystem : ModSystem, ILiveConfigurable
     #endregion
 
     #region ModSystem Overrides
+    /// <summary>Loads the spawn decal system only on the client.</summary>
     public override bool ShouldLoad(EnumAppSide forSide)
     {
         return forSide == EnumAppSide.Client;
     }
 
+    /// <summary>Registers spawn updates and applies the current decal configuration.</summary>
     public override void StartClientSide(ICoreClientAPI api)
     {
         capi = api;
@@ -38,6 +40,7 @@ public class SpawnDecalClientSystem : ModSystem, ILiveConfigurable
         ApplyConfig(api);
     }
 
+    /// <summary>Releases the renderer and client references.</summary>
     public override void Dispose()
     {
         DisposeRenderer();
@@ -46,6 +49,7 @@ public class SpawnDecalClientSystem : ModSystem, ILiveConfigurable
         base.Dispose();
     }
 
+    /// <summary>Applies live configuration on the client.</summary>
     public void OnConfigReloaded(ICoreAPI api)
     {
         if (api is not ICoreClientAPI clientApi) return;
@@ -72,6 +76,7 @@ public class SpawnDecalClientSystem : ModSystem, ILiveConfigurable
     #endregion
 
     #region Live Reload
+    /// <summary>Creates, removes, or resizes the renderer to match configuration.</summary>
     private void ApplyConfig(ICoreClientAPI api)
     {
         if (!VanillaExpandedModSystem.Config.EnableSpawnDecal)
@@ -95,11 +100,12 @@ public class SpawnDecalClientSystem : ModSystem, ILiveConfigurable
         }
     }
 
+    /// <summary>Unregisters the renderer from its owning stage before disposing its mesh.</summary>
     private void DisposeRenderer()
     {
         if (renderer is null || capi is null) return;
 
-        capi.Event.UnregisterRenderer(renderer, EnumRenderStage.OIT);
+        capi.Event.UnregisterRenderer(renderer, SpawnDecalRenderer.RenderStage);
         renderer.Dispose();
         renderer = null;
         lastDecalSize = null;
@@ -107,6 +113,7 @@ public class SpawnDecalClientSystem : ModSystem, ILiveConfigurable
     #endregion
 
     #region Network Handlers
+    /// <summary>Updates the decal position or starts its fade from server spawn data.</summary>
     private void OnTemporalSpawnPacket(Packet_TemporalSpawn packet)
     {
         if (!VanillaExpandedModSystem.Config.EnableSpawnDecal) return;
