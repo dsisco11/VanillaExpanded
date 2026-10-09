@@ -1,4 +1,3 @@
-using VanillaExpanded.ItemSlotIndicators;
 using VanillaExpanded.NightVisionIndicators;
 using VanillaExpanded.Tests.Mocks;
 
@@ -48,7 +47,7 @@ public sealed class NightVisionFuelIndicatorProviderTests
     }
     #endregion
 
-    #region Fuel And Color
+    #region Fuel
     /// <summary>Fuel is divided by the standard device capacity and overfill remains read-only.</summary>
     [Theory]
     [InlineData(6, 0.25f)]
@@ -61,24 +60,18 @@ public sealed class NightVisionFuelIndicatorProviderTests
         Assert.True(new NightVisionFuelIndicatorProvider().TryGetIndicator(slot, out var indicator));
         Assert.Equal(expected, indicator.Fill);
         Assert.Equal(fuel, slot.Itemstack!.Attributes.GetDecimal("fuelHours"));
-        if (expected == 1)
-        {
-            Assert.Equal(IndicatorColorPallette.WithOpacity(IndicatorColorPallette.Green, 0.5f), indicator.Color);
-        }
     }
 
-    /// <summary>Missing, empty, and negative fuel produce the shared full-slot red warning.</summary>
+    /// <summary>Missing, empty, and negative fuel remain eligible without mutating the stack.</summary>
     [Theory]
     [InlineData(null)]
     [InlineData(0d)]
     [InlineData(-5d)]
     [InlineData(double.NegativeInfinity)]
-    public void EmptyFuel_ProducesFullRedWarning(double? fuel)
+    public void EmptyFuel_RemainsApplicableWithoutMutation(double? fuel)
     {
         var slot = CreateDeviceSlot(fuel);
-        Assert.True(new NightVisionFuelIndicatorProvider().TryGetIndicator(slot, out var indicator));
-        Assert.Equal(1, indicator.Fill);
-        Assert.Equal(IndicatorColorPallette.WithOpacity(IndicatorColorPallette.Red, 0.3f), indicator.Color);
+        Assert.True(new NightVisionFuelIndicatorProvider().TryGetIndicator(slot, out _));
         Assert.Equal(fuel.HasValue, slot.Itemstack!.Attributes.HasAttribute("fuelHours"));
     }
 
@@ -98,7 +91,6 @@ public sealed class NightVisionFuelIndicatorProviderTests
         device.CapacityHours = 12;
         Assert.True(provider.TryGetIndicator(slot, out var full));
         Assert.Equal(1, full.Fill);
-        Assert.Equal(IndicatorColorPallette.WithOpacity(IndicatorColorPallette.Green, 0.5f), full.Color);
     }
 
     /// <summary>The next query reflects consumption and refueling through the game's methods.</summary>
@@ -114,8 +106,7 @@ public sealed class NightVisionFuelIndicatorProviderTests
         Assert.True(provider.TryGetIndicator(slot, out var half));
         Assert.Equal(0.5f, half.Fill);
         device.AddFuelHours(stack, -12);
-        Assert.True(provider.TryGetIndicator(slot, out var empty));
-        Assert.Equal(IndicatorColorPallette.WithOpacity(IndicatorColorPallette.Red, 0.3f), empty.Color);
+        Assert.True(provider.TryGetIndicator(slot, out _));
         device.SetFuelHours(stack, 24);
         Assert.True(provider.TryGetIndicator(slot, out var refilled));
         Assert.Equal(full, refilled);

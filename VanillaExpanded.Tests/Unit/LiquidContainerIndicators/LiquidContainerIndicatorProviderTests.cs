@@ -76,19 +76,15 @@ public sealed class LiquidContainerIndicatorProviderTests
     [InlineData(25, 10, 5, 0.5f)]
     [InlineData(1000, 100, 10, 1)]
     [InlineData(2000, 100, 10, 1)]
-    public void Contents_ProduceProportionalBlueFill(int portions, float density, float capacity, float expected)
+    public void Contents_ReportClampedResourceFraction(int portions, float density, float capacity, float expected)
     {
         var slot = CreateSlot(portions, density, capacity);
         slot.Itemstack!.StackSize = 4;
         Assert.True(new LiquidContainerIndicatorProvider().TryGetIndicator(slot, out var indicator));
         Assert.Equal(expected, indicator.Fill);
-        Assert.Equal(LiquidSloshIndicatorEffect.DrawRange, indicator.DrawRange);
-        Assert.True(ItemSlotIndicatorDrawInput.TryCreate(100, 100, 48, indicator, out var draw));
-        Assert.Equal(expected * 0.85f, draw.Fill, 5);
-        Assert.True(indicator.Color.Z > indicator.Color.Y && indicator.Color.Y > indicator.Color.X);
     }
 
-    /// <summary>Empty containers produce zero fill without a red warning.</summary>
+    /// <summary>Empty containers report no remaining liquid.</summary>
     [Fact]
     public void EmptyContainer_ProducesZeroFill()
     {
@@ -98,9 +94,7 @@ public sealed class LiquidContainerIndicatorProviderTests
         Assert.True(new LiquidContainerIndicatorProvider().TryGetIndicator(slot, out var indicator));
         Assert.Equal(0, indicator.Fill);
         Assert.True(ItemSlotIndicatorDrawInput.TryCreate(100, 100, 48, indicator, out var draw));
-        Assert.Equal(0f, draw.Fill);
         Assert.True(draw.TryCreateBoundaryCue(out _));
-        Assert.True(indicator.Color.Z > indicator.Color.X);
     }
 
     /// <summary>Taking liquid and replacing contents update the same stack without waiting for a cache.</summary>

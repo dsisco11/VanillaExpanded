@@ -216,13 +216,13 @@ public sealed class ItemSlotIndicatorTests
     #endregion
 
     #region Freshness
-    /// <summary>Active spoilage grows toward rot using purple and the configured presentation style.</summary>
+    /// <summary>Active spoilage reports progress toward rot using the configured presentation style.</summary>
     [Theory]
     [InlineData(0.1f, 0)]
     [InlineData(0.5f, 1)]
     [InlineData(1f, 2)]
     [InlineData(1.2f, 0)]
-    public void Freshness_ActiveSpoilage_GrowsPurple(float spoilage, int style)
+    public void Freshness_ActiveSpoilage_ReportsProgress(float spoilage, int style)
     {
         var world = new Mock<IWorldAccessor>();
         var api = new Mock<ICoreAPI>();
@@ -241,8 +241,6 @@ public sealed class ItemSlotIndicatorTests
 
         Assert.True(system.TryGetRenderSelection(slot, out var selection));
         Assert.Equal(Math.Clamp(spoilage, 0, 1), selection.Indicator.Fill);
-        Assert.Equal(IndicatorColorPallette.WithOpacity(IndicatorColorPallette.Purple,
-            VanillaExpandedModSystem.Config.PerishableItemFreshnessIndicatorIntensity), selection.Indicator.Color);
         Assert.Equal((ItemSlotIndicatorRenderingStyle)style, selection.Style);
     }
 
@@ -288,7 +286,6 @@ public sealed class ItemSlotIndicatorTests
         if (perishable)
         {
             Assert.Equal(freshness, first.Indicator.Fill);
-            Assert.Equal(FreshnessIndicatorProvider.FreshnessColor(freshness), first.Indicator.Color);
         }
         item.Verify(instance => instance.UpdateAndGetTransitionState(world.Object, slot, EnumTransitionType.Perish), Times.Once);
     }

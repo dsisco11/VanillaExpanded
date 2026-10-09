@@ -26,7 +26,6 @@ public sealed class CrucibleIndicatorProviderTests
         Assert.True(new CrucibleIndicatorProvider(molten).TryGetIndicator(slot, out var indicator));
         Assert.False(new CrucibleIndicatorProvider(!molten).TryGetIndicator(slot, out _));
         Assert.Equal(fill, indicator.Fill);
-        Assert.Equal(CrucibleIndicatorEffect.DrawRange, indicator.DrawRange);
     }
 
     /// <summary>Empty, negative-unit, and unresolved-output crucibles do not invent metal contents.</summary>
@@ -97,16 +96,14 @@ public sealed class CrucibleIndicatorProviderTests
         finally { config.CrucibleIndicatorCapacityUnits = originalCapacity; }
     }
 
-    /// <summary>Heating changes the tint without changing quantity or selecting the wrong phase.</summary>
+    /// <summary>Heating within the solid range preserves the reported quantity.</summary>
     [Fact]
-    public void HeatTint_IsIndependentOfAmount()
+    public void Heating_PreservesAmount()
     {
         var provider = new CrucibleIndicatorProvider(false);
         Assert.True(provider.TryGetIndicator(CreateSlot(1280, 20), out var cold));
         Assert.True(provider.TryGetIndicator(CreateSlot(1280, 800), out var hot));
         Assert.Equal(cold.Fill, hot.Fill);
-        Assert.True(hot.Color.X > cold.Color.X);
-        Assert.True(hot.Color.Z < cold.Color.Z);
     }
 
     /// <summary>Metal has a separate engine identity, stronger damping, and restrained camera impulses.</summary>

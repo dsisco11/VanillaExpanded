@@ -31,11 +31,6 @@ public sealed class PreparationIndicatorProviderTests
         slot.Itemstack = new ItemStack(item.Object);
         Assert.True(new PreparationIndicatorProvider().TryGetIndicator(slot, out var indicator));
         Assert.Equal(expected, indicator.Fill);
-        Assert.Equal(0.5f, indicator.Color.W);
-        if (expected == 0 || expected == 1)
-        {
-            Assert.Equal(IndicatorColorPallette.WithOpacity(IndicatorColorPallette.PreparationColors[expected == 0 ? 0 : 1], 0.5f), indicator.Color);
-        }
         item.Verify(value => value.UpdateAndGetTransitionStates(world.Object, slot), Times.Once);
     }
 

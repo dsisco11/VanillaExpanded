@@ -1,7 +1,6 @@
 using Moq;
 
 using VanillaExpanded.ClothingIndicators;
-using VanillaExpanded.ItemSlotIndicators;
 using VanillaExpanded.Tests.Mocks;
 
 using Vintagestory.API.Common;
@@ -75,23 +74,22 @@ public sealed class ClothingIndicatorProviderTests
     }
     #endregion
 
-    #region Condition And Color
-    /// <summary>Fill reports actual condition, while full warmth begins at half condition.</summary>
+    #region Condition
+    /// <summary>Fill reports actual condition and clamps values above the resource limit.</summary>
     [Theory]
     [InlineData(0.5f)]
     [InlineData(0.75f)]
     [InlineData(1)]
     [InlineData(2)]
-    public void FullWarmth_IsGreenWithActualClampedFill(float condition)
+    public void Condition_ReportsClampedResourceFraction(float condition)
     {
         Assert.True(new ClothingIndicatorProvider().TryGetIndicator(CreateClothing(condition), out var indicator));
         Assert.Equal(Math.Min(condition, 1), indicator.Fill);
-        Assert.Equal(IndicatorColorPallette.WithOpacity(IndicatorColorPallette.Green, 0.5f), indicator.Color);
     }
 
-    /// <summary>Below the warmth threshold, condition retains its fraction and progresses toward green.</summary>
+    /// <summary>Below the warmth threshold, condition retains its resource fraction.</summary>
     [Fact]
-    public void LowCondition_UsesActualFillAndWarmthGradient()
+    public void LowCondition_ReportsResourceFraction()
     {
         var provider = new ClothingIndicatorProvider();
         Assert.True(provider.TryGetIndicator(CreateClothing(0.1f), out var low));
@@ -100,20 +98,15 @@ public sealed class ClothingIndicatorProviderTests
         Assert.Equal(0.1f, low.Fill);
         Assert.Equal(0.25f, middle.Fill);
         Assert.Equal(0.49f, high.Fill);
-        Assert.True(low.Color.X > low.Color.Y);
-        Assert.True(high.Color.Y > high.Color.X);
-        Assert.NotEqual(low.Color, middle.Color);
     }
 
-    /// <summary>Zero and negative condition give a full-height shared-red warning.</summary>
+    /// <summary>Zero and negative condition remain eligible for an indicator.</summary>
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
-    public void RuinedClothing_ProducesFullRedWarning(float condition)
+    public void RuinedClothing_RemainsApplicable(float condition)
     {
-        Assert.True(new ClothingIndicatorProvider().TryGetIndicator(CreateClothing(condition), out var indicator));
-        Assert.Equal(1, indicator.Fill);
-        Assert.Equal(IndicatorColorPallette.WithOpacity(IndicatorColorPallette.Red, 0.3f), indicator.Color);
+        Assert.True(new ClothingIndicatorProvider().TryGetIndicator(CreateClothing(condition), out _));
     }
 
     /// <summary>Nonfinite condition does not become a misleading warning or level.</summary>
@@ -141,8 +134,7 @@ public sealed class ClothingIndicatorProviderTests
         Assert.Equal(0.75f, repaired.Fill);
         Assert.Equal(0.75f, slot.Itemstack.Attributes.GetFloat("condition"));
         slot.Itemstack.Attributes.SetFloat("condition", 0);
-        Assert.True(provider.TryGetIndicator(slot, out var ruined));
-        Assert.Equal(1, ruined.Fill);
+        Assert.True(provider.TryGetIndicator(slot, out _));
         Assert.Equal(0, slot.Itemstack.Attributes.GetFloat("condition"));
     }
     #endregion

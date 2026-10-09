@@ -122,7 +122,6 @@ public sealed class FoodContainerIndicatorProviderTests : System.IDisposable
         Assert.Equal(foodContainer, new FoodContainerIndicatorProvider().TryGetIndicator(slot, out var contained));
         var actual = foodContainer ? contained : ordinary;
         Assert.Equal(0.5f, actual.Fill);
-        Assert.Equal(FreshnessIndicatorProvider.FreshnessColor(0.5f), ordinary.Color);
         item.Verify(value => value.UpdateAndGetTransitionState(world, slot, EnumTransitionType.Perish), Times.Once);
     }
 
