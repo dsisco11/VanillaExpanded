@@ -16,7 +16,7 @@ public sealed class HudOverlayIconTextPresentationTests : IDisposable
     public HudOverlayIconTextPresentationTests()
     {
         var translations = new Mock<ITranslationService>();
-        translations.Setup(x => x.Get(It.IsAny<string>(), It.IsAny<object[]>())).Returns((string key, object[] args) => key);
+        translations.Setup(x => x.Get(It.IsAny<string>(), It.IsAny<object[]>())).Returns((string key, object[] args) => key == "vanillaexpanded:bow-ammunition-count" ? $"{args[0]}x" : key);
         Vintagestory.API.Config.Lang.AvailableLanguages["en"] = translations.Object;
     }
     /// <summary>Restores the engine translation registry after preparation checks.</summary>
@@ -76,6 +76,34 @@ public sealed class HudOverlayIconTextPresentationTests : IDisposable
         presentation.Reset();
         Assert.Equal(SizeF.Empty, presentation.Size);
         Assert.All(textures, texture => Assert.True(texture.Disposed));
+    }
+    /// <summary>Compact count-first content keeps native pixel widths and centers its icon at both GUI scales.</summary>
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void CompactPresentationPlacesCountBeforeIcon(double scale)
+    {
+        var api = new Mock<ICoreClientAPI>();
+        var renderer = new Mock<IRenderAPI>();
+        api.SetupGet(x => x.Render).Returns(renderer.Object);
+        using var presentation = new HudOverlayIconTextPresentation((_, localized) =>
+        {
+            Assert.Equal("20x", localized);
+            return new LoadedTexture(api.Object) { Width = (int)(20 * scale), Height = (int)(14 * scale) };
+        }, iconSize: 24, textBeforeIcon: true, gap: 4, fontSize: 14);
+        presentation.SetContent(new ItemStack(new Item { Code = new AssetLocation("game:arrow-flint") }), "vanillaexpanded:bow-ammunition-count", 20);
+        presentation.Prepare(new HudOverlayPreparationContext(api.Object, scale, "en"));
+        Assert.Equal(new SizeF(48, 24), presentation.Size);
+        // Set native resolved pixels directly so the test does not mutate global GUI scale.
+        var bounds = ElementBounds.Fixed(0, 0, 48, 24).WithEmptyParent();
+        bounds.absFixedX = 10;
+        bounds.absFixedY = 20;
+        bounds.absInnerWidth = 48 * scale;
+        bounds.absInnerHeight = 24 * scale;
+        presentation.Draw(renderer.Object, bounds, new RectangleF(10, 20, (float)(48 * scale), (float)(24 * scale)), .1f);
+        renderer.Verify(x => x.Render2DTexturePremultipliedAlpha(0, 10, 20 + 5 * scale, 20 * scale, 14 * scale, 50), Times.Once);
+        renderer.Verify(x => x.RenderItemstackToGui(It.IsAny<ItemSlot>(), 10 + 36 * scale, 20 + 12 * scale, 50,
+            (float)(24 * scale), -1, .1f, true, false, false), Times.Once);
     }
     #endregion
 }
