@@ -132,20 +132,23 @@ Planning requested: 2026-10-10. Execution is authorized for the phase explicitly
     Proposal: [First consumer: bow ammunition](AnchoredHudOverlays.proposal.md#first-consumer-bow-ammunition), [Placement model](AnchoredHudOverlays.proposal.md#placement-model).
     Outcome: the supported active main-hand bow displays the next arrow type and total eligible quantity of that collectible type.
 
-    ☐ Add feature-owned applicability, selector access, inventory sampling/subscriptions, and overlay content under src/BowAmmunition.
-        ☐ Register vanillaexpanded:bow-ammunition in held-item-status with vertical packing and the proposed hotbar-right-middle / group-left-middle / (12, 0) placement.
-        ☐ Hide for no supported active main-hand bow or a dead player; discard old snapshots when switching away or replacing player/session.
-        ☐ Invoke the verified owning GetNextArrow method through a cached read-only binding. Keep custom-bow adapters feature-specific and hide unverified implementations.
-        ☐ Sum positive stacks of the selected collectible identity through the same eligible WalkInventory traversal, excluding creative slots and other types; use a sufficiently wide accumulator.
-        ☐ Preserve verified opened-external-inventory participation and engine ordering; do not group by stack-attribute equality or restrict traversal to a hand-written bag list.
-        ☐ Display the selected icon and count; use localized names where applicable without an always-visible full name. Show a muted generic arrow and localized No arrows/0 state when a supported bow has no eligible ammunition.
-    ☐ Attach/detach notifications across every inventory that can affect traversal; coalesce slot/open/close changes into refresh invalidation.
-        ☐ Request 250 ms fallback refreshes while applicable, including inventory membership and active-hand checks; use available events to shorten latency without assuming complete event coverage.
-        ☐ Reflect current client-visible synchronized inventory without predictive decrements or long-lived selected-slot references; selection may change again on firing release.
-    ☐ Verify mixed arrow types and multiple stacks, including 12 + 8 flint alongside 30 copper producing flint 20 when flint is selected first.
-        ☐ Cover zero/empty stacks, creative exclusion, external inventory open/close, traversal order changes, unsupported bows, no arrows, death/hand switches, synchronized consumption, and player/session replacement.
-        ☐ Verify no inventory mutation and complete subscription/resource cleanup across enable/disable and world transitions.
-    ☐ Completion: content matches verified installed selection semantics under focused checks, and second review/independent audit pass; user-run firing/display agreement remains a final acceptance requirement.
+    ☑ Add feature-owned applicability, selector access, inventory sampling/subscriptions, and overlay content under src/BowAmmunition.
+        ☑ Register vanillaexpanded:bow-ammunition in held-item-status with vertical packing and the proposed hotbar-right-middle / group-left-middle / (12, 0) placement.
+        ☑ Hide for no supported active main-hand bow or a dead player; discard old snapshots when switching away or replacing player/session.
+        ☑ Invoke the verified owning GetNextArrow method through a cached read-only binding. Keep custom-bow adapters feature-specific and hide unverified implementations.
+        ☑ Sum positive stacks of the selected collectible identity through the same eligible WalkInventory traversal, excluding creative slots and other types; use a sufficiently wide accumulator.
+        ☑ Preserve verified opened-external-inventory participation and engine ordering; do not group by stack-attribute equality or restrict traversal to a hand-written bag list.
+        ☑ Display the selected icon and count; use localized names where applicable without an always-visible full name. Show a muted generic arrow and localized No arrows/0 state when a supported bow has no eligible ammunition.
+    ☑ Attach/detach notifications across every inventory that can affect traversal; coalesce slot/open/close changes into refresh invalidation.
+        ☑ Request 250 ms fallback refreshes while applicable, including inventory membership and active-hand checks; use available events to shorten latency without assuming complete event coverage.
+        ☑ Reflect current client-visible synchronized inventory without predictive decrements or long-lived selected-slot references; selection may change again on firing release.
+    ☑ Verify mixed arrow types and multiple stacks, including 12 + 8 flint alongside 30 copper producing flint 20 when flint is selected first.
+        ☑ Cover zero/empty stacks, creative exclusion, external inventory open/close, traversal order changes, unsupported bows, no arrows, death/hand switches, synchronized consumption, and player/session replacement.
+        ☑ Verify no inventory mutation and complete subscription/resource cleanup across enable/disable and world transitions.
+    ☑ Completion: content matches verified installed selection semantics under focused checks, and second review/independent audit pass; user-run firing/display agreement remains a final acceptance requirement.
+
+    Verification notes (2026-10-10; second review and independent audit passed): both projects built and all 100 focused HUD/bow tests passed (88 shared HUD, 12 bow; zero skips). Installed API/survival assembly hashes still match the proposal. Executed native selector and EntityPlayer traversal checks cover mixed types/stacks, differing attributes, creative inventories/slots, nonpositive quantities, opened external inventories/order, wide totals, and unchanged live inventory. Consumer checks cover slot/active-hand/local open-close notifications, removed inventory cleanup, client-visible quantity changes, unsupported hands, death, actual player replacement, disable/re-enable, repeated session cleanup, cached empty presentation, query-free drawing, and client registration/default placement/250 ms interval. Texture ownership/caching uses an inert allocation seam; native font/glyph appearance and synchronized firing/display agreement remain user-run acceptance in Phase 7. Existing offline NU1900 and unrelated compiler warnings remain; no game was launched.
+    Traceability: applicability/selection/counting tasks -> proposal First consumer / Selection authority and compatibility / Installed integration contract -> feature-owned exact ItemBow binding, native WalkInventory samples and sampler tests; notifications/fallback tasks -> Selection authority and compatibility / Updates -> all-available-inventory subscriptions, local event filtering, shared scheduler invalidation, 250 ms registration and notification tests; presentation/cleanup tasks -> Meaning of the display / Resource lifecycle / Ownership and registration -> copied arrow/count, localized muted empty state, enabled transition/session ownership and cached drawing/resource tests. Independent audit found no unresolved requirement. Live configuration remains Phase 6; the project.todo feature marker remains unchecked until final acceptance.
 
 ## Phase 6: Integrate live configuration and user documentation
     Depends on: Phases 2–5.
