@@ -84,6 +84,21 @@ public class VanillaExpandedConfig
 
     #endregion
 
+    #region Animal Sex Indicators (Client-Side)
+    /// <summary>Shows terrain-occluded sex symbols above living animals of generation one or greater.</summary>
+    public bool EnableAnimalSexIndicators { get; set; } = true;
+    /// <summary>Base symbol size in blocks (0.05 to 1), rendered at half this size.</summary>
+    public float AnimalSexIndicatorSize { get; set; } = 0.25f;
+    /// <summary>Maximum symbol viewing distance in blocks (1 to 8).</summary>
+    public float AnimalSexIndicatorRange { get; set; } = 8;
+    /// <summary>Maximum symbol opacity before distance fading (0 to 1).</summary>
+    public float AnimalSexIndicatorOpacity { get; set; } = 0.75f;
+    /// <summary>Male symbol color as a packed RGB integer, default blue.</summary>
+    public int AnimalMaleIconColor { get; set; } = 0x4DA6FF;
+    /// <summary>Female symbol color as a packed RGB integer, default pink.</summary>
+    public int AnimalFemaleIconColor { get; set; } = 0xFF75B5;
+    #endregion
+
     #region Recipe Toggles
     /// <summary>
     /// Enable decrafting backpacks into leather using knife or shears.

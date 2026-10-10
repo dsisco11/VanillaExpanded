@@ -3,6 +3,15 @@
   "file": "VanillaExpanded.json",
   "settings": {
     "boolean": {
+      "EnableAnimalSexIndicators": {
+        "code": "EnableAnimalSexIndicators",
+        "name": "EnableAnimalSexIndicators",
+        "ingui": "vanillaexpanded:config-animal-sex-indicators",
+        "comment": "vanillaexpanded:config-animal-sex-indicators-tooltip",
+        "default": true,
+        "weight": 9.1,
+        "clientSide": true
+      },
       "EnableBucketSourceProtectionPatch": {
         "code": "EnableBucketSourceProtectionPatch",
         "name": "EnableBucketSourceProtectionPatch",
@@ -198,6 +207,34 @@
       }
     },
     "integer": {
+      "AnimalFemaleIconColor": {
+        "code": "AnimalFemaleIconColor",
+        "name": "AnimalFemaleIconColor",
+        "ingui": "vanillaexpanded:config-animal-female-icon-color",
+        "comment": "vanillaexpanded:config-animal-female-icon-color-tooltip",
+        "default": 16741813,
+        "weight": 9.5,
+        "clientSide": true,
+        "range": {
+          "min": 0,
+          "max": 16777215,
+          "step": 1
+        }
+      },
+      "AnimalMaleIconColor": {
+        "code": "AnimalMaleIconColor",
+        "name": "AnimalMaleIconColor",
+        "ingui": "vanillaexpanded:config-animal-male-icon-color",
+        "comment": "vanillaexpanded:config-animal-male-icon-color-tooltip",
+        "default": 5089023,
+        "weight": 9.4,
+        "clientSide": true,
+        "range": {
+          "min": 0,
+          "max": 16777215,
+          "step": 1
+        }
+      },
       "FoodLevelIndicatorStyle": {
         "code": "FoodLevelIndicatorStyle",
         "name": "FoodLevelIndicatorStyle",
@@ -224,6 +261,48 @@
       }
     },
     "float": {
+      "AnimalSexIndicatorOpacity": {
+        "code": "AnimalSexIndicatorOpacity",
+        "name": "AnimalSexIndicatorOpacity",
+        "ingui": "vanillaexpanded:config-animal-sex-indicator-opacity",
+        "comment": "vanillaexpanded:config-animal-sex-indicator-opacity-tooltip",
+        "default": 0.75,
+        "weight": 9.35,
+        "clientSide": true,
+        "range": {
+          "min": 0,
+          "max": 1,
+          "step": 0.05
+        }
+      },
+      "AnimalSexIndicatorRange": {
+        "code": "AnimalSexIndicatorRange",
+        "name": "AnimalSexIndicatorRange",
+        "ingui": "vanillaexpanded:config-animal-sex-indicator-range",
+        "comment": "vanillaexpanded:config-animal-sex-indicator-range-tooltip",
+        "default": 8,
+        "weight": 9.3,
+        "clientSide": true,
+        "range": {
+          "min": 1,
+          "max": 8,
+          "step": 1
+        }
+      },
+      "AnimalSexIndicatorSize": {
+        "code": "AnimalSexIndicatorSize",
+        "name": "AnimalSexIndicatorSize",
+        "ingui": "vanillaexpanded:config-animal-sex-indicator-size",
+        "comment": "vanillaexpanded:config-animal-sex-indicator-size-tooltip",
+        "default": 0.25,
+        "weight": 9.2,
+        "clientSide": true,
+        "range": {
+          "min": 0.05,
+          "max": 1,
+          "step": 0.05
+        }
+      },
       "CrucibleIndicatorCapacityUnits": {
         "code": "CrucibleIndicatorCapacityUnits",
         "name": "CrucibleIndicatorCapacityUnits",
@@ -345,6 +424,11 @@
     }
   },
   "formatting": [
+    {
+      "type": "separator",
+      "title": "vanillaexpanded:config-section-animal-sex-indicators",
+      "weight": 9
+    },
     {
       "type": "separator",
       "title": "vanillaexpanded:config-section-auto-stash",
