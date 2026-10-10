@@ -1,4 +1,6 @@
 {
+  "config-animal-sex-indicator-opacity": "Symbol opacity",
+  "config-animal-sex-indicator-opacity-tooltip": "Maximum opacity before distance fading. Default: 75%.",
   "config-animal-male-icon-color": "Male symbol RGB color",
   "config-animal-male-icon-color-tooltip": "Packed RGB color as a decimal number (0–16777215). Default blue: 5089023.",
   "config-animal-female-icon-color": "Female symbol RGB color",
@@ -7,9 +9,9 @@
   "config-animal-sex-indicators": "Enable animal sex indicators",
   "config-animal-sex-indicators-tooltip": "Show blue male and pink female symbols above living generation 1+ animals. Terrain hides the symbols.",
   "config-animal-sex-indicator-size": "Symbol size",
-  "config-animal-sex-indicator-size-tooltip": "Width and height of animal sex symbols in blocks.",
+  "config-animal-sex-indicator-size-tooltip": "Base size in blocks; symbols render at half this value.",
   "config-animal-sex-indicator-range": "Viewing distance",
-  "config-animal-sex-indicator-range-tooltip": "Maximum distance in blocks at which animal sex symbols are shown.",
+  "config-animal-sex-indicator-range-tooltip": "Viewing distance up to 8 blocks. Symbols fade over the farther half of this range.",
   "config-section-auto-stash": "Auto Stash",
   "config-section-ignition-tools": "Ignition Tools",
   "config-section-spawn-decal": "Spawn Decal",

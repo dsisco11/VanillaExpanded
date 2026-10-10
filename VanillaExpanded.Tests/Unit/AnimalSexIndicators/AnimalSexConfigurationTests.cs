@@ -22,7 +22,7 @@ public sealed class AnimalSexConfigurationTests
         var settings = patch.RootElement.GetProperty("settings").EnumerateObject()
             .SelectMany(category => category.Value.EnumerateObject())
             .Where(setting => setting.Name.StartsWith("Animal") || setting.Name.StartsWith("EnableAnimal")).ToArray();
-        Assert.Equal(5, settings.Length);
+        Assert.Equal(6, settings.Length);
         foreach (var setting in settings)
         {
             Assert.True(setting.Value.GetProperty("clientSide").GetBoolean());

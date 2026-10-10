@@ -22,7 +22,14 @@ internal sealed class AnimalSexIndicatorRenderer : IRenderer
     /// <summary>Draws late in the opaque world pass, after terrain has populated depth.</summary>
     public double RenderOrder => 0.99;
     /// <summary>Declares the maximum supported viewing distance.</summary>
-    public int RenderRange => 64;
+    public int RenderRange => 8;
+
+    /// <summary>Retains full opacity in the nearer half of the range and fades continuously to zero at its edge.</summary>
+    internal static float GetDistanceFade(double distance, double range)
+    {
+        // The last half of the viewing range is a linear fade, avoiding a visible cutoff.
+        return (float)Math.Clamp((range - distance) / (range * 0.5), 0, 1);
+    }
 
     /// <summary>Loads cached symbol assets and uploads one quad, then registers world rendering.</summary>
     public AnimalSexIndicatorRenderer(ICoreClientAPI api)
@@ -55,8 +62,9 @@ internal sealed class AnimalSexIndicatorRenderer : IRenderer
         if (disposed || shader is null || stage != EnumRenderStage.Opaque || !config.EnableAnimalSexIndicators || api.World.Player is null) return;
         var player = api.World.Player.Entity;
         var camera = player.CameraPos;
-        float range = FiniteClamp(config.AnimalSexIndicatorRange, 24, 1, 64);
-        float size = FiniteClamp(config.AnimalSexIndicatorSize, 0.25f, 0.05f, 1);
+        float range = FiniteClamp(config.AnimalSexIndicatorRange, 8, 1, 8);
+        float size = FiniteClamp(config.AnimalSexIndicatorSize, 0.25f, 0.05f, 1) * 0.5f;
+        float opacity = FiniteClamp(config.AnimalSexIndicatorOpacity, 0.75f, 0, 1);
         double[] view = api.Render.CameraMatrixOrigin;
         using var state = new AnimalSexIndicatorRenderState(api.Render);
         GL.Enable(EnableCap.DepthTest);
@@ -83,7 +91,9 @@ internal sealed class AnimalSexIndicatorRenderer : IRenderer
                 double x = entity.Pos.X - camera.X;
                 double y = entity.Pos.InternalY + entity.SelectionBox.Y2 + 0.12 + size / 2 - camera.Y;
                 double z = entity.Pos.Z - camera.Z;
-                if (x * x + y * y + z * z > range * range) continue;
+                double distanceSquared = x * x + y * y + z * z;
+                if (distanceSquared >= range * range) continue;
+                float alpha = opacity * GetDistanceFade(Math.Sqrt(distanceSquared), range);
                 // Transpose the view rotation to keep the billboard facing the camera, including pitch.
                 model.Identity();
                 float[] matrix = model.Values;
@@ -91,7 +101,7 @@ internal sealed class AnimalSexIndicatorRenderer : IRenderer
                 for (int row = 0; row < 3; row++) matrix[column * 4 + row] = (float)view[row * 4 + column] * size;
                 matrix[12] = (float)x; matrix[13] = (float)y; matrix[14] = (float)z;
                 int color = sex == "male" ? config.AnimalMaleIconColor : config.AnimalFemaleIconColor;
-                tint.Set(((color >> 16) & 255) / 255f, ((color >> 8) & 255) / 255f, (color & 255) / 255f, 1);
+                tint.Set(((color >> 16) & 255) / 255f, ((color >> 8) & 255) / 255f, (color & 255) / 255f, alpha);
                 AnimalSexIndicatorDraw.Draw(api.Render, shader, quad,
                     sex == "male" ? maleTextureId : femaleTextureId, matrix, tint);
             }

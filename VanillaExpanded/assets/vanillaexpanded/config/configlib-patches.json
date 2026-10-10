@@ -261,17 +261,31 @@
       }
     },
     "float": {
+      "AnimalSexIndicatorOpacity": {
+        "code": "AnimalSexIndicatorOpacity",
+        "name": "AnimalSexIndicatorOpacity",
+        "ingui": "vanillaexpanded:config-animal-sex-indicator-opacity",
+        "comment": "vanillaexpanded:config-animal-sex-indicator-opacity-tooltip",
+        "default": 0.75,
+        "weight": 9.35,
+        "clientSide": true,
+        "range": {
+          "min": 0,
+          "max": 1,
+          "step": 0.05
+        }
+      },
       "AnimalSexIndicatorRange": {
         "code": "AnimalSexIndicatorRange",
         "name": "AnimalSexIndicatorRange",
         "ingui": "vanillaexpanded:config-animal-sex-indicator-range",
         "comment": "vanillaexpanded:config-animal-sex-indicator-range-tooltip",
-        "default": 24,
+        "default": 8,
         "weight": 9.3,
         "clientSide": true,
         "range": {
           "min": 1,
-          "max": 64,
+          "max": 8,
           "step": 1
         }
       },
