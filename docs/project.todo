@@ -1,6 +1,6 @@
 # Vanilla: Expanded TODO List:
     ## Issues:
-        ☐ Fix respawn decal looking obnoxious (too colorful).
+        ☐ Fix cave-art tool-mode menu. all of the options are extremely tiny because there are so many.
 
     ## New Features:
         ☐ Add HUD indicator to show current arrow type and quantity when player is holding a bow.
@@ -8,6 +8,7 @@
         ☐ Add HUD indicator for current weather conditions (e.g., rain, snow, fog).
         ☐ Add HUD indicator for outside temperature when approaching a level outside the players comfort zone.
         ☐ Add HUD indicator for player body temperature when approaching dangerous levels.
+        ☐ Add a "Todo List" feature which allows players to create their own ingame tasks and reminders.
         ☐ Temporal gear amulets should provide information about when the next storm is expected to occur (approximately, with increasing accuracy as the storm gets closer).
         ☐ Wearing a temporal gear amulet should provide a subtle HUD indicator when a storm is approaching.
         ☐ Targeted items such as tools on toolracks have a subtle highlight to indicate that they are targeted.
