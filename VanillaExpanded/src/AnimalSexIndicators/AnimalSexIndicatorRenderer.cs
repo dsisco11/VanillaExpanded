@@ -13,6 +13,7 @@ internal sealed class AnimalSexIndicatorRenderer : IRenderer
     private readonly MeshRef quad;
     private readonly int maleTextureId;
     private readonly int femaleTextureId;
+    private readonly int pregnantFemaleTextureId;
     private readonly Matrixf model = new();
     private readonly Vec4f tint = new();
     private AnimalSexIndicatorShaderProgram? shader;
@@ -44,6 +45,7 @@ internal sealed class AnimalSexIndicatorRenderer : IRenderer
             // Cached asset textures belong to the engine and survive renderer disposal.
             maleTextureId = api.Render.GetOrLoadTexture(new AssetLocation(Constants.ModId, "textures/animal-sex-indicators/male.png"));
             femaleTextureId = api.Render.GetOrLoadTexture(new AssetLocation(Constants.ModId, "textures/animal-sex-indicators/female.png"));
+            pregnantFemaleTextureId = api.Render.GetOrLoadTexture(new AssetLocation(Constants.ModId, "textures/animal-sex-indicators/female-pregnant.png"));
             if (!ReloadShader()) throw new InvalidOperationException("Could not compile the animal sex indicator shader.");
             api.Event.ReloadShader += ReloadShader;
             api.Event.RegisterRenderer(this, EnumRenderStage.Opaque, "animal-sex-indicators");
@@ -86,8 +88,8 @@ internal sealed class AnimalSexIndicatorRenderer : IRenderer
             foreach (var entity in api.World.LoadedEntities.Values)
             {
                 if (!entity.IsRendered || entity.Pos.Dimension != player.Pos.Dimension) continue;
-                string? sex = AnimalSexEligibility.GetSex(entity);
-                if (sex is null) continue;
+                string? iconVariant = AnimalSexEligibility.GetIconVariant(entity);
+                if (iconVariant is null) continue;
                 double x = entity.Pos.X - camera.X;
                 double y = entity.Pos.InternalY + entity.SelectionBox.Y2 + 0.12 + size / 2 - camera.Y;
                 double z = entity.Pos.Z - camera.Z;
@@ -100,10 +102,15 @@ internal sealed class AnimalSexIndicatorRenderer : IRenderer
                 for (int column = 0; column < 3; column++)
                 for (int row = 0; row < 3; row++) matrix[column * 4 + row] = (float)view[row * 4 + column] * size;
                 matrix[12] = (float)x; matrix[13] = (float)y; matrix[14] = (float)z;
-                int color = sex == "male" ? config.AnimalMaleIconColor : config.AnimalFemaleIconColor;
+                int color = iconVariant == "male" ? config.AnimalMaleIconColor : config.AnimalFemaleIconColor;
                 tint.Set(((color >> 16) & 255) / 255f, ((color >> 8) & 255) / 255f, (color & 255) / 255f, alpha);
                 AnimalSexIndicatorDraw.Draw(api.Render, shader, quad,
-                    sex == "male" ? maleTextureId : femaleTextureId, matrix, tint);
+                    iconVariant switch
+                    {
+                        "male" => maleTextureId,
+                        "female-pregnant" => pregnantFemaleTextureId,
+                        _ => femaleTextureId
+                    }, matrix, tint);
             }
         }
         finally { shader.Stop(); }

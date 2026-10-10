@@ -16,5 +16,14 @@ internal static class AnimalSexEligibility
         string? gender = entity.Properties?.Variant.TryGetValue("gender", out string value) == true ? value : null;
         return gender is "male" or "female" ? gender : null;
     }
+
+    /// <summary>Selects the pregnancy variant from current synchronized breeding state.</summary>
+    public static string? GetIconVariant(Entity entity)
+    {
+        // Preserve eligibility and read the live watched tree so conception and birth update immediately.
+        string? sex = GetSex(entity);
+        return sex == "female" && entity.WatchedAttributes.GetTreeAttribute("multiply")?.GetBool("isPregnant", false) == true
+            ? "female-pregnant" : sex;
+    }
     #endregion
 }
