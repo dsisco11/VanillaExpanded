@@ -156,6 +156,6 @@
   "config-tool-mode-menu-size-tooltip": "Scale the tool-mode radial menu from 0.15 to 2.5. 1 keeps the default size. Changes take effect immediately.",
   "config-quick-swap-menu-size": "Quick-swap menu size",
   "config-quick-swap-menu-size-tooltip": "Scale the quick-swap radial menu from 0.15 to 2.5. 1 keeps the default size. Changes take effect immediately.",
-  "bow-ammunition-count": "{0}",
+  "bow-ammunition-count": "{0}x",
   "bow-ammunition-empty": "➶  No arrows / 0"
 }

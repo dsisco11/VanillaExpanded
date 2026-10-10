@@ -11,11 +11,13 @@ internal sealed class HudOverlayAnchorContext
 {
     public const string ScreenTargetId = "screen";
     public const string HotbarTargetId = "hotbar";
+    public const string SaturationTargetId = "saturation";
     public const double SafeInset = 12;
     private readonly int threadId = Environment.CurrentManagedThreadId;
     private readonly Func<double> readScale;
     private readonly Func<RectangleF?> readHotbar;
     private readonly Func<bool> isHidden;
+    private readonly Func<RectangleF?> readSaturation;
     private readonly Dictionary<string, RectangleF?> frameTargets = new(StringComparer.Ordinal);
     private RectangleF viewport;
     private int leftMargin, rightMargin;
@@ -39,12 +41,13 @@ internal sealed class HudOverlayAnchorContext
         WindowBounds = api.Gui.WindowBounds;
         readScale = () => RuntimeEnv.GUIScale;
         readHotbar = new HudOverlayHotbarAnchor(api).Resolve;
+        readSaturation = new HudOverlaySaturationAnchor(api).Resolve;
         isHidden = () => api.HideGuis;
     }
 
     /// <summary>Accepts native bounds and target readers for headless integration without a graphics context.</summary>
     internal HudOverlayAnchorContext(ElementBounds windowBounds, Func<double> readScale,
-        Func<RectangleF?> readHotbar, Func<bool>? isHidden = null)
+        Func<RectangleF?> readHotbar, Func<bool>? isHidden = null, Func<RectangleF?>? readSaturation = null)
     {
         ArgumentNullException.ThrowIfNull(windowBounds);
         ArgumentNullException.ThrowIfNull(readScale);
@@ -52,6 +55,7 @@ internal sealed class HudOverlayAnchorContext
         WindowBounds = windowBounds;
         this.readScale = readScale;
         this.readHotbar = readHotbar;
+        this.readSaturation = readSaturation ?? (() => null);
         this.isHidden = isHidden ?? (() => false);
     }
     #endregion
@@ -96,6 +100,7 @@ internal sealed class HudOverlayAnchorContext
         {
             ScreenTargetId => viewport,
             HotbarTargetId => readHotbar(),
+            SaturationTargetId => readSaturation(),
             _ => null
         };
         if (rectangle is { } value && !IsAvailable(value)) rectangle = null;

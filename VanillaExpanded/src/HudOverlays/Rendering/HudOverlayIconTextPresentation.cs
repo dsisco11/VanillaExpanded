@@ -12,6 +12,9 @@ namespace VanillaExpanded.HudOverlays.Rendering;
 internal sealed class HudOverlayIconTextPresentation : IDisposable
 {
     private readonly System.Func<HudOverlayPreparationContext, string, LoadedTexture> createText;
+    private readonly float iconSize;
+    private readonly float gap;
+    private readonly bool textBeforeIcon;
     private readonly ItemSlot slot = new DummySlot();
     private byte[]? iconContent;
     private string key = string.Empty;
@@ -25,9 +28,16 @@ internal sealed class HudOverlayIconTextPresentation : IDisposable
     #region Public API
     #region Content and preparation
     /// <summary>Uses native contrast text by default, accepting an inert resource factory for focused lifecycle checks.</summary>
-    public HudOverlayIconTextPresentation(System.Func<HudOverlayPreparationContext, string, LoadedTexture>? createText = null)
+    public HudOverlayIconTextPresentation(System.Func<HudOverlayPreparationContext, string, LoadedTexture>? createText = null,
+        float iconSize = 32, bool textBeforeIcon = false, float gap = 6, float? fontSize = null)
     {
-        this.createText = createText ?? CreateNativeText;
+        if (!float.IsFinite(iconSize) || iconSize <= 0) throw new ArgumentOutOfRangeException(nameof(iconSize));
+        if (!float.IsFinite(gap) || gap < 0) throw new ArgumentOutOfRangeException(nameof(gap));
+        if (fontSize.HasValue && (!float.IsFinite(fontSize.Value) || fontSize.Value <= 0)) throw new ArgumentOutOfRangeException(nameof(fontSize));
+        this.iconSize = iconSize;
+        this.textBeforeIcon = textBeforeIcon;
+        this.gap = gap;
+        this.createText = createText ?? ((preparation, localized) => CreateNativeText(preparation, localized, fontSize));
     }
     /// <summary>Copies sampled content so engine item rendering never receives a live inventory stack.</summary>
     public void SetContent(ItemStack? icon, string localizedKey, params object[] arguments)
@@ -59,8 +69,8 @@ internal sealed class HudOverlayIconTextPresentation : IDisposable
         previous?.Dispose();
         context = preparation;
         scale = preparation.GuiScale;
-        float iconWidth = slot.Itemstack == null ? 0 : 32;
-        Size = new SizeF(iconWidth + (text == null ? 0 : (iconWidth > 0 ? 6 : 0) + (float)(text.Width / scale)),
+        float iconWidth = slot.Itemstack == null ? 0 : iconSize;
+        Size = new SizeF(iconWidth + (text == null ? 0 : (iconWidth > 0 ? gap : 0) + (float)(text.Width / scale)),
             Math.Max(iconWidth, text == null ? 0 : (float)(text.Height / scale)));
         dirty = false;
     }
@@ -74,14 +84,19 @@ internal sealed class HudOverlayIconTextPresentation : IDisposable
         double x = bounds.renderX;
         double y = bounds.renderY;
         double height = bounds.OuterHeight;
-        if (slot.Itemstack != null)
+        // Keep the text and icon centered independently within the allocated native bounds.
+        double textX = x;
+        double iconX = x;
+        if (text != null && slot.Itemstack != null)
         {
-            renderer.RenderItemstackToGui(slot, x + 16 * scale, y + height / 2, 50, (float)(32 * scale), -1,
-                deltaTime, shading: true, rotate: false, showStackSize: false);
-            x += 38 * scale;
+            if (textBeforeIcon) iconX += text.Width + gap * scale;
+            else textX += (iconSize + gap) * scale;
         }
-        if (text != null) renderer.Render2DTexturePremultipliedAlpha(text.TextureId, x, y + (height - text.Height) / 2,
+        if (text != null) renderer.Render2DTexturePremultipliedAlpha(text.TextureId, textX, y + (height - text.Height) / 2,
             text.Width, text.Height, 50);
+        if (slot.Itemstack != null)
+            renderer.RenderItemstackToGui(slot, iconX + iconSize * scale / 2, y + height / 2, 50, (float)(iconSize * scale), -1,
+                deltaTime, shading: true, rotate: false, showStackSize: false);
     }
     /// <summary>Releases session-owned text and sampled copies without disposing borrowed engine resources.</summary>
     public void Reset()
@@ -108,9 +123,10 @@ internal sealed class HudOverlayIconTextPresentation : IDisposable
     #endregion
     #region Private
     /// <summary>Creates localized white text with a dark stroke through the borrowed native GUI service.</summary>
-    private static LoadedTexture CreateNativeText(HudOverlayPreparationContext preparation, string localized)
+    private static LoadedTexture CreateNativeText(HudOverlayPreparationContext preparation, string localized, float? fontSize)
     {
         var font = CairoFont.WhiteSmallText().WithStroke(new double[] { 0, 0, 0, .85 }, 1.5);
+        if (fontSize.HasValue) font.WithFontSize(fontSize.Value);
         return preparation.Api.Gui.TextTexture.GenTextTexture(localized, font);
     }
     #endregion
