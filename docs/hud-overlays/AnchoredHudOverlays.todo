@@ -23,7 +23,7 @@ Planning requested: 2026-10-10. Execution is authorized for the phase explicitly
     Do not alter bow firing, reserve or move ammunition, mutate inventory, predict consumption, or introduce an arrow-selection preference.
 
 ## Assumptions and unresolved details
-    Carry forward the proposal's defaults: both enable toggles true; hotbar-right attachment with left-middle group pivot and (12, 0) GUI-unit offset; vertical held-item-status packing; 12 GUI-unit safe inset; 1,000 ms default refresh; 100 ms heartbeat; 250 ms bow fallback refresh.
+    Carry forward the proposal's defaults: both enable toggles true; saturation-meter top-left attachment with left-bottom group pivot and (-4, 0) GUI-unit offset; vertical held-item-status packing; 12 GUI-unit safe inset; 1,000 ms default refresh; 100 ms heartbeat; 250 ms bow fallback refresh.
     Installed bow selection/traversal, DrawOrder 0.1, and event coverage are resolved by the linked installed integration contract. Live hotbar extent/visibility, input behavior, and synchronized firing/display agreement remain acceptance obligations.
     Layout defaults are resolved: gap 6 GUI units, content padding 4 on each side, start cross-axis alignment, and zero native root padding. Concrete configuration keys/ranges beyond those named in the proposal and later internal signatures remain implementation choices.
     Registered instances and IDs persist for the client ModSystem lifetime. BeginSession/EndSession bind and release session state/resources; EndSession is idempotent, and final removal ends any active session before disposing the instance exactly once.
@@ -133,12 +133,12 @@ Planning requested: 2026-10-10. Execution is authorized for the phase explicitly
     Outcome: the supported active main-hand bow displays the next arrow type and total eligible quantity of that collectible type.
 
     ☑ Add feature-owned applicability, selector access, inventory sampling/subscriptions, and overlay content under src/BowAmmunition.
-        ☑ Register vanillaexpanded:bow-ammunition in held-item-status with vertical packing and the proposed hotbar-right-middle / group-left-middle / (12, 0) placement.
+        ☑ Register vanillaexpanded:bow-ammunition in held-item-status with vertical packing and the saturation-meter top-left / group-left-bottom / (-4, 0) placement.
         ☑ Hide for no supported active main-hand bow or a dead player; discard old snapshots when switching away or replacing player/session.
         ☑ Invoke the verified owning GetNextArrow method through a cached read-only binding. Keep custom-bow adapters feature-specific and hide unverified implementations.
         ☑ Sum positive stacks of the selected collectible identity through the same eligible WalkInventory traversal, excluding creative slots and other types; use a sufficiently wide accumulator.
         ☑ Preserve verified opened-external-inventory participation and engine ordering; do not group by stack-attribute equality or restrict traversal to a hand-written bag list.
-        ☑ Display the selected icon and count; use localized names where applicable without an always-visible full name. Show a muted generic arrow and localized No arrows/0 state when a supported bow has no eligible ammunition.
+        ☑ Display `<count>x <arrow icon>` with a 24 GUI-unit icon, 14-point native text, and a 4 GUI-unit gap; use localized names where applicable without an always-visible full name. Show a muted generic arrow and localized No arrows/0 state when a supported bow has no eligible ammunition.
     ☑ Attach/detach notifications across every inventory that can affect traversal; coalesce slot/open/close changes into refresh invalidation.
         ☑ Request 250 ms fallback refreshes while applicable, including inventory membership and active-hand checks; use available events to shorten latency without assuming complete event coverage.
         ☑ Reflect current client-visible synchronized inventory without predictive decrements or long-lived selected-slot references; selection may change again on firing release.
@@ -150,6 +150,8 @@ Planning requested: 2026-10-10. Execution is authorized for the phase explicitly
     Verification notes (2026-10-10; second review and independent audit passed): both projects built and all 100 focused HUD/bow tests passed (88 shared HUD, 12 bow; zero skips). Installed API/survival assembly hashes still match the proposal. Executed native selector and EntityPlayer traversal checks cover mixed types/stacks, differing attributes, creative inventories/slots, nonpositive quantities, opened external inventories/order, wide totals, and unchanged live inventory. Consumer checks cover slot/active-hand/local open-close notifications, removed inventory cleanup, client-visible quantity changes, unsupported hands, death, actual player replacement, disable/re-enable, repeated session cleanup, cached empty presentation, query-free drawing, and client registration/default placement/250 ms interval. Texture ownership/caching uses an inert allocation seam; native font/glyph appearance and synchronized firing/display agreement remain user-run acceptance in Phase 7. Existing offline NU1900 and unrelated compiler warnings remain; no game was launched.
     Traceability: applicability/selection/counting tasks -> proposal First consumer / Selection authority and compatibility / Installed integration contract -> feature-owned exact ItemBow binding, native WalkInventory samples and sampler tests; notifications/fallback tasks -> Selection authority and compatibility / Updates -> all-available-inventory subscriptions, local event filtering, shared scheduler invalidation, 250 ms registration and notification tests; presentation/cleanup tasks -> Meaning of the display / Resource lifecycle / Ownership and registration -> copied arrow/count, localized muted empty state, enabled transition/session ownership and cached drawing/resource tests. Independent audit found no unresolved requirement. Live configuration remains Phase 6; the project.todo feature marker remains unchecked until final acceptance.
 
+    Presentation revision (2026-10-10): requested compact `<count>x <arrow icon>` uses a 24 GUI-unit icon, 14-point native text and 4 GUI-unit gap. The group now docks to the public native saturation meter top-left with left-bottom pivot and (-4, 0) offset; content aligns to the meter left edge and ends 4 GUI units above it. Installed HudStatbar IL establishes composer statbar / element saturationstatbar and spectator suppression. Build succeeded and all 122 focused HUD/bow tests passed, including native meter unavailable/recovery checks and content geometry at scales 1, 1.5 and 2. Live appearance remains pending.
+
 ## Phase 6: Integrate live configuration and user documentation
     Depends on: Phases 2–5.
     Proposal: [Configuration](AnchoredHudOverlays.proposal.md#configuration), [Updates](AnchoredHudOverlays.proposal.md#updates).
@@ -157,7 +159,7 @@ Planning requested: 2026-10-10. Execution is authorized for the phase explicitly
 
     ☐ Extend VanillaExpandedConfig, existing ConfigLib mappings, and localization with a visibly grouped HUD Overlays section.
         ☐ Add EnableHudOverlays and EnableBowAmmunitionOverlay, both default true.
-        ☐ Expose held-item-status placement as hotbar or one of nine screen positions plus X/Y GUI-unit offsets; retain packing/order settings as registration defaults.
+        ☐ Expose held-item-status placement as saturation meter, hotbar, or one of nine screen positions plus X/Y GUI-unit offsets; retain packing/order settings as registration defaults.
         ☐ Use stable persisted keys and consistent defaults; unknown anchor keys revert to the group default, and nonfinite offsets revert to defaults.
     ☐ Implement ILiveConfigurable integration for settings and placement changes.
         ☐ Disabling a feature immediately stops its sampling and releases layout space; disabling all overlays stops expensive work while allowing restart-free re-enable.
