@@ -101,28 +101,31 @@ Planning requested: 2026-10-10. Execution is authorized for the phase explicitly
     Proposal: [Update, visibility, and drawing](AnchoredHudOverlays.proposal.md#update-visibility-and-drawing), [Native positioning reuse](AnchoredHudOverlays.proposal.md#native-positioning-reuse).
     Outcome: registered overlays update and render through a reusable, passive native HUD host.
 
-    ☐ Add HudOverlaySystem as client-only composition/event wiring and keep scheduler, native host, registry, and layout policy in their owning modules.
-    ☐ Add the HudElement-derived host under src/HudOverlays/Rendering with one owned GuiComposer per group and native root/child bounds from Phase 3.
-        ☐ Open without focus, return Focusable false, decline keyboard/mouse events, and capture neither general nor raw input.
-        ☐ Use the verified native draw order and HUD transform; restore temporary drawing state through existing engine APIs.
-        ☐ Draw only eligible group/content state and honor assigned clipping, including oversized content, without per-frame recomposition.
-        ☐ Keep ordinary inventory dialogs from becoming an automatic hide condition; modal coverage follows native draw order.
-    ☐ Add shared monotonic scheduling under src/HudOverlays/Updating with a 100 ms heartbeat, positive per-overlay intervals, and coalesced invalidation.
-        ☐ Keep applicability checks cheap; perform expensive refresh only when enabled, applicable, globally visible, and attached to an available target.
-        ☐ Publish stable snapshots; separate content/preparation dirtiness from measurement/layout dirtiness. Drawing must not sample gameplay state.
-        ☐ Refresh before showing content after enabling, player/session replacement, target restoration, or HideGuis restoration; retain invalidation while expensive work is suspended.
-        ☐ Continue bounded refreshes for overflow-suppressed entries; account for heartbeat granularity rather than promising exact sub-heartbeat latency.
-    ☐ Add reusable icon-and-text presentation with native GUI item rendering and cached text resources.
-        ☐ Render item presentation copies without mutating live inventory; borrow engine icons/atlas/meshes.
-        ☐ Reprepare only for relevant content, locale, font, or GUI-scale changes; use accessible contrast, localization, and clipping/ellipsis within assigned bounds.
-    ☐ Implement lifecycle and failure isolation.
-        ☐ Hide for missing world/player, world exit, or HideGuis; support additional feature applicability restrictions.
-        ☐ Set UnregisterOnClose true; use TryClose before disposal and TryOpen for reopening, without manually editing GUI collections.
-        ☐ On LeaveWorld stop updates, detach feature subscriptions, close/dispose session host/composers, and clear session snapshots/resources/target references; recreate session bindings for the next ready world.
-        ☐ Make final event/listener/resource cleanup idempotent and preserve borrowed-resource ownership.
-        ☐ Hide a failing refresh/preparation consumer, emit a bounded diagnostic, and retry on its next scheduled refresh. Missing optional targets generate no warnings.
-    ☐ Verify fake-clock scheduling and native host/lifecycle integration: coalescing, interval bounds, disabled/inapplicable/unavailable states, restoration, overflow updates, failure recovery, unchanged-frame resource reuse, and repeated session/open/close/dispose sequences.
-    ☐ Completion: the generic runtime works with focused test consumers, passes relevant checks and second review/independent audit, and leaves live input/visual acceptance explicitly pending.
+    ☑ Add HudOverlaySystem as client-only composition/event wiring and keep scheduler, native host, registry, and layout policy in their owning modules.
+    ☑ Add the HudElement-derived host under src/HudOverlays/Rendering with one owned GuiComposer per group and native root/child bounds from Phase 3.
+        ☑ Open without focus, return Focusable false, decline keyboard/mouse events, and capture neither general nor raw input.
+        ☑ Use the verified native draw order and HUD transform; restore temporary drawing state through existing engine APIs.
+        ☑ Draw only eligible group/content state and honor assigned clipping, including oversized content, without per-frame recomposition.
+        ☑ Keep ordinary inventory dialogs from becoming an automatic hide condition; modal coverage follows native draw order.
+    ☑ Add shared monotonic scheduling under src/HudOverlays/Updating with a 100 ms heartbeat, positive per-overlay intervals, and coalesced invalidation.
+        ☑ Keep applicability checks cheap; perform expensive refresh only when enabled, applicable, globally visible, and attached to an available target.
+        ☑ Publish stable snapshots; separate content/preparation dirtiness from measurement/layout dirtiness. Drawing must not sample gameplay state.
+        ☑ Refresh before showing content after enabling, player/session replacement, target restoration, or HideGuis restoration; retain invalidation while expensive work is suspended.
+        ☑ Continue bounded refreshes for overflow-suppressed entries; account for heartbeat granularity rather than promising exact sub-heartbeat latency.
+    ☑ Add reusable icon-and-text presentation with native GUI item rendering and cached text resources.
+        ☑ Render item presentation copies without mutating live inventory; borrow engine icons/atlas/meshes.
+        ☑ Reprepare only for relevant content, locale, font, or GUI-scale changes; use accessible contrast, localization, and clipping/ellipsis within assigned bounds.
+    ☑ Implement lifecycle and failure isolation.
+        ☑ Hide for missing world/player, world exit, or HideGuis; support additional feature applicability restrictions.
+        ☑ Set UnregisterOnClose true; use TryClose before disposal and TryOpen for reopening, without manually editing GUI collections.
+        ☑ On LeaveWorld stop updates, detach feature subscriptions, close/dispose session host/composers, and clear session snapshots/resources/target references; recreate session bindings for the next ready world.
+        ☑ Make final event/listener/resource cleanup idempotent and preserve borrowed-resource ownership.
+        ☑ Hide a failing refresh/preparation consumer, emit a bounded diagnostic, and retry on its next scheduled refresh. Missing optional targets generate no warnings.
+    ☑ Verify fake-clock scheduling and native host/lifecycle integration: coalescing, interval bounds, disabled/inapplicable/unavailable states, restoration, overflow updates, failure recovery, unchanged-frame resource reuse, and repeated session/open/close/dispose sequences.
+    ☑ Completion: the generic runtime works with focused test consumers, passes relevant checks and second review/independent audit, and leaves live input/visual acceptance explicitly pending.
+
+    Verification notes (2026-10-10; second review and independent audit passed): current projects built successfully and all 88 focused HudOverlay tests passed. Fake-clock and session checks cover coalescing, intervals, suspended/restored visibility, overflow updates, bounded failure recovery, late binding isolation, player/entity replacement, listener ID zero, and repeated cleanup. Native composer construction/drawing checks cover passive input, stable compositions, deferred removal, HUD matrix/scissor restoration, and draw failure isolation. Presentation checks cover copied items, unchanged-content/context reuse, and owned texture disposal through an inert allocation seam. Native font allocation stalled in the headless environment and is not a validation receipt; live text appearance, GPU behavior, and input acceptance remain pending in Phase 7. Existing unrelated build/offline package-audit warnings remain; no game was launched.
+    Traceability: composition/host tasks -> proposal Native positioning reuse / Input and focus / Drawing -> thin client ModSystem, owning session lifecycle, native dynamic group composers and host tests; scheduling/visibility tasks -> Updates / Visibility rules -> monotonic shared scheduler, fake-clock restoration/overflow/retry checks and session tests; presentation/resource tasks -> Drawing / Resource lifecycle -> copied item rendering, localized contrast text caching, native scissor stack, owned resource replacement and repeated session teardown checks. Independent audit rechecked boundary-failure isolation and scheduled applicability retries; later consumers/configuration and live acceptance remain pending.
 
 ## Phase 5: Add the bow ammunition consumer
     Depends on: Phases 1–4.
