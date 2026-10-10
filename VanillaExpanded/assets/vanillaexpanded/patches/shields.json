@@ -1,0 +1,18 @@
+[
+  {
+    "op": "add",
+    "path": "/tags",
+    "value": [
+      "tool-shield"
+    ],
+    "file": "game:itemtypes/tool/shield.json"
+  },
+  {
+    "op": "add",
+    "path": "/tags",
+    "value": [
+      "tool-shield"
+    ],
+    "file": "game:itemtypes/tool/roundshield.json"
+  }
+]
