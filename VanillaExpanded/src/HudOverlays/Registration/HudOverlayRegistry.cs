@@ -65,9 +65,26 @@ internal sealed class HudOverlayRegistry : IDisposable
     #endregion
 
     #region Iteration
+    /// <summary>Identifies the exact active registration with a successfully initialized session binding.</summary>
+    public bool IsSessionBound(HudOverlayRegistration registration)
+    {
+        CheckAvailable();
+        return active.TryGetValue(registration.Id, out var entry) && ReferenceEquals(entry.Registration, registration) && entry.SessionBound;
+    }
+
     /// <summary>Applies queued changes at the next boundary, then visits a stable ordered membership snapshot.</summary>
     /// <remarks>Nested passes are rejected. Changes from callbacks become visible only at the following boundary.</remarks>
-    public void RunPass(Action<HudOverlayRegistration> visit)
+    public void RunPass(Action<HudOverlayRegistration> visit, Action<Exception>? onBoundaryFailure = null)
+    {
+        ArgumentNullException.ThrowIfNull(visit);
+        RunSnapshotPass(snapshot =>
+        {
+            foreach (var registration in snapshot) visit(registration);
+        }, onBoundaryFailure);
+    }
+
+    /// <summary>Visits stable membership; an optional failure handler isolates failed boundary bindings before visiting unaffected entries.</summary>
+    public void RunSnapshotPass(Action<IReadOnlyList<HudOverlayRegistration>> visit, Action<Exception>? onBoundaryFailure = null)
     {
         CheckThread();
         ObjectDisposedException.ThrowIf(disposed, this);
@@ -86,11 +103,16 @@ internal sealed class HudOverlayRegistry : IDisposable
                 TryAction(action, ref failures);
                 if (disposed) break;
             }
-            ThrowFailures(failures);
+            if (failures != null)
+            {
+                if (onBoundaryFailure == null) ThrowFailures(failures);
+                else onBoundaryFailure(new AggregateException(failures));
+            }
             if (disposed) return;
             var snapshot = active.Values.OrderBy(entry => entry.Registration.Order)
-                .ThenBy(entry => entry.Registration.Id, StringComparer.Ordinal).ToArray();
-            foreach (var entry in snapshot) visit(entry.Registration);
+                .ThenBy(entry => entry.Registration.Id, StringComparer.Ordinal)
+                .Select(entry => entry.Registration).ToArray();
+            visit(Array.AsReadOnly(snapshot));
         }
         finally { inPass = false; }
     }
