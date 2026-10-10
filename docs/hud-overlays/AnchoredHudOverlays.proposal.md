@@ -1,6 +1,6 @@
 # Anchored HUD overlays
 
-Status: Proposed; awaiting approval. This document defines the design only. An implementation plan will be created after approval.
+Status: Design baseline for [AnchoredHudOverlays.todo](AnchoredHudOverlays.todo). The installed integration contract was verified and independently audited on 2026-10-10; runtime implementation and user-run acceptance remain separate obligations.
 
 ## Purpose
 
@@ -8,11 +8,11 @@ Provide a reusable client system for adding passive overlays anchored to screen 
 
 The first consumer is an arrow indicator while the player holds a bow. The same placement and lifecycle contracts should accommodate the time, weather, temperature, and temporal-storm indicators listed in [project.todo](../project.todo). Those features' gameplay rules remain separate proposals.
 
-The user has confirmed that both screen positions and named HUD elements are required. The remaining choices below are recommendations for review.
+Both screen positions and named HUD elements are required. The resolved native integration, layout defaults, and lifetime decisions below govern the implementation checklist.
 
 ## Existing foundations and evidence
 
-The evidence below combines the current local source checkout with read-only metadata/IL inspection of the installed game assemblies on 2026-10-09. The positioning APIs are present in VintagestoryAPI.dll; client behavior described below was inspected in G:/Vintagestory/VintagestoryLib.dll. Bow selection remains source-backed pending installed verification. No game was launched, and live GUI appearance/input behavior remains unverified.
+The evidence below combines the local source checkout, fresh installed metadata/IL inspection, and focused headless native contract probes on 2026-10-10. The positioning APIs are in VintagestoryAPI.dll; client behavior was inspected in G:/Vintagestory/VintagestoryLib.dll, and bow selection in Mods/VSSurvivalMod.dll. Assembly identities and probe results are recorded in the installed integration contract below. No game was launched; live GUI appearance/input and multiplayer synchronization remain unverified.
 
 No base-game IHudOverlay declaration was found in the inspected VintagestoryAPI, VintagestoryLib, VSSurvivalMod, or VSEssentials assemblies. IHudOverlay below is a proposed internal VanillaExpanded contract; the existing native base is HudElement.
 
@@ -27,9 +27,33 @@ No base-game IHudOverlay declaration was found in the inspected VintagestoryAPI,
 | [ItemSlotIndicatorSystem](../../VanillaExpanded/src/ItemSlotIndicators/ItemSlotIndicatorSystem.cs) | Owns provider registration and separates sampling from presentation; providers have refresh and configuration contracts. | Retain that separation of responsibilities. Its per-item-slot cache and priority selection are specialized and should not become the HUD overlay registry. |
 | [RadialMenuDialog](../../VanillaExpanded/src/RadialMenu/RadialMenuDialog.cs) | Deliberately captures input and renders an interactive menu. | This system needs a separate passive HUD host. Existing radial menus remain independent. |
 | [LiveConfigReload](../../VanillaExpanded/src/ModSystems/LiveConfigReload.cs), [VanillaExpandedConfig](../../VanillaExpanded/src/VanillaExpandedConfig.cs) | Provide an existing configuration reload boundary and persisted visual settings. | Extend these boundaries and add a visibly grouped HUD Overlays section to ConfigLib. |
-| [ItemBow](../../../vssurvivalmod/Item/ItemBow.cs), GetNextArrow | Finds the first positive arrow stack using EntityAgent.WalkInventory, excludes ItemSlotCreative, and tests the collectible path prefix arrow-. The method is protected and nonvirtual. | Use the owning bow selection method through a narrowly scoped read-only accessor, subject to installed-API verification. Do not introduce a competing sort or preferred-arrow policy. |
+| [ItemBow](../../../vssurvivalmod/Item/ItemBow.cs), GetNextArrow | Finds the first positive arrow stack using EntityAgent.WalkInventory, excludes ItemSlotCreative, and tests the collectible path prefix arrow-. The method is protected and nonvirtual. | Use the owning bow selection method through the verified cached open-instance .NET delegate. Do not introduce a competing sort or preferred-arrow policy. |
 | [EntityPlayer](../../../vsapi/Common/Entity/EntityPlayer.cs), WalkInventory | Traverses InventoriesOrdered, skips creative inventories, and includes only inventories opened by the player. | Arrow availability must use this traversal, not a hand-written hotbar/backpack list. Open external inventories can affect the result in this checkout. |
 | [InventoryBase](../../../vsapi/Common/Inventory/InventoryBase.cs) | Exposes SlotModified and inventory open/close events. | Coalesce relevant inventory changes into a refresh request; retain a bounded fallback for missed changes. |
+
+## Installed integration contract
+
+Verified on 2026-10-10 against these installed files under G:/Vintagestory. All four report assembly version 1.22.7.0; file versions differ as shown. This is evidence for this installed build, not a compatibility claim for every version in the mod's supported range.
+
+| Assembly | File version | SHA-256 |
+| --- | --- | --- |
+| VintagestoryAPI.dll | 1.22.0 | 034283e7e9d98eae45ee63005576fd89badc3c995b531cc4c3fe46f3eb2d3296 |
+| VintagestoryLib.dll | 1.22.7 | e08f22b493b92feaf0aaeb79d22437ea0f7efc38aa7f72a04a47f98bc0e40df0 |
+| Mods/VSSurvivalMod.dll | 1.22.7 | d67b48a321403b2052b33c7d0caa99611f92350ffac73ea72672901dd87ccd7a |
+| Mods/VSEssentials.dll | 1.22.7 | a28565c5c9181f8cc84b98a2b7457ab824b8ecb7763714448da1f7c245aecd6e |
+
+The installed method evidence establishes these integration boundaries:
+
+- HudElement.OnRenderGUI pushes the matrix, translates Z by -150, renders its composers, and pops the matrix. HudElement identifies as HUD and keeps the mouse grabbed. GuiDialog defaults Focusable true and receives mouse events when open, so the passive host must explicitly decline focus and keyboard/mouse events; capture defaults are already false.
+- GuiDialog.TryOpen(bool) registers an absent dialog and requests focus only for an ordinary dialog when requested. TryClose triggers normal GUI-close handling only when previously open. GuiManager.OnGuiClosed removes OpenedGuis membership and, with UnregisterOnClose true, LoadedGuis membership. Use that public lifecycle instead of manual list mutation.
+- GuiAPI.GetDialogBoundsInArea compares each opened composer's Alignment exactly and returns its bounds in a list, including an empty list for no matches. GuiAPI.LoadedGuis exposes the native registered list; HudHotbar.ComposeGuis supplies the public hotbar composer and grid keys recorded above.
+- GuiManager.OnGuiOpened's comparison and OnRenderFrameGUI's reversed traversal establish ascending render order. Use the native 0.1 host order with the later inventory/map/menu/tool-tip bands documented below; live depth/input behavior still needs acceptance.
+- GuiAPI.WindowBounds constructs ElementWindowBounds. That object snapshots platform window dimensions, reports RequiresRecalculation after a resize, and updates dimensions in CalcWorldBounds. Native bounds scale fixed fields once, retain native pixel dialog margins, and propagate parent offsets/padding/render offsets. Cache the window parent for the session and invalidate every affected group when it changes.
+- ItemBow.GetNextArrow is protected, nonvirtual, returns ItemSlot, and accepts EntityAgent. Its inventory-walk predicate skips ItemSlotCreative, null stacks/collectibles, non-arrow paths, and nonpositive quantities, stopping at the first match. Interaction start calls it; release on the client returns before selection/consumption, while server release after the charge threshold selects again and consumes/marks the selected slot dirty.
+- EntityPlayer.WalkInventory traverses InventoriesOrdered, skips the creative inventory class, checks HasOpened(player), visits slots in ascending index order, and stops on a false callback result. Selection/counting must retain that ordering and eligibility, including opened external inventories.
+- InventoryBase event accessors and open/close bodies, InventoryNetworkUtil packet updates, the client active-slot setters, and IClientEventAPI.AfterActiveSlotChanged support the event-plus-polling contract below. Metadata exposes no public inventory-manager membership event.
+
+Focused headless probes executed the installed protected selector through a cached MethodInfo.CreateDelegate binding, checking first-positive/order behavior, empty/zero/creative exclusions, repeated calls, and unchanged inventory state. Native ElementBounds.CalcWorldBounds passed 243 screen cases: nine alignments times nine pivots at GUI scales 1, 1.5, and 2, with asymmetric native pixel margins, logical safe inset/offsets, and zero native root padding. Additional native checks confirmed stale margins after RightBottom-to-CenterTop changes and correct parent/child render-offset propagation and fixed-size scaling. These are contract checks; they do not establish rendered appearance, complete overlay implementation, or live multiplayer agreement.
 
 ## Scope
 
@@ -43,7 +67,7 @@ Interactive widgets, drag-to-position editing, world/entity projection, automati
 
 Use one native GuiComposer per overlay group, owned by the passive HUD host, with an ElementBounds root and native child bounds for its participating contents. Stable group IDs identify these compositions. This keeps group bounds available to the engine through the normal GUI surface; a second generic bounds hierarchy is unnecessary.
 
-Screen placements map to the corresponding EnumDialogArea and use WindowBounds as the native window parent. Apply safe insets and group offsets through the native bounds contract. Named HUD attachments compute the desired root origin from the target's rendered rectangle, then express that result through native fixed bounds with Alignment None. Convert pixel results to GUI units at this boundary; ElementBounds performs the final GUI scaling.
+Screen placements map to the corresponding EnumDialogArea and use a cached WindowBounds instance as the native window parent. GuiAPI.WindowBounds constructs a new ElementWindowBounds on every access, so acquire it once per session host; refresh it with CalcWorldBounds on a viewport change and invalidate all dependent group roots before drawing. Apply safe insets, pivot adjustments, and group offsets through the native bounds contract. Named HUD attachments compute the desired root origin from the target's rendered rectangle, then express that result through native fixed bounds with Alignment None. Convert pixel results to GUI units at this boundary; ElementBounds performs the final GUI scaling.
 
 The remaining custom layout policy measures current content, selects/order-packs visible members, attaches the group to a target, and handles viewport clamping/overflow. Use native child/relative bounds helpers where their contracts fit; for example, BelowCopy creates a copy rather than an automatically updating vertical stack. Membership or measurement changes therefore require an explicit packing pass. Drawing consumes the resulting native bounds.
 
@@ -72,6 +96,8 @@ Groups are registered separately with a stable ID and one placement/packing defi
 
 Registration returns an idempotent removal handle. Successful registration transfers overlay lifetime ownership to the system; removing it disposes that overlay's resources exactly once. Rejected registrations leave ownership with the caller. Engine-owned icons, atlas resources, item meshes, inventory objects, and API services remain borrowed.
 
+The registered overlay instance and stable ID persist for the client ModSystem lifetime. Give that instance explicit BeginSession/EndSession responsibilities: BeginSession binds the current player/world/API context and starts with no sample or presentation resources; EndSession detaches its subscriptions and releases all session-bound samples, references, and resources without disposing the registered instance. BeginSession requires an inactive, undisposed instance; the host must end any previous session first. EndSession is idempotent and safe after partial initialization. Final removal/disposal ends any active session before final instance disposal exactly once. Rebinding reuses the registered instance and creates fresh resources, so no factory or ambiguous ownership transfer is needed. Feature disable/enable suspends/resumes work within the session and requires fresh content before display; it does not invalidate the registration handle.
+
 Feature modules register their own overlays. The registry, host, and layout service must never depend on the bow, weather, or temperature modules. No static active instance or global feature singleton is needed for the new system.
 
 Registry mutations requested during iteration are applied at the next pass boundary. All update, measurement, resource preparation, rendering, and removal work occurs on the client main thread.
@@ -80,7 +106,7 @@ Registry mutations requested during iteration are applied at the next pass bound
 
 ### Anchor targets
 
-A target resolves to an available, visible rectangle in framebuffer pixels, derived from native bounds. Screen targets use capi.Gui.WindowBounds with a proposed shared safe inset of 12 GUI units. A named HUD target, initially hotbar, resolves through an adapter over the corresponding native GUI and its final rendered bounds. The rectangle is a read-only layout input, not a separate UI bounds model.
+A target resolves to an available, visible rectangle in framebuffer pixels, derived from native bounds. Screen targets read the session host's raw, uninset native WindowBounds. Apply the shared 12 GUI-unit safe inset once through the screen fixed-offset equation; derive the viewport safe rectangle separately for final clipping/clamping without insetting WindowBounds itself. A named HUD target, initially hotbar, resolves through an adapter over the corresponding native GUI and its final rendered bounds. The rectangle is a read-only layout input, not a separate UI bounds model.
 
 Anchor adapters expose only target identity, availability/visibility, and the rectangle. They contain engine integration knowledge; overlay features contain none. Read each required target once per visible host frame and share the result among its groups. Changed rectangles invalidate layout; unchanged rectangles do not require a new layout pass. A hidden, closed, missing, uninitialized, or ambiguous native target is unavailable. Its dependents hide quietly and recover when it becomes available. Do not guess a replacement rectangle from hard-coded hotbar dimensions.
 
@@ -96,13 +122,17 @@ For target rectangle R, measured group size S in pixels, target point A, group p
 
     groupOrigin = R.origin + A * R.size - P * S + g * O
 
-This equation defines the intended attachment geometry and can validate native screen alignment in geometry checks; screen positioning itself uses ElementBounds.Alignment. Named HUD docking uses the equation to calculate its native root bounds. Positive X is right; positive Y is down. Native target rectangles are already in pixels. Convert computed pixel positions and measured sizes to GUI units before assigning native fixed bounds, allowing ElementBounds to scale exactly once. Do not assign already-scaled positions as fixedX/fixedY.
+This equation defines named-target attachment geometry. Screen positioning uses ElementBounds.Alignment and preserves the native left/right dialog margins; it is not assumed to equal an inset-only viewport formula. Positive X is right; positive Y is down. Native target rectangles are already in pixels. Convert computed pixel positions and measured sizes to GUI units before assigning native fixed bounds, allowing ElementBounds to scale exactly once. Do not assign already-scaled positions as fixedX/fixedY.
+
+The nine screen choices map directly to LeftTop, CenterTop, RightTop, LeftMiddle, CenterMiddle, RightMiddle, LeftBottom, CenterBottom, and RightBottom. Let A be that screen choice's normalized point, P the group pivot, S its measured outer size in pixels, I the 12 GUI-unit inset, and O the configured GUI-unit offset. With fixedX/fixedY zero, use fixedOffset = O + (1 - 2*A)*I + (A - P)*S/g, componentwise, then calculate native bounds and apply whole-group clamping. The usual screen pivot is P=A. Native LeftDialogMargin/RightDialogMargin values are already pixel margins and remain in the engine's alignment result; do not rescale or overwrite them.
+
+Keep native group-root padding zero. Include content padding in the measured fixed root size and packed child coordinates instead. The inspected LeftMiddle calculation centers absInnerHeight while other middle choices center OuterHeight; a zero-padding root gives consistent outer-rectangle pivots without patching engine behavior. When changing alignment, clear stale derived margins/offsets and mark/recalculate affected bounds; Alignment None does not itself reset prior alignment margins.
 
 Proposed bow placement: group held-item-status attached to the hotbar's right-middle, with its own left-middle pivot and an offset of (12, 0) GUI units. The exact visual placement is subject to user-run in-game review. A screen placement can be selected explicitly in configuration if that location is preferred or the hotbar adapter is unavailable; missing-target behavior itself remains hide, with no automatic relocation.
 
 ### Group layout
 
-Each group owns horizontal or vertical packing, gap, padding, and cross-axis alignment. The held-item-status group initially uses vertical packing. Only applicable, enabled overlays with available anchors participate. Hiding an overlay releases its space; remaining entries retain their relative order.
+Each group owns horizontal or vertical packing, gap, padding, and cross-axis alignment. Registration defaults are a 6 GUI-unit gap, 4 GUI-units of content padding on every side, and start cross-axis alignment. The held-item-status group uses vertical packing with those defaults. Content padding contributes to root dimensions/child positions, not native root padding. Only applicable, enabled overlays with available anchors participate. Hiding an overlay releases its space; remaining entries retain their relative order.
 
 Measure all participating contents, update the group's native root size, position it through native screen alignment or named-target attachment, then assign native child bounds in deterministic order. Clamp the whole group to the viewport safe rectangle, preserving member spacing. This may move a group away from its preferred attachment near a screen edge; it must not independently clamp members into overlap.
 
@@ -126,19 +156,21 @@ No adaptive scheduler is needed initially. The bow overlay requests a 250 ms fal
 
 The native host derives from HudElement, opens without focus, reports Focusable false, declines keyboard and mouse events, and captures neither general nor raw input. Overlays have no input handlers. Bow drawing, movement, scrolling the hotbar, inventory interaction, and Escape must retain their normal behavior.
 
-All overlays hide when the world/player is unavailable, during world exit, or when HideGuis is true. Feature applicability can add restrictions; the initial bow overlay hides while the player is dead. Ordinary inventory dialogs do not automatically hide overlays. Modal menus cover the overlays through normal GUI ordering; the exact installed ordering must be verified.
+All overlays hide when the world/player is unavailable, during world exit, or when HideGuis is true. Feature applicability can add restrictions; the initial bow overlay hides while the player is dead. Ordinary inventory dialogs do not automatically hide overlays. Modal menus cover the overlays through the verified native GUI ordering; actual rendered coverage remains a live acceptance check.
 
-Use the normal HUD draw band below inventory dialogs, tooltips, and modal menus. Select the concrete DrawOrder from installed ordering evidence rather than copying the radial menu's topmost order. Preserve native HUD transforms and restore any temporary rendering state through the established engine APIs. Do not add shaders or custom OpenGL state machinery for the icon-and-text indicator.
+Use DrawOrder = 0.1, the native default HUD band. Installed GuiManager.OnGuiOpened stores dialogs in descending DrawOrder and OnRenderFrameGUI renders the reversed sequence. This places the host below the map dialog (0.11), inventory/handbook dialogs (0.2), Escape (0.89), and HudMouseTools (0.9); same-order native HUD peers retain engine ordering. Preserve native HUD transforms and restore any temporary rendering state through the established engine APIs. Do not add shaders or custom OpenGL state machinery for the icon-and-text indicator.
 
 ### Resource lifecycle
 
 The registry owns registration lifetime; the host owns drawing dispatch and its own GUI resources. Each overlay owns its feature resources, including text textures; shared presentation helpers own any resources they cache. Prepare on content, locale, font, or GUI-scale changes, and reuse otherwise. Draw item icons through the game's GUI item rendering path using a presentation copy of the selected stack; the copy must not allow rendering to mutate live inventory state.
 
-Viewport size, GUI scale, changed native anchor bounds, membership, order, placement configuration, and measured content size invalidate layout. Reading a live anchor rectangle is cheap; unchanged rectangles do not trigger recomposition.
+Viewport size, GUI scale, changed native anchor bounds, changed GuiStyle.LeftDialogMargin/RightDialogMargin pixel values, membership, order, placement configuration, and measured content size invalidate layout. Sample the two native margin values with the shared layout context and invalidate affected screen roots when they change; native CalcWorldBounds reads them only while recalculating alignment. Reading a live anchor rectangle is cheap; unchanged rectangles do not trigger recomposition.
 
 Set the host's UnregisterOnClose to true. In the inspected installed client, GuiManager.OnGuiClosed removes the host from OpenedGuis and removes it from LoadedGuis when that flag is true. Close through TryClose before disposing; do not edit native GUI collections directly. Reopening uses TryOpen's normal registration contract.
 
-On LeaveWorld, stop updates, detach feature subscriptions, close and dispose the session host and its group composers, and release session-bound snapshots/resources and native-target references. Retain registration descriptions for rebinding, not live disposed presentation resources. On the next ready world, create a new host and fresh session bindings/resources. On final disposal, detach remaining events/listeners and release registrations and host resources idempotently. Implementation validation must confirm cleanup for repeated open/close, disable/re-enable, and world exit; composer disposal alone is not deregistration.
+The host is the sole owner of group composers: its native dialog disposal releases them, so feature/session cleanup must not dispose the same composers separately.
+
+On LeaveWorld, stop updates, detach feature subscriptions, close and dispose the session host and its group composers, and release session-bound snapshots/resources and native-target references. Retain registered overlay instances and metadata, with each instance ended through EndSession and retaining no disposed resources or previous world/player references. On the next ready world, create a new host and invoke BeginSession for fresh bindings/resources. On final disposal, detach remaining events/listeners and release registrations and host resources idempotently. Implementation validation must confirm cleanup for repeated open/close, disable/re-enable, and world exit; composer disposal alone is not deregistration.
 
 A failed feature refresh or preparation hides that overlay and emits one bounded diagnostic for the failure, without taking down the host. Retry at its next scheduled refresh, avoiding per-frame log spam. Missing optional anchors are an ordinary visibility state and emit no warnings.
 
@@ -154,13 +186,15 @@ Quantity is grouped by collectible identity, not stack attributes, because the i
 
 ### Selection authority and compatibility
 
-Bow-specific code resolves the next slot by invoking the existing protected GetNextArrow through a verified cached read-only accessor, using the mod's existing Harmony dependency if needed. Do not patch firing, reserve ammunition, move stacks, change inventory, or introduce a selection preference. Cache the method binding, not the selected live slot indefinitely.
+Bow-specific code resolves the next slot through one cached open-instance Func<ItemBow, EntityAgent, ItemSlot> bound with MethodInfo.CreateDelegate to the installed protected nonvirtual GetNextArrow(EntityAgent) method. The headless probe executed this path successfully using existing .NET reflection; it needs neither a Harmony patch nor a new dependency. Bind once, validate the signature, and fail closed for unsupported bindings. Do not patch firing, reserve ammunition, move stacks, change inventory, or introduce a selection preference. Cache the method binding, not the selected live slot indefinitely.
 
-Count matching positive stacks using the same EntityPlayer.WalkInventory traversal and creative-slot exclusion. In this checkout, an opened external inventory can participate. Preserve that behavior if installed verification confirms it; do not silently narrow the display to personal bags when that differs from firing selection.
+Count matching positive stacks using the same EntityPlayer.WalkInventory traversal and creative-slot exclusion. Installed EntityPlayer.WalkInventory confirms that an opened external inventory can participate. Preserve that traversal; do not silently narrow the display to personal bags when that differs from firing selection.
 
-Initially support the verified base ItemBow behavior. A derived or custom bow with unverified firing/selection semantics requires an explicit feature-specific adapter; otherwise hide the indicator for it. Generic bow tags or EnumTool.Bow alone cannot establish ammunition selection compatibility. This compatibility policy does not belong in the shared overlay host.
+Initially support collectibles whose runtime type is exactly the verified ItemBow type. A derived or custom bow requires an explicit feature-specific adapter that verifies its firing/selection semantics; otherwise hide the indicator for it. Generic bow tags or EnumTool.Bow alone cannot establish ammunition selection compatibility. This compatibility policy does not belong in the shared overlay host.
 
-Inventory subscriptions must include all inventories that can affect the traversal, not only the currently selected stack. Attach/detach SlotModified and open/close callbacks as that inventory set changes. The bounded fallback refresh also rechecks inventory membership and active-hand identity. The initial implementation must verify which installed events can shorten that fallback without pretending all mutations are guaranteed to emit them.
+Subscribe to InventoryBase.SlotModified, OnInventoryOpened, and OnInventoryClosed for every available inventory in InventoriesOrdered, including currently closed inventories so their opening is observed; filter player-specific events for the local player. Subscribe to IClientEventAPI.AfterActiveSlotChanged for immediate invalidation. The installed local active-slot setter and SetActiveHotbarSlotNumberFromServer both notify this event for the local player. Installed InventoryNetworkUtil full-inventory updates notify changed slots, and single/double-slot packet paths invoke DidModifyItemSlot, which raises SlotModified. Open/close events run after opened-player membership changes.
+
+IPlayerInventoryManager exposes no public inventory-membership change event. While the bow is applicable, the 250 ms fallback therefore reconciles the available inventory references and subscriptions, reads current active-hand stack/collectible identity, and refreshes selection/counts even when no event arrived. This also covers same-slot replacement and custom/direct mutations that bypass normal notifications. Unsubscribe removed/replaced inventory instances and all session-bound handlers at EndSession. Hand applicability is checked on the shared 100 ms heartbeat even when the bow overlay is hidden, so entering the bow state does not depend on an existing inventory subscription. Event callbacks invalidate only; they do not traverse inventory or render.
 
 The display is based on current client-visible inventory state. Server-authoritative firing and synchronized changes may briefly differ; refresh on those changes rather than predict decrements locally. Once the player switches away from the bow or the session changes, discard the prior arrow snapshot.
 
@@ -188,7 +222,7 @@ Settings are local presentation preferences and apply live through ILiveConfigur
 
 ## Validation required before implementation is considered complete
 
-- Recheck the installed contracts at implementation time: the public hotbar type/composer/element keys and native positioning/close APIs are already inspected; draw ordering, live visibility/extent, and GetNextArrow/WalkInventory selection agreement remain prerequisites. If a supported game version differs, reconcile this proposal before relying on a replacement policy.
+- Recheck the installed contracts at implementation time: the public hotbar type/composer/element keys and native positioning/close APIs are already inspected; the native draw order, selector/traversal, and notification paths are also established for the recorded installed build. Recheck changed assemblies, and retain live visibility/extent and synchronized firing/display agreement as acceptance requirements. If a supported game version differs, reconcile this proposal before relying on a replacement policy.
 - Geometry and native-bounds integration checks cover the nine EnumDialogArea screen mappings, named attachment points, differing pivots, GUI scaling once at the native boundary, parent/child bounds, render offsets, ordered packing, hiding/reappearance, resize, group clamping, and deterministic overflow. Confirm group composers expose the resulting bounds without a parallel layout authority.
 - Scheduler/lifecycle checks cover coalesced invalidation, refresh bounds, no sampling for disabled/inapplicable or unavailable-anchor content, restoration after HUD hiding, registry removal, and world transitions. Drawing must not trigger gameplay sampling or resource recreation for unchanged content.
 - Bow checks cover multiple stacks/types, selector order, zero/empty stacks, creative exclusions, traversal membership/open inventories, unsupported bows, no arrows, hotbar switches, synchronized consumption, and player/session replacement. Ensure every borrowed resource and event subscription has an owning cleanup boundary.
@@ -198,6 +232,6 @@ Settings are local presentation preferences and apply live through ILiveConfigur
 
 ## Approval decisions and remaining evidence
 
-Approval is requested for the shared host/group architecture, quiet hiding for unavailable named anchors, explicit screen-placement alternatives, deterministic overflow, icon-plus-count presentation, type-total quantity semantics, and the base-bow compatibility boundary.
+The governing design retains the shared host/group architecture, quiet hiding for unavailable named anchors, explicit screen-placement alternatives, deterministic overflow, icon-plus-count presentation, type-total quantity semantics, and the exact-base-bow compatibility boundary.
 
-Native positioning APIs and the public hotbar composer access are verified source/installed-assembly foundations. Group packing, attachment policy, and overlay lifecycle remain proposed behavior. Installed bow-selection agreement, final draw ordering, live hotbar extent/visibility, the proposed hotbar-right placement, and responsiveness intervals still require their stated verification and visual/runtime acceptance. After this proposal is approved, derive a separate dependency-ordered implementation checklist with traceability to these contracts. Keep the existing project feature entries unchecked until implementation and acceptance are complete.
+Native positioning APIs, public hotbar composer access, bow selection/traversal, and GUI draw ordering are established installed contracts. The layout defaults and registered-instance/session lifetime decisions are resolved design requirements; their production implementation remains checklist work. Live hotbar extent/visibility, input pass-through, firing/display agreement under synchronization, visual placement, and responsiveness still require user-run acceptance. Follow the linked implementation checklist and keep project feature entries unchecked until implementation and acceptance are complete.
