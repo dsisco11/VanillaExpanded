@@ -27,7 +27,7 @@ internal sealed class BowAmmunitionOverlay : IHudOverlay
         HudOverlayIconTextPresentation? emptyPresentation = null)
     {
         this.invalidate = invalidate;
-        this.presentation = presentation ?? new();
+        this.presentation = presentation ?? new(iconSize: 24, textBeforeIcon: true, gap: 4, fontSize: 14);
         this.emptyPresentation = emptyPresentation ?? new(CreateMutedText);
     }
     /// <summary>Binds one fresh player session with no retained arrow sample.</summary>
@@ -131,7 +131,7 @@ internal sealed class BowAmmunitionOverlay : IHudOverlay
     /// <summary>Renders the generic arrow glyph and localized empty state with muted accessible contrast.</summary>
     private static LoadedTexture CreateMutedText(HudOverlayPreparationContext context, string text)
     {
-        var font = CairoFont.WhiteSmallText().WithColor(new double[] { .7, .7, .7, 1 })
+        var font = CairoFont.WhiteSmallText().WithFontSize(14).WithColor(new double[] { .7, .7, .7, 1 })
             .WithStroke(new double[] { 0, 0, 0, .85 }, 1.5);
         return context.Api.Gui.TextTexture.GenTextTexture(text, font);
     }

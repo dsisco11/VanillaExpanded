@@ -315,6 +315,34 @@ public sealed class HudOverlayLayoutTests
         finally { RuntimeEnv.GUIScale = old; }
     }
 
+    /// <summary>Aligns visible arrow content with the meter left edge and leaves a scaled four-unit gap above it.</summary>
+    [Theory]
+    [InlineData(1)]
+    [InlineData(1.5)]
+    [InlineData(2)]
+    public void SaturationPlacementAlignsContentAboveMeter(double scale)
+    {
+        float old = RuntimeEnv.GUIScale;
+        try
+        {
+            RuntimeEnv.GUIScale = (float)scale;
+            var target = new RectangleF(800, 700, 200, 10);
+            int reads = 0;
+            var context = new HudOverlayAnchorContext(new Window(1800, 1000), () => scale, () => null,
+                readSaturation: () => { reads++; return target; });
+            context.BeginFrame();
+            var group = Group(new(HudOverlayAnchorContext.SaturationTargetId, HudOverlayPoint.LeftTop, HudOverlayPoint.LeftBottom, -4, 0));
+            using var layout = new HudOverlayGroupLayout();
+            layout.Apply(context, group, new[] { Member("mod:arrow", 40, 20) });
+            var member = Assert.Single(layout.Members);
+            Near(target.Left, member.Bounds.renderX);
+            Near(target.Top - 4 * scale, member.Bounds.renderY + member.Bounds.OuterHeight);
+            context.Resolve(HudOverlayAnchorContext.SaturationTargetId);
+            Assert.Equal(1, reads);
+        }
+        finally { RuntimeEnv.GUIScale = old; }
+    }
+
     /// <summary>Invalid native measurements fail before creating child geometry.</summary>
     [Theory]
     [InlineData(float.NaN, 1)]

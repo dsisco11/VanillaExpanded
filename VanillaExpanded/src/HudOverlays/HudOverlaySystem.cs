@@ -28,7 +28,7 @@ internal sealed class HudOverlaySystem : ModSystem, ILiveConfigurable
         ObjectDisposedException.ThrowIf(disposed, this);
         this.api = api;
         Registry.RegisterGroup(new HudOverlayGroup("held-item-status", new HudOverlayPlacement(
-            HudOverlayAnchorContext.HotbarTargetId, HudOverlayPoint.RightMiddle, HudOverlayPoint.LeftMiddle, 12, 0)));
+            HudOverlayAnchorContext.SaturationTargetId, HudOverlayPoint.LeftTop, HudOverlayPoint.LeftBottom, -4, 0)));
         session = new HudOverlaySession(api, Registry);
         api.Event.LevelFinalize += session.EnterWorld;
         api.Event.LeaveWorld += session.LeaveWorld;

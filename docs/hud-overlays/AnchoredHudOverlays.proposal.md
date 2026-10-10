@@ -106,13 +106,15 @@ Registry mutations requested during iteration are applied at the next pass bound
 
 ### Anchor targets
 
-A target resolves to an available, visible rectangle in framebuffer pixels, derived from native bounds. Screen targets read the session host's raw, uninset native WindowBounds. Apply the shared 12 GUI-unit safe inset once through the screen fixed-offset equation; derive the viewport safe rectangle separately for final clipping/clamping without insetting WindowBounds itself. A named HUD target, initially hotbar, resolves through an adapter over the corresponding native GUI and its final rendered bounds. The rectangle is a read-only layout input, not a separate UI bounds model.
+A target resolves to an available, visible rectangle in framebuffer pixels, derived from native bounds. Screen targets read the session host's raw, uninset native WindowBounds. Apply the shared 12 GUI-unit safe inset once through the screen fixed-offset equation; derive the viewport safe rectangle separately for final clipping/clamping without insetting WindowBounds itself. A named HUD target, such as hotbar or saturation meter, resolves through an adapter over the corresponding native GUI and its final rendered bounds. The rectangle is a read-only layout input, not a separate UI bounds model.
 
 Anchor adapters expose only target identity, availability/visibility, and the rectangle. They contain engine integration knowledge; overlay features contain none. Read each required target once per visible host frame and share the result among its groups. Changed rectangles invalidate layout; unchanged rectangles do not require a new layout pass. A hidden, closed, missing, uninitialized, or ambiguous native target is unavailable. Its dependents hide quietly and recover when it becomes available. Do not guess a replacement rectangle from hard-coded hotbar dimensions.
 
 The hotbar adapter finds the installed Vintagestory.Client.NoObf.HudHotbar through capi.Gui.LoadedGuis and reads its inherited public Composers["hotbar"].Bounds after composition. Read renderX/renderY and OuterWidth/OuterHeight rather than the private dialogBounds field. The initial hotbar target means the complete hotbar composer rectangle; hotbargrid, offhandgrid, and backpackgrid are available if a future feature explicitly needs a narrower target. Retain quiet hiding when the native GUI is closed or its composer/bounds are absent.
 
 These type and composer/element keys are verified installed integration points, not a guarantee across every future game version or replacement HUD mod. Preserve the adapter boundary and recheck it when compatibility changes. The actual rendered extent, visibility transitions, and desired docking position still require live acceptance. No private accessor or hotbar rendering patch belongs in the initial adapter.
+
+The saturation-meter adapter reads the installed public HudStatbar.Composers["statbar"].GetStatbar("saturationstatbar").Bounds. Installed ComposeGuis IL identifies the composer as inventory-statbar and the element as saturationstatbar. It uses the meter's rendered rectangle, mirrors the native statbar's spectator-mode suppression, and applies the same quiet unavailable/ambiguous rules as the hotbar adapter, and does not guess meter dimensions. This docking target follows the requested bow presentation revision; native appearance remains a live acceptance check.
 
 ### Placement model
 
@@ -128,7 +130,7 @@ The nine screen choices map directly to LeftTop, CenterTop, RightTop, LeftMiddle
 
 Keep native group-root padding zero. Include content padding in the measured fixed root size and packed child coordinates instead. The inspected LeftMiddle calculation centers absInnerHeight while other middle choices center OuterHeight; a zero-padding root gives consistent outer-rectangle pivots without patching engine behavior. When changing alignment, clear stale derived margins/offsets and mark/recalculate affected bounds; Alignment None does not itself reset prior alignment margins.
 
-Proposed bow placement: group held-item-status attached to the hotbar's right-middle, with its own left-middle pivot and an offset of (12, 0) GUI units. The exact visual placement is subject to user-run in-game review. A screen placement can be selected explicitly in configuration if that location is preferred or the hotbar adapter is unavailable; missing-target behavior itself remains hide, with no automatic relocation.
+Bow placement: group held-item-status attached to the saturation meter's top-left, with its own left-bottom pivot and an offset of (-4, 0) GUI units. The offset compensates for the group's 4-unit content padding so the count begins at the meter's left edge and the content ends 4 units above it. The exact visual placement is subject to user-run in-game review. A screen placement can be selected explicitly in configuration if that location is preferred or the hotbar adapter is unavailable; missing-target behavior itself remains hide, with no automatic relocation.
 
 ### Group layout
 
@@ -182,7 +184,7 @@ The indicator shows the arrow type the supported bow would select next and the t
 
 For example, if the first eligible arrow is flint and the traversal contains stacks of 12 and 8 flint arrows plus 30 copper arrows, display a flint arrow icon and 20. After those flint arrows are exhausted, display the next type chosen by the bow and its quantity.
 
-Quantity is grouped by collectible identity, not stack attributes, because the inspected selector tests the arrow path prefix and positive quantity rather than stack equality. Use a sufficiently wide accumulator and never include another arrow type. Use localized item names and accessible contrast; proposed normal presentation is an item icon plus count, with no always-visible full item name. With a supported bow and no eligible arrows, display a muted generic arrow symbol and localized No arrows/0 state. With no supported bow in the active main hand, hide and release layout space.
+Quantity is grouped by collectible identity, not stack attributes, because the inspected selector tests the arrow path prefix and positive quantity rather than stack equality. Use a sufficiently wide accumulator and never include another arrow type. Use localized item names and accessible contrast; normal presentation is `<count>x <arrow icon>`, using a 24 GUI-unit icon, 14-point native text, and a 4 GUI-unit gap, with no always-visible full item name. With a supported bow and no eligible arrows, display a muted generic arrow symbol and localized No arrows/0 state. With no supported bow in the active main hand, hide and release layout space.
 
 ### Selection authority and compatibility
 
@@ -206,7 +208,7 @@ Each named component owns one responsibility; exact filenames can follow establi
 | --- | --- |
 | src/HudOverlays/HudOverlaySystem.cs | Client composition and lifecycle/event wiring only. |
 | src/HudOverlays/Registration/ | IHudOverlay contract, metadata, stable registry, and removal lifetime. |
-| src/HudOverlays/Anchoring/ | Placement metadata mapped to native alignment, named target contract, and public hotbar composer adapter. |
+| src/HudOverlays/Anchoring/ | Placement metadata mapped to native alignment, named target contract, and public hotbar and saturation-meter adapters. |
 | src/HudOverlays/Layout/ | Measurement/order/packing and viewport-fit policy applied to native bounds; pure geometry only for attachment, fit, and clipping calculations. |
 | src/HudOverlays/Updating/ | Shared scheduling, invalidation, and applicability/visibility transitions. |
 | src/HudOverlays/Rendering/ | Native passive host, group composers/child bounds, and reusable icon-and-text presentation. |
@@ -216,7 +218,7 @@ Keep the initial contracts internal and small. Do not introduce a generalized wi
 
 ## Configuration
 
-Extend VanillaExpandedConfig and the existing ConfigLib mapping/localization with a HUD Overlays section. Proposed initial controls are EnableHudOverlays and EnableBowAmmunitionOverlay (both default true), and held-item-status placement: named hotbar or one of nine screen positions, plus X/Y offsets. Group direction, gap, padding, and overlay order are registration defaults initially.
+Extend VanillaExpandedConfig and the existing ConfigLib mapping/localization with a HUD Overlays section. Proposed initial controls are EnableHudOverlays and EnableBowAmmunitionOverlay (both default true), and held-item-status placement: named saturation meter, hotbar, or one of nine screen positions, plus X/Y offsets. Group direction, gap, padding, and overlay order are registration defaults initially.
 
 Settings are local presentation preferences and apply live through ILiveConfigurable. Disabling one feature removes only its content and space; disabling the system stops expensive overlay work while retaining the ability to re-enable it without restarting. Unknown anchor keys fall back to the group's documented default; nonfinite offsets fall back to defaults. The configuration parser and ConfigLib display must agree on persisted keys and defaults.
 
