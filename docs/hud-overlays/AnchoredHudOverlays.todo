@@ -77,21 +77,24 @@ Planning requested: 2026-10-10. Execution is authorized for the phase explicitly
     Proposal: [Native positioning reuse](AnchoredHudOverlays.proposal.md#native-positioning-reuse), [Anchors and placement](AnchoredHudOverlays.proposal.md#anchors-and-placement).
     Outcome: registered content can be laid out using native bounds at screen or hotbar anchors.
 
-    ☐ Add placement metadata and named-target resolution under src/HudOverlays/Anchoring.
-        ☐ Resolve screen targets from WindowBounds with the 12 GUI-unit safe inset and native EnumDialogArea mappings.
-        ☐ Resolve the complete hotbar composer through the verified public type/key; read renderX/renderY and OuterWidth/OuterHeight after composition.
-        ☐ Treat hidden, closed, missing, uninitialized, or ambiguous targets as unavailable; hide dependents quietly and recover when available without fallback coordinates or automatic relocation.
-        ☐ Read each required target once per visible host frame and share its result. Invalidate layout only when relevant bounds/availability change.
-    ☐ Implement measurement, stable packing, attachment, viewport fit, and clipping policy under src/HudOverlays/Layout.
-        ☐ Maintain one native root and child bounds per group/content hierarchy; use native relative helpers where suitable and explicitly repack after membership/measurement changes.
-        ☐ Use native screen alignment; for named attachments apply groupOrigin = R.origin + A * R.size - P * S + g * O, with pixel-to-GUI-unit conversion before setting native fixed bounds.
-        ☐ Preserve positive-X-right/positive-Y-down semantics, native render offsets, and exactly one application of GUI scale.
-        ☐ Support horizontal/vertical packing, gap, padding, and cross-axis alignment; omit disabled/inapplicable entries and preserve remaining relative order when space closes up.
-        ☐ Clamp the whole group within the safe rectangle while retaining member spacing; allow different groups to overlap without automatic collision handling.
-        ☐ Retain the longest ordered prefix that fits; clip a single oversized first member instead of scaling it. Omitted entries remain update-eligible and recover when space permits.
-        ☐ Invalidate on viewport/GUI-scale changes, native target or native dialog-margin changes, membership/order/placement changes, and measured content changes. Position-only changes must not rebuild presentation resources.
-    ☐ Check native-bounds integration and geometry for nine screen mappings, differing pivots, offsets, scale changes, native margins and changes to them/render offsets, multiple members/groups, hide/reappear, resize, clamping, and deterministic overflow.
-    ☐ Completion: resulting native bounds satisfy proposal geometry and invalidation rules without a parallel UI tree or occupancy allocator; focused checks, second review, and independent audit pass.
+    ☑ Add placement metadata and named-target resolution under src/HudOverlays/Anchoring.
+        ☑ Resolve screen targets from WindowBounds with the 12 GUI-unit safe inset and native EnumDialogArea mappings.
+        ☑ Resolve the complete hotbar composer through the verified public type/key; read renderX/renderY and OuterWidth/OuterHeight after composition.
+        ☑ Treat hidden, closed, missing, uninitialized, or ambiguous targets as unavailable; hide dependents quietly and recover when available without fallback coordinates or automatic relocation.
+        ☑ Read each required target once per visible host frame and share its result. Invalidate layout only when relevant bounds/availability change.
+    ☑ Implement measurement, stable packing, attachment, viewport fit, and clipping policy under src/HudOverlays/Layout.
+        ☑ Maintain one native root and child bounds per group/content hierarchy; use native relative helpers where suitable and explicitly repack after membership/measurement changes.
+        ☑ Use native screen alignment; for named attachments apply groupOrigin = R.origin + A * R.size - P * S + g * O, with pixel-to-GUI-unit conversion before setting native fixed bounds.
+        ☑ Preserve positive-X-right/positive-Y-down semantics, native render offsets, and exactly one application of GUI scale.
+        ☑ Support horizontal/vertical packing, gap, padding, and cross-axis alignment; omit disabled/inapplicable entries and preserve remaining relative order when space closes up.
+        ☑ Clamp the whole group within the safe rectangle while retaining member spacing; allow different groups to overlap without automatic collision handling.
+        ☑ Retain the longest ordered prefix that fits; clip a single oversized first member instead of scaling it. Omitted entries remain update-eligible and recover when space permits.
+        ☑ Invalidate on viewport/GUI-scale changes, native target or native dialog-margin changes, membership/order/placement changes, and measured content changes. Position-only changes must not rebuild presentation resources.
+    ☑ Check native-bounds integration and geometry for nine screen mappings, differing pivots, offsets, scale changes, native margins and changes to them/render offsets, multiple members/groups, hide/reappear, resize, clamping, and deterministic overflow.
+    ☑ Completion: resulting native bounds satisfy proposal geometry and invalidation rules without a parallel UI tree or occupancy allocator; focused checks, second review, and independent audit pass.
+
+    Verification notes (2026-10-10; second review and independent audit passed): build succeeded and all 63 focused HudOverlays tests passed (25 registry, 23 layout, 15 native hotbar cases), including 486 screen/named attachment-pivot-scale combinations. Installed API/Lib hashes and file versions still match the proposal. Checks cover native parent rebinding, margins, render-offset clipping, stable packing/cross-axis alignment, whole-group clamping, ordered-prefix overflow/recovery, target caching/availability, live measurement/order/scale changes, and hidden-target replacement/removal cleanup. Existing unrelated compiler warnings and offline NU1900 remain; no game was launched.
+    Traceability: anchor tasks -> proposal Native positioning reuse / Anchor targets -> session-cached WindowBounds, shared frame context and public full-composer hotbar adapter plus native unavailable/recovery tests; packing/attachment tasks -> Placement model / Group layout -> native root/child layout and .NET geometry, 486 installed-bounds combinations and packing/overflow checks; invalidation tasks -> Resource lifecycle -> separate geometry/screen-margin revisions, target/measurement/order/offset checks and resource-free layout updates. Native host/composer rendering and scheduler integration remain in Phase 4; live visibility/extent, visuals, and input acceptance remain in Phase 7.
 
 ## Phase 4: Add passive host, scheduling, and resource lifecycle
     Depends on: Phases 1–3.
