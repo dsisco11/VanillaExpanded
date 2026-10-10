@@ -2,7 +2,7 @@
 
 Source proposal: [AnchoredHudOverlays.proposal.md](AnchoredHudOverlays.proposal.md)
 Related feature: [project.todo](../project.todo), bow arrow type and quantity HUD indicator.
-Planning requested: 2026-10-10. This checklist authorizes no implementation by itself; every task starts unchecked.
+Planning requested: 2026-10-10. Execution is authorized for the phase explicitly requested by the user; later phases remain pending.
 
 ## Goal and execution rules
     Deliver reusable passive HUD overlays anchored to screen positions or named HUD elements, with bow ammunition as the first consumer.
@@ -24,30 +24,33 @@ Planning requested: 2026-10-10. This checklist authorizes no implementation by i
 
 ## Assumptions and unresolved details
     Carry forward the proposal's defaults: both enable toggles true; hotbar-right attachment with left-middle group pivot and (12, 0) GUI-unit offset; vertical held-item-status packing; 12 GUI-unit safe inset; 1,000 ms default refresh; 100 ms heartbeat; 250 ms bow fallback refresh.
-    Installed bow-selection agreement, actual draw ordering, supported event coverage, and live hotbar extent/visibility remain verification obligations.
-    Gap, padding, cross-axis alignment defaults, concrete configuration keys/ranges beyond those named in the proposal, and exact internal signatures need implementation choices consistent with the proposal.
-    The proposal transfers ownership of an overlay instance but also requires session rebinding after resource disposal. Resolve the reset/recreation contract before lifecycle consumers are implemented; retain stable registration identity and exactly-once final disposal.
-    Confirm how supported screen attachment/pivot combinations map onto native EnumDialogArea and fixed offsets, including native margins. Do not silently replace native screen alignment with a parallel coordinate system.
+    Installed bow selection/traversal, DrawOrder 0.1, and event coverage are resolved by the linked installed integration contract. Live hotbar extent/visibility, input behavior, and synchronized firing/display agreement remain acceptance obligations.
+    Layout defaults are resolved: gap 6 GUI units, content padding 4 on each side, start cross-axis alignment, and zero native root padding. Concrete configuration keys/ranges beyond those named in the proposal and later internal signatures remain implementation choices.
+    Registered instances and IDs persist for the client ModSystem lifetime. BeginSession/EndSession bind and release session state/resources; EndSession is idempotent, and final removal ends any active session before disposing the instance exactly once.
+    Use the proposal's nine native EnumDialogArea mappings and fixed-offset pivot/inset equation, preserving pixel dialog margins and clearing stale derived margins when changing alignment. Cache WindowBounds per session; refresh and invalidate dependent native roots on resize.
     Future/replacement HUD compatibility and custom bow semantics are not established by the inspected base-game types. Missing anchors hide quietly; unverified custom bows remain unsupported unless a feature-specific adapter establishes their contract.
 
 ## Phase 1: Establish installed integration contracts
     Depends on: none.
-    Proposal: [Existing foundations and evidence](AnchoredHudOverlays.proposal.md#existing-foundations-and-evidence), [Native positioning reuse](AnchoredHudOverlays.proposal.md#native-positioning-reuse), [Selection authority and compatibility](AnchoredHudOverlays.proposal.md#selection-authority-and-compatibility).
+    Proposal: [Existing foundations and evidence](AnchoredHudOverlays.proposal.md#existing-foundations-and-evidence), [Native positioning reuse](AnchoredHudOverlays.proposal.md#native-positioning-reuse), [Selection authority and compatibility](AnchoredHudOverlays.proposal.md#selection-authority-and-compatibility), [Installed integration contract](AnchoredHudOverlays.proposal.md#installed-integration-contract).
     Outcome: subsequent components can rely on concrete installed APIs without guessing behavior.
 
-    ☐ Recheck the supported installed game assemblies and record their identity/version alongside the relevant method/type findings.
-        ☐ Confirm HudElement transforms, GuiDialog opening/input contracts, UnregisterOnClose, and GuiManager.OnGuiClosed removal from both GUI collections.
-        ☐ Confirm WindowBounds, ElementBounds scaling/alignment/parent-child behavior, render offsets, and the intended nine screen mappings.
-        ☐ Confirm GetDialogBoundsInArea is an exact-alignment bounds query and returns an empty list for no matches; preserve its distinction from allocation and named-anchor selection.
-        ☐ Confirm HudHotbar is discoverable through LoadedGuis and publicly exposes Composers["hotbar"].Bounds; verify the composer name and known element keys without depending on private fields.
-        ☐ Establish a host DrawOrder below inventory dialogs, tooltips, and modal menus from installed behavior; leave actual appearance/input acceptance for Phase 7.
-    ☐ Verify the installed ItemBow.GetNextArrow signature/accessibility and its use at interaction start and release; establish a cached read-only invocation path using existing dependencies.
-        ☐ Verify EntityPlayer.WalkInventory ordering, opened-inventory membership, positive-stack eligibility, creative exclusions, and participation of opened external inventories.
-        ☐ Identify usable SlotModified/open/close notifications, inventory membership changes, active-hand detection, and synchronized updates; document gaps covered by polling.
-        ☐ Define the supported base-bow boundary from actual firing/selection behavior; do not infer compatibility from tags or EnumTool alone.
-    ☐ Resolve the session reset/recreation contract, screen pivot mapping, and unspecified layout defaults within the proposal's stated ownership and positioning rules.
-    ☐ Reconcile any installed mismatch or unresolved semantic conflict with the proposal before implementing the affected consumer; do not substitute a new selection or placement policy silently.
-    ☐ Completion: installed contracts and remaining live-only questions are explicit, and second review/independent audit find no unresolved prerequisite for the dependent work.
+    ☑ Recheck the supported installed game assemblies and record their identity/version alongside the relevant method/type findings.
+        ☑ Confirm HudElement transforms, GuiDialog opening/input contracts, UnregisterOnClose, and GuiManager.OnGuiClosed removal from both GUI collections.
+        ☑ Confirm WindowBounds, ElementBounds scaling/alignment/parent-child behavior, render offsets, and the intended nine screen mappings.
+        ☑ Confirm GetDialogBoundsInArea is an exact-alignment bounds query and returns an empty list for no matches; preserve its distinction from allocation and named-anchor selection.
+        ☑ Confirm HudHotbar is discoverable through LoadedGuis and publicly exposes Composers["hotbar"].Bounds; verify the composer name and known element keys without depending on private fields.
+        ☑ Establish a host DrawOrder below inventory dialogs, tooltips, and modal menus from installed behavior; leave actual appearance/input acceptance for Phase 7.
+    ☑ Verify the installed ItemBow.GetNextArrow signature/accessibility and its use at interaction start and release; establish a cached read-only invocation path using existing dependencies.
+        ☑ Verify EntityPlayer.WalkInventory ordering, opened-inventory membership, positive-stack eligibility, creative exclusions, and participation of opened external inventories.
+        ☑ Identify usable SlotModified/open/close notifications, inventory membership changes, active-hand detection, and synchronized updates; document gaps covered by polling.
+        ☑ Define the supported base-bow boundary from actual firing/selection behavior; do not infer compatibility from tags or EnumTool alone.
+    ☑ Resolve the session reset/recreation contract, screen pivot mapping, and unspecified layout defaults within the proposal's stated ownership and positioning rules.
+    ☑ Reconcile any installed mismatch or unresolved semantic conflict with the proposal before implementing the affected consumer; do not substitute a new selection or placement policy silently.
+    ☑ Completion: installed contracts and remaining live-only questions are explicit, and second review/independent audit find no unresolved prerequisite for the dependent work.
+
+    Verification notes (2026-10-10; second review and independent audit passed): installed assembly identities and method evidence are recorded in the proposal's Installed integration contract. The installed selector delegate probe passed; 243 native alignment/pivot/scale cases and additional stale-margin/render-offset checks passed. GUI IL establishes lifecycle, hotbar keys, and DrawOrder 0.1; bow/event IL establishes selection/traversal and the notification-plus-polling boundary.
+    Traceability: native GUI tasks -> foundations/native reuse/installed contract -> GUI API and client IL plus native bounds probes; bow tasks -> selection authority/installed contract -> selector delegate and bow/inventory/event IL; resolution tasks -> ownership/placement/group layout -> persistent-instance session contract and explicit native layout defaults. Independent audit rechecked the native-margin invalidation correction and found no unresolved prerequisite. Live-only questions remain in Phase 7.
 
 ## Phase 2: Define overlay registration and ownership
     Depends on: Phase 1.
@@ -83,8 +86,8 @@ Planning requested: 2026-10-10. This checklist authorizes no implementation by i
         ☐ Support horizontal/vertical packing, gap, padding, and cross-axis alignment; omit disabled/inapplicable entries and preserve remaining relative order when space closes up.
         ☐ Clamp the whole group within the safe rectangle while retaining member spacing; allow different groups to overlap without automatic collision handling.
         ☐ Retain the longest ordered prefix that fits; clip a single oversized first member instead of scaling it. Omitted entries remain update-eligible and recover when space permits.
-        ☐ Invalidate on viewport/GUI-scale changes, native target changes, membership/order/placement changes, and measured content changes. Position-only changes must not rebuild presentation resources.
-    ☐ Check native-bounds integration and geometry for nine screen mappings, differing pivots, offsets, scale changes, native margins/render offsets, multiple members/groups, hide/reappear, resize, clamping, and deterministic overflow.
+        ☐ Invalidate on viewport/GUI-scale changes, native target or native dialog-margin changes, membership/order/placement changes, and measured content changes. Position-only changes must not rebuild presentation resources.
+    ☐ Check native-bounds integration and geometry for nine screen mappings, differing pivots, offsets, scale changes, native margins and changes to them/render offsets, multiple members/groups, hide/reappear, resize, clamping, and deterministic overflow.
     ☐ Completion: resulting native bounds satisfy proposal geometry and invalidation rules without a parallel UI tree or occupancy allocator; focused checks, second review, and independent audit pass.
 
 ## Phase 4: Add passive host, scheduling, and resource lifecycle
