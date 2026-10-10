@@ -57,17 +57,20 @@ Planning requested: 2026-10-10. Execution is authorized for the phase explicitly
     Proposal: [Ownership and registration](AnchoredHudOverlays.proposal.md#ownership-and-registration), [Proposed source responsibilities](AnchoredHudOverlays.proposal.md#proposed-source-responsibilities).
     Outcome: features can register bounded passive content without depending on each other or on native target details.
 
-    ☐ Add the internal IHudOverlay contract under src/HudOverlays/Registration for applicability, refresh, stable sampled content, measurement, preparation, drawing, and lifecycle responsibilities.
-        ☐ Support arbitrary bounded passive presentations; keep icon-and-text as a reusable consumer presentation rather than the universal content schema.
-        ☐ Make the draw contract consume sampled/prepared state without gameplay queries, inventory traversal, or input handling.
-    ☐ Add group definitions and overlay metadata: stable namespaced ID, overlay instance, enabled selector, group ID, order, and validated positive refresh interval with 1,000 ms default.
-        ☐ Reject duplicate group IDs, duplicate overlay IDs, and unknown group references before changing registry state or taking resource ownership.
-        ☐ Order by ascending numeric order then ordinal stable ID, independent of registration timing.
-        ☐ Return an idempotent removal handle; transfer lifetime ownership only after successful registration, preserving caller ownership on rejection.
-        ☐ Apply registry changes requested during iteration at the next pass boundary, on the client main thread.
-    ☐ Define resource ownership and session rebinding according to Phase 1: final disposal once, session resources refreshed, borrowed engine/API/inventory resources never disposed by overlays.
-    ☐ Add focused registry/ownership checks for rejected registrations, stable ordering, deferred mutations, removal during iteration, repeated removal/disposal, and session rebinding.
-    ☐ Completion: registration and resource ownership are deterministic and verified; feature types do not leak into shared components; second review and independent audit pass.
+    ☑ Add the internal IHudOverlay contract under src/HudOverlays/Registration for applicability, refresh, stable sampled content, measurement, preparation, drawing, and lifecycle responsibilities.
+        ☑ Support arbitrary bounded passive presentations; keep icon-and-text as a reusable consumer presentation rather than the universal content schema.
+        ☑ Make the draw contract consume sampled/prepared state without gameplay queries, inventory traversal, or input handling.
+    ☑ Add group definitions and overlay metadata: stable namespaced ID, overlay instance, enabled selector, group ID, order, and validated positive refresh interval with 1,000 ms default.
+        ☑ Reject duplicate group IDs, duplicate overlay IDs, and unknown group references before changing registry state or taking resource ownership.
+        ☑ Order by ascending numeric order then ordinal stable ID, independent of registration timing.
+        ☑ Return an idempotent removal handle; transfer lifetime ownership only after successful registration, preserving caller ownership on rejection.
+        ☑ Apply registry changes requested during iteration at the next pass boundary, on the client main thread.
+    ☑ Define resource ownership and session rebinding according to Phase 1: final disposal once, session resources refreshed, borrowed engine/API/inventory resources never disposed by overlays.
+    ☑ Add focused registry/ownership checks for rejected registrations, stable ordering, deferred mutations, removal during iteration, repeated removal/disposal, and session rebinding.
+    ☑ Completion: registration and resource ownership are deterministic and verified; feature types do not leak into shared components; second review and independent audit pass.
+
+    Verification notes (2026-10-10; second review and independent audit passed): both projects built successfully and 25 focused HudOverlayRegistryTests passed. Checks cover rejection/caller ownership, ordinal ordering, deferred membership and session binding, main-thread enforcement, partial initialization, repeated removal/disposal, session rebinding, retiring-instance reuse rejection, and queued-reference cleanup. Existing offline NU1900 package-audit warning remains; no game was launched.
+    Traceability: registration/metadata tasks -> proposal Ownership and registration / Proposed source responsibilities -> Registration contracts, immutable group metadata, and focused registry tests; passive-content tasks -> Scope / Updates / Resource lifecycle -> separate applicability/refresh/measurement/preparation/draw responsibilities with sampled-state, clipping, and borrowed-resource documentation; lifecycle tasks -> Ownership and registration / Resource lifecycle -> exact final disposal, fresh session binding, cleanup failure handling, and deferred teardown tests. Anchoring/Layout files declare group metadata only; native resolution, packing, host, and scheduler remain later work.
 
 ## Phase 3: Implement native anchoring and group layout
     Depends on: Phases 1–2.
