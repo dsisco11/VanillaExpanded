@@ -72,14 +72,13 @@ internal sealed class FoodGrainSimulationShaderProgram : ShaderProgram
     internal int VertexArray { get => vertexArray; set => vertexArray = RequireHandle(value); }
     #endregion
     #region Compilation and Execution
-    /// <summary>Declares feedback before engine linking and validates the linked particle contract once.</summary>
+    /// <summary>Links the particle program with feedback outputs and validates its linked contract once.</summary>
     public override bool Compile()
     {
         if (GeometryShader is not null) throw new InvalidOperationException("Grain simulation uses vertex invocations only.");
-        if (!ItemSlotIndicatorTransformFeedbackLink.Compile(this, () => base.Compile())) return false;
+        if (!SimulationShaderCompiler.Compile(this, varyings)) return false;
         try
         {
-            ItemSlotIndicatorBufferSampler.Register(this, "state");
             foreach (string name in new[] { "state", "particleCount", "pass", "timeStep", "containerAcceleration" })
                 if (!HasUniform(name)) throw new InvalidOperationException($"Grain solver missing '{name}'.");
             GL.GetProgram(ProgramId, GetProgramParameterName.ActiveUniforms, out int count);
@@ -108,10 +107,6 @@ internal sealed class FoodGrainSimulationShaderProgram : ShaderProgram
         }
         catch { Dispose(); throw; }
     }
-
-    /// <summary>Defines the eight-float interleaved particle record before linking.</summary>
-    internal void ConfigureFeedback(int programId) =>
-        GL.TransformFeedbackVaryings(programId, varyings.Length, varyings, TransformFeedbackMode.InterleavedAttribs);
 
     /// <summary>Runs one caller-selected pass, releasing only owned scratch bindings without querying GPU state.</summary>
     internal void Advance()

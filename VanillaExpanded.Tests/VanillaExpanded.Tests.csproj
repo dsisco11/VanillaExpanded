@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -43,7 +43,7 @@
       <HintPath>$(VINTAGE_STORY)/Lib/OpenTK.Core.dll</HintPath>
       <Private>true</Private>
     </Reference>
-    <!-- Link-adapter tests inspect the concrete engine platform's IL without opening a window. -->
+    <!-- Engine platform dependencies support shader contract inspection without opening the game. -->
     <Reference Include="OpenTK.Windowing.Common">
       <HintPath>$(VINTAGE_STORY)/Lib/OpenTK.Windowing.Common.dll</HintPath>
       <Private>true</Private>

@@ -1,18 +1,12 @@
 using System.Numerics;
-using System.Reflection.Emit;
-
-using HarmonyLib;
-
-using OpenTK.Graphics.OpenGL4;
 
 using VanillaExpanded.ItemSlotIndicators.Effects.LiquidSlosh;
-using VanillaExpanded.ItemSlotIndicators.Effects;
 
 using Vintagestory.Client.NoObf;
 
 namespace VanillaExpanded.Tests.Unit.ItemSlotIndicators.Effects;
 
-/// <summary>Checks typed solver inputs and pre-link adaptation without creating a graphics context.</summary>
+/// <summary>Checks typed solver inputs without creating a graphics context.</summary>
 [Trait("Category", "Unit")]
 public sealed class LiquidSloshSimulationShaderProgramTests
 {
@@ -172,49 +166,5 @@ public sealed class LiquidSloshSimulationShaderProgramTests
     }
     #endregion
 
-    #region Engine Link Adaptation
-    /// <summary>The installed engine linker remains compatible with the narrowly scoped pre-link adapter.</summary>
-    [Fact]
-    public void EngineLinker_ContainsSupportedPreLinkInsertionPoint()
-    {
-        var target = AccessTools.Method(typeof(ClientPlatformWindows), nameof(ClientPlatformWindows.CreateShaderProgram),
-            [typeof(ShaderProgram)]);
-        var original = PatchProcessor.GetOriginalInstructions(target).ToList();
-        int count = original.Count;
-        var adapted = ItemSlotIndicatorTransformFeedbackLink.InsertConfiguration(original).ToList();
-        Assert.Equal(count + 3, adapted.Count);
-        int callback = adapted.FindIndex(instruction => instruction.operand is System.Reflection.MethodInfo method
-            && method.DeclaringType == typeof(ItemSlotIndicatorTransformFeedbackLink) && method.Name == "Configure");
-        int inserted = callback - 2;
-        Assert.True(inserted >= 0);
-        Assert.Equal(OpCodes.Dup, adapted[inserted].opcode);
-        Assert.Equal(OpCodes.Ldarg_1, adapted[inserted + 1].opcode);
-        Assert.Equal("LinkProgram", ((System.Reflection.MethodInfo)adapted[inserted + 3].operand).Name);
-    }
-
-    /// <summary>Branches targeting the engine link also execute configuration without changing its stack argument.</summary>
-    [Fact]
-    public void PreLinkAdapter_MovesLabelsBeforeConfiguration()
-    {
-        var link = new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(GL), nameof(GL.LinkProgram), [typeof(int)]));
-        var label = new DynamicMethod("test-label", typeof(void), Type.EmptyTypes).GetILGenerator().DefineLabel();
-        link.labels.Add(label);
-        var adapted = ItemSlotIndicatorTransformFeedbackLink.InsertConfiguration([link]).ToList();
-        Assert.Equal(OpCodes.Dup, adapted[0].opcode);
-        Assert.Contains(label, adapted[0].labels);
-        Assert.Empty(link.labels);
-        Assert.Same(link, adapted[3]);
-    }
-
-    /// <summary>Missing or ambiguous engine links fail explicitly rather than silently producing an unconfigured program.</summary>
-    [Fact]
-    public void UnsupportedLinkerBody_IsRejected()
-    {
-        Assert.Throws<InvalidOperationException>(() => ItemSlotIndicatorTransformFeedbackLink.InsertConfiguration([]));
-        var link = AccessTools.Method(typeof(GL), nameof(GL.LinkProgram), [typeof(int)]);
-        Assert.Throws<InvalidOperationException>(() => ItemSlotIndicatorTransformFeedbackLink.InsertConfiguration(
-            [new(OpCodes.Call, link), new(OpCodes.Call, link)]));
-    }
-    #endregion
     #endregion
 }

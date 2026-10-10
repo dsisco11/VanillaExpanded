@@ -160,17 +160,16 @@ internal sealed class LiquidSloshSimulationShaderProgram : ShaderProgram
     #endregion
 
     #region Compilation and Execution
-    /// <summary>Configures feedback before the engine links, preserving engine diagnostics and fresh uniform locations.</summary>
+    /// <summary>Links the liquid program with feedback outputs, preserving engine stage diagnostics and fresh uniforms.</summary>
     public override bool Compile()
     {
         if (GeometryShader is not null)
             throw new InvalidOperationException("The liquid solver uses one vertex invocation per cell, without a geometry stage.");
-        // The scoped adapter only changes linking for this concrete program and is removed even on failure.
-        bool compiled = ItemSlotIndicatorTransformFeedbackLink.Compile(this, () => base.Compile());
+        // Only this simulation program enters our linker; the engine's shared linker remains untouched.
+        bool compiled = SimulationShaderCompiler.Compile(this, feedbackVaryings);
         if (!compiled) return false;
         try
         {
-            ItemSlotIndicatorBufferSampler.Register(this, "state");
             foreach (string uniform in requiredUniforms)
                 if (!HasUniform(uniform))
                     throw new InvalidOperationException($"Liquid solver is missing uniform '{uniform}'.");
@@ -183,10 +182,6 @@ internal sealed class LiquidSloshSimulationShaderProgram : ShaderProgram
             throw;
         }
     }
-
-    /// <summary>Installs the interleaved feedback record while the engine program is created but not yet linked.</summary>
-    internal void ConfigureFeedback(int programId) =>
-        GL.TransformFeedbackVaryings(programId, feedbackVaryings.Length, feedbackVaryings, TransformFeedbackMode.InterleavedAttribs);
 
     /// <summary>Advances the fixed point grid in the dedicated simulation pass without rasterization or CPU readback.</summary>
     /// <remarks>The caller activates this program before submission and stops it in its own finally block.
