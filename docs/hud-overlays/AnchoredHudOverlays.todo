@@ -1,0 +1,175 @@
+# Anchored HUD Overlays Implementation Checklist
+
+Source proposal: [AnchoredHudOverlays.proposal.md](AnchoredHudOverlays.proposal.md)
+Related feature: [project.todo](../project.todo), bow arrow type and quantity HUD indicator.
+Planning requested: 2026-10-10. This checklist authorizes no implementation by itself; every task starts unchecked.
+
+## Goal and execution rules
+    Deliver reusable passive HUD overlays anchored to screen positions or named HUD elements, with bow ammunition as the first consumer.
+    The proposal is authoritative. Its native API findings are prior evidence to recheck; its unverified runtime behavior is not a completion receipt.
+    Use native ElementBounds and GuiComposer for bounds, alignment, and scaling. Keep feature policy outside the shared registry, host, scheduler, and layout components.
+    Keep HudOverlaySystem client-only and thin. Follow the proposal's source responsibility directories; use one clearly named responsibility per file and directional dependencies.
+    Document classes/methods with XML comments, explain nontrivial logic, and group methods by visibility and functional family. Avoid redundant forwarding methods and project staging language in production code/docs.
+    Run all build/test tools through subagents, as required by the supplied AGENTS.md instructions. Do not launch the game; live acceptance is user-run.
+    Before checking a phase complete, collect its focused evidence, perform a second review, and obtain an independent implementation audit against the linked proposal sections. Resolve and recheck findings first.
+    Keep receipts in the existing validation workflow and concise checklist notes; do not create unrequested standalone audit documents.
+
+## Scope boundaries
+    Include internal registration, named anchors, dynamic group packing, scheduling, passive rendering, lifecycle/resource ownership, live configuration, and the base-bow indicator.
+    Exclude interactive widgets, drag positioning, world/entity projection, automatic HUD discovery, collision avoidance across groups or unrelated UI, and a public cross-mod API.
+    Exclude implementation of time/weather/temperature/storm features, migration of existing radial menus/progress or item-slot indicators, adaptive scheduling, new shaders/custom OpenGL machinery, a second UI bounds tree, an event bus, service locator, or global active singleton.
+    Do not reserve smallblockgui positions. Native GetFreePos/OccupyPos/FreePos remain available for future conventional dialog placement; no replacement occupancy allocator is needed here.
+    Keep placement preferences in VanillaExpandedConfig/ConfigLib. Native saved dialog positions are not a second position authority in this scope.
+    Do not alter bow firing, reserve or move ammunition, mutate inventory, predict consumption, or introduce an arrow-selection preference.
+
+## Assumptions and unresolved details
+    Carry forward the proposal's defaults: both enable toggles true; hotbar-right attachment with left-middle group pivot and (12, 0) GUI-unit offset; vertical held-item-status packing; 12 GUI-unit safe inset; 1,000 ms default refresh; 100 ms heartbeat; 250 ms bow fallback refresh.
+    Installed bow-selection agreement, actual draw ordering, supported event coverage, and live hotbar extent/visibility remain verification obligations.
+    Gap, padding, cross-axis alignment defaults, concrete configuration keys/ranges beyond those named in the proposal, and exact internal signatures need implementation choices consistent with the proposal.
+    The proposal transfers ownership of an overlay instance but also requires session rebinding after resource disposal. Resolve the reset/recreation contract before lifecycle consumers are implemented; retain stable registration identity and exactly-once final disposal.
+    Confirm how supported screen attachment/pivot combinations map onto native EnumDialogArea and fixed offsets, including native margins. Do not silently replace native screen alignment with a parallel coordinate system.
+    Future/replacement HUD compatibility and custom bow semantics are not established by the inspected base-game types. Missing anchors hide quietly; unverified custom bows remain unsupported unless a feature-specific adapter establishes their contract.
+
+## Phase 1: Establish installed integration contracts
+    Depends on: none.
+    Proposal: [Existing foundations and evidence](AnchoredHudOverlays.proposal.md#existing-foundations-and-evidence), [Native positioning reuse](AnchoredHudOverlays.proposal.md#native-positioning-reuse), [Selection authority and compatibility](AnchoredHudOverlays.proposal.md#selection-authority-and-compatibility).
+    Outcome: subsequent components can rely on concrete installed APIs without guessing behavior.
+
+    ☐ Recheck the supported installed game assemblies and record their identity/version alongside the relevant method/type findings.
+        ☐ Confirm HudElement transforms, GuiDialog opening/input contracts, UnregisterOnClose, and GuiManager.OnGuiClosed removal from both GUI collections.
+        ☐ Confirm WindowBounds, ElementBounds scaling/alignment/parent-child behavior, render offsets, and the intended nine screen mappings.
+        ☐ Confirm GetDialogBoundsInArea is an exact-alignment bounds query and returns an empty list for no matches; preserve its distinction from allocation and named-anchor selection.
+        ☐ Confirm HudHotbar is discoverable through LoadedGuis and publicly exposes Composers["hotbar"].Bounds; verify the composer name and known element keys without depending on private fields.
+        ☐ Establish a host DrawOrder below inventory dialogs, tooltips, and modal menus from installed behavior; leave actual appearance/input acceptance for Phase 7.
+    ☐ Verify the installed ItemBow.GetNextArrow signature/accessibility and its use at interaction start and release; establish a cached read-only invocation path using existing dependencies.
+        ☐ Verify EntityPlayer.WalkInventory ordering, opened-inventory membership, positive-stack eligibility, creative exclusions, and participation of opened external inventories.
+        ☐ Identify usable SlotModified/open/close notifications, inventory membership changes, active-hand detection, and synchronized updates; document gaps covered by polling.
+        ☐ Define the supported base-bow boundary from actual firing/selection behavior; do not infer compatibility from tags or EnumTool alone.
+    ☐ Resolve the session reset/recreation contract, screen pivot mapping, and unspecified layout defaults within the proposal's stated ownership and positioning rules.
+    ☐ Reconcile any installed mismatch or unresolved semantic conflict with the proposal before implementing the affected consumer; do not substitute a new selection or placement policy silently.
+    ☐ Completion: installed contracts and remaining live-only questions are explicit, and second review/independent audit find no unresolved prerequisite for the dependent work.
+
+## Phase 2: Define overlay registration and ownership
+    Depends on: Phase 1.
+    Proposal: [Ownership and registration](AnchoredHudOverlays.proposal.md#ownership-and-registration), [Proposed source responsibilities](AnchoredHudOverlays.proposal.md#proposed-source-responsibilities).
+    Outcome: features can register bounded passive content without depending on each other or on native target details.
+
+    ☐ Add the internal IHudOverlay contract under src/HudOverlays/Registration for applicability, refresh, stable sampled content, measurement, preparation, drawing, and lifecycle responsibilities.
+        ☐ Support arbitrary bounded passive presentations; keep icon-and-text as a reusable consumer presentation rather than the universal content schema.
+        ☐ Make the draw contract consume sampled/prepared state without gameplay queries, inventory traversal, or input handling.
+    ☐ Add group definitions and overlay metadata: stable namespaced ID, overlay instance, enabled selector, group ID, order, and validated positive refresh interval with 1,000 ms default.
+        ☐ Reject duplicate group IDs, duplicate overlay IDs, and unknown group references before changing registry state or taking resource ownership.
+        ☐ Order by ascending numeric order then ordinal stable ID, independent of registration timing.
+        ☐ Return an idempotent removal handle; transfer lifetime ownership only after successful registration, preserving caller ownership on rejection.
+        ☐ Apply registry changes requested during iteration at the next pass boundary, on the client main thread.
+    ☐ Define resource ownership and session rebinding according to Phase 1: final disposal once, session resources refreshed, borrowed engine/API/inventory resources never disposed by overlays.
+    ☐ Add focused registry/ownership checks for rejected registrations, stable ordering, deferred mutations, removal during iteration, repeated removal/disposal, and session rebinding.
+    ☐ Completion: registration and resource ownership are deterministic and verified; feature types do not leak into shared components; second review and independent audit pass.
+
+## Phase 3: Implement native anchoring and group layout
+    Depends on: Phases 1–2.
+    Proposal: [Native positioning reuse](AnchoredHudOverlays.proposal.md#native-positioning-reuse), [Anchors and placement](AnchoredHudOverlays.proposal.md#anchors-and-placement).
+    Outcome: registered content can be laid out using native bounds at screen or hotbar anchors.
+
+    ☐ Add placement metadata and named-target resolution under src/HudOverlays/Anchoring.
+        ☐ Resolve screen targets from WindowBounds with the 12 GUI-unit safe inset and native EnumDialogArea mappings.
+        ☐ Resolve the complete hotbar composer through the verified public type/key; read renderX/renderY and OuterWidth/OuterHeight after composition.
+        ☐ Treat hidden, closed, missing, uninitialized, or ambiguous targets as unavailable; hide dependents quietly and recover when available without fallback coordinates or automatic relocation.
+        ☐ Read each required target once per visible host frame and share its result. Invalidate layout only when relevant bounds/availability change.
+    ☐ Implement measurement, stable packing, attachment, viewport fit, and clipping policy under src/HudOverlays/Layout.
+        ☐ Maintain one native root and child bounds per group/content hierarchy; use native relative helpers where suitable and explicitly repack after membership/measurement changes.
+        ☐ Use native screen alignment; for named attachments apply groupOrigin = R.origin + A * R.size - P * S + g * O, with pixel-to-GUI-unit conversion before setting native fixed bounds.
+        ☐ Preserve positive-X-right/positive-Y-down semantics, native render offsets, and exactly one application of GUI scale.
+        ☐ Support horizontal/vertical packing, gap, padding, and cross-axis alignment; omit disabled/inapplicable entries and preserve remaining relative order when space closes up.
+        ☐ Clamp the whole group within the safe rectangle while retaining member spacing; allow different groups to overlap without automatic collision handling.
+        ☐ Retain the longest ordered prefix that fits; clip a single oversized first member instead of scaling it. Omitted entries remain update-eligible and recover when space permits.
+        ☐ Invalidate on viewport/GUI-scale changes, native target changes, membership/order/placement changes, and measured content changes. Position-only changes must not rebuild presentation resources.
+    ☐ Check native-bounds integration and geometry for nine screen mappings, differing pivots, offsets, scale changes, native margins/render offsets, multiple members/groups, hide/reappear, resize, clamping, and deterministic overflow.
+    ☐ Completion: resulting native bounds satisfy proposal geometry and invalidation rules without a parallel UI tree or occupancy allocator; focused checks, second review, and independent audit pass.
+
+## Phase 4: Add passive host, scheduling, and resource lifecycle
+    Depends on: Phases 1–3.
+    Proposal: [Update, visibility, and drawing](AnchoredHudOverlays.proposal.md#update-visibility-and-drawing), [Native positioning reuse](AnchoredHudOverlays.proposal.md#native-positioning-reuse).
+    Outcome: registered overlays update and render through a reusable, passive native HUD host.
+
+    ☐ Add HudOverlaySystem as client-only composition/event wiring and keep scheduler, native host, registry, and layout policy in their owning modules.
+    ☐ Add the HudElement-derived host under src/HudOverlays/Rendering with one owned GuiComposer per group and native root/child bounds from Phase 3.
+        ☐ Open without focus, return Focusable false, decline keyboard/mouse events, and capture neither general nor raw input.
+        ☐ Use the verified native draw order and HUD transform; restore temporary drawing state through existing engine APIs.
+        ☐ Draw only eligible group/content state and honor assigned clipping, including oversized content, without per-frame recomposition.
+        ☐ Keep ordinary inventory dialogs from becoming an automatic hide condition; modal coverage follows native draw order.
+    ☐ Add shared monotonic scheduling under src/HudOverlays/Updating with a 100 ms heartbeat, positive per-overlay intervals, and coalesced invalidation.
+        ☐ Keep applicability checks cheap; perform expensive refresh only when enabled, applicable, globally visible, and attached to an available target.
+        ☐ Publish stable snapshots; separate content/preparation dirtiness from measurement/layout dirtiness. Drawing must not sample gameplay state.
+        ☐ Refresh before showing content after enabling, player/session replacement, target restoration, or HideGuis restoration; retain invalidation while expensive work is suspended.
+        ☐ Continue bounded refreshes for overflow-suppressed entries; account for heartbeat granularity rather than promising exact sub-heartbeat latency.
+    ☐ Add reusable icon-and-text presentation with native GUI item rendering and cached text resources.
+        ☐ Render item presentation copies without mutating live inventory; borrow engine icons/atlas/meshes.
+        ☐ Reprepare only for relevant content, locale, font, or GUI-scale changes; use accessible contrast, localization, and clipping/ellipsis within assigned bounds.
+    ☐ Implement lifecycle and failure isolation.
+        ☐ Hide for missing world/player, world exit, or HideGuis; support additional feature applicability restrictions.
+        ☐ Set UnregisterOnClose true; use TryClose before disposal and TryOpen for reopening, without manually editing GUI collections.
+        ☐ On LeaveWorld stop updates, detach feature subscriptions, close/dispose session host/composers, and clear session snapshots/resources/target references; recreate session bindings for the next ready world.
+        ☐ Make final event/listener/resource cleanup idempotent and preserve borrowed-resource ownership.
+        ☐ Hide a failing refresh/preparation consumer, emit a bounded diagnostic, and retry on its next scheduled refresh. Missing optional targets generate no warnings.
+    ☐ Verify fake-clock scheduling and native host/lifecycle integration: coalescing, interval bounds, disabled/inapplicable/unavailable states, restoration, overflow updates, failure recovery, unchanged-frame resource reuse, and repeated session/open/close/dispose sequences.
+    ☐ Completion: the generic runtime works with focused test consumers, passes relevant checks and second review/independent audit, and leaves live input/visual acceptance explicitly pending.
+
+## Phase 5: Add the bow ammunition consumer
+    Depends on: Phases 1–4.
+    Proposal: [First consumer: bow ammunition](AnchoredHudOverlays.proposal.md#first-consumer-bow-ammunition), [Placement model](AnchoredHudOverlays.proposal.md#placement-model).
+    Outcome: the supported active main-hand bow displays the next arrow type and total eligible quantity of that collectible type.
+
+    ☐ Add feature-owned applicability, selector access, inventory sampling/subscriptions, and overlay content under src/BowAmmunition.
+        ☐ Register vanillaexpanded:bow-ammunition in held-item-status with vertical packing and the proposed hotbar-right-middle / group-left-middle / (12, 0) placement.
+        ☐ Hide for no supported active main-hand bow or a dead player; discard old snapshots when switching away or replacing player/session.
+        ☐ Invoke the verified owning GetNextArrow method through a cached read-only binding. Keep custom-bow adapters feature-specific and hide unverified implementations.
+        ☐ Sum positive stacks of the selected collectible identity through the same eligible WalkInventory traversal, excluding creative slots and other types; use a sufficiently wide accumulator.
+        ☐ Preserve verified opened-external-inventory participation and engine ordering; do not group by stack-attribute equality or restrict traversal to a hand-written bag list.
+        ☐ Display the selected icon and count; use localized names where applicable without an always-visible full name. Show a muted generic arrow and localized No arrows/0 state when a supported bow has no eligible ammunition.
+    ☐ Attach/detach notifications across every inventory that can affect traversal; coalesce slot/open/close changes into refresh invalidation.
+        ☐ Request 250 ms fallback refreshes while applicable, including inventory membership and active-hand checks; use available events to shorten latency without assuming complete event coverage.
+        ☐ Reflect current client-visible synchronized inventory without predictive decrements or long-lived selected-slot references; selection may change again on firing release.
+    ☐ Verify mixed arrow types and multiple stacks, including 12 + 8 flint alongside 30 copper producing flint 20 when flint is selected first.
+        ☐ Cover zero/empty stacks, creative exclusion, external inventory open/close, traversal order changes, unsupported bows, no arrows, death/hand switches, synchronized consumption, and player/session replacement.
+        ☐ Verify no inventory mutation and complete subscription/resource cleanup across enable/disable and world transitions.
+    ☐ Completion: content matches verified installed selection semantics under focused checks, and second review/independent audit pass; user-run firing/display agreement remains a final acceptance requirement.
+
+## Phase 6: Integrate live configuration and user documentation
+    Depends on: Phases 2–5.
+    Proposal: [Configuration](AnchoredHudOverlays.proposal.md#configuration), [Updates](AnchoredHudOverlays.proposal.md#updates).
+    Outcome: users can enable overlays and select the held-item group's native screen or hotbar placement through existing settings.
+
+    ☐ Extend VanillaExpandedConfig, existing ConfigLib mappings, and localization with a visibly grouped HUD Overlays section.
+        ☐ Add EnableHudOverlays and EnableBowAmmunitionOverlay, both default true.
+        ☐ Expose held-item-status placement as hotbar or one of nine screen positions plus X/Y GUI-unit offsets; retain packing/order settings as registration defaults.
+        ☐ Use stable persisted keys and consistent defaults; unknown anchor keys revert to the group default, and nonfinite offsets revert to defaults.
+    ☐ Implement ILiveConfigurable integration for settings and placement changes.
+        ☐ Disabling a feature immediately stops its sampling and releases layout space; disabling all overlays stops expensive work while allowing restart-free re-enable.
+        ☐ Apply placement changes through layout invalidation, with no unnecessary content resampling/resource recreation; refresh restored content before showing it.
+        ☐ Keep config persistence authoritative; do not write duplicate positions through native saved-dialog APIs.
+    ☐ Verify configuration loading, persisted key/ConfigLib display agreement, invalid values, toggles, screen/hotbar switching, offsets, and repeated live reload.
+    ☐ Update appropriate user/developer documentation for settings, next-arrow/type-total meaning, missing-anchor behavior, unsupported bows, and ownership/registration expectations. Avoid claiming unperformed live acceptance.
+    ☐ Completion: runtime/configuration/defaults/localization agree, relevant checks pass, and second review/independent audit find no integration gaps.
+
+## Phase 7: Complete integrated validation and user-run acceptance
+    Depends on: Phases 1–6.
+    Proposal: [Validation required before implementation is considered complete](AnchoredHudOverlays.proposal.md#validation-required-before-implementation-is-considered-complete), [Approval decisions and remaining evidence](AnchoredHudOverlays.proposal.md#approval-decisions-and-remaining-evidence).
+    Outcome: the implementation has appropriate automated evidence and explicit user acceptance of live behavior.
+
+    ☐ Through subagents, run the relevant build and focused registry/layout/scheduler/lifecycle/bow/configuration checks; resolve failures and rerun affected checks.
+    ☐ Inspect the normal build/package output for required configuration, localization, and presentation assets; keep package evidence distinct from in-game results.
+    ☐ Reconcile the complete implementation against every linked proposal contract, including borrowed resources, subscriptions, native bounds/registration, supported compatibility boundaries, and absence of gameplay queries/resource recreation in unchanged draws.
+    ☐ Collect user-run acceptance for normal/high GUI scale, window resizing, hotbar placement/extent, screen placements, HUD hiding/restoration, missing target recovery, and overflow behavior.
+    ☐ Collect user-run input/render acceptance for movement, hotbar scrolling, bow draw/release, inventory interaction, Escape, dialogs/tooltips/modal menus, and representative third-party HUD layouts.
+    ☐ Collect user-run ammunition acceptance for arrow-type transitions, synchronized consumption, relevant inventory open/close, no arrows, and world exit/rejoin.
+    ☐ Confirm acceptable contrast, icon/count readability, hotbar-right placement, and refresh responsiveness; reconcile required tuning with the proposal and rerun affected validation.
+    ☐ Remove temporary diagnostic instrumentation or scaffolding introduced during implementation; retain useful existing-workflow receipts without adding unnecessary audit files.
+    ☐ Complete the final second review and independent implementation audit. Resolve every finding or record an explicitly approved deferral with its remaining acceptance boundary.
+    ☐ Completion: source/API, automated, package, and live evidence are distinguished; all required acceptance is complete or explicitly approved for deferral, and no unsupported completion claim remains.
+
+## Final acceptance and traceability
+    ☐ Confirm all proposal sections are covered: foundations/native reuse (1, 3–4), ownership/source boundaries (2–4), anchors/layout (3), updates/input/resources (4), bow behavior (5), configuration (6), and validation (all phases plus 7).
+    ☐ Confirm no future-feature or excluded-scope work was introduced and all remaining decisions/deferrals are explicit.
+    ☐ Update the bow feature marker in project.todo only after implementation and required acceptance are complete; leave unrelated HUD feature entries unchecked.
+    ☐ Mark this checklist complete only after the linked-document review, focused evidence, second review, and independent audit requirements are satisfied.
