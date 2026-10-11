@@ -3,6 +3,24 @@
   "file": "VanillaExpanded.json",
   "settings": {
     "boolean": {
+      "EnableHudOverlays": {
+        "code": "EnableHudOverlays",
+        "name": "EnableHudOverlays",
+        "ingui": "vanillaexpanded:config-enable-hud-overlays",
+        "comment": "vanillaexpanded:config-enable-hud-overlays-tooltip",
+        "default": true,
+        "weight": 10.1,
+        "clientSide": true
+      },
+      "EnableBowAmmunitionOverlay": {
+        "code": "EnableBowAmmunitionOverlay",
+        "name": "EnableBowAmmunitionOverlay",
+        "ingui": "vanillaexpanded:config-enable-bow-ammunition-overlay",
+        "comment": "vanillaexpanded:config-enable-bow-ammunition-overlay-tooltip",
+        "default": true,
+        "weight": 10.2,
+        "clientSide": true
+      },
       "EnableAnimalSexIndicators": {
         "code": "EnableAnimalSexIndicators",
         "name": "EnableAnimalSexIndicators",
@@ -207,6 +225,28 @@
       }
     },
     "integer": {
+      "HeldItemStatusAnchor": {
+        "code": "HeldItemStatusAnchor",
+        "name": "HeldItemStatusAnchor",
+        "ingui": "vanillaexpanded:config-held-item-status-anchor",
+        "comment": "vanillaexpanded:config-held-item-status-anchor-tooltip",
+        "default": "saturation",
+        "weight": 10.3,
+        "clientSide": true,
+        "mapping": {
+          "saturation": 0,
+          "hotbar": 1,
+          "screen-left-top": 2,
+          "screen-center-top": 3,
+          "screen-right-top": 4,
+          "screen-left-middle": 5,
+          "screen-center-middle": 6,
+          "screen-right-middle": 7,
+          "screen-left-bottom": 8,
+          "screen-center-bottom": 9,
+          "screen-right-bottom": 10
+        }
+      },
       "AnimalFemaleIconColor": {
         "code": "AnimalFemaleIconColor",
         "name": "AnimalFemaleIconColor",
@@ -261,6 +301,34 @@
       }
     },
     "float": {
+      "HeldItemStatusOffsetX": {
+        "code": "HeldItemStatusOffsetX",
+        "name": "HeldItemStatusOffsetX",
+        "ingui": "vanillaexpanded:config-held-item-status-offset-x",
+        "comment": "vanillaexpanded:config-held-item-status-offset-x-tooltip",
+        "default": -4,
+        "weight": 10.4,
+        "clientSide": true,
+        "range": {
+          "min": -2048,
+          "max": 2048,
+          "step": 1
+        }
+      },
+      "HeldItemStatusOffsetY": {
+        "code": "HeldItemStatusOffsetY",
+        "name": "HeldItemStatusOffsetY",
+        "ingui": "vanillaexpanded:config-held-item-status-offset-y",
+        "comment": "vanillaexpanded:config-held-item-status-offset-y-tooltip",
+        "default": 0,
+        "weight": 10.5,
+        "clientSide": true,
+        "range": {
+          "min": -2048,
+          "max": 2048,
+          "step": 1
+        }
+      },
       "AnimalSexIndicatorOpacity": {
         "code": "AnimalSexIndicatorOpacity",
         "name": "AnimalSexIndicatorOpacity",
@@ -424,6 +492,11 @@
     }
   },
   "formatting": [
+    {
+      "type": "separator",
+      "title": "vanillaexpanded:config-section-hud-overlays",
+      "weight": 10
+    },
     {
       "type": "separator",
       "title": "vanillaexpanded:config-section-animal-sex-indicators",

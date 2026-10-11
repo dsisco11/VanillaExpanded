@@ -23,6 +23,12 @@ You can now bulk transfer matching items from your inventory into storage contai
 
 Hold the Quick Tools hotkey (assign it in Controls) to open a radial menu of available tools, weapons, healing items, and light sources from your hotbar and backpack. Select an item to equip it instantly; use the center **Unequip** action to restore your previous item or stow the item currently held.
 
+### Bow Ammunition
+
+While holding a supported base-game bow in your main hand, a compact `<count>x <arrow icon>` indicator shows the next arrow type and its total positive quantity in inventories eligible for bow selection.
+
+The default placement is just above the saturation meter, aligned with its left edge. With no eligible arrows, it shows a muted arrow symbol and localized `No arrows / 0`. Unsupported custom or derived bows hide the indicator.
+
 ### New Hotkeys
 
 - Hotkey for quickly swapping a light source into the off-hand (default: `F`) or hotbar (default: `Shift + F`) when available (press again to swap the light source back into its prior slot).
@@ -73,93 +79,105 @@ The sections and setting order below match the ConfigLib menu. Setting names are
 
 #### Auto Stash
 
-| Setting | Default | Range / choices | Description |
-| --- | --- | --- | --- |
-| `EnableAutoStash` * | `true` | `true`, `false` | Enable auto-stashing items into containers by holding the interact key. |
-| `AutoStashDelay` | `0.5` | 0.1–2 | Time in seconds to hold the interact key before auto-stashing begins. |
-| `AutoStashGuiRendersTopmost` | `true` | `true`, `false` | Render the auto-stash progress bar above dialogs and other game UI. |
+| Setting                      | Default | Range / choices | Description                                                             |
+| ---------------------------- | ------- | --------------- | ----------------------------------------------------------------------- |
+| `EnableAutoStash` \*         | `true`  | `true`, `false` | Enable auto-stashing items into containers by holding the interact key. |
+| `AutoStashDelay`             | `0.5`   | 0.1–2           | Time in seconds to hold the interact key before auto-stashing begins.   |
+| `AutoStashGuiRendersTopmost` | `true`  | `true`, `false` | Render the auto-stash progress bar above dialogs and other game UI.     |
 
 #### Ignition Tools
 
-| Setting | Default | Range / choices | Description |
-| --- | --- | --- | --- |
-| `EnableIgnitionTools` * | `true` | `true`, `false` | Enable lighting fires using lanterns, candles, and oil lamps. |
-| `IgnitionDelay` | `0.5` | 0.1–2 | Time in seconds to hold the interact key before igniting a fire. |
+| Setting                  | Default | Range / choices | Description                                                      |
+| ------------------------ | ------- | --------------- | ---------------------------------------------------------------- |
+| `EnableIgnitionTools` \* | `true`  | `true`, `false` | Enable lighting fires using lanterns, candles, and oil lamps.    |
+| `IgnitionDelay`          | `0.5`   | 0.1–2           | Time in seconds to hold the interact key before igniting a fire. |
 
 #### Spawn Decal
 
-| Setting | Default | Range / choices | Description |
-| --- | --- | --- | --- |
-| `EnableSpawnDecal` * | `true` | `true`, `false` | Show a glowing decal at the player's respawn point. |
-| `SpawnDecalSize` | `0.4` | 0.2–1 | Size of the spawn point decal. |
+| Setting               | Default | Range / choices | Description                                         |
+| --------------------- | ------- | --------------- | --------------------------------------------------- |
+| `EnableSpawnDecal` \* | `true`  | `true`, `false` | Show a glowing decal at the player's respawn point. |
+| `SpawnDecalSize`      | `0.4`   | 0.2–1           | Size of the spawn point decal.                      |
 
 #### Alloy Calculator
 
-| Setting | Default | Range / choices | Description |
-| --- | --- | --- | --- |
-| `EnableAlloyCalculator` | `true` | `true`, `false` | Enable the alloy calculator GUI for crucibles. |
+| Setting                       | Default | Range / choices | Description                                                                                                                            |
+| ----------------------------- | ------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `EnableAlloyCalculator`       | `true`  | `true`, `false` | Enable the alloy calculator GUI for crucibles.                                                                                         |
 | `DisableAlloyCalculatorPatch` | `false` | `true`, `false` | Disable firepit GUI detection for the alloy calculator. Requires a world reload or restart; prevents automatic opening while disabled. |
 
 #### Gameplay
 
-| Setting | Default | Range / choices | Description |
-| --- | --- | --- | --- |
-| `EnableBucketSourceProtectionPatch` | `true` | `true`, `false` | Protect existing water blocks from bucket spills when liquid source transport is disabled in world options. |
-| `EnableEquipLightHotkey` | `true` | `true`, `false` | Enable the hotkey to equip light sources to offhand/hotbar. |
+| Setting                             | Default | Range / choices | Description                                                                                                 |
+| ----------------------------------- | ------- | --------------- | ----------------------------------------------------------------------------------------------------------- |
+| `EnableBucketSourceProtectionPatch` | `true`  | `true`, `false` | Protect existing water blocks from bucket spills when liquid source transport is disabled in world options. |
+| `EnableEquipLightHotkey`            | `true`  | `true`, `false` | Enable the hotkey to equip light sources to offhand/hotbar.                                                 |
 
 #### Recipe Toggles
 
-| Setting | Default | Range / choices | Description |
-| --- | --- | --- | --- |
-| `EnableBackpackDecraft` | `true` | `true`, `false` | Enable decrafting backpacks into leather using knife or shears. |
-| `EnableLinenSackDecraft` | `true` | `true`, `false` | Enable decrafting linen sacks into flax fibers using knife or shears. |
-| `EnableMetalBitsRecycling` | `true` | `true`, `false` | Enable recycling metal tool heads into metal bits using a chisel. |
-| `EnableStickRecipes` | `true` | `true`, `false` | Enable crafting sticks from planks and firewood. |
-| `EnableWattleDecraft` | `true` | `true`, `false` | Enable decrafting wattle blocks into sticks. |
+| Setting                    | Default | Range / choices | Description                                                           |
+| -------------------------- | ------- | --------------- | --------------------------------------------------------------------- |
+| `EnableBackpackDecraft`    | `true`  | `true`, `false` | Enable decrafting backpacks into leather using knife or shears.       |
+| `EnableLinenSackDecraft`   | `true`  | `true`, `false` | Enable decrafting linen sacks into flax fibers using knife or shears. |
+| `EnableMetalBitsRecycling` | `true`  | `true`, `false` | Enable recycling metal tool heads into metal bits using a chisel.     |
+| `EnableStickRecipes`       | `true`  | `true`, `false` | Enable crafting sticks from planks and firewood.                      |
+| `EnableWattleDecraft`      | `true`  | `true`, `false` | Enable decrafting wattle blocks into sticks.                          |
 
 #### Item Slot Indicators
 
-| Setting | Default | Range / choices | Description |
-| --- | --- | --- | --- |
-| `EnablePerishableItemFreshnessIndicators` | `true` | `true`, `false` | Show freshness on perishable item slots using the selected indicator style. |
-| `EnablePreparationIndicators` | `true` | `true`, `false` | Show preparation progress on item slots. |
-| `EnableClothingIndicators` | `true` | `true`, `false` | Show clothing condition on item slots. |
-| `EnableLiquidContainerIndicators` | `true` | `true`, `false` | Show liquid volume on liquid containers and watering cans. |
-| `EnableCrucibleIndicators` | `true` | `true`, `false` | Show metal amount in filled crucibles and firepit input crucibles. |
-| `EnableNightVisionFuelIndicators` | `true` | `true`, `false` | Show night-vision fuel on item slots. |
-| `PerishableItemFreshnessIndicatorStyle` | `freshness-background` | `freshness-background`, `freshness-outline`, `freshness-bar` | Choose a bottom-up background fill, colored outline, or horizontal progress bar. |
-| `PerishableItemFreshnessIndicatorIntensity` | `0.35` | 0.05–1 | Opacity of freshness backgrounds and outlines; progress bars remain fully opaque. |
-| `FoodLevelIndicatorStyle` | `progress-bar` | `progress-bar`, `slot-background` | Show food amounts as a progress bar or animated particles in the slot background. Freshness has its own style. |
-| `EnableLiquidSloshEffect` | `true` | `true`, `false` | Animate liquid volume indicators; disabling retains plain fills and pauses the liquid simulation. |
-| `EnableCrucibleEffect` | `true` | `true`, `false` | Animate solid and molten metal; disabling retains a plain amount indicator. |
-| `CrucibleIndicatorCapacityUnits` | `2560` | 100–25600 | Metal units represented by a full indicator; a visual reference, not a container capacity limit. |
+| Setting                                     | Default                | Range / choices                                              | Description                                                                                                    |
+| ------------------------------------------- | ---------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| `EnablePerishableItemFreshnessIndicators`   | `true`                 | `true`, `false`                                              | Show freshness on perishable item slots using the selected indicator style.                                    |
+| `EnablePreparationIndicators`               | `true`                 | `true`, `false`                                              | Show preparation progress on item slots.                                                                       |
+| `EnableClothingIndicators`                  | `true`                 | `true`, `false`                                              | Show clothing condition on item slots.                                                                         |
+| `EnableLiquidContainerIndicators`           | `true`                 | `true`, `false`                                              | Show liquid volume on liquid containers and watering cans.                                                     |
+| `EnableCrucibleIndicators`                  | `true`                 | `true`, `false`                                              | Show metal amount in filled crucibles and firepit input crucibles.                                             |
+| `EnableNightVisionFuelIndicators`           | `true`                 | `true`, `false`                                              | Show night-vision fuel on item slots.                                                                          |
+| `PerishableItemFreshnessIndicatorStyle`     | `freshness-background` | `freshness-background`, `freshness-outline`, `freshness-bar` | Choose a bottom-up background fill, colored outline, or horizontal progress bar.                               |
+| `PerishableItemFreshnessIndicatorIntensity` | `0.35`                 | 0.05–1                                                       | Opacity of freshness backgrounds and outlines; progress bars remain fully opaque.                              |
+| `FoodLevelIndicatorStyle`                   | `progress-bar`         | `progress-bar`, `slot-background`                            | Show food amounts as a progress bar or animated particles in the slot background. Freshness has its own style. |
+| `EnableLiquidSloshEffect`                   | `true`                 | `true`, `false`                                              | Animate liquid volume indicators; disabling retains plain fills and pauses the liquid simulation.              |
+| `EnableCrucibleEffect`                      | `true`                 | `true`, `false`                                              | Animate solid and molten metal; disabling retains a plain amount indicator.                                    |
+| `CrucibleIndicatorCapacityUnits`            | `2560`                 | 100–25600                                                    | Metal units represented by a full indicator; a visual reference, not a container capacity limit.               |
 
 #### Radial Menus
 
-| Setting | Default | Range / choices | Description |
-| --- | --- | --- | --- |
-| `RadialMenuBackdropOpacity` | `0.2` | 0–1 | Opacity of the screen-darkening backdrop behind radial menus; 0 disables it. |
-| `RadialMenuOpacity` | `0.5` | 0–1 | Background and border opacity of radial menus. Icons and labels retain their opacity. |
-| `EnableToolModeRadialMenu` * | `true` | `true`, `false` | Replace base-game tool-mode grids with a radial menu. |
-| `ToolModeMenuSize` | `1` | 0.15–2.5 | Scale the tool-mode radial menu; 1 keeps its default size. |
-| `ToolModeRingSize` | `1` | 0.15–2.5 | Scale tool-mode option-ring thickness while preserving the center circle and gaps. |
-| `ToolModeCenterSize` | `1` | 0.15–2.5 | Scale the tool-mode center circle; 1 keeps its default size. |
-| `ToolModeIconSize` | `0.75` | 0.15–2.5 | Scale icons within tool-mode wedges; 1 fills the available icon space. Larger values may overlap wedges. |
-| `QuickToolSelectOnRelease` | `true` | `true`, `false` | Select the hovered quick-tool entry when the activation key is released. |
-| `QuickSwapMenuSize` | `1` | 0.15–2.5 | Scale the quick-swap radial menu; 1 keeps its default size. |
+| Setting                       | Default | Range / choices | Description                                                                                              |
+| ----------------------------- | ------- | --------------- | -------------------------------------------------------------------------------------------------------- |
+| `RadialMenuBackdropOpacity`   | `0.2`   | 0–1             | Opacity of the screen-darkening backdrop behind radial menus; 0 disables it.                             |
+| `RadialMenuOpacity`           | `0.5`   | 0–1             | Background and border opacity of radial menus. Icons and labels retain their opacity.                    |
+| `EnableToolModeRadialMenu` \* | `true`  | `true`, `false` | Replace base-game tool-mode grids with a radial menu.                                                    |
+| `ToolModeMenuSize`            | `1`     | 0.15–2.5        | Scale the tool-mode radial menu; 1 keeps its default size.                                               |
+| `ToolModeRingSize`            | `1`     | 0.15–2.5        | Scale tool-mode option-ring thickness while preserving the center circle and gaps.                       |
+| `ToolModeCenterSize`          | `1`     | 0.15–2.5        | Scale the tool-mode center circle; 1 keeps its default size.                                             |
+| `ToolModeIconSize`            | `0.75`  | 0.15–2.5        | Scale icons within tool-mode wedges; 1 fills the available icon space. Larger values may overlap wedges. |
+| `QuickToolSelectOnRelease`    | `true`  | `true`, `false` | Select the hovered quick-tool entry when the activation key is released.                                 |
+| `QuickSwapMenuSize`           | `1`     | 0.15–2.5        | Scale the quick-swap radial menu; 1 keeps its default size.                                              |
 
 #### Animal Sex Indicators
 
-| Setting | Default | Range / choices | Description |
-| --- | --- | --- | --- |
-| `EnableAnimalSexIndicators` | `true` | `true`, `false` | Show terrain-occluded sex symbols above living generation 1+ animals, with a heart for pregnant females. |
-| `AnimalSexIndicatorSize` | `0.25` | 0.05–1 | Base size in blocks, rendered at half this value (default visible size: 0.125 blocks). |
-| `AnimalSexIndicatorRange` | `8` | 1–8 | Viewing distance in blocks; symbols fade over the farther half of this range. |
-| `AnimalSexIndicatorOpacity` | `0.75` | 0–1 | Maximum opacity before distance fading; 0.75 means 75%. |
-| `AnimalMaleIconColor` | `5089023` | 0–16777215 | Packed RGB decimal color; default blue (#4DA6FF). |
-| `AnimalFemaleIconColor` | `16741813` | 0–16777215 | Packed RGB decimal color for female and pregnant-female icons; default pink (#FF75B5). |
+| Setting                     | Default    | Range / choices | Description                                                                                              |
+| --------------------------- | ---------- | --------------- | -------------------------------------------------------------------------------------------------------- |
+| `EnableAnimalSexIndicators` | `true`     | `true`, `false` | Show terrain-occluded sex symbols above living generation 1+ animals, with a heart for pregnant females. |
+| `AnimalSexIndicatorSize`    | `0.25`     | 0.05–1          | Base size in blocks, rendered at half this value (default visible size: 0.125 blocks).                   |
+| `AnimalSexIndicatorRange`   | `8`        | 1–8             | Viewing distance in blocks; symbols fade over the farther half of this range.                            |
+| `AnimalSexIndicatorOpacity` | `0.75`     | 0–1             | Maximum opacity before distance fading; 0.75 means 75%.                                                  |
+| `AnimalMaleIconColor`       | `5089023`  | 0–16777215      | Packed RGB decimal color; default blue (#4DA6FF).                                                        |
+| `AnimalFemaleIconColor`     | `16741813` | 0–16777215      | Packed RGB decimal color for female and pregnant-female icons; default pink (#FF75B5).                   |
 
-* Settings marked with an asterisk require a world reload when enabling a feature that was disabled when the world loaded, because its systems or patches were not installed.
+#### HUD Overlays
+
+| Setting                      | Default      | Range / choices                                                                                                                                                                                                              | Description                                                                             |
+| ---------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `EnableHudOverlays`          | `true`       | `true`, `false`                                                                                                                                                                                                              | Enable passive HUD overlays; applies live without restarting.                           |
+| `EnableBowAmmunitionOverlay` | `true`       | `true`, `false`                                                                                                                                                                                                              | Show the next-arrow type and type-total quantity while holding a supported bow.         |
+| `HeldItemStatusAnchor`       | `saturation` | `saturation`, `hotbar`, `screen-left-top`, `screen-center-top`, `screen-right-top`, `screen-left-middle`, `screen-center-middle`, `screen-right-middle`, `screen-left-bottom`, `screen-center-bottom`, `screen-right-bottom` | Select native docking or a screen position. Unknown values fall back to saturation.     |
+| `HeldItemStatusOffsetX`      | `-4`         | -2048–2048 in ConfigLib                                                                                                                                                                                                      | Horizontal offset in GUI units; positive moves right. Nonfinite values fall back to -4. |
+| `HeldItemStatusOffsetY`      | `0`          | -2048–2048 in ConfigLib                                                                                                                                                                                                      | Vertical offset in GUI units; positive moves down. Nonfinite values fall back to 0.     |
+
+The two offsets are shared across placement choices. The saturation default compensates for content padding and leaves a four-unit gap above the meter. Hotbar docking attaches the group's left-middle to the hotbar's right-middle; screen placements use matching attachment and pivot points. Native viewport clamping keeps the group within the safe rectangle. Placement changes apply live and retain cached presentation; restored content receives a fresh sample before display. Without ConfigLib, edit the JSON file and restart the game to load manual changes.
+
+- Settings marked with an asterisk require a world reload when enabling a feature that was disabled when the world loaded, because its systems or patches were not installed.
 
 Recipe-toggle changes require a world reload to rebuild the available recipes. `DisableAlloyCalculatorPatch` also requires a world reload or restart. The normal `EnableAlloyCalculator` toggle can change live when its patch is installed.
 
@@ -209,5 +227,7 @@ Additional grant to Anego Studios:
 Anego Studios and its affiliates are granted a perpetual, worldwide, non-exclusive, royalty-free license to use, modify, sublicense, and distribute this code, or derivative works, as part of the official VintageStory game or related products, under any terms of their choosing, without the obligations of Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International Public License, provided that attribution to the original author (“David Sisco”) is given in the game credits or documentation.
 
 ## Developer documentation
+
+See [anchored HUD overlays](docs/hud-overlays/HudOverlays.md) for passive registration, configuration, and resource ownership contracts.
 
 See [item-slot indicator effects](docs/ItemSlotIndicatorEffects.md) for internal registration, shader and geometry contracts, resource ownership, and validation requirements.

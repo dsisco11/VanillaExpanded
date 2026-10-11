@@ -36,6 +36,18 @@ internal sealed class HudOverlayRegistry : IDisposable
         Mutate(() => activeGroups.Add(group.Id, group));
     }
 
+    /// <summary>Replaces existing group placement/packing at a pass boundary without changing registration ownership.</summary>
+    public void UpdateGroup(HudOverlayGroup group)
+    {
+        CheckAvailable();
+        ArgumentNullException.ThrowIfNull(group);
+        if (!groups.ContainsKey(group.Id)) throw new ArgumentException("The group is not registered.", nameof(group));
+        if (groups[group.Id] == group) return;
+        // Reserve the latest definition immediately; readers see it at the next safe mutation boundary.
+        groups[group.Id] = group;
+        Mutate(() => activeGroups[group.Id] = group);
+    }
+
     /// <summary>Returns a detached read-only group snapshot, independent of later registration.</summary>
     public IReadOnlyList<HudOverlayGroup> GetGroups()
     {

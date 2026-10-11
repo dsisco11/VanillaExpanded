@@ -95,10 +95,18 @@ internal sealed class HudOverlayGroupLayout : IDisposable
         RectangleF safe = context.SafeRectangle;
         double x = Math.Clamp(Root.renderX, safe.Left, Math.Max(safe.Left, safe.Right - Root.OuterWidth));
         double y = Math.Clamp(Root.renderY, safe.Top, Math.Max(safe.Top, safe.Bottom - Root.OuterHeight));
-        Root.fixedOffsetX += (x - Root.renderX) / scale;
-        Root.fixedOffsetY += (y - Root.renderY) / scale;
-        Root.MarkDirtyRecursive();
-        Root.CalcWorldBounds();
+        if (x != Root.renderX || y != Root.renderY)
+        {
+            // Rebase through the same native alignment before assigning a bounded offset. Adding
+            // a correction to an extreme finite preference loses viewport pixels to cancellation.
+            Root.fixedX = Root.fixedY = Root.fixedOffsetX = Root.fixedOffsetY = 0;
+            Root.MarkDirtyRecursive();
+            Root.CalcWorldBounds();
+            Root.fixedOffsetX = (x - Root.renderX) / scale;
+            Root.fixedOffsetY = (y - Root.renderY) / scale;
+            Root.MarkDirtyRecursive();
+            Root.CalcWorldBounds();
+        }
         foreach (HudOverlayMemberLayout member in Members)
             member.Clip = RectangleF.Intersect(safe, new RectangleF((float)member.Bounds.renderX, (float)member.Bounds.renderY,
                 (float)member.Bounds.OuterWidth, (float)member.Bounds.OuterHeight));

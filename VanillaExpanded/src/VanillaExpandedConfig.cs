@@ -1,5 +1,6 @@
 using System;
 using VanillaExpanded.ItemSlotIndicators;
+using VanillaExpanded.HudOverlays.Configuration;
 
 namespace VanillaExpanded;
 
@@ -82,6 +83,28 @@ public class VanillaExpandedConfig
     /// <summary>Shows night-vision fuel indicators on item slots.</summary>
     public bool EnableNightVisionFuelIndicators { get; set; } = true;
 
+    #endregion
+
+    #region HUD Overlays (Client-Side)
+    /// <summary>Enables passive anchored HUD overlays and their sampling.</summary>
+    public bool EnableHudOverlays { get; set; } = true;
+
+    /// <summary>Shows the next arrow type and its eligible type-total quantity while holding a supported bow.</summary>
+    public bool EnableBowAmmunitionOverlay { get; set; } = true;
+
+    private string heldItemStatusAnchor = "saturation";
+    /// <summary>Selects a stable anchor key; numeric ConfigLib events and unknown keys are normalized for persistence.</summary>
+    public string HeldItemStatusAnchor
+    {
+        get => heldItemStatusAnchor;
+        set => heldItemStatusAnchor = HudOverlayConfiguration.NormalizeAnchorKey(value);
+    }
+
+    /// <summary>Horizontal placement offset in GUI units; positive values move right.</summary>
+    public float HeldItemStatusOffsetX { get; set; } = -4;
+
+    /// <summary>Vertical placement offset in GUI units; positive values move down.</summary>
+    public float HeldItemStatusOffsetY { get; set; } = 0;
     #endregion
 
     #region Animal Sex Indicators (Client-Side)
