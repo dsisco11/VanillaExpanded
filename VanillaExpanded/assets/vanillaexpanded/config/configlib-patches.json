@@ -57,6 +57,15 @@
         "weight": 10.8,
         "clientSide": true
       },
+      "EnableRiftActivityOverlay": {
+        "code": "EnableRiftActivityOverlay",
+        "name": "EnableRiftActivityOverlay",
+        "ingui": "vanillaexpanded:config-enable-rift-activity-overlay",
+        "comment": "vanillaexpanded:config-enable-rift-activity-overlay-tooltip",
+        "default": true,
+        "weight": 10.85,
+        "clientSide": true
+      },
       "EnableAnimalSexIndicators": {
         "code": "EnableAnimalSexIndicators",
         "name": "EnableAnimalSexIndicators",
