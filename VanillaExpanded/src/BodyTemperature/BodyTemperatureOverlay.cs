@@ -12,6 +12,7 @@ internal sealed class BodyTemperatureOverlay : IHudOverlay
 {
     private readonly BodyTemperatureThermometerPresentation thermometer;
     private bool showReading = true;
+    private readonly BodyTemperatureTrend trend = new();
     private ICoreClientAPI? api;
     private Vintagestory.API.Common.Entities.Entity? sampledEntity;
     private bool disposed;
@@ -82,7 +83,16 @@ internal sealed class BodyTemperatureOverlay : IHudOverlay
         if (!IsApplicable()) return HudOverlayChange.None;
         var entity = api!.World.Player.Entity;
         // Recovery hysteresis belongs to one entity and must not survive player replacement.
-        var next = BodyTemperatureSample.Read(entity, ReferenceEquals(sampledEntity, entity) ? Sample : null);
+        bool sameEntity = ReferenceEquals(sampledEntity, entity);
+        if (!sameEntity) trend.Reset();
+        var next = BodyTemperatureSample.Read(entity, sameEntity ? Sample : null);
+        var tree = entity.WatchedAttributes.GetTreeAttribute("bodyTemp");
+        int direction = 0;
+        // Track healthy readings too, so entering a warning already has a valid rate baseline.
+        if (tree?.HasAttribute("bodytemp") == true && tree.HasAttribute("bodyTempUpdateTotalHours"))
+            direction = trend.Update(tree.GetFloat("bodytemp"), tree.GetDouble("bodyTempUpdateTotalHours"), api.World.ElapsedMilliseconds);
+        else trend.Reset();
+        if (next != null) next = next with { Trend = direction };
         sampledEntity = entity;
         if (Sample == next && !cleared) return HudOverlayChange.None;
         cleared = false;
@@ -113,6 +123,7 @@ internal sealed class BodyTemperatureOverlay : IHudOverlay
     private void Clear()
     {
         sampledEntity = null;
+        trend.Reset();
         if (Sample == null) return;
         Sample = null;
         cleared = true;

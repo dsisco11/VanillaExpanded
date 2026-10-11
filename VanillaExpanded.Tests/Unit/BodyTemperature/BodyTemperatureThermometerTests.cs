@@ -80,14 +80,14 @@ public sealed class BodyTemperatureThermometerTests
         presentation.SetContent(new(45, 37, BodyTemperatureRisk.Overheating), false);
         presentation.Prepare(new(api.Object, 2, "en"));
         var loads = renderer.Invocations.Where(call => call.Method.Name == "GetOrLoadTexture").ToArray();
-        Assert.Equal(2, loads.Length);
-        Assert.Equal(new[] { "vanillaexpanded:textures/hud/body-temperature/outline.png", "vanillaexpanded:textures/hud/body-temperature/fill-mask.png" },
+        Assert.Equal(4, loads.Length);
+        Assert.Equal(new[] { "vanillaexpanded:textures/hud/body-temperature/outline.png", "vanillaexpanded:textures/hud/body-temperature/fill-mask.png", "vanillaexpanded:textures/hud/body-temperature/chevron-up.png", "vanillaexpanded:textures/hud/body-temperature/chevron-down.png" },
             loads.Select(call => call.Arguments[0].ToString()));
         var replacementApi = new Mock<ICoreClientAPI>(); replacementApi.SetupGet(value => value.Render).Returns(renderer.Object);
         presentation.Prepare(new(replacementApi.Object, 2, "en"));
-        Assert.Equal(4, renderer.Invocations.Count(call => call.Method.Name == "GetOrLoadTexture"));
+        Assert.Equal(8, renderer.Invocations.Count(call => call.Method.Name == "GetOrLoadTexture"));
         presentation.Reset(); presentation.Dispose(); Assert.Equal(SizeF.Empty, presentation.Size);
-        Assert.Equal(4, borrowed.Count); Assert.All(borrowed, texture => { Assert.False(texture.Disposed); Assert.Equal(7, texture.TextureId); Assert.True(texture.IgnoreUndisposed); });
+        Assert.Equal(8, borrowed.Count); Assert.All(borrowed, texture => { Assert.False(texture.Disposed); Assert.Equal(7, texture.TextureId); Assert.True(texture.IgnoreUndisposed); });
         gui.Verify(value => value.DeleteTexture(It.IsAny<int>()), Times.Never);
     }
     /// <summary>Minimum, midpoint, and maximum fills crop the same full mask at both GUI scales.</summary>
@@ -115,6 +115,31 @@ public sealed class BodyTemperatureThermometerTests
         var color = Assert.IsType<Vec4f>(mask[6]); Assert.Equal(.25f, color.R, 5); Assert.Equal(.6f, color.G, 5);
         Assert.Equal(1, calls[3].Arguments[0]);
     }
+    /// <summary>Trend textures stay within measured bounds and reverse without moving the thermometer.</summary>
+    [Theory]
+    [InlineData(1)] [InlineData(2)] [InlineData(-1)] [InlineData(-2)]
+    public void TrendChevronsRespectMeasuredBounds(int trend)
+    {
+        var api = new Mock<ICoreClientAPI>();
+        using var presentation = new BodyTemperatureThermometerPresentation(new HudOverlayIconTextPresentation(),
+            context => Enumerable.Range(1, 4).Select(id => new LoadedTexture(context.Api) { TextureId = id, IgnoreUndisposed = true }).ToArray());
+        presentation.SetContent(new(34, 37, BodyTemperatureRisk.Cold, .25f, trend), false);
+        presentation.Prepare(new(api.Object, 1, "en"));
+        Assert.Equal(new SizeF(14, 46), presentation.Size);
+        var bounds = Bounds(1);
+        bounds.absInnerHeight = presentation.Size.Height;
+        var renderer = new Mock<IRenderAPI>();
+        presentation.Draw(renderer.Object, bounds, new RectangleF(0, 0, 1000, 1000), .1f);
+        var chevrons = renderer.Invocations.Where(call => call.Method.Name == "RenderTexture" && (int)call.Arguments[0] == (trend > 0 ? 3 : 4)).ToArray();
+        Assert.Equal(Math.Abs(trend), chevrons.Length);
+        foreach (var call in chevrons)
+        {
+            double y = (double)call.Arguments[2];
+            Assert.InRange(y, bounds.renderY, bounds.renderY + bounds.OuterHeight - 4);
+            Assert.True(trend > 0 ? y < bounds.renderY + 11 : y > bounds.renderY + 35);
+        }
+    }
+
     /// <summary>The fill scissor intersects the host member clip and always restores it when rendering fails.</summary>
     [Fact]
     public void FillCropIntersectsHostAndRestoresAfterFailure()
