@@ -39,6 +39,15 @@
         "weight": 10.4,
         "clientSide": true
       },
+      "EnableWeatherConditionsOverlay": {
+        "code": "EnableWeatherConditionsOverlay",
+        "name": "EnableWeatherConditionsOverlay",
+        "ingui": "vanillaexpanded:config-enable-weather-conditions-overlay",
+        "comment": "vanillaexpanded:config-enable-weather-conditions-overlay-tooltip",
+        "default": true,
+        "weight": 10.8,
+        "clientSide": true
+      },
       "EnableAnimalSexIndicators": {
         "code": "EnableAnimalSexIndicators",
         "name": "EnableAnimalSexIndicators",

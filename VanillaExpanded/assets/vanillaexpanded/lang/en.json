@@ -163,6 +163,8 @@
   "config-enable-body-temperature-overlay-tooltip": "Show a dynamic thermometer at the toolbar’s bottom-left when cold or too hot. Blue while the game’s freezing effect is active, deepening with its intensity. Orange above normal plus 5°C; red above plus 7°C. Heat warnings indicate elevated temperature, not native heat damage. Changes take effect immediately.",
   "bow-ammunition-count": "{0}x",
   "bow-ammunition-empty": "➶  No arrows / 0",
+  "config-enable-weather-conditions-overlay": "Show weather conditions",
+  "config-enable-weather-conditions-overlay-tooltip": "Show rain, snow, hail, and weather fog icons beside the toolbar. Fair weather hides the icons. Changes take effect immediately.",
   "config-section-hud-overlays": "HUD Overlays",
   "config-enable-hud-overlays": "Enable HUD overlays",
   "config-enable-hud-overlays-tooltip": "Show passive anchored HUD overlays. Disable to stop their sampling. Changes take effect immediately.",
