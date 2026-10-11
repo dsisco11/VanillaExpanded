@@ -1,0 +1,69 @@
+[
+  {
+    "op": "add",
+    "file": "game:itemtypes/tool/arrow.json",
+    "path": "/attributes/ve-radial-menu-propertiesByType",
+    "value": {
+      "arrow-bone": {
+        "transform": {
+          "origin": {
+            "x": 1.1532986,
+            "y": 0.032283153,
+            "z": 0.5003143
+          },
+          "rotation": {
+            "x": 0,
+            "y": 10,
+            "z": 90
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.5
+        }
+      },
+      "arrow-erel": {
+        "transform": {
+          "origin": {
+            "x": -0.4,
+            "y": 0.03125,
+            "z": 0.5
+          },
+          "rotation": {
+            "x": 90,
+            "y": -90,
+            "z": 0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.5
+        }
+      },
+      "*": {
+        "transform": {
+          "origin": {
+            "x": 1.0375,
+            "y": 0.03125,
+            "z": 0.5125
+          },
+          "rotation": {
+            "x": 90,
+            "y": 90,
+            "z": 0
+          },
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 2.5
+        }
+      }
+    }
+  }
+]

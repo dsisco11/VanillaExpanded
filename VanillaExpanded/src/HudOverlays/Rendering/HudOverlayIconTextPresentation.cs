@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Linq;
 using Cairo;
+using VanillaExpanded.ItemRendering;
 using VanillaExpanded.HudOverlays.Registration;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -17,6 +18,8 @@ internal sealed class HudOverlayIconTextPresentation : IDisposable
     private readonly float iconSize;
     private readonly float gap;
     private readonly bool textBeforeIcon;
+    private readonly bool useItemPresentation;
+    private readonly ElementBounds iconClip = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
     private readonly ItemSlot slot = new DummySlot();
     private byte[]? iconContent;
     private string key = string.Empty;
@@ -30,10 +33,10 @@ internal sealed class HudOverlayIconTextPresentation : IDisposable
     public SizeF Size { get; private set; }
     #region Public API
     #region Content and preparation
-    /// <summary>Uses native contrast text by default, accepting an inert resource factory for focused lifecycle checks.</summary>
+    /// <summary>Uses native contrast text with optional backdrop and shared asset-authored item presentation.</summary>
     public HudOverlayIconTextPresentation(System.Func<HudOverlayPreparationContext, string, LoadedTexture>? createText = null,
         float iconSize = 32, bool textBeforeIcon = false, float gap = 6, float? fontSize = null, bool circularIconBackground = false,
-        System.Func<HudOverlayPreparationContext, float, LoadedTexture>? createIconBackground = null)
+        System.Func<HudOverlayPreparationContext, float, LoadedTexture>? createIconBackground = null, bool useItemPresentation = false)
     {
         if (!float.IsFinite(iconSize) || iconSize <= 0) throw new ArgumentOutOfRangeException(nameof(iconSize));
         if (!float.IsFinite(gap) || gap < 0) throw new ArgumentOutOfRangeException(nameof(gap));
@@ -41,6 +44,7 @@ internal sealed class HudOverlayIconTextPresentation : IDisposable
         this.createIconBackground = circularIconBackground ? createIconBackground ?? CreateNativeIconBackground : null;
         this.iconSize = iconSize;
         this.textBeforeIcon = textBeforeIcon;
+        this.useItemPresentation = useItemPresentation;
         this.gap = gap;
         this.createText = createText ?? ((preparation, localized) => CreateNativeText(preparation, localized, fontSize));
     }
@@ -110,9 +114,7 @@ internal sealed class HudOverlayIconTextPresentation : IDisposable
         if (slot.Itemstack != null && iconBackground != null)
             renderer.Render2DTexturePremultipliedAlpha(iconBackground.TextureId, iconX, y + (height - iconSize * scale) / 2,
                 iconSize * scale, iconSize * scale, 49);
-        if (slot.Itemstack != null)
-            renderer.RenderItemstackToGui(slot, iconX + iconSize * scale / 2, y + height / 2, 50, (float)(iconSize * scale), -1,
-                deltaTime, shading: true, rotate: false, showStackSize: false);
+        if (slot.Itemstack != null) DrawItem(renderer, iconX, y + (height - iconSize * scale) / 2, clip, deltaTime);
     }
     /// <summary>Releases session-owned textures and sampled copies without disposing borrowed engine resources.</summary>
     public void Reset()
@@ -141,6 +143,46 @@ internal sealed class HudOverlayIconTextPresentation : IDisposable
     #endregion
     #endregion
     #region Private
+    /// <summary>Uses shared asset-authored presentation inside the icon slot, restoring the enclosing shader and scissor.</summary>
+    private void DrawItem(IRenderAPI renderer, double x, double y, RectangleF clip, float deltaTime)
+    {
+        float pixels = (float)(iconSize * scale);
+        if (!useItemPresentation)
+        {
+            renderer.RenderItemstackToGui(slot, x + pixels / 2, y + pixels / 2, 50, pixels, -1,
+                deltaTime, shading: true, rotate: false, showStackSize: false);
+            return;
+        }
+        // The enlarged head uses only the icon square; the host's member clip still bounds the whole presentation.
+        double left = Math.Max(x, clip.Left), top = Math.Max(y, clip.Top);
+        double right = Math.Min(x + pixels, clip.Right), bottom = Math.Min(y + pixels, clip.Bottom);
+        if (right <= left || bottom <= top) return;
+        iconClip.absFixedX = left;
+        iconClip.absFixedY = top;
+        iconClip.absInnerWidth = right - left;
+        iconClip.absInnerHeight = bottom - top;
+        iconClip.Initialized = true;
+        renderer.PushScissor(iconClip, true);
+        try
+        {
+            // Native texture draws may leave another program active; the shared item renderer requires the GUI program.
+            IShaderProgram? previous = renderer.CurrentActiveShader;
+            IShaderProgram? gui = renderer.GetEngineShader(EnumShaderProgram.Gui);
+            bool switchShader = gui != null && !gui.Disposed && !gui.LoadError && !ReferenceEquals(previous, gui);
+            try
+            {
+                if (switchShader) { previous?.Stop(); gui!.Use(); }
+                if (ToolHeadPresentationSystem.Renderer?.TryRender(context!.Api, slot, x + pixels / 2, y + pixels / 2, pixels, 0, 50) != true)
+                    renderer.RenderItemstackToGui(slot, x + pixels / 2, y + pixels / 2, 50, pixels, -1,
+                        deltaTime, shading: true, rotate: false, showStackSize: false);
+            }
+            finally
+            {
+                if (switchShader) { renderer.CurrentActiveShader?.Stop(); previous?.Use(); }
+            }
+        }
+        finally { renderer.PopScissor(); }
+    }
     /// <summary>Composes a translucent black circle using the native Cairo texture upload service.</summary>
     private static LoadedTexture CreateNativeIconBackground(HudOverlayPreparationContext preparation, float diameter)
     {

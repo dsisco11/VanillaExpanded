@@ -12,9 +12,27 @@ using Vintagestory.API.MathTools;
 namespace VanillaExpanded.Tests.Unit.ItemRendering;
 
 /// <summary>Checks public preparation/submission, early fallback, and post-preparation cancellation.</summary>
-public sealed class ToolHeadPresentationIntegrationTests
+[Collection("HudOverlayGeometry")]
+public sealed class ToolHeadPresentationIntegrationTests : IDisposable
 {
+    private readonly Vintagestory.API.Config.ITranslationService? english = Vintagestory.API.Config.Lang.AvailableLanguages.GetValueOrDefault("en");
     #region Public API
+    #region Lifecycle
+    /// <summary>Supplies deterministic borrowed localization for HUD integration.</summary>
+    public ToolHeadPresentationIntegrationTests()
+    {
+        var translations = new Mock<Vintagestory.API.Config.ITranslationService>();
+        translations.Setup(service => service.Get(It.IsAny<string>(), It.IsAny<object[]>())).Returns((string key, object[] _) => key);
+        Vintagestory.API.Config.Lang.AvailableLanguages["en"] = translations.Object;
+    }
+    /// <summary>Restores localization after each isolated HUD test.</summary>
+    public void Dispose()
+    {
+        if (english == null) Vintagestory.API.Config.Lang.AvailableLanguages.Remove("en");
+        else Vintagestory.API.Config.Lang.AvailableLanguages["en"] = english;
+    }
+
+    #endregion
     #region Dedicated presentation
     /// <summary>Configured draws ignore inventory presentation, prepare once, notify once, and borrow selected resources.</summary>
     [Theory]
@@ -39,6 +57,76 @@ public sealed class ToolHeadPresentationIntegrationTests
         Assert.Equal(80, f.Matrices["modelMatrix"][12]);
         Assert.Equal(220, f.Matrices["modelMatrix"][13]);
         Assert.Equal(1, f.Restores);
+    }
+
+    /// <summary>HUD icons reuse authored presentation at the HUD depth or fall back once inside their own intersected clip.</summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void HudRoutingKeepsCountOutsideClippedIcon(bool configured)
+    {
+        var f = new Fixture();
+        if (!configured) f.Item.Attributes = null;
+        f.Api.SetupGet(api => api.Gui).Returns(new Mock<IGuiAPI>().Object);
+        f.Render.Setup(render => render.GetItemStackRenderInfo(It.IsAny<ItemSlot>(), EnumItemRenderTarget.Gui, 0))
+            .Returns(() => { f.Preparations++; return f.Info; });
+        var field = typeof(ToolHeadPresentationSystem).GetField("<Renderer>k__BackingField", BindingFlags.Static | BindingFlags.NonPublic)!;
+        var previous = field.GetValue(null);
+        try
+        {
+            field.SetValue(null, f.Renderer);
+            using var presentation = new VanillaExpanded.HudOverlays.Rendering.HudOverlayIconTextPresentation(
+                (_, _) => new LoadedTexture(f.Api.Object) { Width = 20, Height = 14 }, iconSize: 24,
+                textBeforeIcon: true, gap: 4, fontSize: 14, useItemPresentation: true);
+            presentation.SetContent(new ItemStack(f.Item), "20x");
+            presentation.Prepare(new VanillaExpanded.HudOverlays.Registration.HudOverlayPreparationContext(f.Api.Object, 1, "en"));
+            var bounds = ElementBounds.Fixed(0, 0, 48, 24).WithEmptyParent();
+            bounds.absFixedX = 10; bounds.absFixedY = 20; bounds.absInnerWidth = 48; bounds.absInnerHeight = 24;
+            presentation.Draw(f.Render.Object, bounds, new System.Drawing.RectangleF(40, 22, 16, 20), .1f);
+            Assert.Equal(configured ? 1 : 0, f.Draws);
+            Assert.Equal(configured ? 1 : 0, f.Preparations);
+            f.Render.Verify(render => render.RenderItemstackToGui(It.IsAny<ItemSlot>(), 46, 32, 50, 24, -1, .1f, true, false, false),
+                configured ? Times.Never() : Times.Once());
+            f.Render.Verify(render => render.Render2DTexturePremultipliedAlpha(0, 10, It.Is<double>(y => Math.Abs(y - 25) < .001), 20, 14, 50), Times.Once());
+            f.Render.Verify(render => render.PushScissor(It.Is<ElementBounds>(clip => clip.renderX == 40 && clip.renderY == 22
+                && clip.OuterWidth == 16 && clip.OuterHeight == 20), true), Times.Once());
+            f.Render.Verify(render => render.PopScissor(), Times.Once());
+            if (configured) Assert.Equal(50, f.Matrices["modelMatrix"][2] * .5f + f.Matrices["modelMatrix"][6] * .5f + f.Matrices["modelMatrix"][10] * .5f + f.Matrices["modelMatrix"][14]);
+        }
+        finally { field.SetValue(null, previous); }
+    }
+
+    /// <summary>Dedicated HUD submission failures restore the icon clip and the caller's borrowed shader.</summary>
+    [Fact]
+    public void HudSubmissionFailureRestoresClipAndShader()
+    {
+        var f = new Fixture();
+        var caller = new Mock<IShaderProgram>();
+        f.Api.SetupGet(api => api.Gui).Returns(new Mock<IGuiAPI>().Object);
+        f.Render.SetupGet(render => render.CurrentActiveShader).Returns(caller.Object);
+        caller.Setup(shader => shader.Stop()).Callback(() => f.Render.SetupGet(render => render.CurrentActiveShader).Returns((IShaderProgram)null!));
+        f.Shader.Setup(shader => shader.Use()).Callback(() => f.Render.SetupGet(render => render.CurrentActiveShader).Returns(f.Shader.Object));
+        f.Render.Setup(render => render.GetItemStackRenderInfo(It.IsAny<ItemSlot>(), EnumItemRenderTarget.Gui, 0)).Returns(f.Info);
+        f.Render.Setup(render => render.RenderMultiTextureMesh(It.IsAny<MultiTextureMeshRef>(), "tex2d", 0)).Throws(new InvalidOperationException("draw"));
+        var field = typeof(ToolHeadPresentationSystem).GetField("<Renderer>k__BackingField", BindingFlags.Static | BindingFlags.NonPublic)!;
+        var previous = field.GetValue(null);
+        try
+        {
+            field.SetValue(null, f.Renderer);
+            using var presentation = new VanillaExpanded.HudOverlays.Rendering.HudOverlayIconTextPresentation(
+                (_, _) => new LoadedTexture(f.Api.Object), iconSize: 24, useItemPresentation: true);
+            presentation.SetContent(new ItemStack(f.Item), "20x");
+            presentation.Prepare(new VanillaExpanded.HudOverlays.Registration.HudOverlayPreparationContext(f.Api.Object, 1, "en"));
+            var bounds = ElementBounds.Fixed(10, 20, 24, 24).WithEmptyParent();
+            bounds.CalcWorldBounds();
+            Assert.Throws<InvalidOperationException>(() => presentation.Draw(f.Render.Object, bounds, new System.Drawing.RectangleF(0, 0, 100, 100), .1f));
+            f.Render.Verify(render => render.PopScissor(), Times.Once());
+            caller.Verify(shader => shader.Stop(), Times.Once());
+            caller.Verify(shader => shader.Use(), Times.Once());
+            f.Shader.Verify(shader => shader.Stop(), Times.Once());
+            Assert.Equal(1, f.Restores);
+        }
+        finally { field.SetValue(null, previous); }
     }
 
     #endregion
