@@ -1,5 +1,6 @@
 using System;
 using VanillaExpanded.HudOverlays.Configuration;
+using VanillaExpanded.HudOverlays.Anchoring;
 using VanillaExpanded.HudOverlays.Lifecycle;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.ModSystems;
@@ -29,6 +30,9 @@ internal sealed class HudOverlaySystem : ModSystem, ILiveConfigurable
         this.api = api;
         Registry.RegisterGroup(new HudOverlayGroup("held-item-status",
             HudOverlayConfiguration.ResolveHeldItemStatusPlacement(VanillaExpandedModSystem.Config)));
+        Registry.RegisterGroup(new HudOverlayGroup("player-status",
+            new HudOverlayPlacement(HudOverlayAnchorContext.HotbarTargetId,
+                HudOverlayPoint.LeftBottom, HudOverlayPoint.RightBottom, 0, 4)));
         session = new HudOverlaySession(api, Registry, enabled: () => VanillaExpandedModSystem.Config.EnableHudOverlays);
         api.Event.LevelFinalize += session.EnterWorld;
         api.Event.LeaveWorld += session.LeaveWorld;

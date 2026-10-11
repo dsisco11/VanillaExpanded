@@ -21,6 +21,24 @@
         "weight": 10.2,
         "clientSide": true
       },
+      "EnableBodyTemperatureOverlay": {
+        "code": "EnableBodyTemperatureOverlay",
+        "name": "EnableBodyTemperatureOverlay",
+        "ingui": "vanillaexpanded:config-enable-body-temperature-overlay",
+        "comment": "vanillaexpanded:config-enable-body-temperature-overlay-tooltip",
+        "default": true,
+        "weight": 10.3,
+        "clientSide": true
+      },
+      "ShowBodyTemperatureReading": {
+        "code": "ShowBodyTemperatureReading",
+        "name": "ShowBodyTemperatureReading",
+        "ingui": "vanillaexpanded:config-show-body-temperature-reading",
+        "comment": "vanillaexpanded:config-show-body-temperature-reading-tooltip",
+        "default": true,
+        "weight": 10.4,
+        "clientSide": true
+      },
       "EnableAnimalSexIndicators": {
         "code": "EnableAnimalSexIndicators",
         "name": "EnableAnimalSexIndicators",
@@ -231,7 +249,7 @@
         "ingui": "vanillaexpanded:config-held-item-status-anchor",
         "comment": "vanillaexpanded:config-held-item-status-anchor-tooltip",
         "default": "saturation",
-        "weight": 10.3,
+        "weight": 10.5,
         "clientSide": true,
         "mapping": {
           "saturation": 0,
@@ -307,7 +325,7 @@
         "ingui": "vanillaexpanded:config-held-item-status-offset-x",
         "comment": "vanillaexpanded:config-held-item-status-offset-x-tooltip",
         "default": -4,
-        "weight": 10.4,
+        "weight": 10.6,
         "clientSide": true,
         "range": {
           "min": -2048,
@@ -321,7 +339,7 @@
         "ingui": "vanillaexpanded:config-held-item-status-offset-y",
         "comment": "vanillaexpanded:config-held-item-status-offset-y-tooltip",
         "default": 0,
-        "weight": 10.5,
+        "weight": 10.7,
         "clientSide": true,
         "range": {
           "min": -2048,

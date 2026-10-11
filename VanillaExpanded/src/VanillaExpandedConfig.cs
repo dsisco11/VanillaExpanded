@@ -92,6 +92,12 @@ public class VanillaExpandedConfig
     /// <summary>Shows the next arrow type and its eligible type-total quantity while holding a supported bow.</summary>
     public bool EnableBowAmmunitionOverlay { get; set; } = true;
 
+    /// <summary>Shows synchronized body temperature when native cold effects or dangerous frost exposure approach.</summary>
+    public bool EnableBodyTemperatureOverlay { get; set; } = true;
+
+    /// <summary>Shows a whole-degree reading beside the thermometer; disabling retains the dynamic icon.</summary>
+    public bool ShowBodyTemperatureReading { get; set; } = true;
+
     private string heldItemStatusAnchor = "saturation";
     /// <summary>Selects a stable anchor key; numeric ConfigLib events and unknown keys are normalized for persistence.</summary>
     public string HeldItemStatusAnchor
