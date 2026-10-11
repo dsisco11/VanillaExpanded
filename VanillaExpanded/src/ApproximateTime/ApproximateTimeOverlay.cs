@@ -8,10 +8,10 @@ using Vintagestory.API.Common.Entities;
 
 namespace VanillaExpanded.ApproximateTime;
 
-/// <summary>Samples sunlight exposure and owns the cached approximate time icon.</summary>
+/// <summary>Reads synchronized observation age and owns the cached approximate time icon.</summary>
 internal sealed class ApproximateTimeOverlay : IHudOverlay
 {
-    private readonly ApproximateTimeEstimate estimate = new();
+
     private readonly ApproximateTimePresentation presentation;
     private ICoreClientAPI? api;
     private Entity? entity;
@@ -26,7 +26,7 @@ internal sealed class ApproximateTimeOverlay : IHudOverlay
     {
         this.presentation = presentation ?? new();
     }
-    /// <summary>Binds one client world without retaining a previous calibration.</summary>
+    /// <summary>Binds one client world for presentation.</summary>
     public void BeginSession(ICoreClientAPI api)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
@@ -34,14 +34,14 @@ internal sealed class ApproximateTimeOverlay : IHudOverlay
         if (this.api != null) throw new InvalidOperationException("An approximate time session is already bound.");
         this.api = api;
     }
-    /// <summary>Immediately clears calibration and textures when disabled.</summary>
+    /// <summary>Clears presentation when disabled without changing saved observation age.</summary>
     public bool SetEnabled(bool value)
     {
         enabled = value;
         if (!value) Clear();
         return value;
     }
-    /// <summary>Releases world bindings and personal time history.</summary>
+    /// <summary>Releases world and presentation bindings.</summary>
     public void EndSession()
     {
         api = null;
@@ -64,7 +64,7 @@ internal sealed class ApproximateTimeOverlay : IHudOverlay
         if (!applicable) Clear();
         return applicable;
     }
-    /// <summary>Samples the native calendar and local sunlight outside the drawing path.</summary>
+    /// <summary>Reads synchronized observation age and samples the native calendar outside the drawing path.</summary>
     public HudOverlayChange Refresh()
     {
         if (!IsApplicable()) return HudOverlayChange.None;
@@ -75,14 +75,9 @@ internal sealed class ApproximateTimeOverlay : IHudOverlay
             entity = current;
         }
         var calendar = api.World.Calendar;
-        var pos = current.Pos.AsBlockPos;
-        // Local propagated sunlight can reach windows and covered spaces. Block light is excluded,
-        // and solar intensity prevents moonlit nights from recalibrating the personal clock.
-        bool sunVisible = api.World.BlockAccessor.GetLightLevel(pos, EnumLightLevelType.OnlySunLight) > 0
-            && calendar.SunLightStrength >= .1f;
-        estimate.Observe(calendar.TotalHours, calendar.HourOfDay, calendar.HoursPerDay, sunVisible, current.EntityId);
         var next = ApproximateTimePeriod.Unknown;
-        double? observedDayOffset = estimate.EstimatedDayOffset;
+        double? observedDayOffset = ApproximateTimeEstimate.GetDayOffset(ApproximateTimeState.Read(current),
+            calendar.HoursPerDay, api.World.Player.PlayerUID);
         if (observedDayOffset is double dayOffset)
         {
             // Ask the native calendar for the seasonal solar path at the remembered time, not the true
@@ -90,16 +85,7 @@ internal sealed class ApproximateTimeOverlay : IHudOverlay
             double estimatedDay = calendar.TotalDays + dayOffset;
             var location = current.Pos.XYZ;
             float height = calendar.GetSunPosition(location, estimatedDay).Y;
-            float coordinate = (Math.Clamp(height * 1.4f + .2f, -1, 1) + 1) / 2;
-            float solarIntensity = coordinate;
-            if (calendar is Vintagestory.Common.GameCalendar nativeCalendar)
-            {
-                // Reproduce the native solar-only intensity at estimated time using the owning color lookup.
-                // Current DayLightStrength includes moonlight and would also bypass personal clock drift.
-                Color sunlight = nativeCalendar.getSunlightPixelRel(Math.Clamp(coordinate + calendar.SunsetMod, 0, 1), .01f);
-                solarIntensity = (sunlight.R + sunlight.G + sunlight.B) / (3f * 255)
-                    + Math.Max(0, (height - .4f) / 7.5f);
-            }
+            float solarIntensity = ApproximateTimeSolarIntensity.Get(calendar, height);
             next = ApproximateTimeSolarPeriod.FromSunHeight(
                 calendar.GetSunPosition(location, estimatedDay - .02).Y,
                 height,
@@ -125,12 +111,12 @@ internal sealed class ApproximateTimeOverlay : IHudOverlay
     #endregion
     #endregion
     #region Private
-    /// <summary>Resets character-specific calibration and releases borrowed artwork bindings.</summary>
+    /// <summary>Clears character-specific presentation and releases borrowed artwork bindings.</summary>
     private void Clear()
     {
         entity = null;
         period = null;
-        estimate.Reset();
+
         presentation.Reset();
     }
     #endregion
