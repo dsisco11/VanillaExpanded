@@ -33,6 +33,9 @@ internal sealed class HudOverlaySystem : ModSystem, ILiveConfigurable
         Registry.RegisterGroup(new HudOverlayGroup("player-status",
             new HudOverlayPlacement(HudOverlayAnchorContext.HotbarTargetId,
                 HudOverlayPoint.LeftBottom, HudOverlayPoint.RightBottom, 0, 4)));
+        Registry.RegisterGroup(new HudOverlayGroup("weather-status",
+            new HudOverlayPlacement(HudOverlayAnchorContext.HotbarTargetId,
+                HudOverlayPoint.RightBottom, HudOverlayPoint.LeftBottom, 4, 4)));
         session = new HudOverlaySession(api, Registry, enabled: () => VanillaExpandedModSystem.Config.EnableHudOverlays);
         api.Event.LevelFinalize += session.EnterWorld;
         api.Event.LeaveWorld += session.LeaveWorld;
