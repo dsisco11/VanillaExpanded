@@ -18,7 +18,8 @@ internal sealed class ApproximateTimeServerSystem : ModSystem
     public override void StartServerSide(ICoreServerAPI api)
     {
         this.api = api;
-        lastHours = api.World.Calendar.TotalHours;
+        // The server calendar is not initialized during mod startup; the first valid tick sets the baseline.
+        lastHours = null;
         tickId = api.Event.RegisterGameTickListener(OnTick, 1000);
     }
     /// <summary>Unregisters tracking without deleting persisted player attributes.</summary>
@@ -37,6 +38,7 @@ internal sealed class ApproximateTimeServerSystem : ModSystem
     {
         if (api == null) return;
         var calendar = api.World.Calendar;
+        if (calendar == null) return;
         double hours = calendar.TotalHours;
         if (!double.IsFinite(hours)) return;
         // A reversed calendar contributes no elapsed exposure; saved uncertainty remains intact.
