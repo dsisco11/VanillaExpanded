@@ -47,6 +47,6 @@ Subscribe to relevant game events during the feature's active lifecycle and use 
 
 The bow indicator is the first consumer. Its feature module determines bow compatibility, obtains the next arrow through the base bow's selection method, and counts matching arrows using the same eligible inventory traversal. The shared runtime only sees measured, prepared overlay content.
 
-Item presentation reuses the quick-swap menus’ shared renderer and asset-authored `ve-radial-menu-properties`. Arrow patches frame the working end independently of inventory transforms. The presentation clips the enlarged model to its icon slot, keeping it separate from the count. Missing or unsupported custom presentation falls back to the engine icon path.
+Item presentation reuses the quick-swap menus’ shared renderer and asset-authored `ve-item-icon-properties`. Arrow patches frame the working end independently of inventory transforms. The presentation clips the enlarged model to its icon slot, keeping it separate from the count. Missing or unsupported custom presentation falls back to the engine icon path.
 
 Selection policy remains with the game. The indicator neither changes ammunition order nor reserves or consumes arrows. Custom bows require a feature-specific adapter that establishes their selection behavior.

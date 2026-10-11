@@ -2,7 +2,7 @@
   {
     "op": "add",
     "file": "game:itemtypes/tool/crowbar.json",
-    "path": "/attributes/ve-radial-menu-propertiesByType",
+    "path": "/attributes/ve-item-icon-propertiesByType",
     "value": {
       "@crowbar-(iron|meteoriciron|steel)": {
         "transform": {

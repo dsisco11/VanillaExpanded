@@ -20,7 +20,7 @@ public sealed class ArrowPresentationAssetTests
         var center = Enumerable.Range(0, 3).Select(axis => (heads.Min(point => point[axis]) + heads.Max(point => point[axis])) / 2).ToArray();
         // Match the packaged asset as it is selected by the engine's ByType expansion.
         var patch = JArray.Parse(File.ReadAllText(FindPatch()));
-        var item = new Item { Attributes = new JsonObject(new JObject { ["ve-radial-menu-properties"] = patch[0]!["value"]!["arrow-bone"]!.DeepClone() }) };
+        var item = new Item { Attributes = new JsonObject(new JObject { ["ve-item-icon-properties"] = patch[0]!["value"]!["arrow-bone"]!.DeepClone() }) };
         var properties = new ToolHeadPresentationResolver((_, reason) => Assert.Fail(reason)).Resolve(item).Properties!;
         Assert.True(ToolHeadPresentationMatrix.TryCreate(properties, 0, 0, 24, 0, out var presentation, 50));
         var drawnCenter = Transform(presentation, center);
@@ -39,7 +39,7 @@ public sealed class ArrowPresentationAssetTests
     public void HeadPivotsFaceUpAndExcludeTail(string variant, float x, float y, float z, float tipX, float tailX)
     {
         var patch = JArray.Parse(File.ReadAllText(FindPatch()));
-        var item = new Item { Attributes = new JsonObject(new JObject { ["ve-radial-menu-properties"] = patch[0]!["value"]![variant]!.DeepClone() }) };
+        var item = new Item { Attributes = new JsonObject(new JObject { ["ve-item-icon-properties"] = patch[0]!["value"]![variant]!.DeepClone() }) };
         var properties = new ToolHeadPresentationResolver((_, reason) => Assert.Fail(reason)).Resolve(item).Properties!;
         Assert.True(ToolHeadPresentationMatrix.TryCreate(properties, 0, 0, 24, 0, out var presentation, 50));
         var center = Transform(presentation, [x, y, z]);

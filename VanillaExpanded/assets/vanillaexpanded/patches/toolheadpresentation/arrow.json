@@ -2,7 +2,7 @@
   {
     "op": "add",
     "file": "game:itemtypes/tool/arrow.json",
-    "path": "/attributes/ve-radial-menu-propertiesByType",
+    "path": "/attributes/ve-item-icon-propertiesByType",
     "value": {
       "arrow-bone": {
         "transform": {

@@ -10,7 +10,7 @@ namespace VanillaExpanded.ItemRendering;
 /// <summary>Resolves dedicated collectible attributes on the client thread and bounds invalid-asset diagnostics.</summary>
 internal sealed class ToolHeadPresentationResolver
 {
-    private const string AttributeName = "ve-radial-menu-properties";
+    private const string AttributeName = "ve-item-icon-properties";
     private readonly Action<CollectibleObject, string> diagnostic;
     private readonly ConditionalWeakTable<CollectibleObject, object> reported = new();
 
