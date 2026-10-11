@@ -1,84 +1,96 @@
-# Anchored HUD overlays
+# HUD overlay integration
 
-The HUD overlay system provides shared positioning, scheduling, and rendering for passive information displays. Features supply their own content and gameplay rules; the shared runtime places that content on the screen or relative to an existing HUD element. Overlays do not receive input.
+The HUD overlay system positions and updates passive displays on the client. An overlay supplies content and a measured footprint; the runtime handles anchoring, group layout, refresh scheduling, GUI scaling, and world-session transitions.
 
-## Architecture
+Reference `VanillaExpanded.dll` and the compatible Vintage Story API assemblies, and declare `vanillaexpanded` as a dependency in your mod metadata. `HudOverlaySystem`, `IHudOverlay`, registration and placement contracts, and the shared icon-and-text presentation are public and can be used from a separate mod assembly. Obtain the running system through the client mod loader; the game owns its lifetime.
 
-An overlay belongs to a named group. The group defines its anchor, attachment point, offset, and packing rules. The runtime measures eligible overlays, packs them in a stable order, and positions the group using the game's native bounds system. Each group renders through a native GUI composer owned by the HUD host.
+## Registering an overlay
 
-The main responsibilities are:
+Implement `IHudOverlay` and register an instance through `HudOverlaySystem.Registry` during client startup, after the HUD system has registered its groups. Existing consumers use `ExecuteOrder() => 1` for this ordering.
 
-- **Registration:** tracks overlay identities, group definitions, and lifetime ownership.
-- **Anchoring:** resolves screen bounds or the rendered bounds of a named HUD element.
-- **Scheduling:** refreshes feature content at bounded intervals and combines event invalidations.
-- **Layout:** packs measured content, positions groups, and handles viewport limits.
-- **Rendering:** draws prepared content through a passive native HUD host.
-- **Session lifecycle:** binds overlays to the current world and player, and releases session resources when that context ends.
+A `HudOverlayRegistration` specifies:
 
-`HudOverlaySystem` connects these components to the client lifecycle and configuration reloads. Feature modules depend on the shared contracts; the shared components do not depend on individual features.
+- A unique namespaced ID, such as `example:status`.
+- The overlay instance and a cheap enabled selector that reads the feature's current setting.
+- An existing group ID.
+- An integer display order and a positive refresh interval in milliseconds.
 
-## Content and presentation
+The registry rejects duplicate IDs, unknown groups, and instances it already owns or has disposed. Successful registration transfers ownership of the overlay to the registry. Keep the returned `IDisposable` handle and dispose it when removing the integration. If registration fails, the caller still owns the instance and must clean it up.
 
-`IHudOverlay` separates gameplay sampling from presentation. Applicability determines whether the feature should participate. Refreshing captures the current content; preparation creates or updates presentation resources; measurement supplies the dimensions used by layout. Drawing consumes that prepared state without querying inventory or other gameplay state.
+For example, use this fragment in your client mod system, where `ExampleOverlay` implements `IHudOverlay` and `featureEnabled` is your setting:
 
-This separation allows placement changes to reuse existing content and textures. Features can invalidate their content in response to game events, while periodic refreshes cover changes for which reliable notifications are unavailable. A failed refresh or preparation hides the affected overlay and permits a later retry without interrupting other overlays.
+```csharp
+var hud = api.ModLoader.GetModSystem<HudOverlaySystem>();
+var overlay = new ExampleOverlay();
+IDisposable registration;
+try
+{
+    registration = hud.Registry.Register(new HudOverlayRegistration(
+        id: "example:status",
+        overlay: overlay,
+        isEnabled: () => featureEnabled,
+        groupId: "player-status",
+        order: 50,
+        refreshIntervalMs: 1000));
+}
+catch
+{
+    overlay.Dispose();
+    throw;
+}
+// Retain registration and dispose it when the integration is removed.
+```
 
-## Placement and visibility
+The fragment uses `VanillaExpanded.HudOverlays` and `VanillaExpanded.HudOverlays.Registration`. Placement types are in `.Anchoring`, packing types in `.Layout`, and `HudOverlayIconTextPresentation` in `.Rendering`. Registration and overlay callbacks run on the client main thread. Dispose your registration handle when unloading; the shared system and registry remain owned by VanillaExpanded.
 
-Anchors expose rendered rectangles rather than owning another UI hierarchy. Native `ElementBounds` controls alignment and GUI scaling. The layout component adds group packing, attachment, viewport clamping, and clipping policy.
+## Implementing the lifecycle
 
-A missing or hidden anchor makes its dependent group unavailable. The runtime does not invent fallback coordinates or relocate the group automatically. Disabled or inapplicable overlays release their layout space. When visibility returns, content is refreshed before it becomes drawable.
+A registered overlay may survive several world sessions. Keep session resources separate from the registration's lifetime.
 
-Placement preferences come from the existing mod configuration. Configuration reloads update group metadata and visibility; they do not create a second position store or rebuild presentation merely because a group moved. User settings and defaults are documented in the [README](../../README.md#hud-overlays).
+| Method | Integration responsibility |
+| --- | --- |
+| `BeginSession(api)` | Bind the current client world and subscribe to relevant events. |
+| `IsApplicable()` | Cheaply decide whether content can currently be sampled. |
+| `Refresh()` | Capture a stable snapshot and report what changed. |
+| `Prepare(context)` | Create or update presentation resources for that snapshot. |
+| `Measure()` | Return finite, nonnegative `SizeF` dimensions in unscaled GUI units. |
+| `Draw(renderer, bounds, clip, deltaTime)` | Render prepared content within the supplied bounds and clip. |
+| `EndSession()` | Detach events, release owned session resources, and clear world references. Make this safe after partial initialization and repeated calls. |
+| `Dispose()` | Perform final cleanup when the registration is removed. |
 
-## Ownership and lifecycle
+The registry calls `EndSession` before final disposal. Dispose resources allocated and owned by the overlay; retain the engine's ownership of borrowed services and cached assets. In particular, dropping a reference to an engine-cached texture does not require disposing that texture.
 
-Successful registration transfers ownership of the overlay instance to the registry. The removal handle ends that ownership. A registered instance can survive multiple world sessions, so session teardown and final disposal are separate responsibilities.
+## Refreshing and drawing
 
-Each feature owns its subscriptions, sampled content, and presentation resources. Session teardown releases those resources and drops references to the previous world and player. The host owns group composers. Engine services, inventory objects, meshes, and atlas resources are borrowed and must not be disposed by an overlay.
+`Refresh` returns `HudOverlayChange.None` for unchanged content, `Presentation` when visual resources need updating, and `Measurement` when the footprint must be measured again. Combine the flags when both change. The preparation context supplies the client API, GUI scale, locale, and font revision so presentation can adapt when those values change.
 
-## Adding a feature
+Periodic refreshes provide a fallback for data without reliable change events. For event-driven updates, call `hud.Invalidate(overlayId)` on the client main thread. Invalidation is coalesced into scheduled work; it does not refresh immediately inside the event callback. Keep subscriptions and gameplay sampling in the integration.
 
-Implement `IHudOverlay` in the feature module and register it with a stable ID, an enabled selector, a group, an order, and a refresh interval. Keep applicability and sampling in that module. Use the shared icon-and-text presentation when it fits the content, or provide a bounded passive presentation that follows the same preparation and clipping contract.
+Drawing consumes the prepared snapshot. Avoid gameplay queries and resource creation in `Draw`. The supplied `clip` is in framebuffer pixels, while measurement and placement offsets use unscaled GUI units. Honor the clip for oversized content and restore any temporary render state. The runtime retries failed refresh or preparation work without interrupting other overlays.
 
-Subscribe to relevant game events during the feature's active lifecycle and use them to request invalidation. Release subscriptions and owned resources when the feature is suspended or its session ends. Add an anchor adapter only when a feature needs a native HUD target that the system does not already expose.
+## Choosing placement
 
-## Bow ammunition
+An overlay belongs to a group. A `HudOverlayGroup` defines one placement and a `HudOverlayPacking` policy for its members. Register a group before registering its overlays; use a distinct group ID when the integration needs independent placement. `UpdateGroup` changes an existing group's placement or packing without replacing its overlay instances.
 
-The bow indicator is the first consumer. Its feature module determines bow compatibility, obtains the next arrow through the base bow's selection method, and counts matching arrows using the same eligible inventory traversal. The shared runtime only sees measured, prepared overlay content.
+`HudOverlayPlacement` defines the target, the attachment point on that target, the pivot on the group, and X/Y offsets. Available target IDs are `screen`, `hotbar`, and `saturation`. Attachment and pivot values come from `HudOverlayPoint`. For example, a target's `LeftBottom` attachment with a group's `RightBottom` pivot places the group to the target's left, aligned at the bottom, before offsets and viewport clamping.
 
-Item presentation reuses the quick-swap menus’ shared renderer and asset-authored `ve-item-icon-properties`. Arrow patches frame the working end independently of inventory transforms. The presentation clips the enlarged model to its icon slot, keeping it separate from the count. Missing or unsupported custom presentation falls back to the engine icon path.
+Packing controls horizontal or vertical flow, spacing, padding, and cross-axis alignment. Members are ordered by ascending `Order`, then by ordinal overlay ID. This establishes relative order, not a permanent screen slot.
 
-Selection policy remains with the game. The indicator neither changes ammunition order nor reserves or consumes arrows. Custom bows require a feature-specific adapter that establishes their selection behavior.
+The built-in groups are:
 
-## Body temperature
+| Group | Intended use |
+| --- | --- |
+| `player-status` | Horizontal status icons beside the hotbar's bottom-left edge. The time indicator uses order 100; use a lower order to appear before it. |
+| `held-item-status` | Held-item information using the user's configured anchor and offsets. |
 
-The body-temperature feature samples the local player's synchronized `bodyTemp/bodytemp` attribute and obtains the normal temperature from `EntityBehaviorBodyTemperature`. Cold applicability and intensity come directly from the synchronized `freezingEffectStrength` attribute. The overlay does not reconstruct the game's cold threshold or environmental protection calculation. A positive effect shows the warning, its normalized intensity controls the blue tint, and a cleared or missing effect hides cold content. Cold damage remains governed by the game's exposure timing and world settings. Hot bands are presentation policy, above normal plus 5°C and plus 7°C; the game has no corresponding native heat-damage threshold and initializes players at normal plus 4°C.
+Joining a shared group adopts its placement and packing rules. Additional native HUD targets currently require extending the anchor resolver; there is no external anchor-registration API.
 
-Hot classification, thermometer fill, and numeric text apply the character panel conversion (above 37, `37 + (raw - 37) / 10`) with only numeric text rounded to whole degrees. The simulation reading is not a literal Celsius reading above 37; for example, raw 45 appears as 37.8°C in the character panel and 38°C in this overlay. Vanilla routinely reaches raw 45 through ordinary warming, so it must not trigger a hot warning. Hot thresholds operate on converted Celsius and are unreachable within vanilla’s warmth ceiling; they remain visual policy for temperatures supplied by other modifications. The column spans converted normal minus 6°C through normal plus 8°C, clamped at either end. Hot warnings persist until normal plus 4.75°C, providing a quarter-degree recovery margin. Cold warnings follow the native effect without an additional recovery margin. Missing data, dead players, Creative, and Spectator states clear the warning.
+## Visibility and cleanup
 
-The `player-status` group uses the hotbar's bottom-left attachment and a bottom-right group pivot. Packing offsets align the content with the toolbar's bottom edge and leave a small gap to its left. The held-item group remains independent.
+The global HUD setting, the registration's enabled selector, applicability, and anchor availability determine participation. A missing or hidden anchor hides its group without choosing a fallback location. Hidden or inapplicable members currently release their layout space, so adjacent members may move. Fixed slots for invisible indicators are not yet supported.
 
-Thermometer artwork is stored as two transparent PNG assets under `textures/hud/body-temperature`: an outline and a fully filled silhouette used as the fill mask. The presentation borrows these textures from the engine’s asset cache. It tints the filled silhouette and clips its visible height to the sampled level, then draws the outline. The mask’s alpha confines the color to the thermometer shape; the bulb retains a minimum fill so cold remains visible at the lowest level. GUI scaling changes draw dimensions while retaining the cached assets.
+An applicable overlay can return an empty footprint when it has nothing to show. This keeps it eligible for refreshes that may reveal content later. When visibility returns, the runtime refreshes content before drawing it.
 
-The feature owns its optional localized text texture. Text changes only when the displayed whole degree or preparation context changes. Disabling the feature or ending a session releases owned text and drops borrowed texture references; the engine retains ownership of the asset cache. Drawing consumes sampled state and creates no resources. The feature and reading toggles use the existing live configuration mechanism.
+Disabling a registration does not remove it or end its session. If disabling a feature should immediately release its resources, the integration must perform that cleanup as part of its own configuration handling. Existing integrations also invalidate their registration and call `hud.ConfigurationChanged()` to update visibility promptly.
 
-Temperature trends compare converted readings at synchronized `bodyTempUpdateTotalHours` timestamps. Repeated HUD polls retain the last trend; missing data, entity/session changes, clock reversal, or a 15-second publication gap discard history. Below 0.05°C per game hour is treated as stable; 1°C per game hour or above uses two chevrons, otherwise one. Orange upward chevrons sit above the icon and blue downward chevrons below. The presentation borrows two chevron texture assets and reserves space at both ends while a trend is present, keeping the icon stationary when direction reverses. Healthy players remain hidden.
-
-## Weather conditions
-
-The weather feature samples current climate at the local player and reads the client weather system’s blended snapshot. Precipitation uses current rainfall and the snapshot’s precipitation type. Automatic precipitation follows the native particle renderer’s temperature comparison against the snapshot’s snow threshold; explicit rain, snow, and hail remain authoritative. Fog reads the weather modifier’s weighted density, excluding unrelated composite scene effects such as underwater and temporal fog. Ordinary distance haze stays below the visibility threshold. Entry and exit thresholds stabilize icons through blended weather transitions.
-
-The shared horizontal `player-status` group attaches to the toolbar’s bottom-left edge. Precipitation and fog occupy separate 24-unit slots, allowing concurrent conditions. Four transparent PNG assets under `textures/hud/weather` provide the artwork; the presentation borrows engine-cached `LoadedTexture` instances. Sampling runs once per second, drawing consumes prepared state, and GUI scaling reuses the textures. Missing climate data, dead players, disable, and world exit clear the content and borrowed references. The feature uses the existing live configuration mechanism.
-
-## Approximate time
-
-`ApproximateTimeSystem` registers a compact texture icon as the rightmost member of the horizontal status group beside the bottom-left edge of the hotbar. Its overlay reads synchronized observation age and samples the native client calendar once per second, outside rendering. The presentation borrows engine-cached transparent textures for dawn, morning, noon, afternoon, dusk, and night. No numeric label or background is rendered.
-
-`ApproximateTimeServerSystem` stores elapsed game hours in the player's synchronized, persistent `vanillaexpanded:approximateTime` attribute tree under `timeSinceSunObserved`. Once per second it advances the counter for living online players without sunlight, or resets it when local `OnlySunLight` is positive and solar-only intensity reaches 0.1. Sunlight through windows and covered spaces qualifies; sky exposure is not required. Block light and moonlight do not qualify. Offline and dead players retain their counter without accumulating additional time.
-
-The client derives drift through `ApproximateTimeEstimate`: 0.1 game hours per elapsed hour, capped at one third of a calendar day. A stable player UID determines the fast or slow direction across sessions. Missing saved data starts at zero. Reconnects, world reloads, character replacement, and HUD toggles do not clear persisted observation age. Multiplayer tracking requires the mod on the server.
-
-Icon selection samples native `GetSunPosition` at the current calendar day plus derived drift and current player location. Solar intensity and rising or falling direction distinguish night, dawn, morning, noon, afternoon, and dusk, following season and latitude. Intensity selects night below 0.1 and dawn or dusk below 0.65. Native calendars use the public sunlight color lookup plus its high-sun contribution at the estimated elevation, excluding moonlight; alternate calendars use normalized solar elevation. Invalid samples retain the last valid icon, or leave presentation empty before its first valid sample.
-
-`EnableApproximateTimeOverlay` and the global HUD setting control presentation through the live configuration path. Disabling the HUD releases cached presentation bindings without changing server-owned observation age.
+Overlays currently receive no mouse input or hover callbacks. Interactive controls and hover labels require additional shared API support.

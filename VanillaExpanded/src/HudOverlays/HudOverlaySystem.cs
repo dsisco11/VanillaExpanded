@@ -11,15 +11,33 @@ using Vintagestory.API.Common;
 namespace VanillaExpanded.HudOverlays;
 
 /// <summary>Connects client world/configuration events to the owning HUD runtime and built-in group registrations.</summary>
-internal sealed class HudOverlaySystem : ModSystem, ILiveConfigurable
+public sealed class HudOverlaySystem : ModSystem, ILiveConfigurable
 {
     private ICoreClientAPI? api;
     private HudOverlaySession? session;
     private bool disposed;
+    /// <summary>Gets the shared registry for client overlay and group registration.</summary>
     public HudOverlayRegistry Registry { get; } = new();
-    public HudOverlaySession? Session => session;
+    internal HudOverlaySession? Session => session;
 
     #region Public API
+    #region Integration
+    /// <summary>Requests a coalesced content refresh on the client main thread; inactive sessions need no invalidation.</summary>
+    public void Invalidate(string overlayId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(overlayId);
+        ObjectDisposedException.ThrowIf(disposed, this);
+        session?.Scheduler?.Invalidate(overlayId);
+    }
+
+    /// <summary>Reevaluates live visibility after integration settings change, without sampling during the callback.</summary>
+    public void ConfigurationChanged()
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        session?.ConfigurationChanged();
+    }
+    #endregion
+    #region Mod lifecycle
     /// <summary>Loads the passive overlay runtime on clients only.</summary>
     public override bool ShouldLoad(EnumAppSide forSide) => forSide == EnumAppSide.Client;
 
@@ -73,5 +91,6 @@ internal sealed class HudOverlaySystem : ModSystem, ILiveConfigurable
             finally { base.Dispose(); }
         }
     }
+    #endregion
     #endregion
 }

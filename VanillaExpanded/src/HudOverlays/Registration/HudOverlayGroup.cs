@@ -5,7 +5,7 @@ using VanillaExpanded.HudOverlays.Layout;
 namespace VanillaExpanded.HudOverlays.Registration;
 
 /// <summary>One stable group identity with exactly one immutable placement and packing definition.</summary>
-internal sealed record HudOverlayGroup
+public sealed record HudOverlayGroup
 {
     public string Id { get; }
     public HudOverlayPlacement Placement { get; }

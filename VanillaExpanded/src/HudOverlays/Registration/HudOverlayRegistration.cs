@@ -3,7 +3,7 @@ using System;
 namespace VanillaExpanded.HudOverlays.Registration;
 
 /// <summary>Immutable overlay metadata; ownership transfers only when the registry accepts it.</summary>
-internal sealed record HudOverlayRegistration
+public sealed record HudOverlayRegistration
 {
     public const int DefaultRefreshIntervalMs = 1000;
     public string Id { get; }

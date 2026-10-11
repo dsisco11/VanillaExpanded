@@ -10,7 +10,7 @@ namespace VanillaExpanded.HudOverlays.Registration;
 /// Drawing honors the assigned clip (including oversized content), restores temporary native draw state,
 /// reads only sampled/prepared state, and creates no resources for unchanged content.
 /// Final removal calls EndSession before Dispose; Dispose releases only owned resources, never borrowed ones.</remarks>
-internal interface IHudOverlay : IDisposable
+public interface IHudOverlay : IDisposable
 {
     #region Public API
     #region Lifecycle

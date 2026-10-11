@@ -11,7 +11,7 @@ using Vintagestory.API.Config;
 namespace VanillaExpanded.HudOverlays.Rendering;
 
 /// <summary>Owns cloned item content, cached localized contrast text and an optional backdrop, borrowing engine icon resources.</summary>
-internal sealed class HudOverlayIconTextPresentation : IDisposable
+public sealed class HudOverlayIconTextPresentation : IDisposable
 {
     private readonly System.Func<HudOverlayPreparationContext, string, LoadedTexture> createText;
     private readonly System.Func<HudOverlayPreparationContext, float, LoadedTexture>? createIconBackground;
