@@ -34,10 +34,10 @@ public sealed class WeatherConditionsSystemTests
             fixture.Api.SetupGet(value => value.ModLoader).Returns(loader.Object);
             hud.StartClientSide(fixture.Api.Object);
             system.StartClientSide(fixture.Api.Object);
-            var group = hud.Registry.GetGroups().Single(value => value.Id == "weather-status");
+            var group = hud.Registry.GetGroups().Single(value => value.Id == "player-status");
             Assert.Equal(HudOverlayAnchorContext.HotbarTargetId, group.Placement.TargetId);
-            Assert.Equal(HudOverlayPoint.RightBottom, group.Placement.Attachment);
-            Assert.Equal(HudOverlayPoint.LeftBottom, group.Placement.Pivot);
+            Assert.Equal(HudOverlayPoint.LeftBottom, group.Placement.Attachment);
+            Assert.Equal(HudOverlayPoint.RightBottom, group.Placement.Pivot);
             hud.Registry.BeginSession(fixture.Api.Object);
             WeatherConditionsOverlay? overlay = null;
             hud.Registry.RunPass(registration =>

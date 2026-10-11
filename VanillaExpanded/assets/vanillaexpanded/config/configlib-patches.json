@@ -39,6 +39,15 @@
         "weight": 10.4,
         "clientSide": true
       },
+      "EnableApproximateTimeOverlay": {
+        "code": "EnableApproximateTimeOverlay",
+        "name": "EnableApproximateTimeOverlay",
+        "ingui": "vanillaexpanded:config-enable-approximate-time-overlay",
+        "comment": "vanillaexpanded:config-enable-approximate-time-overlay-tooltip",
+        "default": true,
+        "weight": 10.9,
+        "clientSide": true
+      },
       "EnableWeatherConditionsOverlay": {
         "code": "EnableWeatherConditionsOverlay",
         "name": "EnableWeatherConditionsOverlay",

@@ -23,9 +23,13 @@ You can now bulk transfer matching items from your inventory into storage contai
 
 Hold the Quick Tools hotkey (assign it in Controls) to open a radial menu of available tools, weapons, healing items, and light sources from your hotbar and backpack. Select an item to equip it instantly; use the center **Unequip** action to restore your previous item or stow the item currently held.
 
+### Approximate Time
+
+A compact texture icon at the right end of the status group beside the bottom-left edge of the toolbar indicates estimated dawn, morning, noon, afternoon, dusk, or night. Icons follow seasonal daylight and the local solar path. Outdoor daylight recalibrates the estimate; shelter and night gradually introduce up to eight hours of error on a normal day. An hourglass icon appears under cover before the first daylight observation; open sky can still reveal night or twilight. There is no numeric label or background circle. Toggle it live with `EnableApproximateTimeOverlay`.
+
 ### Weather Conditions
 
-Small weather icons appear beside the toolbar’s bottom-right edge during rain, snow, hail, or fog. Fog can appear alongside precipitation. The icons use transparent textures without labels or background circles and hide during fair weather. Toggle them with `EnableWeatherConditionsOverlay`; changes apply immediately.
+Small weather icons appear beside the toolbar’s bottom-left edge during rain, snow, hail, or fog. Fog can appear alongside precipitation. The icons use transparent textures without labels or background circles and hide during fair weather. Toggle them with `EnableWeatherConditionsOverlay`; changes apply immediately.
 
 ### Body Temperature Warning
 
@@ -190,6 +194,7 @@ The sections and setting order below match the ConfigLib menu. Setting names are
 | `HeldItemStatusAnchor`       | `saturation` | `saturation`, `hotbar`, `screen-left-top`, `screen-center-top`, `screen-right-top`, `screen-left-middle`, `screen-center-middle`, `screen-right-middle`, `screen-left-bottom`, `screen-center-bottom`, `screen-right-bottom` | Select native docking or a screen position. Unknown values fall back to saturation.     |
 | `HeldItemStatusOffsetX`      | `-4`         | -2048–2048 in ConfigLib                                                                                                                                                                                                      | Horizontal offset in GUI units; positive moves right. Nonfinite values fall back to -4. |
 | `HeldItemStatusOffsetY`      | `0`          | -2048–2048 in ConfigLib                                                                                                                                                                                                      | Vertical offset in GUI units; positive moves down. Nonfinite values fall back to 0.     |
+| `EnableApproximateTimeOverlay` | `true` | `true`, `false` | Show sunlight-calibrated approximate time; applies live. |
 | `EnableWeatherConditionsOverlay` | `true` | `true`, `false` | Show texture icons for active rain, snow, hail, and weather fog; applies live. |
 
 The two offsets are shared across placement choices. The saturation default compensates for content padding and leaves a four-unit gap above the meter. Hotbar docking attaches the group's left-middle to the hotbar's right-middle; screen placements use matching attachment and pivot points. Native viewport clamping keeps the group within the safe rectangle. Placement changes apply live and retain cached presentation; restored content receives a fresh sample before display. Without ConfigLib, edit the JSON file and restart the game to load manual changes.
