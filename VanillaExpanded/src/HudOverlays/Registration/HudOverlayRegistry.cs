@@ -7,7 +7,7 @@ using Vintagestory.API.Client;
 namespace VanillaExpanded.HudOverlays.Registration;
 
 /// <summary>Owns accepted overlay lifetimes and main-thread, pass-boundary membership/session transitions.</summary>
-internal sealed class HudOverlayRegistry : IDisposable
+public sealed class HudOverlayRegistry : IDisposable
 {
     private readonly int threadId = Environment.CurrentManagedThreadId;
     private readonly Dictionary<string, HudOverlayGroup> groups = new(StringComparer.Ordinal);

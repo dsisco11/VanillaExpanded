@@ -3,7 +3,7 @@ using System;
 namespace VanillaExpanded.HudOverlays.Anchoring;
 
 /// <summary>Immutable target attachment metadata; it neither resolves targets nor calculates native bounds.</summary>
-internal sealed record HudOverlayPlacement
+public sealed record HudOverlayPlacement
 {
     public string TargetId { get; }
     public HudOverlayPoint Attachment { get; }

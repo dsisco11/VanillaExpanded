@@ -3,7 +3,7 @@ using System;
 namespace VanillaExpanded.HudOverlays.Layout;
 
 /// <summary>Immutable group packing defaults; padding contributes to content size rather than native root padding.</summary>
-internal sealed record HudOverlayPacking
+public sealed record HudOverlayPacking
 {
     public HudOverlayDirection Direction { get; }
     public HudOverlayCrossAlignment CrossAlignment { get; }
