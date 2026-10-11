@@ -2,7 +2,7 @@
   {
     "op": "add",
     "file": "game:itemtypes/tool/knife.json",
-    "path": "/attributes/ve-radial-menu-propertiesByType",
+    "path": "/attributes/ve-item-icon-propertiesByType",
     "value": {
       "@knife-generic-(chert|granite|andesite|basalt|obsidian|peridotite|flint|bone.*)": {
         "transform": {

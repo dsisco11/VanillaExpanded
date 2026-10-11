@@ -2,7 +2,7 @@
   {
     "op": "add",
     "file": "game:itemtypes/tool/prospectingpick.json",
-    "path": "/attributes/ve-radial-menu-properties",
+    "path": "/attributes/ve-item-icon-properties",
     "value": {
       "transform": {
         "origin": {
