@@ -1,5 +1,5 @@
 using System;
-using VanillaExpanded.HudOverlays.Anchoring;
+using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Lifecycle;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.ModSystems;
@@ -27,9 +27,9 @@ internal sealed class HudOverlaySystem : ModSystem, ILiveConfigurable
         ArgumentNullException.ThrowIfNull(api);
         ObjectDisposedException.ThrowIf(disposed, this);
         this.api = api;
-        Registry.RegisterGroup(new HudOverlayGroup("held-item-status", new HudOverlayPlacement(
-            HudOverlayAnchorContext.SaturationTargetId, HudOverlayPoint.LeftTop, HudOverlayPoint.LeftBottom, -4, 0)));
-        session = new HudOverlaySession(api, Registry);
+        Registry.RegisterGroup(new HudOverlayGroup("held-item-status",
+            HudOverlayConfiguration.ResolveHeldItemStatusPlacement(VanillaExpandedModSystem.Config)));
+        session = new HudOverlaySession(api, Registry, enabled: () => VanillaExpandedModSystem.Config.EnableHudOverlays);
         api.Event.LevelFinalize += session.EnterWorld;
         api.Event.LeaveWorld += session.LeaveWorld;
     }
@@ -37,7 +37,15 @@ internal sealed class HudOverlaySystem : ModSystem, ILiveConfigurable
     /// <summary>Applies live selectors immediately without forcing gameplay samples or texture preparation.</summary>
     public void OnConfigReloaded(ICoreAPI api)
     {
-        if (ReferenceEquals(this.api, api)) session?.ConfigurationChanged();
+        if (disposed || !ReferenceEquals(this.api, api)) return;
+        foreach (var group in Registry.GetGroups())
+        {
+            if (group.Id != "held-item-status") continue;
+            Registry.UpdateGroup(new HudOverlayGroup(group.Id,
+                HudOverlayConfiguration.ResolveHeldItemStatusPlacement(VanillaExpandedModSystem.Config), group.Packing));
+            break;
+        }
+        session?.ConfigurationChanged();
     }
 
     /// <summary>Detaches world events and releases session resources before final registration ownership.</summary>
