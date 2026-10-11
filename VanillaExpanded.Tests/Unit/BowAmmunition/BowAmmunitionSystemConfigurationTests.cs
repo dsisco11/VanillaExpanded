@@ -56,12 +56,12 @@ public sealed class BowAmmunitionSystemConfigurationTests
         try
         {
             var fixture = new BowAmmunitionSamplerTests.Fixture();
-            hud.StartClientSide(fixture.Api.Object); var packing = hud.Registry.GetGroups().Single().Packing;
+            hud.StartClientSide(fixture.Api.Object); var packing = hud.Registry.GetGroups().Single(group => group.Id == "held-item-status").Packing;
             foreach (string key in new[] { "hotbar", "screen-right-bottom", "saturation", "screen-left-top" })
             {
                 config.HeldItemStatusAnchor = key; config.HeldItemStatusOffsetX = 8; config.HeldItemStatusOffsetY = -12;
                 hud.OnConfigReloaded(fixture.Api.Object); hud.OnConfigReloaded(fixture.Api.Object);
-                var group = hud.Registry.GetGroups().Single();
+                var group = hud.Registry.GetGroups().Single(group => group.Id == "held-item-status");
                 Assert.Equal(HudOverlayConfiguration.ResolveHeldItemStatusPlacement(config), group.Placement);
                 Assert.Same(packing, group.Packing);
             }
