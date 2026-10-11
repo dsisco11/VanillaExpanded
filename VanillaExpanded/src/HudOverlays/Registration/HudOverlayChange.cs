@@ -4,7 +4,7 @@ namespace VanillaExpanded.HudOverlays.Registration;
 
 /// <summary>Separates sampled presentation changes from measured-size changes.</summary>
 [Flags]
-internal enum HudOverlayChange
+public enum HudOverlayChange
 {
     None = 0,
     Presentation = 1,

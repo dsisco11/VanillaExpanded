@@ -4,7 +4,7 @@ using Vintagestory.API.Client;
 namespace VanillaExpanded.HudOverlays.Registration;
 
 /// <summary>Borrowed native preparation access plus values used to invalidate presentation resources.</summary>
-internal sealed record HudOverlayPreparationContext
+public sealed record HudOverlayPreparationContext
 {
     public ICoreClientAPI Api { get; }
     public double GuiScale { get; }
