@@ -132,6 +132,32 @@ public sealed class BodyTemperatureOverlayTests : IDisposable
         Assert.Equal(SizeF.Empty, overlay.Measure());
     }
 
+    /// <summary>Samples native timestamps while healthy and clears trend history across entity replacement.</summary>
+    [Fact]
+    public void TrendSurvivesRepeatedPollsAndResetsForReplacementEntity()
+    {
+        var fixture = CreateFixture();
+        using var overlay = new BodyTemperatureOverlay();
+        overlay.BeginSession(fixture.Api.Object);
+        SetTemperature(fixture, 37);
+        fixture.Entity.WatchedAttributes.GetTreeAttribute("bodyTemp").SetDouble("bodyTempUpdateTotalHours", 10);
+        overlay.Refresh();
+        SetTemperature(fixture, 34);
+        fixture.Entity.WatchedAttributes.GetTreeAttribute("bodyTemp").SetDouble("bodyTempUpdateTotalHours", 11);
+        overlay.Refresh();
+        Assert.Equal(-2, overlay.Sample!.Trend);
+        Assert.Equal(HudOverlayChange.None, overlay.Refresh());
+        var replacement = CreateFixture();
+        SetTemperature(replacement, 34);
+        replacement.Entity.WatchedAttributes.GetTreeAttribute("bodyTemp").SetDouble("bodyTempUpdateTotalHours", 12);
+        fixture.Entity = replacement.Entity;
+        overlay.Refresh();
+        Assert.Equal(0, overlay.Sample!.Trend);
+        fixture.Entity.WatchedAttributes.RemoveAttribute("bodyTemp");
+        overlay.Refresh();
+        Assert.Null(overlay.Sample);
+    }
+
     /// <summary>Missing behavior or synchronized tree never fabricates a dangerous zero-temperature reading.</summary>
     [Fact]
     public void MissingDataRemainsHiddenAndNewEntityIsSampled()
