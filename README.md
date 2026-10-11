@@ -25,7 +25,7 @@ Hold the Quick Tools hotkey (assign it in Controls) to open a radial menu of ava
 
 ### Approximate Time
 
-A compact texture icon at the right end of the status group beside the bottom-left edge of the toolbar indicates estimated dawn, morning, noon, afternoon, dusk, or night. Icons follow seasonal daylight and the local solar path. Local sunlight, including sunlight reaching covered spaces, recalibrates the estimate; darkness gradually introduces up to eight hours of error on a normal day. Entering a world seeds an initial estimate even under cover; sunlight later corrects accumulated error. There is no numeric label or background circle. Toggle it live with `EnableApproximateTimeOverlay`.
+A compact texture icon at the right end of the status group beside the bottom-left edge of the toolbar indicates estimated dawn, morning, noon, afternoon, dusk, or night. Icons follow seasonal daylight and the local solar path. Local sunlight, including sunlight reaching covered spaces, recalibrates the estimate; darkness gradually introduces up to eight hours of error on a normal day. The server saves time spent online without sunlight across reconnects and world reloads; sunlight resets it. Multiplayer tracking requires the mod on the server. There is no numeric label or background circle. Toggle it live with `EnableApproximateTimeOverlay`.
 
 ### Weather Conditions
 
