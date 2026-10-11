@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Linq;
+using Cairo;
 using VanillaExpanded.HudOverlays.Registration;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -8,10 +9,11 @@ using Vintagestory.API.Config;
 
 namespace VanillaExpanded.HudOverlays.Rendering;
 
-/// <summary>Owns a cloned item presentation and cached localized contrast text, borrowing all engine icon resources.</summary>
+/// <summary>Owns cloned item content, cached localized contrast text and an optional backdrop, borrowing engine icon resources.</summary>
 internal sealed class HudOverlayIconTextPresentation : IDisposable
 {
     private readonly System.Func<HudOverlayPreparationContext, string, LoadedTexture> createText;
+    private readonly System.Func<HudOverlayPreparationContext, float, LoadedTexture>? createIconBackground;
     private readonly float iconSize;
     private readonly float gap;
     private readonly bool textBeforeIcon;
@@ -20,6 +22,7 @@ internal sealed class HudOverlayIconTextPresentation : IDisposable
     private string key = string.Empty;
     private object[] arguments = Array.Empty<object>();
     private LoadedTexture? text;
+    private LoadedTexture? iconBackground;
     private HudOverlayPreparationContext? context;
     private bool dirty = true;
     private bool disposed;
@@ -29,11 +32,13 @@ internal sealed class HudOverlayIconTextPresentation : IDisposable
     #region Content and preparation
     /// <summary>Uses native contrast text by default, accepting an inert resource factory for focused lifecycle checks.</summary>
     public HudOverlayIconTextPresentation(System.Func<HudOverlayPreparationContext, string, LoadedTexture>? createText = null,
-        float iconSize = 32, bool textBeforeIcon = false, float gap = 6, float? fontSize = null)
+        float iconSize = 32, bool textBeforeIcon = false, float gap = 6, float? fontSize = null, bool circularIconBackground = false,
+        System.Func<HudOverlayPreparationContext, float, LoadedTexture>? createIconBackground = null)
     {
         if (!float.IsFinite(iconSize) || iconSize <= 0) throw new ArgumentOutOfRangeException(nameof(iconSize));
         if (!float.IsFinite(gap) || gap < 0) throw new ArgumentOutOfRangeException(nameof(gap));
         if (fontSize.HasValue && (!float.IsFinite(fontSize.Value) || fontSize.Value <= 0)) throw new ArgumentOutOfRangeException(nameof(fontSize));
+        this.createIconBackground = circularIconBackground ? createIconBackground ?? CreateNativeIconBackground : null;
         this.iconSize = iconSize;
         this.textBeforeIcon = textBeforeIcon;
         this.gap = gap;
@@ -61,6 +66,14 @@ internal sealed class HudOverlayIconTextPresentation : IDisposable
         ObjectDisposedException.ThrowIf(disposed, this);
         ArgumentNullException.ThrowIfNull(preparation);
         if (!dirty && context == preparation) return;
+        // The backdrop depends only on scale and API ownership; count and locale changes reuse it.
+        if (createIconBackground != null && (iconBackground == null || context?.GuiScale != preparation.GuiScale || !ReferenceEquals(context?.Api, preparation.Api)))
+        {
+            LoadedTexture replacementBackground = createIconBackground(preparation, iconSize);
+            LoadedTexture? previousBackground = iconBackground;
+            iconBackground = replacementBackground;
+            previousBackground?.Dispose();
+        }
         // Replace the owned texture only after successful generation, retaining cleanup ownership on failures.
         string localized = Lang.GetL(preparation.Locale, key, arguments);
         LoadedTexture? replacement = string.IsNullOrEmpty(localized) ? null : createText(preparation, localized);
@@ -94,15 +107,20 @@ internal sealed class HudOverlayIconTextPresentation : IDisposable
         }
         if (text != null) renderer.Render2DTexturePremultipliedAlpha(text.TextureId, textX, y + (height - text.Height) / 2,
             text.Width, text.Height, 50);
+        if (slot.Itemstack != null && iconBackground != null)
+            renderer.Render2DTexturePremultipliedAlpha(iconBackground.TextureId, iconX, y + (height - iconSize * scale) / 2,
+                iconSize * scale, iconSize * scale, 49);
         if (slot.Itemstack != null)
             renderer.RenderItemstackToGui(slot, iconX + iconSize * scale / 2, y + height / 2, 50, (float)(iconSize * scale), -1,
                 deltaTime, shading: true, rotate: false, showStackSize: false);
     }
-    /// <summary>Releases session-owned text and sampled copies without disposing borrowed engine resources.</summary>
+    /// <summary>Releases session-owned textures and sampled copies without disposing borrowed engine resources.</summary>
     public void Reset()
     {
         LoadedTexture? previous = text;
+        LoadedTexture? previousBackground = iconBackground;
         text = null;
+        iconBackground = null;
         slot.Itemstack = null;
         iconContent = null;
         key = string.Empty;
@@ -110,7 +128,8 @@ internal sealed class HudOverlayIconTextPresentation : IDisposable
         context = null;
         Size = SizeF.Empty;
         dirty = true;
-        previous?.Dispose();
+        try { previous?.Dispose(); }
+        finally { previousBackground?.Dispose(); }
     }
     /// <summary>Finally releases owned resources exactly once.</summary>
     public void Dispose()
@@ -122,6 +141,27 @@ internal sealed class HudOverlayIconTextPresentation : IDisposable
     #endregion
     #endregion
     #region Private
+    /// <summary>Composes a translucent black circle using the native Cairo texture upload service.</summary>
+    private static LoadedTexture CreateNativeIconBackground(HudOverlayPreparationContext preparation, float diameter)
+    {
+        int pixels = Math.Max(1, (int)Math.Ceiling(diameter * preparation.GuiScale));
+        using var surface = new ImageSurface(Format.Argb32, pixels, pixels);
+        using var drawing = new Context(surface);
+        drawing.SetSourceRGBA(0, 0, 0, .5);
+        drawing.Arc(pixels / 2d, pixels / 2d, pixels / 2d, 0, Math.PI * 2);
+        drawing.Fill();
+        var texture = new LoadedTexture(preparation.Api);
+        try
+        {
+            preparation.Api.Gui.LoadOrUpdateCairoTexture(surface, true, ref texture);
+            return texture;
+        }
+        catch
+        {
+            texture.Dispose();
+            throw;
+        }
+    }
     /// <summary>Creates localized white text with a dark stroke through the borrowed native GUI service.</summary>
     private static LoadedTexture CreateNativeText(HudOverlayPreparationContext preparation, string localized, float? fontSize)
     {
