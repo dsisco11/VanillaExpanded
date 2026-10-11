@@ -103,7 +103,7 @@ public sealed class ToolHeadPresentationMatrixTests
     /// <summary>Resolves real asset inputs for matrix tests.</summary>
     private static ToolHeadPresentationProperties Settings(string json)
     {
-        var item = new Item { Attributes = new JsonObject(new JObject { ["ve-radial-menu-properties"] = JObject.Parse(json) }) };
+        var item = new Item { Attributes = new JsonObject(new JObject { ["ve-item-icon-properties"] = JObject.Parse(json) }) };
         return new ToolHeadPresentationResolver((_, reason) => Assert.Fail(reason)).Resolve(item).Properties!;
     }
     /// <summary>Transforms a point using column-vector indexing rather than production matrix helpers.</summary>

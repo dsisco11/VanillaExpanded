@@ -171,7 +171,7 @@ public sealed class ToolHeadPresentationIntegrationTests : IDisposable
         switch(scenario)
         {
             case "missing": f.Item.Attributes = null; break;
-            case "invalid": f.Item.Attributes = new JsonObject(JObject.Parse("{\"ve-radial-menu-properties\":{\"transform\":{\"scale\":-1}}}")); break;
+            case "invalid": f.Item.Attributes = new JsonObject(JObject.Parse("{\"ve-item-icon-properties\":{\"transform\":{\"scale\":-1}}}")); break;
             case "custom": f.RegisterCustom(); break;
             case "projection": f.Projection[5] = 1; break;
             case "shader": f.Shader.Setup(s => s.HasUniform("alphaTest")).Returns(false); break;
@@ -396,7 +396,7 @@ public sealed class ToolHeadPresentationIntegrationTests : IDisposable
         public readonly Mock<ICoreClientAPI> Api = new();
         public readonly Mock<IRenderAPI> Render = new();
         public readonly Mock<IShaderProgram> Shader = new();
-        public readonly TestItem Item = new() { ItemId = 7, Attributes = new JsonObject(JObject.Parse("{\"ve-radial-menu-properties\":{}}")) };
+        public readonly TestItem Item = new() { ItemId = 7, Attributes = new JsonObject(JObject.Parse("{\"ve-item-icon-properties\":{}}")) };
         public readonly ItemRenderInfo Info = new() { ModelRef = new MultiTextureMeshRef([], []), NormalShaded = true, ApplyColor = true, AlphaTest = 0.05f, DamageEffect = 0.4f };
         public readonly Dictionary<string, float[]> Matrices = new();
         public readonly float[] Projection = new Matrixf().Values;

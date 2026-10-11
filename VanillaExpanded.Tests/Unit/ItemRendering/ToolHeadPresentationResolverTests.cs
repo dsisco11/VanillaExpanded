@@ -41,7 +41,7 @@ public sealed class ToolHeadPresentationResolverTests
     {
         Item item = ItemWith(JObject.Parse(json));
         var stack = new ItemStack(item);
-        stack.Attributes.SetString("ve-radial-menu-properties", "invalid stack override");
+        stack.Attributes.SetString("ve-item-icon-properties", "invalid stack override");
         var settings = Valid(stack.Collectible);
         var t = settings.CreateModelTransform();
         Assert.Equal((rx, ry, rz), (t.Rotation.X, t.Rotation.Y, t.Rotation.Z));
@@ -65,7 +65,7 @@ public sealed class ToolHeadPresentationResolverTests
     {
         Item item = ItemWith(JObject.Parse("{\"transform\":{\"rotation\":{\"x\":25},\"scale\":2}}"));
         var settings = Valid(item);
-        item.Attributes.Token!["ve-radial-menu-properties"]!["transform"]!["rotation"]!["x"] = 99;
+        item.Attributes.Token!["ve-item-icon-properties"]!["transform"]!["rotation"]!["x"] = 99;
         var caller = settings.CreateModelTransform();
         caller.Rotation.X = -10;
         caller.Translation.Y = 100;
@@ -122,9 +122,9 @@ public sealed class ToolHeadPresentationResolverTests
         for (int i = 0; i < 100; i++) resolver.Resolve(first);
         resolver.Resolve(second);
         Assert.Equal(2, warnings);
-        first.Attributes.Token!["ve-radial-menu-properties"] = new JObject();
+        first.Attributes.Token!["ve-item-icon-properties"] = new JObject();
         Assert.Equal(ToolHeadPresentationStatus.Valid, resolver.Resolve(first).Status);
-        first.Attributes.Token!["ve-radial-menu-properties"] = JValue.CreateNull();
+        first.Attributes.Token!["ve-item-icon-properties"] = JValue.CreateNull();
         Assert.Equal(ToolHeadPresentationStatus.Invalid, resolver.Resolve(first).Status);
         Assert.Equal(2, warnings);
     }
@@ -172,7 +172,7 @@ public sealed class ToolHeadPresentationResolverTests
 
     #region Private
     /// <summary>Creates a collectible with dedicated asset properties.</summary>
-    private static Item ItemWith(JToken token) => new() { Attributes = new JsonObject(new JObject { ["ve-radial-menu-properties"] = token }) };
+    private static Item ItemWith(JToken token) => new() { Attributes = new JsonObject(new JObject { ["ve-item-icon-properties"] = token }) };
 
     /// <summary>Checks successful resolution without warning and returns owned settings.</summary>
     private static ToolHeadPresentationProperties Valid(CollectibleObject item)

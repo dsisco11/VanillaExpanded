@@ -2,7 +2,7 @@
   {
     "op": "add",
     "file": "game:itemtypes/tool/bow.json",
-    "path": "/attributes/ve-radial-menu-propertiesByType",
+    "path": "/attributes/ve-item-icon-propertiesByType",
     "value": {
       "bow-simple": {
         "transform": {
