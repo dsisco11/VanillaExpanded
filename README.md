@@ -29,6 +29,8 @@ A compact thermometer appears just left of the toolbar, aligned with its bottom 
 
 Cold warnings follow the game’s synchronized freezing effect: the icon appears while that effect is active, and its blue color deepens with the effect’s intensity. Elevated-temperature warnings use the converted reading and appear in orange above 42°C and red above 44°C for the default player. Vanilla’s normal warmth ceiling does not reach these thresholds. The numeric reading uses the character panel’s temperature conversion, rounded to whole degrees. Heat warnings are informational: the game has no native overheating-damage threshold. A quarter-degree recovery margin prevents the heat warning flickering near its visibility boundary.
 
+While a temperature warning is visible, orange chevrons above the thermometer indicate warming and blue chevrons below indicate cooling. One chevron means slow change; two mean fast change.
+
 The warning uses synchronized body temperature and stays hidden in Creative and Spectator modes. Toggle it through `EnableBodyTemperatureOverlay`, or turn off `ShowBodyTemperatureReading` for the icon alone.
 
 ### Bow Ammunition
