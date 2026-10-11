@@ -14,6 +14,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     private readonly Func<HudOverlayRegistration, bool> isDrawable;
     private readonly Action<HudOverlayRegistration, Exception> failure;
     private readonly Action<Exception>? boundaryFailure;
+    private readonly HudOverlayHoverLabels hoverLabels;
     private readonly Dictionary<string, HudOverlayGroupLayout> groups = new(StringComparer.Ordinal);
     private readonly Dictionary<HudOverlayMemberLayout, ElementBounds> clips = new();
     private HashSet<HudOverlayRegistration> active = new();
@@ -32,6 +33,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         this.isDrawable = isDrawable;
         this.failure = failure;
         this.boundaryFailure = boundaryFailure;
+        hoverLabels = new HudOverlayHoverLabels(api);
     }
     /// <summary>Registers a live session host through the native GUI lifecycle without taking focus.</summary>
     public override bool TryOpen(bool withFocus)
@@ -104,6 +106,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
             {
                 capi.Render.GlTranslate(0, 0, -150);
                 foreach (var pair in Composers) if (groups[pair.Key].Available) pair.Value.Render(deltaTime);
+                hoverLabels.Draw(groups.Values, registration => active.Contains(registration) && isDrawable(registration), deltaTime);
             }
             finally { capi.Render.GlPopMatrix(); active.Clear(); }
         }, boundaryFailure);
@@ -116,6 +119,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         if (disposed) return;
         disposed = true;
         BeforeRender = null;
+        hoverLabels.Dispose();
         try { TryClose(); }
         finally
         {

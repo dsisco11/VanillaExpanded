@@ -12,10 +12,12 @@ public sealed record HudOverlayRegistration
     public string GroupId { get; }
     public int Order { get; }
     public int RefreshIntervalMs { get; }
+    /// <summary>Optional localization key explaining this indicator; the host resolves it in the current locale.</summary>
+    public string? HoverLabelKey { get; }
     #region Public API
-    /// <summary>Defines a namespaced overlay, live enabled selector, group, deterministic order and positive interval.</summary>
+    /// <summary>Defines a namespaced overlay, live enabled selector, group, deterministic order, positive interval and optional localized hover label.</summary>
     public HudOverlayRegistration(string id, IHudOverlay overlay, Func<bool> isEnabled, string groupId, int order = 0,
-        int refreshIntervalMs = DefaultRefreshIntervalMs)
+        int refreshIntervalMs = DefaultRefreshIntervalMs, string? hoverLabelKey = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         int separator = id.IndexOf(':');
@@ -31,6 +33,7 @@ public sealed record HudOverlayRegistration
         GroupId = groupId;
         Order = order;
         RefreshIntervalMs = refreshIntervalMs;
+        HoverLabelKey = hoverLabelKey;
     }
     #endregion
     #region Private

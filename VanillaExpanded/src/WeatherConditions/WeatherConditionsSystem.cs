@@ -34,7 +34,7 @@ internal sealed class WeatherConditionsSystem : ModSystem, ILiveConfigurable
         {
             registration = hud.Registry.Register(new HudOverlayRegistration(OverlayId, overlay,
                 () => overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays
-                    && VanillaExpandedModSystem.Config.EnableWeatherConditionsOverlay), "player-status", refreshIntervalMs: 1000));
+                    && VanillaExpandedModSystem.Config.EnableWeatherConditionsOverlay), "player-status", refreshIntervalMs: 1000, hoverLabelKey: "vanillaexpanded:hud-label-weather-conditions"));
         }
         catch { overlay.Dispose(); throw; }
     }
