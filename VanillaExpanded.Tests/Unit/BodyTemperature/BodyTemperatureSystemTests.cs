@@ -25,7 +25,8 @@ public sealed class BodyTemperatureSystemTests
         Assert.True(feature.ExecuteOrder() > hud.ExecuteOrder());
         hud.StartClientSide(api.Object); feature.StartClientSide(api.Object);
         var group = Assert.Single(hud.Registry.GetGroups(), group => group.Id == "player-status");
-        Assert.Equal("player-status", group.Id); Assert.Equal(HudOverlayDirection.Vertical, group.Packing.Direction);
+        Assert.Equal("player-status", group.Id); Assert.Equal(HudOverlayDirection.Horizontal, group.Packing.Direction);
+        Assert.Equal(HudOverlayCrossAlignment.End, group.Packing.CrossAlignment);
         Assert.Equal(HudOverlayAnchorContext.HotbarTargetId, group.Placement.TargetId);
         Assert.Equal(HudOverlayPoint.LeftBottom, group.Placement.Attachment);
         Assert.Equal(HudOverlayPoint.RightBottom, group.Placement.Pivot);

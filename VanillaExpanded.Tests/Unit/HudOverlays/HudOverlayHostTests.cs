@@ -1,10 +1,12 @@
 using System.Drawing;
 using System.Reflection;
 using Moq;
+using VanillaExpanded.ApproximateTime;
 using VanillaExpanded.HudOverlays.Anchoring;
 using VanillaExpanded.HudOverlays.Layout;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering;
+using VanillaExpanded.HudOverlays.Updating;
 using Vintagestory.API.Client;
 namespace VanillaExpanded.Tests.Unit.HudOverlays;
 /// <summary>Exercises native passive lifecycle and render state restoration without a graphics context.</summary>
@@ -18,6 +20,67 @@ public sealed class HudOverlayHostTests : IDisposable
     /// <summary>Restores the borrowed native GUI global after each check.</summary>
     public void Dispose() => Vintagestory.API.Config.RuntimeEnv.GUIScale = oldScale;
     #region Native lifecycle and drawing
+    /// <summary>Runs native composition after scheduling a zero-size fair-weather member ahead of the time icon.</summary>
+    [Fact]
+    public void FairWeatherSiblingDoesNotSuppressScheduledTimeIcon()
+    {
+        var api = new Mock<ICoreClientAPI>(); var gui = new Mock<IGuiAPI>(); var renderer = new Mock<IRenderAPI>();
+        api.SetupGet(value => value.Gui).Returns(gui.Object); api.SetupGet(value => value.Render).Returns(renderer.Object);
+        api.SetupGet(value => value.Input).Returns(new Mock<IInputAPI>().Object);
+        gui.SetupGet(value => value.LoadedGuis).Returns(new List<GuiDialog>());
+        gui.Setup(value => value.CreateCompo(It.IsAny<string>(), It.IsAny<ElementBounds>())).Returns((string name, ElementBounds bounds) =>
+            (GuiComposer)Activator.CreateInstance(typeof(GuiComposer), BindingFlags.Instance | BindingFlags.NonPublic,
+                null, new object[] { api.Object, bounds, name }, null)!);
+        using var registry = new HudOverlayRegistry();
+        var group = new HudOverlayGroup("weather-status", new HudOverlayPlacement("hotbar", HudOverlayPoint.RightBottom,
+            HudOverlayPoint.LeftBottom, 4, 4), new HudOverlayPacking(HudOverlayDirection.Horizontal));
+        registry.RegisterGroup(group);
+        var weather = new Mock<IHudOverlay>(); var time = new Mock<IHudOverlay>();
+        using var icon = new ApproximateTimePresentation(context => Enumerable.Range(1, 7)
+            .Select(id => new LoadedTexture(context.Api) { TextureId = id, IgnoreUndisposed = true }).ToArray());
+        icon.SetContent(ApproximateTimePeriod.Unknown);
+        time.Setup(value => value.Prepare(It.IsAny<HudOverlayPreparationContext>())).Callback<HudOverlayPreparationContext>(icon.Prepare);
+        time.Setup(value => value.Draw(renderer.Object, It.IsAny<ElementBounds>(), It.IsAny<RectangleF>(), .1f))
+            .Callback<IRenderAPI, ElementBounds, RectangleF, float>((render, bounds, _, _) => icon.Draw(render, bounds));
+        weather.Setup(value => value.IsApplicable()).Returns(true); time.Setup(value => value.IsApplicable()).Returns(true);
+        SizeF weatherSize = SizeF.Empty;
+        weather.Setup(value => value.Measure()).Returns(() => weatherSize); time.Setup(value => value.Measure()).Returns(() => icon.Size);
+        weather.Setup(value => value.Refresh()).Returns(HudOverlayChange.Measurement);
+        registry.Register(new HudOverlayRegistration("mod:weather", weather.Object, () => true, group.Id));
+        registry.Register(new HudOverlayRegistration("mod:time", time.Object, () => true, group.Id, order: 100));
+        registry.BeginSession(api.Object);
+        var anchors = new HudOverlayAnchorContext(new Window(), () => 1, () => new RectangleF(50, 50, 100, 20));
+        anchors.BeginFrame();
+        long now = 0;
+        var scheduler = new HudOverlayScheduler(registry, () => now);
+        scheduler.Update(anchors, new HudOverlayPreparationContext(api.Object, 1, "en"), true);
+        using var layout = new HudOverlayGroupLayout(); layout.Apply(anchors, group, scheduler.GetMembers(group.Id));
+        Assert.Equal(2, layout.Members.Count);
+        var emptyWeather = layout.Members.Single(value => value.Registration.Id == "mod:weather");
+        Assert.Equal(0, emptyWeather.Bounds.OuterWidth); Assert.Equal(0, emptyWeather.Bounds.OuterHeight);
+        var member = layout.Members.Single(value => value.Registration.Id == "mod:time");
+        Assert.Equal(24, member.Bounds.OuterWidth); Assert.Equal(24, member.Bounds.OuterHeight);
+        Assert.Equal(24, member.Clip.Width); Assert.Equal(24, member.Clip.Height);
+        using var host = new HudOverlayHost(api.Object, registry, scheduler.IsDrawable, (_, error) => throw error);
+        host.Synchronize(new Dictionary<string, HudOverlayGroupLayout> { [group.Id] = layout });
+        host.TryOpen(false); host.OnRenderGUI(.1f);
+        time.Verify(value => value.Draw(renderer.Object, member.Bounds, member.Clip, .1f), Times.Once);
+        weather.Verify(value => value.Draw(It.IsAny<IRenderAPI>(), It.IsAny<ElementBounds>(), It.IsAny<RectangleF>(), It.IsAny<float>()), Times.Never);
+        renderer.Verify(value => value.RenderTexture(1, It.IsAny<double>(), It.IsAny<double>(), 24, 24, 50, null), Times.Once);
+        // Resize the already composed group through rain and fair weather without replacing its native composer.
+        var composer = host.Composers[group.Id];
+        foreach (SizeF nextSize in new[] { new SizeF(24, 24), SizeF.Empty })
+        {
+            weatherSize = nextSize; now += 1000; anchors.BeginFrame();
+            scheduler.Update(anchors, new HudOverlayPreparationContext(api.Object, 1, "en"), true);
+            layout.Apply(anchors, group, scheduler.GetMembers(group.Id));
+            host.Synchronize(new Dictionary<string, HudOverlayGroupLayout> { [group.Id] = layout });
+            Assert.Same(composer, host.Composers[group.Id]);
+            Assert.Equal(24, layout.Members.Single(value => value.Registration.Id == "mod:time").Clip.Width);
+            host.OnRenderGUI(.1f);
+        }
+        renderer.Verify(value => value.RenderTexture(1, It.IsAny<double>(), It.IsAny<double>(), 24, 24, 50, null), Times.Exactly(3));
+    }
     /// <summary>Native open/close registration remains focus-free and final cleanup is idempotent.</summary>
     [Fact]
     public void NativeLifecycleDeclinesInputAndClosesBeforeDisposal()

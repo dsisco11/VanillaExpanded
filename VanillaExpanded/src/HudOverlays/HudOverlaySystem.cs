@@ -2,6 +2,7 @@ using System;
 using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Anchoring;
 using VanillaExpanded.HudOverlays.Lifecycle;
+using VanillaExpanded.HudOverlays.Layout;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.ModSystems;
 using Vintagestory.API.Client;
@@ -32,10 +33,8 @@ internal sealed class HudOverlaySystem : ModSystem, ILiveConfigurable
             HudOverlayConfiguration.ResolveHeldItemStatusPlacement(VanillaExpandedModSystem.Config)));
         Registry.RegisterGroup(new HudOverlayGroup("player-status",
             new HudOverlayPlacement(HudOverlayAnchorContext.HotbarTargetId,
-                HudOverlayPoint.LeftBottom, HudOverlayPoint.RightBottom, 0, 4)));
-        Registry.RegisterGroup(new HudOverlayGroup("weather-status",
-            new HudOverlayPlacement(HudOverlayAnchorContext.HotbarTargetId,
-                HudOverlayPoint.RightBottom, HudOverlayPoint.LeftBottom, 4, 4)));
+                HudOverlayPoint.LeftBottom, HudOverlayPoint.RightBottom, 0, 4),
+            new HudOverlayPacking(HudOverlayDirection.Horizontal, crossAlignment: HudOverlayCrossAlignment.End)));
         session = new HudOverlaySession(api, Registry, enabled: () => VanillaExpandedModSystem.Config.EnableHudOverlays);
         api.Event.LevelFinalize += session.EnterWorld;
         api.Event.LeaveWorld += session.LeaveWorld;
