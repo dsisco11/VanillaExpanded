@@ -25,6 +25,17 @@ public sealed class ToolHeadPresentationMatrixTests
         AssertPoint(m, 1.5f, 1.5f, 0.5f, 123 + size, 234 - size, 100);
     }
 
+    /// <summary>Caller depth moves the model pivot without altering authored presentation or screen placement.</summary>
+    [Theory]
+    [InlineData(49d)]
+    [InlineData(50d)]
+    [InlineData(100d)]
+    public void ExplicitDepthPreservesPivotPlacement(double depth)
+    {
+        Assert.True(ToolHeadPresentationMatrix.TryCreate(Settings("{}"), 123, 234, 24, 0, out var matrix, depth));
+        AssertPoint(matrix, .5f, .5f, .5f, 123, 234, (float)depth);
+    }
+
     /// <summary>Checks clockwise screen angles around the anchor and authored offset.</summary>
     [Theory]
     [InlineData(0d, 0f, 0f, -40f)]
