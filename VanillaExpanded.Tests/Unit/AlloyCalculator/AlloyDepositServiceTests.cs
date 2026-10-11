@@ -15,6 +15,70 @@ namespace VanillaExpanded.Tests.Unit.AlloyCalculator;
 [Trait("Category", "Unit")]
 public class AlloyDepositServiceTests
 {
+    /// <summary>Verifies smaller copper-bit supplies are consumed before nuggets, with separate slots and exact totals.</summary>
+    [Theory]
+    [InlineData(800, false)]
+    [InlineData(800, true)]
+    [InlineData(90, false)]
+    public void CreateAndExecutePlan_MixedCopperForms_DepositsExactAmount(int nuggetAmount, bool bitsAfterNuggets)
+    {
+        TestContext context = CreateContext(backpackAmount: 10);
+        MockItem nugget = CreateItem(context.Fixture, 30, "nugget-copper");
+        nugget.CombustibleProps = context.Fixture.BackpackInventory[0].Itemstack!.Collectible.CombustibleProps;
+        // Model the supply across ordinary inventory stacks, including the reported 800-nugget case.
+        int remaining = nuggetAmount;
+        ItemSlot[] supplySlots = context.Fixture.BackpackInventory.Concat(context.Fixture.HotbarInventory).ToArray();
+        for (int index = 1; remaining > 0; index++)
+        {
+            int amount = Math.Min(64, remaining);
+            supplySlots[index].Itemstack = new ItemStack(nugget, amount);
+            remaining -= amount;
+        }
+        ItemSlot bitSource = supplySlots[0];
+        if (bitsAfterNuggets)
+        {
+            // Priority follows stack size even when the bit stack appears later in inventory order.
+            supplySlots[^1].Itemstack = bitSource.Itemstack;
+            bitSource.Itemstack = null;
+            bitSource = supplySlots[^1];
+        }
+
+        Assert.Equal(nuggetAmount + 10, supplySlots.Where(static slot => slot.CanTake()).Sum(static slot => slot.StackSize));
+        Assert.True(context.Ingredient.ResolvedStack.Equals(context.Fixture.World,
+            nugget.CombustibleProps.SmeltedStack.ResolvedItemstack));
+
+        Assert.Equal(AlloyDepositResultCode.Success, AlloyDepositService.CreatePlan(
+            context.Fixture.ClientApi, context.Firepit, [context.Ingredient],
+            new Dictionary<int, ItemStack> { [0] = new(context.Ingot, 100) },
+            context.Fixture.Player, out AlloyDepositPlan? plan));
+        Assert.Equal(AlloyDepositResultCode.Success, AlloyDepositService.ExecutePlan(
+            context.Fixture.ClientApi, context.Firepit, plan!, context.Fixture.Player));
+        Assert.Equal(100, context.Inventory.CookingSlots.Sum(static slot => slot.StackSize));
+        Assert.True(bitSource.Empty);
+        Assert.Equal("metalbit-copper", context.Inventory.CookingSlots[0].Itemstack!.Collectible.Code.Path);
+        Assert.Equal(10, context.Inventory.CookingSlots[0].StackSize);
+        Assert.Equal(90, context.Inventory.CookingSlots
+            .Where(slot => slot.Itemstack?.Collectible.Code == nugget.Code).Sum(static slot => slot.StackSize));
+        Assert.Equal(nuggetAmount - 90, supplySlots.Sum(static slot => slot.StackSize));
+    }
+
+    /// <summary>Verifies incompatible forms cannot partially fill a plan with too few assigned slots.</summary>
+    [Fact]
+    public void ExecutePlan_MixedFormsCannotFit_RejectsBeforeTransfers()
+    {
+        TestContext context = CreateContext(backpackAmount: 10);
+        MockItem nugget = CreateItem(context.Fixture, 30, "nugget-copper");
+        nugget.CombustibleProps = context.Fixture.BackpackInventory[0].Itemstack!.Collectible.CombustibleProps;
+        context.Fixture.BackpackInventory[1].Itemstack = new ItemStack(nugget, 20);
+        var plan = new AlloyDepositPlan([new AlloyDepositSlotTarget(0, context.Ingredient, 25)]);
+
+        Assert.Equal(AlloyDepositResultCode.InsufficientSpace, AlloyDepositService.ExecutePlan(
+            context.Fixture.ClientApi, context.Firepit, plan, context.Fixture.Player));
+        Assert.All(context.Inventory.CookingSlots, static slot => Assert.True(slot.Empty));
+        Assert.Equal(30, context.Fixture.BackpackInventory.Sum(static slot => slot.StackSize));
+        context.Fixture.ClientNetworkMock!.Verify(network => network.SendPacketClient(It.IsAny<object>()), Times.Never);
+    }
+
     /// <summary>Verifies that planning rejects a firepit inventory that is not open.</summary>
     [Fact]
     public void CreatePlan_InventoryClosed_ReturnsInventoryClosed()
