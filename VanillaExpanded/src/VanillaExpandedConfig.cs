@@ -98,6 +98,9 @@ public class VanillaExpandedConfig
     /// <summary>Shows a whole-degree reading beside the thermometer; disabling retains the dynamic icon.</summary>
     public bool ShowBodyTemperatureReading { get; set; } = true;
 
+    /// <summary>Shows texture icons for active local precipitation and weather fog.</summary>
+    public bool EnableWeatherConditionsOverlay { get; set; } = true;
+
     private string heldItemStatusAnchor = "saturation";
     /// <summary>Selects a stable anchor key; numeric ConfigLib events and unknown keys are normalized for persistence.</summary>
     public string HeldItemStatusAnchor
