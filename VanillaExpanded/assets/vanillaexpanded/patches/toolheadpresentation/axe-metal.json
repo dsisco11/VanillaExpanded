@@ -2,7 +2,7 @@
   {
     "op": "add",
     "file": "game:itemtypes/tool/axe-metal.json",
-    "path": "/attributes/ve-radial-menu-propertiesByType",
+    "path": "/attributes/ve-item-icon-propertiesByType",
     "value": {
       "axe-scrap-scrap": {
         "transform": {

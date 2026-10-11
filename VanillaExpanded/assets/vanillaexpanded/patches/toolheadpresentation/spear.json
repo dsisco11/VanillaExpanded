@@ -2,7 +2,7 @@
   {
     "op": "add",
     "file": "game:itemtypes/tool/spear.json",
-    "path": "/attributes/ve-radial-menu-propertiesByType",
+    "path": "/attributes/ve-item-icon-propertiesByType",
     "value": {
       "@spear-generic-(chert|granite|andesite|basalt|obsidian|peridotite|flint)": {
         "transform": {

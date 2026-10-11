@@ -2,7 +2,7 @@
   {
     "op": "add",
     "file": "game:itemtypes/tool/scythe.json",
-    "path": "/attributes/ve-radial-menu-properties",
+    "path": "/attributes/ve-item-icon-properties",
     "value": {
       "transform": {
         "origin": {

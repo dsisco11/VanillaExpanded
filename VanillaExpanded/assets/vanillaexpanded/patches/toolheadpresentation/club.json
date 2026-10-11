@@ -2,7 +2,7 @@
   {
     "op": "add",
     "file": "game:itemtypes/tool/club.json",
-    "path": "/attributes/ve-radial-menu-propertiesByType",
+    "path": "/attributes/ve-item-icon-propertiesByType",
     "value": {
       "club-generic-wood": {
         "transform": {
