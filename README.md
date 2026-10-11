@@ -27,7 +27,7 @@ Hold the Quick Tools hotkey (assign it in Controls) to open a radial menu of ava
 
 While holding a supported base-game bow in your main hand, a compact `<count>x <arrow icon>` indicator shows the next arrow type and its total positive quantity in inventories eligible for bow selection.
 
-The default placement is just above the saturation meter, aligned with its left edge. With no eligible arrows, it shows a muted arrow symbol and localized `No arrows / 0`. Unsupported custom or derived bows hide the indicator.
+The arrow icon has a translucent black circular background. The default placement is just above the saturation meter, aligned with its left edge. With no eligible arrows, it shows a muted arrow symbol and localized `No arrows / 0`. Unsupported custom or derived bows hide the indicator.
 
 ### New Hotkeys
 
