@@ -64,7 +64,7 @@ internal sealed class ApproximateTimeOverlay : IHudOverlay
         if (!applicable) Clear();
         return applicable;
     }
-    /// <summary>Samples the native calendar and overhead cover outside the drawing path.</summary>
+    /// <summary>Samples the native calendar and local sunlight outside the drawing path.</summary>
     public HudOverlayChange Refresh()
     {
         if (!IsApplicable()) return HudOverlayChange.None;
@@ -76,17 +76,15 @@ internal sealed class ApproximateTimeOverlay : IHudOverlay
         }
         var calendar = api.World.Calendar;
         var pos = current.Pos.AsBlockPos;
-        // Rain-map exposure is the game's inexpensive overhead-cover test. At night the clock drifts,
-        // even outdoors; torches and other artificial lights cannot calibrate it.
-        bool skyVisible = api.World.BlockAccessor.GetRainMapHeightAt(pos) <= pos.Y;
-        bool sunVisible = calendar.SunPositionNormalized.Y > 0 && skyVisible;
+        // Local propagated sunlight can reach windows and covered spaces. Block light is excluded,
+        // and solar intensity prevents moonlit nights from recalibrating the personal clock.
+        bool sunVisible = api.World.BlockAccessor.GetLightLevel(pos, EnumLightLevelType.OnlySunLight) > 0
+            && calendar.SunLightStrength >= .1f;
         estimate.Observe(calendar.TotalHours, calendar.HourOfDay, calendar.HoursPerDay, sunVisible, current.EntityId);
         var next = ApproximateTimePeriod.Unknown;
-        double? observedDayOffset = estimate.EstimatedDayOffset ?? (skyVisible ? 0d : null);
+        double? observedDayOffset = estimate.EstimatedDayOffset;
         if (observedDayOffset is double dayOffset)
         {
-            // Open sky reveals night or twilight even before a daylight calibration. Under cover,
-            // an uncalibrated character still has no observation from which to choose an icon.
             // Ask the native calendar for the seasonal solar path at the remembered time, not the true
             // current time. Drift therefore still affects the icon while away from sunlight.
             double estimatedDay = calendar.TotalDays + dayOffset;
@@ -107,6 +105,9 @@ internal sealed class ApproximateTimeOverlay : IHudOverlay
                 height,
                 calendar.GetSunPosition(location, estimatedDay + .02).Y, solarIntensity);
         }
+        // A transient invalid calendar sample must not replace a valid icon with an hourglass.
+        // Before the first usable sample, leave the presentation empty and retry next refresh.
+        if (next == ApproximateTimePeriod.Unknown) return HudOverlayChange.None;
         if (next == period) return HudOverlayChange.None;
         period = next;
         presentation.SetContent(next);

@@ -1,6 +1,6 @@
 {
   "config-enable-approximate-time-overlay": "Show approximate time",
-  "config-enable-approximate-time-overlay-tooltip": "Shows a time-of-day icon to the right of the other status icons beside the left edge of the toolbar. Daylight outdoors calibrates the estimate; shelter and night gradually introduce error. Applies immediately.",
+  "config-enable-approximate-time-overlay-tooltip": "Shows a time-of-day icon to the right of the other status icons beside the left edge of the toolbar. Local sunlight calibrates the estimate, including covered spaces; darkness gradually introduces error. Applies immediately.",
   "config-animal-sex-indicator-opacity": "Symbol opacity",
   "config-animal-sex-indicator-opacity-tooltip": "Maximum opacity before distance fading. Default: 75%.",
   "config-animal-male-icon-color": "Male symbol RGB color",
