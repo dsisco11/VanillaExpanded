@@ -1,4 +1,9 @@
 {
+  "hud-label-bow-ammunition": "Bow Ammunition",
+  "hud-label-body-temperature": "Body Temperature",
+  "hud-label-weather-conditions": "Weather Conditions",
+  "hud-label-approximate-time": "Approximate Time",
+  "hud-label-rift-activity": "Temporal Rift Activity",
   "config-enable-approximate-time-overlay": "Show approximate time",
   "config-enable-approximate-time-overlay-tooltip": "Shows a time-of-day icon to the right of the other status icons beside the left edge of the toolbar. Local sunlight calibrates the estimate, including covered spaces; darkness gradually introduces error. Applies immediately.",
   "config-animal-sex-indicator-opacity": "Symbol opacity",
