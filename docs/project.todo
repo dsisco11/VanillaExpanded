@@ -1,5 +1,7 @@
 # Vanilla: Expanded TODO List:
     ## Issues:
+        ☐ Alloy calculator should prefer using fuels with the lowest burning temperature.
+        ☐ Alloy calculator has bug: will try to use copper bits and if it cant cover the full cost, it fails instead of using other available materials.
         ☐ Fix cave-art tool-mode menu. all of the options are extremely tiny because there are so many.
 
     ## New Features:
