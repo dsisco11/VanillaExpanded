@@ -11,7 +11,7 @@ namespace VanillaExpanded.Tests.Unit.ApproximateTime;
 public sealed class ApproximateTimeServerSystemTests
 {
     #region Public API
-    /// <summary>Only online elapsed time accumulates, local sunlight resets it, and disposal removes the listener.</summary>
+    /// <summary>Deferred calendar startup preserves saved age, online time accumulates, and disposal removes the listener.</summary>
     [Fact]
     public void OnlineObservationAndListenerLifecycle()
     {
@@ -22,13 +22,14 @@ public sealed class ApproximateTimeServerSystemTests
         var events = new Mock<IServerEventAPI>();
         var calendar = new Mock<IGameCalendar>();
         var blocks = new Mock<IBlockAccessor>();
-        double hours = 0;
+        double hours = 1000;
+        IGameCalendar? availableCalendar = null;
         int localSunlight = 0;
         IPlayer[] online = [fixture.Player.Object];
         Action<float>? tick = null;
         api.SetupGet(x => x.World).Returns(world.Object);
         api.SetupGet(x => x.Event).Returns(events.Object);
-        world.SetupGet(x => x.Calendar).Returns(calendar.Object);
+        world.SetupGet(x => x.Calendar).Returns(() => availableCalendar!);
         world.SetupGet(x => x.BlockAccessor).Returns(blocks.Object);
         world.SetupGet(x => x.AllOnlinePlayers).Returns(() => online);
         calendar.SetupGet(x => x.TotalHours).Returns(() => hours);
@@ -45,6 +46,20 @@ public sealed class ApproximateTimeServerSystemTests
             Assert.False(system.ShouldLoad(EnumAppSide.Client));
             system.StartServerSide(api.Object);
             Assert.NotNull(tick);
+            // Startup and early ticks precede calendar creation and must preserve the persisted counter.
+            ApproximateTimeState.Update(fixture.Entity, 4, false);
+            tick!(1);
+            Assert.Equal(4, ApproximateTimeState.Read(fixture.Entity));
+            availableCalendar = calendar.Object;
+            tick(1);
+            Assert.Equal(4, ApproximateTimeState.Read(fixture.Entity));
+            hours = 1002;
+            tick(1);
+            Assert.Equal(6, ApproximateTimeState.Read(fixture.Entity));
+            // Begin the existing sunlight/online lifecycle scenario with a fresh counter and clock.
+            ApproximateTimeState.Update(fixture.Entity, 0, true);
+            hours = 0;
+            tick(1);
             hours = 2;
             tick!(1);
             Assert.Equal(2, ApproximateTimeState.Read(fixture.Entity));
@@ -80,6 +95,7 @@ public sealed class ApproximateTimeServerSystemTests
         try
         {
             restarted.StartServerSide(api.Object);
+            tick!(1);
             hours = 21;
             tick!(1);
             Assert.Equal(2, ApproximateTimeState.Read(fixture.Entity));
