@@ -5,7 +5,7 @@ using Vintagestory.API.Common;
 
 namespace VanillaExpanded.ItemRendering;
 
-/// <summary>Prepares and submits configured radial items directly, leaving ordinary engine draws untouched.</summary>
+/// <summary>Prepares and submits configured GUI items directly, leaving ordinary engine draws untouched.</summary>
 internal sealed class ToolHeadPresentationRenderer
 {
     private readonly ICoreClientAPI api;
@@ -25,14 +25,14 @@ internal sealed class ToolHeadPresentationRenderer
             api.Logger.Warning("[VanillaExpanded] Invalid radial presentation for {0}: {1}", collectible.Code, reason));
     }
 
-    /// <summary>Returns false only before preparation so the caller can safely use ordinary engine fallback.</summary>
-    internal bool TryRender(ICoreClientAPI caller, ItemSlot slot, double x, double y, float size, double wedgeDegrees)
+    /// <summary>Renders at the caller's depth; returns false only before preparation so ordinary engine fallback is safe.</summary>
+    internal bool TryRender(ICoreClientAPI caller, ItemSlot slot, double x, double y, float size, double wedgeDegrees, double z = 100)
     {
         if (!ReferenceEquals(api, caller) || slot.Itemstack is not { } stack) return false;
         var collectible = stack.Collectible;
         var result = resolver.Resolve(collectible);
         if (result.Properties is not { } properties || !eligibility.Supports(collectible)
-            || !ToolHeadPresentationMatrix.TryCreate(properties, x, y, size, wedgeDegrees, out float[] model)) return false;
+            || !ToolHeadPresentationMatrix.TryCreate(properties, x, y, size, wedgeDegrees, out float[] model, z)) return false;
         IShaderProgram shader = api.Render.GetEngineShader(EnumShaderProgram.Gui);
         if (!IsReady(shader)) return false;
         // Capture before callbacks so nested draws and animation updates restore their caller.
@@ -68,7 +68,7 @@ internal sealed class ToolHeadPresentationRenderer
         => ReferenceEquals(slot.Itemstack, stack) && ReferenceEquals(stack.Collectible, collectible)
             && eligibility.Supports(collectible) && IsReady(shader);
 
-    /// <summary>Requires the menu's active GUI shader and the uniforms needed by ordinary mesh effects.</summary>
+    /// <summary>Requires the caller's active GUI shader and the uniforms needed by ordinary mesh effects.</summary>
     private bool IsReady(IShaderProgram? shader)
     {
         if (shader is null || shader.Disposed || shader.LoadError || shader.ClampTexturesToEdge
