@@ -16,13 +16,14 @@ namespace VanillaExpanded.Tests.Unit.ApproximateTime;
 public sealed class ApproximateTimeOverlayTests
 {
     #region Public API
-    /// <summary>Cover and night prevent calibration, daylight restores it, and drawing performs no sampling.</summary>
+    /// <summary>Rendering consumes saved observation age without client terrain sampling or lifetime mutation.</summary>
     [Fact]
     public void SunlightSamplingAndLifecycle()
     {
         var fixture = new BowAmmunitionSamplerTests.Fixture();
         fixture.Entity.Alive = true;
         fixture.Entity.EntityId = 2;
+        ApproximateTimeState.Update(fixture.Entity, 4, false);
         var calendar = new Mock<IClientGameCalendar>();
         double hours = 8;
         var sun = new Vec3f(0, 1, 0);
@@ -96,6 +97,8 @@ public sealed class ApproximateTimeOverlayTests
         fixture.Entity.Alive = false;
         Assert.False(overlay.IsApplicable()); Assert.Equal(SizeF.Empty, overlay.Measure());
         overlay.EndSession(); Assert.False(overlay.IsApplicable());
+        Assert.Equal(4, ApproximateTimeState.Read(fixture.Entity));
+        blocks.Verify(x => x.GetLightLevel(It.IsAny<BlockPos>(), It.IsAny<EnumLightLevelType>()), Times.Never);
     }
     #endregion
 }
