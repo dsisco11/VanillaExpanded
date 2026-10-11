@@ -35,7 +35,7 @@ internal static class AlloyFuelDepositService
         return CreatePlan(api, firepit, api.World.Player.InventoryManager, out plan);
     }
 
-    /// <summary>Creates and validates a minimal-fuel plan against the supplied inventory manager.</summary>
+    /// <summary>Plans the coolest sufficient fuel, minimizing its amount, against the supplied inventory manager.</summary>
     internal static AlloyDepositResultCode CreatePlan(
         ICoreClientAPI api,
         BlockEntityFirepit firepit,
@@ -80,6 +80,7 @@ internal static class AlloyFuelDepositService
 
         ItemStack? bestStack = null;
         int bestAmount = 0;
+        int bestTemperature = int.MaxValue;
         foreach (ItemStack stack in candidates)
         {
             if (!IsSuitableFuel(world, stack, meltingPoint, firepit.HeatModifier)) continue;
@@ -107,10 +108,14 @@ internal static class AlloyFuelDepositService
             }
             if (required > available || required > stack.Collectible.MaxStackSize) continue;
 
-            if (bestStack is null || required < bestAmount)
+            // Preserve hotter fuels when a cooler candidate can complete the melt; minimize count only at equal heat.
+            if (bestStack is null
+                || properties.BurnTemperature < bestTemperature
+                || (properties.BurnTemperature == bestTemperature && required < bestAmount))
             {
                 bestStack = stack;
                 bestAmount = required;
+                bestTemperature = properties.BurnTemperature;
             }
         }
 

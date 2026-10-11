@@ -91,7 +91,10 @@ internal static class AlloyDepositService
             return AlloyDepositResultCode.InsufficientItems;
         }
 
-        plan = createdPlan;
+        plan = AlloyDepositStackPlanner.Resolve(api.World, createdPlan, inventory.CookingSlots,
+            externalSlots.Where(AlloyTransferInventoryPolicy.CanWithdraw).Concat(inventory.CookingSlots),
+            (stack, ingredient) => SmeltsInto(api.World, stack, ingredient.ResolvedStack));
+        if (plan is null) return AlloyDepositResultCode.InsufficientSpace;
         return AlloyDepositResultCode.Success;
     }
 
@@ -136,6 +139,13 @@ internal static class AlloyDepositService
             return AlloyDepositResultCode.InsufficientItems;
         }
 
+        // Resolve again from live supplies so every slot receives a single merge-compatible form before any movement.
+        AlloyDepositPlan? resolvedPlan = AlloyDepositStackPlanner.Resolve(api.World, plan, inventory.CookingSlots,
+            externalSlots.Where(AlloyTransferInventoryPolicy.CanWithdraw).Concat(inventory.CookingSlots),
+            (stack, ingredient) => SmeltsInto(api.World, stack, ingredient.ResolvedStack));
+        if (resolvedPlan is null) return AlloyDepositResultCode.InsufficientSpace;
+        plan = resolvedPlan;
+
         var retainedAmounts = new int[inventory.CookingSlots.Length];
         for (int slotIndex = 0; slotIndex < inventory.CookingSlots.Length; slotIndex++)
         {
@@ -145,7 +155,7 @@ internal static class AlloyDepositService
                 inventoryManager,
                 inventory.CookingSlots[slotIndex],
                 externalSlots,
-                stack => target is not null && SmeltsInto(api.World, stack, target.Ingredient.ResolvedStack),
+                stack => target is not null && MatchesTarget(api.World, stack, target),
                 target?.Amount ?? 0,
                 out retainedAmounts[slotIndex],
                 () => inventoryManager.OpenedInventories.Contains(inventory),
@@ -163,7 +173,7 @@ internal static class AlloyDepositService
                 inventoryManager,
                 inventory.CookingSlots[target.SlotIndex],
                 externalSlots,
-                stack => SmeltsInto(api.World, stack, target.Ingredient.ResolvedStack),
+                stack => MatchesTarget(api.World, stack, target),
                 target.Amount - retainedAmounts[target.SlotIndex],
                 () => inventoryManager.OpenedInventories.Contains(inventory),
                 slot => AlloyTransferInventoryPolicy.IsCurrentExternalSlot(api.World, inventoryManager, inventory, slot));
@@ -179,6 +189,13 @@ internal static class AlloyDepositService
     #endregion
 
     #region Private
+
+    /// <summary>Requires both the desired metal output and the concrete stack form selected for this slot.</summary>
+    private static bool MatchesTarget(IWorldAccessor world, ItemStack stack, AlloyDepositSlotTarget target)
+    {
+        return SmeltsInto(world, stack, target.Ingredient.ResolvedStack)
+            && (target.DesiredStack is null || target.DesiredStack.Equals(world, stack, GlobalConstants.IgnoredStackAttributes));
+    }
 
     /// <summary>Determines whether a source stack smelts into the desired metal ingredient.</summary>
     private static bool SmeltsInto(IWorldAccessor world, ItemStack source, ItemStack target)

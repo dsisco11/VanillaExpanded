@@ -14,6 +14,35 @@ namespace VanillaExpanded.Tests.Unit.AlloyCalculator;
 [Trait("Category", "Unit")]
 public class AlloyFuelDepositServiceTests
 {
+    /// <summary>Verifies cooler fuel wins despite needing more items, with fallback when it cannot supply the melt.</summary>
+    [Theory]
+    [InlineData(1100, 64, true)]
+    [InlineData(1100, 1, false)]
+    [InlineData(900, 64, false)]
+    public void CreatePlan_CoolerFuel_PrefersSufficientSuitableSupply(int temperature, int amount, bool prefersCooler)
+    {
+        TestContext context = CreateContext(currentFuelAmount: 64);
+        MockItem coolerFuel = CreateFuel(context.Fixture, 2, "cooler-fuel");
+        coolerFuel.CombustibleProps.BurnTemperature = temperature;
+        coolerFuel.CombustibleProps.BurnDuration = 10;
+        context.Fixture.BackpackInventory[0].Itemstack = new ItemStack(coolerFuel, amount);
+
+        AlloyDepositResultCode result = AlloyFuelDepositService.CreatePlan(
+            context.Fixture.ClientApi, context.Firepit, context.Fixture.Player, out AlloyFuelDepositPlan? plan);
+
+        Assert.Equal(AlloyDepositResultCode.Success, result);
+        AlloyFuelDepositPlan createdPlan = Assert.IsType<AlloyFuelDepositPlan>(plan);
+        Assert.Equal(prefersCooler ? coolerFuel.Code : context.Fuel.Code, createdPlan.DesiredStack.Collectible.Code);
+        if (prefersCooler)
+        {
+            // The preference must override the previous policy of minimizing item count across different fuels.
+            context.Fixture.BackpackInventory[0].Itemstack = null;
+            Assert.Equal(AlloyDepositResultCode.Success, AlloyFuelDepositService.CreatePlan(
+                context.Fixture.ClientApi, context.Firepit, context.Fixture.Player, out AlloyFuelDepositPlan? hotterPlan));
+            Assert.True(createdPlan.DesiredAmount > hotterPlan!.DesiredAmount);
+        }
+    }
+
     /// <summary>Verifies fuel eligibility against metal temperature, burn duration, and effective firepit heat.</summary>
     [Theory]
     [InlineData(900, 40, 1, false)]
