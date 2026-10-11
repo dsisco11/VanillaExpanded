@@ -35,7 +35,7 @@ internal sealed class BodyTemperatureSystem : ModSystem, ILiveConfigurable
         {
             registration = hud.Registry.Register(new HudOverlayRegistration(OverlayId, overlay,
                 () => overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays
-                    && VanillaExpandedModSystem.Config.EnableBodyTemperatureOverlay), "player-status", refreshIntervalMs: 250));
+                    && VanillaExpandedModSystem.Config.EnableBodyTemperatureOverlay), "player-status", refreshIntervalMs: 250, hoverLabelKey: "vanillaexpanded:hud-label-body-temperature"));
         }
         catch { overlay.Dispose(); throw; }
     }

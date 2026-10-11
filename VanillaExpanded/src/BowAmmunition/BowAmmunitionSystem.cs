@@ -34,7 +34,7 @@ internal sealed class BowAmmunitionSystem : ModSystem, ILiveConfigurable
         {
             registration = hud.Registry.Register(new HudOverlayRegistration(OverlayId, overlay,
                 () => overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays
-                    && VanillaExpandedModSystem.Config.EnableBowAmmunitionOverlay), "held-item-status", refreshIntervalMs: 250));
+                    && VanillaExpandedModSystem.Config.EnableBowAmmunitionOverlay), "held-item-status", refreshIntervalMs: 250, hoverLabelKey: "vanillaexpanded:hud-label-bow-ammunition"));
         }
         catch { overlay.Dispose(); throw; }
     }
