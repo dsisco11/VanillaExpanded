@@ -20,6 +20,8 @@ internal sealed class BodyTemperatureThermometerPresentation : IDisposable
     private bool showReading;
     private readonly ElementBounds fillClip = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
     private readonly Vec4f tint = new(1, 1, 1, 1);
+    private readonly Vec4f warmingTint = new(1, .65f, .2f, 1);
+    private readonly Vec4f coolingTint = new(.25f, .6f, 1, 1);
     public SizeF Size { get; private set; }
 
     #region Public API
@@ -59,7 +61,7 @@ internal sealed class BodyTemperatureThermometerPresentation : IDisposable
         }
         context = preparation;
         if (showReading) text.Prepare(preparation);
-        Size = new SizeF(IconWidth + (showReading ? Gap + text.Size.Width : 0), Math.Max(IconHeight, showReading ? text.Size.Height : 0));
+        Size = new SizeF(IconWidth + (showReading ? Gap + text.Size.Width : 0), Math.Max(IconHeight + (sample.Trend != 0 ? 22 : 0), showReading ? text.Size.Height : 0));
     }
     /// <summary>Draws the tinted full mask through a fill scissor, then the outline through native texture rendering within the host clip.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime)
@@ -81,6 +83,17 @@ internal sealed class BodyTemperatureThermometerPresentation : IDisposable
             finally { renderer.PopScissor(); }
         }
         renderer.RenderTexture(icons[0].TextureId, x, y, IconWidth * scale, IconHeight * scale, 50);
+        if (sample.Trend != 0)
+        {
+            // Reserve both ends in measurement so reversing direction keeps the thermometer stationary.
+            bool warming = sample.Trend > 0;
+            for (int index = 0; index < Math.Abs(sample.Trend); index++)
+            {
+                double arrowY = warming ? y - (6 + index * 5) * scale : y + (IconHeight + 2 + index * 5) * scale;
+                renderer.RenderTexture(icons[warming ? 2 : 3].TextureId, x + 3 * scale, arrowY,
+                    8 * scale, 4 * scale, 50, warming ? warmingTint : coolingTint);
+            }
+        }
         if (showReading)
         {
             // Use an independent cached bounds object only for the text's native draw coordinates.
@@ -124,7 +137,13 @@ internal sealed class BodyTemperatureThermometerPresentation : IDisposable
         // The engine cache owns these textures; wrapper finalizers must not report intentional borrowing as a leak.
         outline.IgnoreUndisposed = true;
         mask.IgnoreUndisposed = true;
-        return [outline, mask];
+        var up = new LoadedTexture(preparation.Api);
+        var down = new LoadedTexture(preparation.Api);
+        preparation.Api.Render.GetOrLoadTexture(new AssetLocation(Constants.ModId, "textures/hud/body-temperature/chevron-up.png"), ref up);
+        preparation.Api.Render.GetOrLoadTexture(new AssetLocation(Constants.ModId, "textures/hud/body-temperature/chevron-down.png"), ref down);
+        up.IgnoreUndisposed = true;
+        down.IgnoreUndisposed = true;
+        return [outline, mask, up, down];
     }
     #endregion
 }

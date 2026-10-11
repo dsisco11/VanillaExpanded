@@ -5,7 +5,7 @@ using Vintagestory.GameContent;
 namespace VanillaExpanded.BodyTemperature;
 
 /// <summary>A synchronized raw simulation reading, native normal temperature, and visual warning band.</summary>
-internal sealed record BodyTemperatureSample(float Celsius, float Normal, BodyTemperatureRisk Risk, float FreezingStrength = 0)
+internal sealed record BodyTemperatureSample(float Celsius, float Normal, BodyTemperatureRisk Risk, float FreezingStrength = 0, int Trend = 0)
 {
     public bool Dangerous => Risk is BodyTemperatureRisk.Freezing or BodyTemperatureRisk.Overheating;
     /// <summary>Matches the character panel's compression of simulation temperatures above 37°C before rounding.</summary>
@@ -13,6 +13,8 @@ internal sealed record BodyTemperatureSample(float Celsius, float Normal, BodyTe
     /// <summary>Maps the converted unrounded reading onto the thermometer range.</summary>
     public float Fill => Math.Clamp((ToCelsius(Celsius) - (ToCelsius(Normal) - 6)) / 14, 0, 1);
     #region Public API
+    /// <summary>Converts the native warmth buffer to the character panel's unrounded Celsius reading.</summary>
+    internal static float ToCelsius(float raw) => raw > 37 ? 37 + (raw - 37) / 10 : raw;
     /// <summary>Reads the native synchronized data, using native freezing intensity and retaining the hot warning within its recovery margin.</summary>
     public static BodyTemperatureSample? Read(Entity entity, BodyTemperatureSample? previous = null)
     {
@@ -42,8 +44,4 @@ internal sealed record BodyTemperatureSample(float Celsius, float Normal, BodyTe
     }
     #endregion
 
-    #region Private
-    /// <summary>Converts the native warmth buffer to the character panel's unrounded Celsius reading.</summary>
-    private static float ToCelsius(float raw) => raw > 37 ? 37 + (raw - 37) / 10 : raw;
-    #endregion
 }
