@@ -1,4 +1,6 @@
 {
+  "config-enable-approximate-time-overlay": "Show approximate time",
+  "config-enable-approximate-time-overlay-tooltip": "Shows a time-of-day icon to the right of the other status icons beside the left edge of the toolbar. Daylight outdoors calibrates the estimate; shelter and night gradually introduce error. Applies immediately.",
   "config-animal-sex-indicator-opacity": "Symbol opacity",
   "config-animal-sex-indicator-opacity-tooltip": "Maximum opacity before distance fading. Default: 75%.",
   "config-animal-male-icon-color": "Male symbol RGB color",
@@ -179,7 +181,7 @@
   "bow-ammunition-count": "{0}x",
   "bow-ammunition-empty": "➶  No arrows / 0",
   "config-enable-weather-conditions-overlay": "Show weather conditions",
-  "config-enable-weather-conditions-overlay-tooltip": "Show rain, snow, hail, and weather fog icons beside the toolbar. Fair weather hides the icons. Changes take effect immediately.",
+  "config-enable-weather-conditions-overlay-tooltip": "Show rain, snow, hail, and weather fog icons beside the left edge of the toolbar. Fair weather hides the icons. Changes take effect immediately.",
   "config-section-hud-overlays": "HUD Overlays",
   "config-enable-hud-overlays": "Enable HUD overlays",
   "config-enable-hud-overlays-tooltip": "Show passive anchored HUD overlays. Disable to stop their sampling. Changes take effect immediately.",

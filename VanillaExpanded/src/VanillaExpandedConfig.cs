@@ -101,6 +101,9 @@ public class VanillaExpandedConfig
     /// <summary>Shows a whole-degree reading beside the thermometer; disabling retains the dynamic icon.</summary>
     public bool ShowBodyTemperatureReading { get; set; } = true;
 
+    /// <summary>Shows a personal time estimate calibrated by daylight exposure.</summary>
+    public bool EnableApproximateTimeOverlay { get; set; } = true;
+
     /// <summary>Shows texture icons for active local precipitation and weather fog.</summary>
     public bool EnableWeatherConditionsOverlay { get; set; } = true;
 
