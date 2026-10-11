@@ -1,8 +1,6 @@
 # Vanilla: Expanded TODO List:
     ## Issues:
         ☐ Design a better separation of alloy calculator inventory ownership/liveness validation, transfer permissions, and storage-versus-machine access policy. Reconsider the storage-class whitelist without weakening ownership or withdrawal checks, and define coverage for vanilla and modded containers.
-        ☐ Alloy calculator should prefer using fuels with the lowest burning temperature.
-        ☐ Alloy calculator has bug: will try to use copper bits and if it cant cover the full cost, it fails instead of using other available materials.
         ☐ Fix cave-art tool-mode menu. all of the options are extremely tiny because there are so many.
 
     ## New Features:
