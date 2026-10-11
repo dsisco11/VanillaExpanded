@@ -6,13 +6,13 @@ namespace VanillaExpanded.Tests.Unit.ApproximateTime;
 public sealed class ApproximateTimeEstimateTests
 {
     #region Public API
-    /// <summary>A character cannot learn the hour in darkness before observing the sun.</summary>
+    /// <summary>Entry under cover seeds an estimate, while sunlight subsequently recalibrates it.</summary>
     [Fact]
-    public void StartsUnknownAndCalibratesInSunlight()
+    public void StartsWithEstimateAndCalibratesInSunlight()
     {
         var estimate = new ApproximateTimeEstimate();
         estimate.Observe(100, 4, 24, false, 2);
-        Assert.Null(estimate.Hour);
+        Assert.Equal(4, estimate.Hour);
         estimate.Observe(104, 8, 24, true, 2);
         Assert.Equal(8, estimate.Hour);
     }
@@ -61,7 +61,7 @@ public sealed class ApproximateTimeEstimateTests
         var estimate = new ApproximateTimeEstimate();
         estimate.Observe(8, 8, 24, true, 2);
         estimate.Observe(7, 7, 24, false, 2);
-        Assert.Null(estimate.Hour);
+        Assert.Equal(7, estimate.Hour);
         estimate.Observe(8, 8, 24, true, 2);
         estimate.Observe(double.NaN, 8, 24, false, 2);
         Assert.Null(estimate.Hour);

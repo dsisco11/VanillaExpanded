@@ -32,7 +32,9 @@ internal sealed class ApproximateTimeEstimate
         if (elapsed < 0 || elapsed > hoursPerDay || (dayLength != 0 && dayLength != hoursPerDay)) Reset();
         dayLength = hoursPerDay;
         lastHours = totalHours;
-        if (sunVisible)
+        // Seed a personal estimate at entry or after a calendar discontinuity, even under cover.
+        // Only subsequent sunlight observations recalibrate it; otherwise uncertainty accumulates.
+        if (sunVisible || !estimatedHours.HasValue)
         {
             estimatedHours = hourOfDay;
             drift = 0;
