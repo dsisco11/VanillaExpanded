@@ -35,6 +35,26 @@ public sealed class HudOverlayRegistryTests
         Assert.Equal(0, unknown.Disposals);
     }
 
+    /// <summary>Multiple live placement changes remain atomic until the next pass without touching overlay ownership.</summary>
+    [Fact]
+    public void GroupUpdatesApplyLatestMetadataAtNextBoundary()
+    {
+        using var registry = CreateRegistry(); var probe = new Probe();
+        registry.Register(Registration("mod:test", probe)); var original = registry.GetGroups().Single();
+        var first = new HudOverlayGroup(original.Id, new HudOverlayPlacement("hotbar", HudOverlayPoint.RightMiddle, HudOverlayPoint.LeftMiddle), original.Packing);
+        var latest = new HudOverlayGroup(original.Id, new HudOverlayPlacement("screen", HudOverlayPoint.RightBottom, HudOverlayPoint.RightBottom, 3, 4), original.Packing);
+        registry.RunPass(_ =>
+        {
+            registry.UpdateGroup(first); registry.UpdateGroup(latest);
+            Assert.Same(original, registry.GetGroups().Single());
+        });
+        Assert.Same(original, registry.GetGroups().Single());
+        registry.RunPass(_ => Assert.Same(latest, registry.GetGroups().Single()));
+        Assert.Equal(0, probe.Disposals); Assert.Equal(0, probe.Ends);
+        Assert.Throws<ArgumentException>(() => registry.UpdateGroup(new HudOverlayGroup("missing", latest.Placement)));
+        Assert.Same(latest, registry.GetGroups().Single());
+    }
+
     /// <summary>Metadata cannot smuggle nonpositive scheduling intervals into the future scheduler.</summary>
     [Theory]
     [InlineData(0)]

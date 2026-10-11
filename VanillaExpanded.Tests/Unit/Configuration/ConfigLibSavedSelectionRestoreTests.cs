@@ -36,6 +36,23 @@ public sealed class ConfigLibSavedSelectionRestoreTests
         Assert.Equal(1, saved.Reloads);
     }
 
+    /// <summary>Restores the HUD dropdown's persisted key through the same optional-provider readiness boundary.</summary>
+    [Fact]
+    public void HudAnchorSavedKeyRestoresAfterReadiness()
+    {
+        var config = new VanillaExpandedConfig();
+        var saved = new PublicConfig(() => config.HeldItemStatusAnchor = "screen-right-bottom");
+        var provider = new PublicProvider(new() { [Constants.ModId] = saved });
+        var (api, events) = CreateClientApi(provider, false);
+        using var restore = ConfigLibSavedSelectionRestore.Attach(api.Object);
+        provider.RaiseLoaded(); Assert.Equal("saturation", config.HeldItemStatusAnchor);
+        events.Raise(value => value.LevelFinalize += null);
+        Assert.Equal("screen-right-bottom", config.HeldItemStatusAnchor);
+        var placement = VanillaExpanded.HudOverlays.Configuration.HudOverlayConfiguration.ResolveHeldItemStatusPlacement(config);
+        Assert.Equal(VanillaExpanded.HudOverlays.Anchoring.HudOverlayPoint.RightBottom, placement.Attachment);
+        Assert.Equal(1, saved.Reloads);
+    }
+
     /// <summary>Leaves installations without ConfigLib untouched.</summary>
     [Fact]
     public void AbsentProvider_DoesNotAttach()

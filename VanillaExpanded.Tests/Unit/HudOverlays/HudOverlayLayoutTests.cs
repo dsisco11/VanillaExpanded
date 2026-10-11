@@ -60,6 +60,27 @@ public sealed class HudOverlayLayoutTests
         finally { RuntimeEnv.GUIScale = old; GuiStyle.LeftDialogMargin = left; GuiStyle.RightDialogMargin = right; }
     }
 
+    /// <summary>Manually persisted finite extreme offsets still clamp native roots to the viewport safe rectangle.</summary>
+    [Theory]
+    [InlineData("screen", 1)]
+    [InlineData("screen", -1)]
+    [InlineData("hotbar", 1)]
+    [InlineData("hotbar", -1)]
+    public void ExtremeFiniteOffsetsRemainInsideViewport(string target, int direction)
+    {
+        float old = RuntimeEnv.GUIScale;
+        try
+        {
+            RuntimeEnv.GUIScale = 1;
+            var context = new HudOverlayAnchorContext(new Window(800, 600), () => 1, () => new RectangleF(200, 400, 300, 40));
+            context.BeginFrame(); using var layout = new HudOverlayGroupLayout();
+            layout.Apply(context, Group(new(target, HudOverlayPoint.LeftTop, HudOverlayPoint.LeftTop, direction * (double)float.MaxValue, direction * (double)float.MaxValue)), new[] { Member("mod:a", 80, 40) });
+            Assert.InRange(layout.Root.renderX, context.SafeRectangle.Left, context.SafeRectangle.Right - layout.Root.OuterWidth);
+            Assert.InRange(layout.Root.renderY, context.SafeRectangle.Top, context.SafeRectangle.Bottom - layout.Root.OuterHeight);
+        }
+        finally { RuntimeEnv.GUIScale = old; }
+    }
+
     /// <summary>Named pixel attachment respects all pivots, positive offsets and parent render offsets.</summary>
     [Theory]
     [InlineData(1)]

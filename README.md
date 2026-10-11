@@ -86,6 +86,12 @@ Some recipes use generic output previews or do not support placement. Recipe/mod
 
 Hold the Quick Tools hotkey (assign it in Controls) to open a radial menu of available tools, weapons, healing items, and light sources from your hotbar and backpack. Select an item to equip it instantly; use the center **Unequip** action to restore your previous item or stow the item currently held.
 
+### Bow Ammunition
+
+While holding a supported base-game bow in your main hand, a compact `<count>x <arrow icon>` indicator shows the next arrow type and its total positive quantity in inventories eligible for bow selection.
+
+The default placement is just above the saturation meter, aligned with its left edge. With no eligible arrows, it shows a muted arrow symbol and localized `No arrows / 0`. Unsupported custom or derived bows hide the indicator.
+
 ### New Hotkeys
 
 - Hotkey for quickly swapping a light source into the off-hand (default: `F`) or hotbar (default: `Shift + F`) when available (press again to swap the light source back into its prior slot).
@@ -243,6 +249,18 @@ There is no AutoLoot layering option: its progress always renders above dialogs,
 | `AnimalMaleIconColor`       | `5089023`  | 0–16777215      | Packed RGB decimal color; default blue (#4DA6FF).                                                        |
 | `AnimalFemaleIconColor`     | `16741813` | 0–16777215      | Packed RGB decimal color for female and pregnant-female icons; default pink (#FF75B5).                   |
 
+#### HUD Overlays
+
+| Setting                      | Default      | Range / choices                                                                                                                                                                                                              | Description                                                                             |
+| ---------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `EnableHudOverlays`          | `true`       | `true`, `false`                                                                                                                                                                                                              | Enable passive HUD overlays; applies live without restarting.                           |
+| `EnableBowAmmunitionOverlay` | `true`       | `true`, `false`                                                                                                                                                                                                              | Show the next-arrow type and type-total quantity while holding a supported bow.         |
+| `HeldItemStatusAnchor`       | `saturation` | `saturation`, `hotbar`, `screen-left-top`, `screen-center-top`, `screen-right-top`, `screen-left-middle`, `screen-center-middle`, `screen-right-middle`, `screen-left-bottom`, `screen-center-bottom`, `screen-right-bottom` | Select native docking or a screen position. Unknown values fall back to saturation.     |
+| `HeldItemStatusOffsetX`      | `-4`         | -2048–2048 in ConfigLib                                                                                                                                                                                                      | Horizontal offset in GUI units; positive moves right. Nonfinite values fall back to -4. |
+| `HeldItemStatusOffsetY`      | `0`          | -2048–2048 in ConfigLib                                                                                                                                                                                                      | Vertical offset in GUI units; positive moves down. Nonfinite values fall back to 0.     |
+
+The two offsets are shared across placement choices. The saturation default compensates for content padding and leaves a four-unit gap above the meter. Hotbar docking attaches the group's left-middle to the hotbar's right-middle; screen placements use matching attachment and pivot points. Native viewport clamping keeps the group within the safe rectangle. Placement changes apply live and retain cached presentation; restored content receives a fresh sample before display. Without ConfigLib, edit the JSON file and restart the game to load manual changes.
+
 - Settings marked with an asterisk require a world reload when enabling a feature that was disabled when the world loaded, because its systems or patches were not installed.
 
 Recipe-toggle changes require a world reload to rebuild the available recipes. `DisableAlloyCalculatorPatch` also requires a world reload or restart. The normal `EnableAlloyCalculator` toggle can change live when its patch is installed.
@@ -309,3 +327,4 @@ Anego Studios and its affiliates are granted a perpetual, worldwide, non-exclusi
 - [Recipe Book](docs/RecipeBook.md): filtering, ordering, UI lifecycle, and rendering.
 - [Alloy Calculator](docs/AlloyCalculator.md): calculation and inventory-transfer design.
 - [Item-slot indicator effects](docs/ItemSlotIndicatorEffects.md): registration, rendering, and resource ownership.
+- [Anchored HUD overlays](docs/hud-overlays/HudOverlays.md): passive registration, configuration, and resource ownership contracts.

@@ -114,7 +114,7 @@ The hotbar adapter finds the installed Vintagestory.Client.NoObf.HudHotbar throu
 
 These type and composer/element keys are verified installed integration points, not a guarantee across every future game version or replacement HUD mod. Preserve the adapter boundary and recheck it when compatibility changes. The actual rendered extent, visibility transitions, and desired docking position still require live acceptance. No private accessor or hotbar rendering patch belongs in the initial adapter.
 
-The saturation-meter adapter reads the installed public HudStatbar.Composers["statbar"].GetStatbar("saturationstatbar").Bounds. Installed ComposeGuis IL identifies the composer as inventory-statbar and the element as saturationstatbar. It uses the meter's rendered rectangle, mirrors the native statbar's spectator-mode suppression, and applies the same quiet unavailable/ambiguous rules as the hotbar adapter, and does not guess meter dimensions. This docking target follows the requested bow presentation revision; native appearance remains a live acceptance check.
+The saturation-meter adapter reads the installed public HudStatbar.Composers["statbar"].GetStatbar("saturationstatbar").Bounds. Installed ComposeGuis IL identifies the composer as inventory-statbar and the element as saturationstatbar. It uses the meter's rendered rectangle, mirrors the native statbar's spectator-mode suppression, and applies the same quiet unavailable/ambiguous rules as the hotbar adapter. It does not guess meter dimensions. This docking target follows the requested bow presentation revision; native appearance remains a live acceptance check.
 
 ### Placement model
 
@@ -219,6 +219,8 @@ Keep the initial contracts internal and small. Do not introduce a generalized wi
 ## Configuration
 
 Extend VanillaExpandedConfig and the existing ConfigLib mapping/localization with a HUD Overlays section. Proposed initial controls are EnableHudOverlays and EnableBowAmmunitionOverlay (both default true), and held-item-status placement: named saturation meter, hotbar, or one of nine screen positions, plus X/Y offsets. Group direction, gap, padding, and overlay order are registration defaults initially.
+
+Persist EnableHudOverlays and EnableBowAmmunitionOverlay as booleans, both default true. HeldItemStatusAnchor defaults to saturation and accepts hotbar plus screen-left-top, screen-center-top, screen-right-top, screen-left-middle, screen-center-middle, screen-right-middle, screen-left-bottom, screen-center-bottom, and screen-right-bottom. ConfigLib mapped numeric events normalize to those stable keys before serialization. HeldItemStatusOffsetX/HeldItemStatusOffsetY default to -4/0 GUI units and are shared across anchors; ConfigLib offers -2048 through 2048 with unit steps. Manual finite values remain valid and are clamped by native group layout.
 
 Settings are local presentation preferences and apply live through ILiveConfigurable. Disabling one feature removes only its content and space; disabling the system stops expensive overlay work while retaining the ability to re-enable it without restarting. Unknown anchor keys fall back to the group's documented default; nonfinite offsets fall back to defaults. The configuration parser and ConfigLib display must agree on persisted keys and defaults.
 

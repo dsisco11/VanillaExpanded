@@ -155,19 +155,22 @@ Planning requested: 2026-10-10. Execution is authorized for the phase explicitly
 ## Phase 6: Integrate live configuration and user documentation
     Depends on: Phases 2–5.
     Proposal: [Configuration](AnchoredHudOverlays.proposal.md#configuration), [Updates](AnchoredHudOverlays.proposal.md#updates).
-    Outcome: users can enable overlays and select the held-item group's native screen or hotbar placement through existing settings.
+    Outcome: users can enable overlays and select the held-item group's native screen, saturation-meter, or hotbar placement through existing settings.
 
-    ☐ Extend VanillaExpandedConfig, existing ConfigLib mappings, and localization with a visibly grouped HUD Overlays section.
-        ☐ Add EnableHudOverlays and EnableBowAmmunitionOverlay, both default true.
-        ☐ Expose held-item-status placement as saturation meter, hotbar, or one of nine screen positions plus X/Y GUI-unit offsets; retain packing/order settings as registration defaults.
-        ☐ Use stable persisted keys and consistent defaults; unknown anchor keys revert to the group default, and nonfinite offsets revert to defaults.
-    ☐ Implement ILiveConfigurable integration for settings and placement changes.
-        ☐ Disabling a feature immediately stops its sampling and releases layout space; disabling all overlays stops expensive work while allowing restart-free re-enable.
-        ☐ Apply placement changes through layout invalidation, with no unnecessary content resampling/resource recreation; refresh restored content before showing it.
-        ☐ Keep config persistence authoritative; do not write duplicate positions through native saved-dialog APIs.
-    ☐ Verify configuration loading, persisted key/ConfigLib display agreement, invalid values, toggles, screen/hotbar switching, offsets, and repeated live reload.
-    ☐ Update appropriate user/developer documentation for settings, next-arrow/type-total meaning, missing-anchor behavior, unsupported bows, and ownership/registration expectations. Avoid claiming unperformed live acceptance.
-    ☐ Completion: runtime/configuration/defaults/localization agree, relevant checks pass, and second review/independent audit find no integration gaps.
+    ☑ Extend VanillaExpandedConfig, existing ConfigLib mappings, and localization with a visibly grouped HUD Overlays section.
+        ☑ Add EnableHudOverlays and EnableBowAmmunitionOverlay, both default true.
+        ☑ Expose held-item-status placement as saturation meter, hotbar, or one of nine screen positions plus X/Y GUI-unit offsets; retain packing/order settings as registration defaults.
+        ☑ Use stable persisted keys and consistent defaults; unknown anchor keys revert to the group default, and nonfinite offsets revert to defaults.
+    ☑ Implement ILiveConfigurable integration for settings and placement changes.
+        ☑ Disabling a feature immediately stops its sampling and releases layout space; disabling all overlays stops expensive work while allowing restart-free re-enable.
+        ☑ Apply placement changes through layout invalidation, with no unnecessary content resampling/resource recreation; refresh restored content before showing it.
+        ☑ Keep config persistence authoritative; do not write duplicate positions through native saved-dialog APIs.
+    ☑ Verify configuration loading, persisted key/ConfigLib display agreement, invalid values, toggles, screen/hotbar switching, offsets, and repeated live reload.
+    ☑ Update appropriate user/developer documentation for settings, next-arrow/type-total meaning, missing-anchor behavior, unsupported bows, and ownership/registration expectations. Avoid claiming unperformed live acceptance.
+    ☑ Completion: runtime/configuration/defaults/localization agree, relevant checks pass, and second review/independent audit find no integration gaps.
+
+    Verification notes (2026-10-10; second review and independent audit passed): current projects built and all 188 focused HUD, bow, and configuration tests passed. Checks cover default loading, all eleven anchor keys and ConfigLib numeric mappings/canonical serialization, unknown/null keys and independent nonfinite offset fallback, mapped selection restoration after client readiness, immediate feature/global disable cleanup and layout-space release, restart-free fresh restoration, repeated live placement changes with retained host/native roots/cached preparations, and deferred group metadata updates. Extreme finite file offsets reproduced a clamp cancellation defect; native-alignment rebasing resolves it, and all four signed screen/hotbar cases plus prior geometry checks pass. Existing offline package-audit and unrelated compiler warnings remain. User/developer docs describe settings and ownership without claiming live appearance; no game was launched.
+    Traceability: config/default/localization tasks -> proposal Configuration / Placement model -> VanillaExpandedConfig canonical keys, HudOverlayConfiguration resolver, ConfigLib HUD Overlays section, localized controls and mapping/load tests; live reload tasks -> Updates / Resource lifecycle / Ownership and registration -> effective bow/global selectors, ILiveConfigurable cleanup, existing session observation, pass-boundary group updates and direct system/session reuse tests; documentation tasks -> Meaning of the display / Selection authority and compatibility / Resource lifecycle -> README HUD settings/arrow semantics and HudOverlays.md registration/borrowed-resource contracts. Independent audit rechecked the extreme-offset correction and found no unresolved requirement. Package and live menu/input/visual/firing acceptance remain Phase 7; project.todo stays unchecked.
 
 ## Phase 7: Complete integrated validation and user-run acceptance
     Depends on: Phases 1–6.
@@ -180,7 +183,7 @@ Planning requested: 2026-10-10. Execution is authorized for the phase explicitly
     ☐ Collect user-run acceptance for normal/high GUI scale, window resizing, hotbar placement/extent, screen placements, HUD hiding/restoration, missing target recovery, and overflow behavior.
     ☐ Collect user-run input/render acceptance for movement, hotbar scrolling, bow draw/release, inventory interaction, Escape, dialogs/tooltips/modal menus, and representative third-party HUD layouts.
     ☐ Collect user-run ammunition acceptance for arrow-type transitions, synchronized consumption, relevant inventory open/close, no arrows, and world exit/rejoin.
-    ☐ Confirm acceptable contrast, icon/count readability, hotbar-right placement, and refresh responsiveness; reconcile required tuning with the proposal and rerun affected validation.
+    ☐ Confirm acceptable contrast, icon/count readability, saturation-meter top-left placement, and refresh responsiveness; reconcile required tuning with the proposal and rerun affected validation.
     ☐ Remove temporary diagnostic instrumentation or scaffolding introduced during implementation; retain useful existing-workflow receipts without adding unnecessary audit files.
     ☐ Complete the final second review and independent implementation audit. Resolve every finding or record an explicitly approved deferral with its remaining acceptance boundary.
     ☐ Completion: source/API, automated, package, and live evidence are distinguished; all required acceptance is complete or explicitly approved for deferral, and no unsupported completion claim remains.

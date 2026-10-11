@@ -9,6 +9,7 @@ using Vintagestory.API.Common;
 namespace VanillaExpanded.Tests.Unit.BowAmmunition;
 
 /// <summary>Checks the thin feature composition root against shared registration defaults.</summary>
+[Collection("HudOverlayGeometry")]
 public sealed class BowAmmunitionSystemTests
 {
     #region Public API
