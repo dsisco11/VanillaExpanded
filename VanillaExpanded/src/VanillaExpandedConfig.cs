@@ -107,6 +107,9 @@ public class VanillaExpandedConfig
     /// <summary>Shows texture icons for active local precipitation and weather fog.</summary>
     public bool EnableWeatherConditionsOverlay { get; set; } = true;
 
+    /// <summary>Shows a fissure icon for non-calm native rift activity.</summary>
+    public bool EnableRiftActivityOverlay { get; set; } = true;
+
     private string heldItemStatusAnchor = "saturation";
     /// <summary>Selects a stable anchor key; numeric ConfigLib events and unknown keys are normalized for persistence.</summary>
     public string HeldItemStatusAnchor

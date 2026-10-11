@@ -181,6 +181,8 @@
   "bow-ammunition-count": "{0}x",
   "bow-ammunition-empty": "➶  No arrows / 0",
   "config-enable-weather-conditions-overlay": "Show weather conditions",
+  "config-enable-rift-activity-overlay": "Show rift activity",
+  "config-enable-rift-activity-overlay-tooltip": "Show a fissure icon for current temporal rift activity beside the left edge of the toolbar. Calm activity hides the icon. Changes take effect immediately.",
   "config-enable-weather-conditions-overlay-tooltip": "Show rain, snow, hail, and weather fog icons beside the left edge of the toolbar. Fair weather hides the icons. Changes take effect immediately.",
   "config-section-hud-overlays": "HUD Overlays",
   "config-enable-hud-overlays": "Enable HUD overlays",

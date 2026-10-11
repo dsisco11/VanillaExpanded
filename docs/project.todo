@@ -11,7 +11,6 @@
         ☐ New "crafting menu" similar to minecraft: shows all craftable items with current inventory, allows searching. (Maybe this can just be added to the handbook?)
 
     ## HUD Indicators:
-        ☐ Add a temporal rift activity indicator using the selected fissure texture design: a widening, branching tear for low, medium, high, and apocalyptic activity. Read the game's rift activity category; hide the indicator during calm activity. Place it in the bottom-left status group before the time indicator.
         ☐ Add localized hover labels to every HUD indicator explaining what the indicator represents. Show labels when the player can move the mouse over the HUD; invisible indicators must not expose hover targets.
         ☐ Give every HUD indicator a stable position relative to its screen/HUD anchor. Reserve each indicator's space while it is invisible so other indicators do not shift into the gap; keep the time indicator rightmost in the bottom-left group.
         ☐ Give all bottom-left HUD indicators a faint black radial-gradient circle behind their icons, fading smoothly to transparent at the edge. Use a consistent treatment across the group; hide the background with its indicator. This replaces the earlier background-free design for these indicators.
