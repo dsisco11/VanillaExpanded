@@ -17,6 +17,7 @@ namespace VanillaExpanded.Tests.Unit.HudOverlays;
 public sealed class HudOverlaySessionTests
 {
     #region Public API
+    #region Session ownership
     /// <summary>Listener identity zero remains valid, while registrations survive fresh world bindings.</summary>
     [Fact]
     public void RejoinRetainsRegistrationAndReleasesEachSession()
@@ -45,6 +46,8 @@ public sealed class HudOverlaySessionTests
         fixture.HasPlayer = true; fixture.Tick(); Assert.Equal(3, fixture.Probe.Begins);
     }
 
+    #endregion
+    #region Live visibility and placement
     /// <summary>Render/configuration paths observe visibility without sampling and wait for a restored heartbeat.</summary>
     [Fact]
     public void VisibilityRestoresOnlyAfterHeartbeat()
@@ -65,6 +68,60 @@ public sealed class HudOverlaySessionTests
         Assert.True(fixture.Session.Scheduler.IsDrawable(fixture.Registration));
     }
 
+    /// <summary>Feature and global toggles release layout immediately, resume only with fresh samples, and retain the host.</summary>
+    [Fact]
+    public void RepeatedFeatureAndSystemReloadsReleaseSpaceWithoutRestart()
+    {
+        using var fixture = new Fixture(); fixture.Session.EnterWorld();
+        var host = fixture.Hosts.Single(); var layout = host.Layouts!["group"];
+        for (int index = 0; index < 3; index++)
+        {
+            int refreshed = fixture.Probe.Refreshes, prepared = fixture.Probe.Preparations;
+            fixture.FeatureEnabled = false; fixture.Session.ConfigurationChanged();
+            Assert.Empty(layout.Members); Assert.False(host.IsOpen);
+            fixture.Tick(); Assert.Equal(refreshed, fixture.Probe.Refreshes);
+            fixture.FeatureEnabled = true; fixture.Session.ConfigurationChanged();
+            Assert.Empty(layout.Members); Assert.Equal(refreshed, fixture.Probe.Refreshes);
+            fixture.Tick(); Assert.Single(layout.Members); Assert.True(host.IsOpen);
+            Assert.Equal(refreshed + 1, fixture.Probe.Refreshes);
+            fixture.Enabled = false; fixture.Session.ConfigurationChanged();
+            Assert.Empty(layout.Members); Assert.False(host.IsOpen);
+            fixture.Tick(); Assert.Equal(refreshed + 1, fixture.Probe.Refreshes);
+            fixture.Enabled = true; fixture.Session.ConfigurationChanged(); Assert.Empty(layout.Members);
+            fixture.Tick(); Assert.Single(layout.Members);
+            Assert.Equal(refreshed + 2, fixture.Probe.Refreshes);
+            Assert.Equal(prepared, fixture.Probe.Preparations);
+            Assert.Same(host, fixture.Hosts.Single()); Assert.Equal(1, fixture.Probe.Begins);
+        }
+    }
+
+    /// <summary>Placement reloads repack cached measurements without sampling, preparing, or replacing native roots.</summary>
+    [Fact]
+    public void RepeatedScreenPlacementReloadsReusePresentationAndNativeRoot()
+    {
+        using var fixture = new Fixture(); fixture.Session.EnterWorld();
+        var host = fixture.Hosts.Single(); var layout = host.Layouts!["group"]; var nativeRoot = layout.Root;
+        var original = fixture.Registry.GetGroups().Single();
+        foreach (var point in Enum.GetValues<HudOverlayPoint>())
+        {
+            fixture.Registry.UpdateGroup(new HudOverlayGroup("group",
+                new HudOverlayPlacement("screen", point, point, -7, 9), original.Packing));
+            fixture.Session.ConfigurationChanged(); fixture.Session.ConfigurationChanged();
+            Assert.Same(nativeRoot, layout.Root); Assert.Single(layout.Members);
+            Assert.Equal(1, fixture.Probe.Refreshes); Assert.Equal(1, fixture.Probe.Preparations);
+            Assert.Same(host, fixture.Hosts.Single()); Assert.Same(original.Packing, fixture.Registry.GetGroups().Single().Packing);
+        }
+        fixture.Registry.UpdateGroup(new HudOverlayGroup("group",
+            new HudOverlayPlacement("hotbar", HudOverlayPoint.RightMiddle, HudOverlayPoint.LeftMiddle), original.Packing));
+        fixture.Session.ConfigurationChanged(); Assert.Empty(layout.Members); Assert.False(host.IsOpen);
+        fixture.Tick(); Assert.Equal(1, fixture.Probe.Refreshes);
+        fixture.Registry.UpdateGroup(original); fixture.Session.ConfigurationChanged(); Assert.Empty(layout.Members);
+        fixture.Tick(); Assert.Single(layout.Members); Assert.Equal(2, fixture.Probe.Refreshes);
+        Assert.Same(nativeRoot, layout.Root); Assert.Same(host, fixture.Hosts.Single());
+    }
+
+    #endregion
+    #region Cleanup failures
     /// <summary>A native close failure cannot prevent owned disposal or feature session cleanup.</summary>
     [Fact]
     public void CloseFailureStillReleasesOwnedResources()
@@ -74,6 +131,7 @@ public sealed class HudOverlaySessionTests
         Assert.Equal(1, fixture.Hosts[0].Disposals); Assert.Equal(1, fixture.Probe.Ends);
         Assert.Null(fixture.Session.Scheduler);
     }
+    #endregion
     #endregion
 
     #region Private
@@ -88,7 +146,7 @@ public sealed class HudOverlaySessionTests
         public readonly HudOverlaySession Session;
         public readonly HudOverlayRegistration Registration;
         public EntityPlayer Entity = new();
-        public bool HasPlayer = true, Hidden, Enabled = true;
+        public bool HasPlayer = true, Hidden, Enabled = true, FeatureEnabled = true;
         private Action<float>? tick;
         private long now;
         private readonly float oldScale = RuntimeEnv.GUIScale;
@@ -104,11 +162,12 @@ public sealed class HudOverlaySessionTests
             Api.SetupGet(value => value.Event).Returns(Events.Object);
             Api.SetupGet(value => value.HideGuis).Returns(() => Hidden);
             var gui = new Mock<IGuiAPI>(); gui.SetupGet(value => value.WindowBounds).Returns(new Window());
+            gui.SetupGet(value => value.LoadedGuis).Returns(new List<GuiDialog>());
             Api.SetupGet(value => value.Gui).Returns(gui.Object);
             Events.Setup(value => value.RegisterGameTickListener(It.IsAny<Action<float>>(), 100, 0))
                 .Callback<Action<float>, int, int>((callback, _, _) => tick = callback).Returns(0);
             Registry.RegisterGroup(new HudOverlayGroup("group", new HudOverlayPlacement("screen", HudOverlayPoint.LeftTop, HudOverlayPoint.LeftTop)));
-            Registration = new HudOverlayRegistration("mod:test", Probe, () => true, "group"); Registry.Register(Registration);
+            Registration = new HudOverlayRegistration("mod:test", Probe, () => FeatureEnabled, "group"); Registry.Register(Registration);
             Session = new HudOverlaySession(Api.Object, Registry, (_, _) => { var host = new Host(); Hosts.Add(host); return host; }, () => now, () => Enabled);
         }
         /// <summary>Advances one heartbeat with the currently exposed world/player.</summary>
@@ -124,13 +183,15 @@ public sealed class HudOverlaySessionTests
         public Action? BeforeRender { get; set; }
         public int Disposals;
         public bool FailClose;
+        public IReadOnlyDictionary<string, HudOverlayGroupLayout>? Layouts;
+        public bool IsOpen;
         #region Public API
         /// <summary>Accepts borrowed native group layout.</summary>
-        public void Synchronize(IReadOnlyDictionary<string, HudOverlayGroupLayout> layouts) { }
+        public void Synchronize(IReadOnlyDictionary<string, HudOverlayGroupLayout> layouts) { Layouts = layouts; }
         /// <summary>Ensures native opening is passive.</summary>
-        public bool TryOpen(bool withFocus) { Assert.False(withFocus); return true; }
+        public bool TryOpen(bool withFocus) { Assert.False(withFocus); IsOpen = true; return true; }
         /// <summary>Optionally simulates a native close callback failure.</summary>
-        public bool TryClose() { if (FailClose) throw new InvalidOperationException(); return true; }
+        public bool TryClose() { if (FailClose) throw new InvalidOperationException(); IsOpen = false; return true; }
         /// <summary>Records final host cleanup.</summary>
         public void Dispose() => Disposals++;
         #endregion
