@@ -15,6 +15,21 @@ public sealed class HudOverlaySchedulerTests : IDisposable
     #region Public API
     /// <summary>Sets deterministic native scale for headless bounds.</summary>
     public HudOverlaySchedulerTests() => Vintagestory.API.Config.RuntimeEnv.GUIScale = 1;
+
+    /// <summary>Extra HUD scaling enlarges measured bounds once and keeps hidden ordinary members collapsed.</summary>
+    [Fact]
+    public void ContentScaleEnlargesMeasuredLayoutAndStillCollapses()
+    {
+        using var fixture = new Fixture();
+        fixture.Anchors.BeginFrame(true);
+        var preparation = new HudOverlayPreparationContext(fixture.Api, 2, "en", contentScale: 1.5);
+        fixture.Scheduler.Update(fixture.Anchors, preparation, true);
+        Assert.Equal(3, preparation.GuiScale);
+        Assert.Equal(new SizeF(30, 30), Assert.Single(fixture.Scheduler.GetMembers("group")).Value);
+        fixture.Enabled = false;
+        fixture.Observe();
+        Assert.Empty(fixture.Scheduler.GetMembers("group"));
+    }
     /// <summary>Restores borrowed native state after each check.</summary>
     public void Dispose() => Vintagestory.API.Config.RuntimeEnv.GUIScale = oldScale;
     /// <summary>Reserved native footprints survive every content and visibility transition, including initial binding failure.</summary>

@@ -121,7 +121,7 @@ internal sealed class HudOverlaySession : IDisposable
         bool visible = !api.HideGuis;
         anchors!.BeginFrame(visible);
         var preparation = new HudOverlayPreparationContext(api, anchors.GuiScale,
-            Lang.CurrentLocale ?? "en", FontRevision());
+            Lang.CurrentLocale ?? "en", FontRevision(), contentScale: 1.5);
         Scheduler!.Update(anchors, preparation, visible, enabled());
         SynchronizeLayouts();
     }
