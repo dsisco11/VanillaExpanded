@@ -25,13 +25,13 @@ Hold the Quick Tools hotkey (assign it in Controls) to open a radial menu of ava
 
 ### Approximate Time
 
-Hover over any visible HUD indicator while the mouse is free (for example, with your inventory open) to see its title. HUD indicators keep their space while hidden, so the other indicators stay in place. The time icon remains rightmost in the bottom-left group.
+Hover over any visible HUD indicator while the mouse is free (for example, with your inventory open) to see its title. HUD indicators keep their space while hidden, so the other indicators stay in place. The time icon remains rightmost in the bottom-left group. Each bottom-left icon has a faint black circle that fades smoothly to transparent at its edge and hides with the icon.
 
-A compact texture icon at the right end of the status group beside the bottom-left edge of the toolbar indicates estimated dawn, morning, noon, afternoon, dusk, or night. Icons follow seasonal daylight and the local solar path. Local sunlight, including sunlight reaching covered spaces, recalibrates the estimate; darkness gradually introduces up to eight hours of error on a normal day. The server saves time spent online without sunlight across reconnects and world reloads; sunlight resets it. Multiplayer tracking requires the mod on the server. There is no numeric label or background circle. Toggle it live with `EnableApproximateTimeOverlay`.
+A compact texture icon at the right end of the status group beside the bottom-left edge of the toolbar indicates estimated dawn, morning, noon, afternoon, dusk, or night. Icons follow seasonal daylight and the local solar path. Local sunlight, including sunlight reaching covered spaces, recalibrates the estimate; darkness gradually introduces up to eight hours of error on a normal day. The server saves time spent online without sunlight across reconnects and world reloads; sunlight resets it. Multiplayer tracking requires the mod on the server. There is no numeric label. Toggle it live with `EnableApproximateTimeOverlay`.
 
 ### Weather Conditions
 
-Small weather icons appear beside the toolbar’s bottom-left edge during rain, snow, hail, or fog. Fog can appear alongside precipitation. The icons use transparent textures without labels or background circles and hide during fair weather. Toggle them with `EnableWeatherConditionsOverlay`; changes apply immediately.
+Small weather icons appear beside the toolbar’s bottom-left edge during rain, snow, hail, or fog. Fog can appear alongside precipitation. The icons use transparent textures and hide during fair weather. Toggle them with `EnableWeatherConditionsOverlay`; changes apply immediately.
 
 ### Temporal Rift Activity
 
@@ -39,7 +39,7 @@ A fissure icon beside the toolbar's bottom-left edge, before the time icon, show
 
 ### Body Temperature Warning
 
-A compact thermometer appears just left of the toolbar, aligned with its bottom edge, when body temperature becomes too low or high. Its colored column rises with temperature, and the adjacent reading shows whole degrees (for example, `34°C`). The icon has an outline for contrast and no background circle.
+A compact thermometer appears just left of the toolbar, aligned with its bottom edge, when body temperature becomes too low or high. Its colored column rises with temperature, and the adjacent reading shows whole degrees (for example, `34°C`). The icon has an outline for contrast.
 
 Cold warnings follow the game’s synchronized freezing effect: the icon appears while that effect is active, and its blue color deepens with the effect’s intensity. Elevated-temperature warnings use the converted reading and appear in orange above 42°C and red above 44°C for the default player. Vanilla’s normal warmth ceiling does not reach these thresholds. The numeric reading uses the character panel’s temperature conversion, rounded to whole degrees. Heat warnings are informational: the game has no native overheating-damage threshold. A quarter-degree recovery margin prevents the heat warning flickering near its visibility boundary.
 

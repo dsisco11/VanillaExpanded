@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using VanillaExpanded.HudOverlays.Registration;
+using VanillaExpanded.HudOverlays.Rendering;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 
@@ -19,9 +20,10 @@ internal sealed class WeatherConditionsOverlay : IHudOverlay
     #region Public API
     #region Lifecycle
     /// <summary>Creates an icon-only presentation with optional headless asset loading.</summary>
-    public WeatherConditionsOverlay(System.Func<HudOverlayPreparationContext, LoadedTexture[]>? load = null)
+    public WeatherConditionsOverlay(System.Func<HudOverlayPreparationContext, LoadedTexture[]>? load = null,
+        System.Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null)
     {
-        presentation = new WeatherConditionsPresentation(load);
+        presentation = new WeatherConditionsPresentation(load, loadBackdrop);
     }
     /// <summary>Binds a borrowed weather provider for one client world.</summary>
     public void BeginSession(ICoreClientAPI api)

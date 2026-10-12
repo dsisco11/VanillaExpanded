@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using VanillaExpanded.HudOverlays.Registration;
+using VanillaExpanded.HudOverlays.Rendering;
 using Vintagestory.API.Client;
 using Vintagestory.GameContent;
 
@@ -19,9 +20,10 @@ internal sealed class RiftActivityOverlay : IHudOverlay
     #region Public API
     #region Lifecycle
     /// <summary>Creates the presentation with optional headless texture loading.</summary>
-    public RiftActivityOverlay(System.Func<HudOverlayPreparationContext, LoadedTexture[]>? load = null)
+    public RiftActivityOverlay(System.Func<HudOverlayPreparationContext, LoadedTexture[]>? load = null,
+        System.Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null)
     {
-        presentation = new RiftActivityPresentation(load);
+        presentation = new RiftActivityPresentation(load, loadBackdrop);
     }
     /// <summary>Binds the native packet provider for the current client world.</summary>
     public void BeginSession(ICoreClientAPI api)

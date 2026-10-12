@@ -81,7 +81,7 @@ public sealed class BodyTemperatureOverlayTests : IDisposable
         var preparation = new HudOverlayPreparationContext(fixture.Api.Object, 1, "en");
         overlay.Prepare(preparation);
         Assert.Equal(1, builds);
-        Assert.Equal(new SizeF(107, 24), overlay.Measure());
+        Assert.Equal(new SizeF(112, 24), overlay.Measure());
         SetTemperature(fixture, 34.01f);
         Assert.NotEqual(HudOverlayChange.None, overlay.Refresh());
         overlay.Prepare(preparation);
@@ -256,17 +256,17 @@ public sealed class BodyTemperatureOverlayTests : IDisposable
         using var overlay = new BodyTemperatureOverlay(text, context => { artBuilds++; return CreateIcons(context); });
         overlay.BeginSession(fixture.Api.Object); SetTemperature(fixture, 34); overlay.Refresh();
         var context = new HudOverlayPreparationContext(fixture.Api.Object, 1, "en"); overlay.Prepare(context);
-        Assert.Equal(new SizeF(45, 24), overlay.Measure());
+        Assert.Equal(new SizeF(50, 24), overlay.Measure());
         var bounds = ElementBounds.Fixed(100, 200, 45, 24).WithEmptyParent(); bounds.CalcWorldBounds();
         var renderer = new Mock<IRenderAPI>(); overlay.Draw(renderer.Object, bounds, new RectangleF(0, 0, 1000, 1000), .1f);
-        var calls = renderer.Invocations.Where(call => call.Method.Name is "Render2DTexturePremultipliedAlpha" or "RenderTexture").ToArray();
-        Assert.Equal(3, calls.Length); Assert.Equal(bounds.renderX + 17, (double)calls[2].Arguments[1]);
-        Assert.Equal(new[] { "PushScissor", "RenderTexture", "PopScissor", "RenderTexture", "Render2DTexturePremultipliedAlpha" }, renderer.Invocations.Select(call => call.Method.Name));
+        var calls = renderer.Invocations.Where(call => call.Method.Name == "Render2DTexturePremultipliedAlpha" || call.Method.Name == "RenderTexture" && (float)call.Arguments[5] != 49).ToArray();
+        Assert.Equal(3, calls.Length); Assert.Equal(bounds.renderX + 22, (double)calls[2].Arguments[1]);
+        Assert.Equal(new[] { "PushScissor", "RenderTexture", "PopScissor", "RenderTexture", "Render2DTexturePremultipliedAlpha" }, renderer.Invocations.Where(call => call.Method.Name != "RenderTexture" || (float)call.Arguments[5] != 49).Select(call => call.Method.Name));
         overlay.SetShowReading(false); Assert.NotEqual(HudOverlayChange.None, overlay.Refresh()); overlay.Prepare(context);
-        Assert.Equal(new SizeF(14, 24), overlay.Measure()); Assert.True(ownedText[0].Disposed);
+        Assert.Equal(new SizeF(24, 24), overlay.Measure()); Assert.True(ownedText[0].Disposed);
         Assert.Equal(1, artBuilds); Assert.Equal(1, textBuilds);
         overlay.SetShowReading(true); overlay.Refresh(); overlay.Prepare(context);
-        Assert.Equal(1, artBuilds); Assert.Equal(2, textBuilds); Assert.Equal(new SizeF(45, 24), overlay.Measure());
+        Assert.Equal(1, artBuilds); Assert.Equal(2, textBuilds); Assert.Equal(new SizeF(50, 24), overlay.Measure());
     }
 
     /// <summary>Strength-only changes update tint without rebuilding text or art and zero clears native cold immediately.</summary>
@@ -288,13 +288,13 @@ public sealed class BodyTemperatureOverlayTests : IDisposable
         var bounds = ElementBounds.Fixed(0, 0, 45, 24).WithEmptyParent(); bounds.CalcWorldBounds();
         var renderer = new Mock<IRenderAPI>();
         overlay.Draw(renderer.Object, bounds, new RectangleF(0, 0, 100, 100), .1f);
-        var firstTint = (Vintagestory.API.MathTools.Vec4f)renderer.Invocations.First(call => call.Method.Name == "RenderTexture").Arguments[6];
+        var firstTint = (Vintagestory.API.MathTools.Vec4f)renderer.Invocations.First(call => call.Method.Name == "RenderTexture" && (float)call.Arguments[5] == 50).Arguments[6];
         Assert.Equal(.5125f, firstTint.R, 5); Assert.Equal(.7875f, firstTint.G, 5);
         SetTemperature(fixture, 37, .75f);
         Assert.NotEqual(HudOverlayChange.None, overlay.Refresh()); overlay.Prepare(context);
         Assert.Equal(1, textBuilds); Assert.Equal(1, iconBuilds);
         renderer.Invocations.Clear(); overlay.Draw(renderer.Object, bounds, new RectangleF(0, 0, 100, 100), .1f);
-        var secondTint = (Vintagestory.API.MathTools.Vec4f)renderer.Invocations.First(call => call.Method.Name == "RenderTexture").Arguments[6];
+        var secondTint = (Vintagestory.API.MathTools.Vec4f)renderer.Invocations.First(call => call.Method.Name == "RenderTexture" && (float)call.Arguments[5] == 50).Arguments[6];
         Assert.Equal(.3375f, secondTint.R, 5); Assert.Equal(.6625f, secondTint.G, 5);
         Assert.Equal(37, overlay.Sample!.DisplayCelsius);
         SetTemperature(fixture, 32, 0); overlay.Refresh(); Assert.Null(overlay.Sample);

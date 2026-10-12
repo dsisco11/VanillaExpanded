@@ -4,6 +4,7 @@ using VanillaExpanded.HudOverlays.Anchoring;
 using VanillaExpanded.HudOverlays.Lifecycle;
 using VanillaExpanded.HudOverlays.Layout;
 using VanillaExpanded.HudOverlays.Registration;
+using VanillaExpanded.HudOverlays.Rendering;
 using VanillaExpanded.ModSystems;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -19,6 +20,7 @@ public sealed class HudOverlaySystem : ModSystem, ILiveConfigurable
     /// <summary>Gets the shared registry for client overlay and group registration.</summary>
     public HudOverlayRegistry Registry { get; } = new();
     internal HudOverlaySession? Session => session;
+    internal HudOverlayIconBackdrop? Backdrop { get; private set; }
 
     #region Public API
     #region Integration
@@ -47,6 +49,7 @@ public sealed class HudOverlaySystem : ModSystem, ILiveConfigurable
         ArgumentNullException.ThrowIfNull(api);
         ObjectDisposedException.ThrowIf(disposed, this);
         this.api = api;
+        Backdrop = new HudOverlayIconBackdrop(api);
         Registry.RegisterGroup(new HudOverlayGroup("held-item-status",
             HudOverlayConfiguration.ResolveHeldItemStatusPlacement(VanillaExpandedModSystem.Config)));
         Registry.RegisterGroup(new HudOverlayGroup("player-status",
@@ -87,8 +90,13 @@ public sealed class HudOverlaySystem : ModSystem, ILiveConfigurable
         {
             session = null;
             api = null;
-            try { Registry.Dispose(); }
-            finally { base.Dispose(); }
+            try { Backdrop?.Dispose(); }
+            finally
+            {
+                Backdrop = null;
+                try { Registry.Dispose(); }
+                finally { base.Dispose(); }
+            }
         }
     }
     #endregion

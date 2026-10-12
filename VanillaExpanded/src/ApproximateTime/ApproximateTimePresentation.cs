@@ -1,16 +1,19 @@
 using System;
 using System.Drawing;
 using VanillaExpanded.HudOverlays.Registration;
+using VanillaExpanded.HudOverlays.Rendering;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 
 namespace VanillaExpanded.ApproximateTime;
 
-/// <summary>Borrows cached time-of-day textures and draws one compact icon without a label or background.</summary>
+/// <summary>Borrows cached time-of-day textures and draws one compact icon with a shared radial-gradient backdrop.</summary>
 internal sealed class ApproximateTimePresentation : IDisposable
 {
     private readonly System.Func<HudOverlayPreparationContext, LoadedTexture[]> load;
+    private readonly System.Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?> loadBackdrop;
     private LoadedTexture[]? icons;
+    private IHudOverlayIconBackdrop? backdrop;
     private HudOverlayPreparationContext? context;
     private ApproximateTimePeriod? period;
     public SizeF Size { get; private set; }
@@ -18,9 +21,11 @@ internal sealed class ApproximateTimePresentation : IDisposable
     #region Public API
     #region Content and rendering
     /// <summary>Uses native cached texture loading, with an injectable loader for headless checks.</summary>
-    public ApproximateTimePresentation(System.Func<HudOverlayPreparationContext, LoadedTexture[]>? load = null)
+    public ApproximateTimePresentation(System.Func<HudOverlayPreparationContext, LoadedTexture[]>? load = null,
+        System.Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null)
     {
         this.load = load ?? LoadIcons;
+        this.loadBackdrop = loadBackdrop ?? HudOverlayIconBackdrop.Load;
     }
     /// <summary>Stores the estimated period independently of the current native hour.</summary>
     public void SetContent(ApproximateTimePeriod value)
@@ -32,6 +37,7 @@ internal sealed class ApproximateTimePresentation : IDisposable
     {
         if (!period.HasValue) return;
         if (icons == null || !ReferenceEquals(context?.Api, preparation.Api)) icons = load(preparation);
+        if (backdrop == null || !ReferenceEquals(context?.Api, preparation.Api)) backdrop = loadBackdrop(preparation);
         context = preparation;
         Size = new SizeF(24, 24);
     }
@@ -40,6 +46,7 @@ internal sealed class ApproximateTimePresentation : IDisposable
     {
         if (!period.HasValue || icons == null || context == null) return;
         double pixels = 24 * context.GuiScale;
+        backdrop?.Draw(renderer, bounds.renderX, bounds.renderY + (bounds.OuterHeight - pixels) / 2, context.GuiScale);
         renderer.RenderTexture(icons[(int)period.Value].TextureId, bounds.renderX,
             bounds.renderY + (bounds.OuterHeight - pixels) / 2, pixels, pixels, 50);
     }
@@ -49,6 +56,7 @@ internal sealed class ApproximateTimePresentation : IDisposable
     public void Reset()
     {
         icons = null;
+        backdrop = null;
         context = null;
         period = null;
         Size = SizeF.Empty;
