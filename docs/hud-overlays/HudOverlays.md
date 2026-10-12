@@ -14,6 +14,7 @@ A `HudOverlayRegistration` specifies:
 - The overlay instance and a cheap enabled selector that reads the feature's current setting.
 - An existing group ID.
 - An integer display order and a positive refresh interval in milliseconds.
+- Optional localization metadata for a hover title and a fixed footprint for a reserved slot.
 
 The registry rejects duplicate IDs, unknown groups, and instances it already owns or has disposed. Successful registration transfers ownership of the overlay to the registry. Keep the returned `IDisposable` handle and dispose it when removing the integration. If registration fails, the caller still owns the instance and must clean it up.
 
@@ -31,7 +32,9 @@ try
         isEnabled: () => featureEnabled,
         groupId: "player-status",
         order: 50,
-        refreshIntervalMs: 1000));
+        refreshIntervalMs: 1000,
+        hoverLabelKey: "example:hud-status",
+        reservedSize: new System.Drawing.SizeF(24, 24)));
 }
 catch
 {
@@ -74,7 +77,9 @@ An overlay belongs to a group. A `HudOverlayGroup` defines one placement and a `
 
 `HudOverlayPlacement` defines the target, the attachment point on that target, the pivot on the group, and X/Y offsets. Available target IDs are `screen`, `hotbar`, and `saturation`. Attachment and pivot values come from `HudOverlayPoint`. For example, a target's `LeftBottom` attachment with a group's `RightBottom` pivot places the group to the target's left, aligned at the bottom, before offsets and viewport clamping.
 
-Packing controls horizontal or vertical flow, spacing, padding, and cross-axis alignment. Members are ordered by ascending `Order`, then by ordinal overlay ID. This establishes relative order, not a permanent screen slot.
+Packing controls horizontal or vertical flow, spacing, padding, and cross-axis alignment. Members are ordered by ascending `Order`, then by ordinal overlay ID.
+
+For a stable slot, supply a positive `reservedSize` in unscaled GUI units when registering the overlay. The layout uses this footprint from the start, including while the overlay is disabled, inapplicable, empty, or recovering from an error. Drawing still requires successfully prepared, visible content; a reservation alone exposes no hover target. Choose a footprint that accommodates the presentation's largest intended content and keep artwork at stable coordinates within the supplied bounds. Content exceeding the slot is clipped. Registrations without a reservation continue to use their measured size and release space when hidden.
 
 The built-in groups are:
 
@@ -87,7 +92,7 @@ Joining a shared group adopts its placement and packing rules. Additional native
 
 ## Visibility and cleanup
 
-The global HUD setting, the registration's enabled selector, applicability, and anchor availability determine participation. A missing or hidden anchor hides its group without choosing a fallback location. Hidden or inapplicable members currently release their layout space, so adjacent members may move. Fixed slots for invisible indicators are not yet supported.
+The global HUD setting, the registration's enabled selector, applicability, and anchor availability determine visibility. A missing or hidden anchor hides its group without choosing a fallback location. The built-in indicators reserve fixed slots, keeping their positions stable when neighboring indicators disappear or change content. Removing a registration releases its slot; changing group membership, placement, or GUI scale can still change positions.
 
 An applicable overlay can return an empty footprint when it has nothing to show. This keeps it eligible for refreshes that may reveal content later. When visibility returns, the runtime refreshes content before drawing it.
 

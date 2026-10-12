@@ -28,6 +28,29 @@ public sealed class HudOverlayIconTextPresentationTests : IDisposable
     }
     #endregion
     #region Presentation
+    /// <summary>Different count widths use one reserved right-edge icon position and keep the configured gap.</summary>
+    [Fact]
+    public void ReservedAmmoIconDoesNotMoveWithCountWidth()
+    {
+        var api = new Mock<ICoreClientAPI>(); var renderer = new Mock<IRenderAPI>();
+        api.SetupGet(value => value.Render).Returns(renderer.Object);
+        int width = 10;
+        using var presentation = new HudOverlayIconTextPresentation((_, _) => new LoadedTexture(api.Object) { Width = width, Height = 14 }, iconSize: 24, textBeforeIcon: true, gap: 2);
+        var bounds = ElementBounds.Fixed(0, 0, 128, 24).WithEmptyParent();
+        bounds.absInnerWidth = 128; bounds.absInnerHeight = 24;
+        foreach (int count in new[] { 1, 12345 })
+        {
+            width = count == 1 ? 10 : 60;
+            presentation.SetContent(new ItemStack(new Item { Code = new AssetLocation("game:arrow-flint") }), "vanillaexpanded:bow-ammunition-count", count);
+            presentation.Prepare(new HudOverlayPreparationContext(api.Object, 1, "en"));
+            presentation.Draw(renderer.Object, bounds, new RectangleF(0, 0, 128, 24), .1f);
+            var icon = Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderItemstackToGui");
+            Assert.Equal(116d, (double)icon.Arguments[1]);
+            var text = Assert.Single(renderer.Invocations, call => call.Method.Name == "Render2DTexturePremultipliedAlpha");
+            Assert.Equal(102d - width, (double)text.Arguments[1]);
+            renderer.Invocations.Clear();
+        }
+    }
     /// <summary>Unchanged contexts reuse text while relevant locale, font, scale and content changes rebuild once.</summary>
     [Fact]
     public void PreparationCachesNativeTextAndDrawUsesCopiedStack()

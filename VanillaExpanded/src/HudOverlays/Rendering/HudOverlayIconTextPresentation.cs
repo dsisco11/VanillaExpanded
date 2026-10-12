@@ -104,10 +104,15 @@ public sealed class HudOverlayIconTextPresentation : IDisposable
         // Keep the text and icon centered independently within the allocated native bounds.
         double textX = x;
         double iconX = x;
-        if (text != null && slot.Itemstack != null)
+        if (slot.Itemstack != null)
         {
-            if (textBeforeIcon) iconX += text.Width + gap * scale;
-            else textX += (iconSize + gap) * scale;
+            if (textBeforeIcon)
+            {
+                // Anchor the icon to the reserved right edge; changing count width only moves the text's left edge.
+                iconX = x + bounds.OuterWidth - iconSize * scale;
+                textX = iconX - gap * scale - (text?.Width ?? 0);
+            }
+            else if (text != null) textX += (iconSize + gap) * scale;
         }
         if (text != null) renderer.Render2DTexturePremultipliedAlpha(text.TextureId, textX, y + (height - text.Height) / 2,
             text.Width, text.Height, 50);

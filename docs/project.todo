@@ -11,7 +11,7 @@
 
     ## HUD Indicators:
         ☑ Add localized hover labels to every HUD indicator explaining what the indicator represents. Show labels when the player can move the mouse over the HUD; invisible indicators must not expose hover targets.
-        ☐ Give every HUD indicator a stable position relative to its screen/HUD anchor. Reserve each indicator's space while it is invisible so other indicators do not shift into the gap; keep the time indicator rightmost in the bottom-left group.
+        ☑ Give every HUD indicator a stable position relative to its screen/HUD anchor. Reserve each indicator's space while it is invisible so other indicators do not shift into the gap; keep the time indicator rightmost in the bottom-left group.
         ☐ Give all bottom-left HUD indicators a faint black radial-gradient circle behind their icons, fading smoothly to transparent at the edge. Use a consistent treatment across the group; hide the background with its indicator. This replaces the earlier background-free design for these indicators.
         ☐ Add an indicator for when a temporal storm is approaching or imminent.
 

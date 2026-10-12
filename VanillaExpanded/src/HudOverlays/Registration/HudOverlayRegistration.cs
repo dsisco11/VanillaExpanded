@@ -1,4 +1,5 @@
 using System;
+using System.Drawing;
 
 namespace VanillaExpanded.HudOverlays.Registration;
 
@@ -14,10 +15,12 @@ public sealed record HudOverlayRegistration
     public int RefreshIntervalMs { get; }
     /// <summary>Optional localization key explaining this indicator; the host resolves it in the current locale.</summary>
     public string? HoverLabelKey { get; }
+    /// <summary>Optional fixed GUI-unit footprint, reserved even while disabled, inapplicable or unprepared.</summary>
+    public SizeF? ReservedSize { get; }
     #region Public API
-    /// <summary>Defines a namespaced overlay, live enabled selector, group, deterministic order, positive interval and optional localized hover label.</summary>
+    /// <summary>Defines identity, live visibility, ordering, refresh interval, optional hover label and optional fixed layout reservation.</summary>
     public HudOverlayRegistration(string id, IHudOverlay overlay, Func<bool> isEnabled, string groupId, int order = 0,
-        int refreshIntervalMs = DefaultRefreshIntervalMs, string? hoverLabelKey = null)
+        int refreshIntervalMs = DefaultRefreshIntervalMs, string? hoverLabelKey = null, SizeF? reservedSize = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         int separator = id.IndexOf(':');
@@ -27,6 +30,8 @@ public sealed record HudOverlayRegistration
         ArgumentNullException.ThrowIfNull(isEnabled);
         ArgumentException.ThrowIfNullOrWhiteSpace(groupId);
         if (refreshIntervalMs <= 0) throw new ArgumentOutOfRangeException(nameof(refreshIntervalMs));
+        if (reservedSize is SizeF size && (!float.IsFinite(size.Width) || !float.IsFinite(size.Height) || size.Width <= 0 || size.Height <= 0))
+            throw new ArgumentOutOfRangeException(nameof(reservedSize), "Reserved dimensions must be finite and positive.");
         Id = id;
         Overlay = overlay;
         IsEnabled = isEnabled;
@@ -34,6 +39,7 @@ public sealed record HudOverlayRegistration
         Order = order;
         RefreshIntervalMs = refreshIntervalMs;
         HoverLabelKey = hoverLabelKey;
+        ReservedSize = reservedSize;
     }
     #endregion
     #region Private

@@ -12,6 +12,17 @@ public sealed class HudOverlayRegistryTests
 {
     #region Public API
     #region Registration and metadata
+    /// <summary>Invalid reservations cannot enter layout or silently erase a reserved slot.</summary>
+    [Theory]
+    [InlineData(0, 24)]
+    [InlineData(24, 0)]
+    [InlineData(-1, 24)]
+    [InlineData(float.NaN, 24)]
+    [InlineData(24, float.PositiveInfinity)]
+    public void ReservedDimensionsMustBeFiniteAndPositive(float width, float height)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new HudOverlayRegistration("mod:test", new Probe(), () => true, "group", reservedSize: new SizeF(width, height)));
+    }
     /// <summary>Rejected duplicate IDs/instances and unknown groups cannot take ownership or alter membership.</summary>
     [Fact]
     public void RejectionsPreserveCallerOwnershipAndMembership()

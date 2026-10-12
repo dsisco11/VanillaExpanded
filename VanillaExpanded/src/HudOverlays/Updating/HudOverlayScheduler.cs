@@ -132,22 +132,23 @@ internal sealed class HudOverlayScheduler
 
     #endregion
     #region Prepared state and cleanup
-    /// <summary>Provides all eligible measured members, including members suppressed by overflow.</summary>
+    /// <summary>Provides fixed reservations independently of visibility and measured sizes for ordinary drawable members.</summary>
     public IReadOnlyList<KeyValuePair<HudOverlayRegistration, SizeF>> GetMembers(string groupId)
     {
         CheckThread();
         return states.Values
-            .Where(state => state.Registration.GroupId == groupId && Drawable(state))
+            .Where(state => state.Registration.GroupId == groupId
+                && (state.Registration.ReservedSize.HasValue || Drawable(state)))
             .OrderBy(state => state.Registration.Order).ThenBy(state => state.Registration.Id, StringComparer.Ordinal)
-            .Select(state => new KeyValuePair<HudOverlayRegistration, SizeF>(state.Registration, state.Size)).ToArray();
+            .Select(state => new KeyValuePair<HudOverlayRegistration, SizeF>(state.Registration, state.Registration.ReservedSize ?? state.Size)).ToArray();
     }
 
-    /// <summary>Rejects stale registration identities and unprepared/restoring feature state.</summary>
+    /// <summary>Rejects stale, unprepared or empty content; a reserved layout slot alone is never drawable or hoverable.</summary>
     public bool IsDrawable(HudOverlayRegistration registration)
     {
         CheckThread();
         return states.TryGetValue(registration.Id, out var state)
-            && ReferenceEquals(state.Registration, registration) && Drawable(state);
+            && ReferenceEquals(state.Registration, registration) && Drawable(state) && state.Size.Width > 0 && state.Size.Height > 0;
     }
 
     /// <summary>Reports one drained lifecycle-boundary failure without interrupting healthy registrations.</summary>

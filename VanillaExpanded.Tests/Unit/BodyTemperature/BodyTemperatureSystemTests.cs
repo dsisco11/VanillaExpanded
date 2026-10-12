@@ -35,6 +35,8 @@ public sealed class BodyTemperatureSystemTests
         {
             visits++; Assert.Equal(BodyTemperatureSystem.OverlayId, registration.Id);
             Assert.Equal(group.Id, registration.GroupId); Assert.Equal(250, registration.RefreshIntervalMs);
+            Assert.Equal(new System.Drawing.SizeF(72, 46), registration.ReservedSize);
+            Assert.True(registration.Order < 90);
             Assert.IsType<BodyTemperatureOverlay>(registration.Overlay);
         });
         Assert.Equal(1, visits); feature.Dispose(); feature.Dispose();
