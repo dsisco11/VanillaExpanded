@@ -35,7 +35,7 @@ internal sealed class WeatherConditionsPresentation : IDisposable
         int count = (sample.Precipitation.HasValue ? 1 : 0) + (sample.Fog ? 1 : 0);
         if (count > 0 && (icons == null || !ReferenceEquals(context?.Api, preparation.Api))) icons = load(preparation);
         context = preparation;
-        Size = count == 0 ? SizeF.Empty : new SizeF(count * Diameter + (count - 1) * Gap, Diameter);
+        Size = count == 0 ? SizeF.Empty : new SizeF(sample.Fog ? 2 * Diameter + Gap : Diameter, Diameter);
     }
     /// <summary>Draws only borrowed prepared textures; the host owns clipping and GUI visibility.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds)
@@ -47,9 +47,9 @@ internal sealed class WeatherConditionsPresentation : IDisposable
         {
             int index = type switch { EnumPrecipitationType.Snow => 1, EnumPrecipitationType.Hail => 2, _ => 0 };
             renderer.RenderTexture(icons[index].TextureId, x, y, pixels, pixels, 50);
-            x += (Diameter + Gap) * context.GuiScale;
         }
-        if (sample.Fog) renderer.RenderTexture(icons[3].TextureId, x, y, pixels, pixels, 50);
+        // Fog owns the second slot even when precipitation is absent.
+        if (sample.Fog) renderer.RenderTexture(icons[3].TextureId, x + (Diameter + Gap) * context.GuiScale, y, pixels, pixels, 50);
     }
     #endregion
     #region Lifetime

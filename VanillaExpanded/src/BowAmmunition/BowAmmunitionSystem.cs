@@ -32,9 +32,11 @@ internal sealed class BowAmmunitionSystem : ModSystem, ILiveConfigurable
         overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays && VanillaExpandedModSystem.Config.EnableBowAmmunitionOverlay);
         try
         {
+            // Reserve the count/empty text area as well as the icon so its anchor never follows text width.
             registration = hud.Registry.Register(new HudOverlayRegistration(OverlayId, overlay,
                 () => overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays
-                    && VanillaExpandedModSystem.Config.EnableBowAmmunitionOverlay), "held-item-status", refreshIntervalMs: 250, hoverLabelKey: "vanillaexpanded:hud-label-bow-ammunition"));
+                    && VanillaExpandedModSystem.Config.EnableBowAmmunitionOverlay), "held-item-status", refreshIntervalMs: 250,
+                hoverLabelKey: "vanillaexpanded:hud-label-bow-ammunition", reservedSize: new System.Drawing.SizeF(128, 24)));
         }
         catch { overlay.Dispose(); throw; }
     }
