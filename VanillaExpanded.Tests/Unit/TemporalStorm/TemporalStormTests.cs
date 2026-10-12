@@ -161,7 +161,7 @@ public sealed class TemporalStormTests
             {
                 Assert.Equal(TemporalStormSystem.OverlayId, registration.Id);
                 Assert.Equal("player-status", registration.GroupId);
-                Assert.Equal(new SizeF(24, 24), registration.ReservedSize);
+                Assert.Null(registration.ReservedSize);
                 Assert.Equal(95, registration.Order);
                 Assert.Equal("vanillaexpanded:hud-label-temporal-storm", registration.HoverLabelKey);
                 Assert.True(registration.IsEnabled());

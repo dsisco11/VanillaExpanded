@@ -33,11 +33,11 @@ internal sealed class BodyTemperatureSystem : ModSystem, ILiveConfigurable
         overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays && VanillaExpandedModSystem.Config.EnableBodyTemperatureOverlay);
         try
         {
-            // Keep room for the degree reading and chevrons at both ends even while the warning is hidden.
+            // Use the visible reading's measured size and release its space while the warning is hidden.
             registration = hud.Registry.Register(new HudOverlayRegistration(OverlayId, overlay,
                 () => overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays
                     && VanillaExpandedModSystem.Config.EnableBodyTemperatureOverlay), "player-status", order: 98, refreshIntervalMs: 250,
-                hoverLabelKey: "vanillaexpanded:hud-label-body-temperature", reservedSize: new System.Drawing.SizeF(72, 46)));
+                hoverLabelKey: "vanillaexpanded:hud-label-body-temperature"));
         }
         catch { overlay.Dispose(); throw; }
     }

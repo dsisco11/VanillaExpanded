@@ -92,7 +92,7 @@ Joining a shared group adopts its placement and packing rules. Additional native
 
 ## Visibility and cleanup
 
-The global HUD setting, the registration's enabled selector, applicability, and anchor availability determine visibility. A missing or hidden anchor hides its group without choosing a fallback location. The built-in indicators reserve fixed slots, keeping their positions stable when neighboring indicators disappear or change content. Removing a registration releases its slot; changing group membership, placement, or GUI scale can still change positions.
+The global HUD setting, the registration's enabled selector, applicability, and anchor availability determine visibility. A missing or hidden anchor hides its group without choosing a fallback location. The built-in indicators use their measured sizes and collapse when hidden, disabled, inapplicable, or empty. The remaining indicators close the gaps while preserving their order. Custom registrations can opt into a fixed reservation as described above.
 
 An applicable overlay can return an empty footprint when it has nothing to show. This keeps it eligible for refreshes that may reveal content later. When visibility returns, the runtime refreshes content before drawing it.
 
