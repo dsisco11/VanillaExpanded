@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using VanillaExpanded.HudOverlays.Registration;
+using VanillaExpanded.HudOverlays.Rendering;
 
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -9,7 +10,7 @@ using Vintagestory.API.Common.Entities;
 namespace VanillaExpanded.ApproximateTime;
 
 /// <summary>Reads synchronized observation age and owns the cached approximate time icon.</summary>
-internal sealed class ApproximateTimeOverlay : IHudOverlay
+internal sealed class ApproximateTimeOverlay : IHudOverlay, IHudOverlayBackdropProvider
 {
 
     private readonly ApproximateTimePresentation presentation;
@@ -103,6 +104,11 @@ internal sealed class ApproximateTimeOverlay : IHudOverlay
     public void Prepare(HudOverlayPreparationContext context) => presentation.Prepare(context);
     /// <summary>Returns prepared icon dimensions in unscaled GUI units.</summary>
     public SizeF Measure() => presentation.Size;
+    /// <summary>Supplies prepared backdrop positions to the shared host pass.</summary>
+    public void CollectBackdrops(IRenderAPI renderer, ElementBounds bounds)
+    {
+        presentation.CollectBackdrops(renderer, bounds);
+    }
     /// <summary>Draws cached artwork without calendar or terrain queries.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime)
     {
