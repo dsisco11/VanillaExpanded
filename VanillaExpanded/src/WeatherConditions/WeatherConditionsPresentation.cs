@@ -19,6 +19,8 @@ internal sealed class WeatherConditionsPresentation : IDisposable
     private HudOverlayPreparationContext? context;
     private WeatherConditionsSample? sample;
     private int[] layers = [];
+    /// <summary>Controls visibility and retained resources during transitions.</summary>
+    public HudOverlayVisibilityTransition Visibility { get; } = new();
     public SizeF Size { get; private set; }
     #region Public API
     #region Content and rendering
@@ -52,6 +54,7 @@ internal sealed class WeatherConditionsPresentation : IDisposable
         if (visible && backdrop == null) backdrop = loadBackdrop(preparation);
         context = preparation;
         Size = visible ? new SizeF(Diameter, Diameter) : SizeF.Empty;
+        if (visible) Visibility.Show();
     }
     /// <summary>Draws only borrowed prepared textures; the host owns clipping and GUI visibility.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds)
@@ -61,7 +64,7 @@ internal sealed class WeatherConditionsPresentation : IDisposable
         double x = bounds.renderX, y = bounds.renderY + (bounds.OuterHeight - pixels) / 2;
         if (icons.Length == WeatherConditionsLayers.Names.Length)
         {
-            foreach (int layer in layers) renderer.RenderTexture(icons[layer].TextureId, x, y, pixels, pixels, 50);
+            foreach (int layer in layers) renderer.RenderTexture(icons[layer].TextureId, x, y, pixels, pixels, 50, HudOverlayDrawOpacity.Tint);
             return;
         }
         // Until the complete approved layer set exists, retain both existing weather symbols inside the one slot.
@@ -71,12 +74,12 @@ internal sealed class WeatherConditionsPresentation : IDisposable
         if (sample.Precipitation is EnumPrecipitationType type)
         {
             int index = type switch { EnumPrecipitationType.Snow => 1, EnumPrecipitationType.Hail => 2, _ => 0 };
-            renderer.RenderTexture(icons[index].TextureId, x, legacyY, legacySize, legacySize, 50);
+            renderer.RenderTexture(icons[index].TextureId, x, legacyY, legacySize, legacySize, 50, HudOverlayDrawOpacity.Tint);
         }
         if (sample.Fog)
         {
             double fogX = both ? x + legacySize : x;
-            renderer.RenderTexture(icons[3].TextureId, fogX, legacyY, legacySize, legacySize, 50);
+            renderer.RenderTexture(icons[3].TextureId, fogX, legacyY, legacySize, legacySize, 50, HudOverlayDrawOpacity.Tint);
         }
     }
     #endregion
@@ -88,9 +91,12 @@ internal sealed class WeatherConditionsPresentation : IDisposable
         double y = bounds.renderY + (bounds.OuterHeight - 24 * context.GuiScale) / 2;
         backdrop?.Queue(renderer, bounds.renderX, y, context.GuiScale);
     }
+    /// <summary>Retains prepared content until the visibility exit finishes.</summary>
+    public void Hide() => Visibility.Hide(Reset);
     /// <summary>Drops bindings without deleting resources owned by the engine cache.</summary>
     public void Reset()
     {
+        Visibility.Reset();
         icons = null;
         backdrop = null;
         context = null;

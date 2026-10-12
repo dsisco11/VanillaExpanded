@@ -155,6 +155,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
                 if (!active.Contains(member.Registration) || !isDrawable(member.Registration)
                     || member.Clip.Width <= 0 || member.Clip.Height <= 0
                     || member.Registration.Overlay is not IHudOverlayBackdropProvider provider) continue;
+                using var opacity = new HudOverlayDrawOpacity(member.Registration.Overlay);
                 try { backdropBatch.Collect(member.Clip, () => provider.CollectBackdrops(capi.Render, member.Bounds)); }
                 catch (Exception error) { failure(member.Registration, error); }
             }
@@ -173,6 +174,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
             clip.absInnerWidth = member.Clip.Width;
             clip.absInnerHeight = member.Clip.Height;
             clip.Initialized = true;
+            using var opacity = new HudOverlayDrawOpacity(member.Registration.Overlay);
             capi.Render.PushScissor(clip, true);
             try { member.Registration.Overlay.Draw(capi.Render, member.Bounds, member.Clip, deltaTime); }
             catch (Exception error) { failure(member.Registration, error); }

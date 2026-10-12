@@ -9,7 +9,7 @@ internal static class ToolHeadGuiShaderSettings
 {
     #region Public API
     /// <summary>Configures prepared geometry and effects without rebuilding inventory presentation.</summary>
-    internal static bool Apply(ICoreClientAPI api, IShaderProgram shader, ItemStack stack, ItemRenderInfo info, float[] model)
+    internal static bool Apply(ICoreClientAPI api, IShaderProgram shader, ItemStack stack, ItemRenderInfo info, float[] model, float opacity = 1)
     {
         int temperature = (int)stack.Collectible.GetTemperature(api.World, stack);
         int glow = GameMath.Clamp((temperature - 550) / 2, 0, 255);
@@ -20,7 +20,7 @@ internal static class ToolHeadGuiShaderSettings
         float lightingTint = info.NormalShaded ? 0.5f : 1f;
         // Direction (0.3, -0.3, sqrt(0.82)) favors the GUI front (+Z) while remaining above and to the right.
         shader.Uniform("lightPosition", 0.9f, -0.9f, 2.7166154f);
-        shader.Uniform("rgbaIn", new Vec4f(lightingTint, lightingTint, lightingTint, 1));
+        shader.Uniform("rgbaIn", new Vec4f(lightingTint, lightingTint, lightingTint, opacity));
         shader.Uniform("applyColor", info.ApplyColor ? 1 : 0);
         shader.Uniform("alphaTest", info.AlphaTest);
         shader.Uniform("extraGlow", glow);

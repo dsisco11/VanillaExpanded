@@ -9,7 +9,7 @@ using Vintagestory.GameContent;
 namespace VanillaExpanded.BowAmmunition;
 
 /// <summary>Owns bow applicability, stable ammunition samples, notifications, and passive presentation.</summary>
-internal sealed class BowAmmunitionOverlay : IHudOverlay
+internal sealed class BowAmmunitionOverlay : IHudOverlay, IHudOverlayVisibilityTransition
 {
     private readonly Action invalidate;
     private readonly HudOverlayIconTextPresentation presentation;
@@ -20,6 +20,11 @@ internal sealed class BowAmmunitionOverlay : IHudOverlay
     private bool enabled = true;
     private bool disposed;
     internal BowAmmunitionSample? Sample { get; private set; }
+    private HudOverlayIconTextPresentation? preparedPresentation;
+    /// <summary>Controls visibility independently of the current ammunition sample.</summary>
+    public HudOverlayVisibilityTransition Visibility { get; } = new();
+    /// <summary>Retains the last preparation for the shared host's exit transition.</summary>
+    public void HidePresentation() => ClearSample();
     #region Public API
     #region Lifecycle
     /// <summary>Uses cached native icon/count presentation and muted text for the generic empty-arrow state.</summary>
@@ -39,7 +44,7 @@ internal sealed class BowAmmunitionOverlay : IHudOverlay
         player = api.World.Player;
         if (enabled && player != null) subscriptions = new(api, player, invalidate);
     }
-    /// <summary>Suspends subscriptions and presentation resources immediately, preserving registration ownership.</summary>
+    /// <summary>Suspends subscriptions and starts the presentation exit, preserving registration ownership.</summary>
     public bool SetEnabled(bool value)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
@@ -63,6 +68,7 @@ internal sealed class BowAmmunitionOverlay : IHudOverlay
         subscriptions?.Dispose(); subscriptions = null;
         api = null; player = null;
         ClearSample();
+        ReleasePresentation();
     }
     /// <summary>Finally releases the consumer and its presentation helpers exactly once.</summary>
     public void Dispose()
@@ -107,14 +113,19 @@ internal sealed class BowAmmunitionOverlay : IHudOverlay
     /// <summary>Prepares only sampled content in the shared scheduler's resource boundary.</summary>
     public void Prepare(HudOverlayPreparationContext context)
     {
-        if (Sample != null) CurrentPresentation.Prepare(context);
+        if (Sample != null)
+        {
+            CurrentPresentation.Prepare(context);
+            preparedPresentation = CurrentPresentation;
+            Visibility.Show();
+        }
     }
     /// <summary>Reports cached dimensions without accessing inventory.</summary>
     public SizeF Measure() => Sample == null ? SizeF.Empty : CurrentPresentation.Size;
     /// <summary>Draws the cached icon/count or muted empty state without gameplay queries.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime)
     {
-        if (Sample != null) CurrentPresentation.Draw(renderer, bounds, clip, deltaTime);
+        preparedPresentation?.Draw(renderer, bounds, clip, deltaTime);
     }
     #endregion
     #endregion
@@ -125,6 +136,13 @@ internal sealed class BowAmmunitionOverlay : IHudOverlay
     private void ClearSample()
     {
         Sample = null;
+        Visibility.Hide(ReleasePresentation);
+    }
+    /// <summary>Releases cached artwork after fading or immediately at world exit.</summary>
+    private void ReleasePresentation()
+    {
+        Visibility.Reset();
+        preparedPresentation = null;
         try { presentation.Reset(); }
         finally { emptyPresentation.Reset(); }
     }

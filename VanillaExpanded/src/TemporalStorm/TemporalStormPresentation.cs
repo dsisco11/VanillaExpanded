@@ -20,6 +20,8 @@ internal sealed class TemporalStormPresentation : IDisposable
     private bool pulsing;
     private readonly TemporalStormPulse pulse = new();
     private readonly Vec4f tint = new(1, 1, 1, 1);
+    /// <summary>Controls visibility and retained resources during transitions.</summary>
+    public HudOverlayVisibilityTransition Visibility { get; } = new(flash: true);
     public SizeF Size { get; private set; }
 
     #region Public API
@@ -48,6 +50,7 @@ internal sealed class TemporalStormPresentation : IDisposable
         if (backdrop == null || !ReferenceEquals(context?.Api, preparation.Api)) backdrop = loadBackdrop(preparation);
         context = preparation;
         Size = new SizeF(24, 24);
+        Visibility.Show();
     }
     /// <summary>Draws prepared artwork without storm sampling.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds, float deltaTime)
@@ -58,7 +61,7 @@ internal sealed class TemporalStormPresentation : IDisposable
         tint.W = pulsing ? pulse.Advance(deltaTime) : 1;
         renderer.RenderTexture(icons[(int)stage.Value].TextureId, bounds.renderX,
             bounds.renderY + (bounds.OuterHeight - pixels) / 2, pixels, pixels, 50,
-            pulsing ? tint : null);
+            pulsing && !Visibility.Animating ? HudOverlayDrawOpacity.Multiply(tint) : HudOverlayDrawOpacity.Tint);
     }
     #endregion
     /// <summary>Queues the prepared icon circle separately from foreground drawing.</summary>
@@ -70,9 +73,12 @@ internal sealed class TemporalStormPresentation : IDisposable
         backdrop?.Queue(renderer, bounds.renderX, y, context.GuiScale);
     }
     #region Lifetime
+    /// <summary>Retains prepared content until the visibility exit finishes.</summary>
+    public void Hide() => Visibility.Hide(Reset);
     /// <summary>Drops session bindings without disposing engine-owned cached textures.</summary>
     public void Reset()
     {
+        Visibility.Reset();
         icons = null;
         backdrop = null;
         context = null;

@@ -10,7 +10,7 @@ using Vintagestory.API.Common.Entities;
 namespace VanillaExpanded.ApproximateTime;
 
 /// <summary>Reads synchronized observation age and owns the cached approximate time icon.</summary>
-internal sealed class ApproximateTimeOverlay : IHudOverlay, IHudOverlayBackdropProvider
+internal sealed class ApproximateTimeOverlay : IHudOverlay, IHudOverlayBackdropProvider, IHudOverlayVisibilityTransition
 {
 
     private readonly ApproximateTimePresentation presentation;
@@ -20,6 +20,11 @@ internal sealed class ApproximateTimeOverlay : IHudOverlay, IHudOverlayBackdropP
     private bool enabled = true;
     private bool disposed;
 
+    /// <summary>Controls retained artwork during visibility changes.</summary>
+    public HudOverlayVisibilityTransition Visibility => presentation.Visibility;
+
+    /// <summary>Retains the last preparation for the shared host's exit transition.</summary>
+    public void HidePresentation() => Clear();
     #region Public API
     #region Lifecycle
     /// <summary>Creates an asset-backed icon presentation with optional headless loading.</summary>
@@ -47,6 +52,7 @@ internal sealed class ApproximateTimeOverlay : IHudOverlay, IHudOverlayBackdropP
     {
         api = null;
         Clear();
+        presentation.Reset();
     }
     /// <summary>Releases borrowed artwork bindings and session bindings exactly once.</summary>
     public void Dispose()
@@ -101,7 +107,10 @@ internal sealed class ApproximateTimeOverlay : IHudOverlay, IHudOverlayBackdropP
         return HudOverlayChange.Presentation | HudOverlayChange.Measurement;
     }
     /// <summary>Prepares cached artwork for the estimated part of the day.</summary>
-    public void Prepare(HudOverlayPreparationContext context) => presentation.Prepare(context);
+    public void Prepare(HudOverlayPreparationContext context)
+    {
+        if (period.HasValue) presentation.Prepare(context);
+    }
     /// <summary>Returns prepared icon dimensions in unscaled GUI units.</summary>
     public SizeF Measure() => presentation.Size;
     /// <summary>Supplies prepared backdrop positions to the shared host pass.</summary>
@@ -123,7 +132,7 @@ internal sealed class ApproximateTimeOverlay : IHudOverlay, IHudOverlayBackdropP
         entity = null;
         period = null;
 
-        presentation.Reset();
+        presentation.Hide();
     }
     #endregion
 }
