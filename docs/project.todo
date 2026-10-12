@@ -1,6 +1,7 @@
 # Vanilla: Expanded TODO List:
     ## Issues:
         ☐ Fix cave-art tool-mode menu. all of the options are extremely tiny because there are so many.
+        ☐ Design a better weather indicator system which can clearly communicate all possible weather states to the player at a glance using only a single "composite" indicator. e.g. the indicator is composed of multiple sub-icons representing different weather elements (rain, snow, storm, wind speed, etc.) that combine into one cohesive visual.
 
     ## New Features:
         ☐ Add a "Todo List" feature which allows players to create their own ingame tasks and reminders.
