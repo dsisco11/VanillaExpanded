@@ -5,6 +5,6 @@ namespace VanillaExpanded.HudOverlays.Rendering;
 /// <summary>Separates prepared backdrop resources from feature-owned icon content.</summary>
 internal interface IHudOverlayIconBackdrop
 {
-    /// <summary>Draws a 24-unit background at the supplied GUI pixel position and scale.</summary>
-    void Draw(IRenderAPI renderer, double x, double y, double scale);
+    /// <summary>Queues a 24-unit background during the host's collection pass at the supplied pixel position and scale.</summary>
+    void Queue(IRenderAPI renderer, double x, double y, double scale);
 }

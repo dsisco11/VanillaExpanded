@@ -8,7 +8,7 @@ using Vintagestory.API.Common;
 namespace VanillaExpanded.BodyTemperature;
 
 /// <summary>Samples synchronized temperature warnings and owns its cached passive temperature presentation.</summary>
-internal sealed class BodyTemperatureOverlay : IHudOverlay
+internal sealed class BodyTemperatureOverlay : IHudOverlay, IHudOverlayBackdropProvider
 {
     private readonly BodyTemperatureThermometerPresentation thermometer;
     private bool showReading = true;
@@ -104,6 +104,12 @@ internal sealed class BodyTemperatureOverlay : IHudOverlay
     }
     #endregion
     #region Presentation
+    /// <summary>Supplies prepared backdrop positions to the shared host pass.</summary>
+    public void CollectBackdrops(IRenderAPI renderer, ElementBounds bounds)
+    {
+        thermometer.CollectBackdrops(renderer, bounds);
+    }
+
     /// <summary>Prepares thermometer artwork and optional localized text for a visible warning.</summary>
     public void Prepare(HudOverlayPreparationContext context)
     {

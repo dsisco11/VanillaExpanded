@@ -88,19 +88,19 @@ public sealed class WeatherConditionsTests
         var renderer = new Mock<IRenderAPI>();
         var bounds = ElementBounds.Fixed(0, 0, 51, 24).WithEmptyParent();
         bounds.CalcWorldBounds();
-        presentation.Draw(renderer.Object, bounds);
+        presentation.CollectBackdrops(renderer.Object, bounds); presentation.Draw(renderer.Object, bounds);
         var fog = Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture" && (float)call.Arguments[5] == 50);
         Assert.Equal(4, fog.Arguments[0]);
         Assert.Equal(bounds.renderX + 27, (double)fog.Arguments[1]);
         renderer.Invocations.Clear();
         presentation.SetContent(new(EnumPrecipitationType.Rain, true));
         presentation.Prepare(preparation);
-        presentation.Draw(renderer.Object, bounds);
+        presentation.CollectBackdrops(renderer.Object, bounds); presentation.Draw(renderer.Object, bounds);
         Assert.Equal(bounds.renderX + 27, (double)Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture" && (int)call.Arguments[0] == 4).Arguments[1]);
         presentation.SetContent(new(null, false));
         presentation.Prepare(preparation);
         Assert.Equal(SizeF.Empty, presentation.Size);
-        renderer.Invocations.Clear(); presentation.Draw(renderer.Object, bounds); Assert.Empty(renderer.Invocations);
+        renderer.Invocations.Clear(); presentation.CollectBackdrops(renderer.Object, bounds); presentation.Draw(renderer.Object, bounds); Assert.Empty(renderer.Invocations);
         presentation.Reset();
         Assert.All(textures, texture => Assert.False(texture.Disposed));
         presentation.SetContent(new(EnumPrecipitationType.Hail, false));
@@ -131,12 +131,12 @@ public sealed class WeatherConditionsTests
         presentation.Prepare(new(second.Object, 2, "en")); Assert.Equal(2, loads);
         var renderer = new Mock<IRenderAPI>();
         var bounds = ElementBounds.Fixed(0, 0, 51, 24).WithEmptyParent(); bounds.CalcWorldBounds();
-        presentation.Draw(renderer.Object, bounds);
+        presentation.CollectBackdrops(renderer.Object, bounds); presentation.Draw(renderer.Object, bounds);
         Assert.Empty(firstBackdrop.Invocations);
         var draw = Assert.Single(secondBackdrop.Invocations);
         Assert.Equal(bounds.renderX + 54, draw.Arguments[1]); Assert.Equal(2d, draw.Arguments[3]);
         presentation.SetContent(new(null, false)); presentation.Prepare(new(second.Object, 2, "en"));
-        presentation.Draw(renderer.Object, bounds); Assert.Single(secondBackdrop.Invocations);
+        presentation.CollectBackdrops(renderer.Object, bounds); presentation.Draw(renderer.Object, bounds); Assert.Single(secondBackdrop.Invocations);
         presentation.Reset(); presentation.Prepare(new(second.Object, 2, "en")); Assert.Equal(2, loads);
     }
     /// <summary>Native sampling caches stable conditions and clears them for missing data, death, disable, and world exit.</summary>

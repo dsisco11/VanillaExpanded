@@ -8,7 +8,7 @@ using Vintagestory.GameContent;
 namespace VanillaExpanded.RiftActivity;
 
 /// <summary>Samples synchronized native rift activity and owns its passive fissure presentation.</summary>
-internal sealed class RiftActivityOverlay : IHudOverlay
+internal sealed class RiftActivityOverlay : IHudOverlay, IHudOverlayBackdropProvider
 {
     private readonly RiftActivityPresentation presentation;
     private ICoreClientAPI? api;
@@ -79,6 +79,12 @@ internal sealed class RiftActivityOverlay : IHudOverlay
     }
     #endregion
     #region Presentation
+    /// <summary>Supplies prepared backdrop positions to the shared host pass.</summary>
+    public void CollectBackdrops(IRenderAPI renderer, ElementBounds bounds)
+    {
+        presentation.CollectBackdrops(renderer, bounds);
+    }
+
     /// <summary>Loads artwork only for a visible activity category.</summary>
     public void Prepare(HudOverlayPreparationContext context)
     {

@@ -8,7 +8,7 @@ using Vintagestory.API.Common;
 namespace VanillaExpanded.WeatherConditions;
 
 /// <summary>Samples local native weather and owns a passive icon presentation.</summary>
-internal sealed class WeatherConditionsOverlay : IHudOverlay
+internal sealed class WeatherConditionsOverlay : IHudOverlay, IHudOverlayBackdropProvider
 {
     private readonly WeatherConditionsPresentation presentation;
     private ICoreClientAPI? api;
@@ -93,6 +93,12 @@ internal sealed class WeatherConditionsOverlay : IHudOverlay
     }
     #endregion
     #region Presentation
+    /// <summary>Supplies prepared backdrop positions to the shared host pass.</summary>
+    public void CollectBackdrops(IRenderAPI renderer, ElementBounds bounds)
+    {
+        presentation.CollectBackdrops(renderer, bounds);
+    }
+
     /// <summary>Prepares cached artwork only while conditions are active.</summary>
     public void Prepare(HudOverlayPreparationContext context)
     {

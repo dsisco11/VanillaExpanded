@@ -15,6 +15,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     private readonly Action<HudOverlayRegistration, Exception> failure;
     private readonly Action<Exception>? boundaryFailure;
     private readonly HudOverlayHoverLabels hoverLabels;
+    private readonly IHudOverlayBackdropBatch? backdropBatch;
     private readonly Dictionary<string, HudOverlayGroupLayout> groups = new(StringComparer.Ordinal);
     private readonly Dictionary<HudOverlayMemberLayout, ElementBounds> clips = new();
     private HashSet<HudOverlayRegistration> active = new();
@@ -27,13 +28,15 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     #region Composition
     /// <summary>Borrows registry and prepared-state decisions; owns only composers allocated for this session.</summary>
     public HudOverlayHost(ICoreClientAPI api, HudOverlayRegistry registry, Func<HudOverlayRegistration, bool> isDrawable,
-        Action<HudOverlayRegistration, Exception> failure, Action<Exception>? boundaryFailure = null) : base(api)
+        Action<HudOverlayRegistration, Exception> failure, Action<Exception>? boundaryFailure = null,
+        IHudOverlayBackdropBatch? backdropBatch = null) : base(api)
     {
         this.registry = registry;
         this.isDrawable = isDrawable;
         this.failure = failure;
         this.boundaryFailure = boundaryFailure;
         hoverLabels = new HudOverlayHoverLabels(api);
+        this.backdropBatch = backdropBatch ?? api.ModLoader?.GetModSystem<HudOverlaySystem>()?.Backdrop;
     }
     /// <summary>Registers a live session host through the native GUI lifecycle without taking focus.</summary>
     public override bool TryOpen(bool withFocus)
@@ -105,10 +108,13 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
             try
             {
                 capi.Render.GlTranslate(0, 0, -150);
+                CollectBackdrops();
+                try { backdropBatch?.Flush(capi.Render); }
+                catch (Exception error) { boundaryFailure?.Invoke(error); }
                 foreach (var pair in Composers) if (groups[pair.Key].Available) pair.Value.Render(deltaTime);
                 hoverLabels.Draw(groups.Values, registration => active.Contains(registration) && isDrawable(registration), deltaTime);
             }
-            finally { capi.Render.GlPopMatrix(); active.Clear(); }
+            finally { backdropBatch?.Clear(); capi.Render.GlPopMatrix(); active.Clear(); }
         }, boundaryFailure);
     }
     /// <summary>No post-render work is needed by these dynamic-only presentations.</summary>
@@ -135,6 +141,25 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     #endregion
     #endregion
     #region Private
+    /// <summary>Collects only visible prepared providers, applying the same membership and clipping gates as foreground drawing.</summary>
+    private void CollectBackdrops()
+    {
+        if (backdropBatch == null) return;
+        backdropBatch.Clear();
+        foreach (var pair in groups)
+        {
+            var group = pair.Value;
+            if (!group.Available || !Composers[pair.Key].Enabled) continue;
+            foreach (var member in group.Members)
+            {
+                if (!active.Contains(member.Registration) || !isDrawable(member.Registration)
+                    || member.Clip.Width <= 0 || member.Clip.Height <= 0
+                    || member.Registration.Overlay is not IHudOverlayBackdropProvider provider) continue;
+                try { backdropBatch.Collect(member.Clip, () => provider.CollectBackdrops(capi.Render, member.Bounds)); }
+                catch (Exception error) { failure(member.Registration, error); }
+            }
+        }
+    }
     /// <summary>Applies the engine scissor stack around each bounded presentation, restoring it even after a consumer error.</summary>
     private void DrawGroup(HudOverlayGroupLayout group, float deltaTime)
     {

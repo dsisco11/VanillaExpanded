@@ -75,7 +75,6 @@ internal sealed class BodyTemperatureThermometerPresentation : IDisposable
         double scale = context.GuiScale;
         // Center the narrow thermometer within the same 24-unit circle used by the other status icons.
         double x = bounds.renderX + 5 * scale, y = bounds.renderY + (bounds.OuterHeight - IconHeight * scale) / 2;
-        backdrop?.Draw(renderer, bounds.renderX, y, scale);
         // Reveal the full mask upward while retaining the bulb at the minimum temperature fill.
         double fillTop = y + 15.5 * (1 - sample.Fill) * scale;
         double left = Math.Max(x, clip.Left), top = Math.Max(fillTop, clip.Top);
@@ -113,6 +112,14 @@ internal sealed class BodyTemperatureThermometerPresentation : IDisposable
         }
     }
     #endregion
+    /// <summary>Queues the prepared icon circle separately from foreground drawing.</summary>
+    public void CollectBackdrops(IRenderAPI renderer, ElementBounds bounds)
+    {
+        if (sample == null || icons == null || context == null) return;
+        double pixels = 24 * context.GuiScale;
+        double y = bounds.renderY + (bounds.OuterHeight - pixels) / 2;
+        backdrop?.Queue(renderer, bounds.renderX, y, context.GuiScale);
+    }
     #region Lifecycle
     /// <summary>Releases owned text and borrowed texture bindings and clears sampled state at suspension or world exit.</summary>
     public void Reset()
