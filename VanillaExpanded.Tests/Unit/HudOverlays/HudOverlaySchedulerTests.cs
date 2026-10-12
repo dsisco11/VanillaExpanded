@@ -3,6 +3,7 @@ using Moq;
 using VanillaExpanded.HudOverlays.Anchoring;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Updating;
+using VanillaExpanded.HudOverlays.Rendering;
 using Vintagestory.API.Client;
 
 namespace VanillaExpanded.Tests.Unit.HudOverlays;
@@ -13,6 +14,32 @@ public sealed class HudOverlaySchedulerTests : IDisposable
 {
     private readonly float oldScale = Vintagestory.API.Config.RuntimeEnv.GUIScale;
     #region Public API
+    /// <summary>Exiting content remains drawable and laid out until its fade finishes, then collapses between heartbeats.</summary>
+    [Fact]
+    public void AnimatedExitRetainsLayoutUntilCompletion()
+    {
+        using var fixture = new Fixture();
+        var overlay = new AnimatedProbe(() => fixture.Now);
+        var registration = new HudOverlayRegistration("mod:animated", overlay, () => true, "group");
+        fixture.Registry.Register(registration);
+        fixture.Tick(0);
+        fixture.Tick(300);
+        overlay.Applicable = false;
+        fixture.Tick(400);
+        Assert.True(fixture.Scheduler.IsDrawable(registration));
+        Assert.Contains(fixture.Scheduler.GetMembers("group"), member => member.Key == registration);
+        fixture.Now = 649;
+        Assert.True(fixture.Scheduler.IsDrawable(registration));
+        fixture.Now = 650;
+        Assert.False(fixture.Scheduler.IsDrawable(registration));
+        Assert.DoesNotContain(fixture.Scheduler.GetMembers("group"), member => member.Key == registration);
+        overlay.Applicable = true;
+        fixture.Tick(700);
+        Assert.True(fixture.Scheduler.IsDrawable(registration));
+        fixture.Visible = false;
+        fixture.Observe();
+        Assert.False(fixture.Scheduler.IsDrawable(registration));
+    }
     /// <summary>Sets deterministic native scale for headless bounds.</summary>
     public HudOverlaySchedulerTests() => Vintagestory.API.Config.RuntimeEnv.GUIScale = 1;
 
@@ -270,7 +297,7 @@ public sealed class HudOverlaySchedulerTests : IDisposable
     }
 
     /// <summary>Counts feature work and optionally fails one boundary.</summary>
-    private sealed class Probe : IHudOverlay
+    private class Probe : IHudOverlay
     {
         public bool Applicable = true, BeginFailure;
         public HudOverlayChange Change;
@@ -284,11 +311,11 @@ public sealed class HudOverlaySchedulerTests : IDisposable
         /// <summary>Has no retained borrowed state to release.</summary>
         public void EndSession() { }
         /// <summary>Returns cheap dynamic applicability.</summary>
-        public bool IsApplicable() { ApplicabilityChecks++; Throw("applicability"); return Applicable; }
+        public virtual bool IsApplicable() { ApplicabilityChecks++; Throw("applicability"); return Applicable; }
         /// <summary>Counts stable sampling and exercises callback invalidation.</summary>
         public HudOverlayChange Refresh() { Refreshes++; OnRefresh?.Invoke(); Throw("refresh"); return Change; }
         /// <summary>Counts preparation and optional resource failure.</summary>
-        public void Prepare(HudOverlayPreparationContext context) { Preparations++; Throw("prepare"); }
+        public virtual void Prepare(HudOverlayPreparationContext context) { Preparations++; Throw("prepare"); }
         /// <summary>Counts measurement of stable content.</summary>
         public SizeF Measure() { Measurements++; Throw("measure"); return Size; }
         /// <summary>Rejects accidental drawing by scheduler work.</summary>
@@ -299,6 +326,30 @@ public sealed class HudOverlaySchedulerTests : IDisposable
         #region Private
         /// <summary>Injects the selected feature boundary failure.</summary>
         private void Throw(string operation) { if (Failure == operation) throw new InvalidOperationException(operation); }
+        #endregion
+    }
+
+    /// <summary>Models an owner retaining its last preparation through an applicability change.</summary>
+    private sealed class AnimatedProbe(Func<long> clock) : Probe, IHudOverlayVisibilityTransition
+    {
+        /// <summary>Uses the fixture clock for rendering as well as sampling.</summary>
+        public HudOverlayVisibilityTransition Visibility { get; } = new(clockMs: clock);
+        #region Public API
+        /// <summary>Starts an exit while the last prepared content remains owned.</summary>
+        public void HidePresentation() => Visibility.Hide(() => { });
+        /// <summary>Starts an exit when gameplay eligibility is lost.</summary>
+        public override bool IsApplicable()
+        {
+            bool applicable = base.IsApplicable();
+            if (!applicable) HidePresentation();
+            return applicable;
+        }
+        /// <summary>Shows freshly prepared content.</summary>
+        public override void Prepare(HudOverlayPreparationContext context)
+        {
+            base.Prepare(context);
+            Visibility.Show();
+        }
         #endregion
     }
 

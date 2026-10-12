@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Linq;
 using VanillaExpanded.HudOverlays.Anchoring;
 using VanillaExpanded.HudOverlays.Registration;
+using VanillaExpanded.HudOverlays.Rendering;
 
 namespace VanillaExpanded.HudOverlays.Updating;
 
@@ -53,7 +54,12 @@ internal sealed class HudOverlayScheduler
             groups ??= registry.GetGroups().ToDictionary(group => group.Id, StringComparer.Ordinal);
             seen.Add(registration.Id);
             if (!states.TryGetValue(registration.Id, out var state) || !ReferenceEquals(state.Registration, registration))
+            {
                 states[registration.Id] = state = new State(registration);
+                if (registration.Overlay is IHudOverlayVisibilityTransition animated) animated.Visibility.Enable();
+            }
+            state.CanRenderTransitions = visible && registry.IsSessionBound(registration)
+                && anchors.Resolve(groups[registration.GroupId].Placement.TargetId).HasValue;
             bool available;
             if (state.Failed && clock() < state.NextRefresh)
             {
@@ -69,6 +75,8 @@ internal sealed class HudOverlayScheduler
             catch (Exception failure) { Fail(state, failure, clock()); available = false; }
             // A restoration never exposes an old snapshot before the next scheduled refresh.
             if (!available || !state.Available) state.NeedsFresh = true;
+            if (available && !state.Available && registration.Overlay is IHudOverlayVisibilityTransition) state.PresentationDirty = true;
+            if (!available && registration.Overlay is IHudOverlayVisibilityTransition fading) fading.HidePresentation();
             state.Available = available;
         }, ReportBoundaryFailure);
         foreach (string id in states.Keys.Where(id => !seen.Contains(id)).ToArray())
@@ -96,7 +104,7 @@ internal sealed class HudOverlayScheduler
                 if (state.Failed && now < state.NextRefresh) return;
                 if (!registry.IsSessionBound(registration) || !registration.IsEnabled()) { state.Applicable = false; state.NeedsFresh = true; return; }
                 state.Applicable = registration.Overlay.IsApplicable();
-                if (!state.Applicable) { state.NeedsFresh = true; return; }
+                if (!state.Applicable) { state.NeedsFresh = true; state.PresentationDirty |= registration.Overlay is IHudOverlayVisibilityTransition; return; }
                 if (!state.Available || state.Failed && now < state.NextRefresh) return;
                 bool contextChanged = state.Context != preparation;
                 if (state.NeedsFresh || invalidated.Contains(registration.Id) || now >= state.NextRefresh)
@@ -123,7 +131,8 @@ internal sealed class HudOverlayScheduler
                     if (!float.IsFinite(size.Width) || !float.IsFinite(size.Height) || size.Width < 0 || size.Height < 0)
                         throw new InvalidOperationException("Overlay measurements must be finite and nonnegative.");
                     // Native bounds already apply the game's GUI scale; apply only the extra content multiplier here.
-                    state.Size = new SizeF((float)(size.Width * preparation.ContentScale),
+                    if (!(registration.Overlay is IHudOverlayVisibilityTransition fading && fading.Visibility.Exiting && size.IsEmpty))
+                        state.Size = new SizeF((float)(size.Width * preparation.ContentScale),
                         (float)(size.Height * preparation.ContentScale));
                     state.MeasurementDirty = false;
                 }
@@ -193,8 +202,18 @@ internal sealed class HudOverlayScheduler
     }
 
     /// <summary>Requires successful sampling, preparation and measurement in the current visible eligibility state.</summary>
-    private static bool Drawable(State state) => state.Available && state.Applicable && !state.NeedsFresh
-        && !state.Failed && !state.PresentationDirty && !state.MeasurementDirty;
+    private static bool Drawable(State state)
+    {
+        if (state.Failed || !state.CanRenderTransitions) return false;
+        if (state.Registration.Overlay is IHudOverlayVisibilityTransition animated)
+        {
+            // Keep the last successful preparation until the exit releases its artwork.
+            if (!animated.Visibility.Renderable) return false;
+            if (animated.Visibility.Exiting) return state.Context != null;
+        }
+        return state.Available && state.Applicable && !state.NeedsFresh
+            && !state.PresentationDirty && !state.MeasurementDirty;
+    }
 
     /// <summary>Hides a failed feature and delays retries, with one diagnostic per uninterrupted failure episode.</summary>
     private void Fail(State state, Exception failure, long now)
@@ -214,7 +233,7 @@ internal sealed class HudOverlayScheduler
     private sealed class State(HudOverlayRegistration registration)
     {
         public HudOverlayRegistration Registration { get; } = registration;
-        public bool Available, Applicable, Failed, Reported;
+        public bool Available, Applicable, Failed, Reported, CanRenderTransitions;
         public bool NeedsFresh = true, PresentationDirty = true, MeasurementDirty = true;
         public long NextRefresh;
         public SizeF Size;

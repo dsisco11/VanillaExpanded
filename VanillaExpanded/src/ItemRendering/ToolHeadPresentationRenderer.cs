@@ -26,7 +26,7 @@ internal sealed class ToolHeadPresentationRenderer
     }
 
     /// <summary>Renders at the caller's depth; returns false only before preparation so ordinary engine fallback is safe.</summary>
-    internal bool TryRender(ICoreClientAPI caller, ItemSlot slot, double x, double y, float size, double wedgeDegrees, double z = 100)
+    internal bool TryRender(ICoreClientAPI caller, ItemSlot slot, double x, double y, float size, double wedgeDegrees, double z = 100, float opacity = 1)
     {
         if (!ReferenceEquals(api, caller) || slot.Itemstack is not { } stack) return false;
         var collectible = stack.Collectible;
@@ -46,7 +46,7 @@ internal sealed class ToolHeadPresentationRenderer
             ReportInvalidation(collectible);
             return true;
         }
-        if (!ToolHeadGuiShaderSettings.Apply(api, shader, stack, info, model))
+        if (!ToolHeadGuiShaderSettings.Apply(api, shader, stack, info, model, opacity))
         {
             ReportInvalidation(collectible);
             return true;

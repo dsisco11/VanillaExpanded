@@ -8,7 +8,7 @@ using Vintagestory.GameContent;
 namespace VanillaExpanded.RiftActivity;
 
 /// <summary>Samples synchronized native rift activity and owns its passive fissure presentation.</summary>
-internal sealed class RiftActivityOverlay : IHudOverlay, IHudOverlayBackdropProvider
+internal sealed class RiftActivityOverlay : IHudOverlay, IHudOverlayBackdropProvider, IHudOverlayVisibilityTransition
 {
     private readonly RiftActivityPresentation presentation;
     private ICoreClientAPI? api;
@@ -17,6 +17,11 @@ internal sealed class RiftActivityOverlay : IHudOverlay, IHudOverlayBackdropProv
     private bool enabled = true;
     private bool disposed;
 
+    /// <summary>Controls retained artwork during visibility changes.</summary>
+    public HudOverlayVisibilityTransition Visibility => presentation.Visibility;
+
+    /// <summary>Retains the last preparation for the shared host's exit transition.</summary>
+    public void HidePresentation() => Clear();
     #region Public API
     #region Lifecycle
     /// <summary>Creates the presentation with optional headless texture loading.</summary>
@@ -34,7 +39,7 @@ internal sealed class RiftActivityOverlay : IHudOverlay, IHudOverlayBackdropProv
         this.api = api;
         weather = api.ModLoader.GetModSystem<ModSystemRiftWeather>();
     }
-    /// <summary>Clears cached artwork immediately when disabled through live configuration.</summary>
+    /// <summary>Starts the artwork exit transition when disabled through live configuration.</summary>
     public bool SetEnabled(bool value)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
@@ -48,6 +53,7 @@ internal sealed class RiftActivityOverlay : IHudOverlay, IHudOverlayBackdropProv
         api = null;
         weather = null;
         Clear();
+        presentation.Reset();
     }
     /// <summary>Releases session bindings exactly once.</summary>
     public void Dispose()
@@ -74,7 +80,7 @@ internal sealed class RiftActivityOverlay : IHudOverlay, IHudOverlayBackdropProv
         if (next == activity) return HudOverlayChange.None;
         activity = next;
         if (next.HasValue) presentation.SetContent(next.Value);
-        else presentation.Reset();
+        else presentation.Hide();
         return HudOverlayChange.Presentation | HudOverlayChange.Measurement;
     }
     #endregion
@@ -100,11 +106,11 @@ internal sealed class RiftActivityOverlay : IHudOverlay, IHudOverlayBackdropProv
     #endregion
     #endregion
     #region Private
-    /// <summary>Clears cached activity and releases borrowed texture references.</summary>
+    /// <summary>Clears sampled activity and defers artwork release until its exit finishes.</summary>
     private void Clear()
     {
         activity = null;
-        presentation.Reset();
+        presentation.Hide();
     }
     #endregion
 }

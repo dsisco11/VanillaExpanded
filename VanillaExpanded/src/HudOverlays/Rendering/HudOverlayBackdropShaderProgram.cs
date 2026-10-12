@@ -10,6 +10,8 @@ internal sealed class HudOverlayBackdropShaderProgram : ShaderProgram
     public float[] ProjectionMatrix { set => ((IShaderProgram)this).UniformMatrix("projectionMatrix", value); }
     /// <summary>Positions the procedural quad in the current GUI model-view space.</summary>
     public float[] ModelViewMatrix { set => ((IShaderProgram)this).UniformMatrix("modelViewMatrix", value); }
+    /// <summary>Applies the owning indicator's visibility transition to its backdrop.</summary>
+    public float Opacity { set => ((IShaderProgram)this).Uniform("opacity", value); }
     #region Public API
     /// <summary>Creates the mod-owned vertex and fragment stages for file registration.</summary>
     public HudOverlayBackdropShaderProgram(ICoreClientAPI api)

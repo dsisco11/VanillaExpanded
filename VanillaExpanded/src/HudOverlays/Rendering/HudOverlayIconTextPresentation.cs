@@ -115,10 +115,10 @@ public sealed class HudOverlayIconTextPresentation : IDisposable
             else if (text != null) textX += (iconSize + gap) * scale;
         }
         if (text != null) renderer.Render2DTexturePremultipliedAlpha(text.TextureId, textX, y + (height - text.Height) / 2,
-            text.Width, text.Height, 50);
+            text.Width, text.Height, 50, HudOverlayDrawOpacity.PremultipliedTint);
         if (slot.Itemstack != null && iconBackground != null)
             renderer.Render2DTexturePremultipliedAlpha(iconBackground.TextureId, iconX, y + (height - iconSize * scale) / 2,
-                iconSize * scale, iconSize * scale, 49);
+                iconSize * scale, iconSize * scale, 49, HudOverlayDrawOpacity.PremultipliedTint);
         if (slot.Itemstack != null) DrawItem(renderer, iconX, y + (height - iconSize * scale) / 2, clip, deltaTime);
     }
     /// <summary>Releases session-owned textures and sampled copies without disposing borrowed engine resources.</summary>
@@ -154,7 +154,7 @@ public sealed class HudOverlayIconTextPresentation : IDisposable
         float pixels = (float)(iconSize * scale);
         if (!useItemPresentation)
         {
-            renderer.RenderItemstackToGui(slot, x + pixels / 2, y + pixels / 2, 50, pixels, -1,
+            renderer.RenderItemstackToGui(slot, x + pixels / 2, y + pixels / 2, 50, pixels, HudOverlayDrawOpacity.ItemColor,
                 deltaTime, shading: true, rotate: false, showStackSize: false);
             return;
         }
@@ -177,8 +177,8 @@ public sealed class HudOverlayIconTextPresentation : IDisposable
             try
             {
                 if (switchShader) { previous?.Stop(); gui!.Use(); }
-                if (ToolHeadPresentationSystem.Renderer?.TryRender(context!.Api, slot, x + pixels / 2, y + pixels / 2, pixels, 0, 50) != true)
-                    renderer.RenderItemstackToGui(slot, x + pixels / 2, y + pixels / 2, 50, pixels, -1,
+                if (ToolHeadPresentationSystem.Renderer?.TryRender(context!.Api, slot, x + pixels / 2, y + pixels / 2, pixels, 0, 50, HudOverlayDrawOpacity.Current) != true)
+                    renderer.RenderItemstackToGui(slot, x + pixels / 2, y + pixels / 2, 50, pixels, HudOverlayDrawOpacity.ItemColor,
                         deltaTime, shading: true, rotate: false, showStackSize: false);
             }
             finally
