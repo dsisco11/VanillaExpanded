@@ -35,7 +35,7 @@ public sealed class BowAmmunitionSystemConfigurationTests
             VanillaExpanded.BowAmmunition.BowAmmunitionOverlay? overlay = null;
             hud.Registry.RunPass(registration =>
             {
-                Assert.Equal(new System.Drawing.SizeF(128, 24), registration.ReservedSize);
+                Assert.Null(registration.ReservedSize);
                 overlay = Assert.IsType<VanillaExpanded.BowAmmunition.BowAmmunitionOverlay>(registration.Overlay);
             });
             fixture.Personal[0].Itemstack = new ItemStack(fixture.Flint, 12);

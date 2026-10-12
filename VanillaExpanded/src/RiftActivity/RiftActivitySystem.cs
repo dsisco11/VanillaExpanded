@@ -35,7 +35,7 @@ internal sealed class RiftActivitySystem : ModSystem, ILiveConfigurable
             registration = hud.Registry.Register(new HudOverlayRegistration(OverlayId, overlay,
                 () => overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays
                     && VanillaExpandedModSystem.Config.EnableRiftActivityOverlay), "player-status", order: 90, refreshIntervalMs: 1000,
-                hoverLabelKey: "vanillaexpanded:hud-label-rift-activity", reservedSize: new System.Drawing.SizeF(24, 24)));
+                hoverLabelKey: "vanillaexpanded:hud-label-rift-activity"));
         }
         catch { overlay.Dispose(); throw; }
     }
