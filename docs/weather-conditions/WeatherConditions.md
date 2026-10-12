@@ -1,6 +1,6 @@
 # Weather conditions
 
-The weather indicator reserves one 24 × 24 GUI-unit slot in `player-status`. The composite artwork consists of transparent 64 × 64 textures drawn at the same origin, using one shared backdrop. Fog and haze share one channel; thunder has its own channel. Colour must not be the only distinction between weather types or intensity levels.
+The weather indicator occupies 24 × 24 GUI units in `player-status` while visible and releases its space when hidden. The composite artwork consists of transparent 64 × 64 textures drawn at the same origin, using one shared backdrop. Fog and haze share one channel; thunder has its own channel. Colour must not be the only distinction between weather types or intensity levels.
 
 ## Current behavior
 

@@ -110,7 +110,8 @@ public sealed class WeatherConditionsCompositeTests
         region.Weight = 1;
         var reader = (WeatherDataReaderPreLoad)RuntimeHelpers.GetUninitializedObject(typeof(WeatherDataReaderPreLoad));
         reader.AdjacentSims = [region, region, region, region];
-        typeof(WeatherDataReaderBase).GetField("rainOverlayData", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(reader, pattern);
+        // Reproduce startup: the public patterns exist, but the reader has not bound its private rain overlay yet.
+        Assert.Throws<NullReferenceException>(() => reader.GetBlendedCloudOpaqueness());
         weather.WeatherDataAtPlayer = reader;
         weather.rainOverlayPattern = pattern;
         Assert.Equal(expected, WeatherConditionsSampler.EstimateCloudCoverage(weather, new()), 5);
