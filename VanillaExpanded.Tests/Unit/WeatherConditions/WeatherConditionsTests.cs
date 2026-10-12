@@ -77,26 +77,26 @@ public sealed class WeatherConditionsTests
         var preparation = new HudOverlayPreparationContext(api, 1, "en");
         presentation.SetContent(new(EnumPrecipitationType.Rain, true));
         presentation.Prepare(preparation);
-        Assert.Equal(new SizeF(51, 24), presentation.Size);
+        Assert.Equal(new SizeF(24, 24), presentation.Size);
         presentation.SetContent(new(EnumPrecipitationType.Snow, false));
         presentation.Prepare(new HudOverlayPreparationContext(api, 2, "en"));
         Assert.Equal(new SizeF(24, 24), presentation.Size);
         Assert.Equal(1, loads);
         presentation.SetContent(new(null, true));
         presentation.Prepare(preparation);
-        Assert.Equal(new SizeF(51, 24), presentation.Size);
+        Assert.Equal(new SizeF(24, 24), presentation.Size);
         var renderer = new Mock<IRenderAPI>();
         var bounds = ElementBounds.Fixed(0, 0, 51, 24).WithEmptyParent();
         bounds.CalcWorldBounds();
         presentation.CollectBackdrops(renderer.Object, bounds); presentation.Draw(renderer.Object, bounds);
         var fog = Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture" && (float)call.Arguments[5] == 50);
         Assert.Equal(4, fog.Arguments[0]);
-        Assert.Equal(bounds.renderX + 27, (double)fog.Arguments[1]);
+        Assert.Equal(bounds.renderX, (double)fog.Arguments[1]);
         renderer.Invocations.Clear();
         presentation.SetContent(new(EnumPrecipitationType.Rain, true));
         presentation.Prepare(preparation);
         presentation.CollectBackdrops(renderer.Object, bounds); presentation.Draw(renderer.Object, bounds);
-        Assert.Equal(bounds.renderX + 27, (double)Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture" && (int)call.Arguments[0] == 4).Arguments[1]);
+        Assert.Equal(bounds.renderX + 12, (double)Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture" && (int)call.Arguments[0] == 4).Arguments[1]);
         presentation.SetContent(new(null, false));
         presentation.Prepare(preparation);
         Assert.Equal(SizeF.Empty, presentation.Size);
@@ -134,7 +134,7 @@ public sealed class WeatherConditionsTests
         presentation.CollectBackdrops(renderer.Object, bounds); presentation.Draw(renderer.Object, bounds);
         Assert.Empty(firstBackdrop.Invocations);
         var draw = Assert.Single(secondBackdrop.Invocations);
-        Assert.Equal(bounds.renderX + 54, draw.Arguments[1]); Assert.Equal(2d, draw.Arguments[3]);
+        Assert.Equal(bounds.renderX, draw.Arguments[1]); Assert.Equal(2d, draw.Arguments[3]);
         presentation.SetContent(new(null, false)); presentation.Prepare(new(second.Object, 2, "en"));
         presentation.CollectBackdrops(renderer.Object, bounds); presentation.Draw(renderer.Object, bounds); Assert.Single(secondBackdrop.Invocations);
         presentation.Reset(); presentation.Prepare(new(second.Object, 2, "en")); Assert.Equal(2, loads);
@@ -148,6 +148,9 @@ public sealed class WeatherConditionsTests
         var loader = new Mock<IModLoader>();
         var weather = new WeatherSystemClient();
         var snapshot = new WeatherDataSnapshot { BlendedPrecType = EnumPrecipitationType.Auto, snowThresholdTemp = 4 };
+        snapshot.lightningMinTemp = 12;
+        snapshot.nearLightningRate = .3f;
+        snapshot.distantLightningRate = .4f;
         snapshot.Ambient.FogDensity.Set(.005f, 1);
         // Seed the native provider's cached frame directly, avoiding startup simulation and graphics services.
         typeof(WeatherSystemClient).GetField("capi", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)!.SetValue(weather, fixture.Api.Object);
@@ -157,8 +160,9 @@ public sealed class WeatherConditionsTests
         fixture.Api.SetupGet(value => value.ModLoader).Returns(loader.Object);
         var blocks = new Mock<IBlockAccessor>();
         fixture.World.SetupGet(value => value.BlockAccessor).Returns(blocks.Object);
-        ClimateCondition? climate = new() { Rainfall = .5f, Temperature = 2 };
+        ClimateCondition? climate = new() { Rainfall = .5f, Temperature = 2, RainCloudOverlay = 1 };
         blocks.Setup(value => value.GetClimateAt(It.IsAny<BlockPos>(), EnumGetClimateMode.NowValues, 0)).Returns(() => climate!);
+        blocks.Setup(value => value.GetWindSpeedAt(It.IsAny<Vec3d>())).Returns(new Vec3d(.8, 0, 0));
         int loads = 0;
         using var overlay = new WeatherConditionsOverlay(context =>
         {
@@ -169,9 +173,12 @@ public sealed class WeatherConditionsTests
         Assert.NotEqual(HudOverlayChange.None, overlay.Refresh());
         Assert.Equal(EnumPrecipitationType.Snow, overlay.Sample!.Precipitation);
         Assert.True(overlay.Sample.Fog);
+        Assert.Equal(2, overlay.Sample.PrecipitationIntensity);
+        Assert.Equal(3, overlay.Sample.WindIntensity);
+        Assert.Equal(0, overlay.Sample.ThunderIntensity);
         var preparation = new HudOverlayPreparationContext(fixture.Api.Object, 1, "en");
         overlay.Prepare(preparation);
-        Assert.Equal(new SizeF(51, 24), overlay.Measure());
+        Assert.Equal(new SizeF(24, 24), overlay.Measure());
         Assert.Equal(HudOverlayChange.None, overlay.Refresh());
         // Native changes after sampling cannot alter the icon until the next refresh.
         climate.Temperature = 20;
@@ -184,6 +191,7 @@ public sealed class WeatherConditionsTests
         Assert.Equal(new[] { 2, 4 }, renderer.Invocations.Where(call => call.Method.Name == "RenderTexture" && (float)call.Arguments[5] == 50).Select(call => (int)call.Arguments[0]).ToArray());
         overlay.Refresh();
         Assert.Equal(EnumPrecipitationType.Rain, overlay.Sample!.Precipitation);
+        Assert.Equal(3, overlay.Sample.ThunderIntensity);
         overlay.Prepare(preparation);
         Assert.Equal(1, loads);
         climate = null;

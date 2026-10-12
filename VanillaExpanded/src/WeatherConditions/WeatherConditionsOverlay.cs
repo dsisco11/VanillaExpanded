@@ -66,7 +66,7 @@ internal sealed class WeatherConditionsOverlay : IHudOverlay, IHudOverlayBackdro
         if (!applicable) Clear();
         return applicable;
     }
-    /// <summary>Copies native local climate and weather-only fog outside the drawing path.</summary>
+    /// <summary>Copies and classifies independent local weather channels outside the drawing path.</summary>
     public HudOverlayChange Refresh()
     {
         if (!IsApplicable()) return HudOverlayChange.None;
@@ -79,16 +79,12 @@ internal sealed class WeatherConditionsOverlay : IHudOverlay, IHudOverlayBackdro
             Clear();
             return changed ? HudOverlayChange.Presentation | HudOverlayChange.Measurement : HudOverlayChange.None;
         }
-        // The native weather modifier excludes unrelated underwater and temporal scene effects.
-        var density = snapshot.Ambient?.FogDensity;
-        float fog = (density?.Value ?? 0) * (density?.Weight ?? 0);
-        var next = WeatherConditionsSample.FromWeather(climate.Rainfall, snapshot.BlendedPrecType,
-            climate.Temperature, snapshot.snowThresholdTemp, fog, ReferenceEquals(sampledEntity, entity) ? Sample : null);
+        var next = WeatherConditionsSampler.Sample(api, weather, snapshot, climate,
+            ReferenceEquals(sampledEntity, entity) ? Sample : null);
         sampledEntity = entity;
         if (next == Sample) return HudOverlayChange.None;
         Sample = next;
-        if (next.Precipitation.HasValue || next.Fog) presentation.SetContent(next);
-        else presentation.Reset();
+        presentation.SetContent(next);
         return HudOverlayChange.Presentation | HudOverlayChange.Measurement;
     }
     #endregion
@@ -99,14 +95,14 @@ internal sealed class WeatherConditionsOverlay : IHudOverlay, IHudOverlayBackdro
         presentation.CollectBackdrops(renderer, bounds);
     }
 
-    /// <summary>Prepares cached artwork only while conditions are active.</summary>
+    /// <summary>Prepares cached artwork for the latest valid sample, including clear skies.</summary>
     public void Prepare(HudOverlayPreparationContext context)
     {
-        if (Sample?.Precipitation != null || Sample?.Fog == true) presentation.Prepare(context);
+        if (Sample != null) presentation.Prepare(context);
     }
-    /// <summary>Measures active icon slots or zero dimensions for fair weather.</summary>
+    /// <summary>Measures the composite slot, or zero when no supported artwork is visible.</summary>
     public SizeF Measure() => presentation.Size;
-    /// <summary>Draws prepared condition icons under the host clip without native sampling.</summary>
+    /// <summary>Draws prepared weather layers under the host clip without native sampling.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime)
     {
         presentation.Draw(renderer, bounds);

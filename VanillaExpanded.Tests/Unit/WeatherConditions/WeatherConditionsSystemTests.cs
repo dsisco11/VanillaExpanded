@@ -44,7 +44,7 @@ public sealed class WeatherConditionsSystemTests
             {
                 Assert.Equal(WeatherConditionsSystem.OverlayId, registration.Id);
                 Assert.Equal(1000, registration.RefreshIntervalMs);
-                Assert.Equal(new System.Drawing.SizeF(51, 24), registration.ReservedSize);
+                Assert.Equal(new System.Drawing.SizeF(24, 24), registration.ReservedSize);
                 Assert.True(registration.Order < 90);
                 overlay = Assert.IsType<WeatherConditionsOverlay>(registration.Overlay);
             });
