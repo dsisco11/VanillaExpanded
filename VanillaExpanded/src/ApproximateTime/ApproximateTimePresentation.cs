@@ -46,11 +46,18 @@ internal sealed class ApproximateTimePresentation : IDisposable
     {
         if (!period.HasValue || icons == null || context == null) return;
         double pixels = 24 * context.GuiScale;
-        backdrop?.Draw(renderer, bounds.renderX, bounds.renderY + (bounds.OuterHeight - pixels) / 2, context.GuiScale);
         renderer.RenderTexture(icons[(int)period.Value].TextureId, bounds.renderX,
             bounds.renderY + (bounds.OuterHeight - pixels) / 2, pixels, pixels, 50);
     }
     #endregion
+    /// <summary>Queues the prepared icon circle separately from foreground drawing.</summary>
+    public void CollectBackdrops(IRenderAPI renderer, ElementBounds bounds)
+    {
+        if (!period.HasValue || icons == null || context == null) return;
+        double pixels = 24 * context.GuiScale;
+        double y = bounds.renderY + (bounds.OuterHeight - pixels) / 2;
+        backdrop?.Queue(renderer, bounds.renderX, y, context.GuiScale);
+    }
     #region Lifetime
     /// <summary>Drops session bindings without disposing engine-owned cached textures.</summary>
     public void Reset()

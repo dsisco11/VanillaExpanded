@@ -57,7 +57,6 @@ internal sealed class WeatherConditionsPresentation : IDisposable
         double x = bounds.renderX, y = bounds.renderY + (bounds.OuterHeight - pixels) / 2;
         if (sample.Precipitation is EnumPrecipitationType type)
         {
-            backdrop?.Draw(renderer, x, y, context.GuiScale);
             int index = type switch { EnumPrecipitationType.Snow => 1, EnumPrecipitationType.Hail => 2, _ => 0 };
             renderer.RenderTexture(icons[index].TextureId, x, y, pixels, pixels, 50);
         }
@@ -65,12 +64,19 @@ internal sealed class WeatherConditionsPresentation : IDisposable
         if (sample.Fog)
         {
             double fogX = x + (Diameter + Gap) * context.GuiScale;
-            backdrop?.Draw(renderer, fogX, y, context.GuiScale);
             renderer.RenderTexture(icons[3].TextureId, fogX, y, pixels, pixels, 50);
         }
     }
     #endregion
     #region Lifetime
+    /// <summary>Queues circles only for prepared active weather conditions.</summary>
+    public void CollectBackdrops(IRenderAPI renderer, ElementBounds bounds)
+    {
+        if (sample == null || icons == null || context == null) return;
+        double y = bounds.renderY + (bounds.OuterHeight - 24 * context.GuiScale) / 2;
+        if (sample.Precipitation.HasValue) backdrop?.Queue(renderer, bounds.renderX, y, context.GuiScale);
+        if (sample.Fog) backdrop?.Queue(renderer, bounds.renderX + (Diameter + Gap) * context.GuiScale, y, context.GuiScale);
+    }
     /// <summary>Drops bindings without deleting resources owned by the engine cache.</summary>
     public void Reset()
     {
