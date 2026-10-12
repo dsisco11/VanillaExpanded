@@ -36,7 +36,7 @@ internal sealed class BodyTemperatureSystem : ModSystem, ILiveConfigurable
             // Keep room for the degree reading and chevrons at both ends even while the warning is hidden.
             registration = hud.Registry.Register(new HudOverlayRegistration(OverlayId, overlay,
                 () => overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays
-                    && VanillaExpandedModSystem.Config.EnableBodyTemperatureOverlay), "player-status", refreshIntervalMs: 250,
+                    && VanillaExpandedModSystem.Config.EnableBodyTemperatureOverlay), "player-status", order: 98, refreshIntervalMs: 250,
                 hoverLabelKey: "vanillaexpanded:hud-label-body-temperature", reservedSize: new System.Drawing.SizeF(72, 46)));
         }
         catch { overlay.Dispose(); throw; }
