@@ -107,6 +107,9 @@ public class VanillaExpandedConfig
     /// <summary>Shows a fissure icon for non-calm native rift activity.</summary>
     public bool EnableRiftActivityOverlay { get; set; } = true;
 
+    /// <summary>Shows a fractured iris icon for approaching, imminent, and active temporal storms.</summary>
+    public bool EnableTemporalStormOverlay { get; set; } = true;
+
     private string heldItemStatusAnchor = "saturation";
     /// <summary>Selects a stable anchor key; numeric ConfigLib events and unknown keys are normalized for persistence.</summary>
     public string HeldItemStatusAnchor
