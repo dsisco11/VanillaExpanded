@@ -98,7 +98,7 @@ public sealed class BowAmmunitionSamplerTests
         internal readonly InventoryGeneric Creative = new(1, "creative", "bow-test", null!);
         internal readonly List<InventoryBase> Ordered = new();
         internal readonly Mock<IPlayerInventoryManager> Manager = new();
-        internal readonly Mock<ICoreClientAPI> Api = new();
+        internal readonly Mock<ICoreClientAPI> Api = new() { DefaultValue = DefaultValue.Mock };
         internal readonly Mock<IClientEventAPI> Events = new();
         internal readonly Mock<IClientWorldAccessor> World = new();
         internal readonly Mock<IClientPlayer> Player;

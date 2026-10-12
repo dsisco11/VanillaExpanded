@@ -74,7 +74,8 @@ public sealed class RiftActivityTests
             Assert.Equal(HudOverlayChange.None, overlay.Refresh());
             renderer.Invocations.Clear();
             overlay.Draw(renderer.Object, ElementBounds.Fixed(0, 0, 24, 24).WithEmptyParent(), RectangleF.Empty, 0);
-            Assert.Equal(index + 1, Assert.Single(renderer.Invocations).Arguments[0]);
+            var iconCall = Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture" && (float)call.Arguments[5] == 50);
+            Assert.Equal(index + 1, Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture" && (float)call.Arguments[5] == 50).Arguments[0]);
         }
         Assert.Equal(1, loads);
         Pattern(weather) = new CurrentPattern { Code = "calm" };
