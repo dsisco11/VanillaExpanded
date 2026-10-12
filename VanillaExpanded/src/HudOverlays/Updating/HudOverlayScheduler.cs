@@ -19,6 +19,7 @@ internal sealed class HudOverlayScheduler
     private readonly HashSet<string> invalidated = new(StringComparer.Ordinal);
     private long nextHeartbeat;
     private bool started;
+    private double contentScale = 1;
 
     #region Public API
     #region Construction and notifications
@@ -80,6 +81,7 @@ internal sealed class HudOverlayScheduler
     /// <summary>Runs bounded heartbeat work; overflow membership is intentionally outside scheduling eligibility.</summary>
     public void Update(HudOverlayAnchorContext anchors, HudOverlayPreparationContext preparation, bool visible, bool enabled = true)
     {
+        contentScale = preparation.ContentScale;
         ObserveVisibility(anchors, visible, enabled);
         long now = clock();
         if (started && now < nextHeartbeat) return;
@@ -120,7 +122,9 @@ internal sealed class HudOverlayScheduler
                     SizeF size = registration.Overlay.Measure();
                     if (!float.IsFinite(size.Width) || !float.IsFinite(size.Height) || size.Width < 0 || size.Height < 0)
                         throw new InvalidOperationException("Overlay measurements must be finite and nonnegative.");
-                    state.Size = size;
+                    // Native bounds already apply the game's GUI scale; apply only the extra content multiplier here.
+                    state.Size = new SizeF((float)(size.Width * preparation.ContentScale),
+                        (float)(size.Height * preparation.ContentScale));
                     state.MeasurementDirty = false;
                 }
                 state.Failed = false;
@@ -140,7 +144,10 @@ internal sealed class HudOverlayScheduler
             .Where(state => state.Registration.GroupId == groupId
                 && (state.Registration.ReservedSize.HasValue || Drawable(state)))
             .OrderBy(state => state.Registration.Order).ThenBy(state => state.Registration.Id, StringComparer.Ordinal)
-            .Select(state => new KeyValuePair<HudOverlayRegistration, SizeF>(state.Registration, state.Registration.ReservedSize ?? state.Size)).ToArray();
+            .Select(state => new KeyValuePair<HudOverlayRegistration, SizeF>(state.Registration,
+                state.Registration.ReservedSize is SizeF reserved
+                    ? new SizeF((float)(reserved.Width * contentScale),
+                        (float)(reserved.Height * contentScale)) : state.Size)).ToArray();
     }
 
     /// <summary>Rejects stale, unprepared or empty content; a reserved layout slot alone is never drawable or hoverable.</summary>
