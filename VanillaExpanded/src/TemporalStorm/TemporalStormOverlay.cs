@@ -75,8 +75,16 @@ internal sealed class TemporalStormOverlay : IHudOverlay, IHudOverlayBackdropPro
         var next = TemporalStormSource.Read(storms, api!.World.Calendar.TotalDays);
         // Urgency keeps changing within one stage, so update the cached pulse before the
         // stage equality check. Drawing never needs to query the calendar or storm provider.
-        if (next.HasValue) presentation.SetContent(next.Value,
-            storms!.StormData.nextStormTotalDays - api.World.Calendar.TotalDays);
+        if (next.HasValue)
+        {
+            var data = storms!.StormData;
+            // Native waning notifications do not broadcast fresh storm data either. Use the
+            // synchronized end deadline and the same 0.02-day window as the base game.
+            double remaining = (next == TemporalStormStage.Active
+                ? data.stormActiveTotalDays : data.nextStormTotalDays) - api.World.Calendar.TotalDays;
+            presentation.SetContent(next.Value, remaining,
+                next == TemporalStormStage.Active && remaining < TemporalStormSource.ImminentWindowDays);
+        }
         if (next == stage) return HudOverlayChange.None;
         stage = next;
         if (!next.HasValue) presentation.Reset();
