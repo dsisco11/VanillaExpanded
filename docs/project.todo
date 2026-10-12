@@ -1,7 +1,6 @@
 # Vanilla: Expanded TODO List:
     ## Issues:
         ☐ Design a better separation of alloy calculator inventory ownership/liveness validation, transfer permissions, and storage-versus-machine access policy. Reconsider the storage-class whitelist without weakening ownership or withdrawal checks, and define coverage for vanilla and modded containers.
-        ☐ Fix cave-art tool-mode menu. all of the options are extremely tiny because there are so many.
         ☐ Design a better weather indicator system which can clearly communicate all possible weather states to the player at a glance using only a single "composite" indicator. e.g. the indicator is composed of multiple sub-icons representing different weather elements (rain, snow, storm, wind speed, etc.) that combine into one cohesive visual.
 
     ## New Features:
