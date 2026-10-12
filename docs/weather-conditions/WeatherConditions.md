@@ -4,6 +4,8 @@ The weather indicator occupies 24 × 24 GUI units in `player-status` while visib
 
 ## Current behavior
 
+The shared HUD content multiplier is 1.5×, so this indicator's 24 × 24 base footprint displays at 36 × 36 GUI units before the game's GUI scale. The 64 × 64 source textures are unchanged.
+
 The complete 24-texture set is included. Independent sky, precipitation, wind, fog/haze, and thunder layers combine inside one fixed footprint. The renderer retains an existing-artwork fallback for missing or incomplete asset packs: precipitation and fog share the slot, while cloud coverage, wind, thunder, and intensity are unavailable in that fallback.
 
 The complete composite set enables a visible clear-weather state. An unavailable cloud estimate selects an unknown-sky layer, rather than claiming clear skies. Disabling the feature, losing the player or climate data, and leaving the world clear presentation and transition history. Changing API ownership reloads borrowed texture bindings; GUI scale and weather changes reuse them. The engine owns the textures.

@@ -2,6 +2,8 @@
 
 The HUD overlay system positions and updates passive displays on the client. An overlay supplies content and a measured footprint; the runtime handles anchoring, group layout, refresh scheduling, GUI scaling, and world-session transitions.
 
+The HUD applies a 1.5× content multiplier in addition to the game's GUI scale. A 24-unit indicator therefore occupies 36 GUI units. Artwork, backdrops, text, and layout measurements enlarge together; anchors retain their native coordinates. `HudOverlayPreparationContext.GuiScale` includes this multiplier, while `ContentScale` exposes the extra factor for font services that already apply native GUI scaling. Overlays continue returning their base unscaled measurements; the scheduler applies the content multiplier to layout once.
+
 Reference `VanillaExpanded.dll` and the compatible Vintage Story API assemblies, and declare `vanillaexpanded` as a dependency in your mod metadata. `HudOverlaySystem`, `IHudOverlay`, registration and placement contracts, and the shared icon-and-text presentation are public and can be used from a separate mod assembly. Obtain the running system through the client mod loader; the game owns its lifetime.
 
 ## Registering an overlay

@@ -214,6 +214,8 @@ public sealed class HudOverlayIconTextPresentation : IDisposable
     {
         var font = CairoFont.WhiteSmallText().WithStroke(new double[] { 0, 0, 0, .85 }, 1.5);
         if (fontSize.HasValue) font.WithFontSize(fontSize.Value);
+        // Cairo applies the native GUI scale internally, so only the additional HUD multiplier belongs in the font.
+        font.UnscaledFontsize *= preparation.ContentScale;
         return preparation.Api.Gui.TextTexture.GenTextTexture(localized, font);
     }
     #endregion
