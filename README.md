@@ -52,7 +52,7 @@ A compact texture icon at the right end of the status group beside the bottom-le
 
 ### Weather Conditions
 
-Small weather icons appear beside the toolbar’s bottom-left edge during rain, snow, hail, or fog. Fog can appear alongside precipitation. The icons use transparent textures and hide during fair weather. Toggle them with `EnableWeatherConditionsOverlay`; changes apply immediately.
+Weather occupies one 24 × 24 slot beside the toolbar’s bottom-left edge. Rounded clouds, wind strokes above the cloud, precipitation below it, fog bands, and lightning combine to show cloud coverage, precipitation type, and independent weather intensities. The indicator uses transparent 64 × 64 texture layers with no outer ring. Toggle it with `EnableWeatherConditionsOverlay`; changes apply immediately. See [weather conditions](docs/weather-conditions/WeatherConditions.md) for the data, artwork, and preview sheet.
 
 ### Temporal Rift Activity
 
@@ -236,7 +236,7 @@ There is no AutoLoot layering option: its progress always renders above dialogs,
 | `HeldItemStatusAnchor`       | `saturation` | `saturation`, `hotbar`, `screen-left-top`, `screen-center-top`, `screen-right-top`, `screen-left-middle`, `screen-center-middle`, `screen-right-middle`, `screen-left-bottom`, `screen-center-bottom`, `screen-right-bottom` | Select native docking or a screen position. Unknown values fall back to saturation.     |
 | `HeldItemStatusOffsetX`      | `-4`         | -2048–2048 in ConfigLib                                                                                                                                                                                                      | Horizontal offset in GUI units; positive moves right. Nonfinite values fall back to -4. |
 | `HeldItemStatusOffsetY`      | `0`          | -2048–2048 in ConfigLib                                                                                                                                                                                                      | Vertical offset in GUI units; positive moves down. Nonfinite values fall back to 0.     |
-| `EnableWeatherConditionsOverlay` | `true` | `true`, `false` | Show texture icons for active rain, snow, hail, and weather fog; applies live. |
+| `EnableWeatherConditionsOverlay` | `true` | `true`, `false` | Show the composite cloud, wind, precipitation, fog/haze, and thunder indicator; applies live. |
 | `EnableRiftActivityOverlay` | `true` | `true`, `false` | Show a fissure icon for temporal rift activity; hidden during calm activity. Applies live. |
 | `EnableTemporalStormOverlay` | `true` | `true`, `false` | Show approaching, imminent, and active temporal storms with a fractured iris icon. Applies live. |
 | `EnableApproximateTimeOverlay` | `true` | `true`, `false` | Show sunlight-calibrated approximate time; applies live. |
