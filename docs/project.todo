@@ -10,12 +10,6 @@
         ☐ Targeted items such as tools on toolracks have a subtle highlight to indicate that they are targeted.
         ☐ New "crafting menu" similar to minecraft: shows all craftable items with current inventory, allows searching. (Maybe this can just be added to the handbook?)
 
-    ## HUD Indicators:
-        ☑ Add localized hover labels to every HUD indicator explaining what the indicator represents. Show labels when the player can move the mouse over the HUD; invisible indicators must not expose hover targets.
-        ☑ Give every HUD indicator a stable position relative to its screen/HUD anchor. Reserve each indicator's space while it is invisible so other indicators do not shift into the gap; keep the time indicator rightmost in the bottom-left group.
-        ☑ Give all bottom-left HUD indicators a faint black radial-gradient circle behind their icons, fading smoothly to transparent at the edge. Use a consistent treatment across the group; hide the background with its indicator. This replaces the earlier background-free design for these indicators.
-        ☐ Add an indicator for when a temporal storm is approaching or imminent.
-
     ## Death Penalties:
         ☐ New death penalty option: lose *bag* items on death (items in inventory are lost, items on hotbar and equipped armor and weapons are kept).
         ☐ New death penalty option: lose *unequipped* items on death (items in inventory and hotbar are lost, equipped armor and weapons are kept).

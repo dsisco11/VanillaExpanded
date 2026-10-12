@@ -66,6 +66,15 @@
         "weight": 10.85,
         "clientSide": true
       },
+      "EnableTemporalStormOverlay": {
+        "code": "EnableTemporalStormOverlay",
+        "name": "EnableTemporalStormOverlay",
+        "ingui": "vanillaexpanded:config-enable-temporal-storm-overlay",
+        "comment": "vanillaexpanded:config-enable-temporal-storm-overlay-tooltip",
+        "default": true,
+        "weight": 10.87,
+        "clientSide": true
+      },
       "EnableAnimalSexIndicators": {
         "code": "EnableAnimalSexIndicators",
         "name": "EnableAnimalSexIndicators",
