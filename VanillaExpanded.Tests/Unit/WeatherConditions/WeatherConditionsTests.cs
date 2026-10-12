@@ -70,7 +70,7 @@ public sealed class WeatherConditionsTests
     [Fact]
     public void CachedBorrowedTexturesAndMeasurement()
     {
-        var api = new Mock<ICoreClientAPI>().Object;
+        var api = new Mock<ICoreClientAPI>() { DefaultValue = DefaultValue.Mock }.Object;
         int loads = 0;
         var textures = Enumerable.Range(1, 4).Select(id => new LoadedTexture(api) { TextureId = id, Width = 96, Height = 96, IgnoreUndisposed = true }).ToArray();
         using var presentation = new WeatherConditionsPresentation(_ => { loads++; return textures; });
@@ -89,7 +89,7 @@ public sealed class WeatherConditionsTests
         var bounds = ElementBounds.Fixed(0, 0, 51, 24).WithEmptyParent();
         bounds.CalcWorldBounds();
         presentation.Draw(renderer.Object, bounds);
-        var fog = Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture");
+        var fog = Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture" && (float)call.Arguments[5] == 50);
         Assert.Equal(4, fog.Arguments[0]);
         Assert.Equal(bounds.renderX + 27, (double)fog.Arguments[1]);
         renderer.Invocations.Clear();
@@ -100,13 +100,44 @@ public sealed class WeatherConditionsTests
         presentation.SetContent(new(null, false));
         presentation.Prepare(preparation);
         Assert.Equal(SizeF.Empty, presentation.Size);
+        renderer.Invocations.Clear(); presentation.Draw(renderer.Object, bounds); Assert.Empty(renderer.Invocations);
         presentation.Reset();
         Assert.All(textures, texture => Assert.False(texture.Disposed));
         presentation.SetContent(new(EnumPrecipitationType.Hail, false));
         presentation.Prepare(preparation);
         Assert.Equal(2, loads);
-        presentation.Prepare(new HudOverlayPreparationContext(new Mock<ICoreClientAPI>().Object, 1, "en"));
+        presentation.Prepare(new HudOverlayPreparationContext(new Mock<ICoreClientAPI>() { DefaultValue = DefaultValue.Mock }.Object, 1, "en"));
         Assert.Equal(3, loads);
+    }
+    /// <summary>An empty ownership transition defers loading and never reuses the previous client's backdrop.</summary>
+    [Fact]
+    public void EmptyOwnershipTransitionDefersBackdropAndReloadsForNewClient()
+    {
+        var first = new Mock<ICoreClientAPI>(); var second = new Mock<ICoreClientAPI>();
+        var firstBackdrop = new Mock<VanillaExpanded.HudOverlays.Rendering.IHudOverlayIconBackdrop>();
+        var secondBackdrop = new Mock<VanillaExpanded.HudOverlays.Rendering.IHudOverlayIconBackdrop>();
+        int loads = 0;
+        using var presentation = new WeatherConditionsPresentation(context => Enumerable.Range(1, 4)
+            .Select(id => new LoadedTexture(context.Api) { TextureId = id, IgnoreUndisposed = true }).ToArray(),
+            context => { loads++; return ReferenceEquals(context.Api, first.Object) ? firstBackdrop.Object : secondBackdrop.Object; });
+        presentation.SetContent(new(null, false)); presentation.Prepare(new(first.Object, 1, "en"));
+        Assert.Equal(0, loads);
+        presentation.SetContent(new(EnumPrecipitationType.Rain, false)); presentation.Prepare(new(first.Object, 1, "en"));
+        Assert.Equal(1, loads);
+        presentation.SetContent(new(null, false)); presentation.Prepare(new(second.Object, 1, "en"));
+        Assert.Equal(1, loads);
+        presentation.SetContent(new(null, true)); presentation.Prepare(new(second.Object, 1, "en"));
+        Assert.Equal(2, loads);
+        presentation.Prepare(new(second.Object, 2, "en")); Assert.Equal(2, loads);
+        var renderer = new Mock<IRenderAPI>();
+        var bounds = ElementBounds.Fixed(0, 0, 51, 24).WithEmptyParent(); bounds.CalcWorldBounds();
+        presentation.Draw(renderer.Object, bounds);
+        Assert.Empty(firstBackdrop.Invocations);
+        var draw = Assert.Single(secondBackdrop.Invocations);
+        Assert.Equal(bounds.renderX + 54, draw.Arguments[1]); Assert.Equal(2d, draw.Arguments[3]);
+        presentation.SetContent(new(null, false)); presentation.Prepare(new(second.Object, 2, "en"));
+        presentation.Draw(renderer.Object, bounds); Assert.Single(secondBackdrop.Invocations);
+        presentation.Reset(); presentation.Prepare(new(second.Object, 2, "en")); Assert.Equal(2, loads);
     }
     /// <summary>Native sampling caches stable conditions and clears them for missing data, death, disable, and world exit.</summary>
     [Fact]
@@ -148,7 +179,9 @@ public sealed class WeatherConditionsTests
         var bounds = ElementBounds.Fixed(0, 0, 51, 24).WithEmptyParent();
         bounds.CalcWorldBounds();
         overlay.Draw(renderer.Object, bounds, new RectangleF(0, 0, 51, 24), .1f);
-        Assert.Equal(new[] { 2, 4 }, renderer.Invocations.Where(call => call.Method.Name == "RenderTexture").Select(call => (int)call.Arguments[0]).ToArray());
+        var draws = renderer.Invocations.Where(call => call.Method.Name == "RenderTexture").ToArray();
+        Assert.Equal(new[] { 50f, 50f }, draws.Select(call => (float)call.Arguments[5]));
+        Assert.Equal(new[] { 2, 4 }, renderer.Invocations.Where(call => call.Method.Name == "RenderTexture" && (float)call.Arguments[5] == 50).Select(call => (int)call.Arguments[0]).ToArray());
         overlay.Refresh();
         Assert.Equal(EnumPrecipitationType.Rain, overlay.Sample!.Precipitation);
         overlay.Prepare(preparation);

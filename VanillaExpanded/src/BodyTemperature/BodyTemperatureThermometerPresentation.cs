@@ -15,6 +15,8 @@ internal sealed class BodyTemperatureThermometerPresentation : IDisposable
     private readonly HudOverlayIconTextPresentation text;
     private readonly System.Func<HudOverlayPreparationContext, LoadedTexture[]> createIcons;
     private LoadedTexture[]? icons;
+    private IHudOverlayIconBackdrop? backdrop;
+    private readonly System.Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?> loadBackdrop;
     private HudOverlayPreparationContext? context;
     private BodyTemperatureSample? sample;
     private bool showReading;
@@ -28,10 +30,12 @@ internal sealed class BodyTemperatureThermometerPresentation : IDisposable
     #region Content and presentation
     /// <summary>Accepts an owned text presentation and optional borrowed asset-texture loader for headless verification.</summary>
     public BodyTemperatureThermometerPresentation(HudOverlayIconTextPresentation text,
-        System.Func<HudOverlayPreparationContext, LoadedTexture[]>? createIcons = null)
+        System.Func<HudOverlayPreparationContext, LoadedTexture[]>? createIcons = null,
+        System.Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null)
     {
         this.text = text;
         this.createIcons = createIcons ?? LoadIcons;
+        this.loadBackdrop = loadBackdrop ?? HudOverlayIconBackdrop.Load;
     }
     /// <summary>Updates raw fill and color while the text cache changes only when the whole-degree value changes.</summary>
     public void SetContent(BodyTemperatureSample value, bool showReading)
@@ -59,16 +63,19 @@ internal sealed class BodyTemperatureThermometerPresentation : IDisposable
             var replacement = createIcons(preparation);
             icons = replacement;
         }
+        if (backdrop == null || !ReferenceEquals(context?.Api, preparation.Api)) backdrop = loadBackdrop(preparation);
         context = preparation;
         if (showReading) text.Prepare(preparation);
-        Size = new SizeF(IconWidth + (showReading ? Gap + text.Size.Width : 0), Math.Max(IconHeight + (sample.Trend != 0 ? 22 : 0), showReading ? text.Size.Height : 0));
+        Size = new SizeF(Math.Max(24, 5 + IconWidth + (showReading ? Gap + text.Size.Width : 0)), Math.Max(IconHeight + (sample.Trend != 0 ? 22 : 0), showReading ? text.Size.Height : 0));
     }
     /// <summary>Draws the tinted full mask through a fill scissor, then the outline through native texture rendering within the host clip.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime)
     {
         if (sample == null || icons == null || context == null) return;
         double scale = context.GuiScale;
-        double x = bounds.renderX, y = bounds.renderY + (bounds.OuterHeight - IconHeight * scale) / 2;
+        // Center the narrow thermometer within the same 24-unit circle used by the other status icons.
+        double x = bounds.renderX + 5 * scale, y = bounds.renderY + (bounds.OuterHeight - IconHeight * scale) / 2;
+        backdrop?.Draw(renderer, bounds.renderX, y, scale);
         // Reveal the full mask upward while retaining the bulb at the minimum temperature fill.
         double fillTop = y + 15.5 * (1 - sample.Fill) * scale;
         double left = Math.Max(x, clip.Left), top = Math.Max(fillTop, clip.Top);
@@ -111,6 +118,7 @@ internal sealed class BodyTemperatureThermometerPresentation : IDisposable
     public void Reset()
     {
         icons = null;
+        backdrop = null;
         text.Reset();
         sample = null;
         context = null;

@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using VanillaExpanded.HudOverlays.Registration;
+using VanillaExpanded.HudOverlays.Rendering;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.GameContent;
@@ -12,16 +13,20 @@ internal sealed class WeatherConditionsPresentation : IDisposable
 {
     private const float Diameter = 24, Gap = 3;
     private readonly System.Func<HudOverlayPreparationContext, LoadedTexture[]> load;
+    private readonly System.Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?> loadBackdrop;
     private LoadedTexture[]? icons;
+    private IHudOverlayIconBackdrop? backdrop;
     private HudOverlayPreparationContext? context;
     private WeatherConditionsSample? sample;
     public SizeF Size { get; private set; }
     #region Public API
     #region Content and rendering
     /// <summary>Uses native cached assets, with an injectable loader for headless lifecycle checks.</summary>
-    public WeatherConditionsPresentation(System.Func<HudOverlayPreparationContext, LoadedTexture[]>? load = null)
+    public WeatherConditionsPresentation(System.Func<HudOverlayPreparationContext, LoadedTexture[]>? load = null,
+        System.Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null)
     {
         this.load = load ?? LoadIcons;
+        this.loadBackdrop = loadBackdrop ?? HudOverlayIconBackdrop.Load;
     }
     /// <summary>Stores the immutable visible conditions for the next preparation.</summary>
     public void SetContent(WeatherConditionsSample value)
@@ -32,8 +37,15 @@ internal sealed class WeatherConditionsPresentation : IDisposable
     public void Prepare(HudOverlayPreparationContext preparation)
     {
         if (sample == null) return;
+        // An empty update can still cross API ownership; discard old cache bindings before deferring the loads.
+        if (!ReferenceEquals(context?.Api, preparation.Api))
+        {
+            icons = null;
+            backdrop = null;
+        }
         int count = (sample.Precipitation.HasValue ? 1 : 0) + (sample.Fog ? 1 : 0);
         if (count > 0 && (icons == null || !ReferenceEquals(context?.Api, preparation.Api))) icons = load(preparation);
+        if (count > 0 && (backdrop == null || !ReferenceEquals(context?.Api, preparation.Api))) backdrop = loadBackdrop(preparation);
         context = preparation;
         Size = count == 0 ? SizeF.Empty : new SizeF(sample.Fog ? 2 * Diameter + Gap : Diameter, Diameter);
     }
@@ -45,11 +57,17 @@ internal sealed class WeatherConditionsPresentation : IDisposable
         double x = bounds.renderX, y = bounds.renderY + (bounds.OuterHeight - pixels) / 2;
         if (sample.Precipitation is EnumPrecipitationType type)
         {
+            backdrop?.Draw(renderer, x, y, context.GuiScale);
             int index = type switch { EnumPrecipitationType.Snow => 1, EnumPrecipitationType.Hail => 2, _ => 0 };
             renderer.RenderTexture(icons[index].TextureId, x, y, pixels, pixels, 50);
         }
         // Fog owns the second slot even when precipitation is absent.
-        if (sample.Fog) renderer.RenderTexture(icons[3].TextureId, x + (Diameter + Gap) * context.GuiScale, y, pixels, pixels, 50);
+        if (sample.Fog)
+        {
+            double fogX = x + (Diameter + Gap) * context.GuiScale;
+            backdrop?.Draw(renderer, fogX, y, context.GuiScale);
+            renderer.RenderTexture(icons[3].TextureId, fogX, y, pixels, pixels, 50);
+        }
     }
     #endregion
     #region Lifetime
@@ -57,6 +75,7 @@ internal sealed class WeatherConditionsPresentation : IDisposable
     public void Reset()
     {
         icons = null;
+        backdrop = null;
         context = null;
         sample = null;
         Size = SizeF.Empty;

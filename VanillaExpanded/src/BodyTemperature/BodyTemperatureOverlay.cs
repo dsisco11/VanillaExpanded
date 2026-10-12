@@ -24,9 +24,10 @@ internal sealed class BodyTemperatureOverlay : IHudOverlay
     #region Lifecycle
     /// <summary>Creates a dynamic thermometer and compact whole-degree text with preparation outside the render path.</summary>
     public BodyTemperatureOverlay(HudOverlayIconTextPresentation? presentation = null,
-        System.Func<HudOverlayPreparationContext, LoadedTexture[]>? createIconTextures = null)
+        System.Func<HudOverlayPreparationContext, LoadedTexture[]>? createIconTextures = null,
+        System.Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null)
     {
-        thermometer = new BodyTemperatureThermometerPresentation(presentation ?? new(fontSize: 14), createIconTextures);
+        thermometer = new BodyTemperatureThermometerPresentation(presentation ?? new(fontSize: 14), createIconTextures, loadBackdrop);
     }
     /// <summary>Changes the reading preference and requests a fresh measurement on the next scheduled sample.</summary>
     public void SetShowReading(bool value)
