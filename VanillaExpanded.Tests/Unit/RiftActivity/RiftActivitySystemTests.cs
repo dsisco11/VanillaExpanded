@@ -45,6 +45,7 @@ public sealed class RiftActivitySystemTests
                 Assert.Equal(RiftActivitySystem.OverlayId, registration.Id);
                 Assert.Equal(1000, registration.RefreshIntervalMs);
                 Assert.Equal(90, registration.Order);
+                Assert.Equal(new System.Drawing.SizeF(24, 24), registration.ReservedSize);
                 Assert.Equal("player-status", registration.GroupId);
                 overlay = Assert.IsType<RiftActivityOverlay>(registration.Overlay);
             });

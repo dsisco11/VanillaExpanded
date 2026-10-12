@@ -117,7 +117,7 @@ public sealed class BodyTemperatureThermometerTests
     }
     /// <summary>Trend textures stay within measured bounds and reverse without moving the thermometer.</summary>
     [Theory]
-    [InlineData(1)] [InlineData(2)] [InlineData(-1)] [InlineData(-2)]
+    [InlineData(0)] [InlineData(1)] [InlineData(2)] [InlineData(-1)] [InlineData(-2)]
     public void TrendChevronsRespectMeasuredBounds(int trend)
     {
         var api = new Mock<ICoreClientAPI>();
@@ -125,11 +125,13 @@ public sealed class BodyTemperatureThermometerTests
             context => Enumerable.Range(1, 4).Select(id => new LoadedTexture(context.Api) { TextureId = id, IgnoreUndisposed = true }).ToArray());
         presentation.SetContent(new(34, 37, BodyTemperatureRisk.Cold, .25f, trend), false);
         presentation.Prepare(new(api.Object, 1, "en"));
-        Assert.Equal(new SizeF(14, 46), presentation.Size);
+        Assert.Equal(new SizeF(14, trend == 0 ? 24 : 46), presentation.Size);
         var bounds = Bounds(1);
-        bounds.absInnerHeight = presentation.Size.Height;
+        bounds.absInnerHeight = 46;
         var renderer = new Mock<IRenderAPI>();
         presentation.Draw(renderer.Object, bounds, new RectangleF(0, 0, 1000, 1000), .1f);
+        var outline = Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture" && (int)call.Arguments[0] == 1);
+        Assert.Equal(bounds.renderY + 11, (double)outline.Arguments[2]);
         var chevrons = renderer.Invocations.Where(call => call.Method.Name == "RenderTexture" && (int)call.Arguments[0] == (trend > 0 ? 3 : 4)).ToArray();
         Assert.Equal(Math.Abs(trend), chevrons.Length);
         foreach (var call in chevrons)

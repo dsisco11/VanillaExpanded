@@ -33,7 +33,11 @@ public sealed class BowAmmunitionSystemConfigurationTests
             system.StartClientSide(fixture.Api.Object);
             hud.Registry.BeginSession(fixture.Api.Object);
             VanillaExpanded.BowAmmunition.BowAmmunitionOverlay? overlay = null;
-            hud.Registry.RunPass(registration => overlay = Assert.IsType<VanillaExpanded.BowAmmunition.BowAmmunitionOverlay>(registration.Overlay));
+            hud.Registry.RunPass(registration =>
+            {
+                Assert.Equal(new System.Drawing.SizeF(128, 24), registration.ReservedSize);
+                overlay = Assert.IsType<VanillaExpanded.BowAmmunition.BowAmmunitionOverlay>(registration.Overlay);
+            });
             fixture.Personal[0].Itemstack = new ItemStack(fixture.Flint, 12);
             overlay!.Refresh(); Assert.Equal(12, overlay.Sample!.Quantity);
             if (global) config.EnableHudOverlays = false; else config.EnableBowAmmunitionOverlay = false;

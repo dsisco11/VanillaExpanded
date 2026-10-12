@@ -8,9 +8,53 @@ using Vintagestory.API.Client;
 namespace VanillaExpanded.Tests.Unit.HudOverlays;
 
 /// <summary>Uses a fake monotonic clock to verify bounded work and stable resource preparation.</summary>
-public sealed class HudOverlaySchedulerTests
+[Collection("HudOverlayGeometry")]
+public sealed class HudOverlaySchedulerTests : IDisposable
 {
+    private readonly float oldScale = Vintagestory.API.Config.RuntimeEnv.GUIScale;
     #region Public API
+    /// <summary>Sets deterministic native scale for headless bounds.</summary>
+    public HudOverlaySchedulerTests() => Vintagestory.API.Config.RuntimeEnv.GUIScale = 1;
+    /// <summary>Restores borrowed native state after each check.</summary>
+    public void Dispose() => Vintagestory.API.Config.RuntimeEnv.GUIScale = oldScale;
+    /// <summary>Reserved native footprints survive every content and visibility transition, including initial binding failure.</summary>
+    [Fact]
+    public void ReservedFootprintsRemainStableThroughSuspensionAndRecovery()
+    {
+        using var fixture = new Fixture(new SizeF(72, 46));
+        var second = new Probe();
+        var time = new HudOverlayRegistration("mod:time", second, () => true, "group", order: 100, reservedSize: new SizeF(24, 24));
+        fixture.Registry.Register(time);
+        using var layout = new VanillaExpanded.HudOverlays.Layout.HudOverlayGroupLayout();
+        fixture.Probe.Applicable = false;
+        fixture.Tick(0);
+        layout.Apply(fixture.Anchors, fixture.Registry.GetGroups()[0], fixture.Scheduler.GetMembers("group"));
+        var baseline = layout.Members.Select(member => (member.Bounds.renderX, member.Bounds.renderY, member.Bounds.OuterWidth, member.Bounds.OuterHeight, member.Clip)).ToArray();
+        Assert.False(fixture.Scheduler.IsDrawable(fixture.Registration));
+        var probeClip = layout.Members.Single(member => member.Registration == fixture.Registration).Clip;
+        Assert.True(probeClip.Width > 0 && probeClip.Height > 0, probeClip.ToString());
+        Assert.Null(VanillaExpanded.HudOverlays.Rendering.HudOverlayHoverLabels.FindTarget(new[] { layout }, fixture.Scheduler.IsDrawable, false, new PointF(probeClip.Left + 1, probeClip.Top + 1)));
+        Assert.Equal(0, fixture.Probe.Refreshes);
+        foreach (string transition in new[] { "applicable", "empty", "large", "disabled", "failure", "recovery", "binding-failure" })
+        {
+            fixture.Enabled = transition != "disabled";
+            fixture.Probe.Applicable = true;
+            fixture.Probe.Size = transition == "empty" ? SizeF.Empty : transition == "large" ? new SizeF(60, 40) : new SizeF(20, 20);
+            fixture.Probe.Failure = transition == "failure" ? "refresh" : null;
+            fixture.Probe.Change = HudOverlayChange.Measurement;
+            if (transition == "binding-failure")
+            {
+                fixture.Registry.EndSession(); fixture.Probe.BeginFailure = true;
+                Assert.Throws<AggregateException>(() => fixture.Registry.BeginSession(fixture.Api));
+            }
+            fixture.Scheduler.Invalidate("mod:test"); fixture.Tick(fixture.Now + 1000);
+            layout.Apply(fixture.Anchors, fixture.Registry.GetGroups()[0], fixture.Scheduler.GetMembers("group"));
+            Assert.Equal(baseline, layout.Members.Select(member => (member.Bounds.renderX, member.Bounds.renderY, member.Bounds.OuterWidth, member.Bounds.OuterHeight, member.Clip)).ToArray());
+            Assert.Equal(transition is "applicable" or "large" or "recovery", fixture.Scheduler.IsDrawable(fixture.Registration));
+            var hovered = VanillaExpanded.HudOverlays.Rendering.HudOverlayHoverLabels.FindTarget(new[] { layout }, fixture.Scheduler.IsDrawable, false, new PointF(probeClip.Left + 1, probeClip.Top + 1));
+            Assert.Equal(transition is "applicable" or "large" or "recovery" ? fixture.Registration : null, hovered);
+        }
+    }
     /// <summary>Multiple invalidations coalesce and refresh intervals receive heartbeat granularity.</summary>
     [Fact]
     public void InvalidationsAndIntervalsAreBounded()
@@ -189,10 +233,10 @@ public sealed class HudOverlaySchedulerTests
         public readonly IDisposable Handle;
         #region Public API
         /// <summary>Creates a bound feature with a 250 ms interval and dynamic named target.</summary>
-        public Fixture()
+        public Fixture(SizeF? reservedSize = null)
         {
             Registry.RegisterGroup(new HudOverlayGroup("group", new HudOverlayPlacement("hotbar", HudOverlayPoint.RightMiddle, HudOverlayPoint.LeftMiddle)));
-            Registration = new HudOverlayRegistration("mod:test", Probe, () => Enabled, "group", refreshIntervalMs: 250);
+            Registration = new HudOverlayRegistration("mod:test", Probe, () => Enabled, "group", refreshIntervalMs: 250, hoverLabelKey: "mod:test-title", reservedSize: reservedSize);
             Handle = Registry.Register(Registration); Registry.BeginSession(Api);
             Scheduler = new HudOverlayScheduler(Registry, () => Now, (_, _) => Diagnostics++);
             Anchors = new HudOverlayAnchorContext(new Window(), () => 1, () => Target);
@@ -215,6 +259,7 @@ public sealed class HudOverlaySchedulerTests
     {
         public bool Applicable = true, BeginFailure;
         public HudOverlayChange Change;
+        public SizeF Size = new(20, 20);
         public string? Failure;
         public Action? OnRefresh;
         public int Refreshes, Preparations, Measurements, Disposals, ApplicabilityChecks;
@@ -230,7 +275,7 @@ public sealed class HudOverlaySchedulerTests
         /// <summary>Counts preparation and optional resource failure.</summary>
         public void Prepare(HudOverlayPreparationContext context) { Preparations++; Throw("prepare"); }
         /// <summary>Counts measurement of stable content.</summary>
-        public SizeF Measure() { Measurements++; Throw("measure"); return new SizeF(20, 20); }
+        public SizeF Measure() { Measurements++; Throw("measure"); return Size; }
         /// <summary>Rejects accidental drawing by scheduler work.</summary>
         public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime) => throw new InvalidOperationException();
         /// <summary>Records exact final ownership cleanup.</summary>
