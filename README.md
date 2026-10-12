@@ -39,7 +39,7 @@ A fissure icon beside the toolbar's bottom-left edge, before the time icon, show
 
 ### Temporal Storm Warning
 
-A fractured iris icon beside the toolbar's bottom-left edge, between rift activity and approximate time, warns of temporal storms. A narrow eye indicates an approaching storm, an open eye with separated portal fragments indicates an imminent storm, and a ruptured portal with outward spikes indicates an active storm. The imminent icon pulses in opacity, accelerating from one pulse every two seconds to three pulses per second as the storm nears. It hides between storms while retaining its space. Toggle it live with `EnableTemporalStormOverlay`.
+A fractured iris icon beside the toolbar's bottom-left edge, between rift activity and approximate time, warns of temporal storms. A narrow eye indicates an approaching storm, an open eye with separated portal fragments indicates an imminent storm, and a ruptured portal with outward spikes indicates an active storm. The imminent icon pulses in opacity, accelerating from one pulse every two seconds to three pulses per second as the storm nears. During waning, the active icon starts the same accelerating pulse until the storm ends. It hides between storms while retaining its space. Toggle it live with `EnableTemporalStormOverlay`.
 
 ### Body Temperature Warning
 

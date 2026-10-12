@@ -2,7 +2,7 @@ using System;
 
 namespace VanillaExpanded.TemporalStorm;
 
-/// <summary>Maintains a continuous opacity pulse whose rate increases through the imminent warning window.</summary>
+/// <summary>Maintains a continuous opacity pulse that accelerates through imminent and waning storm windows.</summary>
 internal sealed class TemporalStormPulse
 {
     private double phase;
