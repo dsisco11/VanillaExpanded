@@ -17,6 +17,7 @@ internal sealed class TemporalStormPresentation : IDisposable
     private IHudOverlayIconBackdrop? backdrop;
     private HudOverlayPreparationContext? context;
     private TemporalStormStage? stage;
+    private bool pulsing;
     private readonly TemporalStormPulse pulse = new();
     private readonly Vec4f tint = new(1, 1, 1, 1);
     public SizeF Size { get; private set; }
@@ -31,10 +32,12 @@ internal sealed class TemporalStormPresentation : IDisposable
         this.loadBackdrop = loadBackdrop ?? HudOverlayIconBackdrop.Load;
     }
     /// <summary>Stores the native storm stage and updates urgency without restarting an existing pulse.</summary>
-    public void SetContent(TemporalStormStage value, double remainingDays)
+    public void SetContent(TemporalStormStage value, double remainingDays, bool waning = false)
     {
-        if (stage != value) pulse.Reset();
+        bool nextPulsing = value == TemporalStormStage.Imminent || (value == TemporalStormStage.Active && waning);
+        if (stage != value || pulsing != nextPulsing) pulse.Reset();
         stage = value;
+        pulsing = nextPulsing;
         pulse.SetRemainingDays(remainingDays);
     }
     /// <summary>Loads borrowed textures once per client API and reserves a fixed 24-unit icon slot.</summary>
@@ -51,11 +54,11 @@ internal sealed class TemporalStormPresentation : IDisposable
     {
         if (!stage.HasValue || icons == null || context == null) return;
         double pixels = 24 * context.GuiScale;
-        // Animate only the imminent artwork; the shared backdrop and other stages remain steady.
-        tint.W = stage == TemporalStormStage.Imminent ? pulse.Advance(deltaTime) : 1;
+        // Imminent and waning storms pulse; the shared backdrop remains steady.
+        tint.W = pulsing ? pulse.Advance(deltaTime) : 1;
         renderer.RenderTexture(icons[(int)stage.Value].TextureId, bounds.renderX,
             bounds.renderY + (bounds.OuterHeight - pixels) / 2, pixels, pixels, 50,
-            stage == TemporalStormStage.Imminent ? tint : null);
+            pulsing ? tint : null);
     }
     #endregion
     /// <summary>Queues the prepared icon circle separately from foreground drawing.</summary>
@@ -74,6 +77,7 @@ internal sealed class TemporalStormPresentation : IDisposable
         backdrop = null;
         context = null;
         stage = null;
+        pulsing = false;
         pulse.Reset();
         Size = SizeF.Empty;
     }

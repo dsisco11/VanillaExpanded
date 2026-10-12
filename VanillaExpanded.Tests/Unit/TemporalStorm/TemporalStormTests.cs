@@ -217,9 +217,75 @@ public sealed class TemporalStormTests
         overlay.Draw(renderer.Object, bounds, RectangleF.Empty, .5f);
         Assert.Null(Assert.Single(renderer.Invocations).Arguments[6]);
         storms.StormData.nowStormActive = true;
+        storms.StormData.stormActiveTotalDays = 1;
         overlay.Refresh(); overlay.Prepare(preparation); renderer.Invocations.Clear();
         overlay.Draw(renderer.Object, bounds, RectangleF.Empty, .5f);
         Assert.Null(Assert.Single(renderer.Invocations).Arguments[6]);
+    }
+
+    /// <summary>Waning is inferred from the end deadline, pulses continuously, and remains active until the server clears it.</summary>
+    [Fact]
+    public void ActiveStormPulsesOnlyWithinWaningWindow()
+    {
+        var fixture = new BowAmmunitionSamplerTests.Fixture();
+        fixture.Entity.Alive = true;
+        var storms = new SystemTemporalStability();
+        var loader = new Mock<IModLoader>();
+        loader.Setup(value => value.GetModSystem<SystemTemporalStability>(true)).Returns(storms);
+        fixture.Api.SetupGet(value => value.ModLoader).Returns(loader.Object);
+        var calendar = new Mock<IClientGameCalendar>();
+        calendar.SetupGet(value => value.TotalDays).Returns(0);
+        fixture.World.SetupGet(value => value.Calendar).Returns(calendar.Object);
+        var config = new TreeAttribute();
+        config.SetBool("temporalStability", true); config.SetString("temporalStorms", "normal");
+        fixture.World.SetupGet(value => value.Config).Returns(config);
+        var renderer = new Mock<IRenderAPI>();
+        var backdrop = new Mock<IHudOverlayIconBackdrop>();
+        using var overlay = new TemporalStormOverlay(context => Enumerable.Range(1, 3)
+            .Select(id => new LoadedTexture(context.Api) { TextureId = id, IgnoreUndisposed = true }).ToArray(), _ => backdrop.Object);
+        var preparation = new HudOverlayPreparationContext(fixture.Api.Object, 1, "en");
+        var bounds = ElementBounds.Fixed(0, 0, 24, 24).WithEmptyParent(); bounds.CalcWorldBounds();
+        overlay.BeginSession(fixture.Api.Object);
+        storms.StormData.nowStormActive = true;
+        storms.StormData.nextStormTotalDays = -1;
+        storms.StormData.stormActiveTotalDays = .02;
+        storms.StormData.stormDayNotify = -1;
+        overlay.Refresh(); overlay.Prepare(preparation);
+        overlay.Draw(renderer.Object, bounds, RectangleF.Empty, 1);
+        Assert.Null(Assert.Single(renderer.Invocations).Arguments[6]);
+
+        // The exact native boundary remains steady even with a stale waning notification marker.
+        storms.StormData.stormDayNotify = 99;
+        storms.StormData.stormActiveTotalDays = .0199;
+        Assert.Equal(HudOverlayChange.None, overlay.Refresh()); renderer.Invocations.Clear();
+        overlay.Draw(renderer.Object, bounds, RectangleF.Empty, 0);
+        Assert.Equal(1, Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W, 5);
+        renderer.Invocations.Clear();
+        double nearWindowRate = .5 + 2.5 * (1 - .0199 / .02);
+        overlay.Draw(renderer.Object, bounds, RectangleF.Empty, (float)(.25 / nearWindowRate));
+        Assert.Equal(.675f, Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W, 5);
+
+        // Deadline updates preserve phase and accelerate the existing pulse to three cycles per second.
+        storms.StormData.stormActiveTotalDays = 0;
+        Assert.Equal(HudOverlayChange.None, overlay.Refresh()); renderer.Invocations.Clear();
+        overlay.Draw(renderer.Object, bounds, RectangleF.Empty, 0);
+        Assert.Equal(.675f, Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W, 5);
+        renderer.Invocations.Clear();
+        overlay.Draw(renderer.Object, bounds, RectangleF.Empty, 1f / 12);
+        Assert.Equal(.35f, Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W, 5);
+        storms.StormData.stormActiveTotalDays = -1;
+        Assert.Equal(HudOverlayChange.None, overlay.Refresh()); renderer.Invocations.Clear();
+        overlay.Draw(renderer.Object, bounds, RectangleF.Empty, 1f / 6);
+        Assert.Equal(1, Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W, 5);
+        Assert.Equal(new SizeF(24, 24), overlay.Measure());
+
+        storms.StormData.nowStormActive = false; storms.StormData.nextStormTotalDays = 5;
+        Assert.NotEqual(HudOverlayChange.None, overlay.Refresh());
+        Assert.Equal(SizeF.Empty, overlay.Measure());
+        renderer.Invocations.Clear(); backdrop.Invocations.Clear();
+        overlay.Draw(renderer.Object, bounds, RectangleF.Empty, .5f);
+        overlay.CollectBackdrops(renderer.Object, bounds);
+        Assert.Empty(renderer.Invocations); Assert.Empty(backdrop.Invocations);
     }
     #endregion
 }
