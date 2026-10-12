@@ -32,11 +32,11 @@ internal sealed class WeatherConditionsSystem : ModSystem, ILiveConfigurable
         overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays && VanillaExpandedModSystem.Config.EnableWeatherConditionsOverlay);
         try
         {
-            // Precipitation and fog each retain a 24-unit icon slot separated by a three-unit gap.
+            // Every weather channel shares one fixed composite slot, regardless of texture resolution.
             registration = hud.Registry.Register(new HudOverlayRegistration(OverlayId, overlay,
                 () => overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays
                     && VanillaExpandedModSystem.Config.EnableWeatherConditionsOverlay), "player-status", refreshIntervalMs: 1000,
-                hoverLabelKey: "vanillaexpanded:hud-label-weather-conditions", reservedSize: new System.Drawing.SizeF(51, 24)));
+                hoverLabelKey: "vanillaexpanded:hud-label-weather-conditions", reservedSize: new System.Drawing.SizeF(24, 24)));
         }
         catch { overlay.Dispose(); throw; }
     }

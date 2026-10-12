@@ -8,16 +8,17 @@ using Vintagestory.GameContent;
 
 namespace VanillaExpanded.WeatherConditions;
 
-/// <summary>Borrows cached condition artwork and lays out precipitation and fog as independent icons.</summary>
+/// <summary>Composes borrowed weather layers into one fixed HUD footprint with one shared backdrop.</summary>
 internal sealed class WeatherConditionsPresentation : IDisposable
 {
-    private const float Diameter = 24, Gap = 3;
+    private const float Diameter = 24;
     private readonly System.Func<HudOverlayPreparationContext, LoadedTexture[]> load;
     private readonly System.Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?> loadBackdrop;
     private LoadedTexture[]? icons;
     private IHudOverlayIconBackdrop? backdrop;
     private HudOverlayPreparationContext? context;
     private WeatherConditionsSample? sample;
+    private int[] layers = [];
     public SizeF Size { get; private set; }
     #region Public API
     #region Content and rendering
@@ -32,6 +33,7 @@ internal sealed class WeatherConditionsPresentation : IDisposable
     public void SetContent(WeatherConditionsSample value)
     {
         sample = value;
+        layers = WeatherConditionsLayers.Select(value);
     }
     /// <summary>Loads artwork once per API binding and measures active icons in unscaled GUI units.</summary>
     public void Prepare(HudOverlayPreparationContext preparation)
@@ -43,39 +45,48 @@ internal sealed class WeatherConditionsPresentation : IDisposable
             icons = null;
             backdrop = null;
         }
-        int count = (sample.Precipitation.HasValue ? 1 : 0) + (sample.Fog ? 1 : 0);
-        if (count > 0 && (icons == null || !ReferenceEquals(context?.Api, preparation.Api))) icons = load(preparation);
-        if (count > 0 && (backdrop == null || !ReferenceEquals(context?.Api, preparation.Api))) backdrop = loadBackdrop(preparation);
+        bool hasData = sample.Precipitation.HasValue || sample.Fog || sample.CloudCoverage.HasValue
+            || sample.WindIntensity > 0 || sample.ThunderIntensity > 0;
+        if (hasData && icons == null) icons = load(preparation);
+        bool visible = hasData && (icons?.Length == WeatherConditionsLayers.Names.Length || sample.Precipitation.HasValue || sample.Fog);
+        if (visible && backdrop == null) backdrop = loadBackdrop(preparation);
         context = preparation;
-        Size = count == 0 ? SizeF.Empty : new SizeF(sample.Fog ? 2 * Diameter + Gap : Diameter, Diameter);
+        Size = visible ? new SizeF(Diameter, Diameter) : SizeF.Empty;
     }
     /// <summary>Draws only borrowed prepared textures; the host owns clipping and GUI visibility.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds)
     {
-        if (sample == null || icons == null || context == null) return;
+        if (sample == null || icons == null || context == null || Size.IsEmpty) return;
         double pixels = Diameter * context.GuiScale;
         double x = bounds.renderX, y = bounds.renderY + (bounds.OuterHeight - pixels) / 2;
+        if (icons.Length == WeatherConditionsLayers.Names.Length)
+        {
+            foreach (int layer in layers) renderer.RenderTexture(icons[layer].TextureId, x, y, pixels, pixels, 50);
+            return;
+        }
+        // Until the complete approved layer set exists, retain both existing weather symbols inside the one slot.
+        bool both = sample.Precipitation.HasValue && sample.Fog;
+        double legacySize = both ? pixels / 2 : pixels;
+        double legacyY = both ? y + pixels / 4 : y;
         if (sample.Precipitation is EnumPrecipitationType type)
         {
             int index = type switch { EnumPrecipitationType.Snow => 1, EnumPrecipitationType.Hail => 2, _ => 0 };
-            renderer.RenderTexture(icons[index].TextureId, x, y, pixels, pixels, 50);
+            renderer.RenderTexture(icons[index].TextureId, x, legacyY, legacySize, legacySize, 50);
         }
-        // Fog owns the second slot even when precipitation is absent.
         if (sample.Fog)
         {
-            double fogX = x + (Diameter + Gap) * context.GuiScale;
-            renderer.RenderTexture(icons[3].TextureId, fogX, y, pixels, pixels, 50);
+            double fogX = both ? x + legacySize : x;
+            renderer.RenderTexture(icons[3].TextureId, fogX, legacyY, legacySize, legacySize, 50);
         }
     }
     #endregion
     #region Lifetime
-    /// <summary>Queues circles only for prepared active weather conditions.</summary>
+    /// <summary>Queues one shared backdrop only when the prepared composite is visible.</summary>
     public void CollectBackdrops(IRenderAPI renderer, ElementBounds bounds)
     {
-        if (sample == null || icons == null || context == null) return;
+        if (sample == null || icons == null || context == null || Size.IsEmpty) return;
         double y = bounds.renderY + (bounds.OuterHeight - 24 * context.GuiScale) / 2;
-        if (sample.Precipitation.HasValue) backdrop?.Queue(renderer, bounds.renderX, y, context.GuiScale);
-        if (sample.Fog) backdrop?.Queue(renderer, bounds.renderX + (Diameter + Gap) * context.GuiScale, y, context.GuiScale);
+        backdrop?.Queue(renderer, bounds.renderX, y, context.GuiScale);
     }
     /// <summary>Drops bindings without deleting resources owned by the engine cache.</summary>
     public void Reset()
@@ -84,6 +95,7 @@ internal sealed class WeatherConditionsPresentation : IDisposable
         backdrop = null;
         context = null;
         sample = null;
+        layers = [];
         Size = SizeF.Empty;
     }
     /// <summary>Releases borrowed bindings on final removal.</summary>
@@ -94,13 +106,22 @@ internal sealed class WeatherConditionsPresentation : IDisposable
     /// <summary>Loads straight-alpha asset textures while leaving disposal ownership with the game.</summary>
     private static LoadedTexture[] LoadIcons(HudOverlayPreparationContext preparation)
     {
-        string[] names = ["rain", "snow", "hail", "fog"];
+        string[] names = WeatherConditionsLayers.Names;
+        string folder = "textures/hud/weather/composite/";
+        // A partial or absent art pack must not request missing textures or mix incompatible full-canvas artwork.
+        foreach (string name in names)
+        {
+            if (preparation.Api.Assets.Exists(new AssetLocation(Constants.ModId, folder + name + ".png"))) continue;
+            names = ["rain", "snow", "hail", "fog"];
+            folder = "textures/hud/weather/";
+            break;
+        }
         var textures = new LoadedTexture[names.Length];
         for (int index = 0; index < names.Length; index++)
         {
             var texture = new LoadedTexture(preparation.Api);
             preparation.Api.Render.GetOrLoadTexture(new AssetLocation(Constants.ModId,
-                "textures/hud/weather/" + names[index] + ".png"), ref texture);
+                folder + names[index] + ".png"), ref texture);
             texture.IgnoreUndisposed = true;
             textures[index] = texture;
         }
