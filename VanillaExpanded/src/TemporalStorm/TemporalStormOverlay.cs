@@ -8,7 +8,7 @@ using Vintagestory.GameContent;
 namespace VanillaExpanded.TemporalStorm;
 
 /// <summary>Samples the synchronized native storm schedule and owns its passive fractured iris presentation.</summary>
-internal sealed class TemporalStormOverlay : IHudOverlay, IHudOverlayBackdropProvider
+internal sealed class TemporalStormOverlay : IHudOverlay, IHudOverlayBackdropProvider, IHudOverlayVisibilityTransition
 {
     private readonly TemporalStormPresentation presentation;
     private ICoreClientAPI? api;
@@ -17,6 +17,11 @@ internal sealed class TemporalStormOverlay : IHudOverlay, IHudOverlayBackdropPro
     private bool enabled = true;
     private bool disposed;
 
+    /// <summary>Controls retained artwork during visibility changes.</summary>
+    public HudOverlayVisibilityTransition Visibility => presentation.Visibility;
+
+    /// <summary>Retains the last preparation for the shared host's exit transition.</summary>
+    public void HidePresentation() => Clear();
     #region Public API
     #region Lifecycle
     /// <summary>Creates the presentation with optional headless texture loading.</summary>
@@ -34,7 +39,7 @@ internal sealed class TemporalStormOverlay : IHudOverlay, IHudOverlayBackdropPro
         this.api = api;
         storms = api.ModLoader.GetModSystem<SystemTemporalStability>();
     }
-    /// <summary>Clears cached artwork immediately when disabled through live configuration.</summary>
+    /// <summary>Starts the artwork exit transition when disabled through live configuration.</summary>
     public bool SetEnabled(bool value)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
@@ -48,6 +53,7 @@ internal sealed class TemporalStormOverlay : IHudOverlay, IHudOverlayBackdropPro
         api = null;
         storms = null;
         Clear();
+        presentation.Reset();
     }
     /// <summary>Releases session bindings exactly once.</summary>
     public void Dispose()
@@ -87,7 +93,7 @@ internal sealed class TemporalStormOverlay : IHudOverlay, IHudOverlayBackdropPro
         }
         if (next == stage) return HudOverlayChange.None;
         stage = next;
-        if (!next.HasValue) presentation.Reset();
+        if (!next.HasValue) presentation.Hide();
         return HudOverlayChange.Presentation | HudOverlayChange.Measurement;
     }
     #endregion
@@ -113,11 +119,11 @@ internal sealed class TemporalStormOverlay : IHudOverlay, IHudOverlayBackdropPro
     #endregion
     #endregion
     #region Private
-    /// <summary>Clears cached stage and releases borrowed texture references.</summary>
+    /// <summary>Clears the sampled stage and defers artwork release until its exit finishes.</summary>
     private void Clear()
     {
         stage = null;
-        presentation.Reset();
+        presentation.Hide();
     }
     #endregion
 }

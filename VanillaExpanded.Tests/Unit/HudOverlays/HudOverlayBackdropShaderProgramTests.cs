@@ -51,7 +51,7 @@ public sealed class HudOverlayBackdropShaderProgramTests
             backdrop.Queue(renderer.Object, 0, 0, 1);
             backdrop.Queue(renderer.Object, 100, 100, 1);
         });
-        var entry = Assert.Single(pending.Cast<(System.Drawing.RectangleF Circle, System.Drawing.RectangleF Clip)>());
+        var entry = Assert.Single(pending.Cast<(System.Drawing.RectangleF Circle, System.Drawing.RectangleF Clip, float Opacity)>());
         Assert.Equal(new System.Drawing.RectangleF(0, 0, 24, 24), entry.Circle);
         Assert.Equal(new System.Drawing.RectangleF(10, 10, 10, 10), entry.Clip);
         Assert.Throws<InvalidOperationException>(() => backdrop.Collect(new(0, 0, 100, 100), () =>

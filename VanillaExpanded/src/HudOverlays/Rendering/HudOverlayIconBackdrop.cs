@@ -16,7 +16,7 @@ internal sealed class HudOverlayIconBackdrop : IHudOverlayIconBackdrop, IHudOver
     private HudOverlayBackdropShaderProgram? shader;
     private MeshRef? quad;
     private bool subscribed;
-    private readonly List<(RectangleF Circle, RectangleF Clip)> pending = new();
+    private readonly List<(RectangleF Circle, RectangleF Clip, float Opacity)> pending = new();
     private RectangleF? collectionClip;
     private readonly ElementBounds scissor = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
     #region Public API
@@ -54,7 +54,7 @@ internal sealed class HudOverlayIconBackdrop : IHudOverlayIconBackdrop, IHudOver
         if (!collectionClip.HasValue) return;
         var circle = new RectangleF((float)x, (float)y, (float)(24 * scale), (float)(24 * scale));
         var clip = RectangleF.Intersect(circle, collectionClip.Value);
-        if (clip.Width > 0 && clip.Height > 0) pending.Add((circle, clip));
+        if (clip.Width > 0 && clip.Height > 0) pending.Add((circle, clip, HudOverlayDrawOpacity.Current));
     }
 
     /// <summary>Scopes collection to one member and rolls back its queued circles if its provider fails.</summary>
@@ -108,6 +108,7 @@ internal sealed class HudOverlayIconBackdrop : IHudOverlayIconBackdrop, IHudOver
                 matrix.Set(modelView).Translate(item.Circle.X, item.Circle.Y, 49f)
                     .Scale(item.Circle.Width, item.Circle.Height, 1).Translate(.5f, .5f, 0).Scale(.5f, .5f, 1);
                 shader.ModelViewMatrix = matrix.Values;
+                shader.Opacity = item.Opacity;
                 scissor.absFixedX = item.Clip.X; scissor.absFixedY = item.Clip.Y;
                 scissor.absInnerWidth = item.Clip.Width; scissor.absInnerHeight = item.Clip.Height;
                 scissor.Initialized = true;

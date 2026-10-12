@@ -8,7 +8,7 @@ using Vintagestory.API.Common;
 namespace VanillaExpanded.WeatherConditions;
 
 /// <summary>Samples local native weather and owns a passive icon presentation.</summary>
-internal sealed class WeatherConditionsOverlay : IHudOverlay, IHudOverlayBackdropProvider
+internal sealed class WeatherConditionsOverlay : IHudOverlay, IHudOverlayBackdropProvider, IHudOverlayVisibilityTransition
 {
     private readonly WeatherConditionsPresentation presentation;
     private ICoreClientAPI? api;
@@ -17,6 +17,11 @@ internal sealed class WeatherConditionsOverlay : IHudOverlay, IHudOverlayBackdro
     private bool enabled = true;
     private bool disposed;
     internal WeatherConditionsSample? Sample { get; private set; }
+    /// <summary>Controls retained artwork during visibility changes.</summary>
+    public HudOverlayVisibilityTransition Visibility => presentation.Visibility;
+
+    /// <summary>Retains the last preparation for the shared host's exit transition.</summary>
+    public void HidePresentation() => Clear();
     #region Public API
     #region Lifecycle
     /// <summary>Creates an icon-only presentation with optional headless asset loading.</summary>
@@ -34,7 +39,7 @@ internal sealed class WeatherConditionsOverlay : IHudOverlay, IHudOverlayBackdro
         this.api = api;
         weather = api.ModLoader.GetModSystem<Vintagestory.GameContent.WeatherSystemClient>();
     }
-    /// <summary>Immediately clears cached conditions when the live feature setting is disabled.</summary>
+    /// <summary>Clears sampled conditions and starts the artwork exit when the feature is disabled.</summary>
     public bool SetEnabled(bool value)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
@@ -48,6 +53,7 @@ internal sealed class WeatherConditionsOverlay : IHudOverlay, IHudOverlayBackdro
         api = null;
         weather = null;
         Clear();
+        presentation.Reset();
     }
     /// <summary>Removes presentation bindings exactly once.</summary>
     public void Dispose()
@@ -115,7 +121,7 @@ internal sealed class WeatherConditionsOverlay : IHudOverlay, IHudOverlayBackdro
     {
         sampledEntity = null;
         Sample = null;
-        presentation.Reset();
+        presentation.Hide();
     }
     #endregion
 }

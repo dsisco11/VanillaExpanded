@@ -8,7 +8,7 @@ using Vintagestory.API.Common;
 namespace VanillaExpanded.BodyTemperature;
 
 /// <summary>Samples synchronized temperature warnings and owns its cached passive temperature presentation.</summary>
-internal sealed class BodyTemperatureOverlay : IHudOverlay, IHudOverlayBackdropProvider
+internal sealed class BodyTemperatureOverlay : IHudOverlay, IHudOverlayBackdropProvider, IHudOverlayVisibilityTransition
 {
     private readonly BodyTemperatureThermometerPresentation thermometer;
     private bool showReading = true;
@@ -20,6 +20,11 @@ internal sealed class BodyTemperatureOverlay : IHudOverlay, IHudOverlayBackdropP
     private bool cleared;
     internal BodyTemperatureSample? Sample { get; private set; }
 
+    /// <summary>Controls retained artwork during visibility changes.</summary>
+    public HudOverlayVisibilityTransition Visibility => thermometer.Visibility;
+
+    /// <summary>Retains the last preparation for the shared host's exit transition.</summary>
+    public void HidePresentation() => Clear();
     #region Public API
     #region Lifecycle
     /// <summary>Creates a dynamic thermometer and compact whole-degree text with preparation outside the render path.</summary>
@@ -44,7 +49,7 @@ internal sealed class BodyTemperatureOverlay : IHudOverlay, IHudOverlayBackdropP
         if (this.api != null) throw new InvalidOperationException("A temperature overlay session is already bound.");
         this.api = api;
     }
-    /// <summary>Suspends owned warning resources immediately while retaining the client session.</summary>
+    /// <summary>Starts the warning exit transition while retaining the client session.</summary>
     public bool SetEnabled(bool value)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
@@ -58,6 +63,7 @@ internal sealed class BodyTemperatureOverlay : IHudOverlay, IHudOverlayBackdropP
         api = null;
         Clear();
         sampledEntity = null;
+        thermometer.Reset();
     }
     /// <summary>Finally releases owned presentation resources exactly once.</summary>
     public void Dispose()
@@ -98,7 +104,7 @@ internal sealed class BodyTemperatureOverlay : IHudOverlay, IHudOverlayBackdropP
         if (Sample == next && !cleared) return HudOverlayChange.None;
         cleared = false;
         Sample = next;
-        if (next == null) thermometer.Reset();
+        if (next == null) thermometer.Hide();
         else thermometer.SetContent(next, showReading);
         return HudOverlayChange.Presentation | HudOverlayChange.Measurement;
     }
@@ -120,7 +126,7 @@ internal sealed class BodyTemperatureOverlay : IHudOverlay, IHudOverlayBackdropP
     /// <summary>Draws cached thermometer layers and optional text without sampling or generating textures.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime)
     {
-        if (Sample != null) thermometer.Draw(renderer, bounds, clip, deltaTime);
+        thermometer.Draw(renderer, bounds, clip, deltaTime);
     }
     #endregion
     #endregion
@@ -134,7 +140,7 @@ internal sealed class BodyTemperatureOverlay : IHudOverlay, IHudOverlayBackdropP
         if (Sample == null) return;
         Sample = null;
         cleared = true;
-        thermometer.Reset();
+        thermometer.Hide();
     }
     #endregion
 }
