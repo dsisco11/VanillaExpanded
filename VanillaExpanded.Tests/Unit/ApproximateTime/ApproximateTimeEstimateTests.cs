@@ -34,28 +34,28 @@ public sealed class ApproximateTimeEstimateTests
         ApproximateTimeState.Update(restored, 1, true);
         Assert.Equal(0, ApproximateTimeState.Read(restored));
     }
-    /// <summary>Solar classification follows light and rising direction rather than fixed hour bands.</summary>
+    /// <summary>Solar classification follows elevation and rising direction rather than fixed hour bands.</summary>
     [Theory]
-    [InlineData(-.4f, -.3f, -.2f, .05f, 6)]
-    [InlineData(-.1f, 0, .1f, .4f, 1)]
-    [InlineData(.1f, 0, -.1f, .4f, 5)]
-    [InlineData(.2f, .4f, .6f, .8f, 2)]
-    [InlineData(.6f, .4f, .2f, .8f, 4)]
-    [InlineData(.3f, .31f, .3f, .8f, 3)]
-    [InlineData(.08f, .09f, .08f, .8f, 3)]
-    [InlineData(.9f, 1, .9f, .8f, 3)]
-    public void SolarElevationChoosesArtwork(float earlier, float current, float later, float intensity, int expected)
+    [InlineData(-.4f, -.3f, -.2f, 6)]
+    [InlineData(-.1f, -.05f, 0, 1)]
+    [InlineData(0, -.05f, -.1f, 5)]
+    [InlineData(.2f, .4f, .6f, 2)]
+    [InlineData(.6f, .4f, .2f, 4)]
+    [InlineData(.3f, .31f, .3f, 3)]
+    [InlineData(.08f, .09f, .08f, 3)]
+    [InlineData(.9f, 1, .9f, 3)]
+    public void SolarElevationChoosesArtwork(float earlier, float current, float later, int expected)
     {
-        Assert.Equal(expected, (int)ApproximateTimeSolarPeriod.FromSunHeight(earlier, current, later, intensity));
+        Assert.Equal(expected, (int)ApproximateTimeSolarPeriod.FromSunHeight(earlier, current, later));
     }
-    /// <summary>Twilight responds to intensity instead of an elevation cutoff or color hue.</summary>
+    /// <summary>Invalid solar samples remain unknown instead of replacing cached valid artwork.</summary>
     [Theory]
-    [InlineData(-.4f, -.3f, -.2f, 1)]
-    [InlineData(-.2f, -.3f, -.4f, 5)]
-    public void SolarIntensityOverridesElevationCutoff(float earlier, float current, float later, int expected)
+    [InlineData(float.NaN, 0, 0)]
+    [InlineData(0, float.PositiveInfinity, 0)]
+    [InlineData(0, 0, float.NegativeInfinity)]
+    public void InvalidElevationIsUnknown(float earlier, float current, float later)
     {
-        Assert.Equal(expected, (int)ApproximateTimeSolarPeriod.FromSunHeight(earlier, current, later, .3f));
-        Assert.Equal(ApproximateTimePeriod.Night, ApproximateTimeSolarPeriod.FromSunHeight(earlier, current, later, .05f));
+        Assert.Equal(ApproximateTimePeriod.Unknown, ApproximateTimeSolarPeriod.FromSunHeight(earlier, current, later));
     }
     #endregion
 }

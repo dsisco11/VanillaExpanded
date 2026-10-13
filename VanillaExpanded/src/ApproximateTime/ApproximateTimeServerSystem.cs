@@ -4,7 +4,7 @@ using Vintagestory.API.Server;
 
 namespace VanillaExpanded.ApproximateTime;
 
-/// <summary>Maintains server-owned sunlight-observation age independently of client HUD visibility.</summary>
+/// <summary>Maintains server-owned sky-exposure age independently of client HUD visibility.</summary>
 internal sealed class ApproximateTimeServerSystem : ModSystem
 {
     private ICoreServerAPI? api;
@@ -14,7 +14,7 @@ internal sealed class ApproximateTimeServerSystem : ModSystem
     #region Public API
     /// <summary>Loads persistent observation tracking on servers only.</summary>
     public override bool ShouldLoad(EnumAppSide side) => side == EnumAppSide.Server;
-    /// <summary>Registers one bounded sunlight sampling pass for online players.</summary>
+    /// <summary>Registers one bounded skylight sampling pass for online players.</summary>
     public override void StartServerSide(ICoreServerAPI api)
     {
         this.api = api;
@@ -48,9 +48,8 @@ internal sealed class ApproximateTimeServerSystem : ModSystem
         {
             var entity = player.Entity;
             if (entity?.Alive != true) continue;
-            float height = calendar.GetSunPosition(entity.Pos.XYZ, calendar.TotalDays).Y;
-            bool sunlight = float.IsFinite(height) && ApproximateTimeSolarIntensity.Get(calendar, height) >= .1f
-                && api.World.BlockAccessor.GetLightLevel(entity.Pos.AsBlockPos, EnumLightLevelType.OnlySunLight) > 0;
+            // Any local skylight is a valid calibration cue, including nighttime sky exposure.
+            bool sunlight = api.World.BlockAccessor.GetLightLevel(entity.Pos.AsBlockPos, EnumLightLevelType.OnlySunLight) > 0;
             ApproximateTimeState.Update(entity, elapsed, sunlight);
         }
     }
