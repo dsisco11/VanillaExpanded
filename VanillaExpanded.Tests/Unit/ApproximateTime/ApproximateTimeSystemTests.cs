@@ -43,7 +43,7 @@ public sealed class ApproximateTimeSystemTests
             {
                 Assert.Equal(ApproximateTimeSystem.OverlayId, registration.Id);
                 Assert.Equal(300, registration.RefreshIntervalMs);
-                Assert.Equal(100, registration.Order);
+                Assert.Equal(98, registration.Order);
                 Assert.Null(registration.ReservedSize);
                 Assert.Equal("world-status", registration.GroupId);
                 overlay = Assert.IsType<ApproximateTimeOverlay>(registration.Overlay);
