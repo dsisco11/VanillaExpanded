@@ -1,6 +1,8 @@
 using System.Drawing;
 using Moq;
 using VanillaExpanded.HudOverlays.Registration;
+using VanillaExpanded.HudOverlays.Rendering;
+using Vintagestory.API.Config;
 using VanillaExpanded.PlayerWetness;
 using VanillaExpanded.Tests.Unit.BowAmmunition;
 using Vintagestory.API.Client;
@@ -10,9 +12,25 @@ namespace VanillaExpanded.Tests.Unit.PlayerWetness;
 
 /// <summary>Checks native wetness sampling, fill geometry, and cached artwork lifetime.</summary>
 [Collection("HudOverlayGeometry")]
-public sealed class PlayerWetnessOverlayTests
+public sealed class PlayerWetnessOverlayTests : IDisposable
 {
+    private readonly ITranslationService? english = Lang.AvailableLanguages.GetValueOrDefault("en");
+
     #region Public API
+    /// <summary>Installs a deterministic percentage translation for cached text tests.</summary>
+    public PlayerWetnessOverlayTests()
+    {
+        var service = new Mock<ITranslationService>();
+        service.Setup(value => value.Get(It.IsAny<string>(), It.IsAny<object[]>()))
+            .Returns((string key, object[] arguments) => arguments.Length == 1 ? $"{arguments[0]}%" : key);
+        Lang.AvailableLanguages["en"] = service.Object;
+    }
+    /// <summary>Restores shared language state after each test.</summary>
+    public void Dispose()
+    {
+        if (english == null) Lang.AvailableLanguages.Remove("en");
+        else Lang.AvailableLanguages["en"] = english;
+    }
     /// <summary>Missing, dry, invalid, and negative samples remain hidden; valid samples clamp to saturation.</summary>
     [Theory]
     [InlineData(0, null)] [InlineData(-1, null)] [InlineData(float.NaN, null)]
@@ -42,7 +60,7 @@ public sealed class PlayerWetnessOverlayTests
             builds++;
             var textures = new[] { new LoadedTexture(context.Api) { TextureId = 1 }, new LoadedTexture(context.Api) { TextureId = 2 } };
             artwork.AddRange(textures); return textures;
-        }, _ => null);
+        }, _ => null, CreateText());
         using var overlay = new PlayerWetnessOverlay(presentation);
         overlay.BeginSession(fixture.Api.Object);
         var preparation = new HudOverlayPreparationContext(fixture.Api.Object, 1, "en", contentScale: 1.5);
@@ -57,7 +75,7 @@ public sealed class PlayerWetnessOverlayTests
         var bounds = Bounds();
         overlay.Draw(renderer.Object, bounds, new RectangleF(0, 0, 1000, 1000), 0);
         Assert.Empty(fixture.World.Invocations); Assert.Empty(fixture.Player.Invocations);
-        Assert.Equal(2, renderer.Invocations.Count(call => call.Method.Name == "Render2DTexture"));
+        Assert.Equal(4, renderer.Invocations.Count(call => call.Method.Name == "Render2DTexture"));
         fixture.Entity.WatchedAttributes.SetFloat("wetness", 0);
         overlay.Refresh();
         Assert.Equal(SizeF.Empty, overlay.Measure()); Assert.All(artwork, texture => Assert.NotEqual(0, texture.TextureId));
@@ -75,23 +93,59 @@ public sealed class PlayerWetnessOverlayTests
     {
         var api = new Mock<ICoreClientAPI>() { DefaultValue = DefaultValue.Mock };
         using var presentation = new PlayerWetnessPresentation(context =>
-            [new LoadedTexture(context.Api) { TextureId = 1 }, new LoadedTexture(context.Api) { TextureId = 2 }], _ => null);
+            [new LoadedTexture(context.Api) { TextureId = 1 }, new LoadedTexture(context.Api) { TextureId = 2 }], _ => null, CreateText());
         presentation.SetContent(wetness); presentation.Prepare(new(api.Object, 1, "en", contentScale: 1.5));
         var bounds = Bounds();
         var renderer = new Mock<IRenderAPI>();
-        double cropTop = -1;
+        var cropTops = new List<double>();
         renderer.Setup(value => value.PushScissor(It.IsAny<ElementBounds>(), true))
-            .Callback<ElementBounds, bool>((crop, _) => cropTop = crop.renderY);
+            .Callback<ElementBounds, bool>((crop, _) => cropTops.Add(crop.renderY));
         presentation.Draw(renderer.Object, bounds, new RectangleF(0, 0, 36, 36));
-        Assert.Equal(36 * (120d - 110d * wetness) / 128, cropTop, 5);
-        renderer.Verify(value => value.PopScissor(), Times.Once);
+        Assert.Equal(2, cropTops.Count);
+        Assert.Equal(1.5 + 22.5 * (118d - 108d * wetness) / 128, cropTops[0], 5);
+        Assert.Equal(13.5 * (118d - 108d * wetness) / 128, cropTops[1], 5);
+        renderer.Verify(value => value.PopScissor(), Times.Exactly(2));
         renderer.Setup(value => value.Render2DTexture(2, It.IsAny<float>(), It.IsAny<float>(),
             It.IsAny<float>(), It.IsAny<float>(), It.IsAny<float>(), It.IsAny<Vintagestory.API.MathTools.Vec4f>()))
             .Throws(new InvalidOperationException("draw failure"));
         Assert.Throws<InvalidOperationException>(() => presentation.Draw(renderer.Object, bounds, new RectangleF(0, 0, 36, 36)));
-        renderer.Verify(value => value.PopScissor(), Times.Exactly(2));
+        renderer.Verify(value => value.PopScissor(), Times.Exactly(3));
     }
 
+    /// <summary>Whole percentages reuse text until they change, render below both drops, and release on reset.</summary>
+    [Fact]
+    public void PercentageIsCachedCenteredBelowDropsAndReleased()
+    {
+        var api = new Mock<ICoreClientAPI>() { DefaultValue = DefaultValue.Mock };
+        var readings = new List<string>();
+        var renderedText = new List<LoadedTexture>();
+        using var text = new HudOverlayIconTextPresentation((context, value) =>
+        {
+            readings.Add(value);
+            var texture = new LoadedTexture(context.Api) { TextureId = 30 + readings.Count, Width = 30, Height = 14 };
+            renderedText.Add(texture);
+            return texture;
+        });
+        using var presentation = new PlayerWetnessPresentation(context =>
+            [new LoadedTexture(context.Api) { TextureId = 1 }, new LoadedTexture(context.Api) { TextureId = 2 }], _ => null, text);
+        var preparation = new HudOverlayPreparationContext(api.Object, 1, "en", contentScale: 1.5);
+        presentation.SetContent(.251f); presentation.Prepare(preparation);
+        presentation.SetContent(.254f); presentation.Prepare(preparation);
+        Assert.Equal(new[] { "25%" }, readings);
+        presentation.SetContent(.26f); presentation.Prepare(preparation);
+        Assert.Equal(new[] { "25%", "26%" }, readings);
+        Assert.Equal(0, renderedText[0].TextureId);
+        var renderer = new Mock<IRenderAPI>();
+        presentation.Draw(renderer.Object, Bounds(), new RectangleF(0, 0, 36, 36));
+        var reading = Assert.Single(renderer.Invocations, call => call.Method.Name == "Render2DTexturePremultipliedAlpha");
+        double x = (double)reading.Arguments[1], y = (double)reading.Arguments[2];
+        double width = (double)reading.Arguments[3], height = (double)reading.Arguments[4];
+        Assert.Equal(18, x + width / 2, 5);
+        Assert.True(y >= 24 && y + height <= 36);
+        presentation.Reset();
+        Assert.Equal(0, renderedText[1].TextureId);
+        Assert.Equal(SizeF.Empty, presentation.Size);
+    }
     /// <summary>Creative, spectator, and dead players release wetness state.</summary>
     [Theory]
     [InlineData(EnumGameMode.Creative)] [InlineData(EnumGameMode.Spectator)]
@@ -126,6 +180,9 @@ public sealed class PlayerWetnessOverlayTests
     #endregion
 
     #region Private
+    /// <summary>Supplies owned text pixels without invoking native font rendering.</summary>
+    private static HudOverlayIconTextPresentation CreateText() => new((context, _) =>
+        new LoadedTexture(context.Api) { TextureId = 3, Width = 30, Height = 14 });
     /// <summary>Supplies a living survival player with mutable native game-mode metadata.</summary>
     private static BowAmmunitionSamplerTests.Fixture CreateFixture()
     {
@@ -147,5 +204,3 @@ public sealed class PlayerWetnessOverlayTests
     private delegate void TextureLoad(AssetLocation location, ref LoadedTexture texture);
     #endregion
 }
-
-
