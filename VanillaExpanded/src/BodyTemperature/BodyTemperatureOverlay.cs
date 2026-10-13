@@ -135,7 +135,7 @@ internal sealed class BodyTemperatureOverlay : IHudOverlay, IHudOverlayBackdropP
     /// <summary>Creates the reading at ordinary HUD font size, applying only the game's native GUI scale.</summary>
     private static LoadedTexture CreateReadingText(HudOverlayPreparationContext context, string localized)
     {
-        var font = CairoFont.WhiteSmallText().WithFontSize(14)
+        var font = CairoFont.WhiteSmallText().WithFontSize(HudOverlaySizes.Text)
             .WithStroke(new double[] { 0, 0, 0, .85 }, 1.5);
         return context.Api.Gui.TextTexture.GenTextTexture(localized, font);
     }

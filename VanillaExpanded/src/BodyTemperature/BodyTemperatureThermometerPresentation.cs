@@ -11,8 +11,8 @@ namespace VanillaExpanded.BodyTemperature;
 /// <summary>Borrows asset-backed thermometer textures and owns whole-degree text; drawing crops and tints a cached full silhouette mask.</summary>
 internal sealed class BodyTemperatureThermometerPresentation : IDisposable
 {
-    internal const float IconWidth = 14, IconHeight = 24, Gap = 3;
-    private const float ChevronWidth = 8, ChevronHeight = 5, ChevronGap = 1, ReadingHeight = 12;
+    internal const float IconWidth = HudOverlaySizes.ThermometerWidth, IconHeight = HudOverlaySizes.Standard, Gap = HudOverlaySizes.ReadingGap;
+    private const float ChevronWidth = HudOverlaySizes.ChevronWidth, ChevronHeight = HudOverlaySizes.ChevronHeight, ChevronGap = HudOverlaySizes.ChevronGap, ReadingHeight = HudOverlaySizes.BodyReadingHeight;
     private float readingWidth, columnWidth;
     private readonly HudOverlayIconTextPresentation text;
     private readonly System.Func<HudOverlayPreparationContext, LoadedTexture[]> createIcons;
@@ -74,7 +74,7 @@ internal sealed class BodyTemperatureThermometerPresentation : IDisposable
         readingWidth = showReading ? text.Size.Width * Math.Min(1, ReadingHeight / Math.Max(1, text.Size.Height)) : 0;
         float trendWidth = sample.Trend == 0 ? 0 : ChevronWidth;
         columnWidth = Math.Max(readingWidth, trendWidth);
-        Size = new SizeF(Math.Max(24, 5 + IconWidth + (columnWidth > 0 ? Gap + columnWidth : 0)), IconHeight);
+        Size = new SizeF(Math.Max(HudOverlaySizes.Standard, 7.5f + IconWidth + (columnWidth > 0 ? Gap + columnWidth : 0)), IconHeight);
         Visibility.Show();
     }
     /// <summary>Draws the tinted full mask through a fill scissor, then the outline through native texture rendering within the host clip.</summary>
@@ -82,10 +82,10 @@ internal sealed class BodyTemperatureThermometerPresentation : IDisposable
     {
         if (sample == null || icons == null || context == null) return;
         double scale = context.GuiScale;
-        // Center the narrow thermometer within the same 24-unit circle used by the other status icons.
-        double x = bounds.renderX + 5 * scale, y = bounds.renderY + (bounds.OuterHeight - IconHeight * scale) / 2;
+        // Center the narrow thermometer within the same HudOverlaySizes.Standard-unit circle used by the other status icons.
+        double x = bounds.renderX + 7.5 * scale, y = bounds.renderY + (bounds.OuterHeight - IconHeight * scale) / 2;
         // Reveal the full mask upward while retaining the bulb at the minimum temperature fill.
-        double fillTop = y + 15.5 * (1 - sample.Fill) * scale;
+        double fillTop = y + 23.25 * (1 - sample.Fill) * scale;
         double left = Math.Max(x, clip.Left), top = Math.Max(fillTop, clip.Top);
         double right = Math.Min(x + IconWidth * scale, clip.Right), bottom = Math.Min(y + IconHeight * scale, clip.Bottom);
         if (right > left && bottom > top)
@@ -130,7 +130,7 @@ internal sealed class BodyTemperatureThermometerPresentation : IDisposable
     public void CollectBackdrops(IRenderAPI renderer, ElementBounds bounds)
     {
         if (sample == null || icons == null || context == null) return;
-        double pixels = 24 * context.GuiScale;
+        double pixels = HudOverlaySizes.Standard * context.GuiScale;
         double y = bounds.renderY + (bounds.OuterHeight - pixels) / 2;
         backdrop?.Queue(renderer, bounds.renderX, y, context.GuiScale);
     }

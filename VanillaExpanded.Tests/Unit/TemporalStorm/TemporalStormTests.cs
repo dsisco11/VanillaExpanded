@@ -100,7 +100,7 @@ public sealed class TemporalStormTests
             storms.StormData.nowStormActive = index == 2;
             Assert.NotEqual(HudOverlayChange.None, overlay.Refresh());
             overlay.Prepare(preparation);
-            Assert.Equal(new SizeF(24, 24), overlay.Measure());
+            Assert.Equal(new SizeF(36, 36), overlay.Measure());
             Assert.Equal(HudOverlayChange.None, overlay.Refresh());
             renderer.Invocations.Clear(); backdrop.Invocations.Clear();
             overlay.Draw(renderer.Object, bounds, RectangleF.Empty, 0);
@@ -277,7 +277,7 @@ public sealed class TemporalStormTests
         Assert.Equal(HudOverlayChange.None, overlay.Refresh()); renderer.Invocations.Clear();
         overlay.Draw(renderer.Object, bounds, RectangleF.Empty, 1f / 6);
         Assert.Equal(1, Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W, 5);
-        Assert.Equal(new SizeF(24, 24), overlay.Measure());
+        Assert.Equal(new SizeF(36, 36), overlay.Measure());
 
         storms.StormData.nowStormActive = false; storms.StormData.nextStormTotalDays = 5;
         Assert.NotEqual(HudOverlayChange.None, overlay.Refresh());

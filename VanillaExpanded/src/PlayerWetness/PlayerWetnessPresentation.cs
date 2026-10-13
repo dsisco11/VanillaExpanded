@@ -13,7 +13,7 @@ internal sealed class PlayerWetnessPresentation : IDisposable
     private readonly Func<HudOverlayPreparationContext, LoadedTexture[]> createTextures;
     private readonly Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?> loadBackdrop;
     private readonly ElementBounds fillClip = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
-    private const float ReadingHeight = 8;
+    private const float ReadingHeight = HudOverlaySizes.WetnessReadingHeight;
     private readonly HudOverlayIconTextPresentation text;
     private readonly ElementBounds textBounds = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
     private float readingWidth;
@@ -34,7 +34,7 @@ internal sealed class PlayerWetnessPresentation : IDisposable
         Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null,
         HudOverlayIconTextPresentation? text = null)
     {
-        this.text = text ?? new HudOverlayIconTextPresentation(fontSize: 14);
+        this.text = text ?? new HudOverlayIconTextPresentation(fontSize: HudOverlaySizes.Text);
         this.createTextures = createTextures ?? PlayerWetnessIconTextures.Create;
         this.loadBackdrop = loadBackdrop ?? HudOverlayIconBackdrop.Load;
     }
@@ -58,7 +58,7 @@ internal sealed class PlayerWetnessPresentation : IDisposable
         context = preparation;
         text.Prepare(preparation);
         readingWidth = text.Size.Width * Math.Min(1, ReadingHeight / Math.Max(1, text.Size.Height));
-        Size = new SizeF(Math.Max(24, readingWidth), 24);
+        Size = new SizeF(Math.Max(HudOverlaySizes.Standard, readingWidth), HudOverlaySizes.Standard);
         Visibility.Show();
     }
     #endregion
@@ -67,7 +67,7 @@ internal sealed class PlayerWetnessPresentation : IDisposable
     public void CollectBackdrops(IRenderAPI renderer, ElementBounds bounds)
     {
         if (context == null || textures == null) return;
-        double pixels = 24 * context.GuiScale;
+        double pixels = HudOverlaySizes.Standard * context.GuiScale;
         backdrop?.Queue(renderer, bounds.renderX, bounds.renderY + (bounds.OuterHeight - pixels) / 2, context.GuiScale);
     }
     /// <summary>Draws the twin drops above a centered cached percentage within the shared indicator height.</summary>
@@ -75,13 +75,13 @@ internal sealed class PlayerWetnessPresentation : IDisposable
     {
         if (context == null || textures == null) return;
         double scale = context.GuiScale;
-        double x = bounds.renderX + (Size.Width - 24) * scale / 2;
-        double y = bounds.renderY + (bounds.OuterHeight - 24 * scale) / 2;
-        DrawDrop(renderer, x + 1.5 * scale, y + scale, 15 * scale, clip);
-        DrawDrop(renderer, x + 11.5 * scale, y, 9 * scale, clip);
+        double x = bounds.renderX + (Size.Width - HudOverlaySizes.Standard) * scale / 2;
+        double y = bounds.renderY + (bounds.OuterHeight - HudOverlaySizes.Standard * scale) / 2;
+        DrawDrop(renderer, x + 2.25 * scale, y + 1.5 * scale, 22.5 * scale, clip);
+        DrawDrop(renderer, x + 17.25 * scale, y, 13.5 * scale, clip);
         // Keep the normal-sized reading below the artwork without increasing the HUD row height.
         textBounds.absFixedX = bounds.renderX + (Size.Width - readingWidth) * scale / 2;
-        textBounds.absFixedY = y + 16 * scale;
+        textBounds.absFixedY = y + 24 * scale;
         textBounds.absInnerWidth = readingWidth * scale;
         textBounds.absInnerHeight = ReadingHeight * scale;
         textBounds.Initialized = true;

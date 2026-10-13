@@ -35,7 +35,7 @@ public sealed class HudOverlayIconTextPresentation : IDisposable
     #region Content and preparation
     /// <summary>Uses native contrast text with optional backdrop and shared asset-authored item presentation.</summary>
     public HudOverlayIconTextPresentation(System.Func<HudOverlayPreparationContext, string, LoadedTexture>? createText = null,
-        float iconSize = 32, bool textBeforeIcon = false, float gap = 6, float? fontSize = null, bool circularIconBackground = false,
+        float iconSize = HudOverlaySizes.Large, bool textBeforeIcon = false, float gap = 9, float? fontSize = null, bool circularIconBackground = false,
         System.Func<HudOverlayPreparationContext, float, LoadedTexture>? createIconBackground = null, bool useItemPresentation = false)
     {
         if (!float.IsFinite(iconSize) || iconSize <= 0) throw new ArgumentOutOfRangeException(nameof(iconSize));
@@ -219,8 +219,8 @@ public sealed class HudOverlayIconTextPresentation : IDisposable
     {
         var font = CairoFont.WhiteSmallText().WithStroke(new double[] { 0, 0, 0, .85 }, 1.5);
         if (fontSize.HasValue) font.WithFontSize(fontSize.Value);
-        // Cairo applies the native GUI scale internally, so only the additional HUD multiplier belongs in the font.
-        font.UnscaledFontsize *= preparation.ContentScale;
+        // Cairo applies the native GUI scale internally; font sizes are absolute GUI units.
+
         return preparation.Api.Gui.TextTexture.GenTextTexture(localized, font);
     }
     #endregion

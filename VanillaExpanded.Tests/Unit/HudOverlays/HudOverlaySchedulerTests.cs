@@ -43,16 +43,16 @@ public sealed class HudOverlaySchedulerTests : IDisposable
     /// <summary>Sets deterministic native scale for headless bounds.</summary>
     public HudOverlaySchedulerTests() => Vintagestory.API.Config.RuntimeEnv.GUIScale = 1;
 
-    /// <summary>Extra HUD scaling enlarges measured bounds once and keeps hidden ordinary members collapsed.</summary>
+    /// <summary>Native GUI scaling leaves measured logical bounds unchanged and hidden ordinary members collapsed.</summary>
     [Fact]
-    public void ContentScaleEnlargesMeasuredLayoutAndStillCollapses()
+    public void NativeGuiScalePreservesMeasuredLayoutAndStillCollapses()
     {
         using var fixture = new Fixture();
         fixture.Anchors.BeginFrame(true);
-        var preparation = new HudOverlayPreparationContext(fixture.Api, 2, "en", contentScale: 1.5);
+        var preparation = new HudOverlayPreparationContext(fixture.Api, 2, "en");
         fixture.Scheduler.Update(fixture.Anchors, preparation, true);
-        Assert.Equal(3, preparation.GuiScale);
-        Assert.Equal(new SizeF(30, 30), Assert.Single(fixture.Scheduler.GetMembers("group")).Value);
+        Assert.Equal(2, preparation.GuiScale);
+        Assert.Equal(new SizeF(20, 20), Assert.Single(fixture.Scheduler.GetMembers("group")).Value);
         fixture.Enabled = false;
         fixture.Observe();
         Assert.Empty(fixture.Scheduler.GetMembers("group"));
