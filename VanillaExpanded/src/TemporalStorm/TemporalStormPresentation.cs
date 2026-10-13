@@ -102,6 +102,7 @@ internal sealed class TemporalStormPresentation : IDisposable
             var texture = new LoadedTexture(preparation.Api);
             preparation.Api.Render.GetOrLoadTexture(new AssetLocation(Constants.ModId,
                 "textures/hud/temporal-storm/" + names[index] + ".png"), ref texture);
+            HudOverlayTextureFiltering.Prepare(texture);
             texture.IgnoreUndisposed = true;
             textures[index] = texture;
         }

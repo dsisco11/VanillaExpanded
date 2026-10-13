@@ -167,13 +167,17 @@ internal sealed class BodyTemperatureThermometerPresentation : IDisposable
         preparation.Api.Render.GetOrLoadTexture(new AssetLocation(Constants.ModId, "textures/hud/body-temperature/outline.png"), ref outline);
         preparation.Api.Render.GetOrLoadTexture(new AssetLocation(Constants.ModId, "textures/hud/body-temperature/fill-mask.png"), ref mask);
         // The engine cache owns these textures; wrapper finalizers must not report intentional borrowing as a leak.
+        HudOverlayTextureFiltering.Prepare(outline);
         outline.IgnoreUndisposed = true;
+        HudOverlayTextureFiltering.Prepare(mask);
         mask.IgnoreUndisposed = true;
         var up = new LoadedTexture(preparation.Api);
         var down = new LoadedTexture(preparation.Api);
         preparation.Api.Render.GetOrLoadTexture(new AssetLocation(Constants.ModId, "textures/hud/body-temperature/chevron-up.png"), ref up);
         preparation.Api.Render.GetOrLoadTexture(new AssetLocation(Constants.ModId, "textures/hud/body-temperature/chevron-down.png"), ref down);
+        HudOverlayTextureFiltering.Prepare(up);
         up.IgnoreUndisposed = true;
+        HudOverlayTextureFiltering.Prepare(down);
         down.IgnoreUndisposed = true;
         return [outline, mask, up, down];
     }

@@ -206,7 +206,7 @@ public sealed class HudOverlayIconTextPresentation : IDisposable
         try
         {
             preparation.Api.Gui.LoadOrUpdateCairoTexture(surface, true, ref texture);
-            return texture;
+            return HudOverlayTextureFiltering.Prepare(texture);
         }
         catch
         {
@@ -221,7 +221,7 @@ public sealed class HudOverlayIconTextPresentation : IDisposable
         if (fontSize.HasValue) font.WithFontSize(fontSize.Value);
         // Cairo applies the native GUI scale internally; font sizes are absolute GUI units.
 
-        return preparation.Api.Gui.TextTexture.GenTextTexture(localized, font);
+        return HudOverlayTextureFiltering.Prepare(preparation.Api.Gui.TextTexture.GenTextTexture(localized, font));
     }
     #endregion
 }
