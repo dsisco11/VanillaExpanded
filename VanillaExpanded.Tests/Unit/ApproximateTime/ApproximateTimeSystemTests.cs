@@ -32,10 +32,10 @@ public sealed class ApproximateTimeSystemTests
             fixture.Api.SetupGet(value => value.ModLoader).Returns(loader.Object);
             hud.StartClientSide(fixture.Api.Object);
             system.StartClientSide(fixture.Api.Object);
-            var group = hud.Registry.GetGroups().Single(value => value.Id == "player-status");
-            Assert.Equal(HudOverlayAnchorContext.HotbarTargetId, group.Placement.TargetId);
-            Assert.Equal(HudOverlayPoint.LeftBottom, group.Placement.Attachment);
-            Assert.Equal(HudOverlayPoint.RightBottom, group.Placement.Pivot);
+            var group = hud.Registry.GetGroups().Single(value => value.Id == "world-status");
+            Assert.Equal(HudOverlayAnchorContext.ScreenTargetId, group.Placement.TargetId);
+            Assert.Equal(HudOverlayPoint.LeftTop, group.Placement.Attachment);
+            Assert.Equal(HudOverlayPoint.LeftTop, group.Placement.Pivot);
             Assert.Equal(VanillaExpanded.HudOverlays.Layout.HudOverlayDirection.Horizontal, group.Packing.Direction);
             hud.Registry.BeginSession(fixture.Api.Object);
             ApproximateTimeOverlay? overlay = null;
@@ -45,7 +45,7 @@ public sealed class ApproximateTimeSystemTests
                 Assert.Equal(300, registration.RefreshIntervalMs);
                 Assert.Equal(100, registration.Order);
                 Assert.Null(registration.ReservedSize);
-                Assert.Equal("player-status", registration.GroupId);
+                Assert.Equal("world-status", registration.GroupId);
                 overlay = Assert.IsType<ApproximateTimeOverlay>(registration.Overlay);
             });
             Assert.True(overlay!.IsApplicable());

@@ -35,7 +35,7 @@ internal sealed class WeatherConditionsSystem : ModSystem, ILiveConfigurable
             // Visible weather channels share one composite footprint; hidden content releases its space.
             registration = hud.Registry.Register(new HudOverlayRegistration(OverlayId, overlay,
                 () => overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays
-                    && VanillaExpandedModSystem.Config.EnableWeatherConditionsOverlay), "player-status", order: 99, refreshIntervalMs: 300,
+                    && VanillaExpandedModSystem.Config.EnableWeatherConditionsOverlay), "world-status", order: 99, refreshIntervalMs: 300,
                 hoverLabelKey: "vanillaexpanded:hud-label-weather-conditions"));
         }
         catch { overlay.Dispose(); throw; }
