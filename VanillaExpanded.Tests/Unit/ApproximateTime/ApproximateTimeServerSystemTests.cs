@@ -12,8 +12,9 @@ public sealed class ApproximateTimeServerSystemTests
 {
     #region Public API
     /// <summary>Deferred calendar startup preserves saved age, online time accumulates, and disposal removes the listener.</summary>
-    [Fact]
-    public void OnlineObservationAndListenerLifecycle()
+    [Theory]
+    [InlineData(-1)] [InlineData(-.05f)] [InlineData(0)] [InlineData(float.NaN)]
+    public void OnlineObservationAndListenerLifecycle(float nighttimeHeight)
     {
         var fixture = new BowAmmunitionSamplerTests.Fixture();
         fixture.Entity.Alive = true;
@@ -76,11 +77,18 @@ public sealed class ApproximateTimeServerSystemTests
             hours = 14;
             tick(1);
             Assert.Equal(0, ApproximateTimeState.Read(fixture.Entity));
-            // Residual local skylight at night cannot count as a sunlight observation.
-            calendar.Setup(x => x.GetSunPosition(It.IsAny<Vec3d>(), It.IsAny<double>())).Returns(new Vec3f(0, -1, 0));
+            // Nighttime skylight resets accumulated drift regardless of solar elevation.
+            calendar.Setup(x => x.GetSunPosition(It.IsAny<Vec3d>(), It.IsAny<double>())).Returns(new Vec3f(0, nighttimeHeight, 0));
+            ApproximateTimeState.Update(fixture.Entity, 4, false);
             hours = 15;
             tick(1);
+            Assert.Equal(0, ApproximateTimeState.Read(fixture.Entity));
+            // Losing sky exposure resumes drift accumulation even during the same night.
+            localSunlight = 0;
+            hours = 16;
+            tick(1);
             Assert.Equal(1, ApproximateTimeState.Read(fixture.Entity));
+            calendar.Verify(x => x.GetSunPosition(It.IsAny<Vec3d>(), It.IsAny<double>()), Times.Never);
         }
         finally
         {
