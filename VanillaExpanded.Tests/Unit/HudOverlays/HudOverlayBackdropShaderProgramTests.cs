@@ -105,9 +105,9 @@ public sealed class HudOverlayBackdropShaderProgramTests
                 collect = () => weather.CollectBackdrops(renderer.Object, bounds); owner = weather; prepare = () => weather.Prepare(context); draw = () => weather.Draw(renderer.Object, bounds); reset = weather.Reset;
                 break;
             case "time":
-                var time = new VanillaExpanded.ApproximateTime.ApproximateTimePresentation(Load, _ => backdrop.Object);
-                time.SetContent(VanillaExpanded.ApproximateTime.ApproximateTimePeriod.Noon);
-                collect = () => time.CollectBackdrops(renderer.Object, bounds); owner = time; prepare = () => time.Prepare(context); draw = () => time.Draw(renderer.Object, bounds); reset = time.Reset;
+                var time = new VanillaExpanded.ApproximateTime.ApproximateTimePresentation(Load, _ => new Mock<VanillaExpanded.ApproximateTime.IApproximateTimeDialRenderer>().Object);
+                time.SetContent(VanillaExpanded.ApproximateTime.ApproximateTimePeriod.Noon, .5);
+                collect = () => { }; owner = time; prepare = () => time.Prepare(context); draw = () => time.Draw(renderer.Object, bounds); reset = time.Reset;
                 break;
             default:
                 var rift = new VanillaExpanded.RiftActivity.RiftActivityPresentation(Load, _ => backdrop.Object);
@@ -117,11 +117,21 @@ public sealed class HudOverlayBackdropShaderProgramTests
         }
         using (owner)
         {
-            prepare(); collect(); draw(); Assert.Equal("backdrop", calls[0]); Assert.Contains("icon", calls);
-            var background = Assert.Single(backdrop.Invocations);
-            var artwork = renderer.Invocations.First(call => call.Method.Name == "RenderTexture");
-            Assert.Equal((double)background.Arguments[1] + (kind == "temperature" ? 5 : 0), artwork.Arguments[1]);
-            Assert.Equal(background.Arguments[2], artwork.Arguments[2]);
+            prepare(); collect(); draw(); Assert.Contains("icon", calls);
+            if (kind == "time")
+            {
+                // The gauge housing replaces the shared circular backdrop.
+                Assert.DoesNotContain("backdrop", calls);
+                Assert.Empty(backdrop.Invocations);
+            }
+            else
+            {
+                Assert.Equal("backdrop", calls[0]);
+                var background = Assert.Single(backdrop.Invocations);
+                var artwork = renderer.Invocations.First(call => call.Method.Name == "RenderTexture");
+                Assert.Equal((double)background.Arguments[1] + (kind == "temperature" ? 5 : 0), artwork.Arguments[1]);
+                Assert.Equal(background.Arguments[2], artwork.Arguments[2]);
+            }
             calls.Clear(); reset(); collect(); draw(); Assert.Empty(calls);
         }
     }
