@@ -36,7 +36,7 @@ public sealed class EnvironmentalTemperatureSystemTests
             visits++; Assert.Equal(EnvironmentalTemperatureSystem.OverlayId, registration.Id);
             Assert.Equal(group.Id, registration.GroupId); Assert.Equal(300, registration.RefreshIntervalMs);
             Assert.Null(registration.ReservedSize);
-            Assert.Equal(98, registration.Order);
+            Assert.Equal(100, registration.Order);
             Assert.IsType<EnvironmentalTemperatureOverlay>(registration.Overlay);
         });
         Assert.Equal(1, visits); feature.Dispose(); feature.Dispose();
