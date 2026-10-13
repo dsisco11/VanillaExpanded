@@ -4,6 +4,8 @@ The HUD overlay system positions and updates passive displays on the client. An 
 
 The HUD applies a 1.5× content multiplier in addition to the game's GUI scale. A 24-unit indicator therefore occupies 36 GUI units. Artwork, backdrops, text, and layout measurements enlarge together; anchors retain their native coordinates. `HudOverlayPreparationContext.GuiScale` includes this multiplier, while `ContentScale` exposes the extra factor for font services that already apply native GUI scaling. Overlays continue returning their base unscaled measurements; the scheduler applies the content multiplier to layout once.
 
+The temperature indicator keeps the same 24-unit base height as the other status indicators. Warming chevrons stack vertically above the reading; cooling chevrons stack below it. The reading uses a 14-point font with native GUI scaling, without the extra 1.5× HUD content multiplier, and fits within the remaining height. Chevrons draw at 8 × 5 base units for slightly heavier strokes. With the reading hidden, the chevrons retain their column beside the thermometer. Trend strength never adds height.
+
 Reference `VanillaExpanded.dll` and the compatible Vintage Story API assemblies, and declare `vanillaexpanded` as a dependency in your mod metadata. `HudOverlaySystem`, `IHudOverlay`, registration and placement contracts, and the shared icon-and-text presentation are public and can be used from a separate mod assembly. Obtain the running system through the client mod loader; the game owns its lifetime.
 
 ## Registering an overlay

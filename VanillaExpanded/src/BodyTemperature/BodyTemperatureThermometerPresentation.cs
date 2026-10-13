@@ -12,6 +12,8 @@ namespace VanillaExpanded.BodyTemperature;
 internal sealed class BodyTemperatureThermometerPresentation : IDisposable
 {
     internal const float IconWidth = 14, IconHeight = 24, Gap = 3;
+    private const float ChevronWidth = 8, ChevronHeight = 5, ChevronGap = 1, ReadingHeight = 12;
+    private float readingWidth, columnWidth;
     private readonly HudOverlayIconTextPresentation text;
     private readonly System.Func<HudOverlayPreparationContext, LoadedTexture[]> createIcons;
     private LoadedTexture[]? icons;
@@ -68,7 +70,11 @@ internal sealed class BodyTemperatureThermometerPresentation : IDisposable
         if (backdrop == null || !ReferenceEquals(context?.Api, preparation.Api)) backdrop = loadBackdrop(preparation);
         context = preparation;
         if (showReading) text.Prepare(preparation);
-        Size = new SizeF(Math.Max(24, 5 + IconWidth + (showReading ? Gap + text.Size.Width : 0)), Math.Max(IconHeight + (sample.Trend != 0 ? 22 : 0), showReading ? text.Size.Height : 0));
+        // Reserve room for two vertically stacked chevrons and fit the normal-sized reading into the remaining height.
+        readingWidth = showReading ? text.Size.Width * Math.Min(1, ReadingHeight / Math.Max(1, text.Size.Height)) : 0;
+        float trendWidth = sample.Trend == 0 ? 0 : ChevronWidth;
+        columnWidth = Math.Max(readingWidth, trendWidth);
+        Size = new SizeF(Math.Max(24, 5 + IconWidth + (columnWidth > 0 ? Gap + columnWidth : 0)), IconHeight);
         Visibility.Show();
     }
     /// <summary>Draws the tinted full mask through a fill scissor, then the outline through native texture rendering within the host clip.</summary>
@@ -94,24 +100,29 @@ internal sealed class BodyTemperatureThermometerPresentation : IDisposable
         renderer.RenderTexture(icons[0].TextureId, x, y, IconWidth * scale, IconHeight * scale, 50, HudOverlayDrawOpacity.Tint);
         if (sample.Trend != 0)
         {
-            // Reserve both ends in measurement so reversing direction keeps the thermometer stationary.
+            // Stack strength vertically in the reading's column; the taller drawing gives the strokes slightly more weight.
             bool warming = sample.Trend > 0;
+            int count = Math.Abs(sample.Trend);
+            double stackHeight = (count * ChevronHeight + (count - 1) * ChevronGap) * scale;
+            double columnX = x + (IconWidth + Gap) * scale;
+            double arrowX = columnX + (columnWidth - ChevronWidth) * scale / 2;
+            double arrowY = warming ? y : y + IconHeight * scale - stackHeight;
             for (int index = 0; index < Math.Abs(sample.Trend); index++)
             {
-                double arrowY = warming ? y - (6 + index * 5) * scale : y + (IconHeight + 2 + index * 5) * scale;
-                renderer.RenderTexture(icons[warming ? 2 : 3].TextureId, x + 3 * scale, arrowY,
-                    8 * scale, 4 * scale, 50, HudOverlayDrawOpacity.Multiply(warming ? warmingTint : coolingTint));
+                renderer.RenderTexture(icons[warming ? 2 : 3].TextureId, arrowX, arrowY + index * (ChevronHeight + ChevronGap) * scale,
+                    ChevronWidth * scale, ChevronHeight * scale, 50, HudOverlayDrawOpacity.Multiply(warming ? warmingTint : coolingTint));
             }
         }
         if (showReading)
         {
             // Use an independent cached bounds object only for the text's native draw coordinates.
-            textBounds.absFixedX = x + (IconWidth + Gap) * scale;
-            textBounds.absFixedY = bounds.renderY;
-            textBounds.absInnerWidth = text.Size.Width * scale;
-            textBounds.absInnerHeight = bounds.OuterHeight;
+            textBounds.absFixedX = x + (IconWidth + Gap + (columnWidth - readingWidth) / 2) * scale;
+            // Reserve the stacked-arrow band on the active trend side; neutral text remains vertically centered.
+            textBounds.absFixedY = y + (sample.Trend > 0 ? IconHeight - ReadingHeight : sample.Trend < 0 ? 0 : (IconHeight - ReadingHeight) / 2) * scale;
+            textBounds.absInnerWidth = readingWidth * scale;
+            textBounds.absInnerHeight = ReadingHeight * scale;
             textBounds.Initialized = true;
-            text.Draw(renderer, textBounds, clip, deltaTime);
+            text.Draw(renderer, textBounds, clip, deltaTime, maximumTextHeight: ReadingHeight);
         }
     }
     #endregion

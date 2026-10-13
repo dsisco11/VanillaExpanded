@@ -8,9 +8,23 @@ using Vintagestory.API.MathTools;
 namespace VanillaExpanded.Tests.Unit.BodyTemperature;
 /// <summary>Checks raw temperature geometry, hysteresis, and reusable native thermometer layers.</summary>
 [Collection("HudOverlayGeometry")]
-public sealed class BodyTemperatureThermometerTests
+public sealed class BodyTemperatureThermometerTests : IDisposable
 {
+    private readonly Vintagestory.API.Config.ITranslationService? english = Vintagestory.API.Config.Lang.AvailableLanguages.GetValueOrDefault("en");
     #region Public API
+    /// <summary>Installs a deterministic reading label for headless geometry checks.</summary>
+    public BodyTemperatureThermometerTests()
+    {
+        var service = new Mock<Vintagestory.API.Config.ITranslationService>();
+        service.Setup(value => value.Get(It.IsAny<string>(), It.IsAny<object[]>())).Returns("34°C");
+        Vintagestory.API.Config.Lang.AvailableLanguages["en"] = service.Object;
+    }
+    /// <summary>Restores the borrowed global language service after each test.</summary>
+    public void Dispose()
+    {
+        if (english == null) Vintagestory.API.Config.Lang.AvailableLanguages.Remove("en");
+        else Vintagestory.API.Config.Lang.AvailableLanguages["en"] = english;
+    }
     #region Classification
     /// <summary>Reproduces the character panel conversion without changing the sampled simulation value.</summary>
     [Theory]
@@ -125,20 +139,54 @@ public sealed class BodyTemperatureThermometerTests
             context => Enumerable.Range(1, 4).Select(id => new LoadedTexture(context.Api) { TextureId = id, IgnoreUndisposed = true }).ToArray());
         presentation.SetContent(new(34, 37, BodyTemperatureRisk.Cold, .25f, trend), false);
         presentation.Prepare(new(api.Object, 1, "en"));
-        Assert.Equal(new SizeF(24, trend == 0 ? 24 : 46), presentation.Size);
+        Assert.Equal(new SizeF(trend == 0 ? 24 : 30, 24), presentation.Size);
         var bounds = Bounds(1);
-        bounds.absInnerHeight = 46;
+        bounds.absInnerWidth = presentation.Size.Width;
         var renderer = new Mock<IRenderAPI>();
         presentation.Draw(renderer.Object, bounds, new RectangleF(0, 0, 1000, 1000), .1f);
         var outline = Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture" && (int)call.Arguments[0] == 1);
-        Assert.Equal(bounds.renderY + 11, (double)outline.Arguments[2]);
+        Assert.Equal(bounds.renderY, (double)outline.Arguments[2]);
         var chevrons = renderer.Invocations.Where(call => call.Method.Name == "RenderTexture" && (int)call.Arguments[0] == (trend > 0 ? 3 : 4)).ToArray();
         Assert.Equal(Math.Abs(trend), chevrons.Length);
-        foreach (var call in chevrons)
+        for (int index = 0; index < chevrons.Length; index++)
         {
+            var call = chevrons[index];
             double y = (double)call.Arguments[2];
-            Assert.InRange(y, bounds.renderY, bounds.renderY + bounds.OuterHeight - 4);
-            Assert.True(trend > 0 ? y < bounds.renderY + 11 : y > bounds.renderY + 35);
+            Assert.InRange(y, bounds.renderY, bounds.renderY + bounds.OuterHeight - 5);
+            double stackHeight = chevrons.Length * 5 + (chevrons.Length - 1);
+            Assert.Equal(bounds.renderY + (trend > 0 ? 0 : 24 - stackHeight) + index * 6, y);
+            Assert.Equal(5d, call.Arguments[4]);
+            Assert.Equal(chevrons[0].Arguments[1], call.Arguments[1]);
+            Assert.True((double)call.Arguments[1] >= bounds.renderX + 22);
+        }
+    }
+
+    /// <summary>Stacked trends stay beside the thermometer and outside fitted text at different GUI scales.</summary>
+    [Theory]
+    [InlineData(1, 2)] [InlineData(1.5, -2)] [InlineData(2, 1)] [InlineData(2, -1)]
+    public void ChevronsAndTallReadingFitTheSameIconHeight(double scale, int trend)
+    {
+        var api = new Mock<ICoreClientAPI>() { DefaultValue = DefaultValue.Mock };
+        var text = new HudOverlayIconTextPresentation((context, _) => new LoadedTexture(context.Api)
+            { TextureId = 5, Width = (int)(28 * scale), Height = (int)(40 * scale), IgnoreUndisposed = true });
+        using var presentation = new BodyTemperatureThermometerPresentation(text,
+            context => Enumerable.Range(1, 4).Select(id => new LoadedTexture(context.Api) { TextureId = id, IgnoreUndisposed = true }).ToArray());
+        presentation.SetContent(new(34, 37, BodyTemperatureRisk.Cold, .25f, trend), true);
+        presentation.Prepare(new(api.Object, scale, "en"));
+        Assert.Equal(24, presentation.Size.Height);
+        var bounds = Bounds(scale);
+        bounds.absInnerWidth = presentation.Size.Width * scale;
+        var renderer = new Mock<IRenderAPI>();
+        presentation.Draw(renderer.Object, bounds, new RectangleF(0, 0, 1000, 1000), .1f);
+        var reading = Assert.Single(renderer.Invocations, call => call.Method.Name == "Render2DTexturePremultipliedAlpha");
+        double textTop = (double)reading.Arguments[2], textBottom = textTop + (double)reading.Arguments[4];
+        Assert.InRange(textTop, bounds.renderY, bounds.renderY + bounds.OuterHeight);
+        Assert.InRange(textBottom, bounds.renderY, bounds.renderY + bounds.OuterHeight);
+        foreach (var arrow in renderer.Invocations.Where(call => call.Method.Name == "RenderTexture" && (int)call.Arguments[0] == (trend > 0 ? 3 : 4)))
+        {
+            double arrowTop = (double)arrow.Arguments[2], arrowBottom = arrowTop + (double)arrow.Arguments[4];
+            Assert.True(trend > 0 ? arrowBottom < textTop : arrowTop > textBottom);
+            Assert.InRange((double)arrow.Arguments[1], bounds.renderX + 22 * scale, bounds.renderX + bounds.OuterWidth - 8 * scale);
         }
     }
 
