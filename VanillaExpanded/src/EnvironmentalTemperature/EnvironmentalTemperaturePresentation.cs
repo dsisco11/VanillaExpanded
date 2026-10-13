@@ -124,7 +124,7 @@ internal sealed class EnvironmentalTemperaturePresentation : IDisposable
     {
         var font = CairoFont.WhiteSmallText().WithFontSize(HudOverlaySizes.Text)
             .WithStroke(new double[] { 0, 0, 0, .85 }, 1.5);
-        return preparation.Api.Gui.TextTexture.GenTextTexture(localized, font);
+        return HudOverlayTextureFiltering.Prepare(preparation.Api.Gui.TextTexture.GenTextTexture(localized, font));
     }
     /// <summary>Borrows the authored scale and marker PNGs through the engine texture cache.</summary>
     private static LoadedTexture[] LoadTextures(HudOverlayPreparationContext preparation)
@@ -136,6 +136,7 @@ internal sealed class EnvironmentalTemperaturePresentation : IDisposable
             var texture = new LoadedTexture(preparation.Api);
             preparation.Api.Render.GetOrLoadTexture(new AssetLocation(Constants.ModId,
                 "textures/hud/environmental-temperature/" + names[index] + ".png"), ref texture);
+            HudOverlayTextureFiltering.Prepare(texture);
             texture.IgnoreUndisposed = true;
             result[index] = texture;
         }

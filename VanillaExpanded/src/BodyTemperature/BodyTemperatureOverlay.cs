@@ -137,7 +137,7 @@ internal sealed class BodyTemperatureOverlay : IHudOverlay, IHudOverlayBackdropP
     {
         var font = CairoFont.WhiteSmallText().WithFontSize(HudOverlaySizes.Text)
             .WithStroke(new double[] { 0, 0, 0, .85 }, 1.5);
-        return context.Api.Gui.TextTexture.GenTextTexture(localized, font);
+        return HudOverlayTextureFiltering.Prepare(context.Api.Gui.TextTexture.GenTextTexture(localized, font));
     }
     /// <summary>Clears stale readings and their owned texture when the player becomes ineligible.</summary>
     private void Clear()

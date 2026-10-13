@@ -1,4 +1,5 @@
 using VanillaExpanded.HudOverlays.Registration;
+using VanillaExpanded.HudOverlays.Rendering;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 
@@ -19,6 +20,7 @@ internal static class PlayerWetnessIconTextures
             context.Api.Render.GetOrLoadTexture(new AssetLocation(Constants.ModId,
                 "textures/hud/player-wetness/" + names[index] + ".png"), ref texture);
             // The cache owns GPU storage; these wrappers only borrow it for drawing.
+            HudOverlayTextureFiltering.Prepare(texture);
             texture.IgnoreUndisposed = true;
             textures[index] = texture;
         }
