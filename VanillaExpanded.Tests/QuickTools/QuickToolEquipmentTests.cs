@@ -28,6 +28,123 @@ public sealed class QuickToolEquipmentTests
         Assert.Equal(2, f.Packets.Count);
     }
 
+    /// <summary>A mining-only bag cannot receive the held item, so selection deposits it elsewhere and restores both homes.</summary>
+    [Fact]
+    public void MiningBagSelection_DepositsOriginalInFreeSlotAndRestores()
+    {
+        var f = new Fixture();
+        var mining = (EnumItemStorageFlags)4;
+        f.Backpack[0] = new ItemSlotBagContent(f.Backpack, 0, 0, mining);
+        ItemStack original = f.PutPlain(f.Hotbar[0], 1);
+        var pick = new ItemStack(new TestItem(2, EnumTool.Pickaxe, storageFlags: EnumItemStorageFlags.General | mining));
+        f.Backpack[0].Itemstack = pick;
+        Assert.False(f.Backpack[0].CanHold(f.Hotbar[0]));
+        Assert.Equal(QuickToolEquipmentResult.LocallyApplied, f.Select("tool:Pickaxe"));
+        Assert.Same(pick, f.Hotbar[0].Itemstack);
+        Assert.Null(f.Backpack[0].Itemstack);
+        Assert.Same(original, f.Hotbar[1].Itemstack);
+        Assert.Equal(2, f.Packets.Count);
+        Assert.True(f.Equipment.ValidateRestoration());
+        Assert.Equal(QuickToolEquipmentResult.LocallyApplied, f.Equipment.Restore());
+        Assert.Same(original, f.Hotbar[0].Itemstack);
+        Assert.Same(pick, f.Backpack[0].Itemstack);
+        Assert.Null(f.Hotbar[1].Itemstack);
+        Assert.Equal(4, f.Packets.Count);
+    }
+    /// <summary>Chained bag selection either relocates A from the previous home or retains its safe fallback location.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MiningBagChain_RestoresOriginalAndBothTools(bool firstToolInMiningBag)
+    {
+        var f = new Fixture();
+        var mining = (EnumItemStorageFlags)4;
+        f.Backpack[0] = new ItemSlotBagContent(f.Backpack, 0, 0, mining);
+        f.Backpack[1] = new ItemSlotBagContent(f.Backpack, 0, 1, mining);
+        ItemStack original = f.PutPlain(f.Hotbar[0], 1);
+        ItemSlot firstHome = firstToolInMiningBag ? f.Backpack[1] : f.Hotbar[1];
+        var axe = new ItemStack(new TestItem(2, EnumTool.Axe, storageFlags: EnumItemStorageFlags.General | mining));
+        firstHome.Itemstack = axe;
+        var pick = new ItemStack(new TestItem(3, EnumTool.Pickaxe, storageFlags: EnumItemStorageFlags.General | mining));
+        f.Backpack[0].Itemstack = pick;
+        Assert.Equal(QuickToolEquipmentResult.LocallyApplied, f.Select("tool:Axe"));
+        Assert.Equal(QuickToolEquipmentResult.LocallyApplied, f.Select("tool:Pickaxe"));
+        Assert.Same(pick, f.Hotbar[0].Itemstack);
+        Assert.Same(axe, firstHome.Itemstack);
+        Assert.Null(f.Backpack[0].Itemstack);
+        Assert.Equal(4, f.Packets.Count);
+        Assert.True(f.Equipment.ValidateRestoration());
+        Assert.Equal(QuickToolEquipmentResult.LocallyApplied, f.Equipment.Restore());
+        Assert.Same(original, f.Hotbar[0].Itemstack);
+        Assert.Same(pick, f.Backpack[0].Itemstack);
+        Assert.Same(axe, firstHome.Itemstack);
+        Assert.Equal(6, f.Packets.Count);
+    }
+
+    /// <summary>No free compatible destination rejects a mining-bag selection before any native movement.</summary>
+    [Fact]
+    public void MiningBagWithoutFreeStorage_RejectsUnchanged()
+    {
+        var f = new Fixture();
+        var mining = (EnumItemStorageFlags)4;
+        f.Backpack[0] = new ItemSlotBagContent(f.Backpack, 0, 0, mining);
+        ItemStack original = f.PutPlain(f.Hotbar[0], 1);
+        var pick = new ItemStack(new TestItem(2, EnumTool.Pickaxe, storageFlags: EnumItemStorageFlags.General | mining));
+        f.Backpack[0].Itemstack = pick;
+        for (int i = 1; i < 5; i++) f.PutPlain(f.Hotbar[i], 10 + i);
+        for (int i = 1; i < 3; i++) f.PutPlain(f.Backpack[i], 20 + i);
+        Assert.Equal(QuickToolEquipmentResult.Rejected, f.Select("tool:Pickaxe"));
+        Assert.Same(original, f.Hotbar[0].Itemstack);
+        Assert.Same(pick, f.Backpack[0].Itemstack);
+        Assert.False(f.Equipment.HasSession);
+        Assert.Empty(f.Packets);
+    }
+
+    /// <summary>Fallback skips restricted empty slots and capacity-limited slots without splitting the held stack.</summary>
+    [Fact]
+    public void MiningBagFallback_SkipsIncompatibleOrUndersizedStorage()
+    {
+        var f = new Fixture();
+        var mining = (EnumItemStorageFlags)4;
+        f.Backpack[0] = new ItemSlotBagContent(f.Backpack, 0, 0, mining);
+        f.Backpack[1] = new ItemSlotBagContent(f.Backpack, 0, 1, mining);
+        ItemStack original = f.PutPlain(f.Hotbar[0], 1);
+        original.StackSize = 2;
+        f.Hotbar[1].MaxSlotStackSize = 1;
+        for (int i = 2; i < 5; i++) f.PutPlain(f.Hotbar[i], 10 + i);
+        var pick = new ItemStack(new TestItem(2, EnumTool.Pickaxe, storageFlags: EnumItemStorageFlags.General | mining));
+        f.Backpack[0].Itemstack = pick;
+        Assert.Equal(QuickToolEquipmentResult.LocallyApplied, f.Select("tool:Pickaxe"));
+        Assert.Null(f.Hotbar[1].Itemstack);
+        Assert.Null(f.Backpack[1].Itemstack);
+        Assert.Same(original, f.Backpack[2].Itemstack);
+        Assert.Equal(2, original.StackSize);
+        Assert.Equal(QuickToolEquipmentResult.LocallyApplied, f.Equipment.Restore());
+        Assert.Same(original, f.Hotbar[0].Itemstack);
+        Assert.Same(pick, f.Backpack[0].Itemstack);
+    }
+    /// <summary>A candidate changed after depositing A stops the fallback without speculative rollback.</summary>
+    [Fact]
+    public void MiningBagFallback_InterruptedAfterDepositPreservesActualContents()
+    {
+        var f = new Fixture();
+        var mining = (EnumItemStorageFlags)4;
+        f.Backpack[0] = new ItemSlotBagContent(f.Backpack, 0, 0, mining);
+        ItemStack original = f.PutPlain(f.Hotbar[0], 1);
+        var pick = new ItemStack(new TestItem(2, EnumTool.Pickaxe, storageFlags: EnumItemStorageFlags.General | mining));
+        var replacement = new ItemStack(new TestItem(3, EnumTool.Pickaxe, storageFlags: EnumItemStorageFlags.General | mining));
+        f.Backpack[0].Itemstack = pick;
+        f.Hotbar.SlotModified += slot =>
+        {
+            if (slot == 0) f.Backpack[0].Itemstack = replacement;
+        };
+        Assert.Equal(QuickToolEquipmentResult.Interrupted, f.Select("tool:Pickaxe"));
+        Assert.Null(f.Hotbar[0].Itemstack);
+        Assert.Same(original, f.Hotbar[1].Itemstack);
+        Assert.Same(replacement, f.Backpack[0].Itemstack);
+        Assert.False(f.Equipment.HasSession);
+        Assert.Single(f.Packets);
+    }
     /// <summary>Server-recreated stack objects remain restorable when each full stack has one matching slot.</summary>
     [Fact]
     public void ServerRecreatedStacks_RestoreUniqueMatches()
@@ -619,7 +736,7 @@ public sealed class QuickToolEquipmentTests
     }
 
     /// <summary>Exposes stable installed collectible methods without a game world dependency.</summary>
-    private sealed class TestItem(int id, EnumTool? category = null, byte brightness = 0, bool offhandCompatible = false) : MockItem(id, brightness)
+    private sealed class TestItem(int id, EnumTool? category = null, byte brightness = 0, bool offhandCompatible = false, EnumItemStorageFlags storageFlags = EnumItemStorageFlags.General) : MockItem(id, brightness)
     {
         /// <summary>Returns the intended category.</summary>
         public override EnumTool? GetTool(ItemSlot slot) => category;
@@ -631,7 +748,7 @@ public sealed class QuickToolEquipmentTests
         public override int GetRemainingDurability(ItemStack stack) => category is null ? 0 : stack.Attributes.GetInt("testRemaining", 20);
         /// <summary>Permits only designated test lights in offhand storage.</summary>
         public override EnumItemStorageFlags GetStorageFlags(ItemStack stack)
-            => offhandCompatible ? EnumItemStorageFlags.General | EnumItemStorageFlags.Offhand : EnumItemStorageFlags.General;
+            => offhandCompatible ? EnumItemStorageFlags.General | EnumItemStorageFlags.Offhand : storageFlags;
     }
 
     /// <summary>Captures the native inventory packet's actual source and target addresses.</summary>

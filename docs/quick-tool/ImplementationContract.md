@@ -101,12 +101,20 @@ H is the recorded active hand, S the current tool's home, T the next candidate's
 | Operation | Initial slots | Native flips | Intended result |
 | --- | --- | --- | --- |
 | First equip B | H=A, S=B | H with S | H=B, S=A |
+| First equip B from incompatible bag | H=A, S=B, F=empty | H with F; H with S | H=B, S=empty, F=A |
 | Switch B to C | H=B, S=A, T=C | H with S; H with T | H=C, S=B, T=A |
+| Switch to incompatible bag C | H=B, S=A, T=C, F=empty | H with S; H with F; H with T | H=C, S=B, T=empty, F=A |
+| Switch to incompatible bag C with A stored separately | H=B, S=empty, U=A, T=C | H with S; H with T | H=C, S=B, U=A, T=empty |
 | Restore C | H=C, T=A | H with T | H=A, T=C |
+| Restore after bag deposit | H=C, T=empty, U=A | H with T; H with U | H=A, T=C, U=empty |
 | Empty-hand restore | H=B, S=empty | H with S | H=empty, S=B |
 | Restore after moved A and blocked S | H=B, U=A, S=unrelated, F=empty | H with F; H with U | H=A, U=empty, S=unrelated, F=B |
 
-When A has moved away from S, use a supported empty return slot for B, then swap A into H before selecting C. The next selection may add a final H-with-T flip. If A is the selected candidate, restore it and close the session; an already-held candidate is a no-op. Validate the intended final arrangement before starting, but do not claim that this makes several native flips atomic. Recheck after each flip. If an intermediate operation fails, preserve the actual resulting inventory, stop, invalidate uncertain history, and report interruption. Never issue speculative rollback packets over state that another handler may have changed.
+`QuickToolEquipment` owns candidate revalidation and session history. `QuickToolSelectionPlanner` chooses selection destinations and the native flip order; `QuickToolMovementPlan.TryCreate` validates the explicit intended arrangement without selecting alternative destinations.
+
+For bag-content sources, prefer the direct exchange. If it cannot satisfy the whole-plan checks, deposit A in the first compatible empty ordinary slot, scanning hotbar then backpack in ascending slot order. Never split stacks or displace an unrelated item. During chained selections, leave A in its existing safe location when returning B does not occupy it; otherwise deposit A before taking C. Preserve the selected tool's original home for restoration. Reject before movement when no complete valid route exists. This fallback does not change the separate offhand direct-exchange policy.
+
+For a direct exchange when A has moved away from S, use a supported empty return slot for B, then swap A into H before selecting C. The next selection may add a final H-with-T flip. If A is the selected candidate, restore it and close the session; an already-held candidate is a no-op. Validate the intended final arrangement before starting, but do not claim that this makes several native flips atomic. Recheck after each flip. If an intermediate operation fails, preserve the actual resulting inventory, stop, invalidate uncertain history, and report interruption. Never issue speculative rollback packets over state that another handler may have changed.
 
 ### Native notifications and action-time validation
 
