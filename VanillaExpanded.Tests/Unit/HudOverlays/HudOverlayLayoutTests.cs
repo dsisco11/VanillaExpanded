@@ -18,6 +18,40 @@ public sealed class HudOverlayLayoutTests
 {
     #region Public API
     #region Attachment
+    /// <summary>Explicit screen padding remains three physical pixels at either native GUI scale and clips overflow there.</summary>
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void ScreenPixelPaddingPreservesViewportInsetAndClip(double scale)
+    {
+        float old = RuntimeEnv.GUIScale;
+        int left = GuiStyle.LeftDialogMargin;
+        try
+        {
+            RuntimeEnv.GUIScale = (float)scale;
+            GuiStyle.LeftDialogMargin = 0;
+            var window = new Window(100, 80) { renderOffsetX = 7, renderOffsetY = 11 };
+            var context = new HudOverlayAnchorContext(window, () => scale, () => null);
+            context.BeginFrame();
+            using var layout = new HudOverlayGroupLayout();
+            var group = Group(new("screen", HudOverlayPoint.LeftTop, HudOverlayPoint.LeftTop, screenPaddingPixels: 3),
+                new HudOverlayPacking(padding: 0));
+            layout.Apply(context, group, new[] { Member("mod:a", 20, 20) });
+            Near(10, layout.Root.renderX);
+            Near(14, layout.Root.renderY);
+            Near(20 * scale, layout.Root.OuterWidth);
+            var member = Assert.Single(layout.Members);
+            Near(10, member.Bounds.renderX);
+            Near(14, member.Bounds.renderY);
+            // An oversized member retains its full dimensions but clips to the same physical inset on every edge.
+            layout.Apply(context, group, new[] { Member("mod:a", 200, 200) });
+            Assert.Equal(new RectangleF(10, 14, 94, 74), Assert.Single(layout.Members).Clip);
+            Near(10, layout.Root.renderX);
+            Near(14, layout.Root.renderY);
+        }
+        finally { RuntimeEnv.GUIScale = old; GuiStyle.LeftDialogMargin = left; }
+    }
+
     /// <summary>Covers nine native screen alignments, nine pivots, offsets, pixel margins, and scaling exactly once.</summary>
     [Theory]
     [InlineData(1)]

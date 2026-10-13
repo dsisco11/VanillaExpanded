@@ -58,8 +58,8 @@ public sealed class HudOverlaySystem : ModSystem, ILiveConfigurable
             new HudOverlayPacking(HudOverlayDirection.Horizontal, crossAlignment: HudOverlayCrossAlignment.End)));
         Registry.RegisterGroup(new HudOverlayGroup("world-status",
             new HudOverlayPlacement(HudOverlayAnchorContext.ScreenTargetId,
-                HudOverlayPoint.LeftTop, HudOverlayPoint.LeftTop, 12, 12),
-            new HudOverlayPacking(HudOverlayDirection.Horizontal)));
+                HudOverlayPoint.LeftTop, HudOverlayPoint.LeftTop, screenPaddingPixels: 3),
+            new HudOverlayPacking(HudOverlayDirection.Horizontal, padding: 0)));
         session = new HudOverlaySession(api, Registry, enabled: () => VanillaExpandedModSystem.Config.EnableHudOverlays);
         api.Event.LevelFinalize += session.EnterWorld;
         api.Event.LeaveWorld += session.LeaveWorld;
