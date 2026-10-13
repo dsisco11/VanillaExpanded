@@ -107,6 +107,9 @@ public class VanillaExpandedConfig
     /// <summary>Shows a personal time estimate calibrated by daylight exposure.</summary>
     public bool EnableApproximateTimeOverlay { get; set; } = true;
 
+    /// <summary>Shows the current local environmental temperature beside weather and time.</summary>
+    public bool EnableEnvironmentalTemperatureOverlay { get; set; } = true;
+
     /// <summary>Shows texture icons for active local precipitation and weather fog.</summary>
     public bool EnableWeatherConditionsOverlay { get; set; } = true;
 

@@ -50,6 +50,9 @@ Hover over any visible HUD indicator while the mouse is free (for example, with 
 
 A compact texture icon beside weather at the top-left of the screen indicates estimated dawn, morning, noon, afternoon, dusk, or night. Icons follow the estimated local seasonal solar path: below −6° is night, between −6° and the horizon is dawn or dusk, and above the horizon is daytime. A half-degree margin prevents boundary flicker. Continuous polar twilight can remain dawn/dusk without entering night. Local skylight, including nighttime skylight and sky light reaching covered spaces, recalibrates the estimate; lack of skylight gradually introduces up to eight hours of error on a normal day. The server saves time spent online without skylight across reconnects and world reloads; skylight resets it. Multiplayer tracking requires the mod on the server. There is no numeric label. Toggle it live with `EnableApproximateTimeOverlay`.
 
+### Environmental Temperature
+
+A Celsius reading above a slim blue-to-amber scale sits to the left of weather and time at the top-left of the screen. It reads the current local climate every 300 ms, independently of body temperature, clothing, and nearby heat-source effects. The marker spans -20°C to 40°C and stops at either end while the number continues to show the actual rounded temperature. The indicator uses the standard HUD height and fades/collapses when disabled or climate data is unavailable. Toggle it live with `EnableEnvironmentalTemperatureOverlay`.
 ### Weather Conditions
 
 Weather and approximate time sit together at the top-left of the screen, with weather to the left of time. Weather occupies one 24 × 24 base slot (36 × 36 at the standard HUD scale). Rounded clouds, wind strokes above the cloud, precipitation below it, fog bands, and lightning combine to show cloud coverage, precipitation type, and independent weather intensities. The indicator uses transparent 64 × 64 texture layers with no outer ring. Toggle it with `EnableWeatherConditionsOverlay`; changes apply immediately. See [weather conditions](docs/weather-conditions/WeatherConditions.md) for the data, artwork, and preview sheet.
@@ -242,6 +245,7 @@ There is no AutoLoot layering option: its progress always renders above dialogs,
 | `EnableWeatherConditionsOverlay` | `true` | `true`, `false` | Show the composite cloud, wind, precipitation, fog/haze, and thunder indicator; applies live. |
 | `EnableRiftActivityOverlay` | `true` | `true`, `false` | Show a fissure icon for temporal rift activity; hidden during calm activity. Applies live. |
 | `EnableTemporalStormOverlay` | `true` | `true`, `false` | Show approaching, imminent, and active temporal storms with a fractured iris icon. Applies live. |
+| `EnableEnvironmentalTemperatureOverlay` | `true` | `true`, `false` | Show local Celsius temperature above a cold-to-hot scale; applies live. |
 | `EnableApproximateTimeOverlay` | `true` | `true`, `false` | Show sunlight-calibrated approximate time; applies live. |
 
 The two offsets are shared across placement choices. The saturation default compensates for content padding and leaves a four-unit gap above the meter. Hotbar docking attaches the group's left-middle to the hotbar's right-middle; screen placements use matching attachment and pivot points. Native viewport clamping keeps the group within the safe rectangle. Placement changes apply live and retain cached presentation; restored content receives a fresh sample before display. Without ConfigLib, edit the JSON file and restart the game to load manual changes.

@@ -57,6 +57,15 @@
         "weight": 10.9,
         "clientSide": true
       },
+      "EnableEnvironmentalTemperatureOverlay": {
+        "code": "EnableEnvironmentalTemperatureOverlay",
+        "name": "EnableEnvironmentalTemperatureOverlay",
+        "ingui": "vanillaexpanded:config-enable-environmental-temperature-overlay",
+        "comment": "vanillaexpanded:config-enable-environmental-temperature-overlay-tooltip",
+        "default": true,
+        "weight": 10.79,
+        "clientSide": true
+      },
       "EnableWeatherConditionsOverlay": {
         "code": "EnableWeatherConditionsOverlay",
         "name": "EnableWeatherConditionsOverlay",

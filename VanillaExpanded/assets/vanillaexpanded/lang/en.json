@@ -1,5 +1,9 @@
 {
   "hud-label-bow-ammunition": "Bow Ammunition",
+  "hud-label-environmental-temperature": "Environmental Temperature",
+  "environmental-temperature-reading": "{0}°C",
+  "config-enable-environmental-temperature-overlay": "Show environmental temperature",
+  "config-enable-environmental-temperature-overlay-tooltip": "Shows local climate temperature above a cold-to-hot scale beside weather and time. Applies immediately.",
   "player-wetness-reading": "{0}%",
   "hud-label-player-wetness": "Player Wetness",
   "config-enable-player-wetness-overlay": "Show player wetness",
