@@ -10,7 +10,7 @@ namespace VanillaExpanded.EnvironmentalTemperature;
 /// <summary>Owns a cached Celsius reading and gradient renderer above borrowed scale-mask and marker textures.</summary>
 internal sealed class EnvironmentalTemperaturePresentation : IDisposable
 {
-    private const float MinimumCelsius = -20, MaximumCelsius = 40, ReadingHeight = 14, ScaleWidth = 30;
+    private const float MinimumCelsius = -20, MaximumCelsius = 40, ReadingHeight = HudOverlaySizes.EnvironmentalReadingHeight, ScaleWidth = HudOverlaySizes.TemperatureScaleWidth;
     private readonly HudOverlayIconTextPresentation text;
     private readonly System.Func<HudOverlayPreparationContext, LoadedTexture[]> loadTextures;
     private readonly System.Func<HudOverlayPreparationContext, IEnvironmentalTemperatureScaleRenderer> createScaleRenderer;
@@ -25,7 +25,7 @@ internal sealed class EnvironmentalTemperaturePresentation : IDisposable
     public HudOverlayVisibilityTransition Visibility { get; } = new();
     /// <summary>Gets the bounded marker position; the numeric reading remains unclamped.</summary>
     internal float MarkerPosition { get; private set; }
-    /// <summary>Gets the base layout footprint before GUI and HUD scaling.</summary>
+    /// <summary>Gets the base layout footprint before native GUI scaling.</summary>
     public SizeF Size { get; private set; }
 
     #region Content and preparation
@@ -61,7 +61,7 @@ internal sealed class EnvironmentalTemperaturePresentation : IDisposable
         text.Prepare(preparation);
         context = preparation;
         readingWidth = text.Size.Width * Math.Min(1, ReadingHeight / Math.Max(1, text.Size.Height));
-        Size = new SizeF(Math.Max(36, readingWidth), 24);
+        Size = new SizeF(Math.Max(HudOverlaySizes.Wide, readingWidth), HudOverlaySizes.Standard);
         Visibility.Show();
     }
     #endregion
@@ -72,7 +72,7 @@ internal sealed class EnvironmentalTemperaturePresentation : IDisposable
     {
         if (context == null || textures == null) return;
         double scale = context.GuiScale;
-        double y = bounds.renderY + (bounds.OuterHeight - 24 * scale) / 2;
+        double y = bounds.renderY + (bounds.OuterHeight - HudOverlaySizes.Standard * scale) / 2;
         double center = bounds.renderX + Size.Width * scale / 2;
         textBounds.absFixedX = center - readingWidth * scale / 2;
         textBounds.absFixedY = y;
@@ -83,9 +83,9 @@ internal sealed class EnvironmentalTemperaturePresentation : IDisposable
         // Endpoint marker centers remain inside the reserved footprint, including their contrast border.
         double left = center - ScaleWidth * scale / 2;
         scaleRenderer!.Draw(renderer, textures[0].TextureId,
-            new RectangleF((float)left, (float)(y + 19 * scale), (float)(ScaleWidth * scale), (float)(2 * scale)), HudOverlayDrawOpacity.Current);
-        renderer.RenderTexture(textures[1].TextureId, left + (ScaleWidth * MarkerPosition - 2.5) * scale,
-            y + 17.5 * scale, 5 * scale, 5 * scale, 51, HudOverlayDrawOpacity.Tint);
+            new RectangleF((float)left, (float)(y + 28.5 * scale), (float)(ScaleWidth * scale), (float)(3 * scale)), HudOverlayDrawOpacity.Current);
+        renderer.RenderTexture(textures[1].TextureId, left + (ScaleWidth * MarkerPosition - 3.75) * scale,
+            y + 26.25 * scale, 7.5 * scale, 7.5 * scale, 51, HudOverlayDrawOpacity.Tint);
     }
     #endregion
 
@@ -115,10 +115,10 @@ internal sealed class EnvironmentalTemperaturePresentation : IDisposable
     #endregion
 
     #region Private
-    /// <summary>Creates normal HUD text using native GUI scaling without the extra indicator content multiplier.</summary>
+    /// <summary>Creates normal HUD text using native GUI scaling using the shared font size.</summary>
     private static LoadedTexture CreateReadingText(HudOverlayPreparationContext preparation, string localized)
     {
-        var font = CairoFont.WhiteSmallText().WithFontSize(14)
+        var font = CairoFont.WhiteSmallText().WithFontSize(HudOverlaySizes.Text)
             .WithStroke(new double[] { 0, 0, 0, .85 }, 1.5);
         return preparation.Api.Gui.TextTexture.GenTextTexture(localized, font);
     }

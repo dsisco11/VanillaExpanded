@@ -181,8 +181,8 @@ public sealed class WeatherConditionsCompositeTests
         presentation.SetContent(WeatherConditionsSample.FromWeather(1, EnumPrecipitationType.Hail, 20, 4, .05f,
             cloudCoverage: 1, windSpeed: 1, thunderRate: 1));
         presentation.Prepare(preparation);
-        Assert.Equal(new SizeF(24, 24), presentation.Size);
-        var bounds = ElementBounds.Fixed(0, 0, 24, 24).WithEmptyParent();
+        Assert.Equal(new SizeF(36, 36), presentation.Size);
+        var bounds = ElementBounds.Fixed(0, 0, 36, 36).WithEmptyParent();
         bounds.CalcWorldBounds();
         var renderer = new Mock<IRenderAPI>();
         presentation.CollectBackdrops(renderer.Object, bounds);
@@ -193,8 +193,8 @@ public sealed class WeatherConditionsCompositeTests
         Assert.All(draws, call =>
         {
             Assert.Equal(bounds.renderX, call.Arguments[1]);
-            Assert.Equal(24 * scale, call.Arguments[3]);
-            Assert.Equal(24 * scale, call.Arguments[4]);
+            Assert.Equal(36 * scale, call.Arguments[3]);
+            Assert.Equal(36 * scale, call.Arguments[4]);
         });
         Assert.Single(draws.Select(call => call.Arguments[2]).Distinct());
         presentation.SetContent(WeatherConditionsSample.FromWeather(0, EnumPrecipitationType.Rain, 20, 4, .001f, cloudCoverage: 0));

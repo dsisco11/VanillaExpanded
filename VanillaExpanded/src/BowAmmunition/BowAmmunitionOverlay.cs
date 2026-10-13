@@ -32,7 +32,7 @@ internal sealed class BowAmmunitionOverlay : IHudOverlay, IHudOverlayVisibilityT
         HudOverlayIconTextPresentation? emptyPresentation = null)
     {
         this.invalidate = invalidate;
-        this.presentation = presentation ?? new(iconSize: 24, textBeforeIcon: true, gap: 1, fontSize: 14, circularIconBackground: true, useItemPresentation: true);
+        this.presentation = presentation ?? new(iconSize: HudOverlaySizes.Standard, textBeforeIcon: true, gap: 1.5f, fontSize: HudOverlaySizes.CountText, circularIconBackground: true, useItemPresentation: true);
         this.emptyPresentation = emptyPresentation ?? new(CreateMutedText);
     }
     /// <summary>Binds one fresh player session with no retained arrow sample.</summary>

@@ -52,7 +52,7 @@ internal sealed class HudOverlayIconBackdrop : IHudOverlayIconBackdrop, IHudOver
     public void Queue(IRenderAPI renderer, double x, double y, double scale)
     {
         if (!collectionClip.HasValue) return;
-        var circle = new RectangleF((float)x, (float)y, (float)(24 * scale), (float)(24 * scale));
+        var circle = new RectangleF((float)x, (float)y, (float)(HudOverlaySizes.Standard * scale), (float)(HudOverlaySizes.Standard * scale));
         var clip = RectangleF.Intersect(circle, collectionClip.Value);
         if (clip.Width > 0 && clip.Height > 0) pending.Add((circle, clip, HudOverlayDrawOpacity.Current));
     }

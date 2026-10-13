@@ -90,7 +90,7 @@ public sealed class BodyTemperatureThermometerTests : IDisposable
         using var presentation = new BodyTemperatureThermometerPresentation(new HudOverlayIconTextPresentation());
         presentation.SetContent(new(34, 37, BodyTemperatureRisk.Cold, .25f), false);
         presentation.Prepare(new(api.Object, 1, "en"));
-        Assert.Equal(new SizeF(24, 24), presentation.Size);
+        Assert.Equal(new SizeF(36, 36), presentation.Size);
         presentation.SetContent(new(45, 37, BodyTemperatureRisk.Overheating), false);
         presentation.Prepare(new(api.Object, 2, "en"));
         var loads = renderer.Invocations.Where(call => call.Method.Name == "GetOrLoadTexture").ToArray();
@@ -122,10 +122,10 @@ public sealed class BodyTemperatureThermometerTests : IDisposable
         var calls = renderer.Invocations.Where(call => call.Method.Name != "RenderTexture" || (float)call.Arguments[5] != 49).ToArray();
         Assert.Equal(new[] { "PushScissor", "RenderTexture", "PopScissor", "RenderTexture" }, calls.Select(call => call.Method.Name));
         var crop = Assert.IsAssignableFrom<ElementBounds>(calls[0].Arguments[0]);
-        Assert.Equal(100 + 5 * scale, crop.renderX); Assert.Equal(200 + 15.5 * (1 - fill) * scale, crop.renderY, 6);
-        Assert.Equal(14 * scale, crop.OuterWidth); Assert.Equal((24 - 15.5 * (1 - fill)) * scale, crop.OuterHeight, 6);
-        var mask = calls[1].Arguments; Assert.Equal(2, mask[0]); Assert.Equal(100 + 5 * scale, mask[1]); Assert.Equal(200d, mask[2]);
-        Assert.Equal(14 * scale, mask[3]); Assert.Equal(24 * scale, mask[4]);
+        Assert.Equal(100 + 7.5 * scale, crop.renderX); Assert.Equal(200 + 23.25 * (1 - fill) * scale, crop.renderY, 6);
+        Assert.Equal(21 * scale, crop.OuterWidth); Assert.Equal((36 - 23.25 * (1 - fill)) * scale, crop.OuterHeight, 6);
+        var mask = calls[1].Arguments; Assert.Equal(2, mask[0]); Assert.Equal(100 + 7.5 * scale, mask[1]); Assert.Equal(200d, mask[2]);
+        Assert.Equal(21 * scale, mask[3]); Assert.Equal(36 * scale, mask[4]);
         var color = Assert.IsType<Vec4f>(mask[6]); Assert.Equal(.25f, color.R, 5); Assert.Equal(.6f, color.G, 5);
         Assert.Equal(1, calls[3].Arguments[0]);
     }
@@ -139,7 +139,7 @@ public sealed class BodyTemperatureThermometerTests : IDisposable
             context => Enumerable.Range(1, 4).Select(id => new LoadedTexture(context.Api) { TextureId = id, IgnoreUndisposed = true }).ToArray());
         presentation.SetContent(new(34, 37, BodyTemperatureRisk.Cold, .25f, trend), false);
         presentation.Prepare(new(api.Object, 1, "en"));
-        Assert.Equal(new SizeF(trend == 0 ? 24 : 30, 24), presentation.Size);
+        Assert.Equal(new SizeF(trend == 0 ? 36 : 45, 36), presentation.Size);
         var bounds = Bounds(1);
         bounds.absInnerWidth = presentation.Size.Width;
         var renderer = new Mock<IRenderAPI>();
@@ -152,12 +152,12 @@ public sealed class BodyTemperatureThermometerTests : IDisposable
         {
             var call = chevrons[index];
             double y = (double)call.Arguments[2];
-            Assert.InRange(y, bounds.renderY, bounds.renderY + bounds.OuterHeight - 5);
-            double stackHeight = chevrons.Length * 5 + (chevrons.Length - 1);
-            Assert.Equal(bounds.renderY + (trend > 0 ? 0 : 24 - stackHeight) + index * 6, y);
-            Assert.Equal(5d, call.Arguments[4]);
+            Assert.InRange(y, bounds.renderY, bounds.renderY + bounds.OuterHeight - 7.5);
+            double stackHeight = chevrons.Length * 7.5 + (chevrons.Length - 1) * 1.5;
+            Assert.Equal(bounds.renderY + (trend > 0 ? 0 : 36 - stackHeight) + index * 9, y);
+            Assert.Equal(7.5d, call.Arguments[4]);
             Assert.Equal(chevrons[0].Arguments[1], call.Arguments[1]);
-            Assert.True((double)call.Arguments[1] >= bounds.renderX + 22);
+            Assert.True((double)call.Arguments[1] >= bounds.renderX + 33);
         }
     }
 
@@ -173,7 +173,7 @@ public sealed class BodyTemperatureThermometerTests : IDisposable
             context => Enumerable.Range(1, 4).Select(id => new LoadedTexture(context.Api) { TextureId = id, IgnoreUndisposed = true }).ToArray());
         presentation.SetContent(new(34, 37, BodyTemperatureRisk.Cold, .25f, trend), true);
         presentation.Prepare(new(api.Object, scale, "en"));
-        Assert.Equal(24, presentation.Size.Height);
+        Assert.Equal(36, presentation.Size.Height);
         var bounds = Bounds(scale);
         bounds.absInnerWidth = presentation.Size.Width * scale;
         var renderer = new Mock<IRenderAPI>();
@@ -186,7 +186,7 @@ public sealed class BodyTemperatureThermometerTests : IDisposable
         {
             double arrowTop = (double)arrow.Arguments[2], arrowBottom = arrowTop + (double)arrow.Arguments[4];
             Assert.True(trend > 0 ? arrowBottom < textTop : arrowTop > textBottom);
-            Assert.InRange((double)arrow.Arguments[1], bounds.renderX + 22 * scale, bounds.renderX + bounds.OuterWidth - 8 * scale);
+            Assert.InRange((double)arrow.Arguments[1], bounds.renderX + 33 * scale, bounds.renderX + bounds.OuterWidth - 12 * scale);
         }
     }
 
@@ -200,11 +200,11 @@ public sealed class BodyTemperatureThermometerTests : IDisposable
         presentation.Prepare(new(api.Object, 1, "en"));
         var renderer = new Mock<IRenderAPI>();
         renderer.Setup(value => value.RenderTexture(2, It.IsAny<double>(), It.IsAny<double>(), It.IsAny<double>(), It.IsAny<double>(), It.IsAny<float>(), It.IsAny<Vec4f>())).Throws(new InvalidOperationException("mask render failed"));
-        Assert.Throws<InvalidOperationException>(() => presentation.Draw(renderer.Object, Bounds(1), new RectangleF(105, 210, 5, 10), .1f));
+        Assert.Throws<InvalidOperationException>(() => presentation.Draw(renderer.Object, Bounds(1), new RectangleF(105, 220, 5, 10), .1f));
         var calls = renderer.Invocations.Where(call => call.Method.Name != "RenderTexture" || (float)call.Arguments[5] != 49).ToArray();
         Assert.Equal(new[] { "PushScissor", "RenderTexture", "PopScissor" }, calls.Select(call => call.Method.Name));
         var crop = Assert.IsAssignableFrom<ElementBounds>(calls[0].Arguments[0]);
-        Assert.Equal(105, crop.renderX); Assert.Equal(210, crop.renderY); Assert.Equal(5, crop.OuterWidth); Assert.Equal(10, crop.OuterHeight);
+        Assert.Equal(107.5, crop.renderX); Assert.Equal(220, crop.renderY); Assert.Equal(2.5, crop.OuterWidth); Assert.Equal(10, crop.OuterHeight);
     }
     #endregion
     #endregion
@@ -212,8 +212,8 @@ public sealed class BodyTemperatureThermometerTests : IDisposable
     /// <summary>Creates initialized pixel bounds independent of global GUI scale.</summary>
     private static ElementBounds Bounds(double scale)
     {
-        var bounds = ElementBounds.Fixed(0, 0, 14, 24).WithEmptyParent();
-        bounds.absFixedX = 100; bounds.absFixedY = 200; bounds.absInnerWidth = 14 * scale; bounds.absInnerHeight = 24 * scale; bounds.Initialized = true;
+        var bounds = ElementBounds.Fixed(0, 0, 21, 36).WithEmptyParent();
+        bounds.absFixedX = 100; bounds.absFixedY = 200; bounds.absInnerWidth = 21 * scale; bounds.absInnerHeight = 36 * scale; bounds.Initialized = true;
         return bounds;
     }
     #endregion

@@ -52,7 +52,7 @@ public sealed class HudOverlayBackdropShaderProgramTests
             backdrop.Queue(renderer.Object, 100, 100, 1);
         });
         var entry = Assert.Single(pending.Cast<(System.Drawing.RectangleF Circle, System.Drawing.RectangleF Clip, float Opacity)>());
-        Assert.Equal(new System.Drawing.RectangleF(0, 0, 24, 24), entry.Circle);
+        Assert.Equal(new System.Drawing.RectangleF(0, 0, 36, 36), entry.Circle);
         Assert.Equal(new System.Drawing.RectangleF(10, 10, 10, 10), entry.Clip);
         Assert.Throws<InvalidOperationException>(() => backdrop.Collect(new(0, 0, 100, 100), () =>
         {
@@ -129,7 +129,7 @@ public sealed class HudOverlayBackdropShaderProgramTests
                 Assert.Equal("backdrop", calls[0]);
                 var background = Assert.Single(backdrop.Invocations);
                 var artwork = renderer.Invocations.First(call => call.Method.Name == "RenderTexture");
-                Assert.Equal((double)background.Arguments[1] + (kind == "temperature" ? 5 : 0), artwork.Arguments[1]);
+                Assert.Equal((double)background.Arguments[1] + (kind == "temperature" ? 7.5 : 0), artwork.Arguments[1]);
                 Assert.Equal(background.Arguments[2], artwork.Arguments[2]);
             }
             calls.Clear(); reset(); collect(); draw(); Assert.Empty(calls);

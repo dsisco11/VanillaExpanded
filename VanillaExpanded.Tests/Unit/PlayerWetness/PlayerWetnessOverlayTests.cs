@@ -63,10 +63,10 @@ public sealed class PlayerWetnessOverlayTests : IDisposable
         }, _ => null, CreateText());
         using var overlay = new PlayerWetnessOverlay(presentation);
         overlay.BeginSession(fixture.Api.Object);
-        var preparation = new HudOverlayPreparationContext(fixture.Api.Object, 1, "en", contentScale: 1.5);
+        var preparation = new HudOverlayPreparationContext(fixture.Api.Object, 1, "en");
         fixture.Entity.WatchedAttributes.SetFloat("wetness", .25f);
         overlay.Refresh(); overlay.Prepare(preparation);
-        Assert.Equal(new SizeF(24, 24), overlay.Measure());
+        Assert.Equal(new SizeF(36, 36), overlay.Measure());
         fixture.Entity.WatchedAttributes.SetFloat("wetness", .75f);
         overlay.Refresh(); overlay.Prepare(preparation);
         Assert.Equal(1, builds);
@@ -94,7 +94,7 @@ public sealed class PlayerWetnessOverlayTests : IDisposable
         var api = new Mock<ICoreClientAPI>() { DefaultValue = DefaultValue.Mock };
         using var presentation = new PlayerWetnessPresentation(context =>
             [new LoadedTexture(context.Api) { TextureId = 1 }, new LoadedTexture(context.Api) { TextureId = 2 }], _ => null, CreateText());
-        presentation.SetContent(wetness); presentation.Prepare(new(api.Object, 1, "en", contentScale: 1.5));
+        presentation.SetContent(wetness); presentation.Prepare(new(api.Object, 1, "en"));
         var bounds = Bounds();
         var renderer = new Mock<IRenderAPI>();
         var cropTops = new List<double>();
@@ -128,7 +128,7 @@ public sealed class PlayerWetnessOverlayTests : IDisposable
         });
         using var presentation = new PlayerWetnessPresentation(context =>
             [new LoadedTexture(context.Api) { TextureId = 1 }, new LoadedTexture(context.Api) { TextureId = 2 }], _ => null, text);
-        var preparation = new HudOverlayPreparationContext(api.Object, 1, "en", contentScale: 1.5);
+        var preparation = new HudOverlayPreparationContext(api.Object, 1, "en");
         presentation.SetContent(.251f); presentation.Prepare(preparation);
         presentation.SetContent(.254f); presentation.Prepare(preparation);
         Assert.Equal(new[] { "25%" }, readings);
