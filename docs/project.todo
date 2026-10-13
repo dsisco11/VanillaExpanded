@@ -2,6 +2,7 @@
     ## Issues:
 
     ## New Features:
+        ☐ Add hud-indicator for player wetness.
         ☐ Add a "Todo List" feature which allows players to create their own ingame tasks and reminders.
         ☐ Temporal gear amulets should provide information about when the next storm is expected to occur (approximately, with increasing accuracy as the storm gets closer).
         ☐ Wearing a temporal gear amulet should provide a subtle HUD indicator when a storm is approaching.
