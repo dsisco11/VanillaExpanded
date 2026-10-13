@@ -34,7 +34,7 @@ internal sealed class ApproximateTimeSystem : ModSystem, ILiveConfigurable
         {
             registration = hud.Registry.Register(new HudOverlayRegistration(OverlayId, overlay,
                 () => overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays
-                    && VanillaExpandedModSystem.Config.EnableApproximateTimeOverlay), "player-status", order: 100, refreshIntervalMs: 300,
+                    && VanillaExpandedModSystem.Config.EnableApproximateTimeOverlay), "world-status", order: 100, refreshIntervalMs: 300,
                 hoverLabelKey: "vanillaexpanded:hud-label-approximate-time"));
         }
         catch { overlay.Dispose(); throw; }

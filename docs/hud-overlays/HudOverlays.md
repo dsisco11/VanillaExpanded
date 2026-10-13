@@ -93,7 +93,8 @@ The built-in groups are:
 
 | Group | Intended use |
 | --- | --- |
-| `player-status` | Horizontal status icons beside the hotbar's bottom-left edge. The time indicator uses order 100; use a lower order to appear before it. |
+| `world-status` | Horizontal weather (order 99) and time (order 100) indicators at the screen's top-left, inset 12 GUI units. Hidden indicators collapse normally. |
+| `player-status` | Horizontal player status icons beside the hotbar's bottom-left edge. |
 | `held-item-status` | Held-item information using the user's configured anchor and offsets. |
 
 Joining a shared group adopts its placement and packing rules. Additional native HUD targets currently require extending the anchor resolver; there is no external anchor-registration API.
