@@ -64,7 +64,17 @@ internal sealed class HudOverlayGroupLayout : IDisposable
         target = resolved;
         previous = ordered;
         Revision++;
-        Available = resolved.HasValue && ordered.Length > 0 && context.SafeRectangle.Width > 0 && context.SafeRectangle.Height > 0;
+        RectangleF safe = context.SafeRectangle;
+        if (group.Placement.TargetId == HudOverlayAnchorContext.ScreenTargetId &&
+            group.Placement.ScreenPaddingPixels is double padding && resolved is RectangleF viewport)
+        {
+            // Pixel padding controls both positioning and clipping, including at non-unit GUI scales.
+            float xInset = (float)Math.Min(padding, viewport.Width / 2);
+            float yInset = (float)Math.Min(padding, viewport.Height / 2);
+            safe = new RectangleF(viewport.X + xInset, viewport.Y + yInset,
+                Math.Max(0, viewport.Width - 2 * xInset), Math.Max(0, viewport.Height - 2 * yInset));
+        }
+        Available = resolved.HasValue && ordered.Length > 0 && safe.Width > 0 && safe.Height > 0;
         if (!Available)
         {
             // Unavailable anchors suspend geometry, but removal must still release stale registration references.
@@ -82,7 +92,7 @@ internal sealed class HudOverlayGroupLayout : IDisposable
 
         double scale = context.GuiScale;
         HudOverlayPacking packing = group.Packing;
-        int count = RetainedCount(ordered, packing, context.SafeRectangle.Size, scale);
+        int count = RetainedCount(ordered, packing, safe.Size, scale);
         SizeF size = PackedSize(ordered, count, packing);
         SynchronizeChildren(ordered, count, packing, size);
         Root.fixedWidth = size.Width;
@@ -92,7 +102,6 @@ internal sealed class HudOverlayGroupLayout : IDisposable
         Root.CalcWorldBounds();
 
         // Shift the whole group, preserving every child offset. Oversized first members start at the safe edge and are clipped.
-        RectangleF safe = context.SafeRectangle;
         double x = Math.Clamp(Root.renderX, safe.Left, Math.Max(safe.Left, safe.Right - Root.OuterWidth));
         double y = Math.Clamp(Root.renderY, safe.Top, Math.Max(safe.Top, safe.Bottom - Root.OuterHeight));
         if (x != Root.renderX || y != Root.renderY)
@@ -238,9 +247,11 @@ internal sealed class HudOverlayGroupLayout : IDisposable
         Root.fixedPaddingX = Root.fixedPaddingY = 0;
         if (placement.TargetId == HudOverlayAnchorContext.ScreenTargetId)
         {
+            double inset = placement.ScreenPaddingPixels.HasValue
+                ? placement.ScreenPaddingPixels.Value / context.GuiScale : HudOverlayAnchorContext.SafeInset;
             Root.Alignment = HudOverlayPoints.Alignment(placement.Attachment);
-            Root.fixedOffsetX = placement.OffsetX + (1 - 2 * attachment.X) * HudOverlayAnchorContext.SafeInset + (attachment.X - pivot.X) * size.Width;
-            Root.fixedOffsetY = placement.OffsetY + (1 - 2 * attachment.Y) * HudOverlayAnchorContext.SafeInset + (attachment.Y - pivot.Y) * size.Height;
+            Root.fixedOffsetX = placement.OffsetX + (1 - 2 * attachment.X) * inset + (attachment.X - pivot.X) * size.Width;
+            Root.fixedOffsetY = placement.OffsetY + (1 - 2 * attachment.Y) * inset + (attachment.Y - pivot.Y) * size.Height;
         }
         else
         {
