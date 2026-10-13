@@ -32,5 +32,9 @@ public static class HudOverlaySizes
     /// <summary>Environmental reading band height.</summary>
     public const float EnvironmentalReadingHeight = 21;
     /// <summary>Environmental scale width.</summary>
-    public const float TemperatureScaleWidth = 45;
+    public const float TemperatureScaleWidth = 3;
+    /// <summary>Vertical scale height with room for endpoint markers.</summary>
+    public const float TemperatureScaleHeight = 28.5f;
+    /// <summary>Environmental scale marker diameter.</summary>
+    public const float TemperatureMarker = 7.5f;
 }

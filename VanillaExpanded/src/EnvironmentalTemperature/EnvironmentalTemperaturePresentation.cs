@@ -7,7 +7,7 @@ using Vintagestory.API.Common;
 
 namespace VanillaExpanded.EnvironmentalTemperature;
 
-/// <summary>Owns a cached Celsius reading and gradient renderer above borrowed scale-mask and marker textures.</summary>
+/// <summary>Owns a cached Celsius reading and gradient renderer beside borrowed scale-mask and marker textures.</summary>
 internal sealed class EnvironmentalTemperaturePresentation : IDisposable
 {
     private const float MinimumCelsius = -20, MaximumCelsius = 40, ReadingHeight = HudOverlaySizes.EnvironmentalReadingHeight, ScaleWidth = HudOverlaySizes.TemperatureScaleWidth;
@@ -61,31 +61,35 @@ internal sealed class EnvironmentalTemperaturePresentation : IDisposable
         text.Prepare(preparation);
         context = preparation;
         readingWidth = text.Size.Width * Math.Min(1, ReadingHeight / Math.Max(1, text.Size.Height));
-        Size = new SizeF(Math.Max(HudOverlaySizes.Wide, readingWidth), HudOverlaySizes.Standard);
+        Size = new SizeF(Math.Max(HudOverlaySizes.Standard, HudOverlaySizes.TemperatureMarker + HudOverlaySizes.ReadingGap + readingWidth), HudOverlaySizes.Standard);
         Visibility.Show();
     }
     #endregion
 
     #region Rendering
-    /// <summary>Draws the cached number and a marker constrained to the scale beneath it.</summary>
+    /// <summary>Draws the cached number and a marker constrained to the vertical scale to its left.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip)
     {
         if (context == null || textures == null) return;
         double scale = context.GuiScale;
         double y = bounds.renderY + (bounds.OuterHeight - HudOverlaySizes.Standard * scale) / 2;
-        double center = bounds.renderX + Size.Width * scale / 2;
-        textBounds.absFixedX = center - readingWidth * scale / 2;
-        textBounds.absFixedY = y;
+        double markerSize = HudOverlaySizes.TemperatureMarker;
+        double barHeight = HudOverlaySizes.TemperatureScaleHeight;
+        double barTop = y + (HudOverlaySizes.Standard - barHeight) * scale / 2;
+        double barCenterX = bounds.renderX + markerSize * scale / 2;
+        textBounds.absFixedX = bounds.renderX + (markerSize + HudOverlaySizes.ReadingGap) * scale;
+        textBounds.absFixedY = y + (HudOverlaySizes.Standard - ReadingHeight) * scale / 2;
         textBounds.absInnerWidth = readingWidth * scale;
         textBounds.absInnerHeight = ReadingHeight * scale;
         textBounds.Initialized = true;
         text.Draw(renderer, textBounds, clip, 0, maximumTextHeight: ReadingHeight);
-        // Endpoint marker centers remain inside the reserved footprint, including their contrast border.
-        double left = center - ScaleWidth * scale / 2;
+        // Cold is at the bottom and hot at the top; endpoint markers remain inside the footprint.
         scaleRenderer!.Draw(renderer, textures[0].TextureId,
-            new RectangleF((float)left, (float)(y + 28.5 * scale), (float)(ScaleWidth * scale), (float)(3 * scale)), HudOverlayDrawOpacity.Current);
-        renderer.RenderTexture(textures[1].TextureId, left + (ScaleWidth * MarkerPosition - 3.75) * scale,
-            y + 26.25 * scale, 7.5 * scale, 7.5 * scale, 51, HudOverlayDrawOpacity.Tint);
+            new RectangleF((float)(barCenterX - ScaleWidth * scale / 2), (float)barTop,
+                (float)(ScaleWidth * scale), (float)(barHeight * scale)), HudOverlayDrawOpacity.Current);
+        renderer.RenderTexture(textures[1].TextureId, bounds.renderX,
+            barTop + (barHeight * (1 - MarkerPosition) - markerSize / 2) * scale,
+            markerSize * scale, markerSize * scale, 51, HudOverlayDrawOpacity.Tint);
     }
     #endregion
 

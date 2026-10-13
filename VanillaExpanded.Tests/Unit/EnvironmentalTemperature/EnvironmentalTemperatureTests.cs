@@ -99,7 +99,7 @@ public sealed class EnvironmentalTemperatureTests : IDisposable
         using var text = new HudOverlayIconTextPresentation((context, value) =>
         {
             reading = value;
-            return new LoadedTexture(context.Api) { Width = 30, Height = 14 };
+            return new LoadedTexture(context.Api) { TextureId = 3, Width = 30, Height = 14 };
         });
         var gradient = new Mock<IEnvironmentalTemperatureScaleRenderer>();
         using var presentation = new EnvironmentalTemperaturePresentation(text, LoadTestTextures, _ => gradient.Object);
@@ -107,17 +107,25 @@ public sealed class EnvironmentalTemperatureTests : IDisposable
         presentation.Prepare(new(api.Object, 1, "en"));
         Assert.Equal(position, presentation.MarkerPosition);
         Assert.Equal(expected, reading);
-        Assert.Equal(new SizeF(54, 36), presentation.Size);
-        var bounds = ElementBounds.Fixed(0, 0, 54, 36).WithEmptyParent();
+        Assert.Equal(new SizeF(42, 36), presentation.Size);
+        var bounds = ElementBounds.Fixed(0, 0, 42, 36).WithEmptyParent();
         bounds.absFixedX = bounds.absFixedY = 0;
-        bounds.absInnerWidth = 54; bounds.absInnerHeight = 36; bounds.Initialized = true;
+        bounds.absInnerWidth = 42; bounds.absInnerHeight = 36; bounds.Initialized = true;
         var renderer = new Mock<IRenderAPI>();
-        presentation.Draw(renderer.Object, bounds, new RectangleF(0, 0, 54, 36));
-        gradient.Verify(value => value.Draw(renderer.Object, 1, new RectangleF(4.5f, 28.5f, 45, 3), 1), Times.Once);
+        presentation.Draw(renderer.Object, bounds, new RectangleF(0, 0, 42, 36));
+        gradient.Verify(value => value.Draw(renderer.Object, 1, new RectangleF(2.25f, 3.75f, 3, 28.5f), 1), Times.Once);
         var marker = Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture" && (int)call.Arguments[0] == 2);
-        double x = (double)marker.Arguments[1], width = (double)marker.Arguments[3];
-        Assert.InRange(x, 0, 54 - width);
-        Assert.Equal(4.5 + position * 45, x + width / 2, 5);
+        double x = (double)marker.Arguments[1], y = (double)marker.Arguments[2];
+        Assert.Equal(0, x);
+        Assert.Equal(28.5 * (1 - position), y, 5);
+        Assert.Equal(7.5, (double)marker.Arguments[3]);
+        Assert.Equal(7.5, (double)marker.Arguments[4]);
+        Assert.InRange(y, 0, 36 - 7.5);
+        var numeric = Assert.Single(renderer.Invocations, call => call.Method.Name == "Render2DTexturePremultipliedAlpha");
+        // The reading occupies the right column and remains vertically centered beside the full-height scale.
+        Assert.Equal(12, (double)numeric.Arguments[1]);
+        Assert.Equal(18, (double)numeric.Arguments[2] + (double)numeric.Arguments[4] / 2);
+        Assert.Equal(42, (double)numeric.Arguments[1] + (double)numeric.Arguments[3]);
     }
 
     /// <summary>Fractional changes move the marker while reusing text and borrowed icons until the rounded reading changes.</summary>
