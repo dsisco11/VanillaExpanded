@@ -89,6 +89,7 @@ internal sealed class RiftActivityPresentation : IDisposable
             var texture = new LoadedTexture(preparation.Api);
             preparation.Api.Render.GetOrLoadTexture(new AssetLocation(Constants.ModId,
                 "textures/hud/rift-activity/" + names[index] + ".png"), ref texture);
+            HudOverlayTextureFiltering.Prepare(texture);
             texture.IgnoreUndisposed = true;
             textures[index] = texture;
         }

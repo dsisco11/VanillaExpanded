@@ -83,10 +83,11 @@ public sealed class BodyTemperatureThermometerTests : IDisposable
     {
         var api = new Mock<ICoreClientAPI>() { DefaultValue = DefaultValue.Mock }; var renderer = new Mock<IRenderAPI>(); var gui = new Mock<IGuiAPI>();
         api.SetupGet(value => value.Render).Returns(renderer.Object); api.SetupGet(value => value.Gui).Returns(gui.Object);
+        // Mocked uploads allocate no OpenGL handles; retain native cache and borrowed-lifetime checks.
         var borrowed = new List<LoadedTexture>();
         renderer.Setup(value => value.GetOrLoadTexture(It.IsAny<Vintagestory.API.Common.AssetLocation>(), ref It.Ref<LoadedTexture>.IsAny))
             .Callback((Vintagestory.API.Common.AssetLocation location, ref LoadedTexture texture) =>
-            { texture = new LoadedTexture(api.Object) { TextureId = 7 }; borrowed.Add(texture); });
+            { texture = new LoadedTexture(api.Object) { TextureId = 0 }; borrowed.Add(texture); });
         using var presentation = new BodyTemperatureThermometerPresentation(new HudOverlayIconTextPresentation());
         presentation.SetContent(new(34, 37, BodyTemperatureRisk.Cold, .25f), false);
         presentation.Prepare(new(api.Object, 1, "en"));
@@ -101,7 +102,7 @@ public sealed class BodyTemperatureThermometerTests : IDisposable
         presentation.Prepare(new(replacementApi.Object, 2, "en"));
         Assert.Equal(8, renderer.Invocations.Count(call => call.Method.Name == "GetOrLoadTexture"));
         presentation.Reset(); presentation.Dispose(); Assert.Equal(SizeF.Empty, presentation.Size);
-        Assert.Equal(8, borrowed.Count); Assert.All(borrowed, texture => { Assert.False(texture.Disposed); Assert.Equal(7, texture.TextureId); Assert.True(texture.IgnoreUndisposed); });
+        Assert.Equal(8, borrowed.Count); Assert.All(borrowed, texture => { Assert.False(texture.Disposed); Assert.Equal(0, texture.TextureId); Assert.True(texture.IgnoreUndisposed); });
         gui.Verify(value => value.DeleteTexture(It.IsAny<int>()), Times.Never);
     }
     /// <summary>Minimum, midpoint, and maximum fills crop the same full mask at both GUI scales.</summary>

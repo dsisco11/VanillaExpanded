@@ -92,6 +92,7 @@ internal sealed class ApproximateTimePresentation : IDisposable
             var texture = new LoadedTexture(preparation.Api);
             preparation.Api.Render.GetOrLoadTexture(new AssetLocation(Constants.ModId,
                 "textures/hud/approximate-time/" + names[index] + ".png"), ref texture);
+            HudOverlayTextureFiltering.Prepare(texture);
             texture.IgnoreUndisposed = true;
             textures[index] = texture;
         }
