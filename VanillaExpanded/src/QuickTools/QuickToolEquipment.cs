@@ -164,16 +164,11 @@ internal sealed class QuickToolEquipment
         ItemStack? original = hand.Itemstack;
         if (original is not null && !ReferenceEquals(view.Find(original, original.StackSize, physicalOffhand), hand))
             return QuickToolEquipmentResult.Rejected;
-        var desired = new Dictionary<ItemSlot, ItemStack?>(ReferenceEqualityComparer.Instance)
-        {
-            [hand] = candidate.Stack,
-            [candidate.Slot] = original
-        };
-        QuickToolMovementPlan? plan = QuickToolMovementPlan.TryCreate(view, physicalOffhand, desired);
+        QuickToolMovementPlan? plan = QuickToolSelectionPlanner.TryCreate(view, physicalOffhand, hand, candidate, original, null, null, out var targets);
         if (plan is null) return QuickToolEquipmentResult.Rejected;
         var newSession = new QuickToolSession(manager.ActiveHotbarSlotNumber, original, candidate.EntryId,
             candidate.Stack, new QuickToolSlotAddress(candidate.Inventory, candidate.SlotIndex));
-        return Execute(plan, hand, [candidate.Slot], () => session = newSession);
+        return Execute(plan, hand, targets, () => session = newSession);
     }
 
     /// <summary>Returns B, recovers original A if moved, then equips C with one native packet per flip.</summary>
@@ -182,18 +177,8 @@ internal sealed class QuickToolEquipment
         QuickToolSession history = session!;
         ItemSlot? returnSlot = ChooseReturnSlot(history.CurrentHome, hand, history.Current, originalAt, candidate.Slot);
         if (returnSlot is null) return QuickToolEquipmentResult.Rejected;
-        var desired = new Dictionary<ItemSlot, ItemStack?>(ReferenceEqualityComparer.Instance)
-        {
-            [hand] = candidate.Stack,
-            [returnSlot] = history.Current,
-            [candidate.Slot] = history.Original
-        };
-        if (originalAt is not null && !ReferenceEquals(originalAt, returnSlot)) desired[originalAt] = null;
-        QuickToolMovementPlan? plan = QuickToolMovementPlan.TryCreate(view, physicalOffhand, desired);
+        QuickToolMovementPlan? plan = QuickToolSelectionPlanner.TryCreate(view, physicalOffhand, hand, candidate, history.Original, originalAt, returnSlot, out var targets);
         if (plan is null) return QuickToolEquipmentResult.Rejected;
-        var targets = new List<ItemSlot> { returnSlot };
-        if (originalAt is not null && !ReferenceEquals(originalAt, returnSlot)) targets.Add(originalAt);
-        targets.Add(candidate.Slot);
         return Execute(plan, hand, targets,
             () => history.Selected(candidate.EntryId, candidate.Stack, new QuickToolSlotAddress(candidate.Inventory, candidate.SlotIndex)));
     }
