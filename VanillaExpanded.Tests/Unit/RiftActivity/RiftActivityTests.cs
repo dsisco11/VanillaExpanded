@@ -70,7 +70,7 @@ public sealed class RiftActivityTests
             Pattern(weather) = new CurrentPattern { Code = categories[index] };
             Assert.NotEqual(HudOverlayChange.None, overlay.Refresh());
             overlay.Prepare(preparation);
-            Assert.Equal(new SizeF(24, 24), overlay.Measure());
+            Assert.Equal(new SizeF(36, 36), overlay.Measure());
             Assert.Equal(HudOverlayChange.None, overlay.Refresh());
             renderer.Invocations.Clear();
             overlay.Draw(renderer.Object, ElementBounds.Fixed(0, 0, 24, 24).WithEmptyParent(), RectangleF.Empty, 0);

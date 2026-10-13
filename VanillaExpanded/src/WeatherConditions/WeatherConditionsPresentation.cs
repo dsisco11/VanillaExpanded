@@ -11,7 +11,7 @@ namespace VanillaExpanded.WeatherConditions;
 /// <summary>Composes borrowed weather layers into one fixed HUD footprint with one shared backdrop.</summary>
 internal sealed class WeatherConditionsPresentation : IDisposable
 {
-    private const float Diameter = 24;
+    private const float Diameter = HudOverlaySizes.Standard;
     private readonly System.Func<HudOverlayPreparationContext, LoadedTexture[]> load;
     private readonly System.Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?> loadBackdrop;
     private LoadedTexture[]? icons;
@@ -88,7 +88,7 @@ internal sealed class WeatherConditionsPresentation : IDisposable
     public void CollectBackdrops(IRenderAPI renderer, ElementBounds bounds)
     {
         if (sample == null || icons == null || context == null || Size.IsEmpty) return;
-        double y = bounds.renderY + (bounds.OuterHeight - 24 * context.GuiScale) / 2;
+        double y = bounds.renderY + (bounds.OuterHeight - HudOverlaySizes.Standard * context.GuiScale) / 2;
         backdrop?.Queue(renderer, bounds.renderX, y, context.GuiScale);
     }
     /// <summary>Retains prepared content until the visibility exit finishes.</summary>

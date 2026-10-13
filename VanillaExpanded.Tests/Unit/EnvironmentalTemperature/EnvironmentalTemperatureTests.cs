@@ -104,10 +104,10 @@ public sealed class EnvironmentalTemperatureTests : IDisposable
         var gradient = new Mock<IEnvironmentalTemperatureScaleRenderer>();
         using var presentation = new EnvironmentalTemperaturePresentation(text, LoadTestTextures, _ => gradient.Object);
         presentation.SetContent(celsius);
-        presentation.Prepare(new(api.Object, 1, "en", contentScale: 1.5));
+        presentation.Prepare(new(api.Object, 1, "en"));
         Assert.Equal(position, presentation.MarkerPosition);
         Assert.Equal(expected, reading);
-        Assert.Equal(new SizeF(36, 24), presentation.Size);
+        Assert.Equal(new SizeF(54, 36), presentation.Size);
         var bounds = ElementBounds.Fixed(0, 0, 54, 36).WithEmptyParent();
         bounds.absFixedX = bounds.absFixedY = 0;
         bounds.absInnerWidth = 54; bounds.absInnerHeight = 36; bounds.Initialized = true;

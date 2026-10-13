@@ -113,27 +113,27 @@ public sealed class HudOverlayHostTests : IDisposable
         var emptyWeather = layout.Members.Single(value => value.Registration.Id == "mod:weather");
         Assert.Equal(0, emptyWeather.Bounds.OuterWidth); Assert.Equal(0, emptyWeather.Bounds.OuterHeight);
         var member = layout.Members.Single(value => value.Registration.Id == "mod:time");
-        Assert.Equal(24, member.Bounds.OuterWidth); Assert.Equal(24, member.Bounds.OuterHeight);
-        Assert.Equal(24, member.Clip.Width); Assert.Equal(24, member.Clip.Height);
+        Assert.Equal(36, member.Bounds.OuterWidth); Assert.Equal(36, member.Bounds.OuterHeight);
+        Assert.Equal(36, member.Clip.Width); Assert.Equal(36, member.Clip.Height);
         using var host = new HudOverlayHost(api.Object, registry, scheduler.IsDrawable, (_, error) => throw error);
         host.Synchronize(new Dictionary<string, HudOverlayGroupLayout> { [group.Id] = layout });
         host.TryOpen(false); host.OnRenderGUI(.1f);
         time.Verify(value => value.Draw(renderer.Object, member.Bounds, member.Clip, .1f), Times.Once);
         weather.Verify(value => value.Draw(It.IsAny<IRenderAPI>(), It.IsAny<ElementBounds>(), It.IsAny<RectangleF>(), It.IsAny<float>()), Times.Never);
-        renderer.Verify(value => value.RenderTexture(1, It.IsAny<double>(), It.IsAny<double>(), 24, 24, 50, null), Times.Once);
+        renderer.Verify(value => value.RenderTexture(1, It.IsAny<double>(), It.IsAny<double>(), 36, 36, 50, null), Times.Once);
         // Resize the already composed group through rain and fair weather without replacing its native composer.
         var composer = host.Composers[group.Id];
-        foreach (SizeF nextSize in new[] { new SizeF(24, 24), SizeF.Empty })
+        foreach (SizeF nextSize in new[] { new SizeF(36, 36), SizeF.Empty })
         {
             weatherSize = nextSize; now += 1000; anchors.BeginFrame();
             scheduler.Update(anchors, new HudOverlayPreparationContext(api.Object, 1, "en"), true);
             layout.Apply(anchors, group, scheduler.GetMembers(group.Id));
             host.Synchronize(new Dictionary<string, HudOverlayGroupLayout> { [group.Id] = layout });
             Assert.Same(composer, host.Composers[group.Id]);
-            Assert.Equal(24, layout.Members.Single(value => value.Registration.Id == "mod:time").Clip.Width);
+            Assert.Equal(36, layout.Members.Single(value => value.Registration.Id == "mod:time").Clip.Width);
             host.OnRenderGUI(.1f);
         }
-        renderer.Verify(value => value.RenderTexture(1, It.IsAny<double>(), It.IsAny<double>(), 24, 24, 50, null), Times.Exactly(3));
+        renderer.Verify(value => value.RenderTexture(1, It.IsAny<double>(), It.IsAny<double>(), 36, 36, 50, null), Times.Exactly(3));
     }
     /// <summary>Native open/close registration remains focus-free and final cleanup is idempotent.</summary>
     [Fact]

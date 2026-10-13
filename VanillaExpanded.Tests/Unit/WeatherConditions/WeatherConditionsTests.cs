@@ -77,14 +77,14 @@ public sealed class WeatherConditionsTests
         var preparation = new HudOverlayPreparationContext(api, 1, "en");
         presentation.SetContent(new(EnumPrecipitationType.Rain, true));
         presentation.Prepare(preparation);
-        Assert.Equal(new SizeF(24, 24), presentation.Size);
+        Assert.Equal(new SizeF(36, 36), presentation.Size);
         presentation.SetContent(new(EnumPrecipitationType.Snow, false));
         presentation.Prepare(new HudOverlayPreparationContext(api, 2, "en"));
-        Assert.Equal(new SizeF(24, 24), presentation.Size);
+        Assert.Equal(new SizeF(36, 36), presentation.Size);
         Assert.Equal(1, loads);
         presentation.SetContent(new(null, true));
         presentation.Prepare(preparation);
-        Assert.Equal(new SizeF(24, 24), presentation.Size);
+        Assert.Equal(new SizeF(36, 36), presentation.Size);
         var renderer = new Mock<IRenderAPI>();
         var bounds = ElementBounds.Fixed(0, 0, 51, 24).WithEmptyParent();
         bounds.CalcWorldBounds();
@@ -96,7 +96,7 @@ public sealed class WeatherConditionsTests
         presentation.SetContent(new(EnumPrecipitationType.Rain, true));
         presentation.Prepare(preparation);
         presentation.CollectBackdrops(renderer.Object, bounds); presentation.Draw(renderer.Object, bounds);
-        Assert.Equal(bounds.renderX + 12, (double)Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture" && (int)call.Arguments[0] == 4).Arguments[1]);
+        Assert.Equal(bounds.renderX + 18, (double)Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture" && (int)call.Arguments[0] == 4).Arguments[1]);
         presentation.SetContent(new(null, false));
         presentation.Prepare(preparation);
         Assert.Equal(SizeF.Empty, presentation.Size);
@@ -178,7 +178,7 @@ public sealed class WeatherConditionsTests
         Assert.Equal(0, overlay.Sample.ThunderIntensity);
         var preparation = new HudOverlayPreparationContext(fixture.Api.Object, 1, "en");
         overlay.Prepare(preparation);
-        Assert.Equal(new SizeF(24, 24), overlay.Measure());
+        Assert.Equal(new SizeF(36, 36), overlay.Measure());
         Assert.Equal(HudOverlayChange.None, overlay.Refresh());
         // Native changes after sampling cannot alter the icon until the next refresh.
         climate.Temperature = 20;

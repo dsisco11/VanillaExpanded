@@ -42,21 +42,21 @@ internal sealed class TemporalStormPresentation : IDisposable
         pulsing = nextPulsing;
         pulse.SetRemainingDays(remainingDays);
     }
-    /// <summary>Loads borrowed textures once per client API and reserves a fixed 24-unit icon slot.</summary>
+    /// <summary>Loads borrowed textures once per client API and reserves a fixed HudOverlaySizes.Standard-unit icon slot.</summary>
     public void Prepare(HudOverlayPreparationContext preparation)
     {
         if (!stage.HasValue) return;
         if (icons == null || !ReferenceEquals(context?.Api, preparation.Api)) icons = load(preparation);
         if (backdrop == null || !ReferenceEquals(context?.Api, preparation.Api)) backdrop = loadBackdrop(preparation);
         context = preparation;
-        Size = new SizeF(24, 24);
+        Size = new SizeF(HudOverlaySizes.Standard, HudOverlaySizes.Standard);
         Visibility.Show();
     }
     /// <summary>Draws prepared artwork without storm sampling.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds, float deltaTime)
     {
         if (!stage.HasValue || icons == null || context == null) return;
-        double pixels = 24 * context.GuiScale;
+        double pixels = HudOverlaySizes.Standard * context.GuiScale;
         // Imminent and waning storms pulse; the shared backdrop remains steady.
         tint.W = pulsing ? pulse.Advance(deltaTime) : 1;
         renderer.RenderTexture(icons[(int)stage.Value].TextureId, bounds.renderX,
@@ -68,7 +68,7 @@ internal sealed class TemporalStormPresentation : IDisposable
     public void CollectBackdrops(IRenderAPI renderer, ElementBounds bounds)
     {
         if (!stage.HasValue || icons == null || context == null) return;
-        double pixels = 24 * context.GuiScale;
+        double pixels = HudOverlaySizes.Standard * context.GuiScale;
         double y = bounds.renderY + (bounds.OuterHeight - pixels) / 2;
         backdrop?.Queue(renderer, bounds.renderX, y, context.GuiScale);
     }
