@@ -10,7 +10,7 @@ using Vintagestory.API.Common.Entities;
 namespace VanillaExpanded.ApproximateTime;
 
 /// <summary>Reads synchronized observation age and owns the cached approximate time icon.</summary>
-internal sealed class ApproximateTimeOverlay : IHudOverlay, IHudOverlayBackdropProvider, IHudOverlayVisibilityTransition
+internal sealed class ApproximateTimeOverlay : IHudOverlay, IHudOverlayVisibilityTransition
 {
 
     private readonly ApproximateTimePresentation presentation;
@@ -83,13 +83,14 @@ internal sealed class ApproximateTimeOverlay : IHudOverlay, IHudOverlayBackdropP
         }
         var calendar = api.World.Calendar;
         var next = ApproximateTimePeriod.Unknown;
+        double estimatedDay = double.NaN;
         double? observedDayOffset = ApproximateTimeEstimate.GetDayOffset(ApproximateTimeState.Read(current),
             calendar.HoursPerDay, api.World.Player.PlayerUID);
         if (observedDayOffset is double dayOffset)
         {
             // Ask the native calendar for the seasonal solar path at the remembered time, not the true
             // current time. Drift therefore still affects the icon while away from sunlight.
-            double estimatedDay = calendar.TotalDays + dayOffset;
+            estimatedDay = calendar.TotalDays + dayOffset;
             var location = current.Pos.XYZ;
             float height = calendar.GetSunPosition(location, estimatedDay).Y;
             next = ApproximateTimeSolarPeriod.FromSunHeight(
@@ -100,10 +101,10 @@ internal sealed class ApproximateTimeOverlay : IHudOverlay, IHudOverlayBackdropP
         // A transient invalid calendar sample must not replace a valid icon with an hourglass.
         // Before the first usable sample, leave the presentation empty and retry next refresh.
         if (next == ApproximateTimePeriod.Unknown) return HudOverlayChange.None;
-        if (next == period) return HudOverlayChange.None;
+        bool periodChanged = next != period;
         period = next;
-        presentation.SetContent(next);
-        return HudOverlayChange.Presentation | HudOverlayChange.Measurement;
+        presentation.SetContent(next, estimatedDay);
+        return HudOverlayChange.Presentation | (periodChanged ? HudOverlayChange.Measurement : HudOverlayChange.None);
     }
     /// <summary>Prepares cached artwork for the estimated part of the day.</summary>
     public void Prepare(HudOverlayPreparationContext context)
@@ -112,11 +113,6 @@ internal sealed class ApproximateTimeOverlay : IHudOverlay, IHudOverlayBackdropP
     }
     /// <summary>Returns prepared icon dimensions in unscaled GUI units.</summary>
     public SizeF Measure() => presentation.Size;
-    /// <summary>Supplies prepared backdrop positions to the shared host pass.</summary>
-    public void CollectBackdrops(IRenderAPI renderer, ElementBounds bounds)
-    {
-        presentation.CollectBackdrops(renderer, bounds);
-    }
     /// <summary>Draws cached artwork without calendar or terrain queries.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime)
     {
