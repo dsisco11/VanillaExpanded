@@ -33,7 +33,7 @@ public sealed class BowAmmunitionSystemTests
         int visits = 0; hud.Registry.RunPass(registration =>
         {
             visits++; Assert.Equal(BowAmmunitionSystem.OverlayId, registration.Id);
-            Assert.Equal(group.Id, registration.GroupId); Assert.Equal(250, registration.RefreshIntervalMs);
+            Assert.Equal(group.Id, registration.GroupId); Assert.Equal(300, registration.RefreshIntervalMs);
             Assert.IsType<BowAmmunitionOverlay>(registration.Overlay);
         });
         Assert.Equal(1, visits); feature.Dispose(); feature.Dispose();

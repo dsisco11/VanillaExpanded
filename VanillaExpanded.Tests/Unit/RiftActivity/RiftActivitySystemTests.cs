@@ -43,7 +43,7 @@ public sealed class RiftActivitySystemTests
             hud.Registry.RunPass(registration =>
             {
                 Assert.Equal(RiftActivitySystem.OverlayId, registration.Id);
-                Assert.Equal(1000, registration.RefreshIntervalMs);
+                Assert.Equal(300, registration.RefreshIntervalMs);
                 Assert.Equal(90, registration.Order);
                 Assert.Null(registration.ReservedSize);
                 Assert.Equal("player-status", registration.GroupId);

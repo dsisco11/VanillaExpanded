@@ -36,7 +36,7 @@ internal sealed class BodyTemperatureSystem : ModSystem, ILiveConfigurable
             // Use the visible reading's measured size and release its space while the warning is hidden.
             registration = hud.Registry.Register(new HudOverlayRegistration(OverlayId, overlay,
                 () => overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays
-                    && VanillaExpandedModSystem.Config.EnableBodyTemperatureOverlay), "player-status", order: 98, refreshIntervalMs: 250,
+                    && VanillaExpandedModSystem.Config.EnableBodyTemperatureOverlay), "player-status", order: 98, refreshIntervalMs: 300,
                 hoverLabelKey: "vanillaexpanded:hud-label-body-temperature"));
         }
         catch { overlay.Dispose(); throw; }
