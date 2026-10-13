@@ -36,7 +36,7 @@ internal sealed class ApproximateTimePresentation : IDisposable
         period = value;
         rotation = (float)((estimatedDay - Math.Floor(estimatedDay) - .5) * 2 * Math.PI);
     }
-    /// <summary>Loads borrowed textures once per client API and reserves a fixed HudOverlaySizes.Standard-unit icon slot.</summary>
+    /// <summary>Loads borrowed textures once per client API and reserves the shared large icon slot.</summary>
     public void Prepare(HudOverlayPreparationContext preparation)
     {
         if (!period.HasValue) return;
@@ -47,14 +47,14 @@ internal sealed class ApproximateTimePresentation : IDisposable
             dial = createDial(preparation);
         }
         context = preparation;
-        Size = new SizeF(HudOverlaySizes.Standard, HudOverlaySizes.Standard);
+        Size = new SizeF(HudOverlaySizes.Large, HudOverlaySizes.Large);
         Visibility.Show();
     }
     /// <summary>Draws prepared artwork without time or terrain sampling.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds)
     {
         if (!period.HasValue || icons == null || context == null) return;
-        double pixels = HudOverlaySizes.Standard * context.GuiScale;
+        double pixels = HudOverlaySizes.Large * context.GuiScale;
         double y = bounds.renderY + (bounds.OuterHeight - pixels) / 2;
         dial?.Draw(renderer, icons[1].TextureId,
             new RectangleF((float)bounds.renderX, (float)y, (float)pixels, (float)pixels),
