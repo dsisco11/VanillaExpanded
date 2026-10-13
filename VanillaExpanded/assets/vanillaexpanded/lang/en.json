@@ -1,5 +1,8 @@
 {
   "hud-label-bow-ammunition": "Bow Ammunition",
+  "hud-label-player-wetness": "Player Wetness",
+  "config-enable-player-wetness-overlay": "Show player wetness",
+  "config-enable-player-wetness-overlay-tooltip": "Shows a filling droplet beside temperature while wet. The fill represents synchronized player wetness. Applies immediately.",
   "hud-label-body-temperature": "Body Temperature",
   "hud-label-weather-conditions": "Weather Conditions",
   "hud-label-approximate-time": "Approximate Time",

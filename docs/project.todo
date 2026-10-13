@@ -3,7 +3,7 @@
         ☐ Design a better separation of alloy calculator inventory ownership/liveness validation, transfer permissions, and storage-versus-machine access policy. Reconsider the storage-class whitelist without weakening ownership or withdrawal checks, and define coverage for vanilla and modded containers.
 
     ## New Features:
-        ☐ Add hud-indicator for player wetness.
+        ☐ quick-swap menu cant handle swapping to an item that is in a special slot (e.g. mining bag, quiver, etc.)
         ☐ Add a "Todo List" feature which allows players to create their own ingame tasks and reminders.
         ☐ Temporal gear amulets should provide information about when the next storm is expected to occur (approximately, with increasing accuracy as the storm gets closer).
         ☐ Wearing a temporal gear amulet should provide a subtle HUD indicator when a storm is approaching.
