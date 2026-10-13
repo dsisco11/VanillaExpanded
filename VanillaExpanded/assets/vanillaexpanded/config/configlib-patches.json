@@ -39,6 +39,15 @@
         "weight": 10.4,
         "clientSide": true
       },
+      "EnablePlayerWetnessOverlay": {
+        "code": "EnablePlayerWetnessOverlay",
+        "name": "EnablePlayerWetnessOverlay",
+        "ingui": "vanillaexpanded:config-enable-player-wetness-overlay",
+        "comment": "vanillaexpanded:config-enable-player-wetness-overlay-tooltip",
+        "default": true,
+        "weight": 10.45,
+        "clientSide": true
+      },
       "EnableApproximateTimeOverlay": {
         "code": "EnableApproximateTimeOverlay",
         "name": "EnableApproximateTimeOverlay",

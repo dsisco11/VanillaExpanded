@@ -98,6 +98,9 @@ public class VanillaExpandedConfig
     /// <summary>Shows synchronized body temperature when native cold effects or dangerous frost exposure approach.</summary>
     public bool EnableBodyTemperatureOverlay { get; set; } = true;
 
+    /// <summary>Shows a filling droplet while synchronized player wetness is nonzero.</summary>
+    public bool EnablePlayerWetnessOverlay { get; set; } = true;
+
     /// <summary>Shows a whole-degree reading beside the thermometer; disabling retains the dynamic icon.</summary>
     public bool ShowBodyTemperatureReading { get; set; } = true;
 
