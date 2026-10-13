@@ -43,7 +43,7 @@ public sealed class WeatherConditionsSystemTests
             hud.Registry.RunPass(registration =>
             {
                 Assert.Equal(WeatherConditionsSystem.OverlayId, registration.Id);
-                Assert.Equal(1000, registration.RefreshIntervalMs);
+                Assert.Equal(300, registration.RefreshIntervalMs);
                 Assert.Null(registration.ReservedSize);
                 Assert.Equal(99, registration.Order);
                 overlay = Assert.IsType<WeatherConditionsOverlay>(registration.Overlay);

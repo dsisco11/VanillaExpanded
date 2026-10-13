@@ -34,7 +34,7 @@ internal sealed class TemporalStormSystem : ModSystem, ILiveConfigurable
         {
             registration = hud.Registry.Register(new HudOverlayRegistration(OverlayId, overlay,
                 () => overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays
-                    && VanillaExpandedModSystem.Config.EnableTemporalStormOverlay), "player-status", order: 95, refreshIntervalMs: 1000,
+                    && VanillaExpandedModSystem.Config.EnableTemporalStormOverlay), "player-status", order: 95, refreshIntervalMs: 300,
                 hoverLabelKey: "vanillaexpanded:hud-label-temporal-storm"));
         }
         catch { overlay.Dispose(); throw; }

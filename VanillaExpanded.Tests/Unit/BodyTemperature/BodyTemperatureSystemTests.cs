@@ -34,7 +34,7 @@ public sealed class BodyTemperatureSystemTests
         int visits = 0; hud.Registry.RunPass(registration =>
         {
             visits++; Assert.Equal(BodyTemperatureSystem.OverlayId, registration.Id);
-            Assert.Equal(group.Id, registration.GroupId); Assert.Equal(250, registration.RefreshIntervalMs);
+            Assert.Equal(group.Id, registration.GroupId); Assert.Equal(300, registration.RefreshIntervalMs);
             Assert.Null(registration.ReservedSize);
             Assert.Equal(98, registration.Order);
             Assert.IsType<BodyTemperatureOverlay>(registration.Overlay);

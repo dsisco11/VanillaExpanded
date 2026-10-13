@@ -42,7 +42,7 @@ public sealed class ApproximateTimeSystemTests
             hud.Registry.RunPass(registration =>
             {
                 Assert.Equal(ApproximateTimeSystem.OverlayId, registration.Id);
-                Assert.Equal(1000, registration.RefreshIntervalMs);
+                Assert.Equal(300, registration.RefreshIntervalMs);
                 Assert.Equal(100, registration.Order);
                 Assert.Null(registration.ReservedSize);
                 Assert.Equal("player-status", registration.GroupId);
