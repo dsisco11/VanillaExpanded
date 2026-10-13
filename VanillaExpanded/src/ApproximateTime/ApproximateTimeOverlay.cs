@@ -92,11 +92,10 @@ internal sealed class ApproximateTimeOverlay : IHudOverlay, IHudOverlayBackdropP
             double estimatedDay = calendar.TotalDays + dayOffset;
             var location = current.Pos.XYZ;
             float height = calendar.GetSunPosition(location, estimatedDay).Y;
-            float solarIntensity = ApproximateTimeSolarIntensity.Get(calendar, height);
             next = ApproximateTimeSolarPeriod.FromSunHeight(
                 calendar.GetSunPosition(location, estimatedDay - .02).Y,
                 height,
-                calendar.GetSunPosition(location, estimatedDay + .02).Y, solarIntensity);
+                calendar.GetSunPosition(location, estimatedDay + .02).Y, period);
         }
         // A transient invalid calendar sample must not replace a valid icon with an hourglass.
         // Before the first usable sample, leave the presentation empty and retry next refresh.
