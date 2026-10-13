@@ -94,13 +94,18 @@ public sealed class HudOverlayIconTextPresentation : IDisposable
     #endregion
     #region Drawing and lifetime
     /// <summary>Draws cached pixels only; the host's assigned native scissor clips oversized icons and text.</summary>
-    public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime)
+    public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime, float? maximumTextHeight = null)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
         if (dirty || context == null) return;
         double x = bounds.renderX;
         double y = bounds.renderY;
         double height = bounds.OuterHeight;
+        // Optional fitting keeps a cached reading inside a fixed-height presentation without regenerating its texture.
+        double textFit = text == null || !maximumTextHeight.HasValue ? 1
+            : Math.Min(1, maximumTextHeight.Value * scale / text.Height);
+        double textWidth = (text?.Width ?? 0) * textFit;
+        double textHeight = (text?.Height ?? 0) * textFit;
         // Keep the text and icon centered independently within the allocated native bounds.
         double textX = x;
         double iconX = x;
@@ -110,12 +115,12 @@ public sealed class HudOverlayIconTextPresentation : IDisposable
             {
                 // Anchor the icon to the reserved right edge; changing count width only moves the text's left edge.
                 iconX = x + bounds.OuterWidth - iconSize * scale;
-                textX = iconX - gap * scale - (text?.Width ?? 0);
+                textX = iconX - gap * scale - textWidth;
             }
             else if (text != null) textX += (iconSize + gap) * scale;
         }
-        if (text != null) renderer.Render2DTexturePremultipliedAlpha(text.TextureId, textX, y + (height - text.Height) / 2,
-            text.Width, text.Height, 50, HudOverlayDrawOpacity.PremultipliedTint);
+        if (text != null) renderer.Render2DTexturePremultipliedAlpha(text.TextureId, textX, y + (height - textHeight) / 2,
+            textWidth, textHeight, 50, HudOverlayDrawOpacity.PremultipliedTint);
         if (slot.Itemstack != null && iconBackground != null)
             renderer.Render2DTexturePremultipliedAlpha(iconBackground.TextureId, iconX, y + (height - iconSize * scale) / 2,
                 iconSize * scale, iconSize * scale, 49, HudOverlayDrawOpacity.PremultipliedTint);

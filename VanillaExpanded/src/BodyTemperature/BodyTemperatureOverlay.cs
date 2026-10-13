@@ -32,7 +32,7 @@ internal sealed class BodyTemperatureOverlay : IHudOverlay, IHudOverlayBackdropP
         System.Func<HudOverlayPreparationContext, LoadedTexture[]>? createIconTextures = null,
         System.Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null)
     {
-        thermometer = new BodyTemperatureThermometerPresentation(presentation ?? new(fontSize: 14), createIconTextures, loadBackdrop);
+        thermometer = new BodyTemperatureThermometerPresentation(presentation ?? new(CreateReadingText), createIconTextures, loadBackdrop);
     }
     /// <summary>Changes the reading preference and requests a fresh measurement on the next scheduled sample.</summary>
     public void SetShowReading(bool value)
@@ -132,6 +132,13 @@ internal sealed class BodyTemperatureOverlay : IHudOverlay, IHudOverlayBackdropP
     #endregion
 
     #region Private
+    /// <summary>Creates the reading at ordinary HUD font size, applying only the game's native GUI scale.</summary>
+    private static LoadedTexture CreateReadingText(HudOverlayPreparationContext context, string localized)
+    {
+        var font = CairoFont.WhiteSmallText().WithFontSize(14)
+            .WithStroke(new double[] { 0, 0, 0, .85 }, 1.5);
+        return context.Api.Gui.TextTexture.GenTextTexture(localized, font);
+    }
     /// <summary>Clears stale readings and their owned texture when the player becomes ineligible.</summary>
     private void Clear()
     {
