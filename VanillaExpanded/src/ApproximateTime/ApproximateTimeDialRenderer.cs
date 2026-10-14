@@ -34,11 +34,8 @@ internal sealed class ApproximateTimeDialRenderer : IApproximateTimeDialRenderer
 
     /// <summary>Draws the clipped rotating disk and restores shader, texture, blend, depth, and cull state.</summary>
     public void Draw(IRenderAPI renderer, int maskTexture, RectangleF bounds, float opacity, float rotation)
-        => DrawLayers(renderer, maskTexture, bounds, opacity, rotation, -1);
+        => DrawLayers(renderer, maskTexture, bounds, opacity, rotation);
 
-    /// <summary>Draws liquid using the shared shader and render-state boundary.</summary>
-    public void DrawTemperature(IRenderAPI renderer, RectangleF bounds, float opacity, float fill)
-        => DrawLayers(renderer, 0, bounds, opacity, 0, fill);
 
     /// <summary>Unsubscribes from reloads and releases only owned GPU resources.</summary>
     public void Dispose()
@@ -52,7 +49,7 @@ internal sealed class ApproximateTimeDialRenderer : IApproximateTimeDialRenderer
 
     #region Private
     /// <summary>Draws one scenery or liquid layer with preserved GUI state.</summary>
-    private void DrawLayers(IRenderAPI renderer, int maskTexture, RectangleF bounds, float opacity, float rotation, float fill)
+    private void DrawLayers(IRenderAPI renderer, int maskTexture, RectangleF bounds, float opacity, float rotation)
     {
         if (shader == null || quad == null) return;
         var previous = renderer.CurrentActiveShader;
@@ -83,7 +80,6 @@ internal sealed class ApproximateTimeDialRenderer : IApproximateTimeDialRenderer
             shader.UniformMatrix("modelViewMatrix", matrix.Values);
             shader.Uniform("opacity", opacity);
             shader.Uniform("rotation", rotation);
-            shader.Uniform("temperatureFill", fill);
             renderer.RenderMesh(quad);
         }
         finally
