@@ -11,6 +11,8 @@ public static class HudOverlaySizes
     public const float Large = 48;
     /// <summary>Extra-large square instrument footprint.</summary>
     public const float ExtraLarge = 64;
+    /// <summary>Combined clock instrument footprint.</summary>
+    public const float Clock = 90f;
     /// <summary>Wide environmental readout footprint.</summary>
     public const float Wide = 54;
     /// <summary>Normal HUD font size.</summary>
