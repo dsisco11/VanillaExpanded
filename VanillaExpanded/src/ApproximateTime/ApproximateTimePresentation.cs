@@ -17,6 +17,7 @@ internal sealed class ApproximateTimePresentation : IDisposable
     private HudOverlayPreparationContext? context;
     private ApproximateTimePeriod? period;
     private float rotation;
+    private readonly ElementBounds liquidClip = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
     private float? temperature;
     private readonly HudOverlayIconTextPresentation reading;
     private readonly ElementBounds readingBounds = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
@@ -81,8 +82,17 @@ internal sealed class ApproximateTimePresentation : IDisposable
         if (temperature.HasValue)
         {
             // Liquid and number share the fixed housing while scenery rotates independently.
-            dial?.DrawTemperature(renderer, new RectangleF((float)bounds.renderX, (float)y, (float)pixels, (float)pixels),
-                HudOverlayDrawOpacity.Current, Math.Clamp((temperature.Value + 20) / 60, 0, 1));
+            float fill = Math.Clamp((temperature.Value + 20) / 60, 0, 1);
+            // Reveal the authored full state upward; retain the complete bulb at minimum fill.
+            double top = y + (0.67 - 0.60 * fill) * pixels;
+            liquidClip.absFixedX = bounds.renderX;
+            liquidClip.absFixedY = top;
+            liquidClip.absInnerWidth = pixels;
+            liquidClip.absInnerHeight = y + pixels - top;
+            liquidClip.Initialized = true;
+            renderer.PushScissor(liquidClip, true);
+            try { renderer.RenderTexture(icons[3].TextureId, bounds.renderX, y, pixels, pixels, 51, HudOverlayDrawOpacity.Tint); }
+            finally { renderer.PopScissor(); }
             double width = Math.Min(reading.Size.Width, 46.8);
             double height = Math.Min(reading.Size.Height, 20.8);
             readingBounds.absFixedX = bounds.renderX + (HudOverlaySizes.Clock - width) * context.GuiScale / 2;
@@ -123,7 +133,7 @@ internal sealed class ApproximateTimePresentation : IDisposable
     /// <summary>Loads copper housing and scenery disk assets with engine cache ownership.</summary>
     private static LoadedTexture[] LoadIcons(HudOverlayPreparationContext preparation)
     {
-        string[] names = ["housing", "disk", "thermometer-housing"];
+        string[] names = ["housing", "disk", "thermometer-housing", "thermometer-full"];
         var textures = new LoadedTexture[names.Length];
         for (int index = 0; index < names.Length; index++)
         {
