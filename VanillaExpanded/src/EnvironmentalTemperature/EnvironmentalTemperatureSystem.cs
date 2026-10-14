@@ -29,13 +29,15 @@ internal sealed class EnvironmentalTemperatureSystem : ModSystem, ILiveConfigura
         this.api = api;
         hud = api.ModLoader.GetModSystem<HudOverlaySystem>();
         overlay = new EnvironmentalTemperatureOverlay();
-        overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays && VanillaExpandedModSystem.Config.EnableEnvironmentalTemperatureOverlay);
+        overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays && VanillaExpandedModSystem.Config.EnableEnvironmentalTemperatureOverlay
+                    && !VanillaExpandedModSystem.Config.EnableApproximateTimeOverlay);
         try
         {
-            // Place local temperature immediately before weather in the top-left row.
+            // Keep temperature available as a separate indicator when the combined clock gauge is disabled.
             registration = hud.Registry.Register(new HudOverlayRegistration(OverlayId, overlay,
                 () => overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays
-                    && VanillaExpandedModSystem.Config.EnableEnvironmentalTemperatureOverlay), "world-status", order: 99, refreshIntervalMs: 300,
+                    && VanillaExpandedModSystem.Config.EnableEnvironmentalTemperatureOverlay
+                    && !VanillaExpandedModSystem.Config.EnableApproximateTimeOverlay), "world-status", order: 99, refreshIntervalMs: 300,
                 hoverLabelKey: "vanillaexpanded:hud-label-environmental-temperature"));
         }
         catch { overlay.Dispose(); throw; }
@@ -44,7 +46,8 @@ internal sealed class EnvironmentalTemperatureSystem : ModSystem, ILiveConfigura
     public void OnConfigReloaded(ICoreAPI api)
     {
         if (disposed || !ReferenceEquals(this.api, api) || overlay == null) return;
-        overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays && VanillaExpandedModSystem.Config.EnableEnvironmentalTemperatureOverlay);
+        overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays && VanillaExpandedModSystem.Config.EnableEnvironmentalTemperatureOverlay
+                    && !VanillaExpandedModSystem.Config.EnableApproximateTimeOverlay);
         // Cleanup must also occur while global visibility suppresses normal selector observation.
         hud?.Session?.Scheduler?.Invalidate(OverlayId);
         hud?.Session?.ConfigurationChanged();

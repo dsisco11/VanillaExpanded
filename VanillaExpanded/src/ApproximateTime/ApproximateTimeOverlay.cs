@@ -102,6 +102,13 @@ internal sealed class ApproximateTimeOverlay : IHudOverlay, IHudOverlayVisibilit
         // Before the first usable sample, leave the presentation empty and retry next refresh.
         if (next == ApproximateTimePeriod.Unknown) return HudOverlayChange.None;
         bool periodChanged = next != period;
+        float? temperature = null;
+        if (VanillaExpandedModSystem.Config.EnableEnvironmentalTemperatureOverlay)
+        {
+            var climate = api.World.BlockAccessor.GetClimateAt(current.Pos.AsBlockPos, EnumGetClimateMode.NowValues);
+            if (climate != null && float.IsFinite(climate.Temperature)) temperature = climate.Temperature;
+        }
+        presentation.SetTemperature(temperature);
         period = next;
         presentation.SetContent(next, estimatedDay);
         return HudOverlayChange.Presentation | (periodChanged ? HudOverlayChange.Measurement : HudOverlayChange.None);
