@@ -94,7 +94,7 @@ public sealed class HudOverlayIconTextPresentation : IDisposable
     #endregion
     #region Drawing and lifetime
     /// <summary>Draws cached pixels only; the host's assigned native scissor clips oversized icons and text.</summary>
-    public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime, float? maximumTextHeight = null)
+    public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime, float? maximumTextHeight = null, float textDepth = 50)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
         if (dirty || context == null) return;
@@ -120,7 +120,7 @@ public sealed class HudOverlayIconTextPresentation : IDisposable
             else if (text != null) textX += (iconSize + gap) * scale;
         }
         if (text != null) renderer.Render2DTexturePremultipliedAlpha(text.TextureId, textX, y + (height - textHeight) / 2,
-            textWidth, textHeight, 50, HudOverlayDrawOpacity.PremultipliedTint);
+            textWidth, textHeight, textDepth, HudOverlayDrawOpacity.PremultipliedTint);
         if (slot.Itemstack != null && iconBackground != null)
             renderer.Render2DTexturePremultipliedAlpha(iconBackground.TextureId, iconX, y + (height - iconSize * scale) / 2,
                 iconSize * scale, iconSize * scale, 49, HudOverlayDrawOpacity.PremultipliedTint);

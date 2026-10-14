@@ -51,14 +51,20 @@ public sealed class ApproximateTimeTemperatureTests : IDisposable
         presentation.SetTemperature(temperature);
         presentation.Prepare(new(api.Object, 1, "en"));
         var renderer = new Mock<IRenderAPI>();
+        renderer.Setup(value => value.PushScissor(It.IsAny<ElementBounds>(), It.IsAny<bool>()))
+            .Callback(() => order.Add("push"));
+        renderer.Setup(value => value.PopScissor()).Callback(() => order.Add("pop"));
         renderer.Setup(value => value.RenderTexture(4, It.IsAny<double>(), It.IsAny<double>(), It.IsAny<double>(),
             It.IsAny<double>(), 51, It.IsAny<Vintagestory.API.MathTools.Vec4f>()))
             .Callback(() => order.Add("thermometer"));
+        renderer.Setup(value => value.RenderTexture(5, It.IsAny<double>(), It.IsAny<double>(), It.IsAny<double>(),
+            It.IsAny<double>(), 52, It.IsAny<Vintagestory.API.MathTools.Vec4f>()))
+            .Callback(() => order.Add("cover"));
         renderer.Setup(value => value.Render2DTexturePremultipliedAlpha(It.IsAny<int>(), It.IsAny<double>(), It.IsAny<double>(),
             It.IsAny<double>(), It.IsAny<double>(), It.IsAny<float>(), It.IsAny<Vintagestory.API.MathTools.Vec4f>()))
             .Callback(() => order.Add("reading"));
         presentation.Draw(renderer.Object, Bounds());
-        Assert.Equal(new[] { "thermometer", "reading" }, order);
+        Assert.Equal(new[] { "push", "thermometer", "pop", "cover", "reading" }, order);
         Assert.Equal(expected, reading);
         var crop = Assert.IsType<ElementBounds>(Assert.Single(renderer.Invocations, call => call.Method.Name == "PushScissor").Arguments[0]);
         Assert.Equal((.67 - .60 * fill) * HudOverlaySizes.Clock, crop.renderY, 5);
@@ -69,9 +75,14 @@ public sealed class ApproximateTimeTemperatureTests : IDisposable
         Assert.Equal((double)HudOverlaySizes.Clock, full.Arguments[3]); Assert.Equal((double)HudOverlaySizes.Clock, full.Arguments[4]);
         Assert.Equal(51f, full.Arguments[5]);
         renderer.Verify(value => value.PopScissor(), Times.Once);
-        Assert.Equal(new[] { 3, 4 }, renderer.Invocations.Where(call => call.Method.Name == "RenderTexture").Select(call => (int)call.Arguments[0]));
+        Assert.Equal(new[] { 3, 4, 5 }, renderer.Invocations.Where(call => call.Method.Name == "RenderTexture").Select(call => (int)call.Arguments[0]));
+        var cover = Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture" && (int)call.Arguments[0] == 5);
+        Assert.Equal(full.Arguments.Skip(1).Take(4), cover.Arguments.Skip(1).Take(4));
+        Assert.Equal(52f, cover.Arguments[5]);
         var housing = Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture" && (int)call.Arguments[0] == 3);
         Assert.Equal(50f, (float)housing.Arguments[5]);
+        var number = Assert.Single(renderer.Invocations, call => call.Method.Name == "Render2DTexturePremultipliedAlpha");
+        Assert.Equal(53f, number.Arguments[5]);
 
     }
     /// <summary>Rounded readings reuse owned pixels, missing readings restore plain housing, and reset releases resources.</summary>
@@ -149,7 +160,7 @@ public sealed class ApproximateTimeTemperatureTests : IDisposable
     #endregion
     #region Private
     /// <summary>Supplies borrowed artwork without GPU allocation.</summary>
-    private static LoadedTexture[] Load(HudOverlayPreparationContext context) => Enumerable.Range(1, 4)
+    private static LoadedTexture[] Load(HudOverlayPreparationContext context) => Enumerable.Range(1, 5)
         .Select(id => new LoadedTexture(context.Api) { TextureId = id, IgnoreUndisposed = true }).ToArray();
     /// <summary>Creates native pixel bounds independent of shared GUI scaling.</summary>
     private static ElementBounds Bounds()

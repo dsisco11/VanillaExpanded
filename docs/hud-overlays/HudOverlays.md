@@ -124,3 +124,5 @@ The rim thermometer uses the option-B bold-glass housing, retaining the 256 × 2
 
 
 The thermometer uses traditional empty/full texture states: `thermometer-housing.png` supplies the empty channel, while `thermometer-full.png` is an aligned red-filled glass overlay with baked material shading and reflections. Temperature controls a bottom-to-top scissor reveal; the full bulb stays visible at minimum fill. PushScissor intersects the host clip and PopScissor restores it even on drawing failure. There is no runtime liquid shading or separate glass-compositing shader. The scenery shader remains independent.
+
+The authored `gauge-cover.png` foreground housing belongs to the entire instrument and draws after its internal mechanisms, currently the clipped thermometer full state at depth 52, covering liquid beneath copper collars and rim edges. Its tube and bulb openings remain transparent. The reading follows the cover; the cover itself is outside the progress scissor and retains the host clip.
