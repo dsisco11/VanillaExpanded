@@ -9,6 +9,4 @@ internal interface IApproximateTimeDialRenderer : IDisposable
 {
     /// <summary>Draws the rotating disk inside the host clip using the supplied visibility opacity.</summary>
     void Draw(IRenderAPI renderer, int maskTexture, RectangleF bounds, float opacity, float rotation);
-    /// <summary>Draws the red liquid inside the fixed curved glass thermometer.</summary>
-    void DrawTemperature(IRenderAPI renderer, RectangleF bounds, float opacity, float fill);
 }

@@ -1,3 +1,4 @@
+using VanillaExpanded.HudOverlays.Rendering;
 using System.Drawing;
 using Moq;
 using VanillaExpanded.ApproximateTime;
@@ -106,7 +107,7 @@ public sealed class ApproximateTimeOverlayTests
         overlay.SetEnabled(false);
         overlay.SetEnabled(true); sunlight = 0;
         overlay.Refresh(); overlay.Prepare(preparation);
-        Assert.Equal(new SizeF(83.2f, 83.2f), overlay.Measure());
+        Assert.Equal(new SizeF(HudOverlaySizes.Clock, HudOverlaySizes.Clock), overlay.Measure());
         renderer.Invocations.Clear();
         overlay.Draw(renderer.Object, ElementBounds.Fixed(0, 0, 24, 24).WithEmptyParent(), new RectangleF(0, 0, 24, 24), 0);
         Assert.Equal(1, (int)Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture" && (float)call.Arguments[5] == 50).Arguments[0]);

@@ -128,10 +128,10 @@ public sealed class HudOverlayHostTests : IDisposable
             layout.Apply(anchors, group, scheduler.GetMembers(group.Id));
             host.Synchronize(new Dictionary<string, HudOverlayGroupLayout> { [group.Id] = layout });
             Assert.Same(composer, host.Composers[group.Id]);
-            Assert.Equal(83.2f, layout.Members.Single(value => value.Registration.Id == "mod:time").Clip.Width);
+            Assert.Equal(HudOverlaySizes.Clock, layout.Members.Single(value => value.Registration.Id == "mod:time").Clip.Width);
             host.OnRenderGUI(.1f);
         }
-        renderer.Verify(value => value.RenderTexture(1, It.IsAny<double>(), It.IsAny<double>(), 83.2f, 83.2f, 50, null), Times.Exactly(3));
+        renderer.Verify(value => value.RenderTexture(1, It.IsAny<double>(), It.IsAny<double>(), HudOverlaySizes.Clock, HudOverlaySizes.Clock, 50, null), Times.Exactly(3));
     }
     /// <summary>Native open/close registration remains focus-free and final cleanup is idempotent.</summary>
     [Fact]
