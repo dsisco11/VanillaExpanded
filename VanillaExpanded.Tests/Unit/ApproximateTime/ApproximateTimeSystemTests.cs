@@ -34,9 +34,9 @@ public sealed class ApproximateTimeSystemTests
             system.StartClientSide(fixture.Api.Object);
             var group = hud.Registry.GetGroups().Single(value => value.Id == "world-status");
             Assert.Equal(HudOverlayAnchorContext.ScreenTargetId, group.Placement.TargetId);
-            Assert.Equal(HudOverlayPoint.LeftTop, group.Placement.Attachment);
-            Assert.Equal(HudOverlayPoint.LeftTop, group.Placement.Pivot);
-            Assert.Equal(VanillaExpanded.HudOverlays.Layout.HudOverlayDirection.Horizontal, group.Packing.Direction);
+            Assert.Equal(HudOverlayPoint.RightTop, group.Placement.Attachment);
+            Assert.Equal(HudOverlayPoint.RightTop, group.Placement.Pivot);
+            Assert.Equal(VanillaExpanded.HudOverlays.Layout.HudOverlayDirection.Vertical, group.Packing.Direction);
             hud.Registry.BeginSession(fixture.Api.Object);
             ApproximateTimeOverlay? overlay = null;
             hud.Registry.RunPass(registration =>
