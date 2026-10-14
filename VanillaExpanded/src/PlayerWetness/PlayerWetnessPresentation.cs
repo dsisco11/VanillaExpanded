@@ -7,12 +7,11 @@ using Vintagestory.API.MathTools;
 
 namespace VanillaExpanded.PlayerWetness;
 
-/// <summary>Borrows slim droplet artwork and owns a percentage reading beneath two continuously filled drops.</summary>
+/// <summary>Borrows slim droplet artwork and owns a percentage reading beneath two fully filled drops.</summary>
 internal sealed class PlayerWetnessPresentation : IDisposable
 {
     private readonly Func<HudOverlayPreparationContext, LoadedTexture[]> createTextures;
     private readonly Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?> loadBackdrop;
-    private readonly ElementBounds fillClip = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
     private const float ReadingHeight = HudOverlaySizes.WetnessReadingHeight;
     private readonly HudOverlayIconTextPresentation text;
     private readonly ElementBounds textBounds = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
@@ -21,7 +20,6 @@ internal sealed class PlayerWetnessPresentation : IDisposable
     private LoadedTexture[]? textures;
     private IHudOverlayIconBackdrop? backdrop;
     private HudOverlayPreparationContext? context;
-    private float wetness;
 
     #region Public API
     #region Content and preparation
@@ -38,15 +36,14 @@ internal sealed class PlayerWetnessPresentation : IDisposable
         this.createTextures = createTextures ?? PlayerWetnessIconTextures.Create;
         this.loadBackdrop = loadBackdrop ?? HudOverlayIconBackdrop.Load;
     }
-    /// <summary>Updates continuous fill and the cached whole-percentage reading without regenerating icon artwork.</summary>
+    /// <summary>Updates the cached whole-percentage reading without regenerating icon artwork.</summary>
     public void SetContent(float value)
     {
-        wetness = value;
-        // Quantize only the reading; both drop fills retain the full sampled precision.
+        // The percentage carries intensity while the artwork remains fully filled.
         int percentage = Math.Clamp((int)Math.Round(value * 100, MidpointRounding.AwayFromZero), 1, 100);
         text.SetContent(null, "vanillaexpanded:player-wetness-reading", percentage);
     }
-    /// <summary>Loads cached artwork at the preparation boundary and reuses it for subsequent fills.</summary>
+    /// <summary>Loads cached artwork at the preparation boundary and reuses it for subsequent readings.</summary>
     public void Prepare(HudOverlayPreparationContext preparation)
     {
         if (textures == null || !ReferenceEquals(context?.Api, preparation.Api))
@@ -77,8 +74,8 @@ internal sealed class PlayerWetnessPresentation : IDisposable
         double scale = context.GuiScale;
         double x = bounds.renderX + (Size.Width - HudOverlaySizes.Standard) * scale / 2;
         double y = bounds.renderY + (bounds.OuterHeight - HudOverlaySizes.Standard * scale) / 2;
-        DrawDrop(renderer, x + 2.25 * scale, y + 1.5 * scale, 22.5 * scale, clip);
-        DrawDrop(renderer, x + 17.25 * scale, y, 13.5 * scale, clip);
+        DrawDrop(renderer, x + 2.25 * scale, y + 1.5 * scale, 22.5 * scale);
+        DrawDrop(renderer, x + 17.25 * scale, y, 13.5 * scale);
         // Keep the normal-sized reading below the artwork without increasing the HUD row height.
         textBounds.absFixedX = bounds.renderX + (Size.Width - readingWidth) * scale / 2;
         textBounds.absFixedY = y + 24 * scale;
@@ -89,14 +86,14 @@ internal sealed class PlayerWetnessPresentation : IDisposable
     }
     #endregion
     #region Lifecycle
-    /// <summary>Retains the last fill while the exit fades.</summary>
+    /// <summary>Retains the artwork and reading while the exit fades.</summary>
     public void Hide() => Visibility.Hide(Reset);
     /// <summary>Releases owned reading pixels and borrowed texture bindings at world exit or after an animated exit.</summary>
     public void Reset()
     {
         Visibility.Reset();
         text.Reset();
-        textures = null; backdrop = null; context = null; wetness = 0; readingWidth = 0; Size = SizeF.Empty;
+        textures = null; backdrop = null; context = null; readingWidth = 0; Size = SizeF.Empty;
     }
     /// <summary>Releases all presentation bindings on final removal.</summary>
     public void Dispose()
@@ -107,21 +104,11 @@ internal sealed class PlayerWetnessPresentation : IDisposable
     #endregion
     #endregion
     #region Private
-    /// <summary>Reveals the same proportional fill independently in each drop and restores the host scissor.</summary>
-    private void DrawDrop(IRenderAPI renderer, double x, double y, double pixels, RectangleF clip)
+    /// <summary>Draws the complete blue silhouette beneath its outline; the host supplies clipping.</summary>
+    private void DrawDrop(IRenderAPI renderer, double x, double y, double pixels)
     {
-        // The authored silhouette spans approximately y=10 through y=118 on its 128-pixel canvas.
-        double top = Math.Max(y + pixels * (118d - 108d * wetness) / 128, clip.Top);
-        double left = Math.Max(x, clip.Left), right = Math.Min(x + pixels, clip.Right), bottom = Math.Min(y + pixels, clip.Bottom);
-        if (right > left && bottom > top)
-        {
-            fillClip.absFixedX = left; fillClip.absFixedY = top;
-            fillClip.absInnerWidth = right - left; fillClip.absInnerHeight = bottom - top; fillClip.Initialized = true;
-            fillTint.Set(.25f, .65f, 1, HudOverlayDrawOpacity.Current);
-            renderer.PushScissor(fillClip, true);
-            try { renderer.Render2DTexture(textures![1].TextureId, (float)x, (float)y, (float)pixels, (float)pixels, 50, fillTint); }
-            finally { renderer.PopScissor(); }
-        }
+        fillTint.Set(.25f, .65f, 1, HudOverlayDrawOpacity.Current);
+        renderer.Render2DTexture(textures![1].TextureId, (float)x, (float)y, (float)pixels, (float)pixels, 50, fillTint);
         renderer.Render2DTexture(textures![0].TextureId, (float)x, (float)y, (float)pixels, (float)pixels, 50, HudOverlayDrawOpacity.Tint);
     }
     #endregion
