@@ -95,7 +95,7 @@ The built-in groups are:
 
 | Group | Intended use |
 | --- | --- |
-| `world-status` | Horizontal time (order 98), weather (order 99), and environmental temperature (order 100) indicators at the screen's top-left, inset 3 physical pixels independently of GUI scale. Hidden indicators collapse normally. |
+| `world-status` | Vertical time (order 98), weather (order 99), and environmental temperature (order 100) indicators at the screen's top-left, inset 3 physical pixels independently of GUI scale. Hidden indicators collapse normally. |
 | `player-status` | Horizontal player status icons beside the hotbar's bottom-left edge. |
 | `held-item-status` | Held-item information using the user's configured anchor and offsets. |
 
