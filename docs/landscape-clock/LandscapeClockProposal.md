@@ -35,15 +35,17 @@ The renderer consumes a prepared scene description. It does not query climate, t
 
 ## Initial environment vocabulary
 
-Select terrain and vegetation independently, avoiding a texture for every combination.
+Approved direction: select terrain and vegetation independently, with climate influencing appearance. Avoid a separate preset or texture for every combination.
+
+The initial scene represents the generated surface environment, not a scan of current visible vegetation. Forest and shrub density provide stable, inexpensive classification inputs. Clearing trees or planting a garden therefore does not immediately change the landscape artwork. Local vegetation evidence is a possible later extension, requiring separate sampling-cost and built-environment rules.
 
 | Dimension | Initial choices | Selection basis |
 |---|---|---|
 | Terrain | Gentle hills; rugged ridges | A small bounded set of terrain-height samples and local relief |
-| Vegetation | Open grass/scrub; sparse woodland; dense woodland | Forest and shrub density |
+| Vegetation | Open land; scrub; sparse woodland; dense woodland | Forest and shrub density |
 | Climate appearance | Temperate; cold; arid | World-generation temperature and rainfall |
 
-Cold woodland may use conifer-like silhouettes as an artistic approximation; it does not claim to identify actual local tree species. Arid open land should initially use sparse scrub, not automatically dunes. Cold climate does not automatically imply current snow coverage.
+Tree-species selection is not approved as a reliable inference from forest density. Conifer versus broadleaf silhouettes require additional evidence or a separately reviewed, explicitly approximate climate-based artistic rule. Arid appearance uses dry ground and sparse vegetation, not automatic dunes. Cold climate does not automatically imply current snow coverage; future snow appearance requires actual coverage evidence. Terrain-height variation identifies ruggedness, not absolute elevation: a high plateau can still select gentle terrain.
 
 Wetlands, coastlines, tropical vegetation, explicit snow coverage, and accurately identified tree types are later candidates requiring additional evidence. A neutral hills-and-sparse-vegetation scene is the safe initial fallback.
 
