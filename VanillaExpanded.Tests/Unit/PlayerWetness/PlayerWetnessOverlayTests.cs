@@ -86,32 +86,43 @@ public sealed class PlayerWetnessOverlayTests : IDisposable
         Assert.Null(overlay.Wetness); Assert.All(artwork, texture => Assert.NotEqual(0, texture.TextureId));
     }
 
-    /// <summary>The drop's crop grows continuously with wetness and restores scissor state after a render failure.</summary>
+    /// <summary>Both blue silhouettes remain fully drawn at every wetness while the numeric percentage changes.</summary>
     [Theory]
-    [InlineData(.01f)] [InlineData(.5f)] [InlineData(1)]
-    public void FillCropMatchesWetnessAndRestoresScissor(float wetness)
+    [InlineData(.01f, "1%")] [InlineData(.5f, "50%")] [InlineData(1, "100%")]
+    public void FullDropsRemainIdenticalAcrossWetness(float wetness, string expectedReading)
     {
         var api = new Mock<ICoreClientAPI>() { DefaultValue = DefaultValue.Mock };
+        string? reading = null;
+        using var text = new HudOverlayIconTextPresentation((context, value) =>
+        {
+            reading = value;
+            return new LoadedTexture(context.Api) { TextureId = 3, Width = 30, Height = 14 };
+        });
         using var presentation = new PlayerWetnessPresentation(context =>
-            [new LoadedTexture(context.Api) { TextureId = 1 }, new LoadedTexture(context.Api) { TextureId = 2 }], _ => null, CreateText());
+            [new LoadedTexture(context.Api) { TextureId = 1 }, new LoadedTexture(context.Api) { TextureId = 2 }], _ => null, text);
         presentation.SetContent(wetness); presentation.Prepare(new(api.Object, 1, "en"));
-        var bounds = Bounds();
         var renderer = new Mock<IRenderAPI>();
-        var cropTops = new List<double>();
-        renderer.Setup(value => value.PushScissor(It.IsAny<ElementBounds>(), true))
-            .Callback<ElementBounds, bool>((crop, _) => cropTops.Add(crop.renderY));
-        presentation.Draw(renderer.Object, bounds, new RectangleF(0, 0, 36, 36));
-        Assert.Equal(2, cropTops.Count);
-        Assert.Equal(1.5 + 22.5 * (118d - 108d * wetness) / 128, cropTops[0], 5);
-        Assert.Equal(13.5 * (118d - 108d * wetness) / 128, cropTops[1], 5);
-        renderer.Verify(value => value.PopScissor(), Times.Exactly(2));
-        renderer.Setup(value => value.Render2DTexture(2, It.IsAny<float>(), It.IsAny<float>(),
-            It.IsAny<float>(), It.IsAny<float>(), It.IsAny<float>(), It.IsAny<Vintagestory.API.MathTools.Vec4f>()))
-            .Throws(new InvalidOperationException("draw failure"));
-        Assert.Throws<InvalidOperationException>(() => presentation.Draw(renderer.Object, bounds, new RectangleF(0, 0, 36, 36)));
-        renderer.Verify(value => value.PopScissor(), Times.Exactly(3));
+        presentation.Draw(renderer.Object, Bounds(), new RectangleF(0, 0, 36, 36));
+        Assert.Equal(expectedReading, reading);
+        var draws = renderer.Invocations.Where(call => call.Method.Name == "Render2DTexture").ToArray();
+        Assert.Equal(new[] { 2, 1, 2, 1 }, draws.Select(call => (int)call.Arguments[0]));
+        // Full mask and outline share each drop's rectangle; the host alone owns scissor state.
+        for (int index = 0; index < draws.Length; index++)
+        {
+            bool large = index < 2;
+            Assert.Equal(large ? 2.25f : 17.25f, (float)draws[index].Arguments[1]);
+            Assert.Equal(large ? 1.5f : 0f, (float)draws[index].Arguments[2]);
+            Assert.Equal(large ? 22.5f : 13.5f, (float)draws[index].Arguments[3]);
+            Assert.Equal(large ? 22.5f : 13.5f, (float)draws[index].Arguments[4]);
+            if (index % 2 == 0)
+            {
+                var tint = Assert.IsType<Vintagestory.API.MathTools.Vec4f>(draws[index].Arguments[6]);
+                Assert.Equal(.25f, tint.R); Assert.Equal(.65f, tint.G); Assert.Equal(1, tint.B); Assert.Equal(1, tint.A);
+            }
+        }
+        renderer.Verify(value => value.PushScissor(It.IsAny<ElementBounds>(), It.IsAny<bool>()), Times.Never);
+        renderer.Verify(value => value.PopScissor(), Times.Never);
     }
-
     /// <summary>Whole percentages reuse text until they change, render below both drops, and release on reset.</summary>
     [Fact]
     public void PercentageIsCachedCenteredBelowDropsAndReleased()
