@@ -93,6 +93,8 @@ internal sealed class ApproximateTimePresentation : IDisposable
             renderer.PushScissor(liquidClip, true);
             try { renderer.RenderTexture(icons[3].TextureId, bounds.renderX, y, pixels, pixels, 51, HudOverlayDrawOpacity.Tint); }
             finally { renderer.PopScissor(); }
+            // The gauge cover occludes internal mechanisms; external readings remain above it.
+            renderer.RenderTexture(icons[4].TextureId, bounds.renderX, y, pixels, pixels, 52, HudOverlayDrawOpacity.Tint);
             double width = Math.Min(reading.Size.Width, 46.8);
             double height = Math.Min(reading.Size.Height, 20.8);
             readingBounds.absFixedX = bounds.renderX + (HudOverlaySizes.Clock - width) * context.GuiScale / 2;
@@ -101,7 +103,7 @@ internal sealed class ApproximateTimePresentation : IDisposable
             readingBounds.absInnerHeight = height * context.GuiScale;
             readingBounds.Initialized = true;
             reading.Draw(renderer, readingBounds, new RectangleF((float)bounds.renderX, (float)y, (float)pixels, (float)pixels),
-                0, maximumTextHeight: 20.8f);
+                0, maximumTextHeight: 20.8f, textDepth: 53);
         }
     }
     #endregion
@@ -133,7 +135,7 @@ internal sealed class ApproximateTimePresentation : IDisposable
     /// <summary>Loads copper housing and scenery disk assets with engine cache ownership.</summary>
     private static LoadedTexture[] LoadIcons(HudOverlayPreparationContext preparation)
     {
-        string[] names = ["housing", "disk", "thermometer-housing", "thermometer-full"];
+        string[] names = ["housing", "disk", "thermometer-housing", "thermometer-full", "gauge-cover"];
         var textures = new LoadedTexture[names.Length];
         for (int index = 0; index < names.Length; index++)
         {
