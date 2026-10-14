@@ -1,6 +1,7 @@
 using Moq;
 using VanillaExpanded.HudOverlays;
 using VanillaExpanded.HudOverlays.Anchoring;
+using VanillaExpanded.HudOverlays.Layout;
 using VanillaExpanded.WeatherConditions;
 using VanillaExpanded.Tests.Unit.BowAmmunition;
 using Vintagestory.API.Common;
@@ -36,8 +37,13 @@ public sealed class WeatherConditionsSystemTests
             system.StartClientSide(fixture.Api.Object);
             var group = hud.Registry.GetGroups().Single(value => value.Id == "world-status");
             Assert.Equal(HudOverlayAnchorContext.ScreenTargetId, group.Placement.TargetId);
-            Assert.Equal(HudOverlayPoint.LeftTop, group.Placement.Attachment);
-            Assert.Equal(HudOverlayPoint.LeftTop, group.Placement.Pivot);
+            Assert.Equal(HudOverlayPoint.RightTop, group.Placement.Attachment);
+            Assert.Equal(HudOverlayPoint.RightTop, group.Placement.Pivot);
+            Assert.Equal(HudOverlayDirection.Vertical, group.Packing.Direction);
+            Assert.Equal(HudOverlayCrossAlignment.End, group.Packing.CrossAlignment);
+            Assert.Equal(0, group.Placement.OffsetX); Assert.Equal(0, group.Placement.OffsetY);
+            Assert.Equal(0, group.Packing.Padding);
+            Assert.Equal(3, group.Placement.ScreenPaddingPixels);
             hud.Registry.BeginSession(fixture.Api.Object);
             WeatherConditionsOverlay? overlay = null;
             hud.Registry.RunPass(registration =>
@@ -45,7 +51,7 @@ public sealed class WeatherConditionsSystemTests
                 Assert.Equal(WeatherConditionsSystem.OverlayId, registration.Id);
                 Assert.Equal(300, registration.RefreshIntervalMs);
                 Assert.Null(registration.ReservedSize);
-                Assert.Equal(99, registration.Order);
+                Assert.Equal(100, registration.Order);
                 overlay = Assert.IsType<WeatherConditionsOverlay>(registration.Overlay);
             });
             Assert.True(overlay!.IsApplicable());
