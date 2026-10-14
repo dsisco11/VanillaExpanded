@@ -2,8 +2,6 @@
 
 The HUD overlay system positions and updates passive displays on the client. An overlay supplies content and a measured footprint; the runtime handles anchoring, group layout, refresh scheduling, GUI scaling, and world-session transitions.
 
-HUD dimensions are absolute GUI units defined in the shared `HudOverlaySizes` palette: Small = 24, Standard = 36, Large = 48, ExtraLarge = 64, and Wide = 54. Supporting text, thermometer, chevron, and scale dimensions also live there. Preparation, measurements, and reservations use those dimensions directly; only the game's native GUI scale converts them to screen pixels.
-
 The temperature indicator keeps the same 36-unit height as the other status indicators. Warming chevrons stack vertically above the reading; cooling chevrons stack below it. The reading uses a 14-point font with native GUI scaling, using native scaling only, and fits within the remaining height. Chevrons draw at 12 × 7.5 GUI units for slightly heavier strokes. With the reading hidden, the chevrons retain their column beside the thermometer. Trend strength never adds height.
 
 Reference `VanillaExpanded.dll` and the compatible Vintage Story API assemblies, and declare `vanillaexpanded` as a dependency in your mod metadata. `HudOverlaySystem`, `IHudOverlay`, registration and placement contracts, and the shared icon-and-text presentation are public and can be used from a separate mod assembly. Obtain the running system through the client mod loader; the game owns its lifetime.
@@ -54,16 +52,16 @@ The fragment uses `VanillaExpanded.HudOverlays` and `VanillaExpanded.HudOverlays
 
 A registered overlay may survive several world sessions. Keep session resources separate from the registration's lifetime.
 
-| Method | Integration responsibility |
-| --- | --- |
-| `BeginSession(api)` | Bind the current client world and subscribe to relevant events. |
-| `IsApplicable()` | Cheaply decide whether content can currently be sampled. |
-| `Refresh()` | Capture a stable snapshot and report what changed. |
-| `Prepare(context)` | Create or update presentation resources for that snapshot. |
-| `Measure()` | Return finite, nonnegative `SizeF` dimensions in unscaled GUI units. |
-| `Draw(renderer, bounds, clip, deltaTime)` | Render prepared content within the supplied bounds and clip. |
-| `EndSession()` | Detach events, release owned session resources, and clear world references. Make this safe after partial initialization and repeated calls. |
-| `Dispose()` | Perform final cleanup when the registration is removed. |
+| Method                                    | Integration responsibility                                                                                                                  |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BeginSession(api)`                       | Bind the current client world and subscribe to relevant events.                                                                             |
+| `IsApplicable()`                          | Cheaply decide whether content can currently be sampled.                                                                                    |
+| `Refresh()`                               | Capture a stable snapshot and report what changed.                                                                                          |
+| `Prepare(context)`                        | Create or update presentation resources for that snapshot.                                                                                  |
+| `Measure()`                               | Return finite, nonnegative `SizeF` dimensions in unscaled GUI units.                                                                        |
+| `Draw(renderer, bounds, clip, deltaTime)` | Render prepared content within the supplied bounds and clip.                                                                                |
+| `EndSession()`                            | Detach events, release owned session resources, and clear world references. Make this safe after partial initialization and repeated calls. |
+| `Dispose()`                               | Perform final cleanup when the registration is removed.                                                                                     |
 
 The registry calls `EndSession` before final disposal. Dispose resources allocated and owned by the overlay; retain the engine's ownership of borrowed services and cached assets. In particular, dropping a reference to an engine-cached texture does not require disposing that texture.
 
@@ -93,11 +91,11 @@ For a stable slot, supply a positive `reservedSize` in unscaled GUI units when r
 
 The built-in groups are:
 
-| Group | Intended use |
-| --- | --- |
-| `world-status` | Vertical combined time/temperature (order 98) and weather (order 100) indicators, with standalone temperature (order 99) when time is disabled at the screen's top-right, inset 3 physical pixels independently of GUI scale. Hidden indicators collapse normally. |
-| `player-status` | Horizontal player status icons beside the hotbar's bottom-left edge. |
-| `held-item-status` | Held-item information using the user's configured anchor and offsets. |
+| Group              | Intended use                                                                                                                                                                                                                                                       |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `world-status`     | Vertical combined time/temperature (order 98) and weather (order 100) indicators, with standalone temperature (order 99) when time is disabled at the screen's top-right, inset 3 physical pixels independently of GUI scale. Hidden indicators collapse normally. |
+| `player-status`    | Horizontal player status icons beside the hotbar's bottom-left edge.                                                                                                                                                                                               |
+| `held-item-status` | Held-item information using the user's configured anchor and offsets.                                                                                                                                                                                              |
 
 Joining a shared group adopts its placement and packing rules. Additional native HUD targets currently require extending the anchor resolver; there is no external anchor-registration API.
 
@@ -115,8 +113,8 @@ Set the registration's optional `hoverLabelKey` to a namespaced localization key
 
 Hover labels do not capture input or take focus. Overlays receive no mouse events or hover callbacks; interactive controls require separate API support.
 
-The approximate-time indicator uses a stationary copper workshop housing and a rotating day/night scenery disk, each a 256 × 256 texture. The gauge uses the shared ExtraLarge size of 64 × 64 GUI units. Its shader clips the disk to the upper semicircular aperture and rotates it once per estimated calendar day, preserving observation-age drift. Noon is upright and entirely daytime; midnight is inverted and entirely nighttime. Rotation refreshes every 300 ms even within the same time period. The presentation owns the reloadable shader and quad, borrows cached textures, and releases owned resources after fade-out or world exit. Live appearance and GPU rendering require in-game verification.
+The approximate-time indicator uses a stationary copper workshop housing and a rotating day/night scenery disk, each a 256 × 256 texture. The gauge uses the shared Clock size of 83.2 × 83.2 GUI units. Its shader clips the disk to the upper semicircular aperture and rotates it once per estimated calendar day, preserving observation-age drift. Noon is upright and entirely daytime; midnight is inverted and entirely nighttime. Rotation refreshes every 300 ms even within the same time period. The presentation owns the reloadable shader and quad, borrows cached textures, and releases owned resources after fade-out or world exit. Live appearance and GPU rendering require in-game verification.
 
 HUD artwork, cached readings, and uploaded icon backgrounds generate mipmaps during preparation and use trilinear minification with linear magnification through `HudOverlayTextureFiltering`. The helper restores the prior texture binding and does not change cache ownership. Native item icons continue using the engine item renderer and its shared atlases; procedural backdrop shaders have no sampled texture.
 
-When approximate time is enabled, its 64-unit gauge also samples current local environmental temperature independently of estimated-time drift. The alternate 256 × 256 copper housing contains recessed glass along the left rim; an antialiased red liquid layer rises along the arc over the fixed -20°C to 40°C range, with an always-filled bulb. A cached normal-sized Celsius reading occupies the lower plate. Nonfinite or missing climate and the environmental-temperature toggle remove this layer and restore the clock-only housing. The standalone environmental registration is enabled only when the clock is disabled, preserving temperature-only configuration. The combined presentation owns its text and shader resources and borrows cached artwork. Live visual acceptance remains required.
+When approximate time is enabled, its 83.2-unit gauge also samples current local environmental temperature independently of estimated-time drift. The alternate 256 × 256 copper housing contains recessed glass along the left rim; an antialiased red liquid layer rises along the arc over the fixed -20°C to 40°C range, with an always-filled bulb. A cached normal-sized Celsius reading occupies the lower plate. Nonfinite or missing climate and the environmental-temperature toggle remove this layer and restore the clock-only housing. The standalone environmental registration is enabled only when the clock is disabled, preserving temperature-only configuration. The combined presentation owns its text and shader resources and borrows cached artwork. Live visual acceptance remains required.

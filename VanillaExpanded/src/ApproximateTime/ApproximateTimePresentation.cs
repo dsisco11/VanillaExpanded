@@ -52,7 +52,7 @@ internal sealed class ApproximateTimePresentation : IDisposable
         }
         else reading.Reset();
     }
-    /// <summary>Loads borrowed textures once per client API and reserves the shared extra-large icon slot.</summary>
+    /// <summary>Loads borrowed textures once per client API and reserves the shared clock-size slot.</summary>
     public void Prepare(HudOverlayPreparationContext preparation)
     {
         if (!period.HasValue) return;
@@ -64,14 +64,14 @@ internal sealed class ApproximateTimePresentation : IDisposable
         }
         if (temperature.HasValue) reading.Prepare(preparation);
         context = preparation;
-        Size = new SizeF(HudOverlaySizes.ExtraLarge, HudOverlaySizes.ExtraLarge);
+        Size = new SizeF(HudOverlaySizes.Clock, HudOverlaySizes.Clock);
         Visibility.Show();
     }
     /// <summary>Draws prepared artwork without time or terrain sampling.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds)
     {
         if (!period.HasValue || icons == null || context == null) return;
-        double pixels = HudOverlaySizes.ExtraLarge * context.GuiScale;
+        double pixels = HudOverlaySizes.Clock * context.GuiScale;
         double y = bounds.renderY + (bounds.OuterHeight - pixels) / 2;
         dial?.Draw(renderer, icons[1].TextureId,
             new RectangleF((float)bounds.renderX, (float)y, (float)pixels, (float)pixels),
@@ -83,15 +83,15 @@ internal sealed class ApproximateTimePresentation : IDisposable
             // Liquid and number share the fixed housing while scenery rotates independently.
             dial?.DrawTemperature(renderer, new RectangleF((float)bounds.renderX, (float)y, (float)pixels, (float)pixels),
                 HudOverlayDrawOpacity.Current, Math.Clamp((temperature.Value + 20) / 60, 0, 1));
-            double width = Math.Min(reading.Size.Width, 36);
-            double height = Math.Min(reading.Size.Height, 16);
-            readingBounds.absFixedX = bounds.renderX + (HudOverlaySizes.ExtraLarge - width) * context.GuiScale / 2;
-            readingBounds.absFixedY = y + 40 * context.GuiScale;
+            double width = Math.Min(reading.Size.Width, 46.8);
+            double height = Math.Min(reading.Size.Height, 20.8);
+            readingBounds.absFixedX = bounds.renderX + (HudOverlaySizes.Clock - width) * context.GuiScale / 2;
+            readingBounds.absFixedY = y + 52 * context.GuiScale;
             readingBounds.absInnerWidth = width * context.GuiScale;
             readingBounds.absInnerHeight = height * context.GuiScale;
             readingBounds.Initialized = true;
             reading.Draw(renderer, readingBounds, new RectangleF((float)bounds.renderX, (float)y, (float)pixels, (float)pixels),
-                0, maximumTextHeight: 16);
+                0, maximumTextHeight: 20.8f);
         }
     }
     #endregion
