@@ -32,10 +32,10 @@ internal sealed class EnvironmentalTemperatureSystem : ModSystem, ILiveConfigura
         overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays && VanillaExpandedModSystem.Config.EnableEnvironmentalTemperatureOverlay);
         try
         {
-            // Place local temperature immediately after weather in the top-left row.
+            // Place local temperature immediately before weather in the top-left row.
             registration = hud.Registry.Register(new HudOverlayRegistration(OverlayId, overlay,
                 () => overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays
-                    && VanillaExpandedModSystem.Config.EnableEnvironmentalTemperatureOverlay), "world-status", order: 100, refreshIntervalMs: 300,
+                    && VanillaExpandedModSystem.Config.EnableEnvironmentalTemperatureOverlay), "world-status", order: 99, refreshIntervalMs: 300,
                 hoverLabelKey: "vanillaexpanded:hud-label-environmental-temperature"));
         }
         catch { overlay.Dispose(); throw; }
