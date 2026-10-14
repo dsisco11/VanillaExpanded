@@ -82,7 +82,7 @@ internal sealed class ApproximateTimePresentation : IDisposable
         if (temperature.HasValue)
         {
             // Liquid and number share the fixed housing while scenery rotates independently.
-            float fill = Math.Clamp((temperature.Value + 20) / 60, 0, 1);
+            float fill = Math.Clamp((temperature.Value + 40) / 100, 0, 1);
             // Reveal the authored full state upward; retain the complete bulb at minimum fill.
             double top = y + (0.67 - 0.60 * fill) * pixels;
             liquidClip.absFixedX = bounds.renderX;
