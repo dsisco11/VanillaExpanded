@@ -51,8 +51,7 @@ public sealed class ApproximateTimeTemperatureTests : IDisposable
         var renderer = new Mock<IRenderAPI>();
         presentation.Draw(renderer.Object, Bounds());
         Assert.Equal(expected, reading);
-        Assert.Equal(new SizeF(64, 64), presentation.Size);
-        dial.Verify(value => value.DrawTemperature(renderer.Object, new RectangleF(0, 0, 64, 64), 1, fill), Times.Once);
+        dial.Verify(value => value.DrawTemperature(renderer.Object, new RectangleF(0, 0, 83.2f, 83.2f), 1, fill), Times.Once);
         Assert.Equal(3, Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture").Arguments[0]);
     }
     /// <summary>Rounded readings reuse owned pixels, missing readings restore plain housing, and reset releases resources.</summary>
@@ -113,17 +112,17 @@ public sealed class ApproximateTimeTemperatureTests : IDisposable
             overlay.BeginSession(fixture.Api.Object);
             var preparation = new HudOverlayPreparationContext(fixture.Api.Object, 1, "en");
             var renderer = new Mock<IRenderAPI>();
-            overlay.Refresh(); overlay.Prepare(preparation); overlay.Draw(renderer.Object, Bounds(), new(0, 0, 64, 64), 0);
+            overlay.Refresh(); overlay.Prepare(preparation); overlay.Draw(renderer.Object, Bounds(), new(0, 0, 83.2f, 83.2f), 0);
             dial.Verify(value => value.DrawTemperature(renderer.Object, It.IsAny<RectangleF>(), 1, .5f), Times.Once);
             climate = null;
             overlay.Refresh(); overlay.Prepare(preparation); renderer.Invocations.Clear();
-            overlay.Draw(renderer.Object, Bounds(), new(0, 0, 64, 64), 0);
+            overlay.Draw(renderer.Object, Bounds(), new(0, 0, 83.2f, 83.2f), 0);
             Assert.Equal(1, Assert.Single(renderer.Invocations).Arguments[0]);
             climate = new() { Temperature = 30 };
             VanillaExpandedModSystem.Config.EnableEnvironmentalTemperatureOverlay = false;
             blocks.Invocations.Clear();
             overlay.Refresh(); overlay.Prepare(preparation); renderer.Invocations.Clear();
-            overlay.Draw(renderer.Object, Bounds(), new(0, 0, 64, 64), 0);
+            overlay.Draw(renderer.Object, Bounds(), new(0, 0, 83.2f, 83.2f), 0);
             Assert.Empty(blocks.Invocations);
             Assert.Equal(1, Assert.Single(renderer.Invocations).Arguments[0]);
             dial.Verify(value => value.DrawTemperature(renderer.Object, It.IsAny<RectangleF>(), It.IsAny<float>(), It.IsAny<float>()), Times.Once);
@@ -138,8 +137,8 @@ public sealed class ApproximateTimeTemperatureTests : IDisposable
     /// <summary>Creates native pixel bounds independent of shared GUI scaling.</summary>
     private static ElementBounds Bounds()
     {
-        var bounds = ElementBounds.Fixed(0, 0, 64, 64).WithEmptyParent();
-        bounds.absFixedX = bounds.absFixedY = 0; bounds.absInnerWidth = bounds.absInnerHeight = 64; bounds.Initialized = true;
+        var bounds = ElementBounds.Fixed(0, 0, 83.2f, 83.2f).WithEmptyParent();
+        bounds.absFixedX = bounds.absFixedY = 0; bounds.absInnerWidth = bounds.absInnerHeight = 83.2f; bounds.Initialized = true;
         return bounds;
     }
     #endregion

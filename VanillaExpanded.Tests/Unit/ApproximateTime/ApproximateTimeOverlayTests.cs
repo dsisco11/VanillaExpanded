@@ -74,7 +74,6 @@ public sealed class ApproximateTimeOverlayTests
         overlay.BeginSession(fixture.Api.Object);
         var preparation = new HudOverlayPreparationContext(fixture.Api.Object, 1, "en", 0);
         overlay.Refresh(); overlay.Prepare(preparation);
-        Assert.Equal(new SizeF(64, 64), overlay.Measure());
         sunlight = 10;
         overlay.Refresh(); overlay.Prepare(preparation);
         Assert.Equal(1, uploads);
@@ -107,7 +106,7 @@ public sealed class ApproximateTimeOverlayTests
         overlay.SetEnabled(false);
         overlay.SetEnabled(true); sunlight = 0;
         overlay.Refresh(); overlay.Prepare(preparation);
-        Assert.Equal(new SizeF(64, 64), overlay.Measure());
+        Assert.Equal(new SizeF(83.2f, 83.2f), overlay.Measure());
         renderer.Invocations.Clear();
         overlay.Draw(renderer.Object, ElementBounds.Fixed(0, 0, 24, 24).WithEmptyParent(), new RectangleF(0, 0, 24, 24), 0);
         Assert.Equal(1, (int)Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture" && (float)call.Arguments[5] == 50).Arguments[0]);

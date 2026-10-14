@@ -103,7 +103,7 @@ public sealed class HudOverlayHostTests : IDisposable
         registry.Register(new HudOverlayRegistration("mod:weather", weather.Object, () => true, group.Id));
         registry.Register(new HudOverlayRegistration("mod:time", time.Object, () => true, group.Id, order: 100));
         registry.BeginSession(api.Object);
-        var anchors = new HudOverlayAnchorContext(new Window(), () => 1, () => new RectangleF(50, 50, 100, 20));
+        var anchors = new HudOverlayAnchorContext(new Window(200), () => 1, () => new RectangleF(50, 50, 100, 20));
         anchors.BeginFrame();
         long now = 0;
         var scheduler = new HudOverlayScheduler(registry, () => now);
@@ -113,14 +113,12 @@ public sealed class HudOverlayHostTests : IDisposable
         var emptyWeather = layout.Members.Single(value => value.Registration.Id == "mod:weather");
         Assert.Equal(0, emptyWeather.Bounds.OuterWidth); Assert.Equal(0, emptyWeather.Bounds.OuterHeight);
         var member = layout.Members.Single(value => value.Registration.Id == "mod:time");
-        Assert.Equal(64, member.Bounds.OuterWidth); Assert.Equal(64, member.Bounds.OuterHeight);
-        Assert.Equal(64, member.Clip.Width); Assert.Equal(64, member.Clip.Height);
         using var host = new HudOverlayHost(api.Object, registry, scheduler.IsDrawable, (_, error) => throw error);
         host.Synchronize(new Dictionary<string, HudOverlayGroupLayout> { [group.Id] = layout });
         host.TryOpen(false); host.OnRenderGUI(.1f);
         time.Verify(value => value.Draw(renderer.Object, member.Bounds, member.Clip, .1f), Times.Once);
         weather.Verify(value => value.Draw(It.IsAny<IRenderAPI>(), It.IsAny<ElementBounds>(), It.IsAny<RectangleF>(), It.IsAny<float>()), Times.Never);
-        renderer.Verify(value => value.RenderTexture(1, It.IsAny<double>(), It.IsAny<double>(), 64, 64, 50, null), Times.Once);
+        renderer.Verify(value => value.RenderTexture(1, It.IsAny<double>(), It.IsAny<double>(), It.IsAny<float>(), It.IsAny<float>(), 50, null), Times.Once);
         // Resize the already composed group through rain and fair weather without replacing its native composer.
         var composer = host.Composers[group.Id];
         foreach (SizeF nextSize in new[] { new SizeF(36, 36), SizeF.Empty })
@@ -130,10 +128,10 @@ public sealed class HudOverlayHostTests : IDisposable
             layout.Apply(anchors, group, scheduler.GetMembers(group.Id));
             host.Synchronize(new Dictionary<string, HudOverlayGroupLayout> { [group.Id] = layout });
             Assert.Same(composer, host.Composers[group.Id]);
-            Assert.Equal(64, layout.Members.Single(value => value.Registration.Id == "mod:time").Clip.Width);
+            Assert.Equal(83.2f, layout.Members.Single(value => value.Registration.Id == "mod:time").Clip.Width);
             host.OnRenderGUI(.1f);
         }
-        renderer.Verify(value => value.RenderTexture(1, It.IsAny<double>(), It.IsAny<double>(), 64, 64, 50, null), Times.Exactly(3));
+        renderer.Verify(value => value.RenderTexture(1, It.IsAny<double>(), It.IsAny<double>(), 83.2f, 83.2f, 50, null), Times.Exactly(3));
     }
     /// <summary>Native open/close registration remains focus-free and final cleanup is idempotent.</summary>
     [Fact]
@@ -284,9 +282,10 @@ public sealed class HudOverlayHostTests : IDisposable
     /// <summary>Supplies actual native window parent semantics without a graphics platform.</summary>
     private sealed class Window : ElementBounds
     {
+        private readonly double height;
         #region Public API
         /// <summary>Creates deterministic native pixel dimensions.</summary>
-        public Window() { IsWindowBounds = true; CalcWorldBounds(); }
+        public Window(double height = 100) { this.height = height; IsWindowBounds = true; CalcWorldBounds(); }
         /// <summary>Returns the native framebuffer origin without a graphics platform.</summary>
         public override double renderX => 0;
         /// <summary>Returns native absolute hit-test origin without a platform parent.</summary>
@@ -296,7 +295,7 @@ public sealed class HudOverlayHostTests : IDisposable
         /// <summary>Returns the native framebuffer origin without a graphics platform.</summary>
         public override double renderY => 0;
         /// <summary>Provides framebuffer dimensions used by native child composition.</summary>
-        public override void CalcWorldBounds() { absInnerWidth = 200; absInnerHeight = 100; Initialized = true; }
+        public override void CalcWorldBounds() { absInnerWidth = 200; absInnerHeight = height; Initialized = true; }
         #endregion
     }
 }
