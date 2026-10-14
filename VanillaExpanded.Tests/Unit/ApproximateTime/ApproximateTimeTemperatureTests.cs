@@ -31,9 +31,13 @@ public sealed class ApproximateTimeTemperatureTests : IDisposable
     }
     /// <summary>The rim clamps to its endpoints while the number retains the actual temperature.</summary>
     [Theory]
+    [InlineData(-55, 0, "-55°C")]
     [InlineData(-40, 0, "-40°C")]
+    [InlineData(0, .4f, "0°C")]
+    [InlineData(9, .49f, "9°C")]
     [InlineData(10, .5f, "10°C")]
-    [InlineData(55, 1, "55°C")]
+    [InlineData(60, 1, "60°C")]
+    [InlineData(75, 1, "75°C")]
     public void RimClampsWithoutClampingReading(float temperature, float fill, string expected)
     {
         var api = new Mock<ICoreClientAPI>() { DefaultValue = DefaultValue.Mock };
