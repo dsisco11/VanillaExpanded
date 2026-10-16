@@ -91,7 +91,7 @@ public sealed class HudOverlayHostTests : IDisposable
         var weather = new Mock<IHudOverlay>(); var time = new Mock<IHudOverlay>();
         using var icon = new ApproximateTimePresentation(context => Enumerable.Range(1, 7)
             .Select(id => new LoadedTexture(context.Api) { TextureId = id, IgnoreUndisposed = true }).ToArray(),
-            _ => new Mock<IApproximateTimeDialRenderer>().Object);
+            new Mock<IApproximateTimeDialRenderer>().Object, (context, _) => new LoadedTexture(context.Api) { TextureId = 20 });
         icon.SetContent(ApproximateTimePeriod.Unknown, .5);
         time.Setup(value => value.Prepare(It.IsAny<HudOverlayPreparationContext>())).Callback<HudOverlayPreparationContext>(icon.Prepare);
         time.Setup(value => value.Draw(renderer.Object, It.IsAny<ElementBounds>(), It.IsAny<RectangleF>(), .1f))

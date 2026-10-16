@@ -1,6 +1,6 @@
 # Separate copper HUD gauges
 
-Status: design proposal. The selected direction is three independent compact gauges with a shared aged-copper aesthetic. This replaces the combined landscape-clock, rim-thermometer, and calendar design in the [landscape clock proposal](../landscape-clock/LandscapeClockProposal.md). It does not specify an implementation plan.
+Status: approved design with runtime integration. The selected direction is three independent compact gauges with a shared aged-copper aesthetic. This replaces the combined landscape-clock, rim-thermometer, and calendar design in the [landscape clock proposal](../landscape-clock/LandscapeClockProposal.md). It does not specify an implementation plan.
 
 ## Shared appearance and construction
 
@@ -8,7 +8,7 @@ Use dark aged brown copper, restrained warm highlights, subtle patina, dark rece
 
 Each gauge has its own backing, independently rendered readings, and foreground housing. The foreground includes any clamps and glass overlays that must cover a reading. Author all components against one shared layout per gauge. Use simple apertures and sufficient transparent margins; keep all layers aligned to the same geometry.
 
-Gauge textures should be no larger than 512×512; small marks can use smaller reusable textures. Display dimensions come from the central `HudOverlaySizes` palette, with normal HUD text sizing. Exact footprints and spacing remain to be chosen through small-size mockups.
+Gauge textures should be no larger than 512×512; small marks can use smaller reusable textures. Display dimensions come from the central `HudOverlaySizes` palette, with normal HUD text sizing. Current palette widths are 90 GUI units for the clock, 320 for the horizontal thermometer, and 256 for the calendar; rectangular instruments preserve their canvas aspect ratios.
 
 ## Clock: 24-hour radial dial
 
@@ -25,11 +25,11 @@ This places the daytime portion toward the top and nighttime toward the bottom. 
 
 Segment tints are supplied dynamically, never baked into the artwork. Proposed colors are muted gold for **day**, peach for **dawn**, rust for **dusk**, and blue for **night**. Neutral segment masks, dividers, and the copper housing remain reusable across all dates.
 
-Determine the phases across the represented day using the game's calendar and solar model at the player's location, including the applicable date and sun-angle information. Evaluate the daily solar cycle, not merely the current sun angle. Dawn and dusk must distinguish a rising from a setting sun. Exact API inputs and phase thresholds require verification before implementation.
+Determine the phases across the represented day using the game's calendar and solar model at the player's location, including the applicable date and sun-angle information. Evaluate the daily solar cycle, not merely the current sun angle. Dawn and dusk must distinguish a rising from a setting sun. The implementation uses normalized `GetSunPosition(position, totalDays).Y`: daylight above the horizon, twilight to −6° solar elevation, and night below −6°. Adjacent samples distinguish rising from setting sun.
 
 The dial must reflect changing phase durations with season and location; it must not assume fixed sunrise/sunset hours or equal day/night halves. Days without a particular phase should not invent a colored interval for it.
 
-**Proposed boundary treatment:** when a phase boundary falls within an hour, blend that segment's tint according to the fraction of the hour occupied by each phase. This preserves 24 segments while representing changes smaller than one hour. This treatment remains a visual choice for review.
+**Boundary treatment:** when a phase boundary falls within an hour, blend that segment's tint according to the fraction of the hour occupied by each phase. This preserves 24 segments while representing changes smaller than one hour. Twelve five-minute samples per hour provide the coverage blend.
 
 Retain the existing approximate-time behavior for the pointer. Recalculate the phase distribution when its calendar/location inputs change; prepare this data outside drawing. Missing solar data should retain a valid previous distribution or show an explicitly neutral face, rather than fabricate normal daylight hours.
 
@@ -53,4 +53,4 @@ Read the date from the game calendar. Month abbreviations must correspond to its
 - Calendar characters remain readable at the intended HUD size.
 - Layers align and remain correctly positioned when their palette dimensions change.
 
-Design A (Workshop) is selected. The independent texture layers and their coordinate contract are documented in [Workshop gauge textures](WorkshopGaugeTextures.md). Runtime integration and small-size in-game acceptance remain outstanding; the clock's phase-boundary treatment remains a visual choice for review.
+Design A (Workshop) is selected. The independent layer composition is documented in [HUD overlays](HudOverlays.md). Runtime integration is implemented; small-size in-game acceptance remains outstanding.

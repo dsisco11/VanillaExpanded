@@ -1,5 +1,7 @@
 # Vanilla: Expanded TODO List:
     ## Issues:
+        ☐ Finish new env. info gauges.
+        ☐ Extrapolate weather icon paths into actual svg files from the `GenerateWeatherIcons` script, then delete the script.
 
     ## New Features:
         ☐ quick-swap menu cant handle swapping to an item that is in a special slot (e.g. mining bag, quiver, etc.)
