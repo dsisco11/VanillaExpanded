@@ -13,8 +13,8 @@ public static class HudOverlaySizes
     public const float ExtraLarge = 64;
     /// <summary>Independent circular clock instrument footprint.</summary>
     public const float Clock = 90f;
-    /// <summary>Horizontal environmental thermometer width; its height follows the 4:1 artwork aspect ratio.</summary>
-    public const float EnvironmentalThermometer = 320;
+    /// <summary>Square footprint of the radial environmental thermometer.</summary>
+    public const float EnvironmentalThermometer = 90;
     /// <summary>Compact month/day calendar width; its height follows the 8:3 artwork aspect ratio.</summary>
     public const float Calendar = 96;
     /// <summary>Wide environmental readout footprint.</summary>
