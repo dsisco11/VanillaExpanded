@@ -1,5 +1,7 @@
 # Landscape clock proposal
 
+Design direction superseded by the [separate copper HUD gauges proposal](../hud-overlays/SeparateGaugesProposal.md): the clock is now a 24-segment radial dial, with independent temperature and calendar gauges. The landscape design below is retained for historical reference.
+
 Status: proposal for review. Bold silhouettes are the selected art direction. This document does not authorize production artwork or runtime changes.
 
 ## Intended result
