@@ -30,7 +30,7 @@ public sealed class CalendarDateTests : IDisposable
         if (english == null) Lang.AvailableLanguages.Remove("en");
         else Lang.AvailableLanguages["en"] = english;
     }
-    /// <summary>Variable-length game months use the native month and year rather than Gregorian day counts.</summary>
+    /// <summary>Variable-length game months use the native month rather than Gregorian day counts.</summary>
     [Theory]
     [InlineData(0, 9, 1)] [InlineData(8, 9, 9)] [InlineData(9, 9, 1)] [InlineData(35, 12, 12)]
     public void NativeDayWithinMonth(int dayOfYear, int daysPerMonth, int expected)
@@ -40,7 +40,7 @@ public sealed class CalendarDateTests : IDisposable
         calendar.SetupGet(value => value.DayOfYear).Returns(dayOfYear);
         calendar.SetupGet(value => value.MonthName).Returns(EnumMonth.October);
         calendar.SetupGet(value => value.Year).Returns(1387);
-        Assert.Equal(new CalendarDateReading(expected, EnumMonth.October, 1387), CalendarDateReading.Read(calendar.Object));
+        Assert.Equal(new CalendarDateReading(expected, EnumMonth.October), CalendarDateReading.Read(calendar.Object));
     }
 
     /// <summary>Calendar rendering scales every layer from one canvas and releases only owned lettering.</summary>
@@ -56,26 +56,38 @@ public sealed class CalendarDateTests : IDisposable
         using var presentation = new CalendarDatePresentation(_ => [backing, glass], () => new WorkshopGaugeText((context, content) =>
         {
             textValues.Add(content);
-            var texture = new LoadedTexture(context.Api) { TextureId = 10 + owned.Count, Width = 30, Height = 14 };
+            var texture = new LoadedTexture(context.Api)
+                { TextureId = 10 + owned.Count, Width = (int)(content.Length * 10 * scale), Height = (int)(14 * scale) };
             owned.Add(texture); return texture;
         }));
-        presentation.SetContent(new(14, EnumMonth.October, 1386));
+        presentation.SetContent(new(14, EnumMonth.October));
         var context = new HudOverlayPreparationContext(api.Object, scale, "en");
         presentation.Prepare(context); presentation.Prepare(context);
-        Assert.Equal(new[] { "14", "OCT", "1386" }, textValues);
-        Assert.Equal(new SizeF(HudOverlaySizes.Calendar, HudOverlaySizes.Calendar * 176 / 512), presentation.Size);
+        Assert.Equal(new[] { "OCT", "14" }, textValues);
+        Assert.Equal(new SizeF(HudOverlaySizes.Calendar, HudOverlaySizes.Calendar * 192 / 512), presentation.Size);
         var renderer = new Mock<IRenderAPI>();
         var bounds = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
         bounds.absFixedX = 20; bounds.absFixedY = 30;
-        bounds.absInnerWidth = HudOverlaySizes.Calendar * scale; bounds.absInnerHeight = HudOverlaySizes.Calendar * scale * 176 / 512;
+        bounds.absInnerWidth = HudOverlaySizes.Calendar * scale; bounds.absInnerHeight = HudOverlaySizes.Calendar * scale * 192 / 512;
         bounds.Initialized = true;
         presentation.Draw(renderer.Object, bounds);
-        Assert.Equal(new[] { 1, 10, 11, 12, 2 }, renderer.Invocations.Select(call => (int)call.Arguments[0]));
+        Assert.Equal(new[] { 1, 10, 11, 2 }, renderer.Invocations.Select(call => (int)call.Arguments[0]));
+        var lettering = renderer.Invocations.Where(call => call.Method.Name == "Render2DTexturePremultipliedAlpha").ToArray();
+        Assert.Equal(2, lettering.Length);
+        // The month and day stay centered in their own windows at every native GUI scale.
+        Assert.Equal(20 + 171d / 512 * HudOverlaySizes.Calendar * scale,
+            (double)lettering[0].Arguments[1] + (double)lettering[0].Arguments[3] / 2, 4);
+        Assert.Equal(20 + 396d / 512 * HudOverlaySizes.Calendar * scale,
+            (double)lettering[1].Arguments[1] + (double)lettering[1].Arguments[3] / 2, 4);
+        // Compact artwork must still accommodate the ordinary text pixels without fitting them down.
+        Assert.Equal(30 * scale, (double)lettering[0].Arguments[3]);
+        Assert.Equal(20 * scale, (double)lettering[1].Arguments[3]);
+        Assert.All(lettering, call => Assert.Equal(14 * scale, (double)call.Arguments[4]));
         foreach (var call in renderer.Invocations.Where(call => call.Method.Name == "RenderTexture"))
         {
             Assert.Equal(20d, call.Arguments[1]); Assert.Equal(30d, call.Arguments[2]);
             Assert.Equal(HudOverlaySizes.Calendar * scale, call.Arguments[3]);
-            Assert.Equal(HudOverlaySizes.Calendar * scale * 176 / 512, call.Arguments[4]);
+            Assert.Equal(HudOverlaySizes.Calendar * scale * 192 / 512, call.Arguments[4]);
         }
         presentation.Reset();
         Assert.All(owned, texture => Assert.True(texture.Disposed));
@@ -97,6 +109,9 @@ public sealed class CalendarDateTests : IDisposable
         using var overlay = new CalendarDateOverlay(); overlay.BeginSession(fixture.Api.Object);
         Assert.NotEqual(HudOverlayChange.None, overlay.Refresh());
         Assert.Equal(HudOverlayChange.None, overlay.Refresh());
+        year++;
+        Assert.Equal(HudOverlayChange.None, overlay.Refresh());
+        calendar.VerifyGet(value => value.Year, Times.Never());
         day = 0; year = 1387;
         Assert.NotEqual(HudOverlayChange.None, overlay.Refresh());
         calendar.Invocations.Clear();
