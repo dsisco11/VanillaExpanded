@@ -10,6 +10,8 @@ The highlight uses world-generation temperature, rainfall, forest density, shrub
 
 The agreed scope is:
 
+- Show the Ecosystem controls and habitat highlight only on the full world map; exclude the minimap.
+
 - Include all naturally spawning wild mammals and birds defined by the base game, with one dropdown entry per species combining age, sex, and cosmetic variants.
 - Exclude fish, insects, supernatural creatures, and domestic-only variants. Mod-added species are deferred to a follow-up.
 - Omit backfill. Capture environmental coverage from data available during normal play, including already loaded areas, and persist it for later use.
@@ -39,7 +41,7 @@ Proposed presentation behavior:
 - Sort species by their localized display names and retain the current selection while the map is recomposed or reopened within the session.
 - Render highlights only over explored map coverage, even when environmental records cover a larger region.
 - Distinguish unavailable environmental data from a confirmed habitat mismatch. A short loading or unavailable indication in the layer panel can provide this distinction without colouring unexplored terrain.
-- Keep the dropdown attached to the full world map, following the existing extra-panel mechanism. Minimap highlighting remains a decision for review.
+- Keep the dropdown attached to the full world map, following the existing extra-panel mechanism. Render the habitat highlight only in the full map, even when the Ecosystem layer is active while the minimap is visible.
 
 ## Verified integration points
 
@@ -207,12 +209,11 @@ Validation should demonstrate local catalogue construction and use without any s
 
 Exercise persistence across tile redraw, map close/reopen, region unload, reconnect, purge, and version changes. Verify that panning over old uncached map images does not trigger saved-record retrieval or world loading, and that ordinary revisiting populates and retains ecosystem coverage. Confirm that server shrub arrays survive transport and persistence with unchanged values, size, padding, and region identity. Verify missing-server-support and missing-record behavior, correct routing to the Ecosystem layer, and that old map images without environmental records remain distinguishable from unsuitable habitat. Include a region with forced climate changes to ensure the existing shrub array is delivered rather than recomputed from the final climate map.
 
-Measure map opening, panning, species switching, cache size, and client environmental capture and server shrub delivery with representative explored maps. Focused automated checks cannot establish visual quality or live performance. In-game acceptance should confirm readable terrain, correct dropdown visibility, stable highlights, and no reveal beyond mapped coverage.
+Measure map opening, panning, species switching, cache size, and client environmental capture and server shrub delivery with representative explored maps. Focused automated checks cannot establish visual quality or live performance. In-game acceptance should confirm readable terrain, correct dropdown visibility, stable highlights, and no reveal beyond mapped coverage. Verify that neither Ecosystem controls nor habitat highlights appear on the minimap, including while the layer is active and after closing the full map.
 
 ## Decisions remaining before an implementation plan
 
-1. Whether the ecosystem highlight also appears on the minimap.
-2. Database connection ownership, after targeted technical verification.
+Database connection ownership, after targeted technical verification.
 
 ## Evidence references
 
