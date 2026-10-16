@@ -10,8 +10,8 @@ The highlight uses world-generation temperature, rainfall, forest density, shrub
 
 The agreed scope is:
 
-- One dropdown entry per unique species, combining age and sex variants.
-- Exclude fish.
+- Include all naturally spawning wild mammals and birds defined by the base game, with one dropdown entry per species combining age, sex, and cosmetic variants.
+- Exclude fish, insects, supernatural creatures, and domestic-only variants. Mod-added species are deferred to a follow-up.
 - Omit backfill. Capture environmental coverage from data available during normal play, including already loaded areas, and persist it for later use.
 - Evaluate regional environmental requirements only.
 - Ignore water, ground, clearance, light, population caps, player distance, and spawn chance.
@@ -61,13 +61,13 @@ The [prospecting layer](../../../../vssurvivalmod/Systems/Prospecting/OreMapLaye
 
 ## Species catalogue and habitat rules
 
-Build the initial catalogue from client-local animal definitions, including locally available asset patches. Verify access to patched assets and reuse of the game's variant resolution; fully resolved spawn conditions on client runtime entities are not assumed. Define stable species identities independently of localized names and individual entity codes.
+Build the initial catalogue of base-game wild mammals and birds from client-local animal definitions, including locally available asset patches for those supported species. Verify access to patched assets and reuse of the game's variant resolution; fully resolved spawn conditions on client runtime entities are not assumed. Define stable species identities independently of localized names and individual entity codes.
 
 Local knowledge is the baseline and does not depend on a server catalogue. Server-only changes may differ from that baseline. A supplemental server-supplied catalogue is deferred to a follow-up; its protocol, precedence, and reconciliation rules are outside the initial implementation.
 
-For animals such as deer, retain the species `type` and combine `age` and `gender` variants. Names such as Elk, Caribou, and Fallow Deer remain separate species entries. Some families need explicit normalization: chickens encode sex in their age variants, while butterflies encode species, sex, colour, and seasonal forms together. A generic entity-code suffix removal is insufficient.
+For animals such as deer, retain the species `type` and combine `age` and `gender` variants. Names such as Elk, Caribou, and Fallow Deer remain separate species entries. Some included families need explicit normalization: chickens encode sex in their age variants. Combine cosmetic variants under their species identity as well. A generic entity-code suffix removal is insufficient.
 
-Use a narrowly owned species mapping for supported animals. Do not classify every land entity as wildlife or assume every `type` variant represents a separate species. The exact catalogue, including treatment of insects and support for mod-added animals, requires review; fish are excluded regardless.
+Use a narrowly owned species mapping for supported animals. Do not classify every land entity as wildlife or assume every `type` variant represents a separate species. The approved catalogue includes all naturally spawning base-game wild mammal and bird species. Exclude fish, insects, supernatural creatures, and domestic-only variants. Support for mod-added species is deferred until their species identities can be supplied reliably; local patches to supported base-game species remain applicable.
 
 Each species entry contains the relevant environmental limits and the entity identities from which they were derived. Where one species genuinely has multiple habitat rule sets, preserve those alternatives. A sample matches if it satisfies a complete applicable rule set; do not merge separate ranges into a larger interval that invents suitable habitat between them.
 
@@ -201,7 +201,7 @@ Snapshot data before background evaluation where game-owned arrays or API access
 
 ## Validation expectations
 
-Validation should demonstrate local catalogue construction and use without any server catalogue message, locally patched definitions and variant resolution, species deduplication, fish exclusion, complete environmental-rule matching, boundary handling, and unknown-data behavior. Compare representative results with the inspected game habitat calculations, including reference-height climate and normalized elevation.
+Validation should demonstrate local catalogue construction and use without any server catalogue message, locally patched definitions and variant resolution, species deduplication across age, sex, and cosmetic variants, coverage of naturally spawning base-game wild mammals and birds, exclusion of fish, insects, supernatural creatures, domestic-only variants, and mod-added species, complete environmental-rule matching, boundary handling, and unknown-data behavior. Compare representative results with the inspected game habitat calculations, including reference-height climate and normalized elevation.
 
 Exercise persistence across tile redraw, map close/reopen, region unload, reconnect, purge, and version changes. Verify that panning over old uncached map images does not trigger saved-record retrieval or world loading, and that ordinary revisiting populates and retains ecosystem coverage. Confirm that server shrub arrays survive transport and persistence with unchanged values, size, padding, and region identity. Verify missing-server-support and missing-record behavior, correct routing to the Ecosystem layer, and that old map images without environmental records remain distinguishable from unsuitable habitat. Include a region with forced climate changes to ensure the existing shrub array is delivered rather than recomputed from the final climate map.
 
@@ -209,10 +209,9 @@ Measure map opening, panning, species switching, cache size, and client environm
 
 ## Decisions remaining before an implementation plan
 
-1. Final species catalogue, including insects and the boundary for mod-added species support.
-2. Whether habitat eligibility combines worldgen and runtime environmental rules or follows one selected convention.
-3. Whether the ecosystem highlight also appears on the minimap.
-4. Database connection ownership, after targeted technical verification.
+1. Whether habitat eligibility combines worldgen and runtime environmental rules or follows one selected convention.
+2. Whether the ecosystem highlight also appears on the minimap.
+3. Database connection ownership, after targeted technical verification.
 
 ## Evidence references
 
