@@ -10,8 +10,8 @@ namespace VanillaExpanded.CalendarDate;
 /// <summary>Composes native date characters between a blank mechanical roller housing and its glass.</summary>
 internal sealed class CalendarDatePresentation : IDisposable
 {
-    private static readonly SizeF Canvas = new(512, 176);
-    private static readonly RectangleF[] Windows = [new(44, 50, 77, 79), new(137, 50, 123, 79), new(275, 50, 193, 79)];
+    private static readonly SizeF Canvas = new(512, 192);
+    private static readonly RectangleF[] Windows = [new(44, 34, 254, 124), new(324, 34, 144, 124)];
     private readonly Func<HudOverlayPreparationContext, LoadedTexture[]> load;
     private readonly WorkshopGaugeText[] characters;
     private LoadedTexture[]? textures;
@@ -31,7 +31,7 @@ internal sealed class CalendarDatePresentation : IDisposable
     {
         this.load = load ?? (preparation => WorkshopGaugeArtwork.Load(preparation, "calendar", "layer-0", "layer-2"));
         createText ??= () => new WorkshopGaugeText();
-        characters = [createText(), createText(), createText()];
+        characters = [createText(), createText()];
     }
 
     /// <summary>Stores sampled native date content without querying the world during drawing.</summary>
@@ -42,9 +42,8 @@ internal sealed class CalendarDatePresentation : IDisposable
     {
         if (date is not CalendarDateReading value) return;
         if (textures == null || !ReferenceEquals(context?.Api, preparation.Api)) textures = load(preparation);
-        characters[0].SetContent(value.Day.ToString(CultureInfo.InvariantCulture));
-        characters[1].SetContent(value.MonthAbbreviation(preparation.Locale));
-        characters[2].SetContent(value.Year.ToString(CultureInfo.InvariantCulture));
+        characters[0].SetContent(value.MonthAbbreviation(preparation.Locale));
+        characters[1].SetContent(value.Day.ToString(CultureInfo.InvariantCulture));
         foreach (var text in characters) text.Prepare(preparation);
         context = preparation;
         Size = new(HudOverlaySizes.Calendar, HudOverlaySizes.Calendar * Canvas.Height / Canvas.Width);

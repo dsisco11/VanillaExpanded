@@ -15,8 +15,8 @@ public static class HudOverlaySizes
     public const float Clock = 90f;
     /// <summary>Horizontal environmental thermometer width; its height follows the 4:1 artwork aspect ratio.</summary>
     public const float EnvironmentalThermometer = 320;
-    /// <summary>Mechanical calendar width; its height follows the 512:176 artwork aspect ratio.</summary>
-    public const float Calendar = 256;
+    /// <summary>Compact month/day calendar width; its height follows the 8:3 artwork aspect ratio.</summary>
+    public const float Calendar = 96;
     /// <summary>Wide environmental readout footprint.</summary>
     public const float Wide = 54;
     /// <summary>Normal HUD font size.</summary>
