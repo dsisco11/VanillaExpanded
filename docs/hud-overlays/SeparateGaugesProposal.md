@@ -8,7 +8,7 @@ Use dark aged brown copper, restrained warm highlights, subtle patina, dark rece
 
 Each gauge has its own backing, independently rendered readings, and foreground housing. The foreground includes any clamps and glass overlays that must cover a reading. Author all components against one shared layout per gauge. Use simple apertures and sufficient transparent margins; keep all layers aligned to the same geometry.
 
-Gauge textures should be no larger than 512×512; small marks can use smaller reusable textures. Display dimensions come from the central `HudOverlaySizes` palette, with normal HUD text sizing. Current palette widths are 90 GUI units for the clock, 320 for the horizontal thermometer, and 96 for the calendar; rectangular instruments preserve their canvas aspect ratios.
+Gauge textures should be no larger than 512×512; small marks can use smaller reusable textures. Display dimensions come from the central `HudOverlaySizes` palette, with normal HUD text sizing. Current palette widths are 90 GUI units for the clock, 90 for the radial thermometer, and 96 for the calendar; rectangular instruments preserve their canvas aspect ratios.
 
 ## Clock: 24-hour radial dial
 
@@ -35,9 +35,9 @@ Retain the existing approximate-time behavior for the pointer. Recalculate the p
 
 ## Temperature: independent thermometer
 
-Selected form: a horizontal copper housing above the calendar, with a thick, realistic red-liquid glass thermometer, bulb on the left, solid neck and tip clamps, and a clear numeric Celsius reading on the right. Its straight travel simplifies masking and alignment.
+Selected form: B, the horseshoe liquid gauge. A circular copper housing contains a thick red-liquid glass tube around its inside edge, with a bulb at the lower-left and a capped tip at the lower-right. Copper neck and tip clamps cover the glass. A normal-sized Celsius reading occupies the center. The instrument uses a 90 × 90 GUI-unit footprint above the calendar.
 
-Retain the environmental range **−40°C to +60°C**, ticks every **5°C**, and labels at **−40, 0, and +60**. Position reusable embossed tick and number textures dynamically above the housing using the same calibration as the fill mask. Use empty/full textures for the liquid display. Clamp visual fill at the endpoints while keeping the actual numeric reading available outside the range.
+Retain the environmental range **−40°C to +60°C**, ticks every **5°C**, and labels at **−40, 0, and +60**. Place runtime ticks and separate number textures along the inner scale using the same angular calibration as the fill mask. Use registered empty/full textures with a clockwise angular alpha reveal for the liquid display. Clamp visual fill at the endpoints while keeping the actual numeric reading available outside the range.
 
 ## Calendar: independent mechanical counter
 

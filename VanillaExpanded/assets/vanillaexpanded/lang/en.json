@@ -3,7 +3,7 @@
   "hud-label-environmental-temperature": "Environmental Temperature",
   "environmental-temperature-reading": "{0}°C",
   "config-enable-environmental-temperature-overlay": "Show environmental temperature",
-  "config-enable-environmental-temperature-overlay-tooltip": "Shows local climate temperature in a horizontal copper thermometer beneath the clock. Applies immediately.",
+  "config-enable-environmental-temperature-overlay-tooltip": "Shows local climate temperature in a radial copper liquid thermometer beneath the clock. Applies immediately.",
   "hud-label-calendar-date": "Calendar Date",
   "config-enable-calendar-date-overlay": "Show calendar date",
   "config-enable-calendar-date-overlay-tooltip": "Shows the abbreviated month and day in a compact calendar beneath the thermometer. Applies immediately.",

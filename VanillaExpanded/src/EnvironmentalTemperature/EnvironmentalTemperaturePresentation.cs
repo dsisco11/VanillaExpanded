@@ -7,13 +7,13 @@ using Vintagestory.API.Config;
 
 namespace VanillaExpanded.EnvironmentalTemperature;
 
-/// <summary>Composes a horizontal empty/full thermometer with dynamic calibration and foreground clamps.</summary>
+/// <summary>Composes a radial empty/full thermometer with dynamic calibration and foreground clamps.</summary>
 internal sealed class EnvironmentalTemperaturePresentation : IDisposable
 {
     private readonly WorkshopGaugeText text;
     private readonly Func<HudOverlayPreparationContext, LoadedTexture[]> loadTextures;
     private readonly Func<HudOverlayPreparationContext, LoadedTexture> createTicks;
-    private readonly ElementBounds liquidClip = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
+    private readonly EnvironmentalTemperatureLiquidMask liquid;
     private LoadedTexture[]? textures;
     private LoadedTexture? ticks;
     private HudOverlayPreparationContext? context;
@@ -31,12 +31,14 @@ internal sealed class EnvironmentalTemperaturePresentation : IDisposable
     /// <summary>Accepts optional owned text and tick factories plus a borrowed artwork loader.</summary>
     public EnvironmentalTemperaturePresentation(WorkshopGaugeText? text = null,
         Func<HudOverlayPreparationContext, LoadedTexture[]>? loadTextures = null,
-        Func<HudOverlayPreparationContext, LoadedTexture>? createTicks = null)
+        Func<HudOverlayPreparationContext, LoadedTexture>? createTicks = null,
+        EnvironmentalTemperatureLiquidMask? liquid = null)
     {
         this.text = text ?? new();
         this.loadTextures = loadTextures ?? (preparation => WorkshopGaugeArtwork.Load(preparation, "thermometer",
-            "layer-0", "layer-1", "layer-2", "label-minus40", "label-zero", "label-plus60"));
-        this.createTicks = createTicks ?? EnvironmentalTemperatureGaugeLayout.CreateTicks;
+            "layer-0", "layer-2", "label-minus40", "label-zero", "label-plus60"));
+        this.createTicks = createTicks ?? EnvironmentalTemperatureScaleArtwork.Create;
+        this.liquid = liquid ?? new();
     }
 
     /// <summary>Stores the current climate reading independently of clock estimation.</summary>
@@ -55,39 +57,33 @@ internal sealed class EnvironmentalTemperaturePresentation : IDisposable
         double rounded = Math.Round(temperature, MidpointRounding.AwayFromZero);
         text.SetContent(Lang.GetL(preparation.Locale, "vanillaexpanded:environmental-temperature-reading", rounded == 0 ? 0d : rounded));
         text.Prepare(preparation);
+        liquid.Prepare(preparation, MarkerPosition);
         context = preparation;
-        Size = new SizeF(HudOverlaySizes.EnvironmentalThermometer, HudOverlaySizes.EnvironmentalThermometer / 4);
+        Size = new SizeF(HudOverlaySizes.EnvironmentalThermometer, HudOverlaySizes.EnvironmentalThermometer);
         Visibility.Show();
     }
 
-    /// <summary>Draws the full variant through an intersecting scissor, with clamps above all internal contents.</summary>
+    /// <summary>Draws angularly masked liquid, calibrated scale elements, and foreground clamps in sandwich order.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip)
     {
         if (context == null || textures == null || ticks == null) return;
-        float width = (float)(HudOverlaySizes.EnvironmentalThermometer * context.GuiScale), height = width / 4;
+        float width = (float)(HudOverlaySizes.EnvironmentalThermometer * context.GuiScale), height = width;
         var screen = new RectangleF((float)bounds.renderX, (float)(bounds.renderY + (bounds.OuterHeight - height) / 2), width, height);
         renderer.RenderTexture(textures[0].TextureId, screen.X, screen.Y, width, height, 50, HudOverlayDrawOpacity.Tint);
-        var reveal = EnvironmentalTemperatureGaugeLayout.LiquidClip(screen, temperature);
-        liquidClip.absFixedX = Math.Max(reveal.Left, clip.Left);
-        liquidClip.absFixedY = Math.Max(reveal.Top, clip.Top);
-        liquidClip.absInnerWidth = Math.Max(0, Math.Min(reveal.Right, clip.Right) - liquidClip.absFixedX);
-        liquidClip.absInnerHeight = Math.Max(0, Math.Min(reveal.Bottom, clip.Bottom) - liquidClip.absFixedY);
-        liquidClip.Initialized = true;
-        renderer.PushScissor(liquidClip, true);
-        try { renderer.RenderTexture(textures[1].TextureId, screen.X, screen.Y, width, height, 51, HudOverlayDrawOpacity.Tint); }
-        finally { renderer.PopScissor(); }
+        liquid.Draw(renderer, screen);
         renderer.Render2DTexturePremultipliedAlpha(ticks.TextureId, screen.X, screen.Y, width, height, 52, HudOverlayDrawOpacity.PremultipliedTint);
         for (int index = 0; index < 3; index++)
         {
             float degree = index == 0 ? -40 : index == 1 ? 0 : 60;
-            float labelWidth = index == 1 ? 20 : 40;
+            float labelWidth = index == 1 ? 64 : 128;
+            var center = EnvironmentalTemperatureGaugeLayout.Position(degree, 128);
             var label = WorkshopGaugeArtwork.Map(screen, EnvironmentalTemperatureGaugeLayout.Canvas,
-                new RectangleF(EnvironmentalTemperatureGaugeLayout.Position(degree) - labelWidth / 2, 80, labelWidth, 20));
-            renderer.RenderTexture(textures[index + 3].TextureId, label.X, label.Y, label.Width, label.Height, 52, HudOverlayDrawOpacity.Tint);
+                new RectangleF(center.X - labelWidth / 2, center.Y - 32, labelWidth, 64));
+            renderer.RenderTexture(textures[index + 2].TextureId, label.X, label.Y, label.Width, label.Height, 52, HudOverlayDrawOpacity.Tint);
         }
         text.Draw(renderer, WorkshopGaugeArtwork.Map(screen, EnvironmentalTemperatureGaugeLayout.Canvas,
             EnvironmentalTemperatureGaugeLayout.Reading), 52);
-        renderer.RenderTexture(textures[2].TextureId, screen.X, screen.Y, width, height, 53, HudOverlayDrawOpacity.Tint);
+        renderer.RenderTexture(textures[1].TextureId, screen.X, screen.Y, width, height, 53, HudOverlayDrawOpacity.Tint);
     }
 
     #endregion
@@ -99,6 +95,7 @@ internal sealed class EnvironmentalTemperaturePresentation : IDisposable
     {
         Visibility.Reset();
         text.Reset();
+        liquid.Reset();
         ticks?.Dispose(); ticks = null;
         textures = null;
         context = null;
