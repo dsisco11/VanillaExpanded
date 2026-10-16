@@ -1,6 +1,6 @@
 # Ecosystem map overlay proposal
 
-Status: proposal for review. This document describes the intended behavior and proposed integration boundaries. It is not an implementation checklist.
+Status: client-side habitat evaluation with server-supplied original shrub arrays approved; remaining design decisions are for review. This document describes the intended behavior and proposed integration boundaries. It is not an implementation checklist.
 
 ## Intended result
 
@@ -14,7 +14,7 @@ The agreed scope is:
 - Exclude fish.
 - Evaluate regional environmental requirements only.
 - Ignore water, ground, clearance, light, population caps, player distance, and spawn chance.
-- Reuse the existing map layer and map networking systems.
+- Use the existing map layer system with client-side habitat evaluation and persistence. Receive the server's original regional shrub arrays through the existing map-layer transport; this requires a server component for shrub delivery.
 - Use client-local animal definitions as the baseline catalogue. A supplemental server-supplied catalogue is deferred to a follow-up.
 
 ```mermaid
@@ -31,7 +31,7 @@ flowchart LR
 
 The Ecosystem tab follows the existing map's toggle-layer behavior. Its dropdown is visible while the tab is active. The selected species controls one translucent highlight, with terrain, landmarks, and other map layers remaining readable.
 
-Changing the selection uses cached environmental data locally. Panning or zooming requests or prepares any missing data for the newly displayed mapped area. Rendering consumes prepared highlight textures rather than performing world queries each frame.
+Changing the selection uses cached environmental data locally. Panning or zooming prepares highlights from cached data and any normally received world data available for the displayed mapped area. It does not request remote environmental backfill. Rendering consumes prepared highlight textures rather than performing world queries each frame.
 
 Proposed presentation behavior:
 
@@ -48,15 +48,15 @@ Inspection of the installed game assemblies established the following behavior. 
 |---|---|---|
 | `WorldMapManager.RegisterMapLayer` and `LayerGroupCode` | Registered layer groups supply map toggle tabs. | Ecosystem can be a normal map layer. |
 | `MapLayer.ComposeDialogExtras` | Layers can supply an extra GUI composer; the world map enables it with the corresponding tab. | The species dropdown can follow the prospecting layer's existing pattern. |
-| `MapLayerData` | Contains a registered layer code and an opaque byte-array payload. | Environmental messages fit the existing transport envelope. |
-| `MapLayerUpdate` | Carries an array of `MapLayerData` messages. | No new outer network packet is required. |
+| `MapLayerData` | Contains a registered layer code and an opaque byte-array payload. | Route original shrub-array payloads to the Ecosystem layer. |
+| `MapLayerUpdate` | Carries an array of `MapLayerData` messages. | Reuse this envelope for shrub delivery without a new outer packet type. |
 | `MapPieceDB` | Stores rendered terrain pixels. | Saved map images do not retain the original elevation or climate arrays. |
 | `MapDB.SetMapPieces` | Replaces the serialized row when a terrain tile is saved. | Extra fields appended to the vanilla record would need preservation patches. |
-| Client region packets | Supply climate and forest maps, but omit shrub maps. | Complete habitat evaluation needs supplemental server data. |
+| Client region packets | Supply climate and forest maps, but omit shrub maps. | Send the server's existing shrub map separately, preserving its array and layout metadata. |
 | Client map chunks | Supply rain and world-generation terrain heightmaps. | Elevation can be captured while map chunks are available. |
 | Client entity packets | Supply entity identity and variants, but omit server spawn conditions. | Use local animal assets for the baseline catalogue; packet omission does not establish that those assets are unavailable. |
 
-The [prospecting layer](../../../vssurvivalmod/Systems/Prospecting/OreMapLayer/OreMapLayer.cs) demonstrates dropdown composition and map-layer data delivery. The shared contracts are available in [SpawnConditions.cs](../../../vsapi/Common/Entity/SpawnConditions.cs), [IMapRegion.cs](../../../vsapi/Common/API/IMapRegion.cs), and [IMapChunk.cs](../../../vsapi/Common/API/IMapChunk.cs).
+The [prospecting layer](../../../../vssurvivalmod/Systems/Prospecting/OreMapLayer/OreMapLayer.cs) demonstrates dropdown composition and map-layer data delivery. The shared contracts are available in [SpawnConditions.cs](../../../../vsapi/Common/Entity/SpawnConditions.cs), [IMapRegion.cs](../../../../vsapi/Common/API/IMapRegion.cs), and [IMapChunk.cs](../../../../vsapi/Common/API/IMapChunk.cs).
 
 ## Species catalogue and habitat rules
 
@@ -93,22 +93,33 @@ Worldgen and runtime habitat definitions must remain distinguishable in the cata
 
 The client climate lookup can return placeholder values when regional data is missing. Validate source availability explicitly; placeholders and absent shrub data must never become valid habitat samples.
 
+## Client-side environmental acquisition
+
+Use normally received climate, forest, and elevation data alongside client-local animal definitions. Receive the original shrub-density array from the server's existing `IMapRegion.ShrubMap`, then cache it on the client. Habitat evaluation and rendering remain client-side.
+
+Do not reconstruct shrub maps locally or duplicate the vanilla generator's initialization and orchestration calls. The inspected vanilla code splits that orchestration between `GenMaps.initWorldGen()` and the private `OnMapRegionGen(...)`; it does not expose a standalone shrub-map operation with a client-compatible context. Moreover, forced climate changes can occur after shrub generation, so the transmitted climate map is not always the original shrub-generator input.
+
+The server component reads the existing regional shrub map rather than generating a replacement. The payload preserves the region coordinates, original integer array, map size, top-left padding, and bottom-right padding, together with a payload version. Preserve the original values and sampling layout rather than sending a resampled approximation.
+
+Missing shrub data remains unavailable until received or recovered from this world's cache. Do not substitute zero density or a locally regenerated array. The initial feature therefore requires server shrub-delivery support to populate uncached shrub coverage. This dependency is separate from the deferred server species catalogue and does not change installation requirements for unrelated mod features.
+
 ## Data ownership and transport
 
-Keep registration thin. Species classification, environmental acquisition, storage, habitat evaluation, and presentation each have a separate owner. The renderer consumes prepared results and does not own persistence or species policy.
+Keep registration thin. Species classification, environmental acquisition, server shrub delivery, storage, habitat evaluation, and presentation each have a separate owner. The renderer consumes prepared results and does not own persistence or species policy.
 
 ```mermaid
 flowchart TB
+    Normal[Normal game region and chunk delivery] --> LocalMaps[Client climate, forest, and height data]
     subgraph Server
-        WorldData[Regional maps and terrain heights] --> Provider[Environmental data provider]
-        Provider --> Delivery[Ecosystem map-layer delivery]
+        Original[Existing regional ShrubMap] --> Snapshot[Original array and layout snapshot]
+        Snapshot --> Delivery[Ecosystem map-layer delivery]
     end
     Delivery --> Envelope[MapLayerData inside MapLayerUpdate]
     Envelope --> Receive[Client Ecosystem OnDataFromServer]
     subgraph Client
-        Receive --> Cache[Environmental cache]
-        Definitions[Client-local animal definitions] --> Rules[Baseline species habitat catalogue]
-        LocalMaps[Available client region and height data] --> Cache
+        Definitions[Local animal definitions] --> Rules[Baseline species habitat catalogue]
+        LocalMaps --> Cache[Environmental cache]
+        Receive --> Cache
         Cache --> Evaluate[Habitat evaluator]
         Rules --> Evaluate
         Selected[Selected species] --> Evaluate
@@ -118,13 +129,13 @@ flowchart TB
     end
 ```
 
-`MapLayerData` handles routing, not environmental structure or persistence. Define a versioned payload for environmental messages and serialize it into its `Data` field. Supplemental catalogue messages are deferred to the follow-up. The receiving ecosystem layer updates its own cache.
+Use `SendMapDataToClient` and the layer's `OnDataFromServer` callback for the versioned shrub payload. `MapLayerData` provides routing; `MapLayerUpdate` provides the existing envelope. The feature owns decoding, completeness checks, and persistence. Capture the server array safely before asynchronous serialization, and avoid resending unchanged regions unnecessarily.
 
-Use the normal map-open and view-change callbacks to serve relevant areas. These server callbacks include the player identity. The inspected `OnDataFromClient(byte[])` dispatch does not forward the sender, so request/reply behavior that needs player identity must not assume that callback provides it. Additional request details should be designed around the available callbacks before committing to a protocol.
+Coordinate shrub delivery with regions supplied during ordinary exploration, including relevant regions already loaded when the feature initializes. Delivery must not depend solely on opening the Ecosystem tab. Map-open and view-change callbacks can supplement this flow for available regions; they do not establish a saved-record backfill mechanism. The precise delivery hook remains an implementation detail to verify. If requests are needed, account for the fact that the inspected `OnDataFromClient(byte[])` callback omits sender identity, whereas server map-open and view-change callbacks receive the player.
 
-The initial server supplement supplies missing environmental data, including shrub maps. Species rules come from the client-local baseline catalogue. Environmental fields already available on the client can be captured there. Whether delivery supplies only missing fields or complete environmental records is an implementation tradeoff; both feed the same cache and evaluator.
+Persist normally received inputs and the original shrub maps for use after regions unload. Missing climate or elevation remains unavailable; shrub delivery alone cannot recover those inputs from old saved map images.
 
-The mod currently allows servers without Vanilla Expanded. The local species catalogue does not require a server catalogue capability. Complete environmental coverage still requires missing environmental inputs; check that capability independently, without changing the installation requirements of unrelated features. Missing environmental inputs remain unavailable rather than being inferred from local species knowledge.
+The species catalogue continues to use client-local animal definitions. A supplemental server catalogue remains deferred to a follow-up; original shrub delivery is part of the initial implementation and does not introduce catalogue synchronization.
 
 ## Persistence in the existing map database
 
@@ -165,20 +176,19 @@ The existing map database uses WAL mode, but its connection is privately owned b
 
 Integrate cache clearing with map purge: the vanilla purge deletes only its map-piece rows. Version environmental records explicitly, and invalidate derived highlight tiles when inputs or the habitat catalogue change. Avoid storing an independent permanent mask for every species when it can be rebuilt from shared environmental inputs.
 
-## Coverage and previously explored areas
+## Coverage, backfill, and historical compatibility
 
-Capture and persist environmental data as areas become available, so the overlay continues working after their world chunks unload. Acquisition should not depend solely on the Ecosystem tab being open; otherwise normal exploration would leave avoidable holes in its cache.
+Capture and persist environmental data as areas become available through ordinary play, so the overlay continues working after their world chunks unload. Acquisition should not depend solely on the Ecosystem tab being open. Also capture relevant regions and map chunks already loaded when the feature initializes.
 
-Previously explored areas are a distinct migration case. Their existing map images contain pixels, not reconstructable climate or height arrays. Full initial coverage therefore requires reading the corresponding saved server region and map-chunk records.
+**Backfill** means obtaining missing environmental inputs for areas already drawn in the saved map before this feature captured them, without requiring the player to revisit those areas. For example, a distant valley may remain visible as a saved map image while its climate and height arrays are no longer available locally. The pixel-only image cannot reconstruct those inputs. Receiving a shrub array alone does not recover missing climate or elevation.
 
-The public world-manager getters return loaded records. A lightweight saved-record retrieval path has not yet been established. Do not present immediate backfill of all existing map coverage as verified, and do not substitute generating or loading full terrain columns as an assumed solution.
+Without backfill, existing worlds remain usable: areas available during normal play gain ecosystem coverage, and revisiting an old mapped area supplies its inputs through normal game loading. Once captured, that coverage persists across travel and reconnects. Old uncached areas remain visible on the ordinary map but have unavailable ecosystem coverage until their required inputs become available. Panning over an old map image alone does not load those inputs.
 
-Two possible initial behaviors remain for review:
+**Historical shrub-generation compatibility** requires no client reproduction of old algorithms: the server supplies the shrub array already held by the region, including historical or server-specific results. Obtaining that record for an unloaded old region is still a separate backfill question.
 
-- Backfill existing explored tiles through a verified saved-record retrieval path.
-- Populate environmental coverage as areas are revisited, showing older uncached coverage as unavailable until then.
+Backfill remains undecided. Neither its omission nor an additional saved-record retrieval mechanism is approved here. Normal environmental capture and original shrub delivery do not require backfill. Any later backfill proposal would need its own verified data source and scope; public server world-manager getters only expose loaded records, and no lightweight saved-record retrieval path has been established.
 
-Neither approach can reconstruct missing inputs from the map image itself. Incoming regional data must still be clipped to explored coverage when rendered.
+Clip the highlight to explored coverage even when a cached regional array extends beyond it.
 
 ## Performance and lifecycle expectations
 
@@ -192,17 +202,17 @@ Snapshot data before background evaluation where game-owned arrays or API access
 
 Validation should demonstrate local catalogue construction and use without any server catalogue message, locally patched definitions and variant resolution, species deduplication, fish exclusion, complete environmental-rule matching, boundary handling, and unknown-data behavior. Compare representative results with the inspected game habitat calculations, including reference-height climate and normalized elevation.
 
-Exercise persistence across tile redraw, map close/reopen, region unload, reconnect, purge, and version changes. Confirm that environmental messages reach the registered layer and that old cached images without environmental records remain distinguishable from unsuitable habitat.
+Exercise persistence across tile redraw, map close/reopen, region unload, reconnect, purge, and version changes. Confirm that server shrub arrays survive transport and persistence with unchanged values, size, padding, and region identity. Verify missing-server-support and missing-record behavior, correct routing to the Ecosystem layer, and that old map images without environmental records remain distinguishable from unsuitable habitat. Include a region with forced climate changes to ensure the existing shrub array is delivered rather than recomputed from the final climate map.
 
-Measure map opening, panning, species switching, cache size, and server data acquisition with representative explored maps. Focused automated checks cannot establish visual quality or live performance. In-game acceptance should confirm readable terrain, correct dropdown visibility, stable highlights, and no reveal beyond mapped coverage.
+Measure map opening, panning, species switching, cache size, and client environmental capture and server shrub delivery with representative explored maps. Focused automated checks cannot establish visual quality or live performance. In-game acceptance should confirm readable terrain, correct dropdown visibility, stable highlights, and no reveal beyond mapped coverage.
 
 ## Decisions remaining before an implementation plan
 
 1. Final species catalogue, including insects and the boundary for mod-added species support.
 2. Whether habitat eligibility combines worldgen and runtime environmental rules or follows one selected convention.
-3. Initial support for previously explored areas: saved-record backfill or progressive coverage on revisiting.
+3. Whether to omit backfill. The approved design captures available environmental data and original server shrub arrays during ordinary play; historical shrub algorithms need not be reproduced on the client.
 4. Whether the ecosystem highlight also appears on the minimap.
-5. Database connection ownership and the saved-record retrieval path, after targeted technical verification.
+5. Database connection ownership, after targeted technical verification. Saved-record retrieval is relevant only if separate backfill support is later approved.
 
 ## Evidence references
 
@@ -215,5 +225,7 @@ The analysis used local API and survival-mod source plus targeted decompilation 
 - `ClientWorldMap.GetClimate` / `GetClimateAt`: cached sampling and placeholder fallback.
 - `ClientMapRegion.UpdateFromPacket`, `ClientMapChunk.UpdateFromPacket`, and `EntityTypeNet`: actual client data availability.
 - `ServerSystemEntitySpawner.GetSuitableClimateTemperatureRainfall` and `GenCreatures`: habitat sampling conventions.
+- `GenMaps.initWorldGen`, `GenMaps.OnMapRegionGen`, and `GenMaps.ForceClimate`: server-dependent orchestration and climate modification after shrub generation.
+- `ServerMapRegion` and `ClientMapRegion`: original shrub-map ownership and omission from normal region packets.
 
-The temporary decompiled analysis files are not repository dependencies. Durable API references include [climate conversion](../../../vsapi/Common/Climate.cs), [world lookup contracts](../../../vsapi/Common/API/IBlockAccessor.cs), [server world-manager access](../../../vsapi/Server/API/IWorldManagerAPI.cs), and [SQLite connection behavior](../../../vsapi/Common/IO/SQLiteDBConnection.cs).
+The temporary decompiled analysis files are not repository dependencies. Durable API references include [climate conversion](../../../../vsapi/Common/Climate.cs), [world lookup contracts](../../../../vsapi/Common/API/IBlockAccessor.cs), [server world-manager access](../../../../vsapi/Server/API/IWorldManagerAPI.cs), and [SQLite connection behavior](../../../../vsapi/Common/IO/SQLiteDBConnection.cs).
