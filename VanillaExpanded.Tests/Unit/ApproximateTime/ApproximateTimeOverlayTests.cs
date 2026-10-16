@@ -17,7 +17,7 @@ namespace VanillaExpanded.Tests.Unit.ApproximateTime;
 public sealed class ApproximateTimeOverlayTests
 {
     #region Public API
-    /// <summary>The scenery rotates a full turn per day with noon upright and midnight inverted.</summary>
+    /// <summary>The pointer turns once per day, with noon up and midnight down.</summary>
     [Theory]
     [InlineData(0.5, 0)]
     [InlineData(0.75, Math.PI / 2)]
@@ -28,15 +28,14 @@ public sealed class ApproximateTimeOverlayTests
         var fixture = new BowAmmunitionSamplerTests.Fixture();
         var dial = new Mock<IApproximateTimeDialRenderer>();
         using var presentation = new ApproximateTimePresentation(context =>
-            Enumerable.Range(0, 2).Select(index => new LoadedTexture(context.Api)
-                { TextureId = index + 1, IgnoreUndisposed = true }).ToArray(), _ => dial.Object);
+            Enumerable.Range(0, 3).Select(index => new LoadedTexture(context.Api)
+                { TextureId = index + 1, IgnoreUndisposed = true }).ToArray(), dial.Object, CreateFace);
         presentation.SetContent(ApproximateTimePeriod.Noon, day);
         presentation.Prepare(new HudOverlayPreparationContext(fixture.Api.Object, 1, "en", 0));
         presentation.Draw(Mock.Of<IRenderAPI>(), ElementBounds.Fixed(0, 0, 24, 24).WithEmptyParent());
         dial.Verify(x => x.Draw(It.IsAny<IRenderAPI>(), 2, It.IsAny<RectangleF>(), 1,
             It.Is<float>(angle => Math.Abs(angle - expected) < .00001)), Times.Once);
         presentation.Reset();
-        dial.Verify(x => x.Dispose(), Times.Once);
     }
     /// <summary>Rendering consumes saved observation age without client terrain sampling or lifetime mutation.</summary>
     [Fact]
@@ -69,9 +68,9 @@ public sealed class ApproximateTimeOverlayTests
         using var overlay = new ApproximateTimeOverlay(new ApproximateTimePresentation(context =>
         {
             uploads++;
-            return Enumerable.Range(0, 2).Select(index => new LoadedTexture(context.Api)
+            return Enumerable.Range(0, 3).Select(index => new LoadedTexture(context.Api)
                 { TextureId = index + 1, Width = 96, Height = 96, IgnoreUndisposed = true }).ToArray();
-        }, _ => Mock.Of<IApproximateTimeDialRenderer>()));
+        }, Mock.Of<IApproximateTimeDialRenderer>(), CreateFace));
         overlay.BeginSession(fixture.Api.Object);
         var preparation = new HudOverlayPreparationContext(fixture.Api.Object, 1, "en", 0);
         overlay.Refresh(); overlay.Prepare(preparation);
@@ -122,5 +121,10 @@ public sealed class ApproximateTimeOverlayTests
         Assert.Equal(4, ApproximateTimeState.Read(fixture.Entity));
         blocks.Verify(x => x.GetLightLevel(It.IsAny<BlockPos>(), It.IsAny<EnumLightLevelType>()), Times.Never);
     }
+    #endregion
+    #region Private
+    /// <summary>Supplies an owned face texture without invoking Cairo or a graphics context.</summary>
+    private static LoadedTexture CreateFace(HudOverlayPreparationContext context, ApproximateTimeDayPhases phases) =>
+        new(context.Api) { TextureId = 20, Width = 512, Height = 512 };
     #endregion
 }

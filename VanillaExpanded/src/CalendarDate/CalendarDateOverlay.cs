@@ -1,0 +1,87 @@
+using System;
+using System.Drawing;
+using VanillaExpanded.HudOverlays.Registration;
+using VanillaExpanded.HudOverlays.Rendering;
+using Vintagestory.API.Client;
+
+namespace VanillaExpanded.CalendarDate;
+
+/// <summary>Samples the native date and owns the independent mechanical calendar indicator.</summary>
+internal sealed class CalendarDateOverlay : IHudOverlay, IHudOverlayVisibilityTransition
+{
+    private readonly CalendarDatePresentation presentation;
+    private ICoreClientAPI? api;
+    private CalendarDateReading? date;
+    private bool enabled = true, disposed;
+
+    #region Public API
+    #region Lifecycle
+    /// <summary>Gets the presentation's retained-resource transition.</summary>
+    public HudOverlayVisibilityTransition Visibility => presentation.Visibility;
+    /// <summary>Creates the feature-owned calendar presentation.</summary>
+    public CalendarDateOverlay(CalendarDatePresentation? presentation = null) => this.presentation = presentation ?? new();
+    /// <summary>Binds one client world.</summary>
+    public void BeginSession(ICoreClientAPI api)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        ArgumentNullException.ThrowIfNull(api);
+        if (this.api != null) throw new InvalidOperationException("A calendar indicator session is already bound.");
+        this.api = api;
+    }
+    /// <summary>Applies feature visibility immediately and retains contents during an exit.</summary>
+    public bool SetEnabled(bool value)
+    {
+        enabled = value;
+        if (!value) HidePresentation();
+        return value;
+    }
+    /// <summary>Ends a world binding and releases presentation resources immediately.</summary>
+    public void EndSession()
+    {
+        api = null; date = null; presentation.Reset();
+    }
+    /// <summary>Releases ownership exactly once.</summary>
+    public void Dispose()
+    {
+        if (disposed) return;
+        disposed = true;
+        EndSession(); presentation.Dispose();
+    }
+    #endregion
+    #region Sampling and rendering
+    /// <summary>Requires an enabled indicator and a living local character.</summary>
+    public bool IsApplicable()
+    {
+        bool applicable = !disposed && enabled && api?.World.Player?.Entity?.Alive == true;
+        if (!applicable) HidePresentation();
+        return applicable;
+    }
+    /// <summary>Samples calendar fields outside drawing, invalidating only when the displayed date changes.</summary>
+    public HudOverlayChange Refresh()
+    {
+        if (!IsApplicable()) return HudOverlayChange.None;
+        var next = CalendarDateReading.Read(api!.World.Calendar);
+        if (next == date) return HudOverlayChange.None;
+        date = next;
+        if (next.HasValue) presentation.SetContent(next.Value);
+        else presentation.Hide();
+        return HudOverlayChange.Presentation | HudOverlayChange.Measurement;
+    }
+    /// <summary>Prepares localized lettering only when valid native date content is available.</summary>
+    public void Prepare(HudOverlayPreparationContext context)
+    {
+        if (date.HasValue) presentation.Prepare(context);
+    }
+    /// <summary>Returns the complete mechanical instrument footprint.</summary>
+    public SizeF Measure() => presentation.Size;
+    /// <summary>Draws cached artwork without accessing world or calendar state.</summary>
+    public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime) => presentation.Draw(renderer, bounds);
+    /// <summary>Clears sampling state while retaining the prepared date through a fade.</summary>
+    public void HidePresentation()
+    {
+        date = null;
+        presentation.Hide();
+    }
+    #endregion
+    #endregion
+}
