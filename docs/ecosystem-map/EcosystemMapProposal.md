@@ -1,6 +1,6 @@
 # Ecosystem map overlay proposal
 
-Status: client-side habitat evaluation with server-supplied original shrub arrays approved; remaining design decisions are for review. This document describes the intended behavior and proposed integration boundaries. It is not an implementation checklist.
+Status: client-side habitat evaluation with server-supplied original shrub arrays and omission of backfill approved; remaining design decisions are for review. This document describes the intended behavior and proposed integration boundaries. It is not an implementation checklist.
 
 ## Intended result
 
@@ -12,6 +12,7 @@ The agreed scope is:
 
 - One dropdown entry per unique species, combining age and sex variants.
 - Exclude fish.
+- Omit backfill. Capture environmental coverage from data available during normal play, including already loaded areas, and persist it for later use.
 - Evaluate regional environmental requirements only.
 - Ignore water, ground, clearance, light, population caps, player distance, and spawn chance.
 - Use the existing map layer system with client-side habitat evaluation and persistence. Receive the server's original regional shrub arrays through the existing map-layer transport; this requires a server component for shrub delivery.
@@ -131,7 +132,7 @@ flowchart TB
 
 Use `SendMapDataToClient` and the layer's `OnDataFromServer` callback for the versioned shrub payload. `MapLayerData` provides routing; `MapLayerUpdate` provides the existing envelope. The feature owns decoding, completeness checks, and persistence. Capture the server array safely before asynchronous serialization, and avoid resending unchanged regions unnecessarily.
 
-Coordinate shrub delivery with regions supplied during ordinary exploration, including relevant regions already loaded when the feature initializes. Delivery must not depend solely on opening the Ecosystem tab. Map-open and view-change callbacks can supplement this flow for available regions; they do not establish a saved-record backfill mechanism. The precise delivery hook remains an implementation detail to verify. If requests are needed, account for the fact that the inspected `OnDataFromClient(byte[])` callback omits sender identity, whereas server map-open and view-change callbacks receive the player.
+Coordinate shrub delivery with regions supplied during ordinary exploration, including relevant regions already loaded when the feature initializes. Delivery must not depend solely on opening the Ecosystem tab. Map-open and view-change callbacks can supplement this flow for available regions; they must not load or generate remote regions to fill missing ecosystem coverage. The precise delivery hook remains an implementation detail to verify. If requests are needed, account for the fact that the inspected `OnDataFromClient(byte[])` callback omits sender identity, whereas server map-open and view-change callbacks receive the player.
 
 Persist normally received inputs and the original shrub maps for use after regions unload. Missing climate or elevation remains unavailable; shrub delivery alone cannot recover those inputs from old saved map images.
 
@@ -184,9 +185,9 @@ Capture and persist environmental data as areas become available through ordinar
 
 Without backfill, existing worlds remain usable: areas available during normal play gain ecosystem coverage, and revisiting an old mapped area supplies its inputs through normal game loading. Once captured, that coverage persists across travel and reconnects. Old uncached areas remain visible on the ordinary map but have unavailable ecosystem coverage until their required inputs become available. Panning over an old map image alone does not load those inputs.
 
-**Historical shrub-generation compatibility** requires no client reproduction of old algorithms: the server supplies the shrub array already held by the region, including historical or server-specific results. Obtaining that record for an unloaded old region is still a separate backfill question.
+**Historical shrub-generation compatibility** requires no client reproduction of old algorithms: the server supplies the shrub array already held by the region, including historical or server-specific results. For an unloaded old region, capture its shrub record when the region becomes available through normal play.
 
-Backfill remains undecided. Neither its omission nor an additional saved-record retrieval mechanism is approved here. Normal environmental capture and original shrub delivery do not require backfill. Any later backfill proposal would need its own verified data source and scope; public server world-manager getters only expose loaded records, and no lightweight saved-record retrieval path has been established.
+Approved scope: omit backfill. Do not add saved-record retrieval, remote region loading, or terrain generation to populate old map-only coverage. Background processing may evaluate and cache available environmental inputs for mapped areas; it does not trigger world loading to obtain missing inputs.
 
 Clip the highlight to explored coverage even when a cached regional array extends beyond it.
 
@@ -202,7 +203,7 @@ Snapshot data before background evaluation where game-owned arrays or API access
 
 Validation should demonstrate local catalogue construction and use without any server catalogue message, locally patched definitions and variant resolution, species deduplication, fish exclusion, complete environmental-rule matching, boundary handling, and unknown-data behavior. Compare representative results with the inspected game habitat calculations, including reference-height climate and normalized elevation.
 
-Exercise persistence across tile redraw, map close/reopen, region unload, reconnect, purge, and version changes. Confirm that server shrub arrays survive transport and persistence with unchanged values, size, padding, and region identity. Verify missing-server-support and missing-record behavior, correct routing to the Ecosystem layer, and that old map images without environmental records remain distinguishable from unsuitable habitat. Include a region with forced climate changes to ensure the existing shrub array is delivered rather than recomputed from the final climate map.
+Exercise persistence across tile redraw, map close/reopen, region unload, reconnect, purge, and version changes. Verify that panning over old uncached map images does not trigger saved-record retrieval or world loading, and that ordinary revisiting populates and retains ecosystem coverage. Confirm that server shrub arrays survive transport and persistence with unchanged values, size, padding, and region identity. Verify missing-server-support and missing-record behavior, correct routing to the Ecosystem layer, and that old map images without environmental records remain distinguishable from unsuitable habitat. Include a region with forced climate changes to ensure the existing shrub array is delivered rather than recomputed from the final climate map.
 
 Measure map opening, panning, species switching, cache size, and client environmental capture and server shrub delivery with representative explored maps. Focused automated checks cannot establish visual quality or live performance. In-game acceptance should confirm readable terrain, correct dropdown visibility, stable highlights, and no reveal beyond mapped coverage.
 
@@ -210,9 +211,8 @@ Measure map opening, panning, species switching, cache size, and client environm
 
 1. Final species catalogue, including insects and the boundary for mod-added species support.
 2. Whether habitat eligibility combines worldgen and runtime environmental rules or follows one selected convention.
-3. Whether to omit backfill. The approved design captures available environmental data and original server shrub arrays during ordinary play; historical shrub algorithms need not be reproduced on the client.
-4. Whether the ecosystem highlight also appears on the minimap.
-5. Database connection ownership, after targeted technical verification. Saved-record retrieval is relevant only if separate backfill support is later approved.
+3. Whether the ecosystem highlight also appears on the minimap.
+4. Database connection ownership, after targeted technical verification.
 
 ## Evidence references
 
