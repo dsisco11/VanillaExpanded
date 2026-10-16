@@ -66,6 +66,15 @@
         "weight": 10.79,
         "clientSide": true
       },
+      "EnableCalendarDateOverlay": {
+        "code": "EnableCalendarDateOverlay",
+        "name": "EnableCalendarDateOverlay",
+        "ingui": "vanillaexpanded:config-enable-calendar-date-overlay",
+        "comment": "vanillaexpanded:config-enable-calendar-date-overlay-tooltip",
+        "default": true,
+        "weight": 10.795,
+        "clientSide": true
+      },
       "EnableWeatherConditionsOverlay": {
         "code": "EnableWeatherConditionsOverlay",
         "name": "EnableWeatherConditionsOverlay",

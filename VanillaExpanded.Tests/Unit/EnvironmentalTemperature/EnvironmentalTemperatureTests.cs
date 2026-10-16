@@ -88,80 +88,106 @@ public sealed class EnvironmentalTemperatureTests : IDisposable
     #endregion
 
     #region Presentation
-    /// <summary>The scale saturates independently of the numeric temperature, including below freezing.</summary>
+    /// <summary>Empty/full layers, clipping, labels, and cover share the same horizontal calibration and scaling.</summary>
     [Theory]
-    [InlineData(-40, 0, "-40°C")] [InlineData(-20, 0, "-20°C")]
-    [InlineData(10, .5f, "10°C")] [InlineData(40, 1, "40°C")] [InlineData(55, 1, "55°C")]
-    public void MarkerClampsButReadingDoesNot(float celsius, float position, string expected)
+    [InlineData(-55, 0, "-55°C", 1)]
+    [InlineData(-40, 0, "-40°C", 2)]
+    [InlineData(0, .4f, "0°C", 1.5)]
+    [InlineData(9, .49f, "9°C", 1)]
+    [InlineData(60, 1, "60°C", 2)]
+    [InlineData(75, 1, "75°C", 1)]
+    public void FillClampsWhileReadingRemainsActual(float celsius, float fill, string expected, double scale)
     {
-        var api = new Mock<ICoreClientAPI>() { DefaultValue = DefaultValue.Mock };
+        var api = new Mock<ICoreClientAPI> { DefaultValue = DefaultValue.Mock };
         string? reading = null;
-        using var text = new HudOverlayIconTextPresentation((context, value) =>
+        using var text = new WorkshopGaugeText((context, value) =>
         {
             reading = value;
-            return new LoadedTexture(context.Api) { TextureId = 3, Width = 30, Height = 14 };
+            return new LoadedTexture(context.Api) { TextureId = 20, Width = (int)(30 * scale), Height = (int)(14 * scale) };
         });
-        var gradient = new Mock<IEnvironmentalTemperatureScaleRenderer>();
-        using var presentation = new EnvironmentalTemperaturePresentation(text, LoadTestTextures, _ => gradient.Object);
-        presentation.SetContent(celsius);
-        presentation.Prepare(new(api.Object, 1, "en"));
-        Assert.Equal(position, presentation.MarkerPosition);
+        using var presentation = new EnvironmentalTemperaturePresentation(text, LoadTestTextures,
+            context => new LoadedTexture(context.Api) { TextureId = 10 });
+        presentation.SetContent(celsius); presentation.Prepare(new(api.Object, scale, "en"));
+        Assert.Equal(fill, presentation.MarkerPosition, 5);
         Assert.Equal(expected, reading);
-        Assert.Equal(new SizeF(42, 36), presentation.Size);
-        var bounds = ElementBounds.Fixed(0, 0, 42, 36).WithEmptyParent();
-        bounds.absFixedX = bounds.absFixedY = 0;
-        bounds.absInnerWidth = 42; bounds.absInnerHeight = 36; bounds.Initialized = true;
+        Assert.Equal(new SizeF(HudOverlaySizes.EnvironmentalThermometer, HudOverlaySizes.EnvironmentalThermometer / 4), presentation.Size);
+        double width = HudOverlaySizes.EnvironmentalThermometer * scale, height = width / 4;
+        var bounds = Bounds(10, 20, width, height);
         var renderer = new Mock<IRenderAPI>();
-        presentation.Draw(renderer.Object, bounds, new RectangleF(0, 0, 42, 36));
-        gradient.Verify(value => value.Draw(renderer.Object, 1, new RectangleF(2.25f, 3.75f, 3, 28.5f), 1), Times.Once);
-        var marker = Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture" && (int)call.Arguments[0] == 2);
-        double x = (double)marker.Arguments[1], y = (double)marker.Arguments[2];
-        Assert.Equal(0, x);
-        Assert.Equal(28.5 * (1 - position), y, 5);
-        Assert.Equal(7.5, (double)marker.Arguments[3]);
-        Assert.Equal(7.5, (double)marker.Arguments[4]);
-        Assert.InRange(y, 0, 36 - 7.5);
-        var numeric = Assert.Single(renderer.Invocations, call => call.Method.Name == "Render2DTexturePremultipliedAlpha");
-        // The reading occupies the right column and remains vertically centered beside the full-height scale.
-        Assert.Equal(12, (double)numeric.Arguments[1]);
-        Assert.Equal(18, (double)numeric.Arguments[2] + (double)numeric.Arguments[4] / 2);
-        Assert.Equal(42, (double)numeric.Arguments[1] + (double)numeric.Arguments[3]);
+        presentation.Draw(renderer.Object, bounds, new(10, 20, (float)width, (float)height));
+        var scissor = Assert.IsType<ElementBounds>(Assert.Single(renderer.Invocations, call => call.Method.Name == "PushScissor").Arguments[0]);
+        Assert.Equal(10d, scissor.renderX); Assert.Equal(20d, scissor.renderY);
+        Assert.Equal((96 + 299 * fill) / 512 * width, scissor.OuterWidth, 4);
+        Assert.Equal(height, scissor.OuterHeight);
+        var layers = renderer.Invocations.Where(call => call.Method.Name == "RenderTexture").ToArray();
+        Assert.Equal(new[] { 1, 2, 4, 5, 6, 3 }, layers.Select(call => (int)call.Arguments[0]));
+        foreach (var layer in layers.Where(call => (int)call.Arguments[0] <= 3))
+        {
+            Assert.Equal(10d, layer.Arguments[1]); Assert.Equal(20d, layer.Arguments[2]);
+            Assert.Equal(width, layer.Arguments[3]); Assert.Equal(height, layer.Arguments[4]);
+        }
+        renderer.Verify(value => value.PopScissor(), Times.Once);
+        Assert.Equal(53f, layers.Last().Arguments[5]);
     }
 
-    /// <summary>Fractional changes move the marker while reusing text and borrowed icons until the rounded reading changes.</summary>
+    /// <summary>Fractional temperature changes reuse reading and ticks; reset disposes owned but not borrowed textures.</summary>
     [Fact]
     public void ReadingCacheAndOwnedLifetimeFollowDisplayedDegrees()
     {
-        var api = new Mock<ICoreClientAPI>() { DefaultValue = DefaultValue.Mock };
+        var api = new Mock<ICoreClientAPI> { DefaultValue = DefaultValue.Mock };
         var readings = new List<LoadedTexture>();
-        using var text = new HudOverlayIconTextPresentation((context, value) =>
+        var borrowed = LoadTestTextures(new(api.Object, 1, "en"));
+        var ticks = new LoadedTexture(api.Object) { TextureId = 99 };
+        using var text = new WorkshopGaugeText((context, _) =>
         {
             var texture = new LoadedTexture(context.Api) { TextureId = 10 + readings.Count, Width = 30, Height = 14 };
-            readings.Add(texture);
-            return texture;
+            readings.Add(texture); return texture;
         });
-        int loads = 0, gradientLoads = 0;
-        var gradient = new Mock<IEnvironmentalTemperatureScaleRenderer>();
-        using var presentation = new EnvironmentalTemperaturePresentation(text, context => { loads++; return LoadTestTextures(context); }, _ => { gradientLoads++; return gradient.Object; });
+        int loads = 0, tickLoads = 0;
+        using var presentation = new EnvironmentalTemperaturePresentation(text, _ => { loads++; return borrowed; }, _ => { tickLoads++; return ticks; });
         var preparation = new HudOverlayPreparationContext(api.Object, 1, "en");
         presentation.SetContent(12.1f); presentation.Prepare(preparation);
         float previous = presentation.MarkerPosition;
         presentation.SetContent(12.4f); presentation.Prepare(preparation);
         Assert.True(presentation.MarkerPosition > previous);
-        Assert.Single(readings); Assert.Equal(1, loads); Assert.Equal(1, gradientLoads);
+        Assert.Single(readings); Assert.Equal(1, loads); Assert.Equal(1, tickLoads);
         presentation.SetContent(12.6f); presentation.Prepare(preparation);
-        Assert.Equal(2, readings.Count); Assert.Equal(0, readings[0].TextureId);
+        Assert.Equal(2, readings.Count); Assert.True(readings[0].Disposed);
         presentation.Hide();
-        gradient.Verify(value => value.Dispose(), Times.Once);
-        Assert.Equal(0, readings[1].TextureId); Assert.Equal(SizeF.Empty, presentation.Size);
+        Assert.True(ticks.Disposed); Assert.True(readings[1].Disposed);
+        Assert.All(borrowed, texture => Assert.False(texture.Disposed)); Assert.Equal(SizeF.Empty, presentation.Size);
+    }
+
+    /// <summary>A failed liquid draw always restores the enclosing host scissor.</summary>
+    [Fact]
+    public void LiquidFailureRestoresScissor()
+    {
+        var api = new Mock<ICoreClientAPI> { DefaultValue = DefaultValue.Mock };
+        using var text = new WorkshopGaugeText((context, _) => new LoadedTexture(context.Api) { TextureId = 20, Width = 30, Height = 14 });
+        using var presentation = new EnvironmentalTemperaturePresentation(text, LoadTestTextures,
+            context => new LoadedTexture(context.Api) { TextureId = 10 });
+        presentation.SetContent(9); presentation.Prepare(new(api.Object, 1, "en"));
+        var renderer = new Mock<IRenderAPI>();
+        renderer.Setup(value => value.RenderTexture(2, It.IsAny<double>(), It.IsAny<double>(), It.IsAny<double>(),
+            It.IsAny<double>(), 51, It.IsAny<Vec4f>())).Throws(new InvalidOperationException("draw"));
+        Assert.Throws<InvalidOperationException>(() => presentation.Draw(renderer.Object, Bounds(0, 0, 320, 80), new(0, 0, 320, 80)));
+        renderer.Verify(value => value.PopScissor(), Times.Once);
     }
     #endregion
     #endregion
 
     #region Private
-    /// <summary>Provides borrowed icon wrappers without a graphics context.</summary>
-    private static LoadedTexture[] LoadTestTextures(HudOverlayPreparationContext context) =>
-        [new LoadedTexture(context.Api) { TextureId = 1, IgnoreUndisposed = true },
-         new LoadedTexture(context.Api) { TextureId = 2, IgnoreUndisposed = true }];
+    /// <summary>Provides borrowed layer wrappers without a graphics context.</summary>
+    private static LoadedTexture[] LoadTestTextures(HudOverlayPreparationContext context) => Enumerable.Range(1, 6)
+        .Select(id => new LoadedTexture(context.Api) { TextureId = id, IgnoreUndisposed = true }).ToArray();
+
+    /// <summary>Creates initialized native screen bounds without depending on GUI scale globals.</summary>
+    private static ElementBounds Bounds(double x, double y, double width, double height)
+    {
+        var bounds = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
+        bounds.absFixedX = x; bounds.absFixedY = y;
+        bounds.absInnerWidth = width; bounds.absInnerHeight = height; bounds.Initialized = true;
+        return bounds;
+    }
     #endregion
 }

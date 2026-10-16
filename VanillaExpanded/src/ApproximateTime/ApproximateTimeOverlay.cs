@@ -17,6 +17,8 @@ internal sealed class ApproximateTimeOverlay : IHudOverlay, IHudOverlayVisibilit
     private ICoreClientAPI? api;
     private Entity? entity;
     private ApproximateTimePeriod? period;
+    private ApproximateTimeDayPhases? phases;
+    private (double Day, int X, int Z, float? Season)? phaseKey;
     private bool enabled = true;
     private bool disposed;
 
@@ -102,15 +104,17 @@ internal sealed class ApproximateTimeOverlay : IHudOverlay, IHudOverlayVisibilit
         // Before the first usable sample, leave the presentation empty and retry next refresh.
         if (next == ApproximateTimePeriod.Unknown) return HudOverlayChange.None;
         bool periodChanged = next != period;
-        float? temperature = null;
-        if (VanillaExpandedModSystem.Config.EnableEnvironmentalTemperatureOverlay)
+        var position = current.Pos.AsBlockPos;
+        var nextKey = (Math.Floor(calendar.TotalDays), position.X, position.Z, calendar.SeasonOverride);
+        if (phaseKey != nextKey)
         {
-            var climate = api.World.BlockAccessor.GetClimateAt(current.Pos.AsBlockPos, EnumGetClimateMode.NowValues);
-            if (climate != null && float.IsFinite(climate.Temperature)) temperature = climate.Temperature;
+            var sampled = ApproximateTimeDayPhases.Sample(calendar.TotalDays,
+                day => calendar.GetSunPosition(current.Pos.XYZ, day).Y);
+            // Keep a valid distribution during transient calendar failures and retry next refresh.
+            if (sampled != null) { phases = sampled; phaseKey = nextKey; }
         }
-        presentation.SetTemperature(temperature);
         period = next;
-        presentation.SetContent(next, estimatedDay);
+        presentation.SetContent(next, estimatedDay, phases);
         return HudOverlayChange.Presentation | (periodChanged ? HudOverlayChange.Measurement : HudOverlayChange.None);
     }
     /// <summary>Prepares cached artwork for the estimated part of the day.</summary>
@@ -133,6 +137,8 @@ internal sealed class ApproximateTimeOverlay : IHudOverlay, IHudOverlayVisibilit
     {
         entity = null;
         period = null;
+        phases = null;
+        phaseKey = null;
 
         presentation.Hide();
     }

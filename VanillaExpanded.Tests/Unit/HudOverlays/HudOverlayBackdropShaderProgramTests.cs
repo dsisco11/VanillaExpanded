@@ -78,6 +78,8 @@ public sealed class HudOverlayBackdropShaderProgramTests
     public void StatusPresentationsBorrowBackdropAndHideTogether(string kind)
     {
         var api = new Mock<ICoreClientAPI>(); var renderer = new Mock<IRenderAPI>();
+        api.SetupGet(value => value.Render).Returns(renderer.Object);
+        api.SetupGet(value => value.Gui).Returns(Mock.Of<IGuiAPI>());
         var backdrop = new Mock<IHudOverlayIconBackdrop>(); var calls = new List<string>();
         backdrop.Setup(value => value.Queue(renderer.Object, It.IsAny<double>(), It.IsAny<double>(), 1))
             .Callback(() => calls.Add("backdrop"));
@@ -105,7 +107,7 @@ public sealed class HudOverlayBackdropShaderProgramTests
                 collect = () => weather.CollectBackdrops(renderer.Object, bounds); owner = weather; prepare = () => weather.Prepare(context); draw = () => weather.Draw(renderer.Object, bounds); reset = weather.Reset;
                 break;
             case "time":
-                var time = new VanillaExpanded.ApproximateTime.ApproximateTimePresentation(Load, _ => new Mock<VanillaExpanded.ApproximateTime.IApproximateTimeDialRenderer>().Object);
+                var time = new VanillaExpanded.ApproximateTime.ApproximateTimePresentation(Load, new Mock<VanillaExpanded.ApproximateTime.IApproximateTimeDialRenderer>().Object, (preparation, _) => new LoadedTexture(preparation.Api) { TextureId = 20 });
                 time.SetContent(VanillaExpanded.ApproximateTime.ApproximateTimePeriod.Noon, .5);
                 collect = () => { }; owner = time; prepare = () => time.Prepare(context); draw = () => time.Draw(renderer.Object, bounds); reset = time.Reset;
                 break;
