@@ -13,7 +13,7 @@ The agreed scope is:
 - Include all naturally spawning wild mammals and birds defined by the base game, with one dropdown entry per species combining age, sex, and cosmetic variants.
 - Exclude fish, insects, supernatural creatures, and domestic-only variants. Mod-added species are deferred to a follow-up.
 - Omit backfill. Capture environmental coverage from data available during normal play, including already loaded areas, and persist it for later use.
-- Evaluate regional environmental requirements only.
+- Evaluate regional environmental requirements using worldgen temperature, rainfall, forest density, and shrub density, with terrain elevation checked separately. Current weather and seasonal climate do not drive habitat eligibility.
 - Ignore water, ground, clearance, light, population caps, player distance, and spawn chance.
 - Use the existing map layer system with client-side habitat evaluation and persistence. Receive the server's original regional shrub arrays through the existing map-layer transport; this requires a server component for shrub delivery.
 - Use client-local animal definitions as the baseline catalogue. A supplemental server-supplied catalogue is deferred to a follow-up.
@@ -90,7 +90,9 @@ The World API exposes efficient regional climate lookup, but calling `GetClimate
 
 The inspected runtime animal spawner evaluates climate at a reference height of approximately `seaLevel * 1.09`, then checks actual elevation separately. Worldgen spawning uses a similar reference for temperature, but reads rainfall differently. Client and server temperature conversion also have different lower clamps. Reuse the appropriate game conversion and sampling conventions rather than the player's displayed temperature.
 
-Worldgen and runtime habitat definitions must remain distinguishable in the catalogue until the evaluation policy is agreed. A reasonable proposal for this general habitat overlay is to include locations satisfying either applicable environmental rule set. This is a recommendation for review, not a settled requirement, and does not imply an extra player-facing mode selector.
+Use worldgen environmental values for habitat eligibility. The inspected base-game animal definitions retain the default `ClimateValueMode.WorldGenValues`; temperature matching reads `WorldGenTemperature`, and ongoing spawning samples generated forest and shrub maps. Spawning during world generation and spawning during ongoing play both use generated environmental values. They are not alternative sources of seasonal or current-weather data.
+
+Preserve any applicable environmental rule alternatives and reconcile differences in vanilla sampling against the agreed behavior: highlight where the species can spawn under those environmental requirements. This is an implementation reconciliation, not an outstanding player-facing policy choice. Do not introduce a worldgen/runtime mode selector.
 
 The client climate lookup can return placeholder values when regional data is missing. Validate source availability explicitly; placeholders and absent shrub data must never become valid habitat samples.
 
@@ -201,7 +203,7 @@ Snapshot data before background evaluation where game-owned arrays or API access
 
 ## Validation expectations
 
-Validation should demonstrate local catalogue construction and use without any server catalogue message, locally patched definitions and variant resolution, species deduplication across age, sex, and cosmetic variants, coverage of naturally spawning base-game wild mammals and birds, exclusion of fish, insects, supernatural creatures, domestic-only variants, and mod-added species, complete environmental-rule matching, boundary handling, and unknown-data behavior. Compare representative results with the inspected game habitat calculations, including reference-height climate and normalized elevation.
+Validation should demonstrate local catalogue construction and use without any server catalogue message, locally patched definitions and variant resolution, species deduplication across age, sex, and cosmetic variants, coverage of naturally spawning base-game wild mammals and birds, exclusion of fish, insects, supernatural creatures, domestic-only variants, and mod-added species, complete environmental-rule matching, boundary handling, independence from current weather and seasonal climate, and unknown-data behavior. Compare representative results with the inspected game habitat calculations, including reference-height climate and normalized elevation.
 
 Exercise persistence across tile redraw, map close/reopen, region unload, reconnect, purge, and version changes. Verify that panning over old uncached map images does not trigger saved-record retrieval or world loading, and that ordinary revisiting populates and retains ecosystem coverage. Confirm that server shrub arrays survive transport and persistence with unchanged values, size, padding, and region identity. Verify missing-server-support and missing-record behavior, correct routing to the Ecosystem layer, and that old map images without environmental records remain distinguishable from unsuitable habitat. Include a region with forced climate changes to ensure the existing shrub array is delivered rather than recomputed from the final climate map.
 
@@ -209,9 +211,8 @@ Measure map opening, panning, species switching, cache size, and client environm
 
 ## Decisions remaining before an implementation plan
 
-1. Whether habitat eligibility combines worldgen and runtime environmental rules or follows one selected convention.
-2. Whether the ecosystem highlight also appears on the minimap.
-3. Database connection ownership, after targeted technical verification.
+1. Whether the ecosystem highlight also appears on the minimap.
+2. Database connection ownership, after targeted technical verification.
 
 ## Evidence references
 
