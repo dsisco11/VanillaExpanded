@@ -6,7 +6,7 @@ Status: design proposal. The selected direction is three independent compact gau
 
 Use dark aged brown copper, restrained warm highlights, subtle patina, dark recesses, and consistent fasteners and typography. Avoid bright orange saturation, pale silver highlights, and fine decorative detail that disappears at HUD size.
 
-Each gauge has its own backing, independently rendered readings, and foreground housing. The foreground includes any clamps and glass overlays that must cover a reading. Author all components against one shared layout per gauge. Use simple apertures and sufficient transparent margins; avoid independently generated layers with differing geometry.
+Each gauge has its own backing, independently rendered readings, and foreground housing. The foreground includes any clamps and glass overlays that must cover a reading. Author all components against one shared layout per gauge. Use simple apertures and sufficient transparent margins; keep all layers aligned to the same geometry.
 
 Gauge textures should be no larger than 512×512; small marks can use smaller reusable textures. Display dimensions come from the central `HudOverlaySizes` palette, with normal HUD text sizing. Exact footprints and spacing remain to be chosen through small-size mockups.
 
@@ -21,7 +21,7 @@ The face contains **24 equal angular segments, one per hour**. Time advances clo
 | Bottom | 00:00 — midnight |
 | Left | 06:00 |
 
-This places the daytime portion toward the top and nighttime toward the bottom. Hour positions stay fixed; seasonal changes alter their phase colors rather than rotating the entire face. A distinct pointer indicates the current estimated time independently of the colored segments. Proposed markings emphasize the four six-hour positions to limit clutter.
+This places the daytime portion toward the top and nighttime toward the bottom. Hour positions stay fixed; seasonal changes alter their phase colors rather than rotating the entire face. A distinct pointer indicates the current estimated time independently of the colored segments. The selected Workshop design has no hour numbers. Any ticks, dividers, and phase colors are drawn at runtime, never baked into its textures.
 
 Segment tints are supplied dynamically, never baked into the artwork. Proposed colors are muted gold for **day**, peach for **dawn**, rust for **dusk**, and blue for **night**. Neutral segment masks, dividers, and the copper housing remain reusable across all dates.
 
@@ -35,7 +35,7 @@ Retain the existing approximate-time behavior for the pointer. Recalculate the p
 
 ## Temperature: independent thermometer
 
-Proposed form: a narrow vertical copper housing with a thick, realistic red-liquid glass thermometer, solid neck and tip clamps, and a clear numeric Celsius reading. Its straight travel simplifies masking and alignment.
+Selected form: a horizontal copper housing above the calendar, with a thick, realistic red-liquid glass thermometer, bulb on the left, solid neck and tip clamps, and a clear numeric Celsius reading on the right. Its straight travel simplifies masking and alignment.
 
 Retain the environmental range **−40°C to +60°C**, ticks every **5°C**, and labels at **−40, 0, and +60**. Position reusable embossed tick and number textures dynamically above the housing using the same calibration as the fill mask. Use empty/full textures for the liquid display. Clamp visual fill at the endpoints while keeping the actual numeric reading available outside the range.
 
@@ -53,4 +53,4 @@ Read the date from the game calendar. Month abbreviations must correspond to its
 - Calendar characters remain readable at the intended HUD size.
 - Layers align and remain correctly positioned when their palette dimensions change.
 
-The next design review should settle the three footprints, their arrangement, and the clock's phase-boundary treatment using compact mockups.
+Design A (Workshop) is selected. The independent texture layers and their coordinate contract are documented in [Workshop gauge textures](WorkshopGaugeTextures.md). Runtime integration and small-size in-game acceptance remain outstanding; the clock's phase-boundary treatment remains a visual choice for review.
