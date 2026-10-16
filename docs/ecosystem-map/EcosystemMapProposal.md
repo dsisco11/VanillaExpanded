@@ -15,6 +15,7 @@ The agreed scope is:
 - Evaluate regional environmental requirements only.
 - Ignore water, ground, clearance, light, population caps, player distance, and spawn chance.
 - Reuse the existing map layer and map networking systems.
+- Use client-local animal definitions as the baseline catalogue. A supplemental server-supplied catalogue is deferred to a follow-up.
 
 ```mermaid
 flowchart LR
@@ -53,13 +54,15 @@ Inspection of the installed game assemblies established the following behavior. 
 | `MapDB.SetMapPieces` | Replaces the serialized row when a terrain tile is saved. | Extra fields appended to the vanilla record would need preservation patches. |
 | Client region packets | Supply climate and forest maps, but omit shrub maps. | Complete habitat evaluation needs supplemental server data. |
 | Client map chunks | Supply rain and world-generation terrain heightmaps. | Elevation can be captured while map chunks are available. |
-| Client entity packets | Supply entity identity and variants, but omit server spawn conditions. | Supply a compact habitat catalogue from the server. |
+| Client entity packets | Supply entity identity and variants, but omit server spawn conditions. | Use local animal assets for the baseline catalogue; packet omission does not establish that those assets are unavailable. |
 
 The [prospecting layer](../../../vssurvivalmod/Systems/Prospecting/OreMapLayer/OreMapLayer.cs) demonstrates dropdown composition and map-layer data delivery. The shared contracts are available in [SpawnConditions.cs](../../../vsapi/Common/Entity/SpawnConditions.cs), [IMapRegion.cs](../../../vsapi/Common/API/IMapRegion.cs), and [IMapChunk.cs](../../../vsapi/Common/API/IMapChunk.cs).
 
 ## Species catalogue and habitat rules
 
-Build the catalogue from the server's resolved entity definitions so effective asset patches are reflected in the habitat limits. Define stable species identities independently of localized names and individual entity codes.
+Build the initial catalogue from client-local animal definitions, including locally available asset patches. Verify access to patched assets and reuse of the game's variant resolution; fully resolved spawn conditions on client runtime entities are not assumed. Define stable species identities independently of localized names and individual entity codes.
+
+Local knowledge is the baseline and does not depend on a server catalogue. Server-only changes may differ from that baseline. A supplemental server-supplied catalogue is deferred to a follow-up; its protocol, precedence, and reconciliation rules are outside the initial implementation.
 
 For animals such as deer, retain the species `type` and combine `age` and `gender` variants. Names such as Elk, Caribou, and Fallow Deer remain separate species entries. Some families need explicit normalization: chickens encode sex in their age variants, while butterflies encode species, sex, colour, and seasonal forms together. A generic entity-code suffix removal is insufficient.
 
@@ -97,16 +100,14 @@ Keep registration thin. Species classification, environmental acquisition, stora
 ```mermaid
 flowchart TB
     subgraph Server
-        Definitions[Resolved animal definitions] --> Catalogue[Species habitat catalogue]
         WorldData[Regional maps and terrain heights] --> Provider[Environmental data provider]
-        Catalogue --> Delivery[Ecosystem map-layer delivery]
-        Provider --> Delivery
+        Provider --> Delivery[Ecosystem map-layer delivery]
     end
     Delivery --> Envelope[MapLayerData inside MapLayerUpdate]
     Envelope --> Receive[Client Ecosystem OnDataFromServer]
     subgraph Client
         Receive --> Cache[Environmental cache]
-        Receive --> Rules[Species catalogue]
+        Definitions[Client-local animal definitions] --> Rules[Baseline species habitat catalogue]
         LocalMaps[Available client region and height data] --> Cache
         Cache --> Evaluate[Habitat evaluator]
         Rules --> Evaluate
@@ -117,13 +118,13 @@ flowchart TB
     end
 ```
 
-`MapLayerData` handles routing, not environmental structure or persistence. Define a versioned payload for catalogue and environmental messages and serialize it into its `Data` field. The receiving ecosystem layer updates its own cache.
+`MapLayerData` handles routing, not environmental structure or persistence. Define a versioned payload for environmental messages and serialize it into its `Data` field. Supplemental catalogue messages are deferred to the follow-up. The receiving ecosystem layer updates its own cache.
 
 Use the normal map-open and view-change callbacks to serve relevant areas. These server callbacks include the player identity. The inspected `OnDataFromClient(byte[])` dispatch does not forward the sender, so request/reply behavior that needs player identity must not assume that callback provides it. Additional request details should be designed around the available callbacks before committing to a protocol.
 
-The server supplement is needed for the effective species rules and shrub maps. Environmental fields already available on the client can be captured there. Whether delivery supplies only missing fields or complete environmental records is an implementation tradeoff; both feed the same cache and evaluator.
+The initial server supplement supplies missing environmental data, including shrub maps. Species rules come from the client-local baseline catalogue. Environmental fields already available on the client can be captured there. Whether delivery supplies only missing fields or complete environmental records is an implementation tradeoff; both feed the same cache and evaluator.
 
-The mod currently allows servers without Vanilla Expanded. Propose enabling Ecosystem only when the server provides the required feature capability, without changing the installation requirements of unrelated features.
+The mod currently allows servers without Vanilla Expanded. The local species catalogue does not require a server catalogue capability. Complete environmental coverage still requires missing environmental inputs; check that capability independently, without changing the installation requirements of unrelated features. Missing environmental inputs remain unavailable rather than being inferred from local species knowledge.
 
 ## Persistence in the existing map database
 
@@ -189,7 +190,7 @@ Snapshot data before background evaluation where game-owned arrays or API access
 
 ## Validation expectations
 
-Validation should demonstrate species deduplication, fish exclusion, complete environmental-rule matching, boundary handling, and unknown-data behavior. Compare representative results with the inspected game habitat calculations, including reference-height climate and normalized elevation.
+Validation should demonstrate local catalogue construction and use without any server catalogue message, locally patched definitions and variant resolution, species deduplication, fish exclusion, complete environmental-rule matching, boundary handling, and unknown-data behavior. Compare representative results with the inspected game habitat calculations, including reference-height climate and normalized elevation.
 
 Exercise persistence across tile redraw, map close/reopen, region unload, reconnect, purge, and version changes. Confirm that environmental messages reach the registered layer and that old cached images without environmental records remain distinguishable from unsuitable habitat.
 
