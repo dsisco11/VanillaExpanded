@@ -8,7 +8,7 @@ Use dark aged brown copper, restrained warm highlights, subtle patina, dark rece
 
 Each gauge has its own backing, independently rendered readings, and foreground housing. The foreground includes any clamps and glass overlays that must cover a reading. Author all components against one shared layout per gauge. Use simple apertures and sufficient transparent margins; keep all layers aligned to the same geometry.
 
-Gauge textures should be no larger than 512×512; small marks can use smaller reusable textures. Display dimensions come from the central `HudOverlaySizes` palette, with normal HUD text sizing. Current palette widths are 90 GUI units for the clock, 320 for the horizontal thermometer, and 256 for the calendar; rectangular instruments preserve their canvas aspect ratios.
+Gauge textures should be no larger than 512×512; small marks can use smaller reusable textures. Display dimensions come from the central `HudOverlaySizes` palette, with normal HUD text sizing. Current palette widths are 90 GUI units for the clock, 320 for the horizontal thermometer, and 96 for the calendar; rectangular instruments preserve their canvas aspect ratios.
 
 ## Clock: 24-hour radial dial
 
@@ -41,7 +41,7 @@ Retain the environmental range **−40°C to +60°C**, ticks every **5°C**, and
 
 ## Calendar: independent mechanical counter
 
-Proposed form: a compact rectangular copper housing with three recessed counters for **day / three-letter month / year**, for example `14 OCT 1386`. Size the month and year windows for their content; keep the characters readable at normal HUD scale.
+A slim rectangular copper housing has two recessed counters for **three-letter month / day**, for example `OCT 14`. Its 512 × 192 canvas renders at 96 × 36 GUI units, with a wider month window and a narrower day window. Characters use normal HUD text sizing.
 
 Read the date from the game calendar. Month abbreviations must correspond to its month names and localization, rather than assuming the example's Gregorian month. Numbers and letters are live content, not baked into the housing texture.
 

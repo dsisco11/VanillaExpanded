@@ -110,7 +110,7 @@ public class VanillaExpandedConfig
     /// <summary>Shows the current local environmental temperature beside weather and time.</summary>
     public bool EnableEnvironmentalTemperatureOverlay { get; set; } = true;
 
-    /// <summary>Shows the native day, abbreviated month, and year in an independent mechanical calendar.</summary>
+    /// <summary>Shows the abbreviated native month and day in an independent mechanical calendar.</summary>
     public bool EnableCalendarDateOverlay { get; set; } = true;
 
     /// <summary>Shows texture icons for active local precipitation and weather fog.</summary>
