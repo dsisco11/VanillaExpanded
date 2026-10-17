@@ -29,7 +29,7 @@ internal sealed class CalendarDatePresentation : IDisposable
     public CalendarDatePresentation(Func<HudOverlayPreparationContext, LoadedTexture[]>? load = null,
         Func<WorkshopGaugeText>? createText = null)
     {
-        this.load = load ?? (preparation => WorkshopGaugeArtwork.Load(preparation, "calendar", "layer-0", "layer-2"));
+        this.load = load ?? (preparation => WorkshopGaugeArtwork.Load(preparation, "calendar/layer-0", "calendar/layer-2"));
         createText ??= () => new WorkshopGaugeText();
         characters = [createText(), createText()];
     }

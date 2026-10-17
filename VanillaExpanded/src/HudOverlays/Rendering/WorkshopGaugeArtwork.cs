@@ -10,14 +10,14 @@ internal static class WorkshopGaugeArtwork
 {
     #region Public API
     /// <summary>Borrows engine-owned textures with consistent HUD filtering.</summary>
-    public static LoadedTexture[] Load(HudOverlayPreparationContext context, string instrument, params string[] names)
+    public static LoadedTexture[] Load(HudOverlayPreparationContext context, params string[] names)
     {
         var textures = new LoadedTexture[names.Length];
         for (int index = 0; index < names.Length; index++)
         {
             var texture = new LoadedTexture(context.Api);
             context.Api.Render.GetOrLoadTexture(new AssetLocation(Constants.ModId,
-                $"textures/hud/workshop-gauges/{instrument}/{names[index]}.png"), ref texture);
+                $"textures/hud/workshop-gauges/{names[index]}.png"), ref texture);
             HudOverlayTextureFiltering.Prepare(texture);
             texture.IgnoreUndisposed = true;
             textures[index] = texture;

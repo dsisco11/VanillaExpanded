@@ -78,7 +78,7 @@ internal sealed class EnvironmentalTemperatureLiquidMask : IDisposable
     private static int[] LoadSource(HudOverlayPreparationContext context)
     {
         using var bitmap = context.Api.Assets.Get(new AssetLocation(Constants.ModId,
-            "textures/hud/workshop-gauges/thermometer/layer-1.png")).ToBitmap(context.Api);
+            "textures/hud/workshop-gauges/thermometer/full-glass.png")).ToBitmap(context.Api);
         if (bitmap.Width != 512 || bitmap.Height != 512) throw new InvalidOperationException("The radial thermometer full layer must be 512 by 512 pixels.");
         return bitmap.Pixels;
     }
