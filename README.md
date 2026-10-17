@@ -25,24 +25,32 @@ Hold the Quick Tools hotkey (assign it in Controls) to open a radial menu of ava
 
 ### Approximate Time
 
-Hover over any visible HUD indicator while the mouse is free (for example, with your inventory open) to see its title. HUD indicators release their space after fading out. The combined time/temperature gauge and weather form a column at the top-right of the screen, in that order from top to bottom. Each bottom-left icon has a faint black circle that fades smoothly to transparent at its edge and hides with the icon.
+Hover over any visible HUD indicator while the mouse is free (for example, with your inventory open) to see its title. HUD indicators release their space after fading out. Time, environmental temperature, calendar, and weather form a column at the top-right of the screen, in that order from top to bottom. Each bottom-left icon has a faint black circle that fades smoothly to transparent at its edge and hides with the icon.
 
-A workshop-style copper rotary gauge above weather at the top-right shows estimated time. A day/night scenery disk rotates behind the upper semicircular cutaway once per estimated day: noon is entirely daytime, midnight entirely nighttime, and sunrise/sunset show opposite half-and-half views. The gauge uses 256 × 256 housing and scenery textures, with an alternate glass-thermometer housing when environmental temperature is enabled and uses the Clock palette size of 83.2 × 83.2 GUI units. Local skylight, including nighttime skylight, recalibrates the estimate; lack of skylight gradually introduces up to eight hours of error on a normal day. The server saves observation age across reconnects and world reloads. Multiplayer tracking requires the mod on the server. Toggle it live with `EnableApproximateTimeOverlay`.
+A workshop-style copper radial clock shows estimated time. Its 24 hourly segments are colored dynamically from the local calendar's day, dawn, dusk, and night phases. Noon is at the top and midnight at the bottom; a copper pointer follows the estimate. The immersive clock uses the shared 90 × 90 GUI-unit Clock size. Local skylight, including nighttime skylight, recalibrates the estimate; lack of skylight gradually introduces up to eight hours of error on a normal day. The server saves observation age across reconnects and world reloads. Multiplayer tracking requires the mod on the server. Toggle it live with `EnableApproximateTimeOverlay` and choose its presentation with `ApproximateTimeGaugeStyle`.
 
 ### Environmental Temperature
 
-Environmental temperature is embedded in the clock gauge: a red liquid thermometer follows its left rim, and a normal-sized Celsius reading sits in the lower copper plate. It samples local climate every 300 ms independently of clock drift. The column spans -20°C to 40°C, while the numeric reading remains unclamped. Missing climate or disabling `EnableEnvironmentalTemperatureOverlay` removes the thermometer and reading. When the clock is disabled, temperature uses its standalone vertical scale with the reading to the right.
+An independent radial red-liquid thermometer beneath the clock samples local climate every 300 ms. Its immersive copper instrument spans -40°C to +60°C, with ticks every 5°C and a normal-sized Celsius reading. The numeric reading remains unclamped. Missing climate hides it, and `EnableEnvironmentalTemperatureOverlay` controls it independently of the clock. `EnvironmentalTemperatureGaugeStyle` selects the presentation.
+
+### Calendar Date
+
+A compact calendar beneath the thermometer displays the three-letter localized month and native calendar day. Its immersive copper housing measures 96 × 36 GUI units and has separate month/day rollers. It refreshes every 300 ms independently of the time estimate. Use `EnableCalendarDateOverlay` to toggle it and `CalendarDateGaugeStyle` to select its presentation.
+
+### Indicator Styles
+
+Each indicator supports `icon` artwork and `text`, which replaces the artwork with a short name such as `AMMO`, `WET`, or `STORM` while retaining its readings and state. Time, environmental temperature, and calendar also support `immersive` copper instruments, their default. Other indicators default to `icon`. Style selectors apply live through ConfigLib and are independent of each indicator's enable toggle. Text uses the normal HUD font, preserves fades and storm urgency pulses, and expands its width for longer readings. See the HUD configuration table below for each selector.
 ### Weather Conditions
 
 Weather and approximate time sit together at the top-right of the screen, with weather below environmental temperature. Weather occupies one 36 × 36 GUI-unit slot. Rounded clouds, wind strokes above the cloud, precipitation below it, fog bands, and lightning combine to show cloud coverage, precipitation type, and independent weather intensities. The indicator uses transparent 64 × 64 texture layers with no outer ring. Toggle it with `EnableWeatherConditionsOverlay`; changes apply immediately. See [weather conditions](docs/weather-conditions/WeatherConditions.md) for the data, artwork, and preview sheet.
 
 ### Temporal Rift Activity
 
-A fissure icon beside the toolbar's bottom-left edge, before the time icon, shows the current rift activity. The tear widens and branches from pale cyan at low activity through cyan at medium, amber at high or very high, and red-orange at apocalyptic. It hides during calm activity. Toggle it live with `EnableRiftActivityOverlay`.
+A fissure icon beside the toolbar's bottom-left edge shows the current rift activity. The tear widens and branches from pale cyan at low activity through cyan at medium, amber at high or very high, and red-orange at apocalyptic. It hides during calm activity. Toggle it live with `EnableRiftActivityOverlay`.
 
 ### Temporal Storm Warning
 
-A fractured iris icon beside the toolbar's bottom-left edge, between rift activity and the wetness/temperature indicators, warns of temporal storms. A narrow eye indicates an approaching storm, an open eye with separated portal fragments indicates an imminent storm, and a ruptured portal with outward spikes indicates an active storm. The imminent icon pulses in opacity, accelerating from one pulse every two seconds to three pulses per second as the storm nears. During waning, the active icon starts the same accelerating pulse until the storm ends. It hides between storms while retaining its space. Toggle it live with `EnableTemporalStormOverlay`.
+A fractured iris icon beside the toolbar's bottom-left edge, between rift activity and the wetness/temperature indicators, warns of temporal storms. A narrow eye indicates an approaching storm, an open eye with separated portal fragments indicates an imminent storm, and a ruptured portal with outward spikes indicates an active storm. The imminent icon pulses in opacity, accelerating from one pulse every two seconds to three pulses per second as the storm nears. During waning, the active icon starts the same accelerating pulse until the storm ends. It fades out and releases its space between storms. Toggle it live with `EnableTemporalStormOverlay`.
 
 ### Body Temperature Warning
 
@@ -203,9 +211,19 @@ The sections and setting order below match the ConfigLib menu. Setting names are
 | Setting                      | Default      | Range / choices                                                                                                                                                                                                              | Description                                                                             |
 | ---------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
 | `EnableHudOverlays`          | `true`       | `true`, `false`                                                                                                                                                                                                              | Enable passive HUD overlays; applies live without restarting.                           |
+| `BowAmmunitionIndicatorStyle` | `icon` | `icon`, `text` | Ammunition icon or AMMO name and count. Applies live. |
+| `BodyTemperatureIndicatorStyle` | `icon` | `icon`, `text` | Thermometer icon or BODY name, risk, trend, and optional temperature. Applies live. |
+| `PlayerWetnessIndicatorStyle` | `icon` | `icon`, `text` | Droplet icon or WET name and percentage. Applies live. |
+| `ApproximateTimeGaugeStyle` | `immersive` | `immersive`, `icon`, `text` | Copper clock, time-period icon, or TIME name and estimated period. Applies live. |
+| `EnvironmentalTemperatureGaugeStyle` | `immersive` | `immersive`, `icon`, `text` | Copper thermometer, compact icon, or TEMP name and Celsius reading. Applies live. |
+| `CalendarDateGaugeStyle` | `immersive` | `immersive`, `icon`, `text` | Mechanical calendar, compact icon, or DATE name and month/day. Applies live. |
+| `WeatherConditionsIndicatorStyle` | `icon` | `icon`, `text` | Composite artwork or WTHR name and independent weather bands. Applies live. |
+| `RiftActivityIndicatorStyle` | `icon` | `icon`, `text` | Fissure icon or RIFT name and activity level. Applies live. |
+| `TemporalStormIndicatorStyle` | `icon` | `icon`, `text` | Fractured iris icon or STORM name and stage; both retain urgency pulses. Applies live. |
+| `EnableCalendarDateOverlay` | `true` | `true`, `false` | Show the independent month/day calendar; applies live. |
 | `EnableBowAmmunitionOverlay` | `true`       | `true`, `false`                                                                                                                                                                                                              | Show the next-arrow type and type-total quantity while holding a supported bow.         |
 | `EnableBodyTemperatureOverlay` | `true` | `true`, `false` | Show the dynamic thermometer when too cold or hot; applies live. |
-| `EnablePlayerWetnessOverlay` | `true` | `true`, `false` | Show twin filling drops and a wetness percentage; applies live. |
+| `EnablePlayerWetnessOverlay` | `true` | `true`, `false` | Show player wetness and a percentage in the selected style; applies live. |
 | `ShowBodyTemperatureReading` | `true` | `true`, `false` | Show whole degrees beside the thermometer; disable for the icon alone. |
 | `HeldItemStatusAnchor`       | `saturation` | `saturation`, `hotbar`, `screen-left-top`, `screen-center-top`, `screen-right-top`, `screen-left-middle`, `screen-center-middle`, `screen-right-middle`, `screen-left-bottom`, `screen-center-bottom`, `screen-right-bottom` | Select native docking or a screen position. Unknown values fall back to saturation.     |
 | `HeldItemStatusOffsetX`      | `-4`         | -2048–2048 in ConfigLib                                                                                                                                                                                                      | Horizontal offset in GUI units; positive moves right. Nonfinite values fall back to -4. |
@@ -213,7 +231,7 @@ The sections and setting order below match the ConfigLib menu. Setting names are
 | `EnableWeatherConditionsOverlay` | `true` | `true`, `false` | Show the composite cloud, wind, precipitation, fog/haze, and thunder indicator; applies live. |
 | `EnableRiftActivityOverlay` | `true` | `true`, `false` | Show a fissure icon for temporal rift activity; hidden during calm activity. Applies live. |
 | `EnableTemporalStormOverlay` | `true` | `true`, `false` | Show approaching, imminent, and active temporal storms with a fractured iris icon. Applies live. |
-| `EnableEnvironmentalTemperatureOverlay` | `true` | `true`, `false` | Show local Celsius temperature above a cold-to-hot scale; applies live. |
+| `EnableEnvironmentalTemperatureOverlay` | `true` | `true`, `false` | Show local Celsius temperature in the selected style; applies live. |
 | `EnableApproximateTimeOverlay` | `true` | `true`, `false` | Show sunlight-calibrated approximate time; applies live. |
 
 The two offsets are shared across placement choices. The saturation default compensates for content padding and leaves a four-unit gap above the meter. Hotbar docking attaches the group's left-middle to the hotbar's right-middle; screen placements use matching attachment and pivot points. Native viewport clamping keeps the group within the safe rectangle. Placement changes apply live and retain cached presentation; restored content receives a fresh sample before display. Without ConfigLib, edit the JSON file and restart the game to load manual changes.

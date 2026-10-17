@@ -1,5 +1,7 @@
 using System;
 using System.Drawing;
+using System.Globalization;
+using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering;
 using Vintagestory.API.Client;
@@ -21,6 +23,9 @@ internal sealed class BowAmmunitionOverlay : IHudOverlay, IHudOverlayVisibilityT
     private bool disposed;
     internal BowAmmunitionSample? Sample { get; private set; }
     private HudOverlayIconTextPresentation? preparedPresentation;
+    private readonly HudIndicatorTextPresentation textStyle;
+    private HudIndicatorStyle style;
+    private bool styleChanged, preparedText;
     /// <summary>Controls visibility independently of the current ammunition sample.</summary>
     public HudOverlayVisibilityTransition Visibility { get; } = new();
     /// <summary>Retains the last preparation for the shared host's exit transition.</summary>
@@ -29,11 +34,22 @@ internal sealed class BowAmmunitionOverlay : IHudOverlay, IHudOverlayVisibilityT
     #region Lifecycle
     /// <summary>Uses cached native icon/count presentation and muted text for the generic empty-arrow state.</summary>
     public BowAmmunitionOverlay(Action invalidate, HudOverlayIconTextPresentation? presentation = null,
-        HudOverlayIconTextPresentation? emptyPresentation = null)
+        HudOverlayIconTextPresentation? emptyPresentation = null, HudIndicatorTextPresentation? textStyle = null)
     {
         this.invalidate = invalidate;
         this.presentation = presentation ?? new(iconSize: HudOverlaySizes.Standard, textBeforeIcon: true, gap: 1.5f, fontSize: HudOverlaySizes.CountText, circularIconBackground: true, useItemPresentation: true);
         this.emptyPresentation = emptyPresentation ?? new(CreateMutedText);
+        this.textStyle = textStyle ?? new();
+    }
+    /// <summary>Changes symbol style without changing the chosen arrow, inventory subscriptions, or visibility.</summary>
+    public void SetStyle(HudIndicatorStyle value)
+    {
+        var next = value == HudIndicatorStyle.Text ? value : HudIndicatorStyle.Icon;
+        if (next == style) return;
+        presentation.Reset(); emptyPresentation.Reset(); textStyle.Reset();
+        preparedPresentation = null; preparedText = false;
+        style = next; styleChanged = true;
+        invalidate();
     }
     /// <summary>Binds one fresh player session with no retained arrow sample.</summary>
     public void BeginSession(ICoreClientAPI api)
@@ -79,7 +95,7 @@ internal sealed class BowAmmunitionOverlay : IHudOverlay, IHudOverlayVisibilityT
         finally
         {
             try { presentation.Dispose(); }
-            finally { emptyPresentation.Dispose(); }
+            finally { emptyPresentation.Dispose(); textStyle.Dispose(); }
         }
     }
     #endregion
@@ -99,10 +115,11 @@ internal sealed class BowAmmunitionOverlay : IHudOverlay, IHudOverlayVisibilityT
         subscriptions?.Reconcile();
         ItemBow bow = (ItemBow)player!.InventoryManager.ActiveHotbarSlot.Itemstack.Collectible;
         BowAmmunitionSample next = BowAmmunitionSampler.Sample(bow, player.Entity!);
-        bool changed = Sample == null || Sample.Quantity != next.Quantity
+        bool changed = styleChanged || Sample == null || Sample.Quantity != next.Quantity
             || !ReferenceEquals(Sample.Icon?.Collectible, next.Icon?.Collectible)
             || (Sample.Icon != null && next.Icon != null && !System.Linq.Enumerable.SequenceEqual(Sample.Icon.ToBytes(), next.Icon.ToBytes()));
         Sample = next;
+        styleChanged = false;
         if (!changed) return HudOverlayChange.None;
         if (next.Icon == null) emptyPresentation.SetContent(null, "vanillaexpanded:bow-ammunition-empty");
         else presentation.SetContent(next.Icon, "vanillaexpanded:bow-ammunition-count", next.Quantity);
@@ -115,17 +132,25 @@ internal sealed class BowAmmunitionOverlay : IHudOverlay, IHudOverlayVisibilityT
     {
         if (Sample != null)
         {
+            if (style == HudIndicatorStyle.Text)
+            {
+                textStyle.Prepare(context, "ammunition", Sample.Quantity.ToString(CultureInfo.InvariantCulture));
+                preparedText = true; preparedPresentation = null; Visibility.Show();
+                return;
+            }
             CurrentPresentation.Prepare(context);
+            preparedText = false;
             preparedPresentation = CurrentPresentation;
             Visibility.Show();
         }
     }
     /// <summary>Reports cached dimensions without accessing inventory.</summary>
-    public SizeF Measure() => Sample == null ? SizeF.Empty : CurrentPresentation.Size;
+    public SizeF Measure() => Sample == null ? SizeF.Empty : style == HudIndicatorStyle.Text ? textStyle.Size : CurrentPresentation.Size;
     /// <summary>Draws the cached icon/count or muted empty state without gameplay queries.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime)
     {
-        preparedPresentation?.Draw(renderer, bounds, clip, deltaTime);
+        if (preparedText) textStyle.Draw(renderer, bounds);
+        else preparedPresentation?.Draw(renderer, bounds, clip, deltaTime);
     }
     #endregion
     #endregion
@@ -142,6 +167,7 @@ internal sealed class BowAmmunitionOverlay : IHudOverlay, IHudOverlayVisibilityT
     private void ReleasePresentation()
     {
         Visibility.Reset();
+        textStyle.Reset(); preparedText = false;
         preparedPresentation = null;
         try { presentation.Reset(); }
         finally { emptyPresentation.Reset(); }

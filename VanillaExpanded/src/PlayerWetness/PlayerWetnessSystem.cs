@@ -29,6 +29,7 @@ internal sealed class PlayerWetnessSystem : ModSystem, ILiveConfigurable
         this.api = api;
         hud = api.ModLoader.GetModSystem<HudOverlaySystem>();
         overlay = new PlayerWetnessOverlay();
+        overlay.SetStyle(VanillaExpandedModSystem.Config.PlayerWetnessIndicatorStyle);
         overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays && VanillaExpandedModSystem.Config.EnablePlayerWetnessOverlay);
         try
         {
@@ -44,6 +45,7 @@ internal sealed class PlayerWetnessSystem : ModSystem, ILiveConfigurable
     public void OnConfigReloaded(ICoreAPI api)
     {
         if (disposed || !ReferenceEquals(this.api, api) || overlay == null) return;
+        overlay.SetStyle(VanillaExpandedModSystem.Config.PlayerWetnessIndicatorStyle);
         overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays && VanillaExpandedModSystem.Config.EnablePlayerWetnessOverlay);
         // Cleanup must also occur while global visibility suppresses normal selector observation.
         hud?.Session?.Scheduler?.Invalidate(OverlayId);

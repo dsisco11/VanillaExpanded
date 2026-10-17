@@ -1,6 +1,5 @@
 # Vanilla: Expanded TODO List:
     ## Hud Indicators:
-        ☐ Add style option to all hud indicators so they support atleast `icon` and `text` which displays a short 3-5 character name rather than the icon.
         ☐ Make it so that the HUD indicators can be moved around freely by the player, just like the base-game windows are.
 
     ## New Features:

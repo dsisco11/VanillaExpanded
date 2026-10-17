@@ -306,6 +306,84 @@
       }
     },
     "integer": {
+      "BowAmmunitionIndicatorStyle": {
+        "code": "BowAmmunitionIndicatorStyle",
+        "name": "BowAmmunitionIndicatorStyle",
+        "ingui": "vanillaexpanded:config-bow-ammunition-indicator-style",
+        "comment": "vanillaexpanded:config-hud-indicator-style-tooltip",
+        "default": "icon",
+        "weight": 10.201,
+        "clientSide": true,
+        "mapping": {
+          "icon": 0,
+          "text": 1
+        }
+      },
+      "BodyTemperatureIndicatorStyle": {
+        "code": "BodyTemperatureIndicatorStyle",
+        "name": "BodyTemperatureIndicatorStyle",
+        "ingui": "vanillaexpanded:config-body-temperature-indicator-style",
+        "comment": "vanillaexpanded:config-hud-indicator-style-tooltip",
+        "default": "icon",
+        "weight": 10.301,
+        "clientSide": true,
+        "mapping": {
+          "icon": 0,
+          "text": 1
+        }
+      },
+      "PlayerWetnessIndicatorStyle": {
+        "code": "PlayerWetnessIndicatorStyle",
+        "name": "PlayerWetnessIndicatorStyle",
+        "ingui": "vanillaexpanded:config-player-wetness-indicator-style",
+        "comment": "vanillaexpanded:config-hud-indicator-style-tooltip",
+        "default": "icon",
+        "weight": 10.451,
+        "clientSide": true,
+        "mapping": {
+          "icon": 0,
+          "text": 1
+        }
+      },
+      "WeatherConditionsIndicatorStyle": {
+        "code": "WeatherConditionsIndicatorStyle",
+        "name": "WeatherConditionsIndicatorStyle",
+        "ingui": "vanillaexpanded:config-weather-conditions-indicator-style",
+        "comment": "vanillaexpanded:config-hud-indicator-style-tooltip",
+        "default": "icon",
+        "weight": 10.801,
+        "clientSide": true,
+        "mapping": {
+          "icon": 0,
+          "text": 1
+        }
+      },
+      "RiftActivityIndicatorStyle": {
+        "code": "RiftActivityIndicatorStyle",
+        "name": "RiftActivityIndicatorStyle",
+        "ingui": "vanillaexpanded:config-rift-activity-indicator-style",
+        "comment": "vanillaexpanded:config-hud-indicator-style-tooltip",
+        "default": "icon",
+        "weight": 10.851,
+        "clientSide": true,
+        "mapping": {
+          "icon": 0,
+          "text": 1
+        }
+      },
+      "TemporalStormIndicatorStyle": {
+        "code": "TemporalStormIndicatorStyle",
+        "name": "TemporalStormIndicatorStyle",
+        "ingui": "vanillaexpanded:config-temporal-storm-indicator-style",
+        "comment": "vanillaexpanded:config-hud-indicator-style-tooltip",
+        "default": "icon",
+        "weight": 10.871,
+        "clientSide": true,
+        "mapping": {
+          "icon": 0,
+          "text": 1
+        }
+      },
       "ApproximateTimeGaugeStyle": {
         "code": "ApproximateTimeGaugeStyle",
         "name": "ApproximateTimeGaugeStyle",
@@ -314,7 +392,7 @@
         "default": "immersive",
         "weight": 10.91,
         "clientSide": true,
-        "mapping": { "immersive": 0, "icon": 1 }
+        "mapping": { "immersive": 0, "icon": 1, "text": 2 }
       },
       "EnvironmentalTemperatureGaugeStyle": {
         "code": "EnvironmentalTemperatureGaugeStyle",
@@ -324,7 +402,7 @@
         "default": "immersive",
         "weight": 10.791,
         "clientSide": true,
-        "mapping": { "immersive": 0, "icon": 1 }
+        "mapping": { "immersive": 0, "icon": 1, "text": 2 }
       },
       "CalendarDateGaugeStyle": {
         "code": "CalendarDateGaugeStyle",
@@ -334,7 +412,7 @@
         "default": "immersive",
         "weight": 10.796,
         "clientSide": true,
-        "mapping": { "immersive": 0, "icon": 1 }
+        "mapping": { "immersive": 0, "icon": 1, "text": 2 }
       },
       "HeldItemStatusAnchor": {
         "code": "HeldItemStatusAnchor",

@@ -30,6 +30,7 @@ internal sealed class BodyTemperatureSystem : ModSystem, ILiveConfigurable
         hud = api.ModLoader.GetModSystem<HudOverlaySystem>();
         overlay = new BodyTemperatureOverlay();
         overlay.SetShowReading(VanillaExpandedModSystem.Config.ShowBodyTemperatureReading);
+        overlay.SetStyle(VanillaExpandedModSystem.Config.BodyTemperatureIndicatorStyle);
         overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays && VanillaExpandedModSystem.Config.EnableBodyTemperatureOverlay);
         try
         {
@@ -45,6 +46,7 @@ internal sealed class BodyTemperatureSystem : ModSystem, ILiveConfigurable
     public void OnConfigReloaded(ICoreAPI api)
     {
         if (disposed || !ReferenceEquals(this.api, api) || overlay == null) return;
+        overlay.SetStyle(VanillaExpandedModSystem.Config.BodyTemperatureIndicatorStyle);
         overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays && VanillaExpandedModSystem.Config.EnableBodyTemperatureOverlay);
         // Cleanup must also occur while global visibility suppresses normal selector observation.
         overlay.SetShowReading(VanillaExpandedModSystem.Config.ShowBodyTemperatureReading);

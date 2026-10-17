@@ -36,7 +36,7 @@ public sealed class EnvironmentalGaugeStyleConfigTests
     /// <summary>Invalid numeric values recover the immersive default for every instrument.</summary>
     [Theory]
     [InlineData(-1)]
-    [InlineData(2)]
+    [InlineData(3)]
     [InlineData(int.MaxValue)]
     public void InvalidEnumValuesFallBack(int value)
     {
@@ -56,6 +56,8 @@ public sealed class EnvironmentalGaugeStyleConfigTests
     [InlineData("\"icon\"", EnvironmentalGaugeStyle.Icon, "icon")]
     [InlineData("\"immersive\"", EnvironmentalGaugeStyle.Immersive, "immersive")]
     [InlineData("1", EnvironmentalGaugeStyle.Icon, "icon")]
+    [InlineData("\"text\"", EnvironmentalGaugeStyle.Text, "text")]
+    [InlineData("2", EnvironmentalGaugeStyle.Text, "text")]
     [InlineData("0", EnvironmentalGaugeStyle.Immersive, "immersive")]
     [InlineData("99", EnvironmentalGaugeStyle.Immersive, "immersive")]
     public void JsonSettingsRoundTrip(string encoded, EnvironmentalGaugeStyle expected, string canonical)

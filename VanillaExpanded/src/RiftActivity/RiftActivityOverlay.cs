@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering;
 using Vintagestory.API.Client;
@@ -22,7 +23,12 @@ internal sealed class RiftActivityOverlay : IHudOverlay, IHudOverlayBackdropProv
 
     /// <summary>Retains the last preparation for the shared host's exit transition.</summary>
     public void HidePresentation() => Clear();
+    private bool styleChanged;
+
     #region Public API
+    /// <summary>Retains style invalidation until the next eligible content and layout refresh.</summary>
+    public void SetStyle(HudIndicatorStyle style) => styleChanged |= presentation.SetStyle(style);
+
     #region Lifecycle
     /// <summary>Creates the presentation with optional headless texture loading.</summary>
     public RiftActivityOverlay(System.Func<HudOverlayPreparationContext, LoadedTexture[]>? load = null,
@@ -77,7 +83,8 @@ internal sealed class RiftActivityOverlay : IHudOverlay, IHudOverlayBackdropProv
     {
         if (!IsApplicable()) return HudOverlayChange.None;
         var next = RiftActivitySource.Read(weather);
-        if (next == activity) return HudOverlayChange.None;
+        if (next == activity && !styleChanged) return HudOverlayChange.None;
+        styleChanged = false;
         activity = next;
         if (next.HasValue) presentation.SetContent(next.Value);
         else presentation.Hide();

@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering;
 using Vintagestory.API.Client;
@@ -25,7 +26,12 @@ internal sealed class BodyTemperatureOverlay : IHudOverlay, IHudOverlayBackdropP
 
     /// <summary>Retains the last preparation for the shared host's exit transition.</summary>
     public void HidePresentation() => Clear();
+    private bool styleChanged;
+
     #region Public API
+    /// <summary>Retains style invalidation until the next eligible content and layout refresh.</summary>
+    public void SetStyle(HudIndicatorStyle style) => styleChanged |= thermometer.SetStyle(style);
+
     #region Lifecycle
     /// <summary>Creates a dynamic thermometer and compact whole-degree text with preparation outside the render path.</summary>
     public BodyTemperatureOverlay(HudOverlayIconTextPresentation? presentation = null,
@@ -101,7 +107,8 @@ internal sealed class BodyTemperatureOverlay : IHudOverlay, IHudOverlayBackdropP
         else trend.Reset();
         if (next != null) next = next with { Trend = direction };
         sampledEntity = entity;
-        if (Sample == next && !cleared) return HudOverlayChange.None;
+        if (Sample == next && !cleared && !styleChanged) return HudOverlayChange.None;
+        styleChanged = false;
         cleared = false;
         Sample = next;
         if (next == null) thermometer.Hide();

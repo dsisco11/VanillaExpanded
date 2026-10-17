@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering;
 using Vintagestory.API.Client;
@@ -14,7 +15,12 @@ internal sealed class PlayerWetnessOverlay : IHudOverlay, IHudOverlayBackdropPro
     private ICoreClientAPI? api;
     private bool enabled = true, disposed;
 
+    private bool styleChanged;
+
     #region Public API
+    /// <summary>Retains style invalidation until the next eligible content and layout refresh.</summary>
+    public void SetStyle(HudIndicatorStyle style) => styleChanged |= presentation.SetStyle(style);
+
     #region Lifecycle and configuration
     /// <summary>Gets the last valid nonzero wetness sample.</summary>
     internal float? Wetness { get; private set; }
@@ -56,7 +62,8 @@ internal sealed class PlayerWetnessOverlay : IHudOverlay, IHudOverlayBackdropPro
         var attributes = api!.World.Player.Entity.WatchedAttributes;
         float raw = attributes.GetFloat("wetness");
         float? next = attributes.HasAttribute("wetness") && float.IsFinite(raw) && raw > 0 ? Math.Clamp(raw, 0, 1) : null;
-        if (next == Wetness) return HudOverlayChange.None;
+        if (next == Wetness && !styleChanged) return HudOverlayChange.None;
+        styleChanged = false;
         Wetness = next;
         if (next.HasValue) presentation.SetContent(next.Value);
         else presentation.Hide();
