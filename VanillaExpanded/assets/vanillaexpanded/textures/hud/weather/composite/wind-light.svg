@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" preserveAspectRatio="xMidYMid meet">
+  <title>wind light</title>
+  <path d="M 18 5 L 40 5 C 46 5 45 1 42 2" fill="none" stroke="#25343e" stroke-width="3.1" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 18 5 L 40 5 C 46 5 45 1 42 2" fill="none" stroke="#d7e4ed" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" preserveAspectRatio="xMidYMid meet">
+  <title>rain moderate</title>
+  <path d="M 13.5 41.3 L 10.5 46.7" fill="none" stroke="#25343e" stroke-width="3.15" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 13.5 41.3 L 10.5 46.7" fill="none" stroke="#86e3ef" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 23.5 41.3 L 20.5 46.7" fill="none" stroke="#25343e" stroke-width="3.15" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 23.5 41.3 L 20.5 46.7" fill="none" stroke="#86e3ef" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 43.5 41.3 L 40.5 46.7" fill="none" stroke="#25343e" stroke-width="3.15" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 43.5 41.3 L 40.5 46.7" fill="none" stroke="#86e3ef" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 53.5 41.3 L 50.5 46.7" fill="none" stroke="#25343e" stroke-width="3.15" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 53.5 41.3 L 50.5 46.7" fill="none" stroke="#86e3ef" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
