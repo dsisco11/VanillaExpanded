@@ -55,9 +55,9 @@ internal sealed class HudOverlayNativeTitleBar : GuiElementDialogTitleBar
         MovableField(this) = movable;
         if (!Menu.IsOpened) Menu.SelectedIndex = movable ? 1 : 0;
     }
-    /// <summary>Retains native titlebar initialization with normal HUD lettering; content drops remain the persistence owner.</summary>
-    public HudOverlayNativeTitleBar(ICoreClientAPI api, string title, GuiComposer composer, Action dismiss, ElementBounds bounds)
-        : base(api, title, composer, dismiss, font: CairoFont.WhiteSmallText().WithFontSize(HudOverlaySizes.Text), bounds: bounds)
+    /// <summary>Initializes a captionless native titlebar; content drops remain the persistence owner.</summary>
+    public HudOverlayNativeTitleBar(ICoreClientAPI api, GuiComposer composer, Action dismiss, ElementBounds bounds)
+        : base(api, string.Empty, composer, dismiss, font: CairoFont.WhiteSmallText().WithFontSize(HudOverlaySizes.Text), bounds: bounds)
     {
         // The native first render saves its parent origin, which here is a transient hover-control origin.
         // Suppress that one write rather than allowing it to overwrite the saved content position.
@@ -66,7 +66,7 @@ internal sealed class HudOverlayNativeTitleBar : GuiElementDialogTitleBar
 
     #endregion
     #region Composition and pointer geometry
-    /// <summary>Initializes native menu resources, then paints a slimmer panel and centers its native glyphs and HUD text.</summary>
+    /// <summary>Initializes native menu resources, then paints a captionless panel and centers its native glyphs.</summary>
     public override void ComposeTextElements(Context context, ImageSurface surface)
     {
         // Native composition owns restoration, dropdown preparation and hover textures. Replace only the static
@@ -79,8 +79,6 @@ internal sealed class HudOverlayNativeTitleBar : GuiElementDialogTitleBar
         context.Rectangle(Bounds.bgDrawX, Bounds.bgDrawY, Bounds.OuterWidth, Bounds.OuterHeight);
         context.Fill();
         context.Operator = Operator.Over;
-        Font.SetupContext(context);
-        DrawTextLineAt(context, text, scaled(6), (Bounds.InnerHeight - Font.GetFontExtents().Height) / 2);
         double closeSize = scaled(unscaledCloseIconSize), menuSize = scaled(unscaledCloseIconSize + 2);
         double closeX = Bounds.OuterWidth - closeSize - scaled(8);
         double menuX = closeX - menuSize - scaled(8);

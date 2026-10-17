@@ -313,12 +313,6 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
             .IntersectsWith(new RectangleF((float)memberControl.Bounds.renderX, (float)memberControl.Bounds.renderY, (float)memberControl.Bounds.OuterWidth, (float)memberControl.Bounds.OuterHeight)));
         var movement = containers.Get(group.Id); movement.Begin(initial, PointF.Empty, 1); movement.Move(new PointF(30, 40)); movement.Commit(new PointF(initial.X + 30, initial.Y + 40));
         Assert.Equal(new[] { "test:hidden", registration.Id }, Assert.Single(containers.Resolved).Tree.Leaves());
-    }    /// <summary>A singleton grip labels its indicator instead of exposing a default or opaque container name.</summary>
-    [Fact]
-    public void SingletonContainerTitleUsesIndicatorIdentity()
-    {
-        pointer = new PointF(initial.X + 5, initial.Y + 5); controls.Synchronize(layouts);
-        Assert.Equal(registration.Id, NativeTitleBar().Text);
     }    /// <summary>Pointer activity away from controls remains untouched; hover rendering does not persist or prepare content.</summary>
     [Fact]
     public void OrdinaryInputAndHoverArePassive()
