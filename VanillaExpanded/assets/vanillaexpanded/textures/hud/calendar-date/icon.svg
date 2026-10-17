@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" preserveAspectRatio="xMidYMid meet">
+  <title>Calendar date</title>
+  <path d="M 13 12 H 51 Q 55 12 55 16 V 52 Q 55 56 51 56 H 13 Q 9 56 9 52 V 16 Q 9 12 13 12 Z" fill="#f3f1e6" stroke="#25343e" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M 10 25 H 54 M 21 7 V 18 M 43 7 V 18" fill="none" stroke="#25343e" stroke-width="4" stroke-linecap="round"/>
+  <path d="M 20 35 H 25 M 37 35 H 42 M 20 45 H 25 M 37 45 H 42" fill="none" stroke="#25343e" stroke-width="4" stroke-linecap="round"/>
+</svg>

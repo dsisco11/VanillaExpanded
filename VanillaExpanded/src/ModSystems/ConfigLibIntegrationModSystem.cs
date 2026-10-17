@@ -185,6 +185,9 @@ internal sealed class ConfigLibIntegrationModSystem : ModSystem
         {
             try
             {
+                // Mapped enum selectors may arrive as unquoted names instead of JSON strings or numeric indices.
+                if (targetType.IsEnum && Enum.TryParse(targetType, rawValue, true, out value))
+                    return value is not null && Enum.IsDefined(targetType, value);
                 value = Convert.ChangeType(rawValue, targetType, CultureInfo.InvariantCulture);
                 return true;
             }

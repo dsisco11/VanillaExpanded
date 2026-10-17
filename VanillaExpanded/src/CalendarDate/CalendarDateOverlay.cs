@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering;
 using Vintagestory.API.Client;
@@ -14,7 +15,12 @@ internal sealed class CalendarDateOverlay : IHudOverlay, IHudOverlayVisibilityTr
     private CalendarDateReading? date;
     private bool enabled = true, disposed;
 
+    private bool styleChanged;
+
     #region Public API
+    /// <summary>Retains a style change until the scheduler prepares and measures the new presentation.</summary>
+    public void SetStyle(EnvironmentalGaugeStyle style) => styleChanged |= presentation.SetStyle(style);
+
     #region Lifecycle
     /// <summary>Gets the presentation's retained-resource transition.</summary>
     public HudOverlayVisibilityTransition Visibility => presentation.Visibility;
@@ -61,7 +67,8 @@ internal sealed class CalendarDateOverlay : IHudOverlay, IHudOverlayVisibilityTr
     {
         if (!IsApplicable()) return HudOverlayChange.None;
         var next = CalendarDateReading.Read(api!.World.Calendar);
-        if (next == date) return HudOverlayChange.None;
+        if (next == date && !styleChanged) return HudOverlayChange.None;
+        styleChanged = false;
         date = next;
         if (next.HasValue) presentation.SetContent(next.Value);
         else presentation.Hide();

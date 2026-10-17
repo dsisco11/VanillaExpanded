@@ -29,6 +29,7 @@ internal sealed class EnvironmentalTemperatureSystem : ModSystem, ILiveConfigura
         this.api = api;
         hud = api.ModLoader.GetModSystem<HudOverlaySystem>();
         overlay = new EnvironmentalTemperatureOverlay();
+        overlay.SetStyle(VanillaExpandedModSystem.Config.EnvironmentalTemperatureGaugeStyle);
         overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays && VanillaExpandedModSystem.Config.EnableEnvironmentalTemperatureOverlay);
         try
         {
@@ -44,6 +45,7 @@ internal sealed class EnvironmentalTemperatureSystem : ModSystem, ILiveConfigura
     public void OnConfigReloaded(ICoreAPI api)
     {
         if (disposed || !ReferenceEquals(this.api, api) || overlay == null) return;
+        overlay.SetStyle(VanillaExpandedModSystem.Config.EnvironmentalTemperatureGaugeStyle);
         overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays && VanillaExpandedModSystem.Config.EnableEnvironmentalTemperatureOverlay);
         // Cleanup must also occur while global visibility suppresses normal selector observation.
         hud?.Session?.Scheduler?.Invalidate(OverlayId);
