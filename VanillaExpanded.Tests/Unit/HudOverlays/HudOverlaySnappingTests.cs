@@ -1,7 +1,9 @@
 using System.Drawing;
+using System.Text.Json;
 using VanillaExpanded.HudOverlays.Anchoring;
 using VanillaExpanded.HudOverlays.Interaction;
 using VanillaExpanded.HudOverlays.Layout;
+using VanillaExpanded.HudOverlays.Persistence;
 using VanillaExpanded.HudOverlays.Registration;
 using Vintagestory.API.Client;
 using Vintagestory.API.Config;
@@ -13,13 +15,63 @@ namespace VanillaExpanded.Tests.Unit.HudOverlays;
 public sealed class HudOverlaySnappingTests
 {
     #region Public API
+    /// <summary>Detachment validates the reflowed source remainder as well as the freely moved member.</summary>
+    [Theory]
+    [InlineData(false)] [InlineData(true)]
+    public void ReflowedSourceRemainderCannotOverlapPeerWithoutShift(bool bypass)
+    {
+        float previousScale = RuntimeEnv.GUIScale; RuntimeEnv.GUIScale = 1;
+        using var storage = new HudLayoutFixture();
+        var members = new[] { storage.Add("test:a", "source"), storage.Add("test:b", "source"),
+            storage.Add("test:c", "source"), storage.Add("test:peer", "peer") };
+        var right = new HudLayoutNode { First = new() { Indicator = "test:b" }, Second = new() { Indicator = "test:c" },
+            Direction = HudOverlayDirection.Vertical, Alignment = HudOverlayCrossAlignment.Start };
+        var source = new HudLayoutContainer { Id = "source", Key = HudOverlayPositionKeys.Group("source"), TemplateId = "source", X = 100, Y = 100,
+            Movable = true, Tree = new() { First = new() { Indicator = "test:a" }, Second = right,
+                Direction = HudOverlayDirection.Horizontal, Alignment = HudOverlayCrossAlignment.Center } };
+        var peer = new HudLayoutContainer { Id = "peer", Key = HudOverlayPositionKeys.Group("peer"), TemplateId = "peer", X = 150, Y = 100,
+            Tree = new() { Indicator = "test:peer" } };
+        storage.Values[HudLayoutStore.SettingKey] = JsonSerializer.Serialize(new HudLayoutSnapshot { Containers = new[] { source, peer } });
+        var containers = new HudOverlayContainers(storage.Api.Object, storage.Registry);
+        var anchors = new HudOverlayAnchorContext(new Window(), () => RuntimeEnv.GUIScale, () => null);
+        var layouts = new Dictionary<string, HudOverlayGroupLayout>();
+        var sizes = new Dictionary<string, SizeF> { ["test:a"] = new(20, 100), ["test:b"] = new(100, 20),
+            ["test:c"] = new(100, 20), ["test:peer"] = new(20, 20) };
+        // Resolve both the original and detached topology through the runtime's native layout boundary.
+        Action repack = () => {
+            anchors.BeginFrame();
+            foreach (var item in containers.Resolved)
+            {
+                if (!layouts.TryGetValue(item.Id, out var layout)) layouts[item.Id] = layout = new HudOverlayGroupLayout();
+                layout.Apply(anchors, containers.Definition(item), members.Where(member => item.Tree.Leaves().Contains(member.Id))
+                    .Select(member => new KeyValuePair<HudOverlayRegistration, SizeF>(member, sizes[member.Id])).ToArray(), containers.Origin(item), item.Tree, item.Padding);
+            }
+        };
+        try
+        {
+            repack(); var original = layouts["source"].Members;
+            var peerClip = Assert.Single(layouts["peer"].Members).Clip;
+            Assert.All(original, member => Assert.False(member.Clip.IntersectsWith(peerClip)));
+            var movement = containers.Get("source", "test:a"); movement.ContainerOrigin = new PointF(100, 100);
+            movement.MemberOrigins = original.ToDictionary(member => member.Registration.Id,
+                member => new PointF((float)member.Bounds.renderX, (float)member.Bounds.renderY));
+            movement.Begin(movement.MemberOrigins["test:a"], PointF.Empty, 1); movement.Move(new PointF(300, 200)); repack();
+            Assert.Contains(layouts["source"].Members, member => member.Clip.IntersectsWith(peerClip));
+            var snapping = new HudOverlaySnapping(containers);
+            snapping.Update(movement, new PointF(400, 300), bypass, 1, new RectangleF(0, 0, 800, 600), layouts, _ => true);
+            Assert.Equal(bypass, snapping.DropAllowed); Assert.Null(snapping.Selected); Assert.Equal(0, storage.Writes);
+            movement.Cancel(); Assert.Equal(source.Tree, containers.Owner("test:b")!.Tree);
+        }
+        finally { foreach (var layout in layouts.Values) layout.Dispose(); RuntimeEnv.GUIScale = previousScale; }
+    }
+
     /// <summary>Physical acquisition and integer preview placement use the same relationships at several GUI scales.</summary>
     [Theory]
     [InlineData(1, false)] [InlineData(1.5, false)] [InlineData(2, false)] [InlineData(1, true)] [InlineData(1.5, true)]
     public void GroupingUsesMeasuredGeometryAcrossScales(float scale, bool edge)
     {
         using var fixture = new Fixture(scale, targetOrigin: edge ? PointF.Empty : null); fixture.Begin(); fixture.MoveBesideTarget();
-        fixture.Update(); Assert.True(fixture.Snapping.Selected?.Grouping);
+        fixture.Update(); Assert.True(fixture.Snapping.Selected?.Grouping); Assert.True(fixture.Snapping.DropAllowed);
         var preview = fixture.Snapping.Insertion; Assert.False(preview.IsEmpty); Assert.False(preview.IntersectsWith(fixture.Snapping.Destination));
         var joined = Assert.Single(fixture.Containers.Resolved); fixture.Movement.Commit(fixture.Containers.Origin(joined)!.Value);
         fixture.Repack(); var actual = fixture.Layouts[joined.Id].Members.Single(value => value.Registration.Id == "test:a");
@@ -50,11 +102,38 @@ public sealed class HudOverlaySnappingTests
     {
         using var fixture = new Fixture(scale); fixture.Begin();
         var target = fixture.Layouts["target"].Root;
-        fixture.Movement.Move(new PointF((float)target.renderX + 2, (float)target.renderY + 2)); fixture.Repack(); fixture.Update();
+        fixture.Movement.Move(new PointF((float)target.renderX + 2, (float)(target.renderY + target.OuterHeight + 1))); fixture.Repack(); fixture.Update();
         var selected = Assert.IsType<HudSnapCandidate>(fixture.Snapping.Selected); Assert.False(selected.Grouping);
+        Assert.True(fixture.Snapping.DropAllowed);
         fixture.Movement.Commit(fixture.Movement.Position!.Value); fixture.Repack(); Assert.Equal(2, fixture.Containers.Resolved.Count);
         var committed = fixture.Layouts["source"].Root;
         Assert.Equal(selected.AlignsX ? selected.Origin.X : selected.Origin.Y, (float)(selected.AlignsX ? committed.renderX : committed.renderY), 3);
+    }
+
+    /// <summary>Edge alignment cannot advertise a snapped placement over another visible indicator.</summary>
+    [Theory]
+    [InlineData(1)] [InlineData(1.5)]
+    public void OverlappingAlignmentIsRejected(float scale)
+    {
+        using var fixture = new Fixture(scale); fixture.Begin();
+        var target = fixture.Layouts["target"].Root;
+        fixture.Movement.Move(new PointF((float)target.renderX + 2, (float)target.renderY + 2)); fixture.Repack(); fixture.Update();
+        Assert.Null(fixture.Snapping.Selected);
+        Assert.Equal(2, fixture.Containers.Resolved.Count);
+    }
+
+    /// <summary>Free placement cannot accept an overlapping drop unless the user explicitly holds the bypass modifier.</summary>
+    [Theory]
+    [InlineData(false)] [InlineData(true)]
+    public void RawOverlappingPlacementRequiresShift(bool bypass)
+    {
+        using var fixture = new Fixture(1); fixture.Begin();
+        var target = fixture.Layouts["target"].Root;
+        var pointer = new PointF((float)target.renderX + 13, (float)target.renderY + 13);
+        fixture.Movement.Move(pointer); fixture.Repack();
+        fixture.Snapping.Update(fixture.Movement, pointer, bypass, 1, new RectangleF(0, 0, 800, 600), fixture.Layouts, _ => true);
+        Assert.Null(fixture.Snapping.Selected);
+        Assert.Equal(bypass, fixture.Snapping.DropAllowed);
     }
 
     /// <summary>A physical center falling between native integer coordinates cannot advertise an exact alignment.</summary>

@@ -52,11 +52,12 @@ internal static class HudSnapGeometry
         return result.OrderByDescending(item => item.Identity == retained).ThenBy(item => item.Distance)
             .ThenByDescending(item => item.Grouping).ThenBy(item => item.Identity, StringComparer.Ordinal).ToArray();
 
-        // Thresholds are physical pixels even when the caller's native GUI scale changes.
+        /// <summary>Applies acquisition or retained-release distance in physical pixels independently of GUI scale.</summary>
         void Add(HudSnapCandidate candidate)
         {
             if (candidate.Distance <= (candidate.Identity == retained ? Release : Acquisition)) result.Add(candidate);
         }
+        /// <summary>Offers matching start, center, and end positions with guides on one physical axis.</summary>
         void AlignAxis(RectangleF reference, bool xAxis, string key)
         {
             for (int index = 0; index < 3; index++)

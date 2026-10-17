@@ -8,7 +8,7 @@ using Vintagestory.API.Client;
 
 namespace VanillaExpanded.HudOverlays.Layout;
 
-/// <summary>Packs an eligible ordered prefix into one native bounds hierarchy without owning presentation resources.</summary>
+/// <summary>Resolves default packing or mixed attachment trees into native bounds without owning presentation resources.</summary>
 /// <remarks>The scheduler supplies enabled/applicable members; overflow suppression never changes their update eligibility.
 /// Position-only changes modify native bounds and clips, without calling presentation preparation.</remarks>
 internal sealed class HudOverlayGroupLayout : IDisposable
