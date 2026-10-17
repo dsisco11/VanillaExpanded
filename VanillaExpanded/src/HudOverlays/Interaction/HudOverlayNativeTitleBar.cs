@@ -29,8 +29,31 @@ internal sealed class HudOverlayNativeTitleBar : GuiElementDialogTitleBar
         AccessTools.FieldRefAccess<GuiElementListMenu, double>("expandedBoxHeight");
 
     public GuiElementListMenu Menu => MenuField(this);
+    private static readonly AccessTools.FieldRef<GuiElementDialogTitleBar, bool> MovableField =
+        AccessTools.FieldRefAccess<GuiElementDialogTitleBar, bool>("movable");
+    private static readonly AccessTools.FieldRef<GuiElementListMenu, SelectionChangedDelegate> SelectionField =
+        AccessTools.FieldRefAccess<GuiElementListMenu, SelectionChangedDelegate>("onSelectionChanged");
 
     #region Public API
+    /// <summary>Reuses native dropdown interaction but replaces its destructive position-reset callback.</summary>
+    public void ConfigurePermission(Action<bool> change, Action reset)
+    {
+        Menu.Values = new[] { "auto", "manual", "reset-layout" };
+        Menu.Names = new[] { Lang.Get("Fixed"), Lang.Get("Movable"), Lang.Get("vanillaexpanded:hud-reset-layout") };
+        SelectionField(Menu) = (code, selected) =>
+        {
+            if (!selected) return;
+            if (code == "reset-layout") reset();
+            else change(code == "manual");
+        };
+    }
+
+    /// <summary>Reflects authoritative permission without invoking the native reset or drag implementation.</summary>
+    public void SynchronizePermission(bool movable)
+    {
+        MovableField(this) = movable;
+        if (!Menu.IsOpened) Menu.SelectedIndex = movable ? 1 : 0;
+    }
     /// <summary>Retains native titlebar initialization with normal HUD lettering; content drops remain the persistence owner.</summary>
     public HudOverlayNativeTitleBar(ICoreClientAPI api, string title, GuiComposer composer, Action dismiss, ElementBounds bounds)
         : base(api, title, composer, dismiss, font: CairoFont.WhiteSmallText().WithFontSize(HudOverlaySizes.Text), bounds: bounds)

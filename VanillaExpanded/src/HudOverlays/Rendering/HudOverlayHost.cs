@@ -18,12 +18,12 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     private readonly HudOverlayHoverLabels hoverLabels;
     private readonly IHudOverlayBackdropBatch? backdropBatch;
     private readonly Dictionary<string, HudOverlayGroupControls> groupControls = new(StringComparer.Ordinal);
-    private readonly HudOverlayGroupPositions? positions;
+    private readonly HudOverlayContainers? containers;
     private HudOverlayGroupControls? ActiveControls => groupControls.Values.FirstOrDefault(control => control.Active);
     private readonly Dictionary<string, HudOverlayGroupLayout> groups = new(StringComparer.Ordinal);
     private readonly Dictionary<HudOverlayMemberLayout, ElementBounds> clips = new();
     private HashSet<HudOverlayRegistration> active = new();
-    private bool disposed;
+    private bool disposed, rendering, synchronizing;
     public Action? BeforeRender { get; set; }
     public override bool Focusable => false;
     public override bool UnregisterOnClose => true;
@@ -33,7 +33,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     /// <summary>Borrows registry and prepared-state decisions; owns only composers allocated for this session.</summary>
     public HudOverlayHost(ICoreClientAPI api, HudOverlayRegistry registry, Func<HudOverlayRegistration, bool> isDrawable,
         Action<HudOverlayRegistration, Exception> failure, Action<Exception>? boundaryFailure = null,
-        IHudOverlayBackdropBatch? backdropBatch = null, HudOverlayGroupPositions? positions = null) : base(api)
+        IHudOverlayBackdropBatch? backdropBatch = null, HudOverlayContainers? containers = null) : base(api)
     {
         this.registry = registry;
         this.isDrawable = isDrawable;
@@ -41,7 +41,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         this.boundaryFailure = boundaryFailure;
         hoverLabels = new HudOverlayHoverLabels(api);
         this.backdropBatch = backdropBatch ?? api.ModLoader?.GetModSystem<HudOverlaySystem>()?.Backdrop;
-        this.positions = positions;
+        this.containers = containers;
 
     }
     /// <summary>Registers a live session host through the native GUI lifecycle without taking focus.</summary>
@@ -71,16 +71,32 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         }
         var retained = layouts.Values.SelectMany(group => group.Members).ToHashSet();
         foreach (var member in clips.Keys.Where(member => !retained.Contains(member)).ToArray()) clips.Remove(member);
-        foreach (string id in groupControls.Keys.Where(id => !layouts.ContainsKey(id)).ToArray())
+        if (containers != null)
         {
-            groupControls[id].Dispose();
-            groupControls.Remove(id);
+            var targets = new Dictionary<string, HudOverlayGroupMovement>(StringComparer.Ordinal);
+            foreach (var pair in layouts)
+            {
+                targets["container:" + pair.Key] = containers.Get(pair.Key);
+                // A singleton's container grip already moves just that indicator; multi-member groups expose separate grips.
+                bool multiple = containers.Resolved.FirstOrDefault(item => item.Id == pair.Key)?.Tree.Leaves().Count() > 1;
+                foreach (var member in pair.Value.Members.Where(member => isDrawable(member.Registration)))
+                {
+                    var individual = containers.Get(pair.Key, member.Registration.Id);
+                    // Detachment makes this a singleton before release. Retain its captured member grip until commit/cancel.
+                    if (multiple || individual.Dragging) targets["member:" + member.Registration.Id] = individual;
+                }
+            }
+            foreach (string id in groupControls.Keys.Where(id => !targets.ContainsKey(id)).ToArray())
+            {
+                groupControls[id].Dispose(); groupControls.Remove(id);
+            }
+            foreach (var target in targets)
+                if (!groupControls.ContainsKey(target.Key)) groupControls[target.Key] = new HudOverlayGroupControls(capi, this,
+                    target.Value, isDrawable, RequestLayout, () => containers.Reset());
         }
-        if (positions != null)
-            foreach (string id in layouts.Keys)
-                if (!groupControls.ContainsKey(id)) groupControls[id] = new HudOverlayGroupControls(capi, this,
-                    positions.Get(id), isDrawable, () => BeforeRender?.Invoke());
-        foreach (var control in groupControls.Values.ToArray()) control.Synchronize(layouts);
+        synchronizing = true;
+        try { foreach (var control in groupControls.Values.ToArray()) control.Synchronize(layouts); }
+        finally { synchronizing = false; }
     }
     #endregion
     #region Input
@@ -142,7 +158,8 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         BeforeRender?.Invoke();
         if (!IsOpened() || capi.HideGuis) return;
         // Keep consumers alive until all composer callbacks finish, including removals requested by drawing.
-        registry.RunSnapshotPass(snapshot =>
+        rendering = true;
+        try { registry.RunSnapshotPass(snapshot =>
         {
             active.UnionWith(snapshot);
             capi.Render.GlPushMatrix();
@@ -158,7 +175,8 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
                 foreach (var control in groupControls.Values.ToArray()) control.Draw(deltaTime);
             }
             finally { backdropBatch?.Clear(); capi.Render.GlPopMatrix(); active.Clear(); }
-        }, boundaryFailure);
+        }, boundaryFailure); }
+        finally { rendering = false; }
     }
     /// <summary>No post-render work is needed by these dynamic-only presentations.</summary>
     public override void OnFinalizeFrame(float dt) { }
@@ -168,24 +186,31 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         if (disposed) return;
         disposed = true;
         BeforeRender = null;
-        foreach (var control in groupControls.Values) control.Dispose();
+        var failures = new List<Exception>();
+        // A failing native release must not strand the other controls or compositions on session replacement.
+        foreach (var control in groupControls.Values) TryRelease(control.Dispose, failures);
         groupControls.Clear();
-        hoverLabels.Dispose();
-        try { TryClose(); }
-        finally
-        {
-            try { base.Dispose(); }
-            finally
-            {
-                // Native dialog disposal releases composers but retains its collection entries.
-                foreach (string id in groups.Keys) Composers.Remove(id);
-                groups.Clear(); clips.Clear(); active.Clear();
-            }
-        }
+        TryRelease(hoverLabels.Dispose, failures);
+        TryRelease(() => TryClose(), failures);
+        foreach (var composer in Composers.Values.ToArray()) TryRelease(composer.Dispose, failures);
+        foreach (var pair in ((IEnumerable<KeyValuePair<string, GuiComposer>>)Composers).ToArray()) Composers.Remove(pair.Key);
+        TryRelease(() => base.Dispose(), failures);
+        groups.Clear(); clips.Clear(); active.Clear();
+        if (failures.Count > 0) throw new AggregateException(failures);
     }
     #endregion
     #endregion
     #region Private
+    /// <summary>Collects native cleanup failures while attempting every independent owned resource.</summary>
+    private static void TryRelease(Action release, List<Exception> failures)
+    {
+        try { release(); } catch (Exception failure) { failures.Add(failure); }
+    }
+    /// <summary>Defers render-time cancellation reflow to the next frame, avoiding nested registry passes.</summary>
+    private void RequestLayout()
+    {
+        if (!rendering && !synchronizing && !disposed) BeforeRender?.Invoke();
+    }
     /// <summary>Collects only visible prepared providers, applying the same membership and clipping gates as foreground drawing.</summary>
     private void CollectBackdrops()
     {
