@@ -403,6 +403,44 @@ public sealed class HudOverlayLayoutTests
         finally { RuntimeEnv.GUIScale = old; }
     }
 
+    /// <summary>Saved origins scale once, survive content changes, and clamp temporarily without rewriting their preference.</summary>
+    [Theory]
+    [InlineData(1)]
+    [InlineData(1.5)]
+    [InlineData(2)]
+    public void SavedOriginSurvivesResizeAndContentMeasurementChanges(double scale)
+    {
+        float oldScale = RuntimeEnv.GUIScale;
+        try
+        {
+            RuntimeEnv.GUIScale = (float)scale;
+            var window = new Window(900, 700);
+            var context = new HudOverlayAnchorContext(window, () => scale, () => null);
+            var group = Group(new("hotbar", HudOverlayPoint.RightBottom, HudOverlayPoint.RightBottom),
+                new HudOverlayPacking(direction: HudOverlayDirection.Horizontal, gap: 7, padding: 4));
+            var origin = new PointF(83, 91);
+            using var layout = new HudOverlayGroupLayout();
+            context.BeginFrame();
+            layout.Apply(context, group, new[] { Member("mod:a", 40, 30), Member("mod:b", 20, 25) }, origin);
+            Assert.True(layout.Available);
+            var root = layout.Root;
+            var first = layout.Members[0].Bounds;
+            var second = layout.Members[1].Bounds;
+            double gap = second.renderX - first.renderX - first.OuterWidth;
+            Near(origin.X * scale, root.renderX); Near(origin.Y * scale, root.renderY);
+            layout.Apply(context, group, new[] { Member("mod:a", 60, 45), Member("mod:b", 20, 25) }, origin);
+            Assert.Same(root, layout.Root);
+            Near(origin.X * scale, root.renderX); Near(origin.Y * scale, root.renderY);
+            Near(gap, layout.Members[1].Bounds.renderX - layout.Members[0].Bounds.renderX - layout.Members[0].Bounds.OuterWidth);
+            window.Resize(120, 110); context.BeginFrame();
+            layout.Apply(context, group, new[] { Member("mod:a", 60, 45), Member("mod:b", 20, 25) }, origin);
+            Assert.InRange(root.renderX, context.SafeRectangle.Left, Math.Max(context.SafeRectangle.Left, context.SafeRectangle.Right - root.OuterWidth));
+            window.Resize(900, 700); context.BeginFrame();
+            layout.Apply(context, group, new[] { Member("mod:a", 60, 45), Member("mod:b", 20, 25) }, origin);
+            Near(origin.X * scale, root.renderX); Near(origin.Y * scale, root.renderY);
+        }
+        finally { RuntimeEnv.GUIScale = oldScale; }
+    }
     /// <summary>Invalid native measurements fail before creating child geometry.</summary>
     [Theory]
     [InlineData(float.NaN, 1)]

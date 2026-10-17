@@ -55,23 +55,30 @@ Completion evidence:
 
 Depends on Phase 1. Outcome: every registered group uses a consistent saved/default/preview position with existing packing and native scaling.
 
-- [ ] Add focused position integration under `HudOverlays`, keeping file responsibilities separate and session/system composition thin.
-  - [ ] Assign stable, distinct VE namespaced group and indicator keys without colliding with other dialogs.
-  - [ ] Read native positions and map valid integer GUI-unit content origins through `HudOverlayPlacement`; missing entries retain registered defaults.
-  - [ ] Make active drag preview override saved placement and registered defaults, with starting placement retained for cancellation.
-  - [ ] Apply native coordinate rounding and screen clamping; preserve saved origin through size/style changes, subject to reachability.
-- [ ] Integrate group placement resolution with `HudOverlaySession`, `HudOverlayGroupLayout`, and scheduler anchor availability.
-  - [ ] Use the same effective placement for layout and availability; a moved screen-positioned group must not depend on its former native anchor.
-  - [ ] Preserve internal group packing and update bounds/clips without refreshing readings or allocating feature artwork.
-  - [ ] Retain saved overrides across unrelated configuration changes; use registered placement again only after reset.
-- [ ] Generalize the retained hover/drag controls to registered groups and add group-default restoration via clearing their native position keys.
-  - [ ] Keep input, control composition resources, and preview state owned by the shared host/session runtime and release them safely on teardown/rebinding.
-- [ ] Add focused verification for key isolation, native position read/write/reset, preview precedence/cancellation, scaling, viewport/style changes, effective-anchor availability, and unchanged packing/content ownership.
+- [x] Add focused position integration under `HudOverlays`, keeping file responsibilities separate and session/system composition thin.
+  - [x] Assign stable, distinct VE namespaced group and indicator keys without colliding with other dialogs.
+  - [x] Read native positions and map valid integer GUI-unit content origins through `HudOverlayPlacement`; missing entries retain registered defaults.
+  - [x] Make active drag preview override saved placement and registered defaults, with starting placement retained for cancellation.
+  - [x] Apply native coordinate rounding and screen clamping; preserve saved origin through size/style changes, subject to reachability.
+- [x] Integrate group placement resolution with `HudOverlaySession`, `HudOverlayGroupLayout`, and scheduler anchor availability.
+  - [x] Use the same effective placement for layout and availability; a moved screen-positioned group must not depend on its former native anchor.
+  - [x] Preserve internal group packing and update bounds/clips without refreshing readings or allocating feature artwork.
+  - [x] Retain saved overrides across unrelated configuration changes; use registered placement again only after reset.
+- [x] Generalize the retained hover/drag controls to registered groups and add group-default restoration via clearing their native position keys.
+  - [x] Keep input, control composition resources, and preview state owned by the shared host/session runtime and release them safely on teardown/rebinding.
+- [x] Add focused verification for key isolation, native position read/write/reset, preview precedence/cancellation, scaling, viewport/style changes, effective-anchor availability, and unchanged packing/content ownership.
 
 Completion criteria:
 
-- [ ] All registered groups can use persisted positions and reset to defaults without altering feature registrations or other dialogs' settings.
-- [ ] Position-only movement neither resamples readings nor recreates feature presentations, and session replacement leaves no retained interaction resources.
+- [x] All registered groups can use persisted positions and reset to defaults without altering feature registrations or other dialogs' settings.
+- [x] Position-only movement neither resamples readings nor recreates feature presentations, and session replacement leaves no retained interaction resources.
+
+Completion evidence:
+
+- Shared session-owned group preferences restore native integer content origins once, with separate group/indicator key namespaces. Active previews override saved/default placement; cancellation discards previews, successful drops use native truncation, and Fixed clears only the selected group key.
+- Every registered group uses the retained native hover controls. Layout and scheduler availability both use screen placement for moved groups; saved origins survive configuration, size, and viewport changes while effective bounds remain clamped and packing stays intact. Feature registrations and presentation ownership are unchanged.
+- Second review and the independent completion audit found no required unresolved issue. Final production/test build and full suite passed 2,209/2,209; focused HUD coverage passed 265/265, with no failures or skips. Receipts: `artifacts/test-results/movable-hud-phase2/phase2-full.trx` and `phase2-focused.trx` in the same directory (repository-relative). Diff checks are clean.
+- Live appearance acceptance remains in Phase 5; no game was launched. Individual containers and snapping remain outside this completed scope.
 
 ## Phase 3: Add individual containers, detachment, and return to group
 

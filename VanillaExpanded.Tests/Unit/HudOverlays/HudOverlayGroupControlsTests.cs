@@ -17,6 +17,8 @@ namespace VanillaExpanded.Tests.Unit.HudOverlays;
 [Collection("HudOverlayGeometry")]
 public sealed class HudOverlayGroupControlsTests : IDisposable
 {
+    private const string GroupId = "world-status";
+    private static readonly string DialogKey = HudOverlayPositionKeys.Group(GroupId);
     private readonly float oldScale = RuntimeEnv.GUIScale;
     private readonly string? oldLocale = Lang.CurrentLocale;
     private readonly ITranslationService? english = Lang.AvailableLanguages.GetValueOrDefault("en");
@@ -39,7 +41,10 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
 
     #region Public API
     /// <summary>Provides headless engine services and one measured world-status member.</summary>
-    public HudOverlayGroupControlsTests()
+    public HudOverlayGroupControlsTests() : this(GroupId) { }
+
+    /// <summary>Creates native controls for any registered group.</summary>
+    private HudOverlayGroupControlsTests(string groupId)
     {
         RuntimeEnv.GUIScale = 1;
         var language = new Mock<ITranslationService>();
@@ -64,9 +69,9 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
         gui.Setup(value => value.CreateCompo(It.IsAny<string>(), It.IsAny<ElementBounds>()))
             .Returns((string name, ElementBounds bounds) => (GuiComposer)Activator.CreateInstance(typeof(GuiComposer),
                 BindingFlags.Instance | BindingFlags.NonPublic, null, new object[] { api.Object, bounds, name }, null)!);
-        movement = new HudOverlayGroupMovement(gui.Object);
+        movement = new HudOverlayGroupMovement(gui.Object, groupId);
         anchors = new HudOverlayAnchorContext(window, () => RuntimeEnv.GUIScale, () => null);
-        group = new HudOverlayGroup(HudOverlayGroupMovement.GroupId,
+        group = new HudOverlayGroup(groupId,
             new HudOverlayPlacement("screen", HudOverlayPoint.LeftTop, HudOverlayPoint.LeftTop, 80, 80));
         registration = new HudOverlayRegistration("test:one", overlay.Object, () => true, group.Id);
         Relayout();
@@ -86,6 +91,73 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
         if (english == null) Lang.AvailableLanguages.Remove("en"); else Lang.AvailableLanguages["en"] = english;
     }
 
+    /// <summary>Nonprototype identities retain the actual native dropdown and selective drag behavior.</summary>
+    [Theory]
+    [InlineData("held-item-status")]
+    [InlineData("mod:custom")]
+    public void ArbitraryGroupsUseNativeControlsAndIsolatedPersistence(string groupId)
+    {
+        using var fixture = new HudOverlayGroupControlsTests(groupId);
+        fixture.NativeTitlebarDropdownSelectsMovementMode();
+        fixture.gui.Invocations.Clear();
+        fixture.DragOutsideHandlePersistsContentOriginOnlyOnLeftRelease();
+        fixture.gui.Verify(value => value.SetDialogPosition(It.Is<string>(key => key != fixture.movement.Key), It.IsAny<Vec2i>()), Times.Never);
+    }
+    /// <summary>The host routes an active nonfirst group, retains control instances, and cancels removed or disposed targets.</summary>
+    [Fact]
+    public void SharedHostRoutesSecondGroupAndReleasesAllControls()
+    {
+        using var registry = new HudOverlayRegistry();
+        registry.RegisterGroup(group);
+        registry.Register(registration);
+        var secondGroup = new HudOverlayGroup("mod:second", group.Placement, group.Packing);
+        registry.RegisterGroup(secondGroup);
+        var secondRegistration = new HudOverlayRegistration("test:second", new Mock<IHudOverlay>().Object, () => true, secondGroup.Id);
+        registry.Register(secondRegistration);
+        using var secondLayout = new HudOverlayGroupLayout();
+        secondLayout.Apply(anchors, secondGroup, new[] { new KeyValuePair<HudOverlayRegistration, SizeF>(secondRegistration, new SizeF(30, 25)) });
+        var sharedLayouts = new Dictionary<string, HudOverlayGroupLayout> { [group.Id] = layout, [secondGroup.Id] = secondLayout };
+        var positions = new HudOverlayGroupPositions(gui.Object);
+        var host = new HudOverlayHost(api.Object, registry, _ => true, (_, failure) => throw failure, positions: positions);
+        try
+        {
+            host.Synchronize(sharedLayouts);
+            var field = typeof(HudOverlayHost).GetField("groupControls", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            var owned = (Dictionary<string, HudOverlayGroupControls>)field.GetValue(host)!;
+            var firstControl = owned[group.Id]; var secondControl = owned[secondGroup.Id];
+            host.Synchronize(sharedLayouts);
+            Assert.Same(firstControl, owned[group.Id]); Assert.Same(secondControl, owned[secondGroup.Id]);
+            var secondMovement = positions.Get(secondGroup.Id);
+            secondMovement.SetMovable(true);
+            secondMovement.Begin(new PointF((float)secondLayout.Root.renderX, (float)secondLayout.Root.renderY), PointF.Empty, 1);
+            Assert.True(host.ShouldReceiveKeyboardEvents());
+            Assert.True(host.OnEscapePressed());
+            Assert.False(secondMovement.Dragging); Assert.False(host.ShouldReceiveKeyboardEvents());
+            var secondOrigin = new PointF((float)secondLayout.Root.renderX, (float)secondLayout.Root.renderY);
+            secondMovement.Begin(secondOrigin, PointF.Empty, 1);
+            pointer = new PointF(19, 23);
+            var move = Event(EnumMouseButton.None); host.OnMouseMove(move);
+            Assert.True(move.Handled);
+            Assert.Equal(new PointF(secondOrigin.X + pointer.X, secondOrigin.Y + pointer.Y), secondMovement.Position);
+            var release = Event(EnumMouseButton.Left); host.OnMouseUp(release);
+            Assert.True(release.Handled); Assert.False(secondMovement.Dragging);
+            // This host fixture has no relayout callback, so release persists the currently displayed layout origin.
+            gui.Verify(value => value.SetDialogPosition(secondMovement.Key,
+                It.Is<Vec2i>(position => position.X == (int)secondOrigin.X && position.Y == (int)secondOrigin.Y)), Times.Once);
+            gui.Verify(value => value.SetDialogPosition(It.Is<string>(key => key != secondMovement.Key), It.IsAny<Vec2i>()), Times.Never);
+            gui.Invocations.Clear();
+            secondMovement.Begin(PointF.Empty, PointF.Empty, 1);
+            sharedLayouts.Remove(secondGroup.Id); host.Synchronize(sharedLayouts);
+            Assert.False(secondMovement.Dragging); Assert.False(secondControl.Active);
+            Assert.DoesNotContain(secondGroup.Id, owned.Keys);
+            var firstMovement = positions.Get(group.Id);
+            firstMovement.SetMovable(true); firstMovement.Begin(PointF.Empty, PointF.Empty, 1);
+            host.Dispose();
+            Assert.False(firstMovement.Dragging); Assert.False(firstControl.Active); Assert.Empty(owned);
+            gui.Verify(value => value.SetDialogPosition(It.IsAny<string>(), It.IsAny<Vec2i>()), Times.Never);
+        }
+        finally { host.Dispose(); }
+    }
     /// <summary>Pointer activity away from controls remains untouched; hover rendering does not persist or prepare content.</summary>
     [Fact]
     public void OrdinaryInputAndHoverArePassive()
@@ -144,7 +216,7 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
         Assert.False(titleBar.Movable);
         Assert.False(movement.Movable);
         Assert.Null(movement.Position);
-        gui.Verify(value => value.SetDialogPosition(HudOverlayGroupMovement.DialogKey, null!), Times.AtLeastOnce);
+        gui.Verify(value => value.SetDialogPosition(movement.Key, null!), Times.AtLeastOnce);
     }
 
     /// <summary>The real native bar caches prepared artwork across frames while preserving its dropdown interaction.</summary>
@@ -309,7 +381,7 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
         var release = Event(EnumMouseButton.Left); controls.OnMouseUp(api.Object, release);
         Assert.True(release.Handled);
         Assert.False(movement.Dragging);
-        gui.Verify(value => value.SetDialogPosition(HudOverlayGroupMovement.DialogKey,
+        gui.Verify(value => value.SetDialogPosition(movement.Key,
             It.Is<Vec2i>(point => point.X == (int)Origin().X && point.Y == (int)Origin().Y)), Times.Once);
     }
 
@@ -333,7 +405,7 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
         Assert.True(controls.Bounds.renderY > layout.Root.renderY + layout.Root.OuterHeight);
         controls.OnMouseUp(api.Object, Event(EnumMouseButton.Left));
         Assert.Equal(requestedOrigin, Origin());
-        gui.Verify(value => value.SetDialogPosition(HudOverlayGroupMovement.DialogKey,
+        gui.Verify(value => value.SetDialogPosition(movement.Key,
             It.Is<Vec2i>(point => point.X == (int)requestedOrigin.X && point.Y == (int)requestedOrigin.Y)), Times.Once);
     }
 

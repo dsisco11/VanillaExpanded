@@ -9,13 +9,15 @@ namespace VanillaExpanded.Tests.Unit.HudOverlays;
 /// <summary>Checks native position ownership and independent preview geometry without feature preparations or engine disk writes.</summary>
 public sealed class HudOverlayGroupMovementTests
 {
+    private const string GroupId = "world-status";
+    private static readonly string DialogKey = HudOverlayPositionKeys.Group(GroupId);
     #region Public API
     /// <summary>Missing positions retain registered placement and cannot move before the player enables the grip.</summary>
     [Fact]
     public void MissingPositionStartsFixedWithoutWrites()
     {
         var gui = new Mock<IGuiAPI>();
-        var movement = new HudOverlayGroupMovement(gui.Object);
+        var movement = new HudOverlayGroupMovement(gui.Object, GroupId);
         movement.Begin(new PointF(10, 20), new PointF(100, 100), 1);
         Assert.False(movement.Movable);
         Assert.False(movement.Dragging);
@@ -31,8 +33,8 @@ public sealed class HudOverlayGroupMovementTests
     public void PreviewUsesTotalDisplacementAndCancelDoesNotPersist(double scale)
     {
         var gui = new Mock<IGuiAPI>();
-        gui.Setup(value => value.GetDialogPosition(HudOverlayGroupMovement.DialogKey)).Returns(new Vec2i(20, 30));
-        var movement = new HudOverlayGroupMovement(gui.Object);
+        gui.Setup(value => value.GetDialogPosition(DialogKey)).Returns(new Vec2i(20, 30));
+        var movement = new HudOverlayGroupMovement(gui.Object, GroupId);
         movement.Begin(new PointF(20, 30), new PointF(100, 100), scale);
         movement.Move(new PointF(160, 190));
         movement.Move(new PointF(130, 160));
@@ -49,10 +51,10 @@ public sealed class HudOverlayGroupMovementTests
     {
         Vec2i? stored = null;
         var gui = new Mock<IGuiAPI>();
-        gui.Setup(value => value.GetDialogPosition(HudOverlayGroupMovement.DialogKey)).Returns(() => stored!);
-        gui.Setup(value => value.SetDialogPosition(HudOverlayGroupMovement.DialogKey, It.IsAny<Vec2i>()))
+        gui.Setup(value => value.GetDialogPosition(DialogKey)).Returns(() => stored!);
+        gui.Setup(value => value.SetDialogPosition(DialogKey, It.IsAny<Vec2i>()))
             .Callback<string, Vec2i>((_, position) => stored = position);
-        var movement = new HudOverlayGroupMovement(gui.Object);
+        var movement = new HudOverlayGroupMovement(gui.Object, GroupId);
         movement.SetMovable(true);
         movement.Begin(new PointF(20, 30), PointF.Empty, 1);
         movement.Move(new PointF(10000, 10000));
@@ -60,8 +62,8 @@ public sealed class HudOverlayGroupMovementTests
         movement.Commit(new PointF(1, 1));
         Assert.Equal(new PointF(150, 240), movement.Position);
         Assert.False(movement.Dragging);
-        gui.Verify(value => value.SetDialogPosition(HudOverlayGroupMovement.DialogKey, It.IsAny<Vec2i>()), Times.Once);
-        var restored = new HudOverlayGroupMovement(gui.Object);
+        gui.Verify(value => value.SetDialogPosition(DialogKey, It.IsAny<Vec2i>()), Times.Once);
+        var restored = new HudOverlayGroupMovement(gui.Object, GroupId);
         Assert.True(restored.Movable);
         Assert.Equal(new PointF(150, 240), restored.Position);
     }
@@ -71,14 +73,14 @@ public sealed class HudOverlayGroupMovementTests
     public void FixedModeRestoresDefaultAndClearsOnlyItsKey()
     {
         var gui = new Mock<IGuiAPI>();
-        gui.Setup(value => value.GetDialogPosition(HudOverlayGroupMovement.DialogKey)).Returns(new Vec2i(20, 30));
-        var movement = new HudOverlayGroupMovement(gui.Object);
+        gui.Setup(value => value.GetDialogPosition(DialogKey)).Returns(new Vec2i(20, 30));
+        var movement = new HudOverlayGroupMovement(gui.Object, GroupId);
         movement.Begin(new PointF(20, 30), PointF.Empty, 1);
         movement.SetMovable(false);
         Assert.Null(movement.Position);
         Assert.False(movement.Dragging);
         Assert.False(movement.Movable);
-        gui.Verify(value => value.SetDialogPosition(HudOverlayGroupMovement.DialogKey, null!), Times.Once);
+        gui.Verify(value => value.SetDialogPosition(DialogKey, null!), Times.Once);
         gui.Verify(value => value.SetDialogPosition(It.IsAny<string>(), It.IsAny<Vec2i>()), Times.Once);
     }
 
