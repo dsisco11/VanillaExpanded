@@ -2,12 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using VanillaExpanded.HudOverlays.Layout;
+using VanillaExpanded.HudOverlays.Interaction;
 using VanillaExpanded.HudOverlays.Registration;
 using Vintagestory.API.Client;
 
 namespace VanillaExpanded.HudOverlays.Rendering;
 
-/// <summary>Owns passive native group composers and dispatches only prepared presentations.</summary>
+/// <summary>Owns native group composers, optional group controls, and prepared presentation dispatch.</summary>
 internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
 {
     private readonly HudOverlayRegistry registry;
@@ -16,6 +17,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     private readonly Action<Exception>? boundaryFailure;
     private readonly HudOverlayHoverLabels hoverLabels;
     private readonly IHudOverlayBackdropBatch? backdropBatch;
+    private readonly HudOverlayGroupControls? controls;
     private readonly Dictionary<string, HudOverlayGroupLayout> groups = new(StringComparer.Ordinal);
     private readonly Dictionary<HudOverlayMemberLayout, ElementBounds> clips = new();
     private HashSet<HudOverlayRegistration> active = new();
@@ -29,7 +31,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     /// <summary>Borrows registry and prepared-state decisions; owns only composers allocated for this session.</summary>
     public HudOverlayHost(ICoreClientAPI api, HudOverlayRegistry registry, Func<HudOverlayRegistration, bool> isDrawable,
         Action<HudOverlayRegistration, Exception> failure, Action<Exception>? boundaryFailure = null,
-        IHudOverlayBackdropBatch? backdropBatch = null) : base(api)
+        IHudOverlayBackdropBatch? backdropBatch = null, HudOverlayGroupMovement? movement = null) : base(api)
     {
         this.registry = registry;
         this.isDrawable = isDrawable;
@@ -37,6 +39,8 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         this.boundaryFailure = boundaryFailure;
         hoverLabels = new HudOverlayHoverLabels(api);
         this.backdropBatch = backdropBatch ?? api.ModLoader?.GetModSystem<HudOverlaySystem>()?.Backdrop;
+        if (movement != null)
+            controls = new HudOverlayGroupControls(api, this, movement, isDrawable, () => BeforeRender?.Invoke());
     }
     /// <summary>Registers a live session host through the native GUI lifecycle without taking focus.</summary>
     public override bool TryOpen(bool withFocus)
@@ -65,33 +69,50 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         }
         var retained = layouts.Values.SelectMany(group => group.Members).ToHashSet();
         foreach (var member in clips.Keys.Where(member => !retained.Contains(member)).ToArray()) clips.Remove(member);
+        controls?.Synchronize(layouts);
     }
     #endregion
     #region Input
-    /// <summary>Declines all keyboard delivery without changing event handling flags.</summary>
-    public override bool ShouldReceiveKeyboardEvents() => false;
-    /// <summary>Declines all mouse delivery without changing event handling flags.</summary>
-    public override bool ShouldReceiveMouseEvents() => false;
+    /// <summary>Receives keyboard events only during dragging or native dropdown interaction.</summary>
+    public override bool ShouldReceiveKeyboardEvents() => controls?.Active == true;
+    /// <summary>Allows selective handle routing while retaining passive behavior for hosts without controls.</summary>
+    public override bool ShouldReceiveMouseEvents() => controls != null && IsOpened();
     /// <summary>Leaves general input ownership with the engine.</summary>
     public override bool CaptureAllInputs() => false;
     /// <summary>Leaves raw mouse ownership with the engine.</summary>
     public override bool CaptureRawMouse() => false;
-    /// <summary>Does not close or consume Escape.</summary>
-    public override bool OnEscapePressed() => false;
-    /// <summary>Ignores direct keyboard delivery.</summary>
-    public override void OnKeyDown(KeyEvent args) { }
-    /// <summary>Ignores direct character delivery.</summary>
-    public override void OnKeyPress(KeyEvent args) { }
+    /// <summary>Cancels active dragging instead of closing the HUD or saving its preview.</summary>
+    public override bool OnEscapePressed() => controls?.Cancel() == true;
+    /// <summary>Routes native dropdown navigation, consuming Escape only when it cancels an active interaction.</summary>
+    public override void OnKeyDown(KeyEvent args)
+    {
+        if (args.KeyCode == (int)GlKeys.Escape && OnEscapePressed()) args.Handled = true;
+        else controls?.OnKeyDown(args);
+    }
+    /// <summary>Routes characters only to an open native dropdown.</summary>
+    public override void OnKeyPress(KeyEvent args) => controls?.OnKeyPress(args);
     /// <summary>Ignores direct key-release delivery.</summary>
     public override void OnKeyUp(KeyEvent args) { }
-    /// <summary>Ignores direct mouse-button delivery.</summary>
-    public override void OnMouseDown(MouseEvent args) { }
-    /// <summary>Ignores direct mouse-release delivery.</summary>
-    public override void OnMouseUp(MouseEvent args) { }
-    /// <summary>Ignores direct pointer delivery.</summary>
-    public override void OnMouseMove(MouseEvent args) { }
-    /// <summary>Ignores direct wheel delivery.</summary>
-    public override void OnMouseWheel(MouseWheelEventArgs args) { }
+    /// <summary>Routes presses to the handle without consuming the content composer's entire rectangle.</summary>
+    public override void OnMouseDown(MouseEvent args) => controls?.OnMouseDown(capi, args);
+    /// <summary>Routes active release delivery even after the pointer leaves the starting bounds.</summary>
+    public override void OnMouseUp(MouseEvent args) => controls?.OnMouseUp(capi, args);
+    /// <summary>Routes active pointer movement without taking ordinary gameplay mouse ownership.</summary>
+    public override void OnMouseMove(MouseEvent args) => controls?.OnMouseMove(capi, args);
+    /// <summary>Routes wheel input only to an open native dropdown under the pointer.</summary>
+    public override void OnMouseWheel(MouseWheelEventArgs args) => controls?.OnMouseWheel(args);
+    /// <summary>Discards active interaction when native dialog focus is transferred elsewhere.</summary>
+    public override void UnFocus()
+    {
+        controls?.Cancel();
+        base.UnFocus();
+    }
+    /// <summary>Cancels transient positioning before native close and deregistration.</summary>
+    public override bool TryClose()
+    {
+        controls?.Cancel();
+        return base.TryClose();
+    }
     #endregion
     #region Rendering and lifecycle
     /// <summary>Uses the native HUD depth transform with exception-safe restoration and stable registry membership.</summary>
@@ -111,8 +132,10 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
                 CollectBackdrops();
                 try { backdropBatch?.Flush(capi.Render); }
                 catch (Exception error) { boundaryFailure?.Invoke(error); }
+                controls?.DrawBackground();
                 foreach (var pair in Composers) if (groups[pair.Key].Available) pair.Value.Render(deltaTime);
                 hoverLabels.Draw(groups.Values, registration => active.Contains(registration) && isDrawable(registration), deltaTime);
+                controls?.Draw(deltaTime);
             }
             finally { backdropBatch?.Clear(); capi.Render.GlPopMatrix(); active.Clear(); }
         }, boundaryFailure);
@@ -125,6 +148,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         if (disposed) return;
         disposed = true;
         BeforeRender = null;
+        controls?.Dispose();
         hoverLabels.Dispose();
         try { TryClose(); }
         finally

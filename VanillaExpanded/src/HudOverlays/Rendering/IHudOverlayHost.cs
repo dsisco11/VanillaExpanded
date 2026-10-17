@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using VanillaExpanded.HudOverlays.Layout;
 namespace VanillaExpanded.HudOverlays.Rendering;
-/// <summary>Owns a session's native compositions and their passive visibility lifetime.</summary>
+/// <summary>Owns a session's native compositions and their visibility lifetime.</summary>
 internal interface IHudOverlayHost : IDisposable
 {
     Action? BeforeRender { get; set; }

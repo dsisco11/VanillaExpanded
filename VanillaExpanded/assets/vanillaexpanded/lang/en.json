@@ -2,6 +2,7 @@
   "mappingkey-immersive": "Immersive",
   "mappingkey-icon": "Icon",
   "mappingkey-text": "Text",
+  "hud-group-world-status": "World status",
   "hud-short-ammunition": "AMMO",
   "hud-short-body-temperature": "BODY",
   "hud-short-wetness": "WET",
