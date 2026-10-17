@@ -13,7 +13,8 @@ internal sealed class HudOverlayGroupMovement
     private PointF start, pointerStart;
     private double dragScale;
     public string? IndicatorId { get; }
-    public string Id => IndicatorId == null ? initialContainer : containers.Owner(IndicatorId)?.Id ?? initialContainer;
+    public string Id => Dragging && containers.ActiveContainer != null ? containers.ActiveContainer
+        : IndicatorId == null ? initialContainer : containers.Owner(IndicatorId)?.Id ?? initialContainer;
     public string Key => "vanillaexpanded:hud:controls:" + (IndicatorId == null ? "container:" + initialContainer : "member:" + IndicatorId);
     public bool Movable => !containers.ReadOnly && containers.Resolved.FirstOrDefault(item => item.Id == Id)?.Movable == true;
     public bool Dragging { get; private set; }
@@ -28,6 +29,8 @@ internal sealed class HudOverlayGroupMovement
     }
     public IReadOnlyDictionary<string, PointF> MemberOrigins { get; set; } = new Dictionary<string, PointF>();
     public PointF ContainerOrigin { get; set; }
+    public PointF UnsnappedOrigin { get; private set; }
+    public long DragRevision { get; private set; }
 
     #region Public API
     #region Binding and permission
@@ -55,17 +58,20 @@ internal sealed class HudOverlayGroupMovement
         if (!double.IsFinite(scale) || scale <= 0) throw new ArgumentOutOfRangeException(nameof(scale));
         if (!containers.Begin(Id, IndicatorId, contentOrigin, MemberOrigins, ContainerOrigin)) return;
         start = contentOrigin;
+        UnsnappedOrigin = contentOrigin;
         pointerStart = pointer;
         dragScale = scale;
         Dragging = true;
+        DragRevision++;
     }
 
     /// <summary>Derives preview geometry from the captured origin and total physical pointer delta.</summary>
     public void Move(PointF pointer)
     {
         if (!Dragging) return;
-        containers.Move(new PointF(start.X + (float)((pointer.X - pointerStart.X) / dragScale),
-            start.Y + (float)((pointer.Y - pointerStart.Y) / dragScale)));
+        UnsnappedOrigin = new PointF(start.X + (float)((pointer.X - pointerStart.X) / dragScale),
+            start.Y + (float)((pointer.Y - pointerStart.Y) / dragScale));
+        containers.ClearSnap(UnsnappedOrigin);
     }
 
     /// <summary>Commits the displayed origin with the entire preview and ends local capture.</summary>

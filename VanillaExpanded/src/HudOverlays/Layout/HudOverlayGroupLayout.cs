@@ -77,10 +77,7 @@ internal sealed class HudOverlayGroupLayout : IDisposable
             placement.ScreenPaddingPixels is double padding && resolved is RectangleF viewport)
         {
             // Pixel padding controls both positioning and clipping, including at non-unit GUI scales.
-            float xInset = (float)Math.Min(padding, viewport.Width / 2);
-            float yInset = (float)Math.Min(padding, viewport.Height / 2);
-            safe = new RectangleF(viewport.X + xInset, viewport.Y + yInset,
-                Math.Max(0, viewport.Width - 2 * xInset), Math.Max(0, viewport.Height - 2 * yInset));
+            safe = HudOverlayAnchorContext.Inset(viewport, padding);
         }
         Available = resolved.HasValue && ordered.Length > 0 && safe.Width > 0 && safe.Height > 0;
         if (!Available)

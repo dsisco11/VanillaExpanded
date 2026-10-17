@@ -34,6 +34,8 @@ internal sealed class HudOverlayGroupControls : IDisposable
     private double scale = 1;
     private RectangleF content;
     private readonly Action reset;
+    private readonly Action<HudOverlayGroupMovement, PointF>? snap;
+    public HudOverlayGroupMovement Movement => movement;
     public bool Active => !disposed && (movement.Dragging || pressed || titleBar.Menu.IsOpened);
     public ElementBounds Bounds => titleBar.Bounds;
 
@@ -41,7 +43,8 @@ internal sealed class HudOverlayGroupControls : IDisposable
     #region Construction and synchronization
     /// <summary>Owns actual native titlebar graphics/menu while borrowing the group's content and position state.</summary>
     public HudOverlayGroupControls(ICoreClientAPI api, GuiDialog host, HudOverlayGroupMovement movement,
-        Func<HudOverlayRegistration, bool> drawable, Action relayout, Action? reset = null)
+        Func<HudOverlayRegistration, bool> drawable, Action relayout, Action? reset = null,
+        Action<HudOverlayGroupMovement, PointF>? snap = null)
     {
         this.api = api;
         this.host = host;
@@ -49,6 +52,7 @@ internal sealed class HudOverlayGroupControls : IDisposable
         this.drawable = drawable;
         this.relayout = relayout;
         this.reset = reset ?? (() => { });
+        this.snap = snap;
         highlight = new HudOverlayGroupHighlight(api);
         compositionBounds = ElementBounds.Fixed(0, 0, Width, HudOverlaySizes.TitleBarHeight).WithParent(api.Gui.WindowBounds);
         composer = api.Gui.CreateCompo(movement.Key, compositionBounds);
@@ -115,6 +119,7 @@ internal sealed class HudOverlayGroupControls : IDisposable
         if (!movement.Dragging) return;
         movement.Move(new PointF(args.X, args.Y));
         relayout();
+        snap?.Invoke(movement, new PointF(args.X, args.Y));
     }
 
     /// <summary>Persists a successful content drop or delegates menu/close icon release to the native titlebar.</summary>
@@ -130,7 +135,8 @@ internal sealed class HudOverlayGroupControls : IDisposable
         {
             movement.Move(new PointF(args.X, args.Y));
             relayout();
-            if (movement.Dragging) movement.Commit(ContentOrigin());
+            snap?.Invoke(movement, new PointF(args.X, args.Y));
+            if (movement.Dragging) movement.Commit(movement.ContainerOrigin);
         }
         else if (pressed && !menuPress && handle.Contains(args.X, args.Y))
             titleBar.OnMouseUpOnElement(api, args);
@@ -280,6 +286,7 @@ internal sealed class HudOverlayGroupControls : IDisposable
                 : !movement.HasMultipleMembers ? group!.Members.First().Registration : null;
             string key = indicator == null ? "vanillaexpanded:hud-group-" + movement.Id : indicator.HoverLabelKey ?? indicator.Id;
             string title = Lang.HasTranslation(key) ? Lang.Get(key) : indicator?.Id ?? Lang.Get("vanillaexpanded:hud-custom-group");
+            if (movement.Dragging && caption != null) title = caption;
             if (!composer.Composed || preparedScale != scale || caption != title)
             {
                 titleBar.Text = title;

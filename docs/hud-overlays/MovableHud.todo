@@ -13,7 +13,7 @@ Persist arbitrary membership through a focused layout metadata boundary, reusing
 
 - Use the native titlebar with its native Fixed/Movable dropdown and the approved compact orange skin: 22 GUI units high with shared 14-point HUD text. Adapt hover visibility, content-origin persistence, and cancellation around the widget; do not substitute a direct mode-toggle interaction.
 - Saved positions use native integer GUI-unit X/Y coordinates, not persisted screen-edge anchors or pivots. Explicit membership metadata will distinguish defaults, independent items, and custom groups; coordinate presence alone is insufficient. Client settings apply across worlds.
-- Begin with a 6-physical-pixel snap threshold and Shift bypass. Select and document the wider release threshold and deterministic candidate tie-breaking during snapping work.
+- Use a 6-physical-pixel acquisition threshold, a 10-pixel release threshold, and Shift bypass. Retained valid candidates win first, followed by distance, grouping before alignment on ties, and ordinal candidate identity.
 - Resolve compact handle dimensions, title/menu presentation, and control-to-content origin mapping in the prototype; do not silently introduce resizing or close-indicator behavior.
 - Run build/test tools through subagents as required by repository instructions. Leave live acceptance to the user; do not launch the game automatically.
 
@@ -187,32 +187,39 @@ Depends on Phase 4. Outcome: individual snaps create/join groups and whole-group
 
 Source: [MovableHudProposal.md](MovableHudProposal.md), Approved interaction decisions, Snapping and membership commits, Persistence.
 
-- [ ] Implement geometry-only snap candidates with measured bounds, locality, deterministic tie-breaking, hysteresis, and Shift bypass.
-  - [ ] Start with a 6-physical-pixel threshold; define the wider release threshold.
-  - [ ] Derive unsnapped geometry from total pointer delta; exclude the source container/descendants, hidden items, handles, shadows, and tooltips.
-  - [ ] Distinguish grouping adjacency from screen/edge/center alignment according to the approved policy.
-  - [ ] Select above/below/left/right attachment and its three cross-axis alignments from pointer position; include side, alignment, target identity, and grouping/alignment-only intent in preview candidates.
-- [ ] Add a grouping resolver and preview transaction over geometric candidates.
-  - [ ] An independent target creates a group containing both items; a grouped target receives the new item without nesting.
-  - [ ] Preview target membership, insertion position, resulting packing, source gap closure, and destination highlight.
-  - [ ] Use normal gaps and the same resolved mixed layout for preview and commit. Preserve existing internal attachments during whole-group merging rather than flattening geometry into a row or column.
-  - [ ] Implement approved whole-group merging into a group or independent item, retaining internal arrangements in one flat membership set. Preview the combined layout; Shift bypasses merging and cancellation restores both source and destination. Allow Fixed targets to receive joins/merges without enabling movement or shifting their top-left origin except for screen clamping.
-- [ ] Render alignment guides and grouping destination/insertion feedback through shared runtime controls, without owning feature textures/state or affecting measured content footprints.
-- [ ] Reconcile preview geometry with screen clamping and native integer rounding; discard invalid grouping candidates/guides.
-- [ ] Commit selected membership and placement together through the recovery boundary only after successful release.
-  - [ ] Shift/free drops preserve independent placement as appropriate; alignment-only snaps never create membership.
-  - [ ] All cancellation paths restore both source and target arrangements without persistent changes.
-  - [ ] Do not mutate membership from incidental proximity, screen alignment, or a bypassed/invalid candidate. Do not write metadata or native coordinates on each pointer move, or rebuild feature artwork for previews.
-- [ ] Verify create/join/leave, whole-group merges and their cancellation, repeated insertion, same-container operations, competing candidates, hidden/removed targets, singleton cleanup, Shift switching, scale conversion, and interrupted commits.
-  - [ ] Cover every side/alignment for individual and whole-group drops, cross-registration membership, both internal arrangements after merge, and Fixed-target mode/origin preservation.
-  - [ ] Check deterministic tie-breaking, wider release hysteresis, locality/exclusions, long drags without accumulated error, Shift transitions, and grouping invalidated by clamping/rounding. Guides must describe the final committed geometry.
-  - [ ] Check membership and origins after restart, failure recovery, and cancellation at all inherited interaction-loss boundaries; prove alignment-only neighbors remain independent.
+- [x] Implement geometry-only snap candidates with measured bounds, locality, deterministic tie-breaking, hysteresis, and Shift bypass.
+  - [x] Start with a 6-physical-pixel threshold; define the wider release threshold.
+  - [x] Derive unsnapped geometry from total pointer delta; exclude the source container/descendants, hidden items, handles, shadows, and tooltips.
+  - [x] Distinguish grouping adjacency from screen/edge/center alignment according to the approved policy.
+  - [x] Select above/below/left/right attachment and its three cross-axis alignments from pointer position; include side, alignment, target identity, and grouping/alignment-only intent in preview candidates.
+- [x] Add a grouping resolver and preview transaction over geometric candidates.
+  - [x] An independent target creates a group containing both items; a grouped target receives the new item without nesting.
+  - [x] Preview target membership, insertion position, resulting packing, source gap closure, and destination highlight.
+  - [x] Use normal gaps and the same resolved mixed layout for preview and commit. Preserve existing internal attachments during whole-group merging rather than flattening geometry into a row or column.
+  - [x] Implement approved whole-group merging into a group or independent item, retaining internal arrangements in one flat membership set. Preview the combined layout; Shift bypasses merging and cancellation restores both source and destination. Allow Fixed targets to receive joins/merges without enabling movement or shifting their top-left origin except for screen clamping.
+- [x] Render alignment guides and grouping destination/insertion feedback through shared runtime controls, without owning feature textures/state or affecting measured content footprints.
+- [x] Reconcile preview geometry with screen clamping and native integer rounding; discard invalid grouping candidates/guides.
+- [x] Commit selected membership and placement together through the recovery boundary only after successful release.
+  - [x] Shift/free drops preserve independent placement as appropriate; alignment-only snaps never create membership.
+  - [x] All cancellation paths restore both source and target arrangements without persistent changes.
+  - [x] Do not mutate membership from incidental proximity, screen alignment, or a bypassed/invalid candidate. Do not write metadata or native coordinates on each pointer move, or rebuild feature artwork for previews.
+- [x] Verify create/join/leave, whole-group merges and their cancellation, repeated insertion, same-container operations, competing candidates, hidden/removed targets, singleton cleanup, Shift switching, scale conversion, and interrupted commits.
+  - [x] Cover every side/alignment for individual and whole-group drops, cross-registration membership, both internal arrangements after merge, and Fixed-target mode/origin preservation.
+  - [x] Check deterministic tie-breaking, wider release hysteresis, locality/exclusions, long drags without accumulated error, Shift transitions, and grouping invalidated by clamping/rounding. Guides must describe the final committed geometry.
+  - [x] Check membership and origins after restart, failure recovery, and cancellation at all inherited interaction-loss boundaries; prove alignment-only neighbors remain independent.
 
 Completion criteria:
 
-- [ ] Snap-created groups persist and move together, with no duplicate membership or nested groups.
-- [ ] Preview, committed layout, guides, reset, and cancellation obey the approved semantics and survive restart.
+- [x] Snap-created groups persist and move together, with no duplicate membership or nested groups.
+- [x] Preview, committed layout, guides, reset, and cancellation obey the approved semantics and survive restart.
 
+Completion evidence:
+
+- Geometry-only candidates use measured visible bounds, 6-pixel acquisition and 10-pixel release hysteresis, deterministic selection, total pointer displacement, and Shift bypass. Individual insertion and whole-tree merging preserve flat membership, destination permission/origin, and existing internal arrangements.
+- Shared controls show the resolved destination/insertion layout and alignment guides. Preview and native placement share safe-inset clamping and integer-origin reconciliation; overlaps and unrepresentable guides are rejected. Base/preview compositions are reused during a held drag, with inactive cached geometry excluded from drawing and targeting.
+- Membership and origins commit together through the authoritative snapshot boundary. Headless coverage verifies all attachment policies, cross-registration membership, create/join/leave, merge preservation, repeated/same-container insertion, hidden/removed targets, cancellation boundaries, Fixed destinations, Shift transitions, scale conversion, clamping, alignment-only independence, restart reconstruction, reset, and interrupted commits without preview preference writes or feature preparation.
+- Second review and the independent completion audit found no remaining required issue. Both projects build; full suite passed 2,292/2,292 and focused HUD coverage passed 335/335, with no failures or skips. Receipts: `artifacts/test-results/movable-hud-phase5/phase5-full.trx` and `phase5-focused.trx` in the same directory (repository-relative). Diff checks are clean.
+- No game was launched. Final documentation reconciliation and user-run in-game appearance/interaction acceptance remain in Phase 6; this completion does not claim that acceptance.
 ## Phase 6: Reconcile documentation and obtain final acceptance
 
 Depends on Phase 5. Outcome: the complete shared behavior is documented, validated, and accepted.

@@ -4,7 +4,11 @@ The HUD overlay system positions and updates passive displays on the client. An 
 
 HUD containers use native hover titlebars while the cursor is free. Hover visible content, choose Movable from the native dropdown, and drag the container title area to move its members together. Multi-member containers expose a separate indicator titlebar for dragging an individual away; remaining members close the gap. Fixed locks both container dragging and individual detachment without changing position or membership. The close icon dismisses controls without disabling indicators. Reset HUD layout restores every built-in group and position, including retained overrides for unavailable integrations. No per-item or per-group reset is provided.
 
-Effective membership is separate from feature registrations. Default templates, independent indicators, and saved custom containers share native bounds, clipping, and scheduler availability. Mixed arrangements use ordered horizontal/vertical pairs with start/center/end alignment. Size changes preserve relationships and container origin subject to screen clamping. Hidden members collapse after their exit transition releases the footprint, retaining their saved relationships for reappearance. Snap-based group creation and merging are not yet available.
+Effective membership is separate from feature registrations. Default templates, independent indicators, and saved custom containers share native bounds, clipping, and scheduler availability. Mixed arrangements use ordered horizontal/vertical pairs with start/center/end alignment. Size changes preserve relationships and container origin subject to screen clamping. Hidden members collapse after their exit transition releases the footprint, retaining their saved relationships for reappearance.
+
+Drag an indicator beside another to create a group or insert into its existing group. Drag a whole container beside another to merge their arrangements. All four sides support start, center, and end cross-axis alignment, chosen by pointer position. The preview highlights the destination and incoming content using the resulting mixed layout; overlapping arrangements are rejected. Fixed destinations accept incoming members while retaining their permission and top-left origin, subject to screen clamping. Hold Shift to bypass snapping and grouping. Matching edges, centers, and screen guides align placement without creating membership.
+
+Snapping acquires within 6 physical pixels and retains the selected candidate within 10 pixels. Retained valid candidates take priority, followed by distance, grouping before alignment on equal distance, and ordinal candidate identity. Distances come from total pointer displacement rather than accumulated snap corrections. Preview geometry is reconciled with integer GUI-unit checkpoints and viewport clamping before release. Previews never write preferences or prepare feature artwork; a successful release commits membership and origins together.
 
 The versioned JSON setting `vanillaexpanded:hud:layout` is authoritative for membership, permissions, layout trees, and integer GUI-unit origin checkpoints. Native dialog positions mirror that snapshot and are repaired from it. Legacy group origins migrate into Movable overrides; missing overrides retain registered defaults. Drops commit the snapshot before updating mirrors, cancellation never writes, and viewport clamping does not rewrite saved preferences. Malformed or newer snapshots remain untouched with defaults shown read-only until global reset. Layouts apply across worlds on the same client.
 
@@ -48,6 +52,10 @@ flowchart TB
 
     subgraph Interaction["Native compositions and controls"]
         Host --> Controls["HudOverlayGroupControls<br/>group and individual grips"]
+        Host --> Snapping["HudOverlaySnapping<br/>measured candidates and preview feedback"]
+        Snapping -. "physical-pixel candidates" .-> SnapGeometry["HudSnapGeometry"]
+        Snapping -. "insertion and merge trees" .-> Grouping["HudGroupingResolver"]
+        Snapping -. "no-write preview transaction" .-> Containers
         Host --> Composers["GuiComposer instances<br/>content compositions"]
         Controls --> ControlComposers["GuiComposer instances<br/>transient control compositions"]
         ControlComposers --> Titlebars["HudOverlayNativeTitleBar<br/>native dropdown with VE callbacks"]
@@ -59,7 +67,7 @@ flowchart TB
     end
 ```
 
-Each effective container has one flat membership set. Its internal `HudLayoutNode` tree describes mixed horizontal/vertical arrangements, not nested movable groups. The runtime applies resolved geometry to native bounds; controls and persistence do not own feature artwork or duplicate overlay instances.
+Each effective container has one flat membership set. Its internal `HudLayoutNode` tree describes mixed horizontal/vertical arrangements, not nested movable groups. The runtime applies resolved geometry to native bounds; controls and persistence do not own feature artwork or duplicate overlay instances. A drag retains its base and preview layouts/compositions for reuse, while only the current preview participates in drawing and targeting. Release or cancellation retires the unused compositions.
 
 ## Registering an overlay
 
