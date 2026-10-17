@@ -5,16 +5,16 @@ Parent task: [project.todo](../project.todo), HUD Indicators.
 
 ## Goal and scope
 
-Make registered HUD indicators and their groups movable through hover controls, with native position persistence and geometric snapping. Keep feature overlays/presentations responsible only for readings, measurements, visibility, and drawing. Reuse native HUD/dialog lifecycle, event routing, GUI bounds/scaling, and position storage.
+Make registered HUD indicators and their groups movable through hover controls, with native coordinate persistence and snapping-created arbitrary groups. Keep feature overlays/presentations responsible only for readings, measurements, visibility, and drawing. Reuse native HUD/dialog lifecycle, event routing, GUI bounds/scaling, and position storage.
 
-Do not add a VE layout file, serializer, persistent docking graph, automatic regrouping by snapping, or an editor for hidden indicators. Do not rewrite feature registrations or duplicate overlay instances. Built-in placements remain defaults. All tasks below remain unchecked until their stated evidence is available; source/headless results do not establish live interaction quality.
+Persist arbitrary membership through a focused layout metadata boundary, reusing native coordinates. Do not add nested groups, an arbitrary inter-group docking graph, or an editor for hidden indicators. Do not rewrite feature registrations or duplicate overlay instances. Built-in placements remain defaults. All tasks below remain unchecked until their stated evidence is available; source/headless results do not establish live interaction quality.
 
 ## Assumptions and decisions to resolve
 
 - Use the native titlebar with its native Fixed/Movable dropdown and the approved compact orange skin: 22 GUI units high with shared 14-point HUD text. Adapt hover visibility, content-origin persistence, and cancellation around the widget; do not substitute a direct mode-toggle interaction.
-- Saved positions use native integer GUI-unit X/Y coordinates, not persisted screen-edge anchors or pivots. Position presence records individual detachment. Client settings apply across worlds.
+- Saved positions use native integer GUI-unit X/Y coordinates, not persisted screen-edge anchors or pivots. Explicit membership metadata will distinguish defaults, independent items, and custom groups; coordinate presence alone is insufficient. Client settings apply across worlds.
 - Begin with a 6-physical-pixel snap threshold and Shift bypass. Select and document the wider release threshold and deterministic candidate tie-breaking during snapping work.
-- Resolve compact handle dimensions, title/menu presentation, and control-to-content origin mapping in the prototype; do not silently introduce resize, close-indicator, or docking behavior.
+- Resolve compact handle dimensions, title/menu presentation, and control-to-content origin mapping in the prototype; do not silently introduce resizing or close-indicator behavior.
 - Run build/test tools through subagents as required by repository instructions. Leave live acceptance to the user; do not launch the game automatically.
 
 ## Phase 1: Verify one movable group and the native titlebar adapter
@@ -78,75 +78,100 @@ Completion evidence:
 - Shared session-owned group preferences restore native integer content origins once, with separate group/indicator key namespaces. Active previews override saved/default placement; cancellation discards previews, successful drops use native truncation, and Fixed clears only the selected group key.
 - Every registered group uses the retained native hover controls. Layout and scheduler availability both use screen placement for moved groups; saved origins survive configuration, size, and viewport changes while effective bounds remain clamped and packing stays intact. Feature registrations and presentation ownership are unchanged.
 - Second review and the independent completion audit found no required unresolved issue. Final production/test build and full suite passed 2,209/2,209; focused HUD coverage passed 265/265, with no failures or skips. Receipts: `artifacts/test-results/movable-hud-phase2/phase2-full.trx` and `phase2-focused.trx` in the same directory (repository-relative). Diff checks are clean.
-- Live appearance acceptance remains in Phase 5; no game was launched. Individual containers and snapping remain outside this completed scope.
+- Live appearance acceptance remains in Phase 6; no game was launched. Individual containers and snapping remain outside this completed scope.
 
-## Phase 3: Add individual containers, detachment, and return to group
+## Design revision and retained foundation
 
-Depends on Phase 2. Outcome: each drawable indicator can move independently while its original group continues packing the remaining members.
+Completed Phases 1 and 2 establish native controls, group origins, selective input, scaling, and shared availability. Their checkmarks describe that verified foundation, not arbitrary grouping. Remaining work replaces named groups as player-facing destinations with runtime containers created by snapping. Built-in registrations remain initial/reset defaults and retain feature ownership.
 
-- [ ] Resolve effective membership before packing: no individual position means registered group membership; a saved position means an independent container.
-  - [ ] Reuse native bounds, measurement, clipping, and render dispatch for independent containers without duplicate registration, sampling, or resource ownership.
-  - [ ] Adapt the layout boundary as needed so independent containers do not require rewriting `HudOverlayRegistration.GroupId`.
-  - [ ] Share effective placement with scheduler availability so detached indicators survive loss of their former group anchor.
-- [ ] Add separate indicator titlebar and group-grip target identities using existing drawable/clipped hover targeting.
-  - [ ] Do not expose invisible targets for hidden, inapplicable, unprepared, or merely reserved slots; retain their persisted positions.
-  - [ ] Keep transient controls out of content footprints, group packing, and feature drawing.
-- [ ] Implement individual drag preview and commit/cancellation.
-  - [ ] Temporarily detach during preview and close the original group's gap; successful release saves the individual position.
-  - [ ] Cancellation restores previous placement and membership, including when an already detached indicator is dragged again.
-  - [ ] Keep detached indicators independent when their original group is moved or reset.
-- [ ] Implement “return to group” by clearing the individual key, and reset-all by clearing known VE group/indicator keys.
-  - [ ] Repopulate/repack the original group immediately after reattachment.
-  - [ ] Preserve unrelated dialog settings and saved entries for temporarily unavailable integrations.
-- [ ] Verify group/individual combinations, reset actions, visibility transitions, registration removal, temporary anchor loss, size/style changes, and repeated session lifecycle cleanup.
+## Phase 3: Resolve arbitrary group semantics and persistence contract
 
-Completion criteria:
+Depends on Phase 2. Outcome: settle the new membership model and storage contract before runtime implementation. Source: [MovableHudProposal.md](MovableHudProposal.md), Placement and group behavior, Snapping and membership commits, Persistence.
 
-- [ ] Grouped, detached, and restored indicators draw and update exactly once with consistent geometry/availability and persistent membership semantics.
-- [ ] Group and individual controls are distinct, reachably positioned, and do not change feature measurements or ordinary input outside their interactions.
-
-## Phase 4: Add geometric snapping and alignment guides
-
-Depends on Phase 3. Outcome: group and individual drag previews align precisely without introducing persistent docking relationships.
-
-- [ ] Implement a geometry-only snap calculation receiving candidate/target rectangles and returning an adjusted rectangle plus guides.
-  - [ ] Derive the unsnapped candidate from starting content bounds and total pointer delta; never feed snapped corrections back into the next delta.
-  - [ ] Gather screen edges and nearby visible VE indicator/group measured bounds, excluding the target, group descendants, handles, shadows, and tooltips.
-  - [ ] Consider matching edges, center lines, and adjacent edges separated by the normal group gap; reject distant perpendicular spans.
-  - [ ] Use the initial 6-physical-pixel threshold at every GUI scale, a wider release threshold, and deterministic tie-breaking.
-  - [ ] Allow Shift to bypass snapping using the unchanged unsnapped candidate.
-- [ ] Apply snapping between pointer movement and effective layout preview; if using native titlebar release saving, apply the final position before it persists.
-  - [ ] Reconcile screen clamping with the final rectangle and remove any guide whose claimed alignment no longer holds.
-  - [ ] Ensure release persists the preview with native rounding and cancellation retains the original saved position.
-  - [ ] Render guides through shared runtime controls without owning feature textures/state or affecting measurements.
-  - [ ] Keep snapping positional only: no implicit regrouping or subsequent follow relationships.
-- [ ] Verify screen/peer alignment, adjacency gaps, exclusions, locality, competing targets, hysteresis, Shift switching, scale conversion, long drags without accumulated error, and clamping near screen edges.
+- [ ] Confirm the proposed interaction defaults and resolve the outstanding design choices with the user before implementing them.
+  - [ ] Define which snaps create/join groups versus align only, insertion feedback, and Shift bypass.
+  - [ ] Choose row/column packing versus two-dimensional arrangements; define perpendicular insertion, order, resizing, and hidden-member behavior.
+  - [ ] Resolve fixed-target insertion, whole-group merging, and the scope of ungroup/restore-default/reset-all actions.
+- [ ] Define a flat container model with stable opaque group IDs and exactly one container per indicator; built-in names are default templates only.
+  - [ ] Specify source removal, target insertion, singleton normalization, empty-group cleanup, and temporarily unavailable membership.
+  - [ ] Keep feature registrations and overlay lifetimes unchanged; do not duplicate sampling or drawing ownership.
+- [ ] Inspect native structured client settings and choose supported metadata persistence or a VE JSON file.
+  - [ ] Specify versioning, validation, unknown IDs, duplicate membership recovery, and client-wide behavior.
+  - [ ] Define authority and recoverable commit ordering across metadata and native position writes; previews never persist.
+  - [ ] Define migration/precedence for existing saved native group origins and narrowly scoped reset behavior.
+- [ ] Reconcile the chosen decisions into the proposal and remaining tasks before implementation.
 
 Completion criteria:
 
-- [ ] Individual and group previews snap predictably; guides match committed geometry and native persistence restores the committed position.
-- [ ] Moving previously aligned items later does not create unrequested attachment behavior or alter group membership.
+- [ ] Grouping, layout, reset, and persistence decisions are explicit and approved; no runtime policy is inferred from old named groups.
+- [ ] The model can represent and restore arbitrary groups without nested membership, orphaned items, or loss of unrelated settings.
 
-## Phase 5: Reconcile documentation and obtain final acceptance
+## Phase 4: Implement effective containers and individual movement
 
-Depends on Phase 4. Outcome: the complete shared behavior is documented, validated, and accepted without confusing headless checks with live interaction evidence.
+Depends on Phase 3. Outcome: indicators and groups use resolved membership and cancellable layout transactions.
 
-- [ ] Update permanent `HudOverlays.md`, README usage, and localized control/menu labels to match the retained implementation, persistence/reset rules, and snapping behavior.
-  - [ ] Describe current behavior without historical change logs or staging language; keep proposal/checklist cross-references coherent.
-  - [ ] Remove remaining prototype scaffolding and obsolete input/layout paths; retain only the chosen titlebar/handle approach.
-  - [ ] Check new classes/methods have required XML comments, nontrivial logic explanations, and visibility/family regions.
-- [ ] Run repository build and appropriate focused/full tests through subagents; record commands/results and distinguish source, headless, and live evidence.
-  - [ ] Review existing host, layout, scheduler, style, visibility-transition, and lifecycle coverage for regressions; do not infer visual acceptance from test passes.
-  - [ ] Reconcile each proposal requirement against implementation and verification; review the final diff and linked documentation.
-- [ ] Obtain user-run in-game acceptance for all indicator styles and registered groups.
-  - [ ] Check free-cursor access, above/below titlebars at every edge, tiny indicator controls, and distinct group versus indicator actions.
-  - [ ] Check foreground inventories/windows and focus, dragging outside initial bounds, no gameplay click-through during drag, and unaffected normal input elsewhere.
-  - [ ] Check cancellation triggers, fade/collapse behavior, detachment/reattachment/reset, size/style/resolution changes, and world/session transitions.
-  - [ ] Check snap locality, guides, jitter resistance, Shift bypass, integer-coordinate commit, and persistence across client restart.
+- [ ] Resolve default, independent, and custom containers before packing, sharing effective placement with scheduler availability.
+  - [ ] Remove the layout assumption that every member must share its registered GroupId, while retaining registration identities.
+  - [ ] Apply the approved group layout policy, size/style repacking, clipping, and native scaling.
+- [ ] Add distinct individual and container controls using drawable clipped targets; custom groups need no names.
+  - [ ] Preserve transient-control measurements, selective input, native menu behavior, and orange hover/movable cues.
+  - [ ] Keep invisible/reserved/unprepared items untargetable while retaining saved membership.
+- [ ] Implement transactional membership/position previews for individual dragging and explicit ungroup actions.
+  - [ ] Preview source removal and repacking; free drops produce independent items.
+  - [ ] Cancellation restores original container identity, order, membership, and origin without writes.
+  - [ ] Group movement retains current membership; independent items no longer follow former groups.
+- [ ] Implement the approved metadata persistence, migration, recovery, singleton/empty cleanup, and reset operations.
+  - [ ] Preserve unknown/unavailable members and unrelated native dialog settings.
+  - [ ] Release all interaction/composition resources on removal and session replacement.
+- [ ] Verify mixed-registration containers, duplicate prevention, independent drawing/updating exactly once, packing, availability, configuration changes, recovery, and lifecycle cleanup.
+
+Completion criteria:
+
+- [ ] Membership resolution drives layout and availability consistently, without changes to feature ownership.
+- [ ] Successful free drops and explicit membership actions persist; cancellation and failed writes recover according to the approved contract.
+
+## Phase 5: Implement snapping-created groups and previews
+
+Depends on Phase 4. Outcome: snapping an individual to another creates a group or inserts into the existing target group.
+
+- [ ] Implement geometry-only snap candidates with measured bounds, locality, deterministic tie-breaking, hysteresis, and Shift bypass.
+  - [ ] Start with a 6-physical-pixel threshold; define the wider release threshold.
+  - [ ] Derive unsnapped geometry from total pointer delta; exclude the source container/descendants, hidden items, handles, shadows, and tooltips.
+  - [ ] Distinguish grouping adjacency from screen/edge/center alignment according to the approved policy.
+- [ ] Add a grouping resolver and preview transaction over geometric candidates.
+  - [ ] An independent target creates a group containing both items; a grouped target receives the new item without nesting.
+  - [ ] Preview target membership, insertion position, resulting packing, source gap closure, and destination highlight.
+  - [ ] Apply the approved policy for group drags/merging and fixed targets; do not invent additional merge behavior.
+- [ ] Reconcile preview geometry with screen clamping and native integer rounding; discard invalid grouping candidates/guides.
+- [ ] Commit selected membership and placement together through the recovery boundary only after successful release.
+  - [ ] Shift/free drops preserve independent placement as appropriate; alignment-only snaps never create membership.
+  - [ ] All cancellation paths restore both source and target arrangements without persistent changes.
+- [ ] Verify create/join/leave, repeated insertion, same-container operations, competing candidates, hidden/removed targets, singleton cleanup, Shift switching, scale conversion, and interrupted commits.
+
+Completion criteria:
+
+- [ ] Snap-created groups persist and move together, with no duplicate membership or nested groups.
+- [ ] Preview, committed layout, guides, reset, and cancellation obey the approved semantics and survive restart.
+
+## Phase 6: Reconcile documentation and obtain final acceptance
+
+Depends on Phase 5. Outcome: the complete shared behavior is documented, validated, and accepted.
+
+- [ ] Update permanent `HudOverlays.md`, README usage, and localized labels for grouping, movement permission, ungroup, reset, persistence, and migration.
+  - [ ] Describe implemented behavior without historical change logs or staging language; reconcile proposal/checklist references.
+  - [ ] Remove obsolete named-container assumptions and input/layout paths; retain default templates and native controls where applicable.
+  - [ ] Check required XML comments, logic explanations, and visibility/family regions.
+- [ ] Run repository build and appropriate focused/full tests through subagents, followed by second review and independent completion audit.
+  - [ ] Cover host, layout, scheduler, styles, transitions, persistence recovery, membership changes, and repeated lifecycle cleanup.
+  - [ ] Keep tests about behavior and relationships rather than specific colors, opacity presets, or fixed visual dimensions.
+- [ ] Obtain user-run in-game acceptance; do not launch the game or infer appearance from headless tests.
+  - [ ] Check every style, cursor/foreground-window behavior, titlebar reachability, selective input, and dragging outside bounds.
+  - [ ] Check cross-feature grouping, insertion previews, group movement, ungroup/reset, visibility changes, and size/resolution changes.
+  - [ ] Check grouping versus alignment, Shift bypass, hysteresis, cancellation, restart persistence, migration, and world/session transitions.
 
 ## Final acceptance
 
-- [ ] Every source-proposal requirement is implemented and verified, or an explicit change is reconciled with the user and proposal.
-- [ ] Native position storage is the sole persistence mechanism; feature overlay/presentation ownership and normal passive HUD behavior remain intact.
-- [ ] Required build/tests, documentation review, cleanup, and user-run interaction evidence are complete.
+- [ ] Every source-proposal requirement and resolved grouping decision is implemented and verified.
+- [ ] Native coordinates and approved membership metadata restore a consistent layout while preserving feature ownership and unrelated settings.
+- [ ] Required build/tests, documentation review, cleanup, independent audit, and user-run interaction acceptance are complete.
 - [ ] Only after these gates pass, mark the parent movable-HUD task in `docs/project.todo` complete.

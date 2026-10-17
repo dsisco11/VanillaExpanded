@@ -2,7 +2,7 @@
 
 ## Recommendation
 
-Reuse Vintage Story's HUD/dialog lifecycle, GUI event routing, native bounds and scaling, and native dialog-position persistence. Prefer the stock titlebar's drag behavior where it can be adapted to hover controls; extend the existing VE layout runtime for individual placement and geometric snapping. Individual feature overlays and their presentation classes should not implement dragging or persistence.
+Reuse Vintage Story's HUD/dialog lifecycle, GUI event routing, native bounds and scaling, and native dialog-position persistence. Prefer the stock titlebar's drag behavior where it can be adapted to hover controls; extend the existing VE layout runtime for individual placement and player-created groups formed by snapping. Individual feature overlays and their presentation classes should not implement dragging or persistence.
 
 This proposal describes the complete intended interaction. The current implementation provides native persisted movement controls for all registered groups while preserving their internal packing. Individual movement and snapping are not yet implemented.
 
@@ -17,13 +17,13 @@ The investigation used the local API source and the installed Vintage Story 1.22
 | `HudElement` / `GuiDialog` | HUDs are native dialogs. `HudElement` does not request an ungrabbed mouse. Mouse delivery and input capture are separately overridable. | Keep the existing native HUD host; enable narrowly scoped pointer interaction. |
 | `GuiComposer` / `GuiElement` | Composers dispatch mouse down, move, and up to interactive elements. Bounds support hit testing and native parent/child geometry. | Implement the handle as a native GUI element, using the existing compositions. |
 | `GuiElementDialogTitleBar` | Its Fixed/Movable menu enables dragging. Mouse movement updates parent `fixedX/Y` using pixel delta divided by GUI scale. Release stores the position. | Prefer native dragging, with an adapter for hover visibility and snapping. |
-| `IGuiAPI.GetDialogPosition` / `SetDialogPosition` | Installed `GuiAPI` delegates directly to global `ClientSettings`. | Use as the position authority, with stable VE namespaced keys. No separate layout file is required. |
+| `IGuiAPI.GetDialogPosition` / `SetDialogPosition` | Installed `GuiAPI` delegates directly to global `ClientSettings`. | Use as the position authority, with stable VE namespaced keys. Reuse coordinates; arbitrary membership needs additional metadata. |
 | `GetDialogBoundsInArea` | Installed implementation returns open composer bounds whose `Alignment` equals the requested dialog area. | Bounds discovery only; this is not a snapping or docking service. |
 | `GuiDialog.GetFreePos` / `OccupyPos` / `FreePos` | Reserves predefined flag-based window positions. | Not appropriate for arbitrary player placement or edge alignment. |
 
 No general snapping or docking facility was found in the inspected native GUI API and window-drag path. Stock dragging changes positions freely; it does not calculate neighboring edges or snap relationships.
 
-The stock titlebar already supplies the essential dragging and persistence. Its direct use of native client settings is suitable. It is not a complete drop-in solution for the proposed hover-only handles: its movable/moving state and setup methods are private, it includes close/menu controls, and it exposes no public drag-completed callback. Prefer a narrow adapter around native event handling and parent bounds, with snapping applied before release stores the position. Hover rendering, small indicator dimensions, and cancellation need validation before claiming that the widget can be reused unchanged. Retain native titlebar and dropdown machinery through the compact skin; a new persistence subsystem is unnecessary.
+The stock titlebar already supplies the essential dragging and persistence. Its direct use of native client settings is suitable. It is not a complete drop-in solution for the proposed hover-only handles: its movable/moving state and setup methods are private, it includes close/menu controls, and it exposes no public drag-completed callback. Prefer a narrow adapter around native event handling and parent bounds, with snapping applied before release stores the position. Hover rendering, small indicator dimensions, and cancellation need validation before claiming that the widget can be reused unchanged. Retain native titlebar and dropdown machinery through the compact skin; native coordinate storage remains reusable; membership requires additional metadata.
 
 Native `GuiManager` dispatches mouse events through registered dialogs until one handles them. A handled mouse-down also invokes its focus-management path, which can unfocus another dialog even if the HUD itself is non-focusable. Interaction must respect foreground windows and must be checked with inventories and other dialogs open; setting `Focusable = false` alone does not guarantee that other dialog focus remains untouched.
 
@@ -36,7 +36,7 @@ Source references: [titlebar](../../../vsapi/Client/UI/Elements/Impl/Interactive
 - Handles are transient overlays. They do not enlarge measured indicator footprints, shift neighboring indicators, or trigger content preparation. Place them above the target when space permits and below it at the screen edge. Keep the handle visible while the pointer travels from the indicator to it, and throughout dragging.
 - Left-drag a grip to move its target. Consume pointer events only for a grip interaction or active drag; leave clicks elsewhere unchanged. Continue the drag outside the original bounds until release.
 - A group drag moves its currently grouped members together and preserves their packing. Dragging an individual indicator away detaches it from automatic packing and gives it its own placement. Remaining members close the gap.
-- A detached indicator no longer moves with its original group. Provide a handle menu action to return it to that group, a group action to restore default placement, and a reset-all action.
+- Dropping an individual onto a grouping snap creates a group with an independent target, or adds the item to the target group. Dragging an individual away removes it from that group. Group controls move the current members together. Provide ungroup and restore-default actions, plus reset-all. Custom groups need stable internal IDs, not predefined names.
 - Escape cancels an active drag and restores its starting placement. Mouse capture changes, world exit, GUI hiding, target removal, or loss of the active interaction cancel safely rather than saving a partial drag.
 - Hidden/inapplicable indicators retain their saved placements but do not expose invisible drag targets. They can be moved when visible; an editor for hidden indicators would be a separate optional extension.
 
@@ -56,76 +56,61 @@ Show a partly transparent orange panel behind the exact group bounds while hover
 
 ## Placement and group behavior
 
-Keep registrations and built-in groups as the defaults. Resolve a user placement over those defaults before layout, rather than rewriting feature registrations or adding drag offsets inside presentation drawing.
+Groups are runtime containers formed by player actions, rather than fixed named destinations. Any registered indicator can join another indicator's group. Stable feature identities retain sampling, visibility, and resource ownership; built-in group definitions supply initial/reset arrangements only. Custom groups use opaque stable IDs and need no user-assigned name.
 
-The existing `HudOverlayGroupLayout` owns positions: it packs child offsets and reapplies the group's attachment whenever geometry changes. Mutating a child's bounds alone would therefore be temporary. An independently positioned indicator needs a separate effective layout container, while retaining its original registration identity and lifecycle ownership. That container can use the same native bounds and layout machinery as an ordinary group.
+Resolve membership and placement before packing, without rewriting feature registrations or duplicating overlays. Layout and scheduler availability consume the same effective container. Independent and user-positioned containers use screen availability even when their former native anchor disappears. Preserve native scaling, integer content origins, and effective screen clamping.
 
-The effective placement must also inform scheduler anchor availability. Currently, the scheduler checks the registered group's anchor. A detached indicator with a screen placement must not disappear merely because its former hotbar anchor becomes unavailable. Resolve placement consistently for both availability and geometry; do not duplicate feature instances or sampling work.
+Individual dragging previews removal from the source group, closing its gap. A successful grouping drop creates or joins a target group; a free drop leaves the item independent. Cancellation restores starting membership, order, identity, and placement without writes. Group dragging preserves membership. Hidden/inapplicable members retain membership but expose no invisible targets and collapse through normal visibility rules.
 
-For free placement, use the native titlebar convention: absolute top-left coordinates in unscaled GUI units. Resolve saved positions into screen placements through the existing `HudOverlayPlacement` vocabulary. Retain native GUI scaling and clamp effective bounds to the visible screen. Native position storage contains only an X/Y pair, so saved edge attachments or pivots are not part of this proposal. Size/style changes preserve the saved origin and repack grouped members normally.
+Each item belongs to exactly one container. Remove empty groups; normalize singleton groups into independent items without moving their displayed content. Preserve metadata for temporarily unavailable indicator IDs. Repack after visibility/size/style changes while retaining container origin, subject to reachability.
 
-Built-in placement configuration remains the fallback. A saved user placement takes precedence until reset; changing an unrelated feature setting must not erase it. Individually detached members stay detached when their original group is moved or reset; reset-all restores both placements and membership.
+### Proposed interaction defaults and decisions
 
-### Effective layout resolution
+- Adjacent-edge snapping to an independent item creates a group; snapping to a grouped item inserts into its existing group. Do not create nested groups.
+- Highlight the destination, insertion side/order, and resulting layout before release. Only the selected grouping candidate changes membership.
+- Screen-edge and matching-edge/center guides remain alignment aids. Shift bypasses snapping and grouping, permitting independent nearby placement.
+- Group dragging keeps its members together. Decide separately whether whole-group merging should be supported; it is not implied by individual insertion.
+- Keep Fixed/Movable movement permission distinct from ungroup and restore-default operations. Do not let a native Fixed callback silently erase custom membership.
 
-Resolve effective containers before invoking the existing packer:
+Before implementing geometry, choose ordered row/column packing versus a two-dimensional arrangement model, including perpendicular insertion, resize, and hidden-member rules. Also resolve whether fixed targets accept joins, whole-group merging, and the scope of restore-default actions. These remain explicit design decisions rather than assumed requirements.
 
-| Position state | Effective layout |
-| --- | --- |
-| No individual override | The indicator remains in its registered group. |
-| Saved individual override | The indicator uses an independent layout container. |
-| Saved group override | The group uses the saved position and retains its internal packing. |
+## Snapping and membership commits
 
-An active drag preview takes precedence over saved or default placement. Routine layout updates must consume that preview rather than overwrite the position with the registered attachment. For an individual drag, temporarily remove the indicator from its group's packed membership and preview its independent container. Commit saves its individual position; cancellation restores its previous placement and membership. The original group repacks accordingly.
+Separate geometric candidate calculation from grouping changes. Geometry returns adjusted bounds, guides, and candidate identity; a grouping resolver determines create/join versus alignment-only behavior.
 
-Independent containers reuse native bounds, clipping, measurement, and rendering dispatch without duplicating feature instances or changing registration ownership. Clearing an individual position returns it to its registered group. Both the layout runtime and scheduler anchor checks consume the same resolved placement.
+- Start with a 6-physical-pixel acquisition threshold, a wider release threshold, and deterministic tie-breaking independent of GUI scale.
+- Derive unsnapped bounds from starting geometry and total pointer displacement; never accumulate snapped corrections.
+- Consider nearby visible item/group measured bounds and screen edges. Exclude the moving container and descendants, hidden content, handles, shadows, and tooltips; reject distant perpendicular spans.
+- Use normal packing gaps for adjacency. Preview the destination arrangement without saving membership or recreating feature artwork.
+- Reconcile clamping and native rounding before release. Remove a grouping candidate if its claimed adjacency no longer holds.
+- Commit membership and placement together only on successful release. All cancellation paths discard the entire preview, including changes to the source group.
 
-## Snapping
-
-Start with geometric snapping, without introducing persistent docking relationships:
-
-- Snap to screen edges and to the visible bounds of other VE indicators/groups. Exclude the moving target and, for a group drag, its descendants.
-- Offer matching left/right/top/bottom edges, center lines, and adjacent edges separated by the existing group gap. Only consider nearby targets with overlapping or nearby perpendicular spans, so distant elements do not attract the drag.
-- Use a small threshold, initially 6 physical pixels, independent of GUI scale. Keep a slightly wider release threshold to prevent jitter between close candidates. Break ties consistently and show alignment guides before release.
-- Allow a modifier, proposed as Shift, to temporarily bypass snapping. Apply screen clamping before accepting the final preview so the committed position matches it.
-- Snap against each indicator's measured footprint, not opaque texture pixels. Do not include transient handles, shadows, or tooltip bounds.
-- Commit the resulting placement on release. Snapping does not silently regroup indicators or make them follow one another later.
-
-### Drag calculation
-
-1. Calculate an unsnapped candidate rectangle from the drag's starting content bounds and total pointer delta.
-2. Collect screen edges and nearby visible indicator/group bounds, excluding the moving target and its descendants.
-3. Calculate candidate adjustments for matching edges, center lines, and adjacent positions using the normal group gap.
-4. Select the closest valid adjustment within the snap threshold, retaining the selected alignment until the wider release threshold is exceeded.
-5. Produce the adjusted preview and alignment guides. Screen clamping must not leave a guide claiming an alignment the final rectangle no longer satisfies.
-6. On release, commit the preview through native position persistence, matching its coordinate rounding.
-
-Keep the unsnapped candidate separate from the snapped preview. Never accumulate snapped corrections into the next pointer delta; doing so would create sticky movement or cumulative position errors. Shift bypasses snapping using the same unsnapped candidate. The snap calculation accepts rectangles and returns geometry and guides, without owning feature state or GUI resources.
-
-This yields precise alignment with a small amount of layout logic. Persistent docking would additionally require attachment relationships, cycle prevention, hidden-target behavior, and propagation after size changes. It should be an explicit later decision if “snapped together” needs to mean “remain attached.” Existing packed groups already provide that behavior for their members.
+Grouped members subsequently move together; alignment-only snaps do not create relationships. Avoid nested groups and arbitrary inter-group attachment graphs.
 
 ## Persistence
 
-Use `IGuiAPI.GetDialogPosition` and `SetDialogPosition`, backed by the game's client settings. Positions are local to the client and shared across worlds. No separate VE JSON file or custom serializer is needed.
+Continue using native `GetDialogPosition`/`SetDialogPosition` for integer GUI-unit origins. X/Y pairs cannot encode arbitrary membership, order, layout policy, or custom group identities. Position presence alone no longer records detachment.
 
-Give each movable group and individual indicator a distinct, stable composer/dialog key, such as `vanillaexpanded:hud:group:world-status` and `vanillaexpanded:hud:indicator:vanillaexpanded:player-wetness`. Save native `Vec2i` GUI-unit positions. A missing group entry means its registered placement applies; a missing indicator entry means it participates in its registered group's packing. Presence of an individual position therefore also records detachment, without a separate membership file.
+Add versioned membership/layout metadata keyed by stable indicator/container IDs. Prefer a supported native structured client setting if inspection confirms a suitable facility; otherwise use a VE-owned JSON layout file. Resolve that storage choice before implementation, without disguising metadata as coordinate keys.
 
-Use native position restoration and the same API after successful content drops; the hover titlebar must not persist its own temporary origin. Reattachment or reset clears the relevant key with `SetDialogPosition(key, null)`; reset-all clears keys for the known VE groups and indicators. Do not erase another dialog's settings. Leave positions for temporarily unavailable integrations intact. Avoid writes on each mouse move and leave serialization and disk persistence to the engine. Validate restored positions and keep effective bounds reachable after viewport changes; match native coordinate rounding rather than introducing another position format.
+Define authority and recoverable commit ordering across metadata and native origins before writing either. Two independent stores are not atomic: interrupted or failed drops must reconcile without orphaned members or half-applied layouts. Never persist previews or write on pointer movement.
+
+Retain client-wide layouts across worlds. Define migration from existing native group positions into the initial arrangement and precedence for subsequent explicit membership. Reset only known VE keys/metadata; preserve unrelated dialogs and unavailable integrations. Validate versions, duplicate membership, invalid references, unknown IDs, and offscreen geometry. Keep saved origins through configuration changes, applying effective clamping without continuous preference writes.
 
 ## Integration boundaries
 
-- **Position integration:** read/reset native dialog-position entries and resolve them over registered defaults.
+- **Membership and position integration:** resolve custom containers over defaults, persist committed topology and native coordinates through a defined recovery boundary.
 - **Existing layout/session runtime:** apply effective placements, independent containers, packing, clipping, and availability consistently.
 - **Native host and drag handle:** own hover targeting, pointer interaction, drag preview, cancellation, and commit requests.
-- **Snap calculation:** operate on supplied rectangles and return an adjusted candidate plus alignment guides; own no textures or feature state.
+- **Snap calculation and grouping resolver:** separate geometric candidates/guides from membership previews and commits; own no feature textures or readings.
 - **Feature overlays/presentations:** continue supplying readings, measured sizes, visibility transitions, and drawing only.
 
-The existing hover-label targeting already checks free-pointer state, drawable membership, and clipped bounds, and can supply the basis for handle targeting. The current host's blanket input refusal must become selective routing; simply calling `GuiDialog`'s default mouse methods would consume clicks over whole composer rectangles.
+The existing hover-label targeting already checks free-pointer state, drawable membership, and clipped bounds, and can supply the basis for handle targeting. Retain the host's selective input routing; simply calling `GuiDialog`'s default mouse methods would consume clicks over whole composer rectangles.
 
 ## Validation expectations
 
 Start with a single draggable group prototype to establish whether the native titlebar can support hover-only rendering, selective input, cancellation, and persisted positions through the adapter. Verify that integration before extending it to individual containers and snapping. This prototype must not require changes to feature overlay or presentation classes.
 
-Check coordinate conversion at multiple GUI scales; native saved-position round trips across client restarts; distinct group/indicator keys; reset behavior; resolution and style changes; group packing after detachment/reattachment; consistent effective-anchor availability; snap tie-breaking and jitter; cancellation; and lifecycle cleanup. Position-only dragging must not refresh readings or recreate feature artwork.
+Check coordinate conversion at multiple GUI scales; native saved-position round trips across client restarts; distinct group/indicator keys; reset behavior; resolution and style changes; group creation/insertion/removal and persistence recovery; consistent effective-anchor availability; snap tie-breaking and jitter; cancellation; and lifecycle cleanup. Position-only dragging must not refresh readings or recreate feature artwork.
 
 In-game acceptance must cover free-cursor access, titlebar reachability at every screen edge, overlapping windows and focus, drag continuation outside bounds, no gameplay click-through during a drag, and ordinary input remaining unaffected away from handles. Source inspection establishes feasibility, not the final interaction quality.
