@@ -4,7 +4,7 @@ The HUD overlay system positions and updates passive displays on the client. An 
 
 HUD containers use native hover titlebars while the cursor is free. Hover visible content, choose Movable from the native dropdown, and drag the container title area to move its members together. Dragging visible indicator content moves that individual through the same cancellable transaction; multi-member groups detach that indicator. Individual members expose no titlebar or dropdown; drag their visible content to detach them, and remaining members close the gap. Container titlebars provide the group menu and movement, including a singleton container's permission/reset access. Fixed locks both container dragging and individual detachment without changing position or membership. The close icon dismisses controls without disabling indicators. Reset HUD layout restores every built-in group and position, including retained overrides for unavailable integrations. No per-item or per-group reset is provided.
 
-Effective membership is separate from feature registrations. Default templates, independent indicators, and saved custom containers share native bounds, clipping, and scheduler availability. Mixed arrangements use ordered horizontal/vertical pairs with start/center/end alignment. Size changes preserve relationships and container origin subject to screen clamping. Hidden members collapse after their exit transition releases the footprint, retaining their saved relationships for reappearance.
+Effective membership is separate from feature registrations. Default templates, independent indicators, and saved custom containers share native bounds, clipping, and scheduler availability. Mixed arrangements use ordered horizontal/vertical pairs with start/center/end alignment. Size changes preserve relationships and container origin subject to screen clamping. Outside movement editing, hidden members collapse after their exit transition releases the footprint, retaining their saved relationships for reappearance.
 
 Drag an indicator beside another to create a group or insert into its existing group. Drag a whole container beside another to merge their arrangements. All four sides support start, center, and end cross-axis alignment, chosen by pointer position. The preview highlights the destination and incoming content using the resulting mixed layout; grouping and alignment candidates that overlap visible indicators are rejected. Free drops that overlap visible indicators cancel without saving; Shift explicitly permits overlap. Fixed destinations accept incoming members while retaining their permission. Insertion grows the group toward the incoming item, preserving the opposite outer edge; left/top additions move its outer origin outward instead of pushing the destination away. Cross-axis growth preserves the chosen start, center, or end anchor. Native rounding and screen clamping still apply, and the preview and committed layout use the same adjusted origin. Hold Shift to bypass snapping and grouping. Matching edges, centers, and screen guides align placement without creating membership.
 
@@ -20,6 +20,10 @@ The temperature indicator keeps the same 36-unit height as the other status indi
 
 Reference `VanillaExpanded.dll` and the compatible Vintage Story API assemblies, and declare `vanillaexpanded` as a dependency in your mod metadata. `HudOverlaySystem`, `IHudOverlay`, registration and placement contracts, and the shared icon-and-text presentation are public and can be used from a separate mod assembly. Obtain the running system through the client mod loader; the game owns its lifetime.
 
+When the cursor is free in a ready world with the global HUD enabled and visible, session-owned `HudOverlayEditPreviews` makes every registered item available for editing. Normal drawable content keeps its presentation. Hidden, disabled, inapplicable, empty, or failed content instead receives a compact labeled stand-in with full hidden-item identity on hover. Placeholders use their reserved footprint or the standard square size, and participate in the same effective layout, direct dragging, snapping, permissions, cancellation, and commit boundary. They never call hidden feature drawing/backdrops or invent readings, change enable toggles, or alter normal sampling. Unknown saved integrations without a registration have no placeholder.
+
+Placeholder lettering prepares on the heartbeat and remains cached through frame layout and dragging. Mouse capture, hidden GUI, global HUD disabling, or loss of the ready session immediately removes edit targets; resources retire on the heartbeat or teardown. Normal visibility and transitions remain authoritative outside editing. If a default native anchor is missing, editing uses a transient screen fallback; only an explicit layout action persists it. Entering/exiting editing never writes preferences.
+
 ## Runtime structure
 
 The session owns the runtime bindings; the registry retains feature ownership across sessions. Solid arrows show ownership or contained data. Dashed arrows show borrowed dependencies and calls.
@@ -34,6 +38,7 @@ flowchart TB
         Session --> Containers["HudOverlayContainers<br/>effective membership and transactions"]
         Session --> Scheduler["HudOverlayScheduler<br/>cached readings and measurements"]
         Session --> Layouts["HudOverlayGroupLayout<br/>one per effective container"]
+        Session --> EditPreviews["HudOverlayEditPreviews<br/>hidden-item placement proxies"]
         Session --> Host["HudOverlayHost<br/>native rendering and input routing"]
         Containers --> Movement["HudOverlayGroupMovement<br/>one per group or individual target"]
         Layouts --> Bounds["ElementBounds<br/>container root and indicator bounds"]
@@ -61,6 +66,7 @@ flowchart TB
         ControlComposers --> Titlebars["HudOverlayNativeTitleBar<br/>native dropdown with VE callbacks"]
         Controls -. "drag and permission requests" .-> Movement
         Movement -. "preview, commit or cancel" .-> Containers
+        Host -. "draws edit-only placeholders" .-> EditPreviews
         Host -. "borrows prepared layouts" .-> Layouts
         Scheduler -. "refreshes and prepares" .-> Features
         Host -. "draws prepared content" .-> Features
@@ -150,7 +156,7 @@ An overlay registers with a default group template. A `HudOverlayGroup` defines 
 
 Packing controls horizontal or vertical flow, spacing, padding, and cross-axis alignment. Members are ordered by ascending `Order`, then by ordinal overlay ID.
 
-For a stable slot, supply a positive `reservedSize` in unscaled GUI units when registering the overlay. The effective container uses this footprint instead of the measured size while the overlay is drawable. Hidden, disabled, inapplicable, empty, and failed members collapse according to visibility transitions, retaining their saved membership. Drawing still requires successfully prepared, visible content; a reservation alone exposes no hover target. Choose a footprint that accommodates the presentation's largest intended content and keep artwork at stable coordinates within the supplied bounds. Content exceeding the slot is clipped. Registrations without a fixed footprint use their measured size. Neither kind exposes invisible hover or drag targets.
+For a stable slot, supply a positive `reservedSize` in unscaled GUI units when registering the overlay. The effective container uses this footprint instead of the measured size while the overlay is drawable. Outside movement editing, hidden, disabled, inapplicable, empty, and failed members collapse according to visibility transitions, retaining their saved membership. Drawing still requires successfully prepared, visible content; a reservation alone exposes no hover target. Choose a footprint that accommodates the presentation's largest intended content and keep artwork at stable coordinates within the supplied bounds. Content exceeding the slot is clipped. Registrations without a fixed footprint use their measured size. Neither kind exposes invisible hover or drag targets; edit placeholders are explicitly prepared visible targets.
 
 The built-in groups are:
 

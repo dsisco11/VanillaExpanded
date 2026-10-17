@@ -49,6 +49,60 @@ public sealed class HudOverlaySessionTests
 
     #endregion
     #region Live visibility and placement
+    /// <summary>Editing exposes an item whose configured native anchor is unavailable without saving a replacement position.</summary>
+    [Fact]
+    public void UnlockedMissingAnchorUsesTransientEditableFallback()
+    {
+        using var fixture = new Fixture(); fixture.FeatureEnabled = false;
+        fixture.Registry.UpdateGroup(new HudOverlayGroup("group", new HudOverlayPlacement("hotbar", HudOverlayPoint.LeftTop, HudOverlayPoint.LeftTop)));
+        fixture.Session.EnterWorld(); var host = fixture.Hosts.Single(); Assert.Empty(host.Layouts!["group"].Members);
+        fixture.Grabbed = false; fixture.Tick();
+        var layout = host.Layouts["group"]; Assert.True(layout.Available); Assert.Single(layout.Members); Assert.True(host.IsOpen);
+        fixture.Gui.Verify(value => value.SetDialogPosition(It.IsAny<string>(), It.IsAny<Vintagestory.API.MathTools.Vec2i>()), Times.Never);
+        fixture.Grabbed = true; host.BeforeRender!(); Assert.Empty(layout.Members); Assert.False(host.IsOpen);
+        fixture.Gui.Verify(value => value.SetDialogPosition(It.IsAny<string>(), It.IsAny<Vintagestory.API.MathTools.Vec2i>()), Times.Never);
+    }
+
+    /// <summary>Unlocked movement exposes registered hidden content without overriding feature sampling or preparation.</summary>
+    [Theory]
+    [InlineData("disabled")] [InlineData("inapplicable")] [InlineData("empty")]
+    public void UnlockedMouseExposesHiddenMembersWithoutInventingReadings(string cause)
+    {
+        using var fixture = new Fixture();
+        fixture.FeatureEnabled = cause != "disabled";
+        fixture.Probe.Applicable = cause != "inapplicable";
+        fixture.Probe.Measurement = cause == "empty" ? SizeF.Empty : new SizeF(20, 20);
+        fixture.Session.EnterWorld(); var host = fixture.Hosts.Single();
+        Assert.Empty(host.Layouts!["group"].Members);
+        int refreshes = fixture.Probe.Refreshes, preparations = fixture.Probe.Preparations;
+        fixture.Grabbed = false; fixture.Tick();
+        Assert.Same(fixture.Registration, Assert.Single(host.Layouts["group"].Members).Registration);
+        Assert.False(fixture.Session.Scheduler!.IsDrawable(fixture.Registration));
+        Assert.True(host.IsOpen);
+        Assert.Equal(refreshes, fixture.Probe.Refreshes); Assert.Equal(preparations, fixture.Probe.Preparations);
+        int lettering = fixture.EditPreparations;
+        host.BeforeRender!(); host.BeforeRender!();
+        Assert.Equal(lettering, fixture.EditPreparations);
+        fixture.Grabbed = true; host.BeforeRender!();
+        Assert.Empty(host.Layouts["group"].Members); Assert.False(host.IsOpen);
+        Assert.Equal(refreshes, fixture.Probe.Refreshes); Assert.Equal(preparations, fixture.Probe.Preparations);
+    }
+
+    /// <summary>Global visibility, GUI suppression and missing sessions take precedence over unlocked editing.</summary>
+    [Theory]
+    [InlineData("global")] [InlineData("guis")] [InlineData("player")]
+    public void UnlockedHiddenMembersRespectSessionAndGlobalVisibility(string cause)
+    {
+        using var fixture = new Fixture(); fixture.FeatureEnabled = false; fixture.Grabbed = false;
+        fixture.Session.EnterWorld(); var host = fixture.Hosts.Single(); Assert.Single(host.Layouts!["group"].Members);
+        if (cause == "global") fixture.Enabled = false;
+        else if (cause == "guis") fixture.Hidden = true;
+        else fixture.HasPlayer = false;
+        host.BeforeRender!();
+        Assert.Empty(host.Layouts["group"].Members); Assert.False(host.IsOpen);
+        Assert.Equal(0, fixture.Probe.Refreshes); Assert.Equal(0, fixture.Probe.Preparations);
+    }
+
     /// <summary>Render/configuration paths observe visibility without sampling and wait for a restored heartbeat.</summary>
     [Fact]
     public void VisibilityRestoresOnlyAfterHeartbeat()
@@ -179,6 +233,7 @@ public sealed class HudOverlaySessionTests
         public readonly Mock<ICoreClientAPI> Api = new();
         public readonly Mock<IClientEventAPI> Events = new();
         public readonly Mock<IGuiAPI> Gui = new();
+        public readonly Mock<IInputAPI> Input = new();
         public readonly HudOverlayRegistry Registry = new();
         public readonly Probe Probe = new();
         public readonly List<Host> Hosts = new();
@@ -186,14 +241,20 @@ public sealed class HudOverlaySessionTests
         public readonly HudOverlayRegistration Registration;
         public EntityPlayer Entity = new();
         public bool HasPlayer = true, Hidden, Enabled = true, FeatureEnabled = true;
+        public bool Grabbed = true;
+        public int EditPreparations;
         private Action<float>? tick;
         private long now;
         private readonly float oldScale = RuntimeEnv.GUIScale;
+        private readonly ITranslationService? english = Lang.AvailableLanguages.GetValueOrDefault("en");
         #region Public API
         /// <summary>Creates real scheduling/layout with fake engine/world and native host services.</summary>
         public Fixture(bool animated = false)
         {
             RuntimeEnv.GUIScale = 1;
+            var language = new Mock<ITranslationService>();
+            language.Setup(value => value.Get(It.IsAny<string>(), It.IsAny<object[]>())).Returns((string key, object[] _) => key);
+            Lang.AvailableLanguages["en"] = language.Object;
             HudLayoutFixture.BindSettings(Api, new Mock<ISettingsClass<string>>(), new Dictionary<string, string>());
             if (animated) Probe = new AnimatedProbe(() => now);
             var world = new Mock<IClientWorldAccessor>(); var player = new Mock<ServerPlayer>((ServerMain)null!, new ServerWorldPlayerData()).As<IClientPlayer>();
@@ -202,6 +263,8 @@ public sealed class HudOverlaySessionTests
             Api.SetupGet(value => value.World).Returns(world.Object);
             Api.SetupGet(value => value.Event).Returns(Events.Object);
             Api.SetupGet(value => value.HideGuis).Returns(() => Hidden);
+            Api.SetupGet(value => value.Input).Returns(Input.Object);
+            Input.SetupGet(value => value.MouseGrabbed).Returns(() => Grabbed);
             Gui.SetupGet(value => value.WindowBounds).Returns(new Window());
             Gui.SetupGet(value => value.LoadedGuis).Returns(new List<GuiDialog>());
             Api.SetupGet(value => value.Gui).Returns(Gui.Object);
@@ -209,14 +272,15 @@ public sealed class HudOverlaySessionTests
                 .Callback<Action<float>, int, int>((callback, _, _) => tick = callback).Returns(0);
             Registry.RegisterGroup(new HudOverlayGroup("group", new HudOverlayPlacement("screen", HudOverlayPoint.LeftTop, HudOverlayPoint.LeftTop)));
             Registration = new HudOverlayRegistration("mod:test", Probe, () => FeatureEnabled, "group", reservedSize: animated ? new SizeF(33, 27) : null); Registry.Register(Registration);
-            Session = new HudOverlaySession(Api.Object, Registry, (_, _) => { var host = new Host(); Hosts.Add(host); return host; }, () => now, () => Enabled);
+            Session = new HudOverlaySession(Api.Object, Registry, (_, _) => { var host = new Host(); Hosts.Add(host); return host; }, () => now, () => Enabled,
+                () => new WorkshopGaugeText((context, _) => { EditPreparations++; return new LoadedTexture(context.Api) { TextureId = 42, Width = 80, Height = 12, IgnoreUndisposed = true }; }));
         }
         /// <summary>Advances one heartbeat with the currently exposed world/player.</summary>
         public void Tick() { now += 100; tick!(0); }
         /// <summary>Advances presentation time without sampling to observe exit completion.</summary>
         public void Advance(long elapsed) => now += elapsed;
         /// <summary>Ends session work before final registry ownership.</summary>
-        public void Dispose() { try { Session.Dispose(); Registry.Dispose(); } finally { RuntimeEnv.GUIScale = oldScale; } }
+        public void Dispose() { try { Session.Dispose(); Registry.Dispose(); } finally { RuntimeEnv.GUIScale = oldScale; if (english == null) Lang.AvailableLanguages.Remove("en"); else Lang.AvailableLanguages["en"] = english; } }
         #endregion
     }
 
@@ -244,6 +308,8 @@ public sealed class HudOverlaySessionTests
     private class Probe : IHudOverlay
     {
         public int Begins, Ends, Disposals, Refreshes, Preparations;
+        public bool Applicable = true;
+        public SizeF Measurement = new(20, 20);
         #region Public API
         #region Lifecycle
         /// <summary>Records fresh session binding.</summary>
@@ -253,13 +319,13 @@ public sealed class HudOverlaySessionTests
         #endregion
         #region Sampling and presentation
         /// <summary>Allows the test presentation in every ready session.</summary>
-        public bool IsApplicable() => true;
+        public bool IsApplicable() => Applicable;
         /// <summary>Publishes unchanged stable content.</summary>
         public HudOverlayChange Refresh() { Refreshes++; return HudOverlayChange.None; }
         /// <summary>Records resource preparation.</summary>
         public virtual void Prepare(HudOverlayPreparationContext context) => Preparations++;
         /// <summary>Measures stable logical content dimensions.</summary>
-        public SizeF Measure() => new(20, 20);
+        public SizeF Measure() => Measurement;
         /// <summary>Rejects accidental gameplay/render coupling in lifecycle paths.</summary>
         public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime) => throw new InvalidOperationException();
         #endregion
