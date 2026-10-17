@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" preserveAspectRatio="xMidYMid meet">
+  <title>Environmental temperature</title>
+  <path d="M 24 39 V 13 A 8 8 0 0 1 40 13 V 39 A 14 14 0 1 1 24 39 Z" fill="#f3f1e6" stroke="#25343e" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M 32 19 V 45" fill="none" stroke="#e45c50" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="32" cy="49" r="8" fill="#e45c50"/>
+  <path d="M 44 17 H 50 M 44 27 H 48 M 44 37 H 50" fill="none" stroke="#f3f1e6" stroke-width="3" stroke-linecap="round"/>
+</svg>

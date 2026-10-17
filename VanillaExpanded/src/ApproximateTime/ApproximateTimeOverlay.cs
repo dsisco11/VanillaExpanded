@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering;
 
@@ -27,7 +28,12 @@ internal sealed class ApproximateTimeOverlay : IHudOverlay, IHudOverlayVisibilit
 
     /// <summary>Retains the last preparation for the shared host's exit transition.</summary>
     public void HidePresentation() => Clear();
+    private bool styleChanged;
+
     #region Public API
+    /// <summary>Retains a style change until the scheduler prepares and measures the new presentation.</summary>
+    public void SetStyle(EnvironmentalGaugeStyle style) => styleChanged |= presentation.SetStyle(style);
+
     #region Lifecycle
     /// <summary>Creates an asset-backed icon presentation with optional headless loading.</summary>
     public ApproximateTimeOverlay(ApproximateTimePresentation? presentation = null)
@@ -103,7 +109,8 @@ internal sealed class ApproximateTimeOverlay : IHudOverlay, IHudOverlayVisibilit
         // A transient invalid calendar sample must not replace a valid icon with an hourglass.
         // Before the first usable sample, leave the presentation empty and retry next refresh.
         if (next == ApproximateTimePeriod.Unknown) return HudOverlayChange.None;
-        bool periodChanged = next != period;
+        bool periodChanged = next != period || styleChanged;
+        styleChanged = false;
         var position = current.Pos.AsBlockPos;
         var nextKey = (Math.Floor(calendar.TotalDays), position.X, position.Z, calendar.SeasonOverride);
         if (phaseKey != nextKey)

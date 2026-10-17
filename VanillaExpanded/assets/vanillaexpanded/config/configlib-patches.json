@@ -315,6 +315,36 @@
       }
     },
     "integer": {
+      "ApproximateTimeGaugeStyle": {
+        "code": "ApproximateTimeGaugeStyle",
+        "name": "ApproximateTimeGaugeStyle",
+        "ingui": "vanillaexpanded:config-approximate-time-gauge-style",
+        "comment": "vanillaexpanded:config-environmental-gauge-style-tooltip",
+        "default": "immersive",
+        "weight": 10.91,
+        "clientSide": true,
+        "mapping": { "immersive": 0, "icon": 1 }
+      },
+      "EnvironmentalTemperatureGaugeStyle": {
+        "code": "EnvironmentalTemperatureGaugeStyle",
+        "name": "EnvironmentalTemperatureGaugeStyle",
+        "ingui": "vanillaexpanded:config-environmental-temperature-gauge-style",
+        "comment": "vanillaexpanded:config-environmental-gauge-style-tooltip",
+        "default": "immersive",
+        "weight": 10.791,
+        "clientSide": true,
+        "mapping": { "immersive": 0, "icon": 1 }
+      },
+      "CalendarDateGaugeStyle": {
+        "code": "CalendarDateGaugeStyle",
+        "name": "CalendarDateGaugeStyle",
+        "ingui": "vanillaexpanded:config-calendar-date-gauge-style",
+        "comment": "vanillaexpanded:config-environmental-gauge-style-tooltip",
+        "default": "immersive",
+        "weight": 10.796,
+        "clientSide": true,
+        "mapping": { "immersive": 0, "icon": 1 }
+      },
       "HeldItemStatusAnchor": {
         "code": "HeldItemStatusAnchor",
         "name": "HeldItemStatusAnchor",

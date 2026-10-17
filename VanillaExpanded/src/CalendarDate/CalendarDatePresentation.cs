@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Globalization;
+using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering;
 using Vintagestory.API.Client;
@@ -17,6 +18,8 @@ internal sealed class CalendarDatePresentation : IDisposable
     private LoadedTexture[]? textures;
     private HudOverlayPreparationContext? context;
     private CalendarDateReading? date;
+    private readonly HudOverlayIconReading compact;
+    private EnvironmentalGaugeStyle style = EnvironmentalGaugeStyle.Immersive;
 
     #region Public API
     /// <summary>Gets the standard fade and collapse transition.</summary>
@@ -27,11 +30,23 @@ internal sealed class CalendarDatePresentation : IDisposable
     #region Content and rendering
     /// <summary>Accepts borrowed artwork and owned text factories for headless validation.</summary>
     public CalendarDatePresentation(Func<HudOverlayPreparationContext, LoadedTexture[]>? load = null,
-        Func<WorkshopGaugeText>? createText = null)
+        Func<WorkshopGaugeText>? createText = null, HudOverlayIconReading? compact = null)
     {
         this.load = load ?? (preparation => WorkshopGaugeArtwork.Load(preparation, "calendar/layer-0", "calendar/layer-2"));
         createText ??= () => new WorkshopGaugeText();
         characters = [createText(), createText()];
+        this.compact = compact ?? new();
+    }
+
+    /// <summary>Changes the instrument style while retaining the native date and active visibility transition.</summary>
+    public bool SetStyle(EnvironmentalGaugeStyle value)
+    {
+        EnvironmentalGaugeStyle next = value == EnvironmentalGaugeStyle.Icon ? value : EnvironmentalGaugeStyle.Immersive;
+        if (next == style) return false;
+        compact.Reset();
+        foreach (var text in characters) text.Reset();
+        textures = null; context = null; Size = SizeF.Empty; style = next;
+        return true;
     }
 
     /// <summary>Stores sampled native date content without querying the world during drawing.</summary>
@@ -41,6 +56,13 @@ internal sealed class CalendarDatePresentation : IDisposable
     public void Prepare(HudOverlayPreparationContext preparation)
     {
         if (date is not CalendarDateReading value) return;
+        if (style == EnvironmentalGaugeStyle.Icon)
+        {
+            compact.Prepare(preparation, "textures/hud/calendar-date/icon.svg",
+                value.MonthAbbreviation(preparation.Locale) + " " + value.Day.ToString(CultureInfo.InvariantCulture));
+            context = preparation; Size = compact.Size; Visibility.Show();
+            return;
+        }
         if (textures == null || !ReferenceEquals(context?.Api, preparation.Api)) textures = load(preparation);
         characters[0].SetContent(value.MonthAbbreviation(preparation.Locale));
         characters[1].SetContent(value.Day.ToString(CultureInfo.InvariantCulture));
@@ -53,7 +75,9 @@ internal sealed class CalendarDatePresentation : IDisposable
     /// <summary>Draws all characters inside the registered roller apertures before the glass foreground.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds)
     {
-        if (context == null || textures == null) return;
+        if (context == null) return;
+        if (style == EnvironmentalGaugeStyle.Icon) { compact.Draw(renderer, bounds); return; }
+        if (textures == null) return;
         float width = (float)(HudOverlaySizes.Calendar * context.GuiScale), height = width * Canvas.Height / Canvas.Width;
         var screen = new RectangleF((float)bounds.renderX, (float)(bounds.renderY + (bounds.OuterHeight - height) / 2), width, height);
         renderer.RenderTexture(textures[0].TextureId, screen.X, screen.Y, width, height, 50, HudOverlayDrawOpacity.Tint);
@@ -70,6 +94,7 @@ internal sealed class CalendarDatePresentation : IDisposable
     public void Reset()
     {
         Visibility.Reset();
+        compact.Reset();
         foreach (var text in characters) text.Reset();
         textures = null; context = null; date = null; Size = SizeF.Empty;
     }
@@ -77,6 +102,7 @@ internal sealed class CalendarDatePresentation : IDisposable
     public void Dispose()
     {
         Reset();
+        compact.Dispose();
         foreach (var text in characters) text.Dispose();
     }
     #endregion

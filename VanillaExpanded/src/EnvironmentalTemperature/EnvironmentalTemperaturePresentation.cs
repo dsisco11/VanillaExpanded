@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering;
 using Vintagestory.API.Client;
@@ -18,6 +19,8 @@ internal sealed class EnvironmentalTemperaturePresentation : IDisposable
     private LoadedTexture? ticks;
     private HudOverlayPreparationContext? context;
     private float temperature;
+    private readonly HudOverlayIconReading compact;
+    private EnvironmentalGaugeStyle style = EnvironmentalGaugeStyle.Immersive;
 
     #region Public API
     /// <summary>Gets the shared fade transition and retained presentation lifetime.</summary>
@@ -32,7 +35,7 @@ internal sealed class EnvironmentalTemperaturePresentation : IDisposable
     public EnvironmentalTemperaturePresentation(WorkshopGaugeText? text = null,
         Func<HudOverlayPreparationContext, LoadedTexture[]>? loadTextures = null,
         Func<HudOverlayPreparationContext, LoadedTexture>? createTicks = null,
-        EnvironmentalTemperatureLiquidMask? liquid = null)
+        EnvironmentalTemperatureLiquidMask? liquid = null, HudOverlayIconReading? compact = null)
     {
         this.text = text ?? new();
         this.loadTextures = loadTextures ?? (preparation => WorkshopGaugeArtwork.Load(preparation,
@@ -40,6 +43,17 @@ internal sealed class EnvironmentalTemperaturePresentation : IDisposable
             "thermometer/label-minus40", "thermometer/label-zero", "thermometer/label-plus60", RadialGaugeLayout.Glass));
         this.createTicks = createTicks ?? EnvironmentalTemperatureScaleArtwork.Create;
         this.liquid = liquid ?? new();
+        this.compact = compact ?? new();
+    }
+
+    /// <summary>Releases the previous style's resources while preserving the sampled climate reading.</summary>
+    public bool SetStyle(EnvironmentalGaugeStyle value)
+    {
+        EnvironmentalGaugeStyle next = value == EnvironmentalGaugeStyle.Icon ? value : EnvironmentalGaugeStyle.Immersive;
+        if (next == style) return false;
+        compact.Reset(); text.Reset(); liquid.Reset(); ticks?.Dispose(); ticks = null;
+        textures = null; context = null; Size = SizeF.Empty; style = next;
+        return true;
     }
 
     /// <summary>Stores the current climate reading independently of clock estimation.</summary>
@@ -48,6 +62,14 @@ internal sealed class EnvironmentalTemperaturePresentation : IDisposable
     /// <summary>Prepares cached whole-degree text and runtime tick pixels outside drawing.</summary>
     public void Prepare(HudOverlayPreparationContext preparation)
     {
+        double rounded = Math.Round(temperature, MidpointRounding.AwayFromZero);
+        string reading = Lang.GetL(preparation.Locale, "vanillaexpanded:environmental-temperature-reading", rounded == 0 ? 0d : rounded);
+        if (style == EnvironmentalGaugeStyle.Icon)
+        {
+            compact.Prepare(preparation, "textures/hud/environmental-temperature/icon.svg", reading);
+            context = preparation; Size = compact.Size; Visibility.Show();
+            return;
+        }
         bool apiChanged = !ReferenceEquals(context?.Api, preparation.Api);
         if (textures == null || apiChanged) textures = loadTextures(preparation);
         if (ticks == null || apiChanged)
@@ -55,8 +77,7 @@ internal sealed class EnvironmentalTemperaturePresentation : IDisposable
             var replacement = createTicks(preparation);
             ticks?.Dispose(); ticks = replacement;
         }
-        double rounded = Math.Round(temperature, MidpointRounding.AwayFromZero);
-        text.SetContent(Lang.GetL(preparation.Locale, "vanillaexpanded:environmental-temperature-reading", rounded == 0 ? 0d : rounded));
+        text.SetContent(reading);
         text.Prepare(preparation);
         liquid.Prepare(preparation, MarkerPosition);
         context = preparation;
@@ -67,7 +88,9 @@ internal sealed class EnvironmentalTemperaturePresentation : IDisposable
     /// <summary>Draws angularly masked liquid, calibrated scale elements, and foreground clamps in sandwich order.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip)
     {
-        if (context == null || textures == null || ticks == null) return;
+        if (context == null) return;
+        if (style == EnvironmentalGaugeStyle.Icon) { compact.Draw(renderer, bounds); return; }
+        if (textures == null || ticks == null) return;
         float width = (float)(HudOverlaySizes.EnvironmentalThermometer * context.GuiScale), height = width;
         var screen = new RectangleF((float)bounds.renderX, (float)(bounds.renderY + (bounds.OuterHeight - height) / 2), width, height);
         var mechanism = EnvironmentalTemperatureGaugeLayout.MechanismBounds(screen);
@@ -99,6 +122,7 @@ internal sealed class EnvironmentalTemperaturePresentation : IDisposable
     public void Reset()
     {
         Visibility.Reset();
+        compact.Reset();
         text.Reset();
         liquid.Reset();
         ticks?.Dispose(); ticks = null;
@@ -111,6 +135,7 @@ internal sealed class EnvironmentalTemperaturePresentation : IDisposable
     public void Dispose()
     {
         Reset();
+        compact.Dispose();
         text.Dispose();
     }
     #endregion
