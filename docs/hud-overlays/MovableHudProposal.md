@@ -6,6 +6,8 @@ Reuse Vintage Story's HUD/dialog lifecycle, GUI event routing, native bounds and
 
 This is a design proposal; the current HUD remains passive and automatically packed.
 
+Implementation checklist: [MovableHud.todo](MovableHud.todo).
+
 ## Base-game findings
 
 The investigation used the local API source and the installed Vintage Story 1.22.7 client assembly.

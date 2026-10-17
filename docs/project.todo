@@ -1,6 +1,8 @@
 # Vanilla: Expanded TODO List:
     ## Hud Indicators:
         ☐ Make it so that the HUD indicators can be moved around freely by the player, just like the base-game windows are.
+            Proposal: [MovableHudProposal.md](hud-overlays/MovableHudProposal.md)
+            Implementation checklist: [MovableHud.todo](hud-overlays/MovableHud.todo)
 
     ## New Features:
         ☐ Add a "Todo List" feature which allows players to create their own ingame tasks and reminders.
