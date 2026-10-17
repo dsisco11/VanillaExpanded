@@ -111,8 +111,9 @@ internal sealed class HudOverlaySnapping
             var tree = HudGroupingResolver.Insert(target.Tree, source.Tree, candidate.Target!.Member,
                 candidate.Side, candidate.Alignment, containers.Definition(target).Packing.Gap);
             var geometry = HudLayoutGeometry.Resolve(tree, sizes, target.Padding);
-            var originPixels = Bounds(targetLayout).Location;
-            var originGui = RoundedClamped(originPixels, new SizeF(geometry.Size.Width * (float)scale, geometry.Size.Height * (float)scale), viewport, safe, scale);
+            var expandedSize = new SizeF(geometry.Size.Width * (float)scale, geometry.Size.Height * (float)scale);
+            var originPixels = ExpandedOrigin(Bounds(targetLayout), expandedSize, candidate.Side, candidate.Alignment);
+            var originGui = RoundedClamped(originPixels, expandedSize, viewport, safe, scale);
             var rectangles = geometry.Rectangles.ToDictionary(item => item.Key, item => new RectangleF(
                 viewport.X + (originGui.X + item.Value.X) * (float)scale, viewport.Y + (originGui.Y + item.Value.Y) * (float)scale,
                 item.Value.Width * (float)scale, item.Value.Height * (float)scale));
@@ -129,9 +130,23 @@ internal sealed class HudOverlaySnapping
     #endregion
 
     #region Private
+    #region Placement geometry
     /// <summary>Uses the native root's physical extents, excluding transient controls and shadows.</summary>
     private static RectangleF Bounds(HudOverlayGroupLayout layout) => new((float)layout.Root.renderX, (float)layout.Root.renderY,
         (float)layout.Root.OuterWidth, (float)layout.Root.OuterHeight);
+
+    /// <summary>Grows toward the attachment while retaining the opposite edge and selected cross-axis anchor.</summary>
+    private static PointF ExpandedOrigin(RectangleF existing, SizeF expanded, HudSnapSide side, HudOverlayCrossAlignment alignment)
+    {
+        // Keeping the former top-left for a left/top insertion pushes the destination away from the incoming item.
+        // Rebase only by the added extent; cross-axis alignment retains its start, center, or end anchor.
+        float factor = alignment == HudOverlayCrossAlignment.Start ? 0 : alignment == HudOverlayCrossAlignment.End ? 1 : .5f;
+        bool horizontal = side is HudSnapSide.Left or HudSnapSide.Right;
+        return new PointF(existing.Left - (horizontal ? side == HudSnapSide.Left ? expanded.Width - existing.Width : 0
+                : factor * (expanded.Width - existing.Width)),
+            existing.Top - (horizontal ? factor * (expanded.Height - existing.Height)
+                : side == HudSnapSide.Above ? expanded.Height - existing.Height : 0));
+    }
 
     /// <summary>Reconciles integer native origins with the same reachability clamp as the native layout.</summary>
     private static PointF RoundedClamped(PointF pixels, SizeF size, RectangleF viewport, RectangleF safe, double scale)
@@ -142,6 +157,8 @@ internal sealed class HudOverlaySnapping
             (int)Math.Clamp(Math.Round(y, MidpointRounding.AwayFromZero), top, Math.Min(int.MaxValue, Math.Max(top, (safe.Bottom - viewport.Top - size.Height) / scale))));
     }
 
+    #endregion
+    #region Collision validation
     /// <summary>Rejects clipping and overlaps introduced by insertion, including collisions with the source remainder.</summary>
     private static bool Valid(IReadOnlyDictionary<string, RectangleF> rectangles,
         IReadOnlyDictionary<string, HudOverlayGroupLayout> layouts, string source, string target, RectangleF viewport)
@@ -180,6 +197,8 @@ internal sealed class HudOverlaySnapping
     private static bool Overlaps(RectangleF a, RectangleF b) => Math.Min(a.Right, b.Right) - Math.Max(a.Left, b.Left) > .01f
         && Math.Min(a.Bottom, b.Bottom) - Math.Max(a.Top, b.Top) > .01f;
 
+    #endregion
+    #region Feedback geometry
     /// <summary>Builds feedback extents from the final visible member rectangles.</summary>
     private static RectangleF Union(IEnumerable<RectangleF> rectangles)
     {
@@ -187,5 +206,6 @@ internal sealed class HudOverlaySnapping
         foreach (var rectangle in rectangles) result = result.IsEmpty ? rectangle : RectangleF.Union(result, rectangle);
         return result;
     }
+    #endregion
     #endregion
 }
