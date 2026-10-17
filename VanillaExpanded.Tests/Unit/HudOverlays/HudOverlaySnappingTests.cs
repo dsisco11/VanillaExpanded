@@ -15,6 +15,98 @@ namespace VanillaExpanded.Tests.Unit.HudOverlays;
 public sealed class HudOverlaySnappingTests
 {
     #region Public API
+    /// <summary>Insertion grows toward the incoming instrument while the existing destination stays in place.</summary>
+    [Theory]
+    [InlineData(1, false)] [InlineData(1.5, false)] [InlineData(2, false)]
+    [InlineData(1, true)] [InlineData(1.5, true)]
+    public void GroupingExpandsOutwardAndPreservesDestination(float scale, bool wholeGroup)
+    {
+        foreach (var side in Enum.GetValues<HudSnapSide>())
+        foreach (bool cancel in new[] { false, true })
+        {
+            using var fixture = new Fixture(scale, targetOrigin: new PointF(220, 180), paired: wholeGroup);
+            var original = fixture.Layouts["target"].Members.ToDictionary(member => member.Registration.Id,
+                member => new PointF((float)member.Bounds.renderX, (float)member.Bounds.renderY));
+            fixture.Begin(); fixture.MoveBesideTarget(side); fixture.Update();
+            Assert.True(fixture.Snapping.Selected?.Grouping); Assert.Equal(side, fixture.Snapping.Selected!.Side);
+            Assert.False(Assert.Single(fixture.Containers.Resolved).Movable);
+            var insertion = fixture.Snapping.Insertion;
+            fixture.Repack(); var preview = Assert.Single(fixture.Containers.Resolved);
+            foreach (var member in fixture.Layouts[preview.Id].Members.Where(member => original.ContainsKey(member.Registration.Id)))
+            {
+                var expected = original[member.Registration.Id];
+                Assert.Equal(expected.X, (float)member.Bounds.renderX, 3);
+                Assert.Equal(expected.Y, (float)member.Bounds.renderY, 3);
+            }
+            if (cancel)
+            {
+                fixture.Movement.Cancel(); fixture.Repack();
+                Assert.Equal(2, fixture.Containers.Resolved.Count);
+                Assert.Equal(original["test:b"].X, (float)fixture.Layouts["target"].Members.First().Bounds.renderX, 3);
+            }
+            else
+            {
+                var origin = fixture.Containers.Origin(preview)!.Value;
+                fixture.Movement.Commit(origin); fixture.Repack();
+                var restored = fixture.Restart(); Assert.Equal(preview, Assert.Single(restored.Resolved));
+                var incoming = fixture.Layouts[preview.Id].Members.Where(member => !original.ContainsKey(member.Registration.Id))
+                    .Select(member => new RectangleF((float)member.Bounds.renderX, (float)member.Bounds.renderY,
+                        (float)member.Bounds.OuterWidth, (float)member.Bounds.OuterHeight)).Aggregate(RectangleF.Union);
+                Assert.Equal(insertion, incoming);
+            }
+        }
+    }
+
+    /// <summary>A larger incoming instrument preserves the destination at each cross-axis attachment alignment.</summary>
+    [Theory]
+    [InlineData(1)] [InlineData(1.5)] [InlineData(2)]
+    public void LargerIncomingPreservesDestinationForEveryAlignment(float scale)
+    {
+        foreach (var side in Enum.GetValues<HudSnapSide>())
+        foreach (var alignment in Enum.GetValues<HudOverlayCrossAlignment>())
+        {
+            using var fixture = new Fixture(scale, targetOrigin: new PointF(180, 140), sourceSize: new SizeF(75, 65));
+            var original = Assert.Single(fixture.Layouts["target"].Members).Bounds;
+            var expected = new PointF((float)original.renderX, (float)original.renderY);
+            var root = fixture.Layouts["target"].Root;
+            float fraction = alignment switch { HudOverlayCrossAlignment.Center => .5f, HudOverlayCrossAlignment.End => .9f, _ => .1f };
+            var pointer = new PointF((float)(root.renderX + root.OuterWidth * fraction), (float)(root.renderY + root.OuterHeight * fraction));
+            fixture.Begin(); fixture.MoveBesideTarget(side); fixture.Update(pointer);
+            Assert.True(fixture.Snapping.Selected?.Grouping); Assert.Equal(side, fixture.Snapping.Selected!.Side);
+            Assert.Equal(alignment, fixture.Snapping.Selected.Alignment);
+            fixture.Repack(); var joined = Assert.Single(fixture.Containers.Resolved);
+            var target = fixture.Layouts[joined.Id].Members.Single(member => member.Registration.Id == "test:b").Bounds;
+            // Center alignment can require a half-GUI-unit origin, while native persistence stores integers.
+            Assert.InRange(Math.Abs(expected.X - (float)target.renderX), 0, scale / 2 + .001f);
+            Assert.InRange(Math.Abs(expected.Y - (float)target.renderY), 0, scale / 2 + .001f);
+            fixture.Movement.Commit(fixture.Containers.Origin(joined)!.Value);
+            Assert.Equal(joined, Assert.Single(fixture.Restart().Resolved));
+        }
+    }
+
+    /// <summary>Insertion beside one nested member grows the destination outer boundary without recentering its root.</summary>
+    [Theory]
+    [InlineData(1)] [InlineData(1.5)] [InlineData(2)]
+    public void NestedInsertionRetainsOppositeOuterEdge(float scale)
+    {
+        foreach (var side in Enum.GetValues<HudSnapSide>())
+        {
+            using var fixture = new Fixture(scale, targetOrigin: new PointF(180, 140), paired: true, individual: true);
+            var root = fixture.Layouts["target"].Root;
+            var before = new RectangleF((float)root.renderX, (float)root.renderY, (float)root.OuterWidth, (float)root.OuterHeight);
+            fixture.Begin(); fixture.Repack(); fixture.MoveBesideTarget(side); fixture.Update();
+            Assert.True(fixture.Snapping.Selected?.Grouping); Assert.Equal(side, fixture.Snapping.Selected!.Side);
+            Assert.NotNull(fixture.Snapping.Selected.Target!.Member);
+            fixture.Repack(); var joined = fixture.Containers.Owner("test:b")!;
+            var after = fixture.Layouts[joined.Id].Root;
+            double expected = side switch { HudSnapSide.Left => before.Right, HudSnapSide.Above => before.Bottom,
+                HudSnapSide.Right => before.Left, _ => before.Top };
+            double actual = side switch { HudSnapSide.Left => after.renderX + after.OuterWidth,
+                HudSnapSide.Above => after.renderY + after.OuterHeight, HudSnapSide.Right => after.renderX, _ => after.renderY };
+            Assert.Equal(expected, actual, 3);
+        }
+    }
+
     /// <summary>Detachment validates the reflowed source remainder as well as the freely moved member.</summary>
     [Theory]
     [InlineData(false)] [InlineData(true)]
@@ -180,31 +272,45 @@ public sealed class HudOverlaySnappingTests
         private readonly HudOverlayAnchorContext anchors;
         private readonly List<HudOverlayRegistration> members = new();
         private readonly SizeF size;
+        private readonly SizeF sourceSize;
         public readonly HudOverlayContainers Containers;
         public readonly HudOverlayGroupMovement Movement;
         public readonly HudOverlaySnapping Snapping;
         public readonly Dictionary<string, HudOverlayGroupLayout> Layouts = new();
         #region Public API
         /// <summary>Builds caller-defined instrument geometry at a selected native scale.</summary>
-        public Fixture(float scale, SizeF? measured = null, PointF? targetOrigin = null)
+        public Fixture(float scale, SizeF? measured = null, PointF? targetOrigin = null, bool paired = false, SizeF? sourceSize = null, bool individual = false)
         {
             RuntimeEnv.GUIScale = scale; size = measured ?? new SizeF(40, 30);
+            this.sourceSize = sourceSize ?? size;
             members.Add(storage.Add("test:a", "source")); members.Add(storage.Add("test:b", "target"));
+            if (paired) { members.Add(storage.Add("test:a2", "source")); members.Add(storage.Add("test:b2", "target")); }
             Containers = new HudOverlayContainers(storage.Api.Object, storage.Registry);
             Containers.SetMovable("source", true, new PointF(30, 40)); Containers.SetMovable("target", false, targetOrigin ?? new PointF(200, 120));
             anchors = new HudOverlayAnchorContext(window, () => RuntimeEnv.GUIScale, () => null);
-            Movement = Containers.Get("source"); Snapping = new HudOverlaySnapping(Containers); Repack();
+            Movement = Containers.Get("source", individual ? "test:a" : null); Snapping = new HudOverlaySnapping(Containers); Repack();
         }
         /// <summary>Captures source movement without native titlebar hit testing.</summary>
         public void Begin() => Movement.Begin(new PointF(30, 40), new PointF(30 * RuntimeEnv.GUIScale, 40 * RuntimeEnv.GUIScale), RuntimeEnv.GUIScale);
         /// <summary>Places raw source bounds immediately beside the measured target.</summary>
-        public void MoveBesideTarget()
+        public void MoveBesideTarget(HudSnapSide side = HudSnapSide.Right)
         {
-            var root = Layouts["target"].Root; float scale = RuntimeEnv.GUIScale;
-            Movement.Move(new PointF((float)(root.renderX + root.OuterWidth + Containers.Definition(Containers.Owner("test:b")!).Packing.Gap * scale), (float)root.renderY)); Repack();
+            var root = Movement.IndicatorId == null ? Layouts["target"].Root :
+                Layouts["target"].Members.Single(member => member.Registration.Id == "test:b").Bounds;
+            float scale = RuntimeEnv.GUIScale;
+            var source = Layouts[Movement.Id].Root;
+            float gap = (float)(Containers.Definition(Containers.Owner("test:b")!).Packing.Gap * scale);
+            var position = side switch {
+                HudSnapSide.Left => new PointF((float)(root.renderX - source.OuterWidth) - gap, (float)root.renderY),
+                HudSnapSide.Above => new PointF((float)root.renderX, (float)(root.renderY - source.OuterHeight) - gap),
+                HudSnapSide.Below => new PointF((float)root.renderX, (float)(root.renderY + root.OuterHeight) + gap),
+                _ => new PointF((float)(root.renderX + root.OuterWidth) + gap, (float)root.renderY) };
+            Movement.Move(position); Repack();
         }
+        /// <summary>Reloads the authoritative committed snapshot without changing its native mirrors.</summary>
+        public HudOverlayContainers Restart() => new(storage.Api.Object, storage.Registry);
         /// <summary>Calculates feedback against native roots and drawable instrument measurements.</summary>
-        public void Update() => Snapping.Update(Movement, new PointF((float)Layouts["target"].Root.renderX, (float)Layouts["target"].Root.renderY), false,
+        public void Update(PointF? pointer = null) => Snapping.Update(Movement, pointer ?? new PointF((float)Layouts["target"].Root.renderX, (float)Layouts["target"].Root.renderY), false,
             RuntimeEnv.GUIScale, new RectangleF(0, 0, 800, 600), Layouts, _ => true);
         /// <summary>Adds a separate measured obstacle in the proposed incoming footprint.</summary>
         public void AddObstacle()
@@ -220,7 +326,7 @@ public sealed class HudOverlaySnappingTests
             foreach (var container in Containers.Resolved)
             {
                 if (!Layouts.TryGetValue(container.Id, out var layout)) Layouts[container.Id] = layout = new HudOverlayGroupLayout();
-                layout.Apply(anchors, Containers.Definition(container), members.Where(value => container.Tree.Leaves().Contains(value.Id)).Select(value => new KeyValuePair<HudOverlayRegistration, SizeF>(value, size)).ToArray(), Containers.Origin(container), container.Tree, container.Padding);
+                layout.Apply(anchors, Containers.Definition(container), members.Where(value => container.Tree.Leaves().Contains(value.Id)).Select(value => new KeyValuePair<HudOverlayRegistration, SizeF>(value, value.Id.StartsWith("test:a", StringComparison.Ordinal) ? sourceSize : size)).ToArray(), Containers.Origin(container), container.Tree, container.Padding);
             }
 
         }
