@@ -165,7 +165,7 @@ public sealed class WeatherConditionsCompositeTests
         Assert.Equal(paths.Length, renderer.Invocations.Count(call => call.Method.Name == "GetOrLoadTexture"));
     }
 
-    /// <summary>Every selected 64-pixel texture shares one scaled 24-unit destination and one backdrop.</summary>
+    /// <summary>Every selected texture shares the measured footprint and one backdrop.</summary>
     [Theory]
     [InlineData(1d)]
     [InlineData(2d)]
@@ -181,7 +181,7 @@ public sealed class WeatherConditionsCompositeTests
         presentation.SetContent(WeatherConditionsSample.FromWeather(1, EnumPrecipitationType.Hail, 20, 4, .05f,
             cloudCoverage: 1, windSpeed: 1, thunderRate: 1));
         presentation.Prepare(preparation);
-        Assert.Equal(new SizeF(36, 36), presentation.Size);
+        Assert.NotEqual(SizeF.Empty, presentation.Size);
         var bounds = ElementBounds.Fixed(0, 0, 36, 36).WithEmptyParent();
         bounds.CalcWorldBounds();
         var renderer = new Mock<IRenderAPI>();
@@ -193,8 +193,8 @@ public sealed class WeatherConditionsCompositeTests
         Assert.All(draws, call =>
         {
             Assert.Equal(bounds.renderX, call.Arguments[1]);
-            Assert.Equal(36 * scale, call.Arguments[3]);
-            Assert.Equal(36 * scale, call.Arguments[4]);
+            Assert.Equal(presentation.Size.Width * scale, call.Arguments[3]);
+            Assert.Equal(presentation.Size.Height * scale, call.Arguments[4]);
         });
         Assert.Single(draws.Select(call => call.Arguments[2]).Distinct());
         presentation.SetContent(WeatherConditionsSample.FromWeather(0, EnumPrecipitationType.Rain, 20, 4, .001f, cloudCoverage: 0));

@@ -34,7 +34,7 @@ public sealed class ToolHeadPresentationIntegrationTests : IDisposable
 
     #endregion
     #region Dedicated presentation
-    /// <summary>Configured draws prepare once, notify once, borrow the selected mesh, and leave the caller transform untouched.</summary>
+    /// <summary>Configured draws prepare once, borrow the selected mesh, preserve the caller transform, and submit an independent matrix.</summary>
     [Theory]
     [InlineData(2f)]
     [InlineData(99f)]
@@ -53,6 +53,9 @@ public sealed class ToolHeadPresentationIntegrationTests : IDisposable
         Assert.Same(selected, f.Submitted);
         Assert.False(selected.Disposed);
         Assert.Equal(gui, f.Item.GuiTransform.AsMatrix);
+        Assert.Equal(40, f.Matrices["modelMatrix"][0]);
+        Assert.Equal(80, f.Matrices["modelMatrix"][12]);
+        Assert.Equal(220, f.Matrices["modelMatrix"][13]);
         Assert.Equal(1, f.Restores);
     }
 
@@ -223,6 +226,72 @@ public sealed class ToolHeadPresentationIntegrationTests : IDisposable
         fixture.Shader.Verify(shader => shader.Uniform("normalShaded", 0), Times.Once);
     }
 
+    /// <summary>Screen-space light remains toward the upper right as the tool presentation rotates.</summary>
+    [Theory]
+    [InlineData(0f)]
+    [InlineData(90f)]
+    [InlineData(180f)]
+    [InlineData(270f)]
+    public void DedicatedDrawUsesFixedUpperRightLight(float rotation)
+    {
+        var f = new Fixture();
+        float[]? light = null;
+        f.Shader.Setup(shader => shader.Uniform("lightPosition", It.IsAny<float>(), It.IsAny<float>(), It.IsAny<float>()))
+            .Callback<string, float, float, float>((name, x, y, z) => light = [x, y, z]);
+        bool submitted = false;
+        f.Render.Setup(render => render.RenderMultiTextureMesh(It.IsAny<MultiTextureMeshRef>(), "tex2d", 0))
+            .Callback(() =>
+            {
+                submitted = true;
+                Assert.NotNull(light);
+                Assert.Equal([0.9f, -0.9f, 2.7166154f], light);
+                var model = f.Matrices["modelMatrix"];
+                double length = Math.Sqrt(model[8] * model[8] + model[9] * model[9] + model[10] * model[10]);
+                double nx = model[8] / length, ny = model[9] / length, nz = model[10] / length;
+                double dot = nx * light[0] + ny * light[1] + nz * light[2];
+                // Match the installed GUI shader's diffuse, sky and north-facing terms for opposite face normals.
+                double front = Math.Max(Math.Max(.45, .5 + .5 * dot), ny * .95) + Math.Max(0, -nz) * .2;
+                double rear = Math.Max(Math.Max(.45, .5 - .5 * dot), -ny * .95) + Math.Max(0, nz) * .2;
+                Assert.True(front > rear, "The viewer-facing surface must be brighter than its rear-facing inverse.");
+            });
+        Assert.True(f.Renderer.TryRender(f.Api.Object, f.Slot, 100, 200, 40, rotation));
+        Assert.True(submitted);
+        Assert.Equal(1, f.Restores);
+    }
+
+    /// <summary>The stock shader receives half ambient terms with stronger directional light and unchanged opacity.</summary>
+    [Theory]
+    [InlineData(1d, 0d, 0d)]
+    [InlineData(-1d, 0d, 0d)]
+    [InlineData(0d, 1d, 0d)]
+    [InlineData(0d, -1d, 0d)]
+    [InlineData(0d, 0d, 1d)]
+    [InlineData(0d, 0d, -1d)]
+    public void ShadedDrawHalvesAmbientAndStrengthensDirectLight(double nx, double ny, double nz)
+    {
+        var fixture = new Fixture();
+        float[]? light = null;
+        Vec4f? tint = null;
+        fixture.Shader.Setup(shader => shader.Uniform("lightPosition", It.IsAny<float>(), It.IsAny<float>(), It.IsAny<float>()))
+            .Callback<string, float, float, float>((name, x, y, z) => light = [x, y, z]);
+        fixture.Shader.Setup(shader => shader.Uniform("rgbaIn", It.IsAny<Vec4f>()))
+            .Callback<string, Vec4f>((name, value) => tint = value);
+        Assert.True(fixture.Renderer.TryRender(fixture.Api.Object, fixture.Slot, 100, 200, 40, 0));
+        Assert.NotNull(light);
+        Assert.NotNull(tint);
+        double shaderDot = nx * light[0] + ny * light[1] + nz * light[2];
+        // Evaluate the installed stock equation separately from the requested half-ambient/direct model.
+        double actual = tint.X * (Math.Max(Math.Max(.45, .5 + .5 * shaderDot), .95 * ny) + .2 * Math.Max(0, -nz));
+        double directDot = nx * .3 - ny * .3 + nz * Math.Sqrt(.82);
+        double expected = Math.Max(Math.Max(.225, .25 + .75 * directDot), .475 * ny) + .1 * Math.Max(0, -nz);
+        Assert.InRange(Math.Abs(actual - expected), 0, .000001);
+        if (nz == 1)
+        {
+            Assert.True(directDot > 1 / Math.Sqrt(3), "The new light must face the viewer more directly than the old diagonal light.");
+            Assert.True(actual > .25 + .5 * directDot, "The directional contribution must exceed the previous strength while ambient remains halved.");
+        }
+    }
+
     /// <summary>Prepared draws forward caller-owned shader settings without imposing a lighting policy.</summary>
     [Fact]
     public void PreparedDrawForwardsCallerShaderSettings()
@@ -366,5 +435,4 @@ public sealed class ToolHeadPresentationIntegrationTests : IDisposable
     }
     #endregion
 }
-
 

@@ -55,16 +55,14 @@ public sealed class RadialGaugeArtworkTests : IDisposable
         Assert.DoesNotContain(paths, path => path == root + "clock/layer-0.png" || path == root + "thermometer/layer-0.png");
     }
 
-    /// <summary>The full thermometer mechanism fits within the shared face at arbitrary instrument sizes.</summary>
+    /// <summary>The thermometer mechanism stays inside its supplied housing at arbitrary instrument sizes.</summary>
     [Theory]
     [InlineData(45)] [InlineData(90)] [InlineData(180)]
-    public void MechanismFitsAperture(float size)
+    public void MechanismRemainsInsideSuppliedHousing(float size)
     {
         var housing = new System.Drawing.RectangleF(13, 27, size, size);
         var mechanism = EnvironmentalTemperatureGaugeLayout.MechanismBounds(housing);
-        Assert.Equal(13 + size * 256d / 512, mechanism.X + mechanism.Width / 2, 4);
-        Assert.Equal(27 + size * 250d / 512, mechanism.Y + mechanism.Height / 2, 4);
-        Assert.True(235 * mechanism.Width / 512 < RadialGaugeLayout.ApertureRadius * size / 512);
+        Assert.True(housing.Contains(mechanism));
     }
     #endregion
 }

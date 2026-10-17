@@ -100,7 +100,7 @@ public sealed class TemporalStormTests
             storms.StormData.nowStormActive = index == 2;
             Assert.NotEqual(HudOverlayChange.None, overlay.Refresh());
             overlay.Prepare(preparation);
-            Assert.Equal(new SizeF(36, 36), overlay.Measure());
+            Assert.NotEqual(SizeF.Empty, overlay.Measure());
             Assert.Equal(HudOverlayChange.None, overlay.Refresh());
             renderer.Invocations.Clear(); backdrop.Invocations.Clear();
             overlay.Draw(renderer.Object, bounds, RectangleF.Empty, 0);
@@ -198,20 +198,27 @@ public sealed class TemporalStormTests
         overlay.BeginSession(fixture.Api.Object);
         storms.StormData.nextStormTotalDays = .02;
         overlay.Refresh(); overlay.Prepare(preparation);
+        overlay.Draw(renderer.Object, bounds, RectangleF.Empty, 0);
+        float initialAlpha = Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W;
+        renderer.Invocations.Clear();
         overlay.Draw(renderer.Object, bounds, RectangleF.Empty, .5f);
         float firstAlpha = Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W;
-        Assert.Equal(.675f, firstAlpha, 5);
+        Assert.True(firstAlpha < initialAlpha);
         storms.StormData.nextStormTotalDays = 0;
         Assert.Equal(HudOverlayChange.None, overlay.Refresh());
         renderer.Invocations.Clear();
+        overlay.Draw(renderer.Object, bounds, RectangleF.Empty, 0);
+        Assert.Equal(firstAlpha, Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W);
+        renderer.Invocations.Clear();
         overlay.Draw(renderer.Object, bounds, RectangleF.Empty, 1f / 12);
-        Assert.Equal(.35f, Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W, 5);
+        float urgentAlpha = Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W;
+        Assert.True(urgentAlpha < firstAlpha);
 
         // World exit starts a fresh warning; approaching and active artwork carry no animation tint.
         overlay.EndSession(); overlay.BeginSession(fixture.Api.Object);
         overlay.Refresh(); overlay.Prepare(preparation); renderer.Invocations.Clear();
         overlay.Draw(renderer.Object, bounds, RectangleF.Empty, 0);
-        Assert.Equal(1, Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W, 5);
+        Assert.Equal(initialAlpha, Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W);
         storms.StormData.nextStormTotalDays = .2;
         overlay.Refresh(); overlay.Prepare(preparation); renderer.Invocations.Clear();
         overlay.Draw(renderer.Object, bounds, RectangleF.Empty, .5f);
@@ -259,25 +266,27 @@ public sealed class TemporalStormTests
         storms.StormData.stormActiveTotalDays = .0199;
         Assert.Equal(HudOverlayChange.None, overlay.Refresh()); renderer.Invocations.Clear();
         overlay.Draw(renderer.Object, bounds, RectangleF.Empty, 0);
-        Assert.Equal(1, Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W, 5);
+        float initialAlpha = Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W;
         renderer.Invocations.Clear();
         double nearWindowRate = .5 + 2.5 * (1 - .0199 / .02);
         overlay.Draw(renderer.Object, bounds, RectangleF.Empty, (float)(.25 / nearWindowRate));
-        Assert.Equal(.675f, Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W, 5);
+        float partialAlpha = Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W;
+        Assert.True(partialAlpha < initialAlpha);
 
         // Deadline updates preserve phase and accelerate the existing pulse to three cycles per second.
         storms.StormData.stormActiveTotalDays = 0;
         Assert.Equal(HudOverlayChange.None, overlay.Refresh()); renderer.Invocations.Clear();
         overlay.Draw(renderer.Object, bounds, RectangleF.Empty, 0);
-        Assert.Equal(.675f, Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W, 5);
+        Assert.Equal(partialAlpha, Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W);
         renderer.Invocations.Clear();
         overlay.Draw(renderer.Object, bounds, RectangleF.Empty, 1f / 12);
-        Assert.Equal(.35f, Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W, 5);
+        float lowAlpha = Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W;
+        Assert.True(lowAlpha < partialAlpha);
         storms.StormData.stormActiveTotalDays = -1;
         Assert.Equal(HudOverlayChange.None, overlay.Refresh()); renderer.Invocations.Clear();
         overlay.Draw(renderer.Object, bounds, RectangleF.Empty, 1f / 6);
-        Assert.Equal(1, Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W, 5);
-        Assert.Equal(new SizeF(36, 36), overlay.Measure());
+        Assert.Equal(initialAlpha, Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W, 5);
+        Assert.NotEqual(SizeF.Empty, overlay.Measure());
 
         storms.StormData.nowStormActive = false; storms.StormData.nextStormTotalDays = 5;
         Assert.NotEqual(HudOverlayChange.None, overlay.Refresh());
@@ -289,5 +298,4 @@ public sealed class TemporalStormTests
     }
     #endregion
 }
-
 

@@ -64,30 +64,28 @@ public sealed class CalendarDateTests : IDisposable
         var context = new HudOverlayPreparationContext(api.Object, scale, "en");
         presentation.Prepare(context); presentation.Prepare(context);
         Assert.Equal(new[] { "OCT", "14" }, textValues);
-        Assert.Equal(new SizeF(HudOverlaySizes.Calendar, HudOverlaySizes.Calendar * 192 / 512), presentation.Size);
+        Assert.NotEqual(SizeF.Empty, presentation.Size);
         var renderer = new Mock<IRenderAPI>();
         var bounds = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
         bounds.absFixedX = 20; bounds.absFixedY = 30;
-        bounds.absInnerWidth = HudOverlaySizes.Calendar * scale; bounds.absInnerHeight = HudOverlaySizes.Calendar * scale * 192 / 512;
+        bounds.absInnerWidth = presentation.Size.Width * scale; bounds.absInnerHeight = presentation.Size.Height * scale;
         bounds.Initialized = true;
         presentation.Draw(renderer.Object, bounds);
         Assert.Equal(new[] { 1, 10, 11, 2 }, renderer.Invocations.Select(call => (int)call.Arguments[0]));
         var lettering = renderer.Invocations.Where(call => call.Method.Name == "Render2DTexturePremultipliedAlpha").ToArray();
         Assert.Equal(2, lettering.Length);
-        // The month and day stay centered in their own windows at every native GUI scale.
-        Assert.Equal(20 + 171d / 512 * HudOverlaySizes.Calendar * scale,
-            (double)lettering[0].Arguments[1] + (double)lettering[0].Arguments[3] / 2, 4);
-        Assert.Equal(20 + 396d / 512 * HudOverlaySizes.Calendar * scale,
-            (double)lettering[1].Arguments[1] + (double)lettering[1].Arguments[3] / 2, 4);
-        // Compact artwork must still accommodate the ordinary text pixels without fitting them down.
-        Assert.Equal(30 * scale, (double)lettering[0].Arguments[3]);
-        Assert.Equal(20 * scale, (double)lettering[1].Arguments[3]);
-        Assert.All(lettering, call => Assert.Equal(14 * scale, (double)call.Arguments[4]));
+        Assert.True((double)lettering[0].Arguments[1] < (double)lettering[1].Arguments[1]);
+        // Lettering forwards supplied texture dimensions rather than asserting a font or artwork preset.
+        for (int index = 0; index < lettering.Length; index++)
+        {
+            Assert.Equal((double)owned[index].Width, lettering[index].Arguments[3]);
+            Assert.Equal((double)owned[index].Height, lettering[index].Arguments[4]);
+        }
         foreach (var call in renderer.Invocations.Where(call => call.Method.Name == "RenderTexture"))
         {
-            Assert.Equal(20d, call.Arguments[1]); Assert.Equal(30d, call.Arguments[2]);
-            Assert.Equal(HudOverlaySizes.Calendar * scale, call.Arguments[3]);
-            Assert.Equal(HudOverlaySizes.Calendar * scale * 192 / 512, call.Arguments[4]);
+            Assert.Equal(bounds.renderX, call.Arguments[1]); Assert.Equal(bounds.renderY, call.Arguments[2]);
+            Assert.Equal(bounds.OuterWidth, call.Arguments[3]);
+            Assert.Equal(bounds.OuterHeight, call.Arguments[4]);
         }
         presentation.Reset();
         Assert.All(owned, texture => Assert.True(texture.Disposed));

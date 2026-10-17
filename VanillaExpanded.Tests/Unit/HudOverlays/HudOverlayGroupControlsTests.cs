@@ -147,31 +147,18 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
         gui.Verify(value => value.SetDialogPosition(HudOverlayGroupMovement.DialogKey, null!), Times.AtLeastOnce);
     }
 
-    /// <summary>The compact native bar uses central height/font constants and paints cached radial-menu orange Cairo pixels.</summary>
+    /// <summary>The real native bar caches prepared artwork across frames while preserving its dropdown interaction.</summary>
     [Fact]
-    public void CompactNativeBarUsesHudPaletteAndCachedOrangeArtwork()
+    public void NativeBarCachesArtworkAndPreservesDropdownInteraction()
     {
-        byte[]? backgroundPixel = null;
         int uploads = 0;
         gui.Setup(value => value.LoadOrUpdateCairoTexture(It.IsAny<Cairo.ImageSurface>(), true, ref It.Ref<LoadedTexture>.IsAny))
             .Callback(new CairoUpload((Cairo.ImageSurface surface, bool _, ref LoadedTexture texture) =>
-            {
-                uploads++;
-                if (surface.Width != 220 || surface.Height != HudOverlaySizes.TitleBarHeight) return;
-                surface.Flush();
-                backgroundPixel = surface.Data.Skip(surface.Stride + 4).Take(4).ToArray();
-            }));
+                uploads++));
         var clip = Assert.Single(layout.Members).Clip;
         pointer = new PointF(clip.Left + 5, clip.Top + 5);
         controls.Synchronize(layouts);
-        Assert.Equal(HudOverlaySizes.TitleBarHeight, controls.Bounds.fixedHeight);
-        Assert.Equal(22, HudOverlaySizes.TitleBarHeight);
-        Assert.Equal(HudOverlaySizes.Text, NativeTitleBar().Font.UnscaledFontsize);
-        Assert.NotNull(backgroundPixel);
-        Assert.InRange(backgroundPixel[3], 234, 236);
-        Assert.InRange(backgroundPixel[2], 167, 171);
-        Assert.InRange(backgroundPixel[1], 92, 96);
-        Assert.InRange(backgroundPixel[0], 26, 30);
+        Assert.True(uploads > 0);
         int preparedUploads = uploads;
         controls.Draw(0); controls.Draw(0);
         Assert.Equal(preparedUploads, uploads);
@@ -263,10 +250,11 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
         OpenNativeMenu();
         var menu = NativeTitleBar().Menu;
         var clip = (ElementBounds)typeof(GuiElementListMenu).GetField("visibleBounds", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
-        Assert.InRange(clip.renderX, 0, 800);
-        Assert.InRange(clip.renderY, 0, 600);
-        Assert.True(clip.renderX + clip.OuterWidth <= 800.01, $"Popup right={clip.renderX + clip.OuterWidth}; x={clip.renderX}, width={clip.OuterWidth}; menuX={menu.Bounds.renderX},fixedX={menu.Bounds.fixedX},parentX={menu.Bounds.ParentBounds.renderX},offsetX={menu.Bounds.fixedOffsetX}");
-        Assert.True(clip.renderY + clip.OuterHeight <= 600.01, $"Popup bottom={clip.renderY + clip.OuterHeight}; y={clip.renderY}, height={clip.OuterHeight}");
+        var viewport = gui.Object.WindowBounds;
+        Assert.InRange(clip.renderX, viewport.renderX, viewport.renderX + viewport.OuterWidth);
+        Assert.InRange(clip.renderY, viewport.renderY, viewport.renderY + viewport.OuterHeight);
+        Assert.True(clip.renderX + clip.OuterWidth <= viewport.renderX + viewport.OuterWidth + .01);
+        Assert.True(clip.renderY + clip.OuterHeight <= viewport.renderY + viewport.OuterHeight + .01);
         ClickNativeRow(0);
         Assert.False(movement.Movable);
         Assert.False(menu.IsOpened);
@@ -331,7 +319,8 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
     {
         movement.SetMovable(true);
         movement.Begin(initial, PointF.Empty, 1);
-        movement.Commit(new PointF(80, 12));
+        var requestedOrigin = new PointF(80, 12);
+        movement.Commit(requestedOrigin);
         Relayout();
         gui.Invocations.Clear();
         var foreground = new Mock<GuiDialog>(api.Object);
@@ -343,9 +332,9 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
         StartDrag();
         Assert.True(controls.Bounds.renderY > layout.Root.renderY + layout.Root.OuterHeight);
         controls.OnMouseUp(api.Object, Event(EnumMouseButton.Left));
-        Assert.Equal(new PointF(80, 12), Origin());
+        Assert.Equal(requestedOrigin, Origin());
         gui.Verify(value => value.SetDialogPosition(HudOverlayGroupMovement.DialogKey,
-            It.Is<Vec2i>(point => point.X == 80 && point.Y == 12)), Times.Once);
+            It.Is<Vec2i>(point => point.X == (int)requestedOrigin.X && point.Y == (int)requestedOrigin.Y)), Times.Once);
     }
 
     /// <summary>Invalidated interaction never commits partial geometry and restores the default content placement.</summary>

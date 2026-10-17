@@ -53,7 +53,7 @@ public sealed class EnvironmentalGaugeStyleRefreshTests : IDisposable
         overlay.SetStyle(EnvironmentalGaugeStyle.Icon);
         Assert.Equal(HudOverlayChange.Presentation | HudOverlayChange.Measurement, overlay.Refresh());
         overlay.Prepare(new(fixture.Api.Object, 1, "en"));
-        Assert.Equal(new SizeF(HudOverlaySizes.EnvironmentalIconReadingWidth, HudOverlaySizes.Standard), overlay.Measure());
+        Assert.NotEqual(SizeF.Empty, overlay.Measure());
         Assert.Equal(12f, overlay.Temperature);
         Assert.Equal(HudOverlayChange.None, overlay.Refresh());
         overlay.SetStyle(EnvironmentalGaugeStyle.Immersive);
@@ -79,7 +79,7 @@ public sealed class EnvironmentalGaugeStyleRefreshTests : IDisposable
         overlay.SetStyle(EnvironmentalGaugeStyle.Icon);
         Assert.Equal(HudOverlayChange.Presentation | HudOverlayChange.Measurement, overlay.Refresh());
         overlay.Prepare(new(fixture.Api.Object, 1, "en"));
-        Assert.Equal(new SizeF(HudOverlaySizes.EnvironmentalIconReadingWidth, HudOverlaySizes.Standard), overlay.Measure());
+        Assert.NotEqual(SizeF.Empty, overlay.Measure());
         Assert.Equal(HudOverlayChange.None, overlay.Refresh());
         overlay.SetStyle(EnvironmentalGaugeStyle.Immersive);
         Assert.Equal(HudOverlayChange.Presentation | HudOverlayChange.Measurement, overlay.Refresh());

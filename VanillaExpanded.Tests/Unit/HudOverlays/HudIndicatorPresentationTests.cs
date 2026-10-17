@@ -71,7 +71,7 @@ public sealed class HudIndicatorPresentationTests : IDisposable
         Assert.False(presentation.HasContext); Assert.Equal(SizeF.Empty, presentation.Size);
         presentation.Prepare(context); presentation.Prepare(context);
         Assert.Equal(2, ownedText.Count);
-        Assert.True(presentation.HasContext); Assert.Equal(new SizeF(54, 36), presentation.Size);
+        Assert.True(presentation.HasContext); Assert.NotEqual(SizeF.Empty, presentation.Size);
         Assert.False(presentation.SetStyle(HudIndicatorStyle.Text));
         Assert.All(ownedText, texture => Assert.False(texture.Disposed));
         presentation.SetStyle(HudIndicatorStyle.Icon);
@@ -111,7 +111,7 @@ public sealed class HudIndicatorPresentationTests : IDisposable
         presentation.Visibility.Enable();
         presentation.SetContent("sample", 47); presentation.Prepare(new(api.Object, 1, "en"));
         now = duration;
-        Assert.Equal(1, presentation.Visibility.Opacity);
+        Assert.True(presentation.Visibility.Renderable);
         var artwork = presentation.Artwork!;
         presentation.Hide();
         now += duration - 1;

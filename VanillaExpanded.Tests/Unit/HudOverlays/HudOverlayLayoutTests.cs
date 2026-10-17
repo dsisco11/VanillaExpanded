@@ -73,21 +73,23 @@ public sealed class HudOverlayLayoutTests
             foreach (HudOverlayPoint pivot in Enum.GetValues<HudOverlayPoint>())
             {
                 using var layout = new HudOverlayGroupLayout();
-                var group = Group(new("screen", anchor, pivot, 3, 4));
+                var group = Group(new("screen", anchor, pivot, 3, 4), new HudOverlayPacking(padding: 5));
                 var member = Member("mod:a", 80, 40);
                 layout.Apply(context, group, new[] { member });
                 PointF a = new((int)anchor % 3 * .5f, (int)anchor / 3 * .5f), p = new((int)pivot % 3 * .5f, (int)pivot / 3 * .5f);
-                double width = 88 * scale, height = 48 * scale;
+                double width = layout.Root.OuterWidth, height = layout.Root.OuterHeight;
+                double insetX = context.SafeRectangle.Left - window.renderX;
+                double insetY = context.SafeRectangle.Top - window.renderY;
                 double nativeX = a.X == 0 ? 17 : a.X == 1 ? 2000 - width - 23 : (2000 - width) / 2;
                 double nativeY = a.Y * (1600 - height);
-                double x = nativeX + scale * (3 + (1 - 2 * a.X) * 12) + (a.X - p.X) * width;
-                double y = nativeY + scale * (4 + (1 - 2 * a.Y) * 12) + (a.Y - p.Y) * height;
+                double x = nativeX + scale * 3 + (1 - 2 * a.X) * insetX + (a.X - p.X) * width;
+                double y = nativeY + scale * 4 + (1 - 2 * a.Y) * insetY + (a.Y - p.Y) * height;
                 Near(Math.Clamp(x, context.SafeRectangle.Left, context.SafeRectangle.Right - width), layout.Root.renderX);
                 Near(Math.Clamp(y, context.SafeRectangle.Top, context.SafeRectangle.Bottom - height), layout.Root.renderY);
                 EnumDialogArea[] expected = { EnumDialogArea.LeftTop, EnumDialogArea.CenterTop, EnumDialogArea.RightTop, EnumDialogArea.LeftMiddle, EnumDialogArea.CenterMiddle, EnumDialogArea.RightMiddle, EnumDialogArea.LeftBottom, EnumDialogArea.CenterBottom, EnumDialogArea.RightBottom };
                 Assert.Equal(expected[(int)anchor], layout.Root.Alignment);
                 Near(80 * scale, layout.Members[0].Bounds.OuterWidth);
-                Near(layout.Root.renderX + 4 * scale, layout.Members[0].Bounds.renderX);
+                Near(layout.Root.renderX + 5 * scale, layout.Members[0].Bounds.renderX);
                 Assert.Equal(0, layout.Root.fixedPaddingX);
             }
         }
@@ -136,8 +138,8 @@ public sealed class HudOverlayLayoutTests
                 using var layout = new HudOverlayGroupLayout();
                 layout.Apply(context, Group(new("hotbar", anchor, pivot, 3, 4)), new[] { Member("mod:a", 80, 40) });
                 PointF a = HudOverlayPoints.Normalized(anchor), p = HudOverlayPoints.Normalized(pivot);
-                Near(target.X + a.X * target.Width - p.X * 88 * scale + 3 * scale, layout.Root.renderX);
-                Near(target.Y + a.Y * target.Height - p.Y * 48 * scale + 4 * scale, layout.Root.renderY);
+                Near(target.X + a.X * target.Width - p.X * layout.Root.OuterWidth + 3 * scale, layout.Root.renderX);
+                Near(target.Y + a.Y * target.Height - p.Y * layout.Root.OuterHeight + 4 * scale, layout.Root.renderY);
                 Assert.Equal(EnumDialogArea.None, layout.Root.Alignment);
             }
         }
@@ -159,7 +161,7 @@ public sealed class HudOverlayLayoutTests
             var direction = (HudOverlayDirection)directionValue;
             var window = new Window(130, 130);
             var context = new HudOverlayAnchorContext(window, () => 1, () => new RectangleF(125, 125, 5, 5));
-            var group = Group(new("hotbar", HudOverlayPoint.RightBottom, HudOverlayPoint.LeftTop), new(direction));
+            var group = Group(new("hotbar", HudOverlayPoint.RightBottom, HudOverlayPoint.LeftTop), new(direction, gap: 6, padding: 4));
             var a = Member("mod:a", 40, 40); var b = Member("mod:b", 40, 40); var c = Member("mod:c", 40, 40);
             using var layout = new HudOverlayGroupLayout();
             context.BeginFrame();
@@ -196,9 +198,10 @@ public sealed class HudOverlayLayoutTests
                 new[] { Member("mod:a", 200, 200), Member("mod:b", 1, 1) });
             var member = Assert.Single(layout.Members);
             Near(200, member.Bounds.OuterWidth);
-            Near(12, layout.Root.renderX);
+            Near(context.SafeRectangle.Left, layout.Root.renderX);
             Assert.True(context.SafeRectangle.Contains(member.Clip));
-            Assert.Equal(new RectangleF(16, 16, 72, 72), member.Clip);
+            Assert.Equal(RectangleF.Intersect(context.SafeRectangle, new RectangleF((float)member.Bounds.renderX,
+                (float)member.Bounds.renderY, (float)member.Bounds.OuterWidth, (float)member.Bounds.OuterHeight)), member.Clip);
         }
         finally { RuntimeEnv.GUIScale = old; }
     }
@@ -286,7 +289,7 @@ public sealed class HudOverlayLayoutTests
             context.BeginFrame();
             var direction = (HudOverlayDirection)directionValue;
             var group = Group(new("screen", HudOverlayPoint.CenterMiddle, HudOverlayPoint.CenterMiddle),
-                new(direction, crossAlignment: (HudOverlayCrossAlignment)alignmentValue));
+                new(direction, padding: 4, crossAlignment: (HudOverlayCrossAlignment)alignmentValue));
             var first = Member("mod:a", 60, 60); var second = Member("mod:b", 20, 20);
             using var a = new HudOverlayGroupLayout(); using var b = new HudOverlayGroupLayout();
             a.Apply(context, group, new[] { first, second }); b.Apply(context, group, new[] { first, second });
@@ -323,13 +326,14 @@ public sealed class HudOverlayLayoutTests
                 () => true, "group", order: -1), b.Value);
             Assert.True(layout.Apply(context, screen, new[] { changed, reordered }));
             Assert.Equal(new[] { "mod:b", "mod:a" }, layout.Members.Select(member => member.Registration.Id));
-            var named = Group(new("hotbar", HudOverlayPoint.RightMiddle, HudOverlayPoint.LeftMiddle, 12, 0));
+            var named = Group(new("hotbar", HudOverlayPoint.RightMiddle, HudOverlayPoint.LeftMiddle, 12, 0),
+                new HudOverlayPacking(padding: 5));
             layout.Apply(context, named, new[] { changed });
             Near(824, layout.Root.renderX);
-            Near(625 - 23, layout.Root.renderY);
+            Near(625 - layout.Root.OuterHeight / 2, layout.Root.renderY);
             Assert.Equal(0, layout.Root.absMarginX); Assert.Equal(0, layout.Root.absMarginY);
             child.renderOffsetX = 5; child.renderOffsetY = 7;
-            Near(layout.Root.renderX + 8 + 5, child.renderX); Near(layout.Root.renderY + 8 + 7, child.renderY);
+            Near(layout.Root.renderX + 5 * scale + 5, child.renderX); Near(layout.Root.renderY + 5 * scale + 7, child.renderY);
             Assert.True(layout.Apply(context, named, new[] { changed }));
             Assert.Equal(RectangleF.Intersect(context.SafeRectangle, new RectangleF((float)child.renderX, (float)child.renderY,
                 (float)child.OuterWidth, (float)child.OuterHeight)), layout.Members[0].Clip);
@@ -386,7 +390,8 @@ public sealed class HudOverlayLayoutTests
             var context = new HudOverlayAnchorContext(new Window(1800, 1000), () => scale, () => null,
                 readSaturation: () => { reads++; return target; });
             context.BeginFrame();
-            var group = Group(new(HudOverlayAnchorContext.SaturationTargetId, HudOverlayPoint.LeftTop, HudOverlayPoint.LeftBottom, -4, 0));
+            var group = Group(new(HudOverlayAnchorContext.SaturationTargetId, HudOverlayPoint.LeftTop, HudOverlayPoint.LeftBottom, -4, 0),
+                new HudOverlayPacking(padding: 4));
             using var layout = new HudOverlayGroupLayout();
             layout.Apply(context, group, new[] { Member("mod:arrow", 40, 20) });
             var member = Assert.Single(layout.Members);

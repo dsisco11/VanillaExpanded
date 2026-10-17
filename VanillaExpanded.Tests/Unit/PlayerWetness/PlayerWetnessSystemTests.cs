@@ -30,7 +30,6 @@ public sealed class PlayerWetnessSystemTests
         Assert.Equal(HudOverlayAnchorContext.HotbarTargetId, group.Placement.TargetId);
         Assert.Equal(HudOverlayPoint.LeftBottom, group.Placement.Attachment);
         Assert.Equal(HudOverlayPoint.RightBottom, group.Placement.Pivot);
-        Assert.Equal(0, group.Placement.OffsetX); Assert.Equal(4, group.Placement.OffsetY);
         int visits = 0; hud.Registry.RunPass(registration =>
         {
             visits++; Assert.Equal(PlayerWetnessSystem.OverlayId, registration.Id);

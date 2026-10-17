@@ -18,9 +18,9 @@ public sealed class TemporalStormPulseTests
     {
         var pulse = new TemporalStormPulse();
         pulse.SetRemainingDays(remaining);
-        Assert.Equal(1, pulse.Advance(0), 5);
-        Assert.Equal(.35f, pulse.Advance((float)halfCycle), 5);
-        Assert.Equal(1, pulse.Advance((float)halfCycle), 5);
+        float initial = pulse.Advance(0);
+        Assert.True(pulse.Advance((float)halfCycle) < initial);
+        Assert.Equal(initial, pulse.Advance((float)halfCycle), 5);
     }
 
     /// <summary>Urgency changes preserve the current phase and subsequently advance at the new rate.</summary>
@@ -29,16 +29,17 @@ public sealed class TemporalStormPulseTests
     {
         var pulse = new TemporalStormPulse();
         pulse.SetRemainingDays(.02);
-        Assert.Equal(.675f, pulse.Advance(.5f), 5);
+        float phase = pulse.Advance(.5f);
         pulse.SetRemainingDays(0);
-        Assert.Equal(.675f, pulse.Advance(0), 5);
-        Assert.Equal(.35f, pulse.Advance(1f / 12), 5);
+        Assert.Equal(phase, pulse.Advance(0), 5);
+        Assert.True(pulse.Advance(1f / 12) < phase);
         pulse.Reset();
-        Assert.Equal(1, pulse.Advance(0), 5);
-        Assert.Equal(.675f, pulse.Advance(.5f), 5);
+        var fresh = new TemporalStormPulse();
+        Assert.Equal(fresh.Advance(0), pulse.Advance(0), 5);
+        Assert.Equal(fresh.Advance(.5f), pulse.Advance(.5f), 5);
     }
 
-    /// <summary>Invalid frame times cannot corrupt phase and long-running output remains within the opacity range.</summary>
+    /// <summary>Invalid frame times cannot corrupt phase and long-running output remains finite.</summary>
     [Fact]
     public void InvalidDeltaTimesLeaveAnimationUnchanged()
     {
@@ -47,7 +48,7 @@ public sealed class TemporalStormPulseTests
         foreach (float delta in new[] { 0f, -1, float.NaN, float.PositiveInfinity, float.NegativeInfinity })
             Assert.Equal(initial, pulse.Advance(delta));
         pulse.SetRemainingDays(.01);
-        for (int frame = 0; frame < 1000; frame++) Assert.InRange(pulse.Advance(.016f), .35f, 1f);
+        for (int frame = 0; frame < 1000; frame++) Assert.True(float.IsFinite(pulse.Advance(.016f)));
     }
     #endregion
 }

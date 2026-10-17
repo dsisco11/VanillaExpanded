@@ -12,12 +12,12 @@ namespace VanillaExpanded.Tests.Unit.ItemSlotIndicators.Rendering;
 public sealed class ItemSlotIndicatorDrawInputTests
 {
     #region Public API
-    /// <summary>Overlay scheduling follows the selected layer and transparent inputs remain rejected.</summary>
+    /// <summary>UI styles choose slot overlay depth while invisible supplied input remains rejected.</summary>
     [Theory]
     [InlineData(0, false)]
     [InlineData(1, true)]
     [InlineData(2, true)]
-    public void StyleInputSchedulesOverlaysAndRejectsTransparentInputs(int style, bool overlays)
+    public void StyleInput_SelectsSlotOverlayDepthAndRejectsInvisibleInput(int style, bool overlays)
     {
         Assert.True(ItemSlotIndicatorDrawInput.TryCreate(24, 24, 48, new(0.5f, new(0.2f, 0.3f, 0.4f, 0.35f)),
             out var input, (ItemSlotIndicatorRenderingStyle)style));
@@ -25,24 +25,45 @@ public sealed class ItemSlotIndicatorDrawInputTests
         Assert.False(ItemSlotIndicatorDrawInput.TryCreate(24, 24, 48, new(0.5f, Vector4.Zero),
             out _, (ItemSlotIndicatorRenderingStyle)style));
     }
-    /// <summary>Bounded inputs preserve sanitized resource fractions and reject unusable geometry.</summary>
+    /// <summary>Bounded mode maps levels while preserving the sanitized resource fraction and rejecting unusable geometry.</summary>
     [Theory]
-    [InlineData(0, 0)]
-    [InlineData(0.5f, 0.5f)]
-    [InlineData(1, 1)]
-    [InlineData(-1, 0)]
-    [InlineData(2, 1)]
-    [InlineData(float.NaN, 0)]
-    public void BoundedInputPreservesSanitizedResourceFraction(float resource, float expectedResource)
+    [InlineData(0, 0.2f, 0)]
+    [InlineData(0.5f, 0.5f, 0.5f)]
+    [InlineData(1, 0.8f, 1)]
+    [InlineData(-1, 0.2f, 0)]
+    [InlineData(2, 0.8f, 1)]
+    [InlineData(float.NaN, 0.2f, 0)]
+    public void BoundedFill_MapsLevelsWithoutChangingResourceMeaning(float resource, float expectedFill, float expectedResource)
     {
         var range = new ItemSlotIndicatorDrawRange(0.2f, 0.8f);
-        Assert.True(ItemSlotIndicatorDrawInput.TryCreate(24, 24, 48,
-            new(resource, Vector4.One, range), out var input));
+        Assert.True(ItemSlotIndicatorDrawInput.TryCreate(24, 24, 48, new(resource, Vector4.One, range), out var input));
+        Assert.Equal(expectedFill, input.Fill, 5);
         Assert.Equal(expectedResource, input.ResourceFill);
         Assert.Equal(range, input.DrawRange);
-        Assert.False(ItemSlotIndicatorDrawInput.TryCreate(24, 24, 0,
-            new(resource, Vector4.One, range), out _));
+        var matrix = new float[16];
+        input.RectangleMatrix(Mat4f.Create(), matrix);
+        Assert.Equal(input.SlotBounds.W * expectedFill / 2, matrix[5], 4);
+        Assert.False(ItemSlotIndicatorDrawInput.TryCreate(24, 24, 0, new(resource, Vector4.One, range), out _));
         Assert.False(ItemSlotIndicatorDrawInput.TryCreate(24, 24, 48, new(0, Vector4.One), out _));
+    }
+
+    /// <summary>Cues remain near the supplied range endpoints and vanish through the middle of the resource range.</summary>
+    [Theory]
+    [InlineData(0, true, 0.2f)]
+    [InlineData(0.075f, true, 0.2f)]
+    [InlineData(0.15f, false, 0)]
+    [InlineData(0.5f, false, 0)]
+    [InlineData(0.925f, true, 0.8f)]
+    [InlineData(1, true, 0.8f)]
+    public void BoundaryCue_LocalizesAtSuppliedRangeEndpoints(float resource, bool visible, float level)
+    {
+        Assert.True(ItemSlotIndicatorDrawInput.TryCreate(24, 24, 48,
+            new(resource, Vector4.One, new ItemSlotIndicatorDrawRange(0.2f, 0.8f)), out var input));
+        Assert.Equal(visible, input.TryCreateBoundaryCue(out var cue));
+        if (!visible) return;
+        Assert.Equal(input.SlotBounds.Y + input.SlotBounds.W * (1 - level), cue.SlotBounds.Y + cue.SlotBounds.W / 2, 4);
+        Assert.InRange(cue.SlotBounds.Y, input.SlotBounds.Y, input.SlotBounds.Y + input.SlotBounds.W - cue.SlotBounds.W);
+        Assert.Equal(1, cue.Fill);
     }
 
     /// <summary>Malformed ranges cannot enter rendering, and slot-edge cues remain inside the slot.</summary>
@@ -58,8 +79,7 @@ public sealed class ItemSlotIndicatorDrawInputTests
         {
             Assert.True(ItemSlotIndicatorDrawInput.TryCreate(24, 24, 48, new(fill, Vector4.One, new ItemSlotIndicatorDrawRange(0, 1)), out var input));
             Assert.True(input.TryCreateBoundaryCue(out var cue));
-            Assert.True(cue.SlotBounds.Y >= input.SlotBounds.Y);
-            Assert.True(cue.SlotBounds.Y + cue.SlotBounds.W <= input.SlotBounds.Y + input.SlotBounds.W);
+            Assert.InRange(cue.SlotBounds.Y, input.SlotBounds.Y, input.SlotBounds.Y + input.SlotBounds.W - cue.SlotBounds.W);
         }
     }
 
@@ -86,20 +106,27 @@ public sealed class ItemSlotIndicatorDrawInputTests
         Assert.False(ItemSlotIndicatorDrawInput.ValidMatrix(matrix));
     }
 
-    /// <summary>Rectangle composition does not mutate the caller's inherited matrix.</summary>
+    /// <summary>Rectangle composition matches the engine helper's transform without mutating its inherited matrix.</summary>
     [Theory]
     [InlineData(0.01f)]
     [InlineData(0.5f)]
     [InlineData(1f)]
-    public void RectangleTransformDoesNotMutateCallerMatrix(float fill)
+    public void RectangleTransform_MatchesEngineMatrixOperationsWithoutMutatingCaller(float fill)
     {
         Assert.True(ItemSlotIndicatorDrawInput.TryCreate(15.25, 24.75, 61.5f, new(fill, Vector4.One), out var input));
         var inherited = Mat4f.Create();
         Mat4f.Translate(inherited, inherited, [5, 7, -100]);
         Mat4f.RotateY(inherited, inherited, 0.1f);
         var original = (float[])inherited.Clone();
+        var expected = (float[])inherited.Clone();
+        var bounds = ItemSlotIndicatorRenderer.CalculateBounds(15.25, 24.75, 61.5f, fill);
+        Mat4f.Translate(expected, expected, [(int)bounds.X, (int)bounds.Y, 80]);
+        Mat4f.Scale(expected, expected, [bounds.Width, bounds.Height, 0]);
+        Mat4f.Scale(expected, expected, [0.5f, 0.5f, 0]);
+        Mat4f.Translate(expected, expected, [1, 1, 0]);
         var actual = new float[16];
         input.RectangleMatrix(inherited, actual);
+        for (int index = 0; index < 16; index++) Assert.Equal(expected[index], actual[index], 4);
         Assert.Equal(original, inherited);
     }
     #endregion
