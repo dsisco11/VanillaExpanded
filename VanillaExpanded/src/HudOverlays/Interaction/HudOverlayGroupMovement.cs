@@ -31,6 +31,7 @@ internal sealed class HudOverlayGroupMovement
     public PointF ContainerOrigin { get; set; }
     public PointF UnsnappedOrigin { get; private set; }
     public long DragRevision { get; private set; }
+    public IReadOnlyCollection<string> StartingMembers { get; private set; } = Array.Empty<string>();
 
     #region Public API
     #region Binding and permission
@@ -56,7 +57,10 @@ internal sealed class HudOverlayGroupMovement
     {
         if (Dragging || !Movable) return;
         if (!double.IsFinite(scale) || scale <= 0) throw new ArgumentOutOfRangeException(nameof(scale));
-        if (!containers.Begin(Id, IndicatorId, contentOrigin, MemberOrigins, ContainerOrigin)) return;
+        string source = Id;
+        var members = containers.Resolved.First(item => item.Id == source).Tree.Leaves().ToArray();
+        if (!containers.Begin(source, IndicatorId, contentOrigin, MemberOrigins, ContainerOrigin)) return;
+        StartingMembers = members;
         start = contentOrigin;
         UnsnappedOrigin = contentOrigin;
         pointerStart = pointer;

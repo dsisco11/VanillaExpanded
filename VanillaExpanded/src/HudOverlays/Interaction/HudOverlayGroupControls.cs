@@ -34,7 +34,7 @@ internal sealed class HudOverlayGroupControls : IDisposable
     private double scale = 1;
     private RectangleF content;
     private readonly Action reset;
-    private readonly Action<HudOverlayGroupMovement, PointF>? snap;
+    private readonly Func<HudOverlayGroupMovement, PointF, bool>? snap;
     public HudOverlayGroupMovement Movement => movement;
     public bool Active => !disposed && (movement.Dragging || pressed || titleBar.Menu.IsOpened);
     public ElementBounds Bounds => titleBar.Bounds;
@@ -44,7 +44,7 @@ internal sealed class HudOverlayGroupControls : IDisposable
     /// <summary>Owns actual native titlebar graphics/menu while borrowing the group's content and position state.</summary>
     public HudOverlayGroupControls(ICoreClientAPI api, GuiDialog host, HudOverlayGroupMovement movement,
         Func<HudOverlayRegistration, bool> drawable, Action relayout, Action? reset = null,
-        Action<HudOverlayGroupMovement, PointF>? snap = null)
+        Func<HudOverlayGroupMovement, PointF, bool>? snap = null)
     {
         this.api = api;
         this.host = host;
@@ -85,6 +85,20 @@ internal sealed class HudOverlayGroupControls : IDisposable
     }
     #endregion
     #region Pointer interaction
+    /// <summary>Starts the existing cancellable movement from drawable clipped content, respecting permissions and foreground input.</summary>
+    public void OnContentMouseDown(ICoreClientAPI api, MouseEvent args)
+    {
+        Refresh(false);
+        if (args.Handled || !visible || Active || !movement.Movable || args.Button != EnumMouseButton.Left) return;
+        // A multi-member group's body belongs to its individual controls; its titlebar remains the whole-group grip.
+        if (movement.IndicatorId == null && movement.HasMultipleMembers) return;
+        if (group?.Members.Any(member => (movement.IndicatorId == null || member.Registration.Id == movement.IndicatorId)
+            && drawable(member.Registration) && member.Clip.Contains(args.X, args.Y)) != true) return;
+        movement.Begin(ContentOrigin(), new PointF(args.X, args.Y), scale);
+        args.Handled = movement.Dragging;
+        if (args.Handled) relayout();
+    }
+
     /// <summary>Routes native dropdown selections and chrome presses separately from cancellable content dragging.</summary>
     public void OnMouseDown(ICoreClientAPI api, MouseEvent args)
     {
@@ -135,8 +149,12 @@ internal sealed class HudOverlayGroupControls : IDisposable
         {
             movement.Move(new PointF(args.X, args.Y));
             relayout();
-            snap?.Invoke(movement, new PointF(args.X, args.Y));
-            if (movement.Dragging) movement.Commit(movement.ContainerOrigin);
+            bool allowed = snap?.Invoke(movement, new PointF(args.X, args.Y)) ?? true;
+            if (movement.Dragging)
+            {
+                if (allowed) movement.Commit(movement.ContainerOrigin);
+                else movement.Cancel();
+            }
         }
         else if (pressed && !menuPress && handle.Contains(args.X, args.Y))
             titleBar.OnMouseUpOnElement(api, args);

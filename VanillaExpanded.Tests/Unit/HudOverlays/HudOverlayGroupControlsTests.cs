@@ -41,6 +41,58 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
     private bool grabbed, hidden, drawable = true;
 
     #region Public API
+    /// <summary>A raw overlapping release rolls back without persistence, while Shift explicitly permits the same placement.</summary>
+    [Theory]
+    [InlineData(false)] [InlineData(true)]
+    public void HostRejectsOverlappingDropUnlessShiftHeld(bool bypass)
+    {
+        using var fixture = new HudOverlayGroupControlsTests(GroupId);
+        fixture.ExerciseGroupingPreview(!bypass, bypass ? 7 : 6);
+    }
+    /// <summary>Dragging drawable indicator content uses the same persisted movement and cancellation boundary as its titlebar.</summary>
+    [Theory]
+    [InlineData(false)] [InlineData(true)]
+    public void IndicatorBodyDragCommitsOrCancels(bool cancel)
+    {
+        movement.SetMovable(true); gui.Invocations.Clear();
+        var clip = Assert.Single(layout.Members).Clip;
+        pointer = new PointF(clip.Left + clip.Width / 2, clip.Top + clip.Height / 2);
+        var down = Event(EnumMouseButton.Left); controls.OnContentMouseDown(api.Object, down);
+        Assert.True(down.Handled); Assert.True(movement.Dragging);
+        var delta = new PointF(70, 45); pointer = new PointF(pointer.X + delta.X, pointer.Y + delta.Y);
+        controls.OnMouseMove(api.Object, Event(EnumMouseButton.None));
+        Assert.Equal(new PointF(initial.X + delta.X, initial.Y + delta.Y), Origin());
+        if (cancel) Assert.True(controls.Cancel()); else controls.OnMouseUp(api.Object, Event(EnumMouseButton.Left));
+        Assert.False(movement.Dragging);
+        Assert.Equal(cancel ? initial : new PointF(initial.X + delta.X, initial.Y + delta.Y), Origin());
+        gui.Verify(value => value.SetDialogPosition(It.IsAny<string>(), It.IsAny<Vec2i>()), cancel ? Times.Never() : Times.Once());
+    }
+
+    /// <summary>Direct content interaction respects movement permission, input ownership, visibility and the actual drawable clip.</summary>
+    [Theory]
+    [InlineData("fixed")] [InlineData("captured")] [InlineData("hidden")] [InlineData("undrawable")]
+    [InlineData("foreground")] [InlineData("right")] [InlineData("outside")]
+    public void IneligibleIndicatorBodyDoesNotCapture(string cause)
+    {
+        movement.SetMovable(cause != "fixed"); gui.Invocations.Clear();
+        var clip = Assert.Single(layout.Members).Clip;
+        pointer = new PointF(clip.Left + clip.Width / 2, clip.Top + clip.Height / 2);
+        switch (cause)
+        {
+            case "captured": grabbed = true; break;
+            case "hidden": hidden = true; break;
+            case "undrawable": drawable = false; break;
+            case "outside": pointer = new PointF(clip.Right + 1, clip.Bottom + 1); break;
+            case "foreground":
+                var dialog = new Mock<GuiDialog>(api.Object); dialog.Setup(value => value.IsOpened()).Returns(true);
+                dialog.Setup(value => value.CaptureAllInputs()).Returns(true); opened.Add(dialog.Object); break;
+        }
+        var down = Event(cause == "right" ? EnumMouseButton.Right : EnumMouseButton.Left);
+        controls.OnContentMouseDown(api.Object, down);
+        Assert.False(down.Handled); Assert.False(movement.Dragging);
+        gui.Verify(value => value.SetDialogPosition(It.IsAny<string>(), It.IsAny<Vec2i>()), Times.Never);
+    }
+
     /// <summary>An active native grip survives disappearance of its source container during a grouping preview.</summary>
     [Theory]
     [InlineData(false, 1)] [InlineData(true, 1)] [InlineData(false, 1.5)] [InlineData(true, 1.5)]
@@ -203,8 +255,8 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
         overlay.Verify(value => value.Prepare(It.IsAny<HudOverlayPreparationContext>()), Times.Never);
     }    /// <summary>Native member drags survive host repacking into singleton controls and can either commit or cancel atomically.</summary>
     [Theory]
-    [InlineData(false)] [InlineData(true)]
-    public void IndividualDragSurvivesPreviewHostSynchronization(bool cancel)
+    [InlineData(false, false)] [InlineData(true, false)] [InlineData(false, true)] [InlineData(true, true)]
+    public void IndividualDragSurvivesPreviewHostSynchronization(bool cancel, bool body)
     {
         using var registry = new HudOverlayRegistry(); registry.RegisterGroup(group); registry.Register(registration);
         var second = new HudOverlayRegistration("test:second", Mock.Of<IHudOverlay>(), () => true, group.Id); registry.Register(second);
@@ -228,8 +280,14 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
             var owned = (Dictionary<string, HudOverlayGroupControls>)typeof(HudOverlayHost).GetField("groupControls", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(host)!;
             var control = owned["member:" + registration.Id]; var member = effective[group.Id].Members.Single(value => value.Registration.Id == registration.Id);
             pointer = new PointF((float)member.Bounds.renderX + 5, (float)member.Bounds.renderY + 5); control.Synchronize(effective);
-            pointer = new PointF((float)control.Bounds.renderX + 5, (float)control.Bounds.renderY + 5);
-            var down = Event(EnumMouseButton.Left); control.OnMouseDown(api.Object, down); Assert.True(down.Handled);
+            var down = Event(EnumMouseButton.Left);
+            if (body) host.OnMouseDown(down);
+            else
+            {
+                pointer = new PointF((float)control.Bounds.renderX + 5, (float)control.Bounds.renderY + 5);
+                down = Event(EnumMouseButton.Left); control.OnMouseDown(api.Object, down);
+            }
+            Assert.True(down.Handled);
             Assert.True(containers.Get(group.Id, registration.Id).Dragging);
             pointer = new PointF(pointer.X + 110, pointer.Y + 80); var move = Event(EnumMouseButton.None); host.OnMouseMove(move);
             Assert.True(move.Handled); Assert.Same(control, owned["member:" + registration.Id]); Assert.True(containers.Get(group.Id, registration.Id).Dragging);
@@ -585,8 +643,30 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
             pointer = new PointF(handle.X + handle.Width / 3, handle.Y + handle.Height / 2);
             var source = effective[group.Id].Root; var destination = effective[targetGroup.Id].Root;
             var delta = new PointF((float)(destination.renderX + destination.OuterWidth + targetGroup.Packing.Gap * RuntimeEnv.GUIScale - source.renderX), (float)(destination.renderY - source.renderY));
+            if (cancellation is 6 or 7)
+                delta = new PointF((float)(destination.renderX + 13 - source.renderX), (float)(destination.renderY + 13 - source.renderY));
             control.OnMouseDown(api.Object, Event(EnumMouseButton.Left)); Assert.True(containers.Get(group.Id).Dragging);
+            if (cancellation == 7) keys[(int)GlKeys.ShiftLeft] = true;
             gui.Invocations.Clear(); pointer = new PointF(pointer.X + delta.X, pointer.Y + delta.Y); host.OnMouseMove(Event(EnumMouseButton.None));
+            if (cancellation is 6 or 7)
+            {
+                Assert.Equal(2, containers.Resolved.Count);
+                var up = Event(EnumMouseButton.Left); host.OnMouseUp(up);
+                Assert.True(up.Handled); Assert.False(containers.Get(group.Id).Dragging);
+                Assert.Equal(2, containers.Resolved.Count);
+                var restored = effective[group.Id].Root;
+                if (cancel)
+                {
+                    Assert.Equal(initial.X, (float)restored.renderX); Assert.Equal(initial.Y, (float)restored.renderY);
+                    gui.Verify(value => value.SetDialogPosition(It.IsAny<string>(), It.IsAny<Vec2i>()), Times.Never);
+                }
+                else
+                {
+                    Assert.Equal(initial.X + delta.X, (float)restored.renderX); Assert.Equal(initial.Y + delta.Y, (float)restored.renderY);
+                    gui.Verify(value => value.SetDialogPosition(It.IsAny<string>(), It.IsAny<Vec2i>()), Times.AtLeastOnce);
+                }
+                return;
+            }
             Assert.Single(containers.Resolved); Assert.Same(control, owned["container:" + group.Id]); Assert.True(containers.Get(group.Id).Dragging);
             gui.Verify(value => value.SetDialogPosition(It.IsAny<string>(), It.IsAny<Vec2i>()), Times.Never);
             keys[(int)GlKeys.ShiftLeft] = true; host.OnMouseMove(Event(EnumMouseButton.None)); Assert.Equal(2, containers.Resolved.Count);

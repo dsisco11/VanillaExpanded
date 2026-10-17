@@ -35,6 +35,7 @@ internal sealed class HudOverlayNativeTitleBar : GuiElementDialogTitleBar
         AccessTools.FieldRefAccess<GuiElementListMenu, SelectionChangedDelegate>("onSelectionChanged");
 
     #region Public API
+    #region Permission and initialization
     /// <summary>Reuses native dropdown interaction but replaces its destructive position-reset callback.</summary>
     public void ConfigurePermission(Action<bool> change, Action reset)
     {
@@ -63,6 +64,8 @@ internal sealed class HudOverlayNativeTitleBar : GuiElementDialogTitleBar
         FirstRenderField(this) = true;
     }
 
+    #endregion
+    #region Composition and pointer geometry
     /// <summary>Initializes native menu resources, then paints a slimmer panel and centers its native glyphs and HUD text.</summary>
     public override void ComposeTextElements(Context context, ImageSurface surface)
     {
@@ -115,5 +118,6 @@ internal sealed class HudOverlayNativeTitleBar : GuiElementDialogTitleBar
         // Recompute the native scissor and scrollbar after moving the dropdown anchor.
         Menu.ComposeDynamicElements();
     }
+    #endregion
     #endregion
 }
