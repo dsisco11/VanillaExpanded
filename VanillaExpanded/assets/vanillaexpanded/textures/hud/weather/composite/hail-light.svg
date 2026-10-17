@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" preserveAspectRatio="xMidYMid meet">
+  <title>hail light</title>
+  <circle cx="17" cy="44" r="1.9" fill="#b7e6f5" stroke="#25343e" stroke-width="1"/>
+  <path d="M 13.2 43 L 11.9 45.3" fill="none" stroke="#25343e" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 13.2 43 L 11.9 45.3" fill="none" stroke="#b7e6f5" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="47" cy="44" r="1.9" fill="#b7e6f5" stroke="#25343e" stroke-width="1"/>
+  <path d="M 43.2 43 L 41.9 45.3" fill="none" stroke="#25343e" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 43.2 43 L 41.9 45.3" fill="none" stroke="#b7e6f5" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

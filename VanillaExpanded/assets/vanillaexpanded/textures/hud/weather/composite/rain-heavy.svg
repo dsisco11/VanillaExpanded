@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" preserveAspectRatio="xMidYMid meet">
+  <title>rain heavy</title>
+  <path d="M 13.5 37.3 L 10.5 42.7" fill="none" stroke="#25343e" stroke-width="3.15" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 13.5 37.3 L 10.5 42.7" fill="none" stroke="#86e3ef" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 23.5 37.3 L 20.5 42.7" fill="none" stroke="#25343e" stroke-width="3.15" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 23.5 37.3 L 20.5 42.7" fill="none" stroke="#86e3ef" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 43.5 37.3 L 40.5 42.7" fill="none" stroke="#25343e" stroke-width="3.15" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 43.5 37.3 L 40.5 42.7" fill="none" stroke="#86e3ef" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 53.5 37.3 L 50.5 42.7" fill="none" stroke="#25343e" stroke-width="3.15" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 53.5 37.3 L 50.5 42.7" fill="none" stroke="#86e3ef" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 18.5 46.3 L 15.5 51.7" fill="none" stroke="#25343e" stroke-width="3.15" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 18.5 46.3 L 15.5 51.7" fill="none" stroke="#86e3ef" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 48.5 46.3 L 45.5 51.7" fill="none" stroke="#25343e" stroke-width="3.15" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 48.5 46.3 L 45.5 51.7" fill="none" stroke="#86e3ef" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

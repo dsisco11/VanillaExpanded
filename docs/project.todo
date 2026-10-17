@@ -3,7 +3,6 @@
         ☐ Implement options to control environmental gauge style, styles can be `immersive` or `icon`, where `icon` uses a more minimal HUD icon representation like the other HUD indicators.
         ☐ Add style option to all hud indicators so they support atleast `icon` (current default) and `text` which displays a short 3-5 character name rather than the icon.
         ☐ Make it so that the HUD indicators can be moved around freely by the player, just like the base-game windows are.
-        ☐ Extrapolate weather icon paths into actual svg files from the `GenerateWeatherIcons` script, then delete the script.
 
     ## New Features:
         ☐ Add a "Todo List" feature which allows players to create their own ingame tasks and reminders.
