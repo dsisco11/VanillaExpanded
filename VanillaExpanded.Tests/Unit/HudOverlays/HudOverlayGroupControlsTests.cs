@@ -236,9 +236,9 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
         }
         finally { host.Dispose(); }
     }
-    /// <summary>Multi-member containers expose separate grips while retaining one feature registration per indicator.</summary>
+    /// <summary>Container chrome and body-only member controllers retain distinct movement identities.</summary>
     [Fact]
-    public void HostCreatesDistinctMemberAndContainerControlIdentities()
+    public void HostRetainsDistinctMemberAndContainerMovementIdentities()
     {
         using var registry = new HudOverlayRegistry(); registry.RegisterGroup(group); registry.Register(registration);
         var second = new HudOverlayRegistration("test:second", Mock.Of<IHudOverlay>(), () => true, group.Id); registry.Register(second);
@@ -253,10 +253,10 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
         containers.SetMovable(group.Id, true, initial); Assert.True(containers.Get(group.Id, registration.Id).Movable);
         containers.SetMovable(group.Id, false, initial); Assert.False(containers.Get(group.Id, registration.Id).Movable);
         overlay.Verify(value => value.Prepare(It.IsAny<HudOverlayPreparationContext>()), Times.Never);
-    }    /// <summary>Native member drags survive host repacking into singleton controls and can either commit or cancel atomically.</summary>
+    }    /// <summary>Member body drags survive host repacking into singleton controls and can either commit or cancel atomically.</summary>
     [Theory]
-    [InlineData(false, false)] [InlineData(true, false)] [InlineData(false, true)] [InlineData(true, true)]
-    public void IndividualDragSurvivesPreviewHostSynchronization(bool cancel, bool body)
+    [InlineData(false)] [InlineData(true)]
+    public void IndividualBodyDragSurvivesPreviewHostSynchronization(bool cancel)
     {
         using var registry = new HudOverlayRegistry(); registry.RegisterGroup(group); registry.Register(registration);
         var second = new HudOverlayRegistration("test:second", Mock.Of<IHudOverlay>(), () => true, group.Id); registry.Register(second);
@@ -281,12 +281,7 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
             var control = owned["member:" + registration.Id]; var member = effective[group.Id].Members.Single(value => value.Registration.Id == registration.Id);
             pointer = new PointF((float)member.Bounds.renderX + 5, (float)member.Bounds.renderY + 5); control.Synchronize(effective);
             var down = Event(EnumMouseButton.Left);
-            if (body) host.OnMouseDown(down);
-            else
-            {
-                pointer = new PointF((float)control.Bounds.renderX + 5, (float)control.Bounds.renderY + 5);
-                down = Event(EnumMouseButton.Left); control.OnMouseDown(api.Object, down);
-            }
+            host.OnMouseDown(down);
             Assert.True(down.Handled);
             Assert.True(containers.Get(group.Id, registration.Id).Dragging);
             pointer = new PointF(pointer.X + 110, pointer.Y + 80); var move = Event(EnumMouseButton.None); host.OnMouseMove(move);
@@ -298,22 +293,54 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
             overlay.Verify(value => value.Refresh(), Times.Never); overlay.Verify(value => value.Prepare(It.IsAny<HudOverlayPreparationContext>()), Times.Never);
         }
         finally { foreach (var item in effective.Values) item.Dispose(); }
-    }    /// <summary>Collapsed saved members do not make individual and whole-container handles occupy the same strip.</summary>
+    }
+
+    /// <summary>Body-only member controllers retain container permissions and foreground window input ownership.</summary>
+    [Theory]
+    [InlineData(false)] [InlineData(true)]
+    public void MemberBodyCannotBypassFixedGroupOrForegroundWindow(bool foreground)
+    {
+        using var registry = new HudOverlayRegistry(); registry.RegisterGroup(group); registry.Register(registration);
+        registry.Register(new HudOverlayRegistration("test:second", Mock.Of<IHudOverlay>(), () => true, group.Id));
+        var containers = new HudOverlayContainers(api.Object, registry);
+        containers.SetMovable(group.Id, foreground, initial);
+        if (foreground)
+        {
+            var dialog = new Mock<GuiDialog>(api.Object); dialog.Setup(value => value.IsOpened()).Returns(true);
+            dialog.Setup(value => value.CaptureAllInputs()).Returns(true); opened.Add(dialog.Object);
+        }
+        using var host = new HudOverlayHost(api.Object, registry, _ => true, (_, failure) => throw failure, containers: containers);
+        host.Synchronize(layouts);
+        var clip = Assert.Single(layout.Members).Clip;
+        pointer = new PointF(clip.Left + clip.Width / 2, clip.Top + clip.Height / 2);
+        var down = Event(EnumMouseButton.Left); host.OnMouseDown(down);
+        Assert.False(down.Handled); Assert.False(containers.Get(group.Id, registration.Id).Dragging);
+        Assert.Null(containers.ActiveContainer);
+    }
+    /// <summary>Collapsed members retain membership while only their container exposes prepared native chrome.</summary>
     [Fact]
-    public void SingleVisibleMemberRetainsSeparateGroupAndIndividualGrips()
+    public void OnlyContainerTitlebarIsPreparedAndMemberChromeCannotCapture()
     {
         using var registry = new HudOverlayRegistry(); registry.RegisterGroup(group); registry.Register(registration);
         registry.Register(new HudOverlayRegistration("test:hidden", Mock.Of<IHudOverlay>(), () => false, group.Id));
         var containers = new HudOverlayContainers(api.Object, registry); containers.SetMovable(group.Id, true, initial);
         using var host = new HudOverlayHost(api.Object, registry, value => value.Id == registration.Id, (_, failure) => throw failure, containers: containers);
-        host.Synchronize(layouts); pointer = new PointF(initial.X + 5, initial.Y + 5); host.Synchronize(layouts);
+        var clip = Assert.Single(layout.Members).Clip;
+        pointer = new PointF(clip.Left + clip.Width / 2, clip.Top + clip.Height / 2); host.Synchronize(layouts);
         var owned = (Dictionary<string, HudOverlayGroupControls>)typeof(HudOverlayHost).GetField("groupControls", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(host)!;
         var groupControl = owned["container:" + group.Id]; var memberControl = owned["member:" + registration.Id];
-        Assert.False(new RectangleF((float)groupControl.Bounds.renderX, (float)groupControl.Bounds.renderY, (float)groupControl.Bounds.OuterWidth, (float)groupControl.Bounds.OuterHeight)
-            .IntersectsWith(new RectangleF((float)memberControl.Bounds.renderX, (float)memberControl.Bounds.renderY, (float)memberControl.Bounds.OuterWidth, (float)memberControl.Bounds.OuterHeight)));
+        var composerField = typeof(HudOverlayGroupControls).GetField("composer", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        Assert.True(((GuiComposer)composerField.GetValue(groupControl)!).Composed);
+        Assert.False(((GuiComposer)composerField.GetValue(memberControl)!).Composed);
+        // Even a direct call bypassing host routing cannot revive a member's absent native grip or dropdown.
+        pointer = new PointF((float)groupControl.Bounds.renderX + 5, (float)groupControl.Bounds.renderY + 5);
+        var down = Event(EnumMouseButton.Left); memberControl.OnMouseDown(api.Object, down);
+        Assert.False(down.Handled); Assert.False(containers.Get(group.Id, registration.Id).Dragging);
         var movement = containers.Get(group.Id); movement.Begin(initial, PointF.Empty, 1); movement.Move(new PointF(30, 40)); movement.Commit(new PointF(initial.X + 30, initial.Y + 40));
         Assert.Equal(new[] { "test:hidden", registration.Id }, Assert.Single(containers.Resolved).Tree.Leaves());
-    }    /// <summary>Pointer activity away from controls remains untouched; hover rendering does not persist or prepare content.</summary>
+    }
+
+    /// <summary>Pointer activity away from controls remains untouched; hover rendering does not persist or prepare content.</summary>
     [Fact]
     public void OrdinaryInputAndHoverArePassive()
     {

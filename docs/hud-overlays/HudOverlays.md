@@ -2,7 +2,7 @@
 
 The HUD overlay system positions and updates passive displays on the client. An overlay supplies content and a measured footprint; the runtime handles anchoring, group layout, refresh scheduling, GUI scaling, and world-session transitions.
 
-HUD containers use native hover titlebars while the cursor is free. Hover visible content, choose Movable from the native dropdown, and drag the container title area to move its members together. Dragging visible indicator content moves that individual through the same cancellable transaction; multi-member groups detach that indicator. Multi-member containers expose a separate indicator titlebar for dragging an individual away; remaining members close the gap. Fixed locks both container dragging and individual detachment without changing position or membership. The close icon dismisses controls without disabling indicators. Reset HUD layout restores every built-in group and position, including retained overrides for unavailable integrations. No per-item or per-group reset is provided.
+HUD containers use native hover titlebars while the cursor is free. Hover visible content, choose Movable from the native dropdown, and drag the container title area to move its members together. Dragging visible indicator content moves that individual through the same cancellable transaction; multi-member groups detach that indicator. Individual members expose no titlebar or dropdown; drag their visible content to detach them, and remaining members close the gap. Container titlebars provide the group menu and movement, including a singleton container's permission/reset access. Fixed locks both container dragging and individual detachment without changing position or membership. The close icon dismisses controls without disabling indicators. Reset HUD layout restores every built-in group and position, including retained overrides for unavailable integrations. No per-item or per-group reset is provided.
 
 Effective membership is separate from feature registrations. Default templates, independent indicators, and saved custom containers share native bounds, clipping, and scheduler availability. Mixed arrangements use ordered horizontal/vertical pairs with start/center/end alignment. Size changes preserve relationships and container origin subject to screen clamping. Hidden members collapse after their exit transition releases the footprint, retaining their saved relationships for reappearance.
 
@@ -51,7 +51,7 @@ flowchart TB
     end
 
     subgraph Interaction["Native compositions and controls"]
-        Host --> Controls["HudOverlayGroupControls<br/>group and individual grips"]
+        Host --> Controls["HudOverlayGroupControls<br/>container titlebars and member body targets"]
         Host --> Snapping["HudOverlaySnapping<br/>measured candidates and preview feedback"]
         Snapping -. "physical-pixel candidates" .-> SnapGeometry["HudSnapGeometry"]
         Snapping -. "insertion and merge trees" .-> Grouping["HudGroupingResolver"]
