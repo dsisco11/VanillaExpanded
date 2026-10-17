@@ -29,6 +29,7 @@ internal sealed class CalendarDateSystem : ModSystem, ILiveConfigurable
         this.api = api;
         hud = api.ModLoader.GetModSystem<HudOverlaySystem>();
         overlay = new CalendarDateOverlay();
+        overlay.SetStyle(VanillaExpandedModSystem.Config.CalendarDateGaugeStyle);
         overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays && VanillaExpandedModSystem.Config.EnableCalendarDateOverlay);
         try
         {
@@ -44,6 +45,7 @@ internal sealed class CalendarDateSystem : ModSystem, ILiveConfigurable
     public void OnConfigReloaded(ICoreAPI api)
     {
         if (disposed || !ReferenceEquals(this.api, api) || overlay == null) return;
+        overlay.SetStyle(VanillaExpandedModSystem.Config.CalendarDateGaugeStyle);
         overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays && VanillaExpandedModSystem.Config.EnableCalendarDateOverlay);
         // Cleanup must also occur while global visibility suppresses normal selector observation.
         hud?.Session?.Scheduler?.Invalidate(OverlayId);

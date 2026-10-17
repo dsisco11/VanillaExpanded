@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering;
 using Vintagestory.API.Client;
@@ -14,7 +15,12 @@ internal sealed class EnvironmentalTemperatureOverlay : IHudOverlay, IHudOverlay
     private ICoreClientAPI? api;
     private bool enabled = true, disposed;
 
+    private bool styleChanged;
+
     #region Public API
+    /// <summary>Retains a style change until the scheduler prepares and measures the new presentation.</summary>
+    public void SetStyle(EnvironmentalGaugeStyle style) => styleChanged |= presentation.SetStyle(style);
+
     #region Lifecycle and configuration
     /// <summary>Gets the last valid local temperature in degrees Celsius.</summary>
     internal float? Temperature { get; private set; }
@@ -54,7 +60,8 @@ internal sealed class EnvironmentalTemperatureOverlay : IHudOverlay, IHudOverlay
         if (!IsApplicable()) return HudOverlayChange.None;
         var climate = api!.World.BlockAccessor.GetClimateAt(api.World.Player.Entity.Pos.AsBlockPos, EnumGetClimateMode.NowValues);
         float? next = climate != null && float.IsFinite(climate.Temperature) ? climate.Temperature : null;
-        if (next == Temperature) return HudOverlayChange.None;
+        if (next == Temperature && !styleChanged) return HudOverlayChange.None;
+        styleChanged = false;
         Temperature = next;
         if (next.HasValue) presentation.SetContent(next.Value);
         else presentation.Hide();

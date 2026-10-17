@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering;
 using Vintagestory.API.Client;
@@ -19,6 +20,8 @@ internal sealed class ApproximateTimePresentation : IDisposable
     private bool faceDirty = true;
     private ApproximateTimePeriod? period;
     private float rotation;
+    private readonly HudOverlayIconReading compact;
+    private EnvironmentalGaugeStyle style = EnvironmentalGaugeStyle.Immersive;
 
     #region Public API
     /// <summary>Controls visibility and retained resources during transitions.</summary>
@@ -30,12 +33,25 @@ internal sealed class ApproximateTimePresentation : IDisposable
     /// <summary>Uses borrowed artwork, an owned face, and a stateless pointer renderer with injectable headless dependencies.</summary>
     public ApproximateTimePresentation(Func<HudOverlayPreparationContext, LoadedTexture[]>? load = null,
         IApproximateTimeDialRenderer? dial = null,
-        Func<HudOverlayPreparationContext, ApproximateTimeDayPhases, LoadedTexture>? createFace = null)
+        Func<HudOverlayPreparationContext, ApproximateTimeDayPhases, LoadedTexture>? createFace = null,
+        HudOverlayIconReading? compact = null)
     {
         this.load = load ?? (preparation => WorkshopGaugeArtwork.Load(preparation,
             RadialGaugeLayout.Backing, "clock/layer-1", RadialGaugeLayout.Glass));
         this.dial = dial ?? new ApproximateTimeDialRenderer();
         this.createFace = createFace ?? ApproximateTimeFaceArtwork.Create;
+        this.compact = compact ?? new();
+    }
+
+    /// <summary>Changes presentation without discarding the synchronized time estimate or solar distribution.</summary>
+    public bool SetStyle(EnvironmentalGaugeStyle value)
+    {
+        EnvironmentalGaugeStyle next = value == EnvironmentalGaugeStyle.Icon ? value : EnvironmentalGaugeStyle.Immersive;
+        if (next == style) return false;
+        compact.Reset();
+        icons = null; face?.Dispose(); face = null; faceDirty = true;
+        context = null; Size = SizeF.Empty; style = next;
+        return true;
     }
 
     /// <summary>Updates the drifting pointer independently of the true daily solar distribution.</summary>
@@ -54,6 +70,12 @@ internal sealed class ApproximateTimePresentation : IDisposable
     public void Prepare(HudOverlayPreparationContext preparation)
     {
         if (!period.HasValue) return;
+        if (style == EnvironmentalGaugeStyle.Icon)
+        {
+            compact.Prepare(preparation, "textures/hud/approximate-time/" + period.Value.ToString().ToLowerInvariant() + ".png");
+            context = preparation; Size = compact.Size; Visibility.Show();
+            return;
+        }
         bool apiChanged = !ReferenceEquals(context?.Api, preparation.Api);
         if (icons == null || apiChanged) icons = load(preparation);
         if (face == null || faceDirty || apiChanged)
@@ -71,7 +93,9 @@ internal sealed class ApproximateTimePresentation : IDisposable
     /// <summary>Draws the backing, colored face, rotated pointer, and glass in sandwich order.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds)
     {
-        if (!period.HasValue || icons == null || context == null || face == null) return;
+        if (!period.HasValue || context == null) return;
+        if (style == EnvironmentalGaugeStyle.Icon) { compact.Draw(renderer, bounds); return; }
+        if (icons == null || face == null) return;
         float pixels = (float)(HudOverlaySizes.Clock * context.GuiScale);
         var screen = new RectangleF((float)bounds.renderX, (float)(bounds.renderY + (bounds.OuterHeight - pixels) / 2), pixels, pixels);
         renderer.RenderTexture(icons[0].TextureId, screen.X, screen.Y, pixels, pixels, 50, HudOverlayDrawOpacity.Tint);
@@ -88,6 +112,7 @@ internal sealed class ApproximateTimePresentation : IDisposable
     public void Reset()
     {
         Visibility.Reset();
+        compact.Reset();
         icons = null;
         face?.Dispose(); face = null;
         context = null;
@@ -97,7 +122,11 @@ internal sealed class ApproximateTimePresentation : IDisposable
         Size = SizeF.Empty;
     }
     /// <summary>Releases presentation ownership on final removal.</summary>
-    public void Dispose() => Reset();
+    public void Dispose()
+    {
+        Reset();
+        compact.Dispose();
+    }
     #endregion
     #endregion
 }

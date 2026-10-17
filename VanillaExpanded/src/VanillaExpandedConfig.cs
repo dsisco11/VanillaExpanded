@@ -104,11 +104,35 @@ public class VanillaExpandedConfig
     /// <summary>Shows a personal time estimate calibrated by daylight exposure.</summary>
     public bool EnableApproximateTimeOverlay { get; set; } = true;
 
+    private EnvironmentalGaugeStyle approximateTimeGaugeStyle = EnvironmentalGaugeStyle.Immersive;
+    /// <summary>Selects the copper time instrument or a compact estimated-day-period icon.</summary>
+    public EnvironmentalGaugeStyle ApproximateTimeGaugeStyle
+    {
+        get => approximateTimeGaugeStyle;
+        set => approximateTimeGaugeStyle = value == EnvironmentalGaugeStyle.Icon ? value : EnvironmentalGaugeStyle.Immersive;
+    }
+
     /// <summary>Shows the current local environmental temperature beside weather and time.</summary>
     public bool EnableEnvironmentalTemperatureOverlay { get; set; } = true;
 
+    private EnvironmentalGaugeStyle environmentalTemperatureGaugeStyle = EnvironmentalGaugeStyle.Immersive;
+    /// <summary>Selects the copper thermometer or a compact icon and current climate reading.</summary>
+    public EnvironmentalGaugeStyle EnvironmentalTemperatureGaugeStyle
+    {
+        get => environmentalTemperatureGaugeStyle;
+        set => environmentalTemperatureGaugeStyle = value == EnvironmentalGaugeStyle.Icon ? value : EnvironmentalGaugeStyle.Immersive;
+    }
+
     /// <summary>Shows the abbreviated native month and day in an independent mechanical calendar.</summary>
     public bool EnableCalendarDateOverlay { get; set; } = true;
+
+    private EnvironmentalGaugeStyle calendarDateGaugeStyle = EnvironmentalGaugeStyle.Immersive;
+    /// <summary>Selects the mechanical date instrument or a compact calendar icon and month/day.</summary>
+    public EnvironmentalGaugeStyle CalendarDateGaugeStyle
+    {
+        get => calendarDateGaugeStyle;
+        set => calendarDateGaugeStyle = value == EnvironmentalGaugeStyle.Icon ? value : EnvironmentalGaugeStyle.Immersive;
+    }
 
     /// <summary>Shows texture icons for active local precipitation and weather fog.</summary>
     public bool EnableWeatherConditionsOverlay { get; set; } = true;
