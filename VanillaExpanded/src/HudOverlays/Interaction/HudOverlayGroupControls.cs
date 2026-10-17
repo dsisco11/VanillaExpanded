@@ -25,6 +25,7 @@ internal sealed class HudOverlayGroupControls : IDisposable
     private readonly HudOverlayNativeTitleBar titleBar;
     private readonly HudOverlayGroupHighlight highlight;
     private HudOverlayGroupLayout? group;
+    private string? caption;
     private double preparedScale;
     private bool visible, pressed, menuPress, disposed;
     private RectangleF handle;
@@ -301,10 +302,17 @@ internal sealed class HudOverlayGroupControls : IDisposable
         if (visible)
         {
             titleBar.SynchronizePermission(movement.Movable);
-            if (!composer.Composed || preparedScale != scale)
+            var indicator = !movement.HasMultipleMembers ? group!.Members.First().Registration : null;
+            string key = indicator == null ? "vanillaexpanded:hud-group-" + movement.Id : indicator.HoverLabelKey ?? indicator.Id;
+            string title = Lang.HasTranslation(key) ? Lang.Get(key) : indicator?.Id ?? Lang.Get("vanillaexpanded:hud-custom-group");
+            // Retain the current label during transient snap identities rather than rebuilding chrome on each preview.
+            if (movement.Dragging && caption != null) title = caption;
+            if (!composer.Composed || preparedScale != scale || caption != title)
             {
+                titleBar.Text = title;
                 if (composer.Composed) composer.ReCompose(); else composer.Compose(false);
                 preparedScale = scale;
+                caption = title;
                 // Native composition restores its parent from settings. Reapply the transient control origin;
                 // successful drops still persist the content origin, never this above/below titlebar origin.
                 PositionComposition(viewport);
