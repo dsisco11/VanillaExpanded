@@ -22,6 +22,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     private readonly HudOverlayContainers? containers;
     private readonly HudOverlaySnapping? snapping;
     private readonly HudOverlayGroupHighlight snapHighlight;
+    private readonly HudOverlayEditPreviews? editPreviews;
     private bool updatingSnap;
     private HudOverlayGroupControls? ActiveControls => groupControls.Values.FirstOrDefault(control => control.Active);
     private readonly Dictionary<string, HudOverlayGroupLayout> groups = new(StringComparer.Ordinal);
@@ -38,7 +39,8 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     /// <summary>Borrows registry and prepared-state decisions; owns only composers allocated for this session.</summary>
     public HudOverlayHost(ICoreClientAPI api, HudOverlayRegistry registry, Func<HudOverlayRegistration, bool> isDrawable,
         Action<HudOverlayRegistration, Exception> failure, Action<Exception>? boundaryFailure = null,
-        IHudOverlayBackdropBatch? backdropBatch = null, HudOverlayContainers? containers = null) : base(api)
+        IHudOverlayBackdropBatch? backdropBatch = null, HudOverlayContainers? containers = null,
+        HudOverlayEditPreviews? editPreviews = null) : base(api)
     {
         this.registry = registry;
         this.isDrawable = isDrawable;
@@ -47,6 +49,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         hoverLabels = new HudOverlayHoverLabels(api);
         this.backdropBatch = backdropBatch ?? api.ModLoader?.GetModSystem<HudOverlaySystem>()?.Backdrop;
         this.containers = containers;
+        this.editPreviews = editPreviews;
         snapping = containers == null ? null : new HudOverlaySnapping(containers);
         snapHighlight = new HudOverlayGroupHighlight(api);
 
@@ -207,7 +210,9 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
                     snapHighlight.Draw(snapping.Destination, true, false);
                 foreach (var pair in Composers) if (visibleGroups.Contains(pair.Key) && groups[pair.Key].Available) pair.Value.Render(deltaTime);
                 hoverLabels.Draw(groups.Where(pair => visibleGroups.Contains(pair.Key)).Select(pair => pair.Value),
-                    registration => active.Contains(registration) && isDrawable(registration), deltaTime);
+                    registration => active.Contains(registration) && isDrawable(registration), deltaTime,
+                    registration => editPreviews?.IsDrawable(registration) == true ? editPreviews.Label(registration)
+                        : Vintagestory.API.Config.Lang.Get(registration.HoverLabelKey!));
                 foreach (var control in groupControls.Values.ToArray()) control.Draw(deltaTime);
                 if (ActiveControls?.Movement.Dragging == true && snapping?.Selected is { } selected)
                 {
@@ -308,6 +313,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
             foreach (var member in group.Members)
             {
                 if (!active.Contains(member.Registration) || !isDrawable(member.Registration)
+                    || editPreviews?.IsDrawable(member.Registration) == true
                     || member.Clip.Width <= 0 || member.Clip.Height <= 0
                     || member.Registration.Overlay is not IHudOverlayBackdropProvider provider) continue;
                 using var opacity = new HudOverlayDrawOpacity(member.Registration.Overlay);
@@ -329,10 +335,22 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
             clip.absInnerWidth = member.Clip.Width;
             clip.absInnerHeight = member.Clip.Height;
             clip.Initialized = true;
-            using var opacity = new HudOverlayDrawOpacity(member.Registration.Overlay);
+            bool preview = editPreviews?.IsDrawable(member.Registration) == true;
             capi.Render.PushScissor(clip, true);
-            try { member.Registration.Overlay.Draw(capi.Render, member.Bounds, member.Clip, deltaTime); }
-            catch (Exception error) { failure(member.Registration, error); }
+            try
+            {
+                if (preview) editPreviews!.Draw(member.Registration, capi.Render, member.Bounds);
+                else
+                {
+                    using var opacity = new HudOverlayDrawOpacity(member.Registration.Overlay);
+                    member.Registration.Overlay.Draw(capi.Render, member.Bounds, member.Clip, deltaTime);
+                }
+            }
+            catch (Exception error)
+            {
+                // Placeholder rendering is host-owned; its failure must not mark a healthy feature sample as failed.
+                if (preview) boundaryFailure?.Invoke(error); else failure(member.Registration, error);
+            }
             finally { capi.Render.PopScissor(); }
         }
     }

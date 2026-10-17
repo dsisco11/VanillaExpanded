@@ -3,6 +3,7 @@
   "mappingkey-icon": "Icon",
   "mappingkey-text": "Text",
   "hud-reset-layout": "Reset HUD layout",
+  "hud-edit-hidden": "{0} (hidden)",
   "hud-custom-group": "HUD group",
   "hud-group-world-status": "World status",
   "hud-group-player-status": "Player status",
