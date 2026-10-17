@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using VanillaExpanded.HudOverlays.Anchoring;
 using VanillaExpanded.HudOverlays.Layout;
+using VanillaExpanded.HudOverlays.Interaction;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering;
 using VanillaExpanded.HudOverlays.Updating;
@@ -25,6 +26,7 @@ internal sealed class HudOverlaySession : IDisposable
     private object? playerEntity;
     private IHudOverlayHost? host;
     private HudOverlayAnchorContext? anchors;
+    private HudOverlayGroupMovement? movement;
     private bool disposed;
     public HudOverlayScheduler? Scheduler { get; private set; }
 
@@ -41,7 +43,7 @@ internal sealed class HudOverlaySession : IDisposable
         this.clock = clock ?? (() => Environment.TickCount64);
         this.enabled = enabled ?? (() => true);
         this.createHost = createHost ?? ((scheduler, _) => new HudOverlayHost(api, registry,
-            scheduler.IsDrawable, scheduler.ReportDrawFailure, scheduler.ReportBoundaryFailure));
+            scheduler.IsDrawable, scheduler.ReportDrawFailure, scheduler.ReportBoundaryFailure, movement: movement));
     }
 
     /// <summary>Starts one ready-world heartbeat, including a cheap wait when the player is not available yet.</summary>
@@ -109,6 +111,7 @@ internal sealed class HudOverlaySession : IDisposable
             try
             {
                 anchors = new HudOverlayAnchorContext(api);
+                movement = new HudOverlayGroupMovement(api.Gui);
                 host = createHost(Scheduler, anchors);
                 host.BeforeRender = BeforeRender;
             }
@@ -145,6 +148,8 @@ internal sealed class HudOverlaySession : IDisposable
             TryCleanup(() => oldHost.TryClose(), ref failures);
             TryCleanup(oldHost.Dispose, ref failures);
         }
+        movement?.Cancel();
+        movement = null;
         foreach (var layout in layouts.Values) TryCleanup(layout.Dispose, ref failures);
         layouts.Clear();
         TryCleanup(registry.EndSession, ref failures);
@@ -170,7 +175,8 @@ internal sealed class HudOverlaySession : IDisposable
         foreach (var group in registry.GetGroups())
         {
             if (!layouts.TryGetValue(group.Id, out var layout)) layouts[group.Id] = layout = new HudOverlayGroupLayout();
-            layout.Apply(anchors, group, Scheduler.GetMembers(group.Id));
+            layout.Apply(anchors, group, Scheduler.GetMembers(group.Id),
+                group.Id == HudOverlayGroupMovement.GroupId ? movement?.Position : null);
         }
         host.Synchronize(layouts);
         bool drawable = false;
