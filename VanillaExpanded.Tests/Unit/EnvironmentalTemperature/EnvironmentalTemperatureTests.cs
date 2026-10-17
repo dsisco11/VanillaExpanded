@@ -114,16 +114,22 @@ public sealed class EnvironmentalTemperatureTests : IDisposable
         var renderer = new Mock<IRenderAPI>();
         presentation.Draw(renderer.Object, Bounds(10, 20, pixels, pixels), new(10, 20, (float)pixels, (float)pixels));
         var layers = renderer.Invocations.Where(call => call.Method.Name == "RenderTexture").ToArray();
-        Assert.Equal(new[] { 1, 0, 3, 4, 5, 2 }, layers.Select(call => (int)call.Arguments[0]));
-        foreach (var layer in layers.Where(call => (int)call.Arguments[0] <= 2))
+        Assert.Equal(new[] { 1, 2, 0, 4, 5, 6, 3, 7 }, layers.Select(call => (int)call.Arguments[0]));
+        foreach (var layer in layers.Where(call => (int)call.Arguments[0] == 1 || (int)call.Arguments[0] == 7))
         {
             Assert.Equal(10d, layer.Arguments[1]); Assert.Equal(20d, layer.Arguments[2]);
             Assert.Equal(pixels, layer.Arguments[3]); Assert.Equal(pixels, layer.Arguments[4]);
         }
-        Assert.Equal(53f, layers.Last().Arguments[5]);
+        var mechanism = EnvironmentalTemperatureGaugeLayout.MechanismBounds(new(10, 20, (float)pixels, (float)pixels));
+        foreach (var layer in layers.Where(call => (int)call.Arguments[0] is 0 or 2 or 3))
+        {
+            Assert.Equal((double)mechanism.X, layer.Arguments[1]); Assert.Equal((double)mechanism.Y, layer.Arguments[2]);
+            Assert.Equal((double)mechanism.Width, layer.Arguments[3]); Assert.Equal((double)mechanism.Height, layer.Arguments[4]);
+        }
+        Assert.Equal(54f, layers.Last().Arguments[5]);
         var number = Assert.Single(renderer.Invocations, call => call.Method.Name == "Render2DTexturePremultipliedAlpha" && (int)call.Arguments[0] == 20);
         Assert.Equal(10 + pixels / 2, (double)number.Arguments[1] + (double)number.Arguments[3] / 2, 4);
-        Assert.Equal(20 + pixels / 2, (double)number.Arguments[2] + (double)number.Arguments[4] / 2, 4);
+        Assert.Equal(20 + pixels * 250 / 512, (double)number.Arguments[2] + (double)number.Arguments[4] / 2, 4);
         Assert.Equal(14 * scale, (double)number.Arguments[4]);
     }
 
@@ -160,7 +166,7 @@ public sealed class EnvironmentalTemperatureTests : IDisposable
 
     #region Private
     /// <summary>Provides borrowed backing, cover, and scale labels without a graphics context.</summary>
-    private static LoadedTexture[] LoadTestTextures(HudOverlayPreparationContext context) => Enumerable.Range(1, 5)
+    private static LoadedTexture[] LoadTestTextures(HudOverlayPreparationContext context) => Enumerable.Range(1, 7)
         .Select(id => new LoadedTexture(context.Api) { TextureId = id, IgnoreUndisposed = true }).ToArray();
 
     /// <summary>Provides a headless alpha-mask resource with transparent source pixels and no native filtering.</summary>

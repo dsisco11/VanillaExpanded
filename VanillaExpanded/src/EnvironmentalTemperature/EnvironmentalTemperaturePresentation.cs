@@ -35,8 +35,9 @@ internal sealed class EnvironmentalTemperaturePresentation : IDisposable
         EnvironmentalTemperatureLiquidMask? liquid = null)
     {
         this.text = text ?? new();
-        this.loadTextures = loadTextures ?? (preparation => WorkshopGaugeArtwork.Load(preparation, "thermometer",
-            "layer-0", "layer-2", "label-minus40", "label-zero", "label-plus60"));
+        this.loadTextures = loadTextures ?? (preparation => WorkshopGaugeArtwork.Load(preparation,
+            RadialGaugeLayout.Backing, "thermometer/empty-glass", "thermometer/clamps",
+            "thermometer/label-minus40", "thermometer/label-zero", "thermometer/label-plus60", RadialGaugeLayout.Glass));
         this.createTicks = createTicks ?? EnvironmentalTemperatureScaleArtwork.Create;
         this.liquid = liquid ?? new();
     }
@@ -69,21 +70,25 @@ internal sealed class EnvironmentalTemperaturePresentation : IDisposable
         if (context == null || textures == null || ticks == null) return;
         float width = (float)(HudOverlaySizes.EnvironmentalThermometer * context.GuiScale), height = width;
         var screen = new RectangleF((float)bounds.renderX, (float)(bounds.renderY + (bounds.OuterHeight - height) / 2), width, height);
+        var mechanism = EnvironmentalTemperatureGaugeLayout.MechanismBounds(screen);
         renderer.RenderTexture(textures[0].TextureId, screen.X, screen.Y, width, height, 50, HudOverlayDrawOpacity.Tint);
-        liquid.Draw(renderer, screen);
-        renderer.Render2DTexturePremultipliedAlpha(ticks.TextureId, screen.X, screen.Y, width, height, 52, HudOverlayDrawOpacity.PremultipliedTint);
+        // All thermometer parts use one inset transform; only the shared housing and glass use the full canvas.
+        renderer.RenderTexture(textures[1].TextureId, mechanism.X, mechanism.Y, mechanism.Width, mechanism.Height, 50.5f, HudOverlayDrawOpacity.Tint);
+        liquid.Draw(renderer, mechanism);
+        renderer.Render2DTexturePremultipliedAlpha(ticks.TextureId, mechanism.X, mechanism.Y, mechanism.Width, mechanism.Height, 52, HudOverlayDrawOpacity.PremultipliedTint);
         for (int index = 0; index < 3; index++)
         {
             float degree = index == 0 ? -40 : index == 1 ? 0 : 60;
             float labelWidth = index == 1 ? 64 : 128;
             var center = EnvironmentalTemperatureGaugeLayout.Position(degree, 128);
-            var label = WorkshopGaugeArtwork.Map(screen, EnvironmentalTemperatureGaugeLayout.Canvas,
+            var label = WorkshopGaugeArtwork.Map(mechanism, EnvironmentalTemperatureGaugeLayout.Canvas,
                 new RectangleF(center.X - labelWidth / 2, center.Y - 32, labelWidth, 64));
-            renderer.RenderTexture(textures[index + 2].TextureId, label.X, label.Y, label.Width, label.Height, 52, HudOverlayDrawOpacity.Tint);
+            renderer.RenderTexture(textures[index + 3].TextureId, label.X, label.Y, label.Width, label.Height, 52, HudOverlayDrawOpacity.Tint);
         }
-        text.Draw(renderer, WorkshopGaugeArtwork.Map(screen, EnvironmentalTemperatureGaugeLayout.Canvas,
+        text.Draw(renderer, WorkshopGaugeArtwork.Map(mechanism, EnvironmentalTemperatureGaugeLayout.Canvas,
             EnvironmentalTemperatureGaugeLayout.Reading), 52);
-        renderer.RenderTexture(textures[1].TextureId, screen.X, screen.Y, width, height, 53, HudOverlayDrawOpacity.Tint);
+        renderer.RenderTexture(textures[2].TextureId, mechanism.X, mechanism.Y, mechanism.Width, mechanism.Height, 53, HudOverlayDrawOpacity.Tint);
+        renderer.RenderTexture(textures[6].TextureId, screen.X, screen.Y, width, height, 54, HudOverlayDrawOpacity.Tint);
     }
 
     #endregion
