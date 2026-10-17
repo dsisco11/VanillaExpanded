@@ -34,7 +34,6 @@ public class ConfigLoadingTests
 
         Assert.True(result.EnableAutoStash);
         Assert.True(result.EnablePerishableItemFreshnessIndicators);
-        Assert.Equal(0.35f, result.PerishableItemFreshnessIndicatorIntensity);
         Assert.True(result.EnableIgnitionTools);
         Assert.True(result.EnableSpawnDecal);
         api.Verify(

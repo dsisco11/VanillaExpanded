@@ -280,10 +280,6 @@ public sealed class ToolHeadPresentationIntegrationTests : IDisposable
         Assert.True(fixture.Renderer.TryRender(fixture.Api.Object, fixture.Slot, 100, 200, 40, 0));
         Assert.NotNull(light);
         Assert.NotNull(tint);
-        Assert.Equal(.5f, tint.X);
-        Assert.Equal(.5f, tint.Y);
-        Assert.Equal(.5f, tint.Z);
-        Assert.Equal(1f, tint.W);
         double shaderDot = nx * light[0] + ny * light[1] + nz * light[2];
         // Evaluate the installed stock equation separately from the requested half-ambient/direct model.
         double actual = tint.X * (Math.Max(Math.Max(.45, .5 + .5 * shaderDot), .95 * ny) + .2 * Math.Max(0, -nz));

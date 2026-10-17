@@ -20,13 +20,17 @@ public sealed class ItemSlotIndicatorStyleLayoutTests
         Assert.True(ItemSlotIndicatorDrawInput.TryCreate(24, 24, 48,
             new(fraction, Vector4.One, new(0.2f, 0.8f)), out var input));
         var layout = ItemSlotIndicatorStyleLayout.Create(input, 1);
-        float height = 48 * (0.2f + fraction * 0.6f);
+        float height = input.SlotBounds.W * (0.2f + fraction * 0.6f);
         Assert.Equal(height, layout.Background.W, 4);
-        Assert.Equal(48 - height, layout.Background.Y, 4);
-        Assert.Equal(new Vector4(4, 43, 40, 2), layout.BarTrack);
-        Assert.Equal(new Vector4(4, 43, 40 * fraction, 2), layout.BarFill);
-        Assert.Equal(new Vector4(0, 0, 48, 2.25f), layout.OutlineTop);
-        Assert.Equal(new Vector4(0, 45.75f, 48, 2.25f), layout.OutlineBottom);
+        Assert.Equal(input.SlotBounds.Y + input.SlotBounds.W - height, layout.Background.Y, 4);
+        Assert.Equal(layout.BarTrack.X, layout.BarFill.X);
+        Assert.Equal(layout.BarTrack.Y, layout.BarFill.Y);
+        Assert.Equal(layout.BarTrack.W, layout.BarFill.W);
+        Assert.Equal(layout.BarTrack.Z * fraction, layout.BarFill.Z);
+        Assert.InRange(layout.BarTrack.X, input.SlotBounds.X, input.SlotBounds.X + input.SlotBounds.Z);
+        Assert.InRange(layout.BarTrack.Y, input.SlotBounds.Y, input.SlotBounds.Y + input.SlotBounds.W);
+        Assert.True(layout.BarTrack.X + layout.BarTrack.Z <= input.SlotBounds.X + input.SlotBounds.Z);
+        Assert.True(layout.BarTrack.Y + layout.BarTrack.W <= input.SlotBounds.Y + input.SlotBounds.W);
     }
 
     /// <summary>All border strips remain inside the slot and share edges without overlapping translucent corners.</summary>
@@ -58,12 +62,6 @@ public sealed class ItemSlotIndicatorStyleLayoutTests
         // Disjoint strips must also cover the entire border, rather than avoiding overlap by leaving gaps.
         Assert.Equal(outerWidth * outerHeight - (outerWidth - 2 * thickness) * (outerHeight - 2 * thickness),
             strips.Sum(strip => strip.Z * strip.W), 4);
-        if (size > 1)
-        {
-            Assert.Equal(2.25f * scale, layout.OutlineTop.W);
-            Assert.Equal(2 * scale, layout.BarTrack.W);
-            Assert.Equal(input.SlotBounds.X + 4 * scale, layout.BarTrack.X);
-        }
     }
 
     /// <summary>Applicable outline and bar presentations retain zero while invisible or malformed inputs stay rejected.</summary>

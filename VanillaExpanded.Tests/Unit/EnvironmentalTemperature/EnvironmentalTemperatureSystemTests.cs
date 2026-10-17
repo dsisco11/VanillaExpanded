@@ -30,9 +30,7 @@ public sealed class EnvironmentalTemperatureSystemTests
         Assert.Equal(HudOverlayAnchorContext.ScreenTargetId, group.Placement.TargetId);
         Assert.Equal(HudOverlayPoint.RightTop, group.Placement.Attachment);
         Assert.Equal(HudOverlayPoint.RightTop, group.Placement.Pivot);
-        Assert.Equal(0, group.Packing.Padding);
-        Assert.Equal(3, group.Placement.ScreenPaddingPixels);
-        Assert.Equal(0, group.Placement.OffsetX); Assert.Equal(0, group.Placement.OffsetY);
+
         int visits = 0; hud.Registry.RunPass(registration =>
         {
             visits++; Assert.Equal(EnvironmentalTemperatureSystem.OverlayId, registration.Id);

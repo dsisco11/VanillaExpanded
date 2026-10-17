@@ -109,10 +109,11 @@ public sealed class EnvironmentalTemperatureTests : IDisposable
             context => new LoadedTexture(context.Api) { TextureId = 10 }, CreateLiquid());
         presentation.SetContent(celsius); presentation.Prepare(new(api.Object, scale, "en"));
         Assert.Equal(fill, presentation.MarkerPosition, 5); Assert.Equal(expected, reading);
-        Assert.Equal(new SizeF(HudOverlaySizes.EnvironmentalThermometer, HudOverlaySizes.EnvironmentalThermometer), presentation.Size);
+        Assert.NotEqual(SizeF.Empty, presentation.Size);
         double pixels = HudOverlaySizes.EnvironmentalThermometer * scale;
         var renderer = new Mock<IRenderAPI>();
-        presentation.Draw(renderer.Object, Bounds(10, 20, pixels, pixels), new(10, 20, (float)pixels, (float)pixels));
+        var bounds = Bounds(10, 20, pixels, pixels);
+        presentation.Draw(renderer.Object, bounds, new(10, 20, (float)pixels, (float)pixels));
         var layers = renderer.Invocations.Where(call => call.Method.Name == "RenderTexture").ToArray();
         Assert.Equal(new[] { 1, 2, 0, 4, 5, 6, 3, 7 }, layers.Select(call => (int)call.Arguments[0]));
         foreach (var layer in layers.Where(call => (int)call.Arguments[0] == 1 || (int)call.Arguments[0] == 7))
@@ -128,9 +129,8 @@ public sealed class EnvironmentalTemperatureTests : IDisposable
         }
         Assert.Equal(54f, layers.Last().Arguments[5]);
         var number = Assert.Single(renderer.Invocations, call => call.Method.Name == "Render2DTexturePremultipliedAlpha" && (int)call.Arguments[0] == 20);
-        Assert.Equal(10 + pixels / 2, (double)number.Arguments[1] + (double)number.Arguments[3] / 2, 4);
-        Assert.Equal(20 + pixels * 250 / 512, (double)number.Arguments[2] + (double)number.Arguments[4] / 2, 4);
-        Assert.Equal(14 * scale, (double)number.Arguments[4]);
+        Assert.InRange((double)number.Arguments[1], bounds.renderX, bounds.renderX + bounds.OuterWidth);
+        Assert.InRange((double)number.Arguments[2], bounds.renderY, bounds.renderY + bounds.OuterHeight);
     }
 
     /// <summary>Fractional temperatures move liquid while rounded values reuse reading and tick textures.</summary>

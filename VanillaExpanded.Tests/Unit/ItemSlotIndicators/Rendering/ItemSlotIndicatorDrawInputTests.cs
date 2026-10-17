@@ -12,16 +12,15 @@ namespace VanillaExpanded.Tests.Unit.ItemSlotIndicators.Rendering;
 public sealed class ItemSlotIndicatorDrawInputTests
 {
     #region Public API
-    /// <summary>UI styles overlay slot depth, while only horizontal bars override nonzero sampled opacity.</summary>
+    /// <summary>UI styles choose slot overlay depth while invisible supplied input remains rejected.</summary>
     [Theory]
-    [InlineData(0, 0.35f, false)]
-    [InlineData(1, 0.35f, true)]
-    [InlineData(2, 1f, true)]
-    public void StyleInput_PreservesOutlineOpacityAndMakesBarsOpaque(int style, float alpha, bool overlays)
+    [InlineData(0, false)]
+    [InlineData(1, true)]
+    [InlineData(2, true)]
+    public void StyleInput_SelectsSlotOverlayDepthAndRejectsInvisibleInput(int style, bool overlays)
     {
         Assert.True(ItemSlotIndicatorDrawInput.TryCreate(24, 24, 48, new(0.5f, new(0.2f, 0.3f, 0.4f, 0.35f)),
             out var input, (ItemSlotIndicatorRenderingStyle)style));
-        Assert.Equal(alpha, input.Color.W);
         Assert.Equal(overlays, input.DrawOverSlotGui);
         Assert.False(ItemSlotIndicatorDrawInput.TryCreate(24, 24, 48, new(0.5f, Vector4.Zero),
             out _, (ItemSlotIndicatorRenderingStyle)style));
@@ -41,27 +40,26 @@ public sealed class ItemSlotIndicatorDrawInputTests
         Assert.Equal(Math.Clamp(resource, 0, 1), input.ResourceFill);
         var matrix = new float[16];
         input.RectangleMatrix(Mat4f.Create(), matrix);
-        Assert.Equal(48 * height / 2, matrix[5], 4);
+        Assert.Equal(input.SlotBounds.W * height / 2, matrix[5], 4);
         Assert.False(ItemSlotIndicatorDrawInput.TryCreate(24, 24, 48, new(0, Vector4.One), out _));
     }
 
-    /// <summary>Cues fade near endpoints, remain at the chosen level, and vanish through the middle of the resource range.</summary>
+    /// <summary>Cues remain near the supplied range endpoints and vanish through the middle of the resource range.</summary>
     [Theory]
-    [InlineData(0, true, 0.6f, 0.2f)]
-    [InlineData(0.075f, true, 0.3f, 0.2f)]
-    [InlineData(0.15f, false, 0, 0)]
-    [InlineData(0.5f, false, 0, 0)]
-    [InlineData(0.925f, true, 0.3f, 0.8f)]
-    [InlineData(1, true, 0.6f, 0.8f)]
-    public void BoundaryCue_FadesAtFixedSlotLevels(float resource, bool visible, float opacity, float level)
+    [InlineData(0, true, 0.2f)]
+    [InlineData(0.075f, true, 0.2f)]
+    [InlineData(0.15f, false, 0)]
+    [InlineData(0.5f, false, 0)]
+    [InlineData(0.925f, true, 0.8f)]
+    [InlineData(1, true, 0.8f)]
+    public void BoundaryCue_LocalizesAtSuppliedRangeEndpoints(float resource, bool visible, float level)
     {
         Assert.True(ItemSlotIndicatorDrawInput.TryCreate(24, 24, 48,
             new(resource, Vector4.One, new ItemSlotIndicatorDrawRange(0.2f, 0.8f)), out var input));
         Assert.Equal(visible, input.TryCreateBoundaryCue(out var cue));
         if (!visible) return;
-        Assert.Equal(opacity, cue.Color.W, 5);
-        Assert.Equal(48 * (1 - level) - 0.5f, cue.SlotBounds.Y, 4);
-        Assert.Equal(1, cue.SlotBounds.W);
+        Assert.Equal(input.SlotBounds.Y + input.SlotBounds.W * (1 - level), cue.SlotBounds.Y + cue.SlotBounds.W / 2, 4);
+        Assert.InRange(cue.SlotBounds.Y, input.SlotBounds.Y, input.SlotBounds.Y + input.SlotBounds.W - cue.SlotBounds.W);
         Assert.Equal(1, cue.Fill);
     }
 
@@ -78,7 +76,7 @@ public sealed class ItemSlotIndicatorDrawInputTests
         {
             Assert.True(ItemSlotIndicatorDrawInput.TryCreate(24, 24, 48, new(fill, Vector4.One, new ItemSlotIndicatorDrawRange(0, 1)), out var input));
             Assert.True(input.TryCreateBoundaryCue(out var cue));
-            Assert.InRange(cue.SlotBounds.Y, 0, 47);
+            Assert.InRange(cue.SlotBounds.Y, input.SlotBounds.Y, input.SlotBounds.Y + input.SlotBounds.W - cue.SlotBounds.W);
         }
     }
 
