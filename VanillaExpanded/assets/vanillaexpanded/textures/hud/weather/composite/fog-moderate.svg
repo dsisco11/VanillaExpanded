@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" preserveAspectRatio="xMidYMid meet">
+  <title>fog moderate</title>
+  <path d="M 13 55 L 51 55" fill="none" stroke="#25343e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 13 55 L 51 55" fill="none" stroke="#c5d3df" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 13 58.2 L 51 58.2" fill="none" stroke="#25343e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 13 58.2 L 51 58.2" fill="none" stroke="#c5d3df" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

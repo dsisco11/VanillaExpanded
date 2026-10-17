@@ -41,7 +41,7 @@ The low precipitation entry/exit values preserve the previous indicator's transi
 
 ## Artwork contract
 
-All layers live under `assets/vanillaexpanded/textures/hud/weather/composite/`, with `.png` extensions. Loading requires the complete set; an absent or partial set uses the existing-artwork fallback without requesting missing textures.
+All layers live under `assets/vanillaexpanded/textures/hud/weather/composite/`. Each icon has an editable `.svg` source and a `.png` texture used by the current renderer. Loading requires the complete PNG set; an absent or partial set uses the existing-artwork fallback without requesting missing textures.
 
 | Draw order | Texture names |
 | --- | --- |
@@ -59,7 +59,7 @@ The selected design uses rounded ivory clouds and precipitation option A. There 
 
 Rain and hail increase from two to four to six marks. Snow increases from one to two to four larger flakes, preserving more of its distinct shape at the 24-pixel HUD size. Wind and fog increase from one to three strokes. Thunder increases bolt breadth. Cloud coverage changes canopy width while keeping its baseline fixed. Intensity distinctions and precipitation types therefore do not depend solely on colour.
 
-The deterministic asset source is [GenerateWeatherIcons.ps1](../../tools/weather-icons/GenerateWeatherIcons.ps1). Run it with PowerShell on Windows to regenerate the 24 PNG layers and the review sheet. It draws oversampled geometry, then resolves to transparent 64 × 64 PNG files. No additional package is required to reproduce these production assets.
+The 24 SVG sources contain the paths, colours, and contrasting outlines directly on a shared `0 0 64 64` view box. Each declares `preserveAspectRatio="xMidYMid meet"` and uses explicit fills and rounded strokes, without stylesheet rules, clones, masks, or filters. Edit these source assets directly. The existing 64 × 64 PNG textures remain the runtime assets; changing an SVG alone does not update its PNG counterpart.
 
 ![Production texture review sheet](weather-textures-preview.png)
 

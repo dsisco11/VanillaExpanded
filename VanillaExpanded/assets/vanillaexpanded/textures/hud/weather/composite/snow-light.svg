@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" preserveAspectRatio="xMidYMid meet">
+  <title>snow light</title>
+  <path d="M 17 40.2 L 17 47.8 M 13.709103 42.1 L 20.290897 45.9 M 13.709103 45.9 L 20.290897 42.1" fill="none" stroke="#25343e" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 17 40.2 L 17 47.8 M 13.709103 42.1 L 20.290897 45.9 M 13.709103 45.9 L 20.290897 42.1" fill="none" stroke="#f7faf7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
