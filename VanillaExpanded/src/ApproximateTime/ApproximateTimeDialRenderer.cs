@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using VanillaExpanded.HudOverlays.Rendering;
 using Vintagestory.API.Client;
 using Vintagestory.API.MathTools;
 
@@ -14,7 +15,8 @@ internal sealed class ApproximateTimeDialRenderer : IApproximateTimeDialRenderer
     /// <summary>Draws the pointer with the standard GUI shader and restores the enclosing model-view matrix.</summary>
     public void Draw(IRenderAPI renderer, int pointerTexture, RectangleF bounds, float opacity, float rotation)
     {
-        double pivotX = bounds.Width * .5, pivotY = bounds.Height * (250d / 512);
+        double pivotX = bounds.Width * RadialGaugeLayout.CenterX / RadialGaugeLayout.Canvas,
+            pivotY = bounds.Height * RadialGaugeLayout.CenterY / RadialGaugeLayout.Canvas;
         tint.W = opacity;
         renderer.GlPushMatrix();
         try

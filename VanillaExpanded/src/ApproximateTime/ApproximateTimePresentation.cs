@@ -32,7 +32,8 @@ internal sealed class ApproximateTimePresentation : IDisposable
         IApproximateTimeDialRenderer? dial = null,
         Func<HudOverlayPreparationContext, ApproximateTimeDayPhases, LoadedTexture>? createFace = null)
     {
-        this.load = load ?? (preparation => WorkshopGaugeArtwork.Load(preparation, "clock", "layer-0", "layer-1", "layer-2"));
+        this.load = load ?? (preparation => WorkshopGaugeArtwork.Load(preparation,
+            RadialGaugeLayout.Backing, "clock/layer-1", RadialGaugeLayout.Glass));
         this.dial = dial ?? new ApproximateTimeDialRenderer();
         this.createFace = createFace ?? ApproximateTimeFaceArtwork.Create;
     }
