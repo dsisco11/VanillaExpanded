@@ -12,7 +12,7 @@ namespace VanillaExpanded.HudOverlays.Interaction;
 internal sealed class HudOverlaySnapping
 {
     private readonly HudOverlayContainers containers;
-    private string? retained;
+    private HudSnapCandidate? retained;
     private HudOverlayGroupMovement? capture;
     private long captureRevision;
     public HudSnapCandidate? Selected { get; private set; }
@@ -85,9 +85,11 @@ internal sealed class HudOverlaySnapping
             {
                 var origin = RoundedClamped(candidate.Origin, raw.Size, viewport, safe, scale);
                 var final = new RectangleF(viewport.X + origin.X * (float)scale, viewport.Y + origin.Y * (float)scale, raw.Width, raw.Height);
-                // Integer native checkpoints may lose an apparent alignment; never show a guide for that result.
+                // Native integer checkpoints need not land exactly on a fractional guide. Keep the magnet within
+                // one GUI unit of the ideal and draw the guide at the actual placement, including boundary rounding.
                 bool xAxis = candidate.AlignsX;
-                if (Math.Abs(xAxis ? final.X - candidate.Origin.X : final.Y - candidate.Origin.Y) > .01f) continue;
+                float correction = xAxis ? final.X - candidate.Origin.X : final.Y - candidate.Origin.Y;
+                if (Math.Abs(correction) > scale + .01f) continue;
                 // Alignment changes placement without membership, but must obey the same collision rule as grouping.
                 // Translate individual footprints rather than treating empty spaces in a mixed group as solid content.
                 var aligned = moving.Members.Where(member => drawable(member.Registration)).ToDictionary(
@@ -98,7 +100,9 @@ internal sealed class HudOverlaySnapping
                 if (!Valid(aligned, layouts, source.Id, string.Empty, safe) || RemainderCollides(movement, layouts, source.Id, string.Empty, drawable)) continue;
                 containers.Move(origin);
                 DropAllowed = true;
-                Selected = candidate;
+                var guide = candidate.Guide;
+                if (xAxis) guide.X += correction; else guide.Y += correction;
+                Selected = candidate with { Origin = final.Location, Guide = guide };
                 Insertion = final;
                 break;
             }
@@ -120,7 +124,7 @@ internal sealed class HudOverlaySnapping
             Insertion = Union(rectangles.Where(item => excluded.Contains(item.Key)).Select(item => item.Value));
             break;
         }
-        retained = Selected?.Identity;
+        retained = Selected;
     }
     #endregion
 
@@ -134,8 +138,8 @@ internal sealed class HudOverlaySnapping
     {
         double x = (pixels.X - viewport.X) / scale, y = (pixels.Y - viewport.Y) / scale;
         double left = (safe.Left - viewport.Left) / scale, top = (safe.Top - viewport.Top) / scale;
-        return new PointF((int)Math.Clamp(x, left, Math.Min(int.MaxValue, Math.Max(left, (safe.Right - viewport.Left - size.Width) / scale))),
-            (int)Math.Clamp(y, top, Math.Min(int.MaxValue, Math.Max(top, (safe.Bottom - viewport.Top - size.Height) / scale))));
+        return new PointF((int)Math.Clamp(Math.Round(x, MidpointRounding.AwayFromZero), left, Math.Min(int.MaxValue, Math.Max(left, (safe.Right - viewport.Left - size.Width) / scale))),
+            (int)Math.Clamp(Math.Round(y, MidpointRounding.AwayFromZero), top, Math.Min(int.MaxValue, Math.Max(top, (safe.Bottom - viewport.Top - size.Height) / scale))));
     }
 
     /// <summary>Rejects clipping and overlaps introduced by insertion, including collisions with the source remainder.</summary>

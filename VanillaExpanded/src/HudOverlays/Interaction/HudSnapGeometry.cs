@@ -9,13 +9,14 @@ namespace VanillaExpanded.HudOverlays.Interaction;
 /// <summary>Calculates physical-pixel candidates without changing membership or retaining pointer corrections.</summary>
 internal static class HudSnapGeometry
 {
-    public const float Acquisition = 6;
-    public const float Release = 10;
+    public const float Acquisition = 16;
+    public const float Release = 26;
+    private const float AlignmentHysteresis = 6;
 
     #region Public API
-    /// <summary>Ranks local adjacency and alignment candidates, retaining an acquired identity within its wider release band.</summary>
+    /// <summary>Prioritizes local grouping, retaining its target and side through alignment changes within a wider release band.</summary>
     public static IReadOnlyList<HudSnapCandidate> Candidates(RectangleF moving, PointF pointer,
-        RectangleF viewport, IEnumerable<HudSnapTarget> targets, string? retained, bool bypass)
+        RectangleF viewport, IEnumerable<HudSnapTarget> targets, HudSnapCandidate? retained, bool bypass)
     {
         if (bypass || moving.Width <= 0 || moving.Height <= 0) return Array.Empty<HudSnapCandidate>();
         var result = new List<HudSnapCandidate>();
@@ -27,11 +28,17 @@ internal static class HudSnapGeometry
             foreach (HudSnapSide side in Enum.GetValues<HudSnapSide>())
             {
                 bool horizontal = side is HudSnapSide.Left or HudSnapSide.Right;
-                // Adjacency requires overlapping perpendicular spans; distant corners are never docking requests.
-                bool local = horizontal ? moving.Bottom >= b.Top && moving.Top <= b.Bottom : moving.Right >= b.Left && moving.Left <= b.Right;
+                bool sameAttachment = retained?.Grouping == true && retained.Target!.Container == target.Container
+                    && retained.Target.Member == target.Member && retained.Side == side;
+                float reach = sameAttachment ? Release : Acquisition;
+                // Nearby corners acquire naturally; the wider retained band also prevents a one-pixel span exit
+                // from abruptly losing a destination while its normal edge remains within magnetic reach.
+                bool local = horizontal ? moving.Bottom >= b.Top - reach && moving.Top <= b.Bottom + reach
+                    : moving.Right >= b.Left - reach && moving.Left <= b.Right + reach;
                 if (!local) continue;
                 float fraction = horizontal ? (pointer.Y - b.Top) / b.Height : (pointer.X - b.Left) / b.Width;
-                var alignment = fraction < 1f / 3 ? HudOverlayCrossAlignment.Start : fraction > 2f / 3 ? HudOverlayCrossAlignment.End : HudOverlayCrossAlignment.Center;
+                var alignment = SelectAlignment(fraction, horizontal ? b.Height : b.Width,
+                    sameAttachment ? retained!.Alignment : null);
                 float factor = alignment == HudOverlayCrossAlignment.Start ? 0 : alignment == HudOverlayCrossAlignment.End ? 1 : .5f;
                 float x = horizontal ? side == HudSnapSide.Left ? b.Left - target.Gap - moving.Width : b.Right + target.Gap
                     : b.Left + factor * (b.Width - moving.Width);
@@ -49,13 +56,17 @@ internal static class HudSnapGeometry
         }
         AlignAxis(viewport, true, "screen");
         AlignAxis(viewport, false, "screen");
-        return result.OrderByDescending(item => item.Identity == retained).ThenBy(item => item.Distance)
-            .ThenByDescending(item => item.Grouping).ThenBy(item => item.Identity, StringComparer.Ordinal).ToArray();
+        // A screen guide cannot hold an indicator away from a nearby valid grouping target. Within each
+        // intent, retain the acquired destination/side before considering a closer competing destination.
+        return result.OrderByDescending(item => item.Grouping)
+            .ThenByDescending(item => item.RetainsAttachment(retained) || item.Identity == retained?.Identity)
+            .ThenBy(item => item.Distance).ThenBy(item => item.Identity, StringComparer.Ordinal).ToArray();
 
         /// <summary>Applies acquisition or retained-release distance in physical pixels independently of GUI scale.</summary>
         void Add(HudSnapCandidate candidate)
         {
-            if (candidate.Distance <= (candidate.Identity == retained ? Release : Acquisition)) result.Add(candidate);
+            bool keep = candidate.RetainsAttachment(retained) || candidate.Identity == retained?.Identity;
+            if (candidate.Distance <= (keep ? Release : Acquisition)) result.Add(candidate);
         }
         /// <summary>Offers matching start, center, and end positions with guides on one physical axis.</summary>
         void AlignAxis(RectangleF reference, bool xAxis, string key)
@@ -72,6 +83,19 @@ internal static class HudSnapGeometry
                     Math.Abs(xAxis ? moving.X - coordinate : moving.Y - coordinate), guide) { AlignsX = xAxis });
             }
         }
+    }
+    #endregion
+
+    #region Private
+    /// <summary>Retains the acquired third across pointer jitter while preserving deliberate access to all alignments.</summary>
+    private static HudOverlayCrossAlignment SelectAlignment(float fraction, float span, HudOverlayCrossAlignment? previous)
+    {
+        float margin = Math.Min(AlignmentHysteresis / span, 1f / 12);
+        if (previous == HudOverlayCrossAlignment.Start && fraction <= 1f / 3 + margin) return previous.Value;
+        if (previous == HudOverlayCrossAlignment.Center && fraction >= 1f / 3 - margin && fraction <= 2f / 3 + margin) return previous.Value;
+        if (previous == HudOverlayCrossAlignment.End && fraction >= 2f / 3 - margin) return previous.Value;
+        return fraction < 1f / 3 ? HudOverlayCrossAlignment.Start
+            : fraction > 2f / 3 ? HudOverlayCrossAlignment.End : HudOverlayCrossAlignment.Center;
     }
     #endregion
 }

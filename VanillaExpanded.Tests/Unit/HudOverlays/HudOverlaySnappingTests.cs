@@ -95,14 +95,14 @@ public sealed class HudOverlaySnappingTests
         Assert.False(fixture.Snapping.Selected?.Grouping == true); Assert.Equal(2, fixture.Containers.Resolved.Count);
     }
 
-    /// <summary>Matching edges are alignment only, and fractional native rounding drops a guide it cannot honor.</summary>
+    /// <summary>Matching edges remain alignment only after native rounding.</summary>
     [Theory]
     [InlineData(1)] [InlineData(1.5)]
     public void AlignmentOnlyDropRetainsSeparateMembership(float scale)
     {
         using var fixture = new Fixture(scale); fixture.Begin();
         var target = fixture.Layouts["target"].Root;
-        fixture.Movement.Move(new PointF((float)target.renderX + 2, (float)(target.renderY + target.OuterHeight + 1))); fixture.Repack(); fixture.Update();
+        fixture.Movement.Move(new PointF((float)target.renderX + 2, (float)(target.renderY + target.OuterHeight + HudSnapGeometry.Release - .1))); fixture.Repack(); fixture.Update();
         var selected = Assert.IsType<HudSnapCandidate>(fixture.Snapping.Selected); Assert.False(selected.Grouping);
         Assert.True(fixture.Snapping.DropAllowed);
         fixture.Movement.Commit(fixture.Movement.Position!.Value); fixture.Repack(); Assert.Equal(2, fixture.Containers.Resolved.Count);
@@ -136,16 +136,22 @@ public sealed class HudOverlaySnappingTests
         Assert.Equal(bypass, fixture.Snapping.DropAllowed);
     }
 
-    /// <summary>A physical center falling between native integer coordinates cannot advertise an exact alignment.</summary>
-    [Fact]
-    public void NonrepresentableCenterDropsAlignmentGuide()
+    /// <summary>A fractional physical center retains alignment and advertises the resolved native position.</summary>
+    [Theory]
+    [InlineData(1.25f)] [InlineData(1.5f)] [InlineData(1.75f)]
+    public void FractionalCenterKeepsResolvedAlignmentGuide(float scale)
     {
-        using var fixture = new Fixture(1.5f); fixture.Begin();
+        using var fixture = new Fixture(scale); fixture.Begin();
         var viewport = new RectangleF(0, 0, 799, 600); var source = fixture.Layouts["source"].Root;
         float center = (viewport.Width - (float)source.OuterWidth) / 2;
         fixture.Movement.Move(new PointF(center + 2, 50)); fixture.Repack();
-        fixture.Snapping.Update(fixture.Movement, new PointF(center + 2, 50), false, 1.5, viewport, fixture.Layouts, _ => true);
-        Assert.Null(fixture.Snapping.Selected);
+        fixture.Snapping.Update(fixture.Movement, new PointF(center + 2, 50), false, scale, viewport, fixture.Layouts, _ => true);
+        var selected = Assert.IsType<HudSnapCandidate>(fixture.Snapping.Selected); Assert.False(selected.Grouping); Assert.True(selected.AlignsX);
+        fixture.Movement.Commit(fixture.Movement.Position!.Value); fixture.Repack();
+        var actual = fixture.Layouts["source"].Root;
+        Assert.Equal(selected.Origin.X, (float)actual.renderX, 3);
+        Assert.InRange(Math.Abs((float)actual.renderX - center), 0, scale);
+        Assert.Equal((float)(actual.renderX + actual.OuterWidth / 2), selected.Guide.X, 3);
         Assert.Equal(2, fixture.Containers.Resolved.Count);
     }
 
