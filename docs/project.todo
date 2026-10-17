@@ -1,10 +1,11 @@
 # Vanilla: Expanded TODO List:
     ## Issues:
         ☐ Finish new env. info gauges.
+        ☐ Implement options to control environmental gauge style, styles can be `immersive` or `icon`, where `icon` uses a more minimal HUD icon representation like the other HUD indicators.
+        ☐ Add style option to all hud indicators so they support atleast `icon` (current default) and `text` which displays a short 3-5 character name rather than the icon.
         ☐ Extrapolate weather icon paths into actual svg files from the `GenerateWeatherIcons` script, then delete the script.
 
     ## New Features:
-        ☐ quick-swap menu cant handle swapping to an item that is in a special slot (e.g. mining bag, quiver, etc.)
         ☐ Add a "Todo List" feature which allows players to create their own ingame tasks and reminders.
         ☐ Temporal gear amulets should provide information about when the next storm is expected to occur (approximately, with increasing accuracy as the storm gets closer).
         ☐ Wearing a temporal gear amulet should provide a subtle HUD indicator when a storm is approaching.
