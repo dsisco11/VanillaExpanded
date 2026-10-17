@@ -22,6 +22,9 @@ internal sealed class HudOverlayContainers
     private readonly Dictionary<string, HudOverlayGroup> templates = new(StringComparer.Ordinal);
     private HudOverlayRegistration[] registrations = Array.Empty<HudOverlayRegistration>();
     private HudLayoutContainer[]? preview;
+    private HudLayoutContainer[]? dragBase;
+    private string? dragContainer;
+    private string? newGroupId;
     private string? active;
     private PointF? previewOrigin;
     private string? draggedIndicator;
@@ -144,6 +147,9 @@ internal sealed class HudOverlayContainers
         previewOrigin = displayed;
         draggedIndicator = indicator;
         preview = records.ToArray();
+        dragBase = preview;
+        dragContainer = active;
+        newGroupId = Guid.NewGuid().ToString("N");
         Resolve();
         return true;
     }
@@ -155,6 +161,39 @@ internal sealed class HudOverlayContainers
         if (!float.IsFinite(position.X) || !float.IsFinite(position.Y)) throw new ArgumentOutOfRangeException(nameof(position));
         previewOrigin = position;
         Resolve();
+    }
+
+    /// <summary>Restores the unsnapped detachment transaction before recalculating against current measured destinations.</summary>
+    public void ClearSnap(PointF position)
+    {
+        if (dragBase == null) return;
+        preview = dragBase;
+        active = dragContainer;
+        Move(position);
+    }
+
+    /// <summary>Publishes a validated destination tree in memory only; the source retires in the same release snapshot.</summary>
+    public bool PreviewJoin(HudSnapCandidate candidate, PointF destinationOrigin)
+    {
+        if (dragBase == null || dragContainer == null || candidate.Target == null) return false;
+        var incoming = resolved.FirstOrDefault(item => item.Id == dragContainer);
+        var destination = resolved.FirstOrDefault(item => item.Id == candidate.Target.Container);
+        if (incoming == null || destination == null || incoming.Id == destination.Id) return false;
+        if (candidate.Target.Member != null && !destination.Tree.Leaves().Contains(candidate.Target.Member)) return false;
+        var tree = HudGroupingResolver.Insert(destination.Tree, incoming.Tree, candidate.Target.Member,
+            candidate.Side, candidate.Alignment, Definition(destination).Packing.Gap);
+        bool independent = destination.Tree.Indicator != null;
+        string id = independent ? newGroupId! : destination.Id;
+        var joined = destination with { Id = id, Key = independent ? "vanillaexpanded:hud:custom:" + id : destination.Key,
+            Tree = tree, X = (int)destinationOrigin.X, Y = (int)destinationOrigin.Y };
+        var records = dragBase.Where(item => item.Id != incoming.Id && item.Id != destination.Id).Append(joined).ToArray();
+        try { new HudLayoutSnapshot { Containers = records }.Validate(); }
+        catch (InvalidOperationException) { return false; }
+        preview = records;
+        active = id;
+        previewOrigin = new PointF(joined.X.Value, joined.Y!.Value);
+        Resolve();
+        return true;
     }
 
     /// <summary>Commits the displayed clamped integer origin with membership in one authoritative snapshot.</summary>
@@ -172,6 +211,8 @@ internal sealed class HudOverlayContainers
     public void Cancel()
     {
         preview = null;
+        dragBase = null;
+        dragContainer = newGroupId = null;
         previewOrigin = null;
         active = draggedIndicator = null;
         foreach (var movement in movements.Values.ToArray()) movement.Cancel();

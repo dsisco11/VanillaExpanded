@@ -4,7 +4,7 @@
 
 Reuse Vintage Story's HUD/dialog lifecycle, GUI event routing, native bounds and scaling, and native dialog-position persistence. Prefer the stock titlebar's drag behavior where it can be adapted to hover controls; extend the existing VE layout runtime for individual placement and player-created groups formed by snapping. Individual feature overlays and their presentation classes should not implement dragging or persistence.
 
-This proposal describes the complete intended interaction. The shared runtime provides effective default/independent/custom containers, persisted permissions and origins, mixed pair-tree layout, and individual detachment. Snap-based group creation and merging remain unimplemented.
+This proposal describes the complete intended interaction. The shared runtime provides effective default/independent/custom containers, persisted permissions and origins, mixed pair-tree layout, individual detachment, and snap-based creation, insertion, and merging. In-game interaction acceptance remains separate from source and headless validation.
 
 Implementation checklist: [MovableHud.todo](MovableHud.todo).
 
@@ -95,7 +95,7 @@ Source: [ElementBounds](../../../vsapi/Client/UI/ElementBounds.cs), especially `
 
 Separate geometric candidate calculation from grouping changes. Geometry returns adjusted bounds, guides, and candidate identity; a grouping resolver determines create/join versus alignment-only behavior.
 
-- Start with a 6-physical-pixel acquisition threshold, a wider release threshold, and deterministic tie-breaking independent of GUI scale.
+- Use a 6-physical-pixel acquisition threshold and a 10-pixel release threshold. Retain a valid acquired candidate first; otherwise rank by distance, grouping before alignment at equal distance, then ordinal candidate identity. Thresholds remain independent of GUI scale.
 - Derive unsnapped bounds from starting geometry and total pointer displacement; never accumulate snapped corrections.
 - Consider nearby visible item/group measured bounds and screen edges. Exclude the moving container and descendants, hidden content, handles, shadows, and tooltips; reject distant perpendicular spans.
 - Use normal packing gaps for adjacency. Preview the destination arrangement without saving membership or recreating feature artwork.

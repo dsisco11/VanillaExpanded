@@ -179,7 +179,8 @@ internal sealed class HudOverlaySession : IDisposable
         if (host == null || anchors == null || Scheduler == null) return;
         if (positions == null) return;
         var live = positions.Resolved.Select(item => item.Id).ToHashSet(StringComparer.Ordinal);
-        foreach (string id in layouts.Keys.Where(id => !live.Contains(id)).ToArray())
+        // Keep both sides of a transient snap available for reuse until release/cancel ends the transaction.
+        foreach (string id in layouts.Keys.Where(id => !live.Contains(id) && positions.ActiveContainer == null).ToArray())
         {
             layouts[id].Dispose(); layouts.Remove(id);
         }
@@ -193,9 +194,10 @@ internal sealed class HudOverlaySession : IDisposable
                 positions.Origin(container),
                 container.Tree, container.Padding);
         }
-        host.Synchronize(layouts);
+        var effectiveLayouts = layouts.Where(item => live.Contains(item.Key)).ToDictionary(item => item.Key, item => item.Value);
+        host.Synchronize(effectiveLayouts);
         bool drawable = false;
-        foreach (var layout in layouts.Values) drawable |= layout.Available && layout.Members.Count > 0;
+        foreach (var layout in effectiveLayouts.Values) drawable |= layout.Available && layout.Members.Count > 0;
         if (drawable) host.TryOpen(false);
         else host.TryClose();
     }

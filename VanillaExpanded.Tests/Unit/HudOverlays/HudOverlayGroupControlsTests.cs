@@ -35,18 +35,37 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
     private readonly Dictionary<string, HudOverlayGroupLayout> layouts = new();
     private readonly List<GuiDialog> opened = new();
     private readonly MouseButtonState buttons = new() { Left = true };
+    private readonly bool[] keys = new bool[Enum.GetValues<GlKeys>().Max(value => (int)value) + 1];
     private readonly PointF initial;
     private PointF pointer;
     private bool grabbed, hidden, drawable = true;
 
     #region Public API
+    /// <summary>An active native grip survives disappearance of its source container during a grouping preview.</summary>
+    [Theory]
+    [InlineData(false, 1)] [InlineData(true, 1)] [InlineData(false, 1.5)] [InlineData(true, 1.5)]
+    public void GroupingPreviewSurvivesHostSynchronizationAndCommitsOrCancels(bool cancel, float scale)
+    {
+        using var fixture = new HudOverlayGroupControlsTests(GroupId, scale);
+        fixture.ExerciseGroupingPreview(cancel);
+    }
+
+    /// <summary>Interaction-loss boundaries roll back both participants of an already visible grouping preview.</summary>
+    [Theory]
+    [InlineData(1)] [InlineData(2)] [InlineData(3)] [InlineData(4)] [InlineData(5)]
+    public void JoinedPreviewRollsBackOnInteractionLoss(int cause)
+    {
+        using var fixture = new HudOverlayGroupControlsTests(GroupId);
+        fixture.ExerciseGroupingPreview(true, cause);
+    }
+
     /// <summary>Provides headless engine services and one measured world-status member.</summary>
     public HudOverlayGroupControlsTests() : this(GroupId) { }
 
     /// <summary>Creates native controls for any registered group.</summary>
-    private HudOverlayGroupControlsTests(string groupId)
+    private HudOverlayGroupControlsTests(string groupId, float scale = 1)
     {
-        RuntimeEnv.GUIScale = 1;
+        RuntimeEnv.GUIScale = scale;
         var language = new Mock<ITranslationService>();
         language.Setup(value => value.Get(It.IsAny<string>(), It.IsAny<object[]>()))
             .Returns((string key, object[] _) => key);
@@ -63,6 +82,7 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
         input.SetupGet(value => value.MouseY).Returns(() => (int)pointer.Y);
         input.SetupGet(value => value.MouseGrabbed).Returns(() => grabbed);
         input.SetupGet(value => value.MouseButton).Returns(buttons);
+        input.SetupGet(value => value.KeyboardKeyStateRaw).Returns(keys);
         var window = new Window();
         gui.SetupGet(value => value.WindowBounds).Returns(window);
         gui.SetupGet(value => value.OpenedGuis).Returns(opened);
@@ -193,14 +213,14 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
         using var host = new HudOverlayHost(api.Object, registry, _ => true, (_, failure) => throw failure, containers: containers);
         // Reproduce session publication: one effective native root per container, then synchronize host controls.
         Action repack = () => {
-            foreach (string id in effective.Keys.Where(id => containers.Resolved.All(value => value.Id != id)).ToArray()) { effective[id].Dispose(); effective.Remove(id); }
+            foreach (string id in effective.Keys.Where(id => containers.ActiveContainer == null && containers.Resolved.All(value => value.Id != id)).ToArray()) { effective[id].Dispose(); effective.Remove(id); }
             foreach (var container in containers.Resolved)
             {
                 if (!effective.TryGetValue(container.Id, out var item)) effective[container.Id] = item = new HudOverlayGroupLayout();
                 var measured = members.Where(value => container.Tree.Leaves().Contains(value.Id)).Select(value => new KeyValuePair<HudOverlayRegistration, SizeF>(value, new SizeF(50, 35))).ToArray();
                 item.Apply(anchors, containers.Definition(container), measured, containers.Origin(container), container.Tree, container.Padding);
             }
-            host.Synchronize(effective);
+            host.Synchronize(effective.Where(pair => containers.Resolved.Any(value => value.Id == pair.Key)).ToDictionary(pair => pair.Key, pair => pair.Value));
         };
         host.BeforeRender = repack; repack();
         try
@@ -533,6 +553,65 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
     #endregion
 
     #region Private
+    /// <summary>Exercises native drag routing with a freshly constructed, consistently scaled fixture.</summary>
+    private void ExerciseGroupingPreview(bool cancel, int cancellation = 0)
+    {
+        using var registry = new HudOverlayRegistry(); registry.RegisterGroup(group); var sourceRegistration = registry.Register(registration);
+        var targetGroup = new HudOverlayGroup("target", new HudOverlayPlacement("screen", HudOverlayPoint.LeftTop, HudOverlayPoint.LeftTop, 300, 200));
+        var target = new HudOverlayRegistration("test:target", Mock.Of<IHudOverlay>(), () => true, targetGroup.Id); registry.RegisterGroup(targetGroup); registry.Register(target);
+        var containers = new HudOverlayContainers(api.Object, registry); containers.SetMovable(group.Id, true, initial);
+        bool targetDrawable = true;
+        var members = new List<HudOverlayRegistration> { registration, target }; var effective = new Dictionary<string, HudOverlayGroupLayout>();
+        using var host = new HudOverlayHost(api.Object, registry, value => value != target || targetDrawable, (_, failure) => throw failure, containers: containers);
+        // Reproduce the session's actual native-root publication after topology changes.
+        Action repack = () => {
+            foreach (string id in effective.Keys.Where(id => containers.ActiveContainer == null && containers.Resolved.All(value => value.Id != id)).ToArray()) { effective[id].Dispose(); effective.Remove(id); }
+            foreach (var container in containers.Resolved)
+            {
+                if (!effective.TryGetValue(container.Id, out var item)) effective[container.Id] = item = new HudOverlayGroupLayout();
+                var measured = members.Where(value => container.Tree.Leaves().Contains(value.Id) && (value != target || targetDrawable)).Select(value => new KeyValuePair<HudOverlayRegistration, SizeF>(value, new SizeF(50, 35))).ToArray();
+                item.Apply(anchors, containers.Definition(container), measured, containers.Origin(container), container.Tree, container.Padding);
+            }
+            host.Synchronize(effective.Where(pair => containers.Resolved.Any(value => value.Id == pair.Key)).ToDictionary(pair => pair.Key, pair => pair.Value));
+        };
+        host.BeforeRender = repack; repack();
+        try
+        {
+            var owned = (Dictionary<string, HudOverlayGroupControls>)typeof(HudOverlayHost).GetField("groupControls", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(host)!;
+            var control = owned["container:" + group.Id];
+            var sourceClip = effective[group.Id].Members.Single().Clip;
+            pointer = new PointF(sourceClip.Left + sourceClip.Width / 2, sourceClip.Top + sourceClip.Height / 2); control.Synchronize(effective);
+            var handle = (RectangleF)typeof(HudOverlayGroupControls).GetField("handle", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(control)!;
+            pointer = new PointF(handle.X + handle.Width / 3, handle.Y + handle.Height / 2);
+            var source = effective[group.Id].Root; var destination = effective[targetGroup.Id].Root;
+            var delta = new PointF((float)(destination.renderX + destination.OuterWidth + targetGroup.Packing.Gap * RuntimeEnv.GUIScale - source.renderX), (float)(destination.renderY - source.renderY));
+            control.OnMouseDown(api.Object, Event(EnumMouseButton.Left)); Assert.True(containers.Get(group.Id).Dragging);
+            gui.Invocations.Clear(); pointer = new PointF(pointer.X + delta.X, pointer.Y + delta.Y); host.OnMouseMove(Event(EnumMouseButton.None));
+            Assert.Single(containers.Resolved); Assert.Same(control, owned["container:" + group.Id]); Assert.True(containers.Get(group.Id).Dragging);
+            gui.Verify(value => value.SetDialogPosition(It.IsAny<string>(), It.IsAny<Vec2i>()), Times.Never);
+            keys[(int)GlKeys.ShiftLeft] = true; host.OnMouseMove(Event(EnumMouseButton.None)); Assert.Equal(2, containers.Resolved.Count);
+            keys[(int)GlKeys.ShiftLeft] = false; host.OnMouseMove(Event(EnumMouseButton.None)); Assert.Single(containers.Resolved);
+            targetDrawable = false; host.OnMouseMove(Event(EnumMouseButton.None)); Assert.Equal(2, containers.Resolved.Count); Assert.True(containers.Get(group.Id).Dragging);
+            keys[(int)GlKeys.ShiftLeft] = true; host.OnMouseMove(Event(EnumMouseButton.None));
+            targetDrawable = true; keys[(int)GlKeys.ShiftLeft] = false; host.OnMouseMove(Event(EnumMouseButton.None)); Assert.Single(containers.Resolved);
+            Assert.Same(source, effective[group.Id].Root);
+            if (!cancel) host.OnMouseUp(Event(EnumMouseButton.Left));
+            else switch (cancellation)
+            {
+                case 1: grabbed = true; host.OnMouseMove(Event(EnumMouseButton.None)); break;
+                case 2: hidden = true; host.OnMouseMove(Event(EnumMouseButton.None)); break;
+                case 3: host.UnFocus(); break;
+                case 4: sourceRegistration.Dispose(); members.Remove(registration); containers.Synchronize(); repack(); host.OnMouseMove(Event(EnumMouseButton.None)); break;
+                case 5: host.Dispose(); break;
+                default: Assert.True(host.OnEscapePressed()); break;
+            }
+            Assert.False(containers.Get(group.Id).Dragging); Assert.Equal(cancel ? 2 : 1, containers.Resolved.Count);
+            if (!cancel) Assert.False(Assert.Single(containers.Resolved).Movable);
+            overlay.Verify(value => value.Refresh(), Times.Never); overlay.Verify(value => value.Prepare(It.IsAny<HudOverlayPreparationContext>()), Times.Never);
+        }
+        finally { foreach (var item in effective.Values) item.Dispose(); }
+    }
+
     /// <summary>Matches the native ref-texture upload signature while keeping real Cairo composition active.</summary>
     private delegate void CairoUpload(Cairo.ImageSurface surface, bool linear, ref LoadedTexture texture);
 

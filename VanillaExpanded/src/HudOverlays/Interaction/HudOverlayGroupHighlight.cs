@@ -48,6 +48,12 @@ internal sealed class HudOverlayGroupHighlight : IDisposable
         if (movable) api.Render.RenderRectangle(bounds.X, bounds.Y, 1, bounds.Width, bounds.Height, border);
     }
 
+    /// <summary>Draws an alignment axis as a one-pixel strip, avoiding degenerate native rectangle meshes.</summary>
+    public void DrawGuide(RectangleF guide)
+    {
+        api.Render.RenderRectangle(guide.X, guide.Y, 1, Math.Max(1, guide.Width), Math.Max(1, guide.Height), border);
+    }
+
     /// <summary>Releases the owned pixel when the session ends.</summary>
     public void Dispose()
     {
