@@ -27,11 +27,13 @@ internal sealed class HudOverlayGroupControls : IDisposable
     private HudOverlayGroupLayout? group;
     private string? caption;
     private double preparedScale;
-    private bool visible, pressed, disposed;
+    private bool visible, pressed, menuPress, disposed;
     private RectangleF handle;
     private RectangleF groupBounds;
     private bool hovered, showOutline;
     private double scale = 1;
+    private RectangleF content;
+    private readonly Action reset;
     public bool Active => !disposed && (movement.Dragging || pressed || titleBar.Menu.IsOpened);
     public ElementBounds Bounds => titleBar.Bounds;
 
@@ -39,25 +41,28 @@ internal sealed class HudOverlayGroupControls : IDisposable
     #region Construction and synchronization
     /// <summary>Owns actual native titlebar graphics/menu while borrowing the group's content and position state.</summary>
     public HudOverlayGroupControls(ICoreClientAPI api, GuiDialog host, HudOverlayGroupMovement movement,
-        Func<HudOverlayRegistration, bool> drawable, Action relayout)
+        Func<HudOverlayRegistration, bool> drawable, Action relayout, Action? reset = null)
     {
         this.api = api;
         this.host = host;
         this.movement = movement;
         this.drawable = drawable;
         this.relayout = relayout;
+        this.reset = reset ?? (() => { });
         highlight = new HudOverlayGroupHighlight(api);
         compositionBounds = ElementBounds.Fixed(0, 0, Width, HudOverlaySizes.TitleBarHeight).WithParent(api.Gui.WindowBounds);
         composer = api.Gui.CreateCompo(movement.Key, compositionBounds);
         titleBar = new HudOverlayNativeTitleBar(api, Lang.Get("vanillaexpanded:hud-group-" + movement.Id), composer,
             () => Cancel(), ElementBounds.Fixed(0, 0, Width, HudOverlaySizes.TitleBarHeight));
+        titleBar.ConfigurePermission(value => movement.SetMovable(value), () => this.reset());
         composer.AddInteractiveElement(titleBar);
     }
 
     /// <summary>Tracks prepared group geometry and cancels controls when their target becomes unavailable.</summary>
     public void Synchronize(IReadOnlyDictionary<string, HudOverlayGroupLayout> layouts)
     {
-        layouts.TryGetValue(movement.Id, out group);
+        if (movement.IndicatorId == null) layouts.TryGetValue(movement.Id, out group);
+        else group = layouts.Values.FirstOrDefault(layout => layout.Members.Any(member => member.Registration.Id == movement.IndicatorId));
         Refresh(false);
     }
 
@@ -83,10 +88,10 @@ internal sealed class HudOverlayGroupControls : IDisposable
         if (args.Handled || !visible || args.Button != EnumMouseButton.Left) return;
         if (titleBar.Menu.IsOpened)
         {
+            menuPress = true;
             titleBar.Menu.OnMouseDown(api, args);
             if (!args.Handled) titleBar.Menu.OnFocusLost();
-            // The native Fixed menu callback already clears its settings key; only synchronize our layout state.
-            if (titleBar.Movable != movement.Movable) movement.SetMovable(titleBar.Movable, clearNativePosition: false);
+
             pressed = true;
             args.Handled = true;
             relayout();
@@ -127,10 +132,10 @@ internal sealed class HudOverlayGroupControls : IDisposable
             relayout();
             if (movement.Dragging) movement.Commit(ContentOrigin());
         }
-        else if (pressed && handle.Contains(args.X, args.Y))
+        else if (pressed && !menuPress && handle.Contains(args.X, args.Y))
             titleBar.OnMouseUpOnElement(api, args);
         if (titleBar.Menu.IsOpened) titleBar.Menu.OnFocusGained();
-        pressed = false;
+        pressed = menuPress = false;
         relayout();
         Refresh(false);
     }
@@ -149,11 +154,8 @@ internal sealed class HudOverlayGroupControls : IDisposable
     {
         if (disposed || !titleBar.Menu.IsOpened) return;
         titleBar.OnKeyDown(api, args);
-        if (titleBar.Movable != movement.Movable)
-        {
-            movement.SetMovable(titleBar.Movable, clearNativePosition: false);
-            relayout();
-        }
+        titleBar.SynchronizePermission(movement.Movable);
+        relayout();
     }
 
     /// <summary>Forwards native type-to-select behavior while the dropdown owns an active interaction.</summary>
@@ -168,7 +170,7 @@ internal sealed class HudOverlayGroupControls : IDisposable
         if (disposed) return false;
         bool active = Active;
         movement.Cancel();
-        pressed = false;
+        pressed = menuPress = false;
         if (titleBar.Menu.IsOpened)
             titleBar.Menu.OnMouseUp(api, new MouseEvent(api.Input.MouseX, api.Input.MouseY, EnumMouseButton.Left, 0));
         titleBar.OnFocusLost();
@@ -187,11 +189,13 @@ internal sealed class HudOverlayGroupControls : IDisposable
         visible = false;
         hovered = showOutline = false;
         movement.Cancel();
-        pressed = false;
-        composer.Dispose();
-        highlight.Dispose();
-        compositionBounds.ParentBounds?.ChildBounds.Remove(compositionBounds);
-        group = null;
+        pressed = menuPress = false;
+        try { composer.Dispose(); }
+        finally
+        {
+            try { highlight.Dispose(); }
+            finally { compositionBounds.ParentBounds?.ChildBounds.Remove(compositionBounds); group = null; }
+        }
     }
 
     /// <summary>Places the compact titlebar above or below content without shifting the content itself.</summary>
@@ -217,16 +221,30 @@ internal sealed class HudOverlayGroupControls : IDisposable
         var pointer = new PointF(input.MouseX, input.MouseY);
         double currentScale = RuntimeEnv.GUIScale;
         bool available = !api.HideGuis && !input.MouseGrabbed && group is { Available: true }
-            && group.Members.Any(member => drawable(member.Registration) && member.Clip.Width > 0 && member.Clip.Height > 0);
+            && group.Members.Any(member => (movement.IndicatorId == null || member.Registration.Id == movement.IndicatorId) && drawable(member.Registration) && member.Clip.Width > 0 && member.Clip.Height > 0);
         // The outline is a global movement cue, independent of pointer hover over an unrelated window.
         // Modal input capture still disables movement; ordinary foreground windows only suppress hover controls.
-        showOutline = available && movement.Movable && !(api.Gui.OpenedGuis?.Any(dialog =>
+        showOutline = available && movement.IndicatorId == null && movement.Movable && !(api.Gui.OpenedGuis?.Any(dialog =>
             !ReferenceEquals(dialog, host) && dialog.IsOpened() && dialog.CaptureAllInputs()) ?? false);
         if (available)
         {
             var bounds = group!.Root;
             groupBounds = new RectangleF((float)bounds.renderX, (float)bounds.renderY,
                 (float)bounds.OuterWidth, (float)bounds.OuterHeight);
+        }
+        if (available)
+        {
+            var target = movement.IndicatorId == null ? null : group!.Members.First(member => member.Registration.Id == movement.IndicatorId);
+            var targetBounds = target?.Bounds ?? group!.Root;
+            content = new RectangleF((float)targetBounds.renderX, (float)targetBounds.renderY,
+                (float)targetBounds.OuterWidth, (float)targetBounds.OuterHeight);
+            var windowBounds = api.Gui.WindowBounds;
+            double guiScale = currentScale;
+            movement.ContainerOrigin = new PointF((float)((group!.Root.renderX - windowBounds.renderX) / guiScale),
+                (float)((group.Root.renderY - windowBounds.renderY) / guiScale));
+            movement.MemberOrigins = group.Members.ToDictionary(member => member.Registration.Id, member => new PointF(
+                (float)((member.Bounds.renderX - windowBounds.renderX) / guiScale), (float)((member.Bounds.renderY - windowBounds.renderY) / guiScale)));
+            if (movement.IndicatorId != null) groupBounds = content;
         }
         bool eligible = available && !Blocked(pointer);
         if (!eligible || (Active && currentScale != scale)
@@ -237,19 +255,31 @@ internal sealed class HudOverlayGroupControls : IDisposable
         }
         scale = currentScale;
         var root = group!.Root;
-        var content = new RectangleF((float)root.renderX, (float)root.renderY, (float)root.OuterWidth, (float)root.OuterHeight);
+
         var window = api.Gui.WindowBounds;
         var viewport = new RectangleF((float)window.renderX, (float)window.renderY,
             (float)window.OuterWidth, (float)window.OuterHeight);
         handle = PlaceHandle(content, viewport, scale);
-        bool overContent = content.Contains(pointer);
+        if (movement.IndicatorId == null && movement.HasMultipleMembers)
+        {
+            float above = content.Top - 2 * (handle.Height + 2);
+            float below = content.Bottom + handle.Height + 4;
+            handle.Y = Math.Clamp(above >= viewport.Top ? above : below,
+                viewport.Top, Math.Max(viewport.Top, viewport.Bottom - handle.Height));
+        }
+        bool overContent = group!.Members.Any(member => drawable(member.Registration)
+            && (movement.IndicatorId == null || member.Registration.Id == movement.IndicatorId) && member.Clip.Contains(pointer));
         hovered = overContent || Active;
         visible = Active || overContent || (visible && RectangleF.Union(content, handle).Contains(pointer));
         PositionComposition(viewport);
         if (visible)
         {
-            string key = "vanillaexpanded:hud-group-" + movement.Id;
-            string title = Lang.HasTranslation(key) ? Lang.Get(key) : movement.Id;
+            titleBar.SynchronizePermission(movement.Movable);
+            var indicator = movement.IndicatorId != null
+                ? group!.Members.First(member => member.Registration.Id == movement.IndicatorId).Registration
+                : !movement.HasMultipleMembers ? group!.Members.First().Registration : null;
+            string key = indicator == null ? "vanillaexpanded:hud-group-" + movement.Id : indicator.HoverLabelKey ?? indicator.Id;
+            string title = Lang.HasTranslation(key) ? Lang.Get(key) : indicator?.Id ?? Lang.Get("vanillaexpanded:hud-custom-group");
             if (!composer.Composed || preparedScale != scale || caption != title)
             {
                 titleBar.Text = title;
@@ -290,8 +320,8 @@ internal sealed class HudOverlayGroupControls : IDisposable
     }
 
     /// <summary>Maps displayed content, rather than titlebar coordinates, to native persisted GUI units.</summary>
-    private PointF ContentOrigin() => new((float)((group!.Root.renderX - api.Gui.WindowBounds.renderX) / scale),
-        (float)((group.Root.renderY - api.Gui.WindowBounds.renderY) / scale));
+    private PointF ContentOrigin() => new((float)((content.X - api.Gui.WindowBounds.renderX) / scale),
+        (float)((content.Y - api.Gui.WindowBounds.renderY) / scale));
     #endregion
     #endregion
 }

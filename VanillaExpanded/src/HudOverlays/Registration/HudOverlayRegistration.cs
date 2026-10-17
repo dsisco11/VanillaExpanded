@@ -15,7 +15,7 @@ public sealed record HudOverlayRegistration
     public int RefreshIntervalMs { get; }
     /// <summary>Optional localization key explaining this indicator; the host resolves it in the current locale.</summary>
     public string? HoverLabelKey { get; }
-    /// <summary>Optional fixed GUI-unit footprint, reserved even while disabled, inapplicable or unprepared.</summary>
+    /// <summary>Optional fixed GUI-unit footprint used while drawable; effective containers still collapse hidden members.</summary>
     public SizeF? ReservedSize { get; }
     #region Public API
     /// <summary>Defines identity, live visibility, ordering, refresh interval, optional hover label and optional fixed layout reservation.</summary>

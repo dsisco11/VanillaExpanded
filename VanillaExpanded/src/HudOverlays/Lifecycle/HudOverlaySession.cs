@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using VanillaExpanded.HudOverlays.Anchoring;
 using VanillaExpanded.HudOverlays.Layout;
 using VanillaExpanded.HudOverlays.Interaction;
@@ -26,7 +27,7 @@ internal sealed class HudOverlaySession : IDisposable
     private object? playerEntity;
     private IHudOverlayHost? host;
     private HudOverlayAnchorContext? anchors;
-    private HudOverlayGroupPositions? positions;
+    private HudOverlayContainers? positions;
     private bool disposed;
     public HudOverlayScheduler? Scheduler { get; private set; }
 
@@ -43,7 +44,7 @@ internal sealed class HudOverlaySession : IDisposable
         this.clock = clock ?? (() => Environment.TickCount64);
         this.enabled = enabled ?? (() => true);
         this.createHost = createHost ?? ((scheduler, _) => new HudOverlayHost(api, registry,
-            scheduler.IsDrawable, scheduler.ReportDrawFailure, scheduler.ReportBoundaryFailure, positions: positions));
+            scheduler.IsDrawable, scheduler.ReportDrawFailure, scheduler.ReportBoundaryFailure, containers: positions));
     }
 
     /// <summary>Starts one ready-world heartbeat, including a cheap wait when the player is not available yet.</summary>
@@ -74,6 +75,7 @@ internal sealed class HudOverlaySession : IDisposable
     {
         if (disposed || anchors == null || Scheduler == null) return;
         bool visible = IsCurrentSession() && !api.HideGuis;
+        positions?.Synchronize();
         anchors.BeginFrame(visible);
         Scheduler.ObserveVisibility(anchors, visible, enabled());
         SynchronizeLayouts();
@@ -107,8 +109,8 @@ internal sealed class HudOverlaySession : IDisposable
             // Failed individual bindings remain owned and hidden; unaffected registrations still run.
             try { registry.BeginSession(api); }
             catch (Exception failure) { Report("session binding", failure); }
-            positions = new HudOverlayGroupPositions(api.Gui);
-            Scheduler = new HudOverlayScheduler(registry, clock, Report, positions.TargetId);
+            positions = new HudOverlayContainers(api, registry, failure => Report("layout persistence", failure));
+            Scheduler = new HudOverlayScheduler(registry, clock, Report, effectiveTarget: positions.TargetId);
             try
             {
                 anchors = new HudOverlayAnchorContext(api);
@@ -122,6 +124,8 @@ internal sealed class HudOverlaySession : IDisposable
             }
         }
         bool visible = !api.HideGuis;
+        positions?.Synchronize();
+        positions?.RepairMirrors();
         anchors!.BeginFrame(visible);
         var preparation = new HudOverlayPreparationContext(api, anchors.GuiScale,
             Lang.CurrentLocale ?? "en", FontRevision());
@@ -163,6 +167,7 @@ internal sealed class HudOverlaySession : IDisposable
     {
         if (disposed || anchors == null || Scheduler == null) return;
         bool visible = IsCurrentSession() && !api.HideGuis;
+        positions?.Synchronize();
         anchors.BeginFrame(visible);
         Scheduler.ObserveVisibility(anchors, visible, enabled());
         SynchronizeLayouts();
@@ -172,11 +177,21 @@ internal sealed class HudOverlaySession : IDisposable
     private void SynchronizeLayouts()
     {
         if (host == null || anchors == null || Scheduler == null) return;
-        foreach (var group in registry.GetGroups())
+        if (positions == null) return;
+        var live = positions.Resolved.Select(item => item.Id).ToHashSet(StringComparer.Ordinal);
+        foreach (string id in layouts.Keys.Where(id => !live.Contains(id)).ToArray())
         {
-            if (!layouts.TryGetValue(group.Id, out var layout)) layouts[group.Id] = layout = new HudOverlayGroupLayout();
-            layout.Apply(anchors, group, Scheduler.GetMembers(group.Id),
-                positions?.Get(group.Id).Position);
+            layouts[id].Dispose(); layouts.Remove(id);
+        }
+        var measured = registry.GetGroups().SelectMany(group => Scheduler.GetMembers(group.Id))
+            .Where(member => Scheduler.IsDrawable(member.Key)).ToDictionary(member => member.Key.Id);
+        foreach (var container in positions.Resolved)
+        {
+            if (!layouts.TryGetValue(container.Id, out var layout)) layouts[container.Id] = layout = new HudOverlayGroupLayout();
+            var members = container.Tree.Leaves().Where(measured.ContainsKey).Select(id => measured[id]).ToArray();
+            layout.Apply(anchors, positions.Definition(container), members,
+                positions.Origin(container),
+                container.Tree, container.Padding);
         }
         host.Synchronize(layouts);
         bool drawable = false;

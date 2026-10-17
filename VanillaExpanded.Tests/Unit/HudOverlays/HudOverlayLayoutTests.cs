@@ -441,6 +441,37 @@ public sealed class HudOverlayLayoutTests
         }
         finally { RuntimeEnv.GUIScale = oldScale; }
     }
+    /// <summary>Mixed-registration trees use native parentage, scale once, collapse branches and reuse child bounds.</summary>
+    [Theory]
+    [InlineData(1)] [InlineData(1.5)] [InlineData(2)]
+    public void MixedTreeUsesNativeBoundsAndReusesGeometry(double scale)
+    {
+        float old = RuntimeEnv.GUIScale;
+        try
+        {
+            RuntimeEnv.GUIScale = (float)scale;
+            var context = new HudOverlayAnchorContext(new Window(900, 700), () => scale, () => null); context.BeginFrame();
+            var first = Member("mod:a", 27, 42);
+            var second = new KeyValuePair<HudOverlayRegistration, SizeF>(new HudOverlayRegistration("other:b", new Mock<IHudOverlay>(MockBehavior.Strict).Object, () => true, "other-registration"), new SizeF(53, 18));
+            var tree = new HudLayoutNode { Direction = HudOverlayDirection.Horizontal, Gap = 8, Alignment = HudOverlayCrossAlignment.End,
+                First = new HudLayoutNode { Indicator = first.Key.Id }, Second = new HudLayoutNode { Indicator = second.Key.Id } };
+            using var layout = new HudOverlayGroupLayout(); var group = Group(new("screen", HudOverlayPoint.LeftTop, HudOverlayPoint.LeftTop)); var origin = new PointF(31, 47);
+            layout.Apply(context, group, new[] { first, second }, origin, tree, 3);
+            var root = layout.Root; var a = layout.Members.Single(value => value.Registration.Id == first.Key.Id); var b = layout.Members.Single(value => value.Registration.Id == second.Key.Id);
+            Assert.Same(root, a.Bounds.ParentBounds); Assert.Same(root, b.Bounds.ParentBounds);
+            Near(8 * scale, b.Bounds.renderX - a.Bounds.renderX - a.Bounds.OuterWidth);
+            Near(a.Bounds.renderY + a.Bounds.OuterHeight, b.Bounds.renderY + b.Bounds.OuterHeight);
+            var before = new PointF((float)root.renderX, (float)root.renderY);
+            layout.Apply(context, group, new[] { new KeyValuePair<HudOverlayRegistration, SizeF>(first.Key, new SizeF(45, 42)), second }, origin, tree, 3);
+            Assert.Same(root, layout.Root); Assert.Same(a.Bounds, layout.Members.Single(value => value.Registration.Id == first.Key.Id).Bounds);
+            Assert.Equal(before, new PointF((float)root.renderX, (float)root.renderY));
+            layout.Apply(context, group, new[] { second }, origin, tree, 3);
+            Near(root.renderX + 3 * scale, layout.Members.Single().Bounds.renderX);
+            Assert.Equal(new[] { first.Key.Id, second.Key.Id }, tree.Leaves());
+            layout.Apply(context, group, Array.Empty<KeyValuePair<HudOverlayRegistration, SizeF>>(), origin, tree, 3); Assert.Empty(layout.Members);
+        }
+        finally { RuntimeEnv.GUIScale = old; }
+    }
     /// <summary>Invalid native measurements fail before creating child geometry.</summary>
     [Theory]
     [InlineData(float.NaN, 1)]
