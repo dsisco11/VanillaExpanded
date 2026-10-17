@@ -25,7 +25,6 @@ internal sealed class HudOverlayGroupControls : IDisposable
     private readonly HudOverlayNativeTitleBar titleBar;
     private readonly HudOverlayGroupHighlight highlight;
     private HudOverlayGroupLayout? group;
-    private string? caption;
     private double preparedScale;
     private bool visible, pressed, menuPress, disposed;
     private RectangleF handle;
@@ -56,7 +55,7 @@ internal sealed class HudOverlayGroupControls : IDisposable
         highlight = new HudOverlayGroupHighlight(api);
         compositionBounds = ElementBounds.Fixed(0, 0, Width, HudOverlaySizes.TitleBarHeight).WithParent(api.Gui.WindowBounds);
         composer = api.Gui.CreateCompo(movement.Key, compositionBounds);
-        titleBar = new HudOverlayNativeTitleBar(api, Lang.Get("vanillaexpanded:hud-group-" + movement.Id), composer,
+        titleBar = new HudOverlayNativeTitleBar(api, composer,
             () => Cancel(), ElementBounds.Fixed(0, 0, Width, HudOverlaySizes.TitleBarHeight));
         titleBar.ConfigurePermission(value => movement.SetMovable(value), () => this.reset());
         composer.AddInteractiveElement(titleBar);
@@ -299,18 +298,10 @@ internal sealed class HudOverlayGroupControls : IDisposable
         if (visible)
         {
             titleBar.SynchronizePermission(movement.Movable);
-            var indicator = movement.IndicatorId != null
-                ? group!.Members.First(member => member.Registration.Id == movement.IndicatorId).Registration
-                : !movement.HasMultipleMembers ? group!.Members.First().Registration : null;
-            string key = indicator == null ? "vanillaexpanded:hud-group-" + movement.Id : indicator.HoverLabelKey ?? indicator.Id;
-            string title = Lang.HasTranslation(key) ? Lang.Get(key) : indicator?.Id ?? Lang.Get("vanillaexpanded:hud-custom-group");
-            if (movement.Dragging && caption != null) title = caption;
-            if (!composer.Composed || preparedScale != scale || caption != title)
+            if (!composer.Composed || preparedScale != scale)
             {
-                titleBar.Text = title;
                 if (composer.Composed) composer.ReCompose(); else composer.Compose(false);
                 preparedScale = scale;
-                caption = title;
                 // Native composition restores its parent from settings. Reapply the transient control origin;
                 // successful drops still persist the content origin, never this above/below titlebar origin.
                 PositionComposition(viewport);
