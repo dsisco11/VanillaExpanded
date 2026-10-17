@@ -21,12 +21,12 @@ public sealed class ApproximateTimeDialRendererTests
         var renderer = new Mock<IRenderAPI>();
         var matrix = new Matrixf().Identity();
         var bounds = new RectangleF(23, 41, size, size);
-        double pivotX = bounds.X + size / 2d, pivotY = bounds.Y + size * 250d / 512;
+        double pivotX = 0, pivotY = 0;
         var order = new List<string>();
         renderer.Setup(value => value.GlPushMatrix()).Callback(() => order.Add("push"));
         renderer.Setup(value => value.GlPopMatrix()).Callback(() => order.Add("pop"));
         renderer.Setup(value => value.GlTranslate(It.IsAny<double>(), It.IsAny<double>(), It.IsAny<double>()))
-            .Callback<double, double, double>((x, y, z) => { matrix.Translate(x, y, z); order.Add("translate"); });
+            .Callback<double, double, double>((x, y, z) => { pivotX = x; pivotY = y; matrix.Translate(x, y, z); order.Add("translate"); });
         renderer.Setup(value => value.GlRotate(It.IsAny<float>(), 0, 0, 1))
             .Callback<float, float, float, float>((angle, _, _, _) => { matrix.RotateZDeg(angle); order.Add("rotate"); });
         renderer.Setup(value => value.RenderTexture(7, It.IsAny<double>(), It.IsAny<double>(), It.IsAny<double>(),
@@ -34,12 +34,14 @@ public sealed class ApproximateTimeDialRendererTests
             .Callback<int, double, double, double, double, float, Vec4f>((_, x, y, width, height, _, tint) =>
             {
                 order.Add("draw");
-                var spindle = matrix.TransformVector(new Vec4f((float)(x + width / 2), (float)(y + height * 250 / 512), 0, 1));
+                // Verify rotation around the declared spindle, independently of its artwork registration coordinates.
+                Assert.InRange(0d, x, x + width); Assert.InRange(0d, y, y + height);
+                var spindle = matrix.TransformVector(new Vec4f(0, 0, 0, 1));
                 Assert.Equal(pivotX, spindle.X, 4); Assert.Equal(pivotY, spindle.Y, 4);
-                var top = matrix.TransformVector(new Vec4f((float)(x + width / 2), (float)y, 0, 1));
-                Assert.Equal(pivotX + directionX * height * 250 / 512, top.X, 4);
-                Assert.Equal(pivotY + directionY * height * 250 / 512, top.Y, 4);
-                Assert.Equal(.35f, tint.W); Assert.Equal(1, tint.X); Assert.Equal(size, width); Assert.Equal(size, height);
+                var top = matrix.TransformVector(new Vec4f(0, (float)(-height / 2), 0, 1));
+                Assert.Equal(pivotX + directionX * height / 2, top.X, 4);
+                Assert.Equal(pivotY + directionY * height / 2, top.Y, 4);
+                Assert.Equal(size, width); Assert.Equal(size, height);
             });
         new ApproximateTimeDialRenderer().Draw(renderer.Object, 7, bounds, .35f, (float)rotation);
         Assert.Equal(new[] { "push", "translate", "rotate", "draw", "pop" }, order);

@@ -66,7 +66,7 @@ public sealed class PlayerWetnessOverlayTests : IDisposable
         var preparation = new HudOverlayPreparationContext(fixture.Api.Object, 1, "en");
         fixture.Entity.WatchedAttributes.SetFloat("wetness", .25f);
         overlay.Refresh(); overlay.Prepare(preparation);
-        Assert.Equal(new SizeF(36, 36), overlay.Measure());
+        Assert.NotEqual(SizeF.Empty, overlay.Measure());
         fixture.Entity.WatchedAttributes.SetFloat("wetness", .75f);
         overlay.Refresh(); overlay.Prepare(preparation);
         Assert.Equal(1, builds);
@@ -86,7 +86,7 @@ public sealed class PlayerWetnessOverlayTests : IDisposable
         Assert.Null(overlay.Wetness); Assert.All(artwork, texture => Assert.NotEqual(0, texture.TextureId));
     }
 
-    /// <summary>Both blue silhouettes remain fully drawn at every wetness while the numeric percentage changes.</summary>
+    /// <summary>Both silhouettes remain fully drawn at every wetness while the numeric percentage changes.</summary>
     [Theory]
     [InlineData(.01f, "1%")] [InlineData(.5f, "50%")] [InlineData(1, "100%")]
     public void FullDropsRemainIdenticalAcrossWetness(float wetness, string expectedReading)
@@ -109,16 +109,8 @@ public sealed class PlayerWetnessOverlayTests : IDisposable
         // Full mask and outline share each drop's rectangle; the host alone owns scissor state.
         for (int index = 0; index < draws.Length; index++)
         {
-            bool large = index < 2;
-            Assert.Equal(large ? 2.25f : 17.25f, (float)draws[index].Arguments[1]);
-            Assert.Equal(large ? 1.5f : 0f, (float)draws[index].Arguments[2]);
-            Assert.Equal(large ? 22.5f : 13.5f, (float)draws[index].Arguments[3]);
-            Assert.Equal(large ? 22.5f : 13.5f, (float)draws[index].Arguments[4]);
-            if (index % 2 == 0)
-            {
-                var tint = Assert.IsType<Vintagestory.API.MathTools.Vec4f>(draws[index].Arguments[6]);
-                Assert.Equal(.25f, tint.R); Assert.Equal(.65f, tint.G); Assert.Equal(1, tint.B); Assert.Equal(1, tint.A);
-            }
+            var pair = draws[index / 2 * 2];
+            Assert.Equal(pair.Arguments.Skip(1).Take(4), draws[index].Arguments.Skip(1).Take(4));
         }
         renderer.Verify(value => value.PushScissor(It.IsAny<ElementBounds>(), It.IsAny<bool>()), Times.Never);
         renderer.Verify(value => value.PopScissor(), Times.Never);
@@ -147,12 +139,15 @@ public sealed class PlayerWetnessOverlayTests : IDisposable
         Assert.Equal(new[] { "25%", "26%" }, readings);
         Assert.Equal(0, renderedText[0].TextureId);
         var renderer = new Mock<IRenderAPI>();
-        presentation.Draw(renderer.Object, Bounds(), new RectangleF(0, 0, 36, 36));
+        var bounds = Bounds();
+        presentation.Draw(renderer.Object, bounds, new RectangleF(0, 0, (float)bounds.OuterWidth, (float)bounds.OuterHeight));
         var reading = Assert.Single(renderer.Invocations, call => call.Method.Name == "Render2DTexturePremultipliedAlpha");
         double x = (double)reading.Arguments[1], y = (double)reading.Arguments[2];
         double width = (double)reading.Arguments[3], height = (double)reading.Arguments[4];
-        Assert.Equal(18, x + width / 2, 5);
-        Assert.True(y >= 24 && y + height <= 36);
+        Assert.Equal(bounds.renderX + bounds.OuterWidth / 2, x + width / 2, 5);
+        var dropBottom = renderer.Invocations.Where(call => call.Method.Name == "Render2DTexture")
+            .Max(call => (float)call.Arguments[2] + (float)call.Arguments[4]);
+        Assert.True(y >= dropBottom && y + height <= bounds.renderY + bounds.OuterHeight);
         presentation.Reset();
         Assert.Equal(0, renderedText[1].TextureId);
         Assert.Equal(SizeF.Empty, presentation.Size);

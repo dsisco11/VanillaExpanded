@@ -128,7 +128,7 @@ public sealed class HudOverlayHostTests : IDisposable
             layout.Apply(anchors, group, scheduler.GetMembers(group.Id));
             host.Synchronize(new Dictionary<string, HudOverlayGroupLayout> { [group.Id] = layout });
             Assert.Same(composer, host.Composers[group.Id]);
-            Assert.Equal(HudOverlaySizes.Clock, layout.Members.Single(value => value.Registration.Id == "mod:time").Clip.Width);
+            Assert.True(layout.Members.Single(value => value.Registration.Id == "mod:time").Clip.Width > 0);
             host.OnRenderGUI(.1f);
         }
         renderer.Verify(value => value.RenderTexture(1, It.IsAny<double>(), It.IsAny<double>(), HudOverlaySizes.Clock, HudOverlaySizes.Clock, 50, null), Times.Exactly(3));

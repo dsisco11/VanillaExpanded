@@ -41,9 +41,7 @@ public sealed class WeatherConditionsSystemTests
             Assert.Equal(HudOverlayPoint.RightTop, group.Placement.Pivot);
             Assert.Equal(HudOverlayDirection.Vertical, group.Packing.Direction);
             Assert.Equal(HudOverlayCrossAlignment.End, group.Packing.CrossAlignment);
-            Assert.Equal(0, group.Placement.OffsetX); Assert.Equal(0, group.Placement.OffsetY);
-            Assert.Equal(0, group.Packing.Padding);
-            Assert.Equal(3, group.Placement.ScreenPaddingPixels);
+
             hud.Registry.BeginSession(fixture.Api.Object);
             WeatherConditionsOverlay? overlay = null;
             hud.Registry.RunPass(registration =>

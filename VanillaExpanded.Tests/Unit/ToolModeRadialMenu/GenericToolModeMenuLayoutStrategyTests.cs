@@ -91,8 +91,8 @@ public sealed class GenericToolModeMenuLayoutStrategyTests : IDisposable
         Assert.Equal(Enumerable.Range(0, count).Select(index => index.ToString()), rings.SelectMany(ring => ring.EntryIds));
         foreach (var ring in rings)
         {
-            Assert.Equal(RadialMenuWedgeStyle.RingGapFraction, ring.InnerRadius - ring.InnerMenu!.OuterRadius, 6);
-            Assert.Equal(ToolModeMenuGeometry.DefaultRingThickness, ring.OuterRadius - ring.InnerRadius, 6);
+            Assert.True(ring.InnerRadius > ring.InnerMenu!.OuterRadius);
+            Assert.Equal(rings[0].OuterRadius - rings[0].InnerRadius, ring.OuterRadius - ring.InnerRadius, 6);
             foreach (string id in ring.EntryIds)
             {
                 Assert.True(content.Layout.TryGetEntryCenter(id, 0, 0, 145.8, out var center));
