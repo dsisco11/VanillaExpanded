@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering;
 using Vintagestory.API.Client;
@@ -22,7 +23,12 @@ internal sealed class TemporalStormOverlay : IHudOverlay, IHudOverlayBackdropPro
 
     /// <summary>Retains the last preparation for the shared host's exit transition.</summary>
     public void HidePresentation() => Clear();
+    private bool styleChanged;
+
     #region Public API
+    /// <summary>Retains style invalidation until the next eligible content and layout refresh.</summary>
+    public void SetStyle(HudIndicatorStyle style) => styleChanged |= presentation.SetStyle(style);
+
     #region Lifecycle
     /// <summary>Creates the presentation with optional headless texture loading.</summary>
     public TemporalStormOverlay(System.Func<HudOverlayPreparationContext, LoadedTexture[]>? load = null,
@@ -91,7 +97,8 @@ internal sealed class TemporalStormOverlay : IHudOverlay, IHudOverlayBackdropPro
             presentation.SetContent(next.Value, remaining,
                 next == TemporalStormStage.Active && remaining < TemporalStormSource.ImminentWindowDays);
         }
-        if (next == stage) return HudOverlayChange.None;
+        if (next == stage && !styleChanged) return HudOverlayChange.None;
+        styleChanged = false;
         stage = next;
         if (!next.HasValue) presentation.Hide();
         return HudOverlayChange.Presentation | HudOverlayChange.Measurement;

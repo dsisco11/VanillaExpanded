@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering;
 using Vintagestory.API.Client;
@@ -9,24 +10,22 @@ using Vintagestory.GameContent;
 namespace VanillaExpanded.WeatherConditions;
 
 /// <summary>Composes borrowed weather layers into one fixed HUD footprint with one shared backdrop.</summary>
-internal sealed class WeatherConditionsPresentation : IDisposable
+internal sealed class WeatherConditionsPresentation : HudIndicatorPresentation<HudIndicatorStyle>
 {
     private const float Diameter = HudOverlaySizes.Standard;
     private readonly System.Func<HudOverlayPreparationContext, LoadedTexture[]> load;
     private readonly System.Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?> loadBackdrop;
     private LoadedTexture[]? icons;
     private IHudOverlayIconBackdrop? backdrop;
-    private HudOverlayPreparationContext? context;
     private WeatherConditionsSample? sample;
     private int[] layers = [];
-    /// <summary>Controls visibility and retained resources during transitions.</summary>
-    public HudOverlayVisibilityTransition Visibility { get; } = new();
-    public SizeF Size { get; private set; }
     #region Public API
     #region Content and rendering
     /// <summary>Uses native cached assets, with an injectable loader for headless lifecycle checks.</summary>
     public WeatherConditionsPresentation(System.Func<HudOverlayPreparationContext, LoadedTexture[]>? load = null,
-        System.Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null)
+        System.Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null,
+        HudIndicatorTextPresentation? textStyle = null)
+        : base(HudIndicatorStyle.Icon, HudIndicatorStyle.Text, textStyle)
     {
         this.load = load ?? LoadIcons;
         this.loadBackdrop = loadBackdrop ?? HudOverlayIconBackdrop.Load;
@@ -42,25 +41,36 @@ internal sealed class WeatherConditionsPresentation : IDisposable
     {
         if (sample == null) return;
         // An empty update can still cross API ownership; discard old cache bindings before deferring the loads.
-        if (!ReferenceEquals(context?.Api, preparation.Api))
+        if (!ReferenceEquals(Context?.Api, preparation.Api))
         {
             icons = null;
             backdrop = null;
         }
         bool hasData = sample.Precipitation.HasValue || sample.Fog || sample.CloudCoverage.HasValue
             || sample.WindIntensity > 0 || sample.ThunderIntensity > 0;
+        if (IsTextStyle)
+        {
+            if (hasData)
+            {
+                TryPrepareText(preparation, "weather", WeatherConditionsText.Format(sample));
+            }
+            else Size = SizeF.Empty;
+            return;
+        }
         if (hasData && icons == null) icons = load(preparation);
         bool visible = hasData && (icons?.Length == WeatherConditionsLayers.Names.Length || sample.Precipitation.HasValue || sample.Fog);
         if (visible && backdrop == null) backdrop = loadBackdrop(preparation);
-        context = preparation;
+        Context = preparation;
         Size = visible ? new SizeF(Diameter, Diameter) : SizeF.Empty;
         if (visible) Visibility.Show();
     }
     /// <summary>Draws only borrowed prepared textures; the host owns clipping and GUI visibility.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds)
     {
-        if (sample == null || icons == null || context == null || Size.IsEmpty) return;
-        double pixels = Diameter * context.GuiScale;
+        if (sample == null || Context == null || Size.IsEmpty) return;
+        if (TryDrawText(renderer, bounds)) return;
+        if (icons == null) return;
+        double pixels = Diameter * Context.GuiScale;
         double x = bounds.renderX, y = bounds.renderY + (bounds.OuterHeight - pixels) / 2;
         if (icons.Length == WeatherConditionsLayers.Names.Length)
         {
@@ -87,27 +97,26 @@ internal sealed class WeatherConditionsPresentation : IDisposable
     /// <summary>Queues one shared backdrop only when the prepared composite is visible.</summary>
     public void CollectBackdrops(IRenderAPI renderer, ElementBounds bounds)
     {
-        if (sample == null || icons == null || context == null || Size.IsEmpty) return;
-        double y = bounds.renderY + (bounds.OuterHeight - HudOverlaySizes.Standard * context.GuiScale) / 2;
-        backdrop?.Queue(renderer, bounds.renderX, y, context.GuiScale);
+        if (sample == null || icons == null || Context == null || Size.IsEmpty) return;
+        double y = bounds.renderY + (bounds.OuterHeight - HudOverlaySizes.Standard * Context.GuiScale) / 2;
+        backdrop?.Queue(renderer, bounds.renderX, y, Context.GuiScale);
     }
-    /// <summary>Retains prepared content until the visibility exit finishes.</summary>
-    public void Hide() => Visibility.Hide(Reset);
-    /// <summary>Drops bindings without deleting resources owned by the engine cache.</summary>
-    public void Reset()
+    #endregion
+    #endregion
+    #region Protected API
+    /// <summary>Releases feature artwork without changing sampled content or feature timers.</summary>
+    protected override void ReleaseArtwork()
     {
-        Visibility.Reset();
-        icons = null;
-        backdrop = null;
-        context = null;
-        sample = null;
-        layers = [];
-        Size = SizeF.Empty;
+        icons = null; backdrop = null;
     }
-    /// <summary>Releases borrowed bindings on final removal.</summary>
-    public void Dispose() => Reset();
+
+    /// <summary>Clears feature contents after a completed exit or world change.</summary>
+    protected override void ClearContent()
+    {
+        sample = null; layers = [];
+    }
     #endregion
-    #endregion
+
     #region Private
     /// <summary>Loads straight-alpha asset textures while leaving disposal ownership with the game.</summary>
     private static LoadedTexture[] LoadIcons(HudOverlayPreparationContext preparation)
@@ -135,4 +144,5 @@ internal sealed class WeatherConditionsPresentation : IDisposable
         return textures;
     }
     #endregion
+
 }

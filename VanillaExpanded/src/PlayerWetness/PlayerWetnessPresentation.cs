@@ -1,5 +1,7 @@
 using System;
 using System.Drawing;
+using VanillaExpanded.HudOverlays.Configuration;
+using Vintagestory.API.Config;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering;
 using Vintagestory.API.Client;
@@ -8,7 +10,7 @@ using Vintagestory.API.MathTools;
 namespace VanillaExpanded.PlayerWetness;
 
 /// <summary>Borrows slim droplet artwork and owns a percentage reading beneath two fully filled drops.</summary>
-internal sealed class PlayerWetnessPresentation : IDisposable
+internal sealed class PlayerWetnessPresentation : HudIndicatorPresentation<HudIndicatorStyle>
 {
     private readonly Func<HudOverlayPreparationContext, LoadedTexture[]> createTextures;
     private readonly Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?> loadBackdrop;
@@ -16,21 +18,18 @@ internal sealed class PlayerWetnessPresentation : IDisposable
     private readonly HudOverlayIconTextPresentation text;
     private readonly ElementBounds textBounds = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
     private float readingWidth;
+    private int percentage;
     private readonly Vec4f fillTint = new(.25f, .65f, 1, 1);
     private LoadedTexture[]? textures;
     private IHudOverlayIconBackdrop? backdrop;
-    private HudOverlayPreparationContext? context;
 
     #region Public API
     #region Content and preparation
-    /// <summary>Controls entry, exit, and retained artwork lifetime.</summary>
-    public HudOverlayVisibilityTransition Visibility { get; } = new();
-    /// <summary>Gets the base GUI footprint, independent of the game's scale.</summary>
-    public SizeF Size { get; private set; }
     /// <summary>Accepts borrowed artwork loaders and an optional owned text presentation for headless verification.</summary>
     public PlayerWetnessPresentation(Func<HudOverlayPreparationContext, LoadedTexture[]>? createTextures = null,
         Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null,
-        HudOverlayIconTextPresentation? text = null)
+        HudOverlayIconTextPresentation? text = null, HudIndicatorTextPresentation? textStyle = null)
+        : base(HudIndicatorStyle.Icon, HudIndicatorStyle.Text, textStyle)
     {
         this.text = text ?? new HudOverlayIconTextPresentation(fontSize: HudOverlaySizes.Text);
         this.createTextures = createTextures ?? PlayerWetnessIconTextures.Create;
@@ -40,19 +39,25 @@ internal sealed class PlayerWetnessPresentation : IDisposable
     public void SetContent(float value)
     {
         // The percentage carries intensity while the artwork remains fully filled.
-        int percentage = Math.Clamp((int)Math.Round(value * 100, MidpointRounding.AwayFromZero), 1, 100);
+        percentage = Math.Clamp((int)Math.Round(value * 100, MidpointRounding.AwayFromZero), 1, 100);
         text.SetContent(null, "vanillaexpanded:player-wetness-reading", percentage);
     }
     /// <summary>Loads cached artwork at the preparation boundary and reuses it for subsequent readings.</summary>
     public void Prepare(HudOverlayPreparationContext preparation)
     {
-        if (textures == null || !ReferenceEquals(context?.Api, preparation.Api))
+        if (IsTextStyle)
+        {
+            TryPrepareText(preparation, "wetness", Lang.GetL(preparation.Locale, "vanillaexpanded:player-wetness-reading", percentage));
+            return;
+        }
+        if (textures == null || !ReferenceEquals(Context?.Api, preparation.Api))
         {
             var replacement = createTextures(preparation);
             textures = replacement;
             backdrop = loadBackdrop(preparation);
         }
-        context = preparation;
+        Context = preparation;
+        text.SetContent(null, "vanillaexpanded:player-wetness-reading", percentage);
         text.Prepare(preparation);
         readingWidth = text.Size.Width * Math.Min(1, ReadingHeight / Math.Max(1, text.Size.Height));
         Size = new SizeF(Math.Max(HudOverlaySizes.Standard, readingWidth), HudOverlaySizes.Standard);
@@ -63,15 +68,17 @@ internal sealed class PlayerWetnessPresentation : IDisposable
     /// <summary>Queues the shared backdrop separately from the foreground layers.</summary>
     public void CollectBackdrops(IRenderAPI renderer, ElementBounds bounds)
     {
-        if (context == null || textures == null) return;
-        double pixels = HudOverlaySizes.Standard * context.GuiScale;
-        backdrop?.Queue(renderer, bounds.renderX, bounds.renderY + (bounds.OuterHeight - pixels) / 2, context.GuiScale);
+        if (Context == null || textures == null) return;
+        double pixels = HudOverlaySizes.Standard * Context.GuiScale;
+        backdrop?.Queue(renderer, bounds.renderX, bounds.renderY + (bounds.OuterHeight - pixels) / 2, Context.GuiScale);
     }
     /// <summary>Draws the twin drops above a centered cached percentage within the shared indicator height.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip)
     {
-        if (context == null || textures == null) return;
-        double scale = context.GuiScale;
+        if (Context == null) return;
+        if (TryDrawText(renderer, bounds)) return;
+        if (textures == null) return;
+        double scale = Context.GuiScale;
         double x = bounds.renderX + (Size.Width - HudOverlaySizes.Standard) * scale / 2;
         double y = bounds.renderY + (bounds.OuterHeight - HudOverlaySizes.Standard * scale) / 2;
         DrawDrop(renderer, x + 2.25 * scale, y + 1.5 * scale, 22.5 * scale);
@@ -86,23 +93,28 @@ internal sealed class PlayerWetnessPresentation : IDisposable
     }
     #endregion
     #region Lifecycle
-    /// <summary>Retains the artwork and reading while the exit fades.</summary>
-    public void Hide() => Visibility.Hide(Reset);
-    /// <summary>Releases owned reading pixels and borrowed texture bindings at world exit or after an animated exit.</summary>
-    public void Reset()
+    /// <summary>Ends shared presentation ownership and disposes feature-owned helpers.</summary>
+    public override void Dispose()
     {
-        Visibility.Reset();
-        text.Reset();
-        textures = null; backdrop = null; context = null; readingWidth = 0; Size = SizeF.Empty;
-    }
-    /// <summary>Releases all presentation bindings on final removal.</summary>
-    public void Dispose()
-    {
-        Reset();
+        base.Dispose();
         text.Dispose();
     }
     #endregion
     #endregion
+    #region Protected API
+    /// <summary>Releases feature artwork without changing sampled content or feature timers.</summary>
+    protected override void ReleaseArtwork()
+    {
+        text.Reset(); textures = null; backdrop = null;
+    }
+
+    /// <summary>Clears feature contents after a completed exit or world change.</summary>
+    protected override void ClearContent()
+    {
+        readingWidth = 0; percentage = 0;
+    }
+    #endregion
+
     #region Private
     /// <summary>Draws the complete blue silhouette beneath its outline; the host supplies clipping.</summary>
     private void DrawDrop(IRenderAPI renderer, double x, double y, double pixels)
@@ -112,4 +124,6 @@ internal sealed class PlayerWetnessPresentation : IDisposable
         renderer.Render2DTexture(textures![0].TextureId, (float)x, (float)y, (float)pixels, (float)pixels, 50, HudOverlayDrawOpacity.Tint);
     }
     #endregion
+
+
 }

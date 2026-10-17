@@ -1,3 +1,4 @@
+using System.Text.Json;
 using VanillaExpanded.ItemSlotIndicators;
 using VanillaExpanded.ModSystems;
 using Vintagestory.API.Datastructures;
@@ -9,6 +10,40 @@ namespace VanillaExpanded.Tests.Unit.Configuration;
 public sealed class FreshnessIndicatorStyleConfigTests
 {
     #region Public API
+    /// <summary>All item-slot indicator settings are sorted into their dedicated localized ConfigLib section.</summary>
+    [Fact]
+    public void ItemSlotIndicatorSettings_HaveDedicatedSection()
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "VanillaExpanded.sln"))) root = root.Parent;
+        Assert.NotNull(root);
+        using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(root.FullName, "VanillaExpanded", "assets",
+            "vanillaexpanded", "config", "configlib-patches.json")));
+        var heading = document.RootElement.GetProperty("formatting").EnumerateArray().Single(entry =>
+            entry.GetProperty("title").GetString() == "vanillaexpanded:config-section-item-slot-indicators");
+        float sectionWeight = heading.GetProperty("weight").GetSingle();
+        // HUD selectors also contain "Indicator"; section ownership is defined by these item-slot settings.
+        string[] itemSlotNames =
+        [
+            nameof(VanillaExpandedConfig.EnablePerishableItemFreshnessIndicators),
+            nameof(VanillaExpandedConfig.EnablePreparationIndicators),
+            nameof(VanillaExpandedConfig.EnableClothingIndicators),
+            nameof(VanillaExpandedConfig.EnableLiquidContainerIndicators),
+            nameof(VanillaExpandedConfig.EnableLiquidSloshEffect),
+            nameof(VanillaExpandedConfig.EnableCrucibleIndicators),
+            nameof(VanillaExpandedConfig.EnableCrucibleEffect),
+            nameof(VanillaExpandedConfig.EnableNightVisionFuelIndicators),
+            nameof(VanillaExpandedConfig.FoodLevelIndicatorStyle),
+            nameof(VanillaExpandedConfig.PerishableItemFreshnessIndicatorStyle),
+            nameof(VanillaExpandedConfig.CrucibleIndicatorCapacityUnits),
+            nameof(VanillaExpandedConfig.PerishableItemFreshnessIndicatorIntensity)
+        ];
+        var indicatorSettings = document.RootElement.GetProperty("settings").EnumerateObject()
+            .SelectMany(category => category.Value.EnumerateObject()).Where(setting => itemSlotNames.Contains(setting.Name));
+        Assert.Equal(12, indicatorSettings.Count());
+        Assert.All(indicatorSettings, setting => Assert.InRange(setting.Value.GetProperty("weight").GetSingle(),
+            sectionWeight + 0.01f, sectionWeight + 0.99f));
+    }
     /// <summary>ConfigLib's saved mapping keys load without discarding other settings; numeric legacy values also load.</summary>
     [Theory]
     [InlineData("\"freshness-background\"", "freshness-background", 0)]

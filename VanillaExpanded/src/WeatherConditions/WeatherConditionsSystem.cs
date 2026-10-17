@@ -29,6 +29,7 @@ internal sealed class WeatherConditionsSystem : ModSystem, ILiveConfigurable
         this.api = api;
         hud = api.ModLoader.GetModSystem<HudOverlaySystem>();
         overlay = new WeatherConditionsOverlay();
+        overlay.SetStyle(VanillaExpandedModSystem.Config.WeatherConditionsIndicatorStyle);
         overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays && VanillaExpandedModSystem.Config.EnableWeatherConditionsOverlay);
         try
         {
@@ -44,6 +45,7 @@ internal sealed class WeatherConditionsSystem : ModSystem, ILiveConfigurable
     public void OnConfigReloaded(ICoreAPI api)
     {
         if (disposed || !ReferenceEquals(this.api, api) || overlay == null) return;
+        overlay.SetStyle(VanillaExpandedModSystem.Config.WeatherConditionsIndicatorStyle);
         overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays && VanillaExpandedModSystem.Config.EnableWeatherConditionsOverlay);
         // Cleanup must also occur while global visibility suppresses normal selector observation.
         hud?.Session?.Scheduler?.Invalidate(OverlayId);

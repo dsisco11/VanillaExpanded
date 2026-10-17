@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering;
 using Vintagestory.API.Client;
@@ -22,7 +23,12 @@ internal sealed class WeatherConditionsOverlay : IHudOverlay, IHudOverlayBackdro
 
     /// <summary>Retains the last preparation for the shared host's exit transition.</summary>
     public void HidePresentation() => Clear();
+    private bool styleChanged;
+
     #region Public API
+    /// <summary>Retains style invalidation until the next eligible content and layout refresh.</summary>
+    public void SetStyle(HudIndicatorStyle style) => styleChanged |= presentation.SetStyle(style);
+
     #region Lifecycle
     /// <summary>Creates an icon-only presentation with optional headless asset loading.</summary>
     public WeatherConditionsOverlay(System.Func<HudOverlayPreparationContext, LoadedTexture[]>? load = null,
@@ -88,7 +94,8 @@ internal sealed class WeatherConditionsOverlay : IHudOverlay, IHudOverlayBackdro
         var next = WeatherConditionsSampler.Sample(api, weather, snapshot, climate,
             ReferenceEquals(sampledEntity, entity) ? Sample : null);
         sampledEntity = entity;
-        if (next == Sample) return HudOverlayChange.None;
+        if (next == Sample && !styleChanged) return HudOverlayChange.None;
+        styleChanged = false;
         Sample = next;
         presentation.SetContent(next);
         return HudOverlayChange.Presentation | HudOverlayChange.Measurement;

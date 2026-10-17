@@ -29,6 +29,7 @@ internal sealed class BowAmmunitionSystem : ModSystem, ILiveConfigurable
         this.api = api;
         hud = api.ModLoader.GetModSystem<HudOverlaySystem>();
         overlay = new BowAmmunitionOverlay(() => hud?.Session?.Scheduler?.Invalidate(OverlayId));
+        overlay.SetStyle(VanillaExpandedModSystem.Config.BowAmmunitionIndicatorStyle);
         overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays && VanillaExpandedModSystem.Config.EnableBowAmmunitionOverlay);
         try
         {
@@ -44,6 +45,7 @@ internal sealed class BowAmmunitionSystem : ModSystem, ILiveConfigurable
     public void OnConfigReloaded(ICoreAPI api)
     {
         if (disposed || !ReferenceEquals(this.api, api) || overlay == null) return;
+        overlay.SetStyle(VanillaExpandedModSystem.Config.BowAmmunitionIndicatorStyle);
         overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays
             && VanillaExpandedModSystem.Config.EnableBowAmmunitionOverlay);
         // Cleanup must also occur while global visibility suppresses normal selector observation.

@@ -1,5 +1,7 @@
 using System;
 using System.Drawing;
+using VanillaExpanded.HudOverlays.Configuration;
+using Vintagestory.API.Config;
 using Vintagestory.API.Common;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering;
@@ -9,7 +11,7 @@ using Vintagestory.API.MathTools;
 namespace VanillaExpanded.BodyTemperature;
 
 /// <summary>Borrows asset-backed thermometer textures and owns whole-degree text; drawing crops and tints a cached full silhouette mask.</summary>
-internal sealed class BodyTemperatureThermometerPresentation : IDisposable
+internal sealed class BodyTemperatureThermometerPresentation : HudIndicatorPresentation<HudIndicatorStyle>
 {
     internal const float IconWidth = HudOverlaySizes.ThermometerWidth, IconHeight = HudOverlaySizes.Standard, Gap = HudOverlaySizes.ReadingGap;
     private const float ChevronWidth = HudOverlaySizes.ChevronWidth, ChevronHeight = HudOverlaySizes.ChevronHeight, ChevronGap = HudOverlaySizes.ChevronGap, ReadingHeight = HudOverlaySizes.BodyReadingHeight;
@@ -19,23 +21,21 @@ internal sealed class BodyTemperatureThermometerPresentation : IDisposable
     private LoadedTexture[]? icons;
     private IHudOverlayIconBackdrop? backdrop;
     private readonly System.Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?> loadBackdrop;
-    private HudOverlayPreparationContext? context;
     private BodyTemperatureSample? sample;
     private bool showReading;
     private readonly ElementBounds fillClip = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
     private readonly Vec4f tint = new(1, 1, 1, 1);
     private readonly Vec4f warmingTint = new(1, .65f, .2f, 1);
     private readonly Vec4f coolingTint = new(.25f, .6f, 1, 1);
-    /// <summary>Controls visibility and retained resources during transitions.</summary>
-    public HudOverlayVisibilityTransition Visibility { get; } = new();
-    public SizeF Size { get; private set; }
 
     #region Public API
     #region Content and presentation
     /// <summary>Accepts an owned text presentation and optional borrowed asset-texture loader for headless verification.</summary>
     public BodyTemperatureThermometerPresentation(HudOverlayIconTextPresentation text,
         System.Func<HudOverlayPreparationContext, LoadedTexture[]>? createIcons = null,
-        System.Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null)
+        System.Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null,
+        HudIndicatorTextPresentation? textStyle = null)
+        : base(HudIndicatorStyle.Icon, HudIndicatorStyle.Text, textStyle)
     {
         this.text = text;
         this.createIcons = createIcons ?? LoadIcons;
@@ -62,14 +62,26 @@ internal sealed class BodyTemperatureThermometerPresentation : IDisposable
     public void Prepare(HudOverlayPreparationContext preparation)
     {
         if (sample == null) return;
-        if (icons == null || !ReferenceEquals(context?.Api, preparation.Api))
+        if (IsTextStyle)
+        {
+            string risk = sample.Risk.ToString().ToUpperInvariant();
+            string value = showReading ? Lang.GetL(preparation.Locale, "vanillaexpanded:body-temperature-reading", sample.DisplayCelsius) + " " + risk : risk;
+            if (sample.Trend != 0) value += sample.Trend > 0 ? " +" + sample.Trend : " " + sample.Trend;
+            TryPrepareText(preparation, "body-temperature", value);
+            return;
+        }
+        if (icons == null || !ReferenceEquals(Context?.Api, preparation.Api))
         {
             var replacement = createIcons(preparation);
             icons = replacement;
         }
-        if (backdrop == null || !ReferenceEquals(context?.Api, preparation.Api)) backdrop = loadBackdrop(preparation);
-        context = preparation;
-        if (showReading) text.Prepare(preparation);
+        if (backdrop == null || !ReferenceEquals(Context?.Api, preparation.Api)) backdrop = loadBackdrop(preparation);
+        Context = preparation;
+        if (showReading)
+        {
+            text.SetContent(null, "vanillaexpanded:body-temperature-reading", sample.DisplayCelsius);
+            text.Prepare(preparation);
+        }
         // Reserve room for two vertically stacked chevrons and fit the normal-sized reading into the remaining height.
         readingWidth = showReading ? text.Size.Width * Math.Min(1, ReadingHeight / Math.Max(1, text.Size.Height)) : 0;
         float trendWidth = sample.Trend == 0 ? 0 : ChevronWidth;
@@ -80,8 +92,10 @@ internal sealed class BodyTemperatureThermometerPresentation : IDisposable
     /// <summary>Draws the tinted full mask through a fill scissor, then the outline through native texture rendering within the host clip.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime)
     {
-        if (sample == null || icons == null || context == null) return;
-        double scale = context.GuiScale;
+        if (sample == null || Context == null) return;
+        if (TryDrawText(renderer, bounds)) return;
+        if (icons == null) return;
+        double scale = Context.GuiScale;
         // Center the narrow thermometer within the same HudOverlaySizes.Standard-unit circle used by the other status icons.
         double x = bounds.renderX + 7.5 * scale, y = bounds.renderY + (bounds.OuterHeight - IconHeight * scale) / 2;
         // Reveal the full mask upward while retaining the bulb at the minimum temperature fill.
@@ -129,32 +143,33 @@ internal sealed class BodyTemperatureThermometerPresentation : IDisposable
     /// <summary>Queues the prepared icon circle separately from foreground drawing.</summary>
     public void CollectBackdrops(IRenderAPI renderer, ElementBounds bounds)
     {
-        if (sample == null || icons == null || context == null) return;
-        double pixels = HudOverlaySizes.Standard * context.GuiScale;
+        if (sample == null || icons == null || Context == null) return;
+        double pixels = HudOverlaySizes.Standard * Context.GuiScale;
         double y = bounds.renderY + (bounds.OuterHeight - pixels) / 2;
-        backdrop?.Queue(renderer, bounds.renderX, y, context.GuiScale);
+        backdrop?.Queue(renderer, bounds.renderX, y, Context.GuiScale);
     }
     #region Lifecycle
-    /// <summary>Retains prepared content until the visibility exit finishes.</summary>
-    public void Hide() => Visibility.Hide(Reset);
-    /// <summary>Releases owned text and borrowed texture bindings and clears sampled state at suspension or world exit.</summary>
-    public void Reset()
+    /// <summary>Ends shared presentation ownership and disposes feature-owned helpers.</summary>
+    public override void Dispose()
     {
-        Visibility.Reset();
-        icons = null;
-        backdrop = null;
-        text.Reset();
-        sample = null;
-        context = null;
-        Size = SizeF.Empty;
-    }
-    /// <summary>Releases borrowed artwork bindings and the owned text presentation on final removal.</summary>
-    public void Dispose()
-    {
-        Reset();
+        base.Dispose();
         text.Dispose();
     }
     #endregion
+    #endregion
+
+    #region Protected API
+    /// <summary>Releases feature artwork without changing sampled content or feature timers.</summary>
+    protected override void ReleaseArtwork()
+    {
+        icons = null; backdrop = null; text.Reset();
+    }
+
+    /// <summary>Clears feature contents after a completed exit or world change.</summary>
+    protected override void ClearContent()
+    {
+        sample = null;
+    }
     #endregion
 
     #region Private
@@ -182,4 +197,6 @@ internal sealed class BodyTemperatureThermometerPresentation : IDisposable
         return [outline, mask, up, down];
     }
     #endregion
+
+
 }

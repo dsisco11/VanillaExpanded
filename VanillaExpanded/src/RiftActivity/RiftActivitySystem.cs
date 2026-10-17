@@ -29,6 +29,7 @@ internal sealed class RiftActivitySystem : ModSystem, ILiveConfigurable
         this.api = api;
         hud = api.ModLoader.GetModSystem<HudOverlaySystem>();
         overlay = new RiftActivityOverlay();
+        overlay.SetStyle(VanillaExpandedModSystem.Config.RiftActivityIndicatorStyle);
         overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays && VanillaExpandedModSystem.Config.EnableRiftActivityOverlay);
         try
         {
@@ -43,6 +44,7 @@ internal sealed class RiftActivitySystem : ModSystem, ILiveConfigurable
     public void OnConfigReloaded(ICoreAPI api)
     {
         if (disposed || !ReferenceEquals(this.api, api) || overlay == null) return;
+        overlay.SetStyle(VanillaExpandedModSystem.Config.RiftActivityIndicatorStyle);
         overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays && VanillaExpandedModSystem.Config.EnableRiftActivityOverlay);
         // Cleanup must also occur while global visibility suppresses normal selector observation.
         hud?.Session?.Scheduler?.Invalidate(OverlayId);

@@ -113,7 +113,23 @@ Set the registration's optional `hoverLabelKey` to a namespaced localization key
 
 Hover labels do not capture input or take focus. Overlays receive no mouse events or hover callbacks; interactive controls require separate API support.
 
-Time, environmental temperature, and calendar each have an independent style selector: `ApproximateTimeGaugeStyle`, `EnvironmentalTemperatureGaugeStyle`, and `CalendarDateGaugeStyle`. All use the `EnvironmentalGaugeStyle` enum, with `Immersive` (the default) and `Icon` values. JSON stores the canonical names `immersive` and `icon`; ConfigLib exposes mapped dropdowns. Undefined numeric enum values fall back to immersive. Changing a style through live configuration invalidates presentation and measurement even when the sampled time period, temperature, or date is unchanged. It does not alter gameplay sampling, approximate-time observation/drift, feature enable toggles, or group ordering.
+Every built-in indicator has an independent style selector. Compact indicators use the `HudIndicatorStyle` enum (`Icon`, the default, or `Text`). Time, environmental temperature, and calendar use `EnvironmentalGaugeStyle`, which also supports `Immersive` and retains it as their default. JSON stores lowercase enum names; ConfigLib exposes mapped dropdowns. Undefined numeric enum values recover the corresponding default. Live style changes invalidate presentation and measurement even when the sampled value is unchanged. They do not change applicability, sampling, observation/drift, enable toggles, group ordering, or visibility transitions.
+
+| Indicator | Configuration property | Text name | Retained reading |
+| --- | --- | --- | --- |
+| Bow ammunition | `BowAmmunitionIndicatorStyle` | `AMMO` | Eligible ammunition count, including zero |
+| Body temperature | `BodyTemperatureIndicatorStyle` | `BODY` | Risk and trend; Celsius when its reading option is enabled |
+| Player wetness | `PlayerWetnessIndicatorStyle` | `WET` | Whole percentage |
+| Approximate time | `ApproximateTimeGaugeStyle` | `TIME` | Estimated day period |
+| Environmental temperature | `EnvironmentalTemperatureGaugeStyle` | `TEMP` | Whole-degree local Celsius reading |
+| Calendar | `CalendarDateGaugeStyle` | `DATE` | Three-letter localized month and native day |
+| Weather | `WeatherConditionsIndicatorStyle` | `WTHR` | Independent weather bands |
+| Rift activity | `RiftActivityIndicatorStyle` | `RIFT` | Native activity level |
+| Temporal storm | `TemporalStormIndicatorStyle` | `STORM` | Storm stage, with the existing urgency pulse |
+
+Text mode replaces artwork with a localized three-to-five-character name above the reading. Both lines use cached normal HUD text. The standard 36-unit height remains fixed; width expands to preserve the reading rather than shrinking it. No icon assets, instrument faces, liquid masks, or icon backdrops are prepared in text mode. Owned lettering is released after fade-out, style changes, API changes, or world exit. Storm text retains the same flashing entry/exit and imminent/waning pulse as its icon. Weather text uses `CLD0` through `CLD4` for cloud coverage and `CLD?` when coverage is unavailable; active precipitation names and `WND`, `FOG`, and `THR` carry intensity suffixes 1–3. This preserves simultaneous weather channels rather than selecting only the dominant condition.
+
+The eight stateful indicator presentations derive from `HudIndicatorPresentation<TStyle>`. The base owns enum validation and style switching, the prepared context and size, cached text-mode rendering, and the shared visibility/reset/dispose lifecycle. Feature implementations provide `ReleaseArtwork` and `ClearContent` separately: switching styles releases only presentation resources, while a completed exit or world reset also clears sampled content and feature timers. This keeps storm urgency timing and sampled readings intact during style changes. Each subclass retains its artwork loaders, native resource ownership, measurement details, and draw order. Text and artwork helper classes keep their narrower ownership contracts rather than inheriting the indicator lifecycle.
 
 Icon style displays a 36 × 36 time-period symbol using the existing dawn/morning/noon/afternoon/dusk/night artwork. Temperature and calendar use a 24-unit symbol beside ordinary 14-point HUD text in a 96 × 36 footprint. Temperature retains the whole-degree Celsius reading, including values outside the instrument scale. Calendar retains the three-letter localized month and native day. The thermometer and calendar SVG symbols are rasterized once into owned textures and use the common trilinear filtering. PNG time icons remain borrowed from the engine cache. Compact text and SVG textures are released after fade-out, style changes, API rebinding, or world exit. Copper instruments and their mechanical resources are not prepared while icon style is active. The detailed instrument composition below describes immersive style.
 

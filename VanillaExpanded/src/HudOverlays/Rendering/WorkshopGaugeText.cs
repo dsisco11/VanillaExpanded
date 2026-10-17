@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using VanillaExpanded.HudOverlays.Registration;
 using Vintagestory.API.Client;
+using Vintagestory.API.MathTools;
 
 namespace VanillaExpanded.HudOverlays.Rendering;
 
@@ -16,6 +17,9 @@ internal sealed class WorkshopGaugeText : IDisposable
 
     #region Public API
     #region Content and preparation
+    /// <summary>Gets prepared lettering dimensions in GUI units without fitting or enlarging its font.</summary>
+    public SizeF Size => texture == null || context == null ? SizeF.Empty
+        : new SizeF((float)(texture.Width / context.GuiScale), (float)(texture.Height / context.GuiScale));
     /// <summary>Accepts a native text factory or a headless substitute with the same ownership contract.</summary>
     public WorkshopGaugeText(Func<HudOverlayPreparationContext, string, LoadedTexture>? create = null)
     {
@@ -44,14 +48,14 @@ internal sealed class WorkshopGaugeText : IDisposable
     #endregion
     #region Drawing and lifetime
     /// <summary>Centers prepared characters without enlarging their normal HUD font size.</summary>
-    public void Draw(IRenderAPI renderer, RectangleF aperture, float depth)
+    public void Draw(IRenderAPI renderer, RectangleF aperture, float depth, Vec4f? tint = null)
     {
         if (texture == null || dirty) return;
         double fit = Math.Min(1, Math.Min(aperture.Width / Math.Max(1, texture.Width), aperture.Height / Math.Max(1, texture.Height)));
         double width = texture.Width * fit, height = texture.Height * fit;
         renderer.Render2DTexturePremultipliedAlpha(texture.TextureId,
             aperture.X + (aperture.Width - width) / 2, aperture.Y + (aperture.Height - height) / 2,
-            width, height, depth, HudOverlayDrawOpacity.PremultipliedTint);
+            width, height, depth, tint ?? HudOverlayDrawOpacity.PremultipliedTint);
     }
 
     /// <summary>Releases session-owned pixels and forces preparation on the next session.</summary>
