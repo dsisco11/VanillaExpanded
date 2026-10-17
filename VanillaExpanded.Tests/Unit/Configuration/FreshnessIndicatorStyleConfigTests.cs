@@ -22,10 +22,24 @@ public sealed class FreshnessIndicatorStyleConfigTests
         var heading = document.RootElement.GetProperty("formatting").EnumerateArray().Single(entry =>
             entry.GetProperty("title").GetString() == "vanillaexpanded:config-section-item-slot-indicators");
         float sectionWeight = heading.GetProperty("weight").GetSingle();
+        // HUD selectors also contain "Indicator"; section ownership is defined by these item-slot settings.
+        string[] itemSlotNames =
+        [
+            nameof(VanillaExpandedConfig.EnablePerishableItemFreshnessIndicators),
+            nameof(VanillaExpandedConfig.EnablePreparationIndicators),
+            nameof(VanillaExpandedConfig.EnableClothingIndicators),
+            nameof(VanillaExpandedConfig.EnableLiquidContainerIndicators),
+            nameof(VanillaExpandedConfig.EnableLiquidSloshEffect),
+            nameof(VanillaExpandedConfig.EnableCrucibleIndicators),
+            nameof(VanillaExpandedConfig.EnableCrucibleEffect),
+            nameof(VanillaExpandedConfig.EnableNightVisionFuelIndicators),
+            nameof(VanillaExpandedConfig.FoodLevelIndicatorStyle),
+            nameof(VanillaExpandedConfig.PerishableItemFreshnessIndicatorStyle),
+            nameof(VanillaExpandedConfig.CrucibleIndicatorCapacityUnits),
+            nameof(VanillaExpandedConfig.PerishableItemFreshnessIndicatorIntensity)
+        ];
         var indicatorSettings = document.RootElement.GetProperty("settings").EnumerateObject()
-            .SelectMany(category => category.Value.EnumerateObject()).Where(setting =>
-                !setting.Name.StartsWith("Animal") && !setting.Name.StartsWith("EnableAnimal")
-                && (setting.Name.Contains("Indicator") || setting.Name is "EnableLiquidSloshEffect" or "EnableCrucibleEffect"));
+            .SelectMany(category => category.Value.EnumerateObject()).Where(setting => itemSlotNames.Contains(setting.Name));
         Assert.Equal(12, indicatorSettings.Count());
         Assert.All(indicatorSettings, setting => Assert.InRange(setting.Value.GetProperty("weight").GetSingle(),
             sectionWeight + 0.01f, sectionWeight + 0.99f));

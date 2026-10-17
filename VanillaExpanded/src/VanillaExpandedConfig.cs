@@ -89,6 +89,54 @@ public class VanillaExpandedConfig
     #endregion
 
     #region HUD Overlays (Client-Side)
+    private HudIndicatorStyle bowAmmunitionIndicatorStyle = HudIndicatorStyle.Icon;
+    /// <summary>Selects icon artwork or a short text name for bow ammunition.</summary>
+    public HudIndicatorStyle BowAmmunitionIndicatorStyle
+    {
+        get => bowAmmunitionIndicatorStyle;
+        set => bowAmmunitionIndicatorStyle = value == HudIndicatorStyle.Text ? value : HudIndicatorStyle.Icon;
+    }
+
+    private HudIndicatorStyle bodyTemperatureIndicatorStyle = HudIndicatorStyle.Icon;
+    /// <summary>Selects icon artwork or a short text name for body temperature.</summary>
+    public HudIndicatorStyle BodyTemperatureIndicatorStyle
+    {
+        get => bodyTemperatureIndicatorStyle;
+        set => bodyTemperatureIndicatorStyle = value == HudIndicatorStyle.Text ? value : HudIndicatorStyle.Icon;
+    }
+
+    private HudIndicatorStyle playerWetnessIndicatorStyle = HudIndicatorStyle.Icon;
+    /// <summary>Selects icon artwork or a short text name for player wetness.</summary>
+    public HudIndicatorStyle PlayerWetnessIndicatorStyle
+    {
+        get => playerWetnessIndicatorStyle;
+        set => playerWetnessIndicatorStyle = value == HudIndicatorStyle.Text ? value : HudIndicatorStyle.Icon;
+    }
+
+    private HudIndicatorStyle weatherConditionsIndicatorStyle = HudIndicatorStyle.Icon;
+    /// <summary>Selects icon artwork or a short text name for weather conditions.</summary>
+    public HudIndicatorStyle WeatherConditionsIndicatorStyle
+    {
+        get => weatherConditionsIndicatorStyle;
+        set => weatherConditionsIndicatorStyle = value == HudIndicatorStyle.Text ? value : HudIndicatorStyle.Icon;
+    }
+
+    private HudIndicatorStyle riftActivityIndicatorStyle = HudIndicatorStyle.Icon;
+    /// <summary>Selects icon artwork or a short text name for rift activity.</summary>
+    public HudIndicatorStyle RiftActivityIndicatorStyle
+    {
+        get => riftActivityIndicatorStyle;
+        set => riftActivityIndicatorStyle = value == HudIndicatorStyle.Text ? value : HudIndicatorStyle.Icon;
+    }
+
+    private HudIndicatorStyle temporalStormIndicatorStyle = HudIndicatorStyle.Icon;
+    /// <summary>Selects icon artwork or a short text name for temporal storm.</summary>
+    public HudIndicatorStyle TemporalStormIndicatorStyle
+    {
+        get => temporalStormIndicatorStyle;
+        set => temporalStormIndicatorStyle = value == HudIndicatorStyle.Text ? value : HudIndicatorStyle.Icon;
+    }
+
     /// <summary>Enables passive anchored HUD overlays and their sampling.</summary>
     public bool EnableHudOverlays { get; set; } = true;
 
@@ -112,7 +160,7 @@ public class VanillaExpandedConfig
     public EnvironmentalGaugeStyle ApproximateTimeGaugeStyle
     {
         get => approximateTimeGaugeStyle;
-        set => approximateTimeGaugeStyle = value == EnvironmentalGaugeStyle.Icon ? value : EnvironmentalGaugeStyle.Immersive;
+        set => approximateTimeGaugeStyle = value is EnvironmentalGaugeStyle.Icon or EnvironmentalGaugeStyle.Text ? value : EnvironmentalGaugeStyle.Immersive;
     }
 
     /// <summary>Shows the current local environmental temperature beside weather and time.</summary>
@@ -123,7 +171,7 @@ public class VanillaExpandedConfig
     public EnvironmentalGaugeStyle EnvironmentalTemperatureGaugeStyle
     {
         get => environmentalTemperatureGaugeStyle;
-        set => environmentalTemperatureGaugeStyle = value == EnvironmentalGaugeStyle.Icon ? value : EnvironmentalGaugeStyle.Immersive;
+        set => environmentalTemperatureGaugeStyle = value is EnvironmentalGaugeStyle.Icon or EnvironmentalGaugeStyle.Text ? value : EnvironmentalGaugeStyle.Immersive;
     }
 
     /// <summary>Shows the abbreviated native month and day in an independent mechanical calendar.</summary>
@@ -134,7 +182,7 @@ public class VanillaExpandedConfig
     public EnvironmentalGaugeStyle CalendarDateGaugeStyle
     {
         get => calendarDateGaugeStyle;
-        set => calendarDateGaugeStyle = value == EnvironmentalGaugeStyle.Icon ? value : EnvironmentalGaugeStyle.Immersive;
+        set => calendarDateGaugeStyle = value is EnvironmentalGaugeStyle.Icon or EnvironmentalGaugeStyle.Text ? value : EnvironmentalGaugeStyle.Immersive;
     }
 
     /// <summary>Shows texture icons for active local precipitation and weather fog.</summary>

@@ -3,7 +3,6 @@
         ☐ Design a better separation of alloy calculator inventory ownership/liveness validation, transfer permissions, and storage-versus-machine access policy. Reconsider the storage-class whitelist without weakening ownership or withdrawal checks, and define coverage for vanilla and modded containers.
 
     ## Hud Indicators:
-        ☐ Add style option to all hud indicators so they support atleast `icon` and `text` which displays a short 3-5 character name rather than the icon.
         ☐ Make it so that the HUD indicators can be moved around freely by the player, just like the base-game windows are.
 
     ## New Features:

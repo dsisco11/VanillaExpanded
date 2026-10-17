@@ -13,5 +13,8 @@ public enum EnvironmentalGaugeStyle
     Immersive = 0,
     /// <summary>Compact HUD symbols with ordinary HUD-size readings.</summary>
     [EnumMember(Value = "icon")]
-    Icon = 1
+    Icon = 1,
+    /// <summary>Uses a short text name and the sampled reading without instrument artwork.</summary>
+    [EnumMember(Value = "text")]
+    Text = 2
 }

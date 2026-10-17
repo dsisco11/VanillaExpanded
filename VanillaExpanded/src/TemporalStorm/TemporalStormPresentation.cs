@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering;
 using Vintagestory.API.Client;
@@ -9,26 +10,24 @@ using Vintagestory.API.MathTools;
 namespace VanillaExpanded.TemporalStorm;
 
 /// <summary>Borrows cached temporal storm textures and draws one compact icon with a shared radial-gradient backdrop.</summary>
-internal sealed class TemporalStormPresentation : IDisposable
+internal sealed class TemporalStormPresentation : HudIndicatorPresentation<HudIndicatorStyle>
 {
     private readonly System.Func<HudOverlayPreparationContext, LoadedTexture[]> load;
     private readonly System.Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?> loadBackdrop;
     private LoadedTexture[]? icons;
     private IHudOverlayIconBackdrop? backdrop;
-    private HudOverlayPreparationContext? context;
     private TemporalStormStage? stage;
     private bool pulsing;
     private readonly TemporalStormPulse pulse = new();
     private readonly Vec4f tint = new(1, 1, 1, 1);
-    /// <summary>Controls visibility and retained resources during transitions.</summary>
-    public HudOverlayVisibilityTransition Visibility { get; } = new(flash: true);
-    public SizeF Size { get; private set; }
 
     #region Public API
     #region Content and rendering
     /// <summary>Uses native cached texture loading, with an injectable loader for headless checks.</summary>
     public TemporalStormPresentation(System.Func<HudOverlayPreparationContext, LoadedTexture[]>? load = null,
-        System.Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null)
+        System.Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null,
+        HudIndicatorTextPresentation? textStyle = null)
+        : base(HudIndicatorStyle.Icon, HudIndicatorStyle.Text, textStyle, flash: true)
     {
         this.load = load ?? LoadIcons;
         this.loadBackdrop = loadBackdrop ?? HudOverlayIconBackdrop.Load;
@@ -46,17 +45,29 @@ internal sealed class TemporalStormPresentation : IDisposable
     public void Prepare(HudOverlayPreparationContext preparation)
     {
         if (!stage.HasValue) return;
-        if (icons == null || !ReferenceEquals(context?.Api, preparation.Api)) icons = load(preparation);
-        if (backdrop == null || !ReferenceEquals(context?.Api, preparation.Api)) backdrop = loadBackdrop(preparation);
-        context = preparation;
+        if (IsTextStyle)
+        {
+            TryPrepareText(preparation, "storm", stage.Value.ToString().ToUpperInvariant());
+            return;
+        }
+        if (icons == null || !ReferenceEquals(Context?.Api, preparation.Api)) icons = load(preparation);
+        if (backdrop == null || !ReferenceEquals(Context?.Api, preparation.Api)) backdrop = loadBackdrop(preparation);
+        Context = preparation;
         Size = new SizeF(HudOverlaySizes.Standard, HudOverlaySizes.Standard);
         Visibility.Show();
     }
     /// <summary>Draws prepared artwork without storm sampling.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds, float deltaTime)
     {
-        if (!stage.HasValue || icons == null || context == null) return;
-        double pixels = HudOverlaySizes.Standard * context.GuiScale;
+        if (!stage.HasValue || Context == null) return;
+        if (IsTextStyle)
+        {
+            float alpha = pulsing ? pulse.Advance(deltaTime) : 1;
+            TryDrawText(renderer, bounds, Visibility.Animating ? 1 : alpha);
+            return;
+        }
+        if (icons == null) return;
+        double pixels = HudOverlaySizes.Standard * Context.GuiScale;
         // Imminent and waning storms pulse; the shared backdrop remains steady.
         tint.W = pulsing ? pulse.Advance(deltaTime) : 1;
         renderer.RenderTexture(icons[(int)stage.Value].TextureId, bounds.renderX,
@@ -67,30 +78,26 @@ internal sealed class TemporalStormPresentation : IDisposable
     /// <summary>Queues the prepared icon circle separately from foreground drawing.</summary>
     public void CollectBackdrops(IRenderAPI renderer, ElementBounds bounds)
     {
-        if (!stage.HasValue || icons == null || context == null) return;
-        double pixels = HudOverlaySizes.Standard * context.GuiScale;
+        if (!stage.HasValue || icons == null || Context == null) return;
+        double pixels = HudOverlaySizes.Standard * Context.GuiScale;
         double y = bounds.renderY + (bounds.OuterHeight - pixels) / 2;
-        backdrop?.Queue(renderer, bounds.renderX, y, context.GuiScale);
+        backdrop?.Queue(renderer, bounds.renderX, y, Context.GuiScale);
     }
-    #region Lifetime
-    /// <summary>Retains prepared content until the visibility exit finishes.</summary>
-    public void Hide() => Visibility.Hide(Reset);
-    /// <summary>Drops session bindings without disposing engine-owned cached textures.</summary>
-    public void Reset()
+    #endregion
+    #region Protected API
+    /// <summary>Releases feature artwork without changing sampled content or feature timers.</summary>
+    protected override void ReleaseArtwork()
     {
-        Visibility.Reset();
-        icons = null;
-        backdrop = null;
-        context = null;
-        stage = null;
-        pulsing = false;
-        pulse.Reset();
-        Size = SizeF.Empty;
+        icons = null; backdrop = null;
     }
-    /// <summary>Releases borrowed bindings on final removal.</summary>
-    public void Dispose() => Reset();
+
+    /// <summary>Clears feature contents after a completed exit or world change.</summary>
+    protected override void ClearContent()
+    {
+        stage = null; pulsing = false; pulse.Reset();
+    }
     #endregion
-    #endregion
+
     #region Private
     /// <summary>Loads transparent temporal storm assets in storm progression order with engine cache ownership.</summary>
     private static LoadedTexture[] LoadIcons(HudOverlayPreparationContext preparation)
@@ -109,4 +116,5 @@ internal sealed class TemporalStormPresentation : IDisposable
         return textures;
     }
     #endregion
+
 }
