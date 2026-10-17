@@ -8,8 +8,8 @@ namespace VanillaExpanded.HudOverlays.Interaction;
 /// <summary>Owns one group's native saved origin and cancellable drag preview, independently of its presentation.</summary>
 internal sealed class HudOverlayGroupMovement
 {
-    public const string GroupId = "world-status";
-    public const string DialogKey = "vanillaexpanded:hud:group:world-status";
+    public string Id { get; }
+    public string Key { get; }
     private readonly IGuiAPI gui;
     private PointF? saved;
     private PointF? preview;
@@ -23,10 +23,13 @@ internal sealed class HudOverlayGroupMovement
     #region Public API
     #region Construction and mode
     /// <summary>Restores native integer GUI-unit coordinates without writing settings during composition or rendering.</summary>
-    public HudOverlayGroupMovement(IGuiAPI gui)
+    public HudOverlayGroupMovement(IGuiAPI gui, string groupId)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(groupId);
         this.gui = gui;
-        var position = gui.GetDialogPosition(DialogKey);
+        Id = groupId;
+        Key = HudOverlayPositionKeys.Group(groupId);
+        var position = gui.GetDialogPosition(Key);
         saved = position == null ? null : new PointF(position.X, position.Y);
         Movable = saved.HasValue;
     }
@@ -39,7 +42,7 @@ internal sealed class HudOverlayGroupMovement
         Cancel();
         if (!value)
         {
-            if (clearNativePosition) gui.SetDialogPosition(DialogKey, null!);
+            if (clearNativePosition) gui.SetDialogPosition(Key, null!);
             saved = null;
         }
         Movable = value;
@@ -72,7 +75,7 @@ internal sealed class HudOverlayGroupMovement
     {
         if (!Dragging) return;
         var position = new Vec2i((int)displayedOrigin.X, (int)displayedOrigin.Y);
-        gui.SetDialogPosition(DialogKey, position);
+        gui.SetDialogPosition(Key, position);
         saved = new PointF(position.X, position.Y);
         Cancel();
     }

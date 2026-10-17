@@ -3,6 +3,7 @@ using Moq;
 using VanillaExpanded.HudOverlays.Anchoring;
 using VanillaExpanded.HudOverlays.Lifecycle;
 using VanillaExpanded.HudOverlays.Layout;
+using VanillaExpanded.HudOverlays.Interaction;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering;
 using Vintagestory.API.Client;
@@ -121,6 +122,33 @@ public sealed class HudOverlaySessionTests
     }
 
     #endregion
+    /// <summary>A saved screen origin survives an unavailable registered anchor and unrelated placement changes without preparation.</summary>
+    [Fact]
+    public void SavedPositionOverridesMissingAnchorAndSurvivesConfigurationChanges()
+    {
+        using var fixture = new Fixture();
+        var saved = new PointF(47, 63);
+        fixture.Gui.Setup(value => value.GetDialogPosition(HudOverlayPositionKeys.Group("group")))
+            .Returns(new Vintagestory.API.MathTools.Vec2i((int)saved.X, (int)saved.Y));
+        var original = fixture.Registry.GetGroups().Single();
+        fixture.Registry.UpdateGroup(new HudOverlayGroup("group",
+            new HudOverlayPlacement("hotbar", HudOverlayPoint.RightBottom, HudOverlayPoint.RightBottom), original.Packing));
+        fixture.Session.EnterWorld();
+        var host = fixture.Hosts.Single(); var layout = host.Layouts!["group"];
+        Assert.Single(layout.Members); Assert.True(host.IsOpen);
+        var root = layout.Root;
+        Assert.Equal(saved.X, root.renderX); Assert.Equal(saved.Y, root.renderY);
+        fixture.Registry.UpdateGroup(original); fixture.Session.ConfigurationChanged();
+        host.BeforeRender!();
+        Assert.Same(root, layout.Root);
+        Assert.Equal(saved.X, root.renderX); Assert.Equal(saved.Y, root.renderY);
+        Assert.Equal(1, fixture.Probe.Refreshes); Assert.Equal(1, fixture.Probe.Preparations);
+        fixture.Gui.Verify(value => value.GetDialogPosition(HudOverlayPositionKeys.Group("group")), Times.Once);
+        fixture.Session.LeaveWorld(); fixture.Session.EnterWorld();
+        Assert.Equal(2, fixture.Probe.Begins); Assert.Equal(1, fixture.Probe.Ends);
+        Assert.Equal(saved.X, fixture.Hosts.Last().Layouts!["group"].Root.renderX);
+        Assert.Equal(1, host.Disposals);
+    }
     #region Cleanup failures
     /// <summary>A native close failure cannot prevent owned disposal or feature session cleanup.</summary>
     [Fact]
@@ -140,6 +168,7 @@ public sealed class HudOverlaySessionTests
     {
         public readonly Mock<ICoreClientAPI> Api = new();
         public readonly Mock<IClientEventAPI> Events = new();
+        public readonly Mock<IGuiAPI> Gui = new();
         public readonly HudOverlayRegistry Registry = new();
         public readonly Probe Probe = new();
         public readonly List<Host> Hosts = new();
@@ -161,9 +190,9 @@ public sealed class HudOverlaySessionTests
             Api.SetupGet(value => value.World).Returns(world.Object);
             Api.SetupGet(value => value.Event).Returns(Events.Object);
             Api.SetupGet(value => value.HideGuis).Returns(() => Hidden);
-            var gui = new Mock<IGuiAPI>(); gui.SetupGet(value => value.WindowBounds).Returns(new Window());
-            gui.SetupGet(value => value.LoadedGuis).Returns(new List<GuiDialog>());
-            Api.SetupGet(value => value.Gui).Returns(gui.Object);
+            Gui.SetupGet(value => value.WindowBounds).Returns(new Window());
+            Gui.SetupGet(value => value.LoadedGuis).Returns(new List<GuiDialog>());
+            Api.SetupGet(value => value.Gui).Returns(Gui.Object);
             Events.Setup(value => value.RegisterGameTickListener(It.IsAny<Action<float>>(), 100, 0))
                 .Callback<Action<float>, int, int>((callback, _, _) => tick = callback).Returns(0);
             Registry.RegisterGroup(new HudOverlayGroup("group", new HudOverlayPlacement("screen", HudOverlayPoint.LeftTop, HudOverlayPoint.LeftTop)));

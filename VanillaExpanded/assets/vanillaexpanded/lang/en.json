@@ -3,6 +3,8 @@
   "mappingkey-icon": "Icon",
   "mappingkey-text": "Text",
   "hud-group-world-status": "World status",
+  "hud-group-player-status": "Player status",
+  "hud-group-held-item-status": "Held item status",
   "hud-short-ammunition": "AMMO",
   "hud-short-body-temperature": "BODY",
   "hud-short-wetness": "WET",

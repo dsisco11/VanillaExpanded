@@ -4,7 +4,7 @@
 
 Reuse Vintage Story's HUD/dialog lifecycle, GUI event routing, native bounds and scaling, and native dialog-position persistence. Prefer the stock titlebar's drag behavior where it can be adapted to hover controls; extend the existing VE layout runtime for individual placement and geometric snapping. Individual feature overlays and their presentation classes should not implement dragging or persistence.
 
-This proposal describes the complete intended interaction. The current implementation provides group movement controls for `world-status`; other groups remain passive and packed. Individual movement and snapping are not yet implemented.
+This proposal describes the complete intended interaction. The current implementation provides native persisted movement controls for all registered groups while preserving their internal packing. Individual movement and snapping are not yet implemented.
 
 Implementation checklist: [MovableHud.todo](MovableHud.todo).
 
@@ -50,7 +50,7 @@ Prototype a narrow adapter around `GuiElementDialogTitleBar` that forwards nativ
 
 The adapter uses `GuiElementDialogTitleBar` with its actual native Fixed/Movable dropdown. Its titlebar skin is compact: 22 GUI units high, standard 14-point HUD text, and the radial menu's orange hover background. Native menu and close glyphs and their hit rectangles follow the slimmer geometry. Retain the native dropdown interaction rather than a direct mode-toggle button. Keep the proven cancellable content-drag integration around the widget so cancellation does not commit a position.
 
-The one-group implementation composes the native titlebar with this compact skin and uses its own `GuiElementListMenu`, including native menu selection callbacks. A small adapter isolates access to the titlebar's private menu/icon bounds and suppresses its first-render parent-position write: the temporary hover titlebar position is not the saved content position. Content dragging and cancellation remain owned by the shared movement integration rather than the titlebar's private drag state. Native initialization, menu resources, and dropdown behavior are reused without patching the engine. Native source/headless contract checks and user acceptance remain separate evidence requirements.
+The group control implementation composes the native titlebar with this compact skin and uses its own `GuiElementListMenu`, including native menu selection callbacks. A small adapter isolates access to the titlebar's private menu/icon bounds and suppresses its first-render parent-position write: the temporary hover titlebar position is not the saved content position. Content dragging and cancellation remain owned by the shared movement integration rather than the titlebar's private drag state. Native initialization, menu resources, and dropdown behavior are reused without patching the engine. Native source/headless contract checks and user acceptance remain separate evidence requirements.
 
 Show a partly transparent orange panel behind the exact group bounds while hovered or interacting. While the cursor is free and the group is Movable, also show an unfilled orange line rectangle around those bounds, including when the pointer is elsewhere. Use the radial menu's orange palette for both. Keep these decorations outside measurements and placement calculations. Foreground windows suppress hover fill and controls at their pointer locations, but the movable outline remains a global free-cursor cue. Hide it for hidden HUDs, a grabbed cursor, unavailable content, or modal input capture.
 

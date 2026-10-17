@@ -17,7 +17,9 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     private readonly Action<Exception>? boundaryFailure;
     private readonly HudOverlayHoverLabels hoverLabels;
     private readonly IHudOverlayBackdropBatch? backdropBatch;
-    private readonly HudOverlayGroupControls? controls;
+    private readonly Dictionary<string, HudOverlayGroupControls> groupControls = new(StringComparer.Ordinal);
+    private readonly HudOverlayGroupPositions? positions;
+    private HudOverlayGroupControls? ActiveControls => groupControls.Values.FirstOrDefault(control => control.Active);
     private readonly Dictionary<string, HudOverlayGroupLayout> groups = new(StringComparer.Ordinal);
     private readonly Dictionary<HudOverlayMemberLayout, ElementBounds> clips = new();
     private HashSet<HudOverlayRegistration> active = new();
@@ -31,7 +33,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     /// <summary>Borrows registry and prepared-state decisions; owns only composers allocated for this session.</summary>
     public HudOverlayHost(ICoreClientAPI api, HudOverlayRegistry registry, Func<HudOverlayRegistration, bool> isDrawable,
         Action<HudOverlayRegistration, Exception> failure, Action<Exception>? boundaryFailure = null,
-        IHudOverlayBackdropBatch? backdropBatch = null, HudOverlayGroupMovement? movement = null) : base(api)
+        IHudOverlayBackdropBatch? backdropBatch = null, HudOverlayGroupPositions? positions = null) : base(api)
     {
         this.registry = registry;
         this.isDrawable = isDrawable;
@@ -39,8 +41,8 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         this.boundaryFailure = boundaryFailure;
         hoverLabels = new HudOverlayHoverLabels(api);
         this.backdropBatch = backdropBatch ?? api.ModLoader?.GetModSystem<HudOverlaySystem>()?.Backdrop;
-        if (movement != null)
-            controls = new HudOverlayGroupControls(api, this, movement, isDrawable, () => BeforeRender?.Invoke());
+        this.positions = positions;
+
     }
     /// <summary>Registers a live session host through the native GUI lifecycle without taking focus.</summary>
     public override bool TryOpen(bool withFocus)
@@ -63,54 +65,72 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
             if (!pair.Value.Available || groups.ContainsKey(pair.Key)) continue;
             var dispatchBounds = ElementBounds.Fill.WithParent(pair.Value.Root);
             var element = new HudOverlayGroupElement(capi, dispatchBounds, dt => DrawGroup(pair.Value, dt));
-            Composers[pair.Key] = capi.Gui.CreateCompo("vanillaexpanded:hud:" + pair.Key, pair.Value.Root)
+            Composers[pair.Key] = capi.Gui.CreateCompo("vanillaexpanded:hud:content:group:" + pair.Key, pair.Value.Root)
                 .OnlyDynamic().AddInteractiveElement(element).Compose(false);
             groups.Add(pair.Key, pair.Value);
         }
         var retained = layouts.Values.SelectMany(group => group.Members).ToHashSet();
         foreach (var member in clips.Keys.Where(member => !retained.Contains(member)).ToArray()) clips.Remove(member);
-        controls?.Synchronize(layouts);
+        foreach (string id in groupControls.Keys.Where(id => !layouts.ContainsKey(id)).ToArray())
+        {
+            groupControls[id].Dispose();
+            groupControls.Remove(id);
+        }
+        if (positions != null)
+            foreach (string id in layouts.Keys)
+                if (!groupControls.ContainsKey(id)) groupControls[id] = new HudOverlayGroupControls(capi, this,
+                    positions.Get(id), isDrawable, () => BeforeRender?.Invoke());
+        foreach (var control in groupControls.Values.ToArray()) control.Synchronize(layouts);
     }
     #endregion
     #region Input
     /// <summary>Receives keyboard events only during dragging or native dropdown interaction.</summary>
-    public override bool ShouldReceiveKeyboardEvents() => controls?.Active == true;
+    public override bool ShouldReceiveKeyboardEvents() => ActiveControls?.Active == true;
     /// <summary>Allows selective handle routing while retaining passive behavior for hosts without controls.</summary>
-    public override bool ShouldReceiveMouseEvents() => controls != null && IsOpened();
+    public override bool ShouldReceiveMouseEvents() => groupControls.Count > 0 && IsOpened();
     /// <summary>Leaves general input ownership with the engine.</summary>
     public override bool CaptureAllInputs() => false;
     /// <summary>Leaves raw mouse ownership with the engine.</summary>
     public override bool CaptureRawMouse() => false;
     /// <summary>Cancels active dragging instead of closing the HUD or saving its preview.</summary>
-    public override bool OnEscapePressed() => controls?.Cancel() == true;
+    public override bool OnEscapePressed() => ActiveControls?.Cancel() == true;
     /// <summary>Routes native dropdown navigation, consuming Escape only when it cancels an active interaction.</summary>
     public override void OnKeyDown(KeyEvent args)
     {
         if (args.KeyCode == (int)GlKeys.Escape && OnEscapePressed()) args.Handled = true;
-        else controls?.OnKeyDown(args);
+        else ActiveControls?.OnKeyDown(args);
     }
     /// <summary>Routes characters only to an open native dropdown.</summary>
-    public override void OnKeyPress(KeyEvent args) => controls?.OnKeyPress(args);
+    public override void OnKeyPress(KeyEvent args) => ActiveControls?.OnKeyPress(args);
     /// <summary>Ignores direct key-release delivery.</summary>
     public override void OnKeyUp(KeyEvent args) { }
     /// <summary>Routes presses to the handle without consuming the content composer's entire rectangle.</summary>
-    public override void OnMouseDown(MouseEvent args) => controls?.OnMouseDown(capi, args);
+    public override void OnMouseDown(MouseEvent args)
+    {
+        var activeControl = ActiveControls;
+        if (activeControl != null) activeControl.OnMouseDown(capi, args);
+        else foreach (var control in groupControls.Values.Reverse().ToArray())
+        {
+            control.OnMouseDown(capi, args);
+            if (args.Handled) break;
+        }
+    }
     /// <summary>Routes active release delivery even after the pointer leaves the starting bounds.</summary>
-    public override void OnMouseUp(MouseEvent args) => controls?.OnMouseUp(capi, args);
+    public override void OnMouseUp(MouseEvent args) => ActiveControls?.OnMouseUp(capi, args);
     /// <summary>Routes active pointer movement without taking ordinary gameplay mouse ownership.</summary>
-    public override void OnMouseMove(MouseEvent args) => controls?.OnMouseMove(capi, args);
+    public override void OnMouseMove(MouseEvent args) => ActiveControls?.OnMouseMove(capi, args);
     /// <summary>Routes wheel input only to an open native dropdown under the pointer.</summary>
-    public override void OnMouseWheel(MouseWheelEventArgs args) => controls?.OnMouseWheel(args);
+    public override void OnMouseWheel(MouseWheelEventArgs args) => ActiveControls?.OnMouseWheel(args);
     /// <summary>Discards active interaction when native dialog focus is transferred elsewhere.</summary>
     public override void UnFocus()
     {
-        controls?.Cancel();
+        foreach (var control in groupControls.Values.ToArray()) control.Cancel();
         base.UnFocus();
     }
     /// <summary>Cancels transient positioning before native close and deregistration.</summary>
     public override bool TryClose()
     {
-        controls?.Cancel();
+        foreach (var control in groupControls.Values.ToArray()) control.Cancel();
         return base.TryClose();
     }
     #endregion
@@ -132,10 +152,10 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
                 CollectBackdrops();
                 try { backdropBatch?.Flush(capi.Render); }
                 catch (Exception error) { boundaryFailure?.Invoke(error); }
-                controls?.DrawBackground();
+                foreach (var control in groupControls.Values.ToArray()) control.DrawBackground();
                 foreach (var pair in Composers) if (groups[pair.Key].Available) pair.Value.Render(deltaTime);
                 hoverLabels.Draw(groups.Values, registration => active.Contains(registration) && isDrawable(registration), deltaTime);
-                controls?.Draw(deltaTime);
+                foreach (var control in groupControls.Values.ToArray()) control.Draw(deltaTime);
             }
             finally { backdropBatch?.Clear(); capi.Render.GlPopMatrix(); active.Clear(); }
         }, boundaryFailure);
@@ -148,7 +168,8 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         if (disposed) return;
         disposed = true;
         BeforeRender = null;
-        controls?.Dispose();
+        foreach (var control in groupControls.Values) control.Dispose();
+        groupControls.Clear();
         hoverLabels.Dispose();
         try { TryClose(); }
         finally
