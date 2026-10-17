@@ -96,7 +96,17 @@ public sealed class HudOverlaySessionTests
         }
     }
 
-    /// <summary>Placement reloads repack cached measurements without sampling, preparing, or replacing native roots.</summary>
+    /// <summary>Reserved artwork footprints collapse after exit and reopen through the same effective native group.</summary>
+    [Fact]
+    public void ReservedMemberFadeCollapseAndReturnUseEffectiveContainerLayout()
+    {
+        using var fixture = new Fixture(animated: true); fixture.Session.EnterWorld(); var host = fixture.Hosts.Single(); var layout = host.Layouts!["group"];
+        fixture.Advance(10000); host.BeforeRender!(); var root = layout.Root; Assert.Single(layout.Members);
+        fixture.FeatureEnabled = false; fixture.Session.ConfigurationChanged(); Assert.Single(layout.Members);
+        fixture.Advance(10000); host.BeforeRender!(); Assert.Empty(layout.Members); Assert.False(host.IsOpen);
+        fixture.FeatureEnabled = true; fixture.Session.ConfigurationChanged(); fixture.Tick(); Assert.Single(layout.Members); Assert.True(host.IsOpen);
+        Assert.Same(root, layout.Root); Assert.Equal(1, fixture.Probe.Begins); Assert.Equal(0, fixture.Probe.Disposals);
+    }    /// <summary>Placement reloads repack cached measurements without sampling, preparing, or replacing native roots.</summary>
     [Fact]
     public void RepeatedScreenPlacementReloadsReusePresentationAndNativeRoot()
     {
@@ -181,9 +191,11 @@ public sealed class HudOverlaySessionTests
         private readonly float oldScale = RuntimeEnv.GUIScale;
         #region Public API
         /// <summary>Creates real scheduling/layout with fake engine/world and native host services.</summary>
-        public Fixture()
+        public Fixture(bool animated = false)
         {
             RuntimeEnv.GUIScale = 1;
+            HudLayoutFixture.BindSettings(Api, new Mock<ISettingsClass<string>>(), new Dictionary<string, string>());
+            if (animated) Probe = new AnimatedProbe(() => now);
             var world = new Mock<IClientWorldAccessor>(); var player = new Mock<ServerPlayer>((ServerMain)null!, new ServerWorldPlayerData()).As<IClientPlayer>();
             player.SetupGet(value => value.Entity).Returns(() => Entity);
             world.SetupGet(value => value.Player).Returns(() => HasPlayer ? player.Object : null!);
@@ -196,11 +208,13 @@ public sealed class HudOverlaySessionTests
             Events.Setup(value => value.RegisterGameTickListener(It.IsAny<Action<float>>(), 100, 0))
                 .Callback<Action<float>, int, int>((callback, _, _) => tick = callback).Returns(0);
             Registry.RegisterGroup(new HudOverlayGroup("group", new HudOverlayPlacement("screen", HudOverlayPoint.LeftTop, HudOverlayPoint.LeftTop)));
-            Registration = new HudOverlayRegistration("mod:test", Probe, () => FeatureEnabled, "group"); Registry.Register(Registration);
+            Registration = new HudOverlayRegistration("mod:test", Probe, () => FeatureEnabled, "group", reservedSize: animated ? new SizeF(33, 27) : null); Registry.Register(Registration);
             Session = new HudOverlaySession(Api.Object, Registry, (_, _) => { var host = new Host(); Hosts.Add(host); return host; }, () => now, () => Enabled);
         }
         /// <summary>Advances one heartbeat with the currently exposed world/player.</summary>
         public void Tick() { now += 100; tick!(0); }
+        /// <summary>Advances presentation time without sampling to observe exit completion.</summary>
+        public void Advance(long elapsed) => now += elapsed;
         /// <summary>Ends session work before final registry ownership.</summary>
         public void Dispose() { try { Session.Dispose(); Registry.Dispose(); } finally { RuntimeEnv.GUIScale = oldScale; } }
         #endregion
@@ -227,7 +241,7 @@ public sealed class HudOverlaySessionTests
     }
 
     /// <summary>Records feature lifetime and stable sampling work.</summary>
-    private sealed class Probe : IHudOverlay
+    private class Probe : IHudOverlay
     {
         public int Begins, Ends, Disposals, Refreshes, Preparations;
         #region Public API
@@ -243,7 +257,7 @@ public sealed class HudOverlaySessionTests
         /// <summary>Publishes unchanged stable content.</summary>
         public HudOverlayChange Refresh() { Refreshes++; return HudOverlayChange.None; }
         /// <summary>Records resource preparation.</summary>
-        public void Prepare(HudOverlayPreparationContext context) => Preparations++;
+        public virtual void Prepare(HudOverlayPreparationContext context) => Preparations++;
         /// <summary>Measures stable logical content dimensions.</summary>
         public SizeF Measure() => new(20, 20);
         /// <summary>Rejects accidental gameplay/render coupling in lifecycle paths.</summary>
@@ -254,7 +268,17 @@ public sealed class HudOverlaySessionTests
         #endregion
     }
 
-    /// <summary>Supplies real native window dimensions without platform access.</summary>
+    /// <summary>Retains prepared content during a controllable exit transition.</summary>
+    private sealed class AnimatedProbe(Func<long> clock) : Probe, IHudOverlayVisibilityTransition
+    {
+        public HudOverlayVisibilityTransition Visibility { get; } = new(clockMs: clock);
+        #region Public API
+        /// <summary>Requests the normal presentation exit without releasing its footprint early.</summary>
+        public void HidePresentation() => Visibility.Hide(() => { });
+        /// <summary>Shows newly eligible sampled content through the shared transition.</summary>
+        public override void Prepare(HudOverlayPreparationContext context) { base.Prepare(context); Visibility.Show(); }
+        #endregion
+    }    /// <summary>Supplies real native window dimensions without platform access.</summary>
     private sealed class Window : ElementBounds
     {
         #region Public API

@@ -15,6 +15,7 @@ internal sealed class HudOverlayScheduler
     private readonly int threadId = Environment.CurrentManagedThreadId;
     private readonly HudOverlayRegistry registry;
     private readonly Func<HudOverlayGroup, string> targetId;
+    private readonly Func<HudOverlayRegistration, string>? effectiveTarget;
     private readonly Func<long> clock;
     private readonly Action<string, Exception>? diagnostic;
     private readonly Dictionary<string, State> states = new(StringComparer.Ordinal);
@@ -25,10 +26,11 @@ internal sealed class HudOverlayScheduler
     #region Public API
     #region Construction and notifications
     /// <summary>Uses monotonic milliseconds and optional bounded diagnostic delivery without owning registrations.</summary>
-    public HudOverlayScheduler(HudOverlayRegistry registry, Func<long>? clockMs = null, Action<string, Exception>? diagnostic = null, Func<HudOverlayGroup, string>? targetId = null)
+    public HudOverlayScheduler(HudOverlayRegistry registry, Func<long>? clockMs = null, Action<string, Exception>? diagnostic = null, Func<HudOverlayGroup, string>? targetId = null, Func<HudOverlayRegistration, string>? effectiveTarget = null)
     {
         ArgumentNullException.ThrowIfNull(registry);
         this.registry = registry;
+        this.effectiveTarget = effectiveTarget;
         this.targetId = targetId ?? (group => group.Placement.TargetId);
         clock = clockMs ?? (() => Environment.TickCount64);
         this.diagnostic = diagnostic;
@@ -60,18 +62,18 @@ internal sealed class HudOverlayScheduler
                 if (registration.Overlay is IHudOverlayVisibilityTransition animated) animated.Visibility.Enable();
             }
             state.CanRenderTransitions = visible && registry.IsSessionBound(registration)
-                && anchors.Resolve(targetId(groups[registration.GroupId])).HasValue;
+                && anchors.Resolve(effectiveTarget?.Invoke(registration) ?? targetId(groups[registration.GroupId])).HasValue;
             bool available;
             if (state.Failed && clock() < state.NextRefresh)
             {
                 state.Available = enabled && visible && registry.IsSessionBound(registration)
-                    && anchors.Resolve(targetId(groups[registration.GroupId])).HasValue;
+                    && anchors.Resolve(effectiveTarget?.Invoke(registration) ?? targetId(groups[registration.GroupId])).HasValue;
                 return;
             }
             try
             {
                 available = enabled && visible && registry.IsSessionBound(registration) && registration.IsEnabled()
-                    && anchors.Resolve(targetId(groups[registration.GroupId])).HasValue;
+                    && anchors.Resolve(effectiveTarget?.Invoke(registration) ?? targetId(groups[registration.GroupId])).HasValue;
             }
             catch (Exception failure) { Fail(state, failure, clock()); available = false; }
             // A restoration never exposes an old snapshot before the next scheduled refresh.

@@ -4,7 +4,7 @@
 
 Reuse Vintage Story's HUD/dialog lifecycle, GUI event routing, native bounds and scaling, and native dialog-position persistence. Prefer the stock titlebar's drag behavior where it can be adapted to hover controls; extend the existing VE layout runtime for individual placement and player-created groups formed by snapping. Individual feature overlays and their presentation classes should not implement dragging or persistence.
 
-This proposal describes the complete intended interaction. The current implementation provides native persisted movement controls for all registered groups while preserving their internal packing. Individual movement and snapping are not yet implemented.
+This proposal describes the complete intended interaction. The shared runtime provides effective default/independent/custom containers, persisted permissions and origins, mixed pair-tree layout, and individual detachment. Snap-based group creation and merging remain unimplemented.
 
 Implementation checklist: [MovableHud.todo](MovableHud.todo).
 

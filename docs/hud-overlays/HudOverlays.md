@@ -2,13 +2,64 @@
 
 The HUD overlay system positions and updates passive displays on the client. An overlay supplies content and a measured footprint; the runtime handles anchoring, group layout, refresh scheduling, GUI scaling, and world-session transitions.
 
-Every registered group supports the base game's titlebar while the cursor is free. Hover the visible indicators in a group to reveal the controls, open the native titlebar menu and choose Movable, then drag the title area to reposition the whole group. Choosing Fixed in that dropdown restores its registered placement. The native close icon dismisses the hover controls without disabling the indicators. Successful drops use the game's native dialog-position settings under `vanillaexpanded:hud:group:<group-id>`; Escape cancels a drag or closes its menu without saving a dragged position. The titlebar occupies a separate composition above or below the content and does not change indicator measurements. Saved content origins take precedence over registered defaults across configuration and size changes. Moved groups use screen availability rather than their original native anchor; clearing their key restores the registered anchor and packing. Effective bounds are clamped to the visible safe area without rewriting the saved origin. Individual movement and snapping are not yet available. Foreground dialogs take pointer priority; the HUD does not request a free cursor itself. Clicking the grip follows native focus transfer and can unfocus another open window, even when the HUD itself is non-focusable.
+HUD containers use native hover titlebars while the cursor is free. Hover visible content, choose Movable from the native dropdown, and drag the container title area to move its members together. Multi-member containers expose a separate indicator titlebar for dragging an individual away; remaining members close the gap. Fixed locks both container dragging and individual detachment without changing position or membership. The close icon dismisses controls without disabling indicators. Reset HUD layout restores every built-in group and position, including retained overrides for unavailable integrations. No per-item or per-group reset is provided.
+
+Effective membership is separate from feature registrations. Default templates, independent indicators, and saved custom containers share native bounds, clipping, and scheduler availability. Mixed arrangements use ordered horizontal/vertical pairs with start/center/end alignment. Size changes preserve relationships and container origin subject to screen clamping. Hidden members collapse after their exit transition releases the footprint, retaining their saved relationships for reappearance. Snap-based group creation and merging are not yet available.
+
+The versioned JSON setting `vanillaexpanded:hud:layout` is authoritative for membership, permissions, layout trees, and integer GUI-unit origin checkpoints. Native dialog positions mirror that snapshot and are repaired from it. Legacy group origins migrate into Movable overrides; missing overrides retain registered defaults. Drops commit the snapshot before updating mirrors, cancellation never writes, and viewport clamping does not rewrite saved preferences. Malformed or newer snapshots remain untouched with defaults shown read-only until global reset. Layouts apply across worlds on the same client.
+
+Titlebars occupy separate compositions above or below content and never change indicator measurements. Foreground dialogs take pointer priority; the HUD does not request a free cursor itself. Native focus transfer can unfocus another open window when a grip is clicked. Escape, cursor capture, hidden GUI, lost interaction, removal, and session exit cancel active dragging.
 
 The hover titlebar is 22 GUI units high and uses the shared 14-point HUD text size. Its orange background uses the radial menu's hover palette, with native menu and close glyphs positioned for the slimmer bar. Hovering or interacting with the group shows a 45%-opacity orange panel behind its exact bounds. When the cursor is free and the group is Movable, an unfilled orange outline remains visible even away from hover. These decorations do not change group measurements or content positions. Foreground pointer ownership suppresses hover controls and fill, while the movable outline stays visible away from hover, including over unrelated windows. Hidden HUDs, a grabbed cursor, unavailable content, or modal input capture suppress the movement cue.
 
 The temperature indicator keeps the same 36-unit height as the other status indicators. Warming chevrons stack vertically above the reading; cooling chevrons stack below it. The reading uses a 14-point font with native GUI scaling, using native scaling only, and fits within the remaining height. Chevrons draw at 12 × 7.5 GUI units for slightly heavier strokes. With the reading hidden, the chevrons retain their column beside the thermometer. Trend strength never adds height.
 
 Reference `VanillaExpanded.dll` and the compatible Vintage Story API assemblies, and declare `vanillaexpanded` as a dependency in your mod metadata. `HudOverlaySystem`, `IHudOverlay`, registration and placement contracts, and the shared icon-and-text presentation are public and can be used from a separate mod assembly. Obtain the running system through the client mod loader; the game owns its lifetime.
+
+## Runtime structure
+
+The session owns the runtime bindings; the registry retains feature ownership across sessions. Solid arrows show ownership or contained data. Dashed arrows show borrowed dependencies and calls.
+
+```mermaid
+flowchart TB
+    System["HudOverlaySystem"] --> Registry["HudOverlayRegistry"]
+    System --> Session["HudOverlaySession"]
+    Registry --> Features["Registered IHudOverlay instances"]
+
+    subgraph Runtime["Session runtime"]
+        Session --> Containers["HudOverlayContainers<br/>effective membership and transactions"]
+        Session --> Scheduler["HudOverlayScheduler<br/>cached readings and measurements"]
+        Session --> Layouts["HudOverlayGroupLayout<br/>one per effective container"]
+        Session --> Host["HudOverlayHost<br/>native rendering and input routing"]
+        Containers --> Movement["HudOverlayGroupMovement<br/>one per group or individual target"]
+        Layouts --> Bounds["ElementBounds<br/>container root and indicator bounds"]
+        Layouts -. "resolves mixed arrangements" .-> Geometry["HudLayoutGeometry"]
+        Containers -. "effective anchor availability" .-> Scheduler
+        Containers -. "membership, tree and origin" .-> Layouts
+    end
+
+    subgraph Persistence["Layout state and persistence"]
+        Containers --> Store["HudLayoutStore"]
+        Store --> Snapshot["HudLayoutSnapshot<br/>authoritative committed state"]
+        Snapshot --> Records["HudLayoutContainer records"]
+        Records --> Trees["HudLayoutNode trees<br/>ordered pairs and indicator leaves"]
+        Store -. "snapshot setting and position mirrors" .-> Settings["Native client settings"]
+    end
+
+    subgraph Interaction["Native compositions and controls"]
+        Host --> Controls["HudOverlayGroupControls<br/>group and individual grips"]
+        Host --> Composers["GuiComposer instances<br/>content compositions"]
+        Controls --> ControlComposers["GuiComposer instances<br/>transient control compositions"]
+        ControlComposers --> Titlebars["HudOverlayNativeTitleBar<br/>native dropdown with VE callbacks"]
+        Controls -. "drag and permission requests" .-> Movement
+        Movement -. "preview, commit or cancel" .-> Containers
+        Host -. "borrows prepared layouts" .-> Layouts
+        Scheduler -. "refreshes and prepares" .-> Features
+        Host -. "draws prepared content" .-> Features
+    end
+```
+
+Each effective container has one flat membership set. Its internal `HudLayoutNode` tree describes mixed horizontal/vertical arrangements, not nested movable groups. The runtime applies resolved geometry to native bounds; controls and persistence do not own feature artwork or duplicate overlay instances.
 
 ## Registering an overlay
 
@@ -91,7 +142,7 @@ An overlay belongs to a group. A `HudOverlayGroup` defines one placement and a `
 
 Packing controls horizontal or vertical flow, spacing, padding, and cross-axis alignment. Members are ordered by ascending `Order`, then by ordinal overlay ID.
 
-For a stable slot, supply a positive `reservedSize` in unscaled GUI units when registering the overlay. The layout uses this footprint from the start, including while the overlay is disabled, inapplicable, empty, or recovering from an error. Drawing still requires successfully prepared, visible content; a reservation alone exposes no hover target. Choose a footprint that accommodates the presentation's largest intended content and keep artwork at stable coordinates within the supplied bounds. Content exceeding the slot is clipped. Registrations without a reservation continue to use their measured size and release space when hidden.
+For a stable slot, supply a positive `reservedSize` in unscaled GUI units when registering the overlay. The effective container uses this footprint instead of the measured size while the overlay is drawable. Hidden, disabled, inapplicable, empty, and failed members collapse according to visibility transitions, retaining their saved membership. Drawing still requires successfully prepared, visible content; a reservation alone exposes no hover target. Choose a footprint that accommodates the presentation's largest intended content and keep artwork at stable coordinates within the supplied bounds. Content exceeding the slot is clipped. Registrations without a fixed footprint use their measured size. Neither kind exposes invisible hover or drag targets.
 
 The built-in groups are:
 
@@ -105,7 +156,7 @@ Joining a shared group adopts its placement and packing rules. Additional native
 
 ## Visibility and cleanup
 
-The global HUD setting, the registration's enabled selector, applicability, and anchor availability determine visibility. A missing or hidden anchor hides its group without choosing a fallback location. The built-in indicators use their measured sizes and collapse after their exit transition finishes. The remaining indicators close the gaps while preserving their order. Custom registrations can opt into a fixed reservation as described above.
+The global HUD setting, the registration's enabled selector, applicability, and anchor availability determine visibility. A missing or hidden anchor hides its group without choosing a fallback location. The built-in indicators use their measured sizes and collapse after their exit transition finishes. The remaining indicators close the gaps while preserving their order. Custom fixed footprints stabilize drawable size but do not reserve empty space for hidden members.
 
 Built-in indicators fade in and out over 250 ms. The temporal storm indicator instead flashes over one second on entry and exit, then resumes its normal urgency pulse when applicable. Foreground artwork, text, and backdrops share the transition opacity. Exiting indicators retain their last prepared content and footprint until the transition completes; reappearing content reverses the transition without releasing its artwork. Hiding the game's GUI or losing the anchor suppresses drawing immediately. World exit, registration removal, and disposal still release resources immediately.
 

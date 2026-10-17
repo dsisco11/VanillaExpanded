@@ -21,6 +21,8 @@ internal sealed class HudOverlayGroupLayout : IDisposable
     private HudOverlayGroup? definition;
     private RectangleF? target;
     private PointF? screenPosition;
+    private HudLayoutNode? tree;
+    private double? treePadding;
     private long contextRevision = -1;
     private readonly Dictionary<ElementBounds, (double X, double Y)> renderOffsets = new();
     private bool disposed;
@@ -33,7 +35,7 @@ internal sealed class HudOverlayGroupLayout : IDisposable
     /// <summary>Consumes sampled measurements and updates native layout only when placement or participating content changes.</summary>
     /// <returns>Whether bounds, membership, clips, or target availability changed.</returns>
     public bool Apply(HudOverlayAnchorContext context, HudOverlayGroup group,
-        IReadOnlyList<KeyValuePair<HudOverlayRegistration, SizeF>> eligibleMembers, PointF? screenPosition = null)
+        IReadOnlyList<KeyValuePair<HudOverlayRegistration, SizeF>> eligibleMembers, PointF? screenPosition = null, HudLayoutNode? tree = null, double? treePadding = null)
     {
         if (Environment.CurrentManagedThreadId != threadId) throw new InvalidOperationException("Native layout requires the creating client main thread.");
         ObjectDisposedException.ThrowIf(disposed, this);
@@ -44,7 +46,6 @@ internal sealed class HudOverlayGroupLayout : IDisposable
             .ThenBy(member => member.Key.Id, StringComparer.Ordinal).ToArray();
         foreach (var member in ordered)
         {
-            if (member.Key.GroupId != group.Id) throw new ArgumentException("A member belongs to a different group.", nameof(eligibleMembers));
             ValidateSize(member.Value);
         }
         if (ordered.Select(member => member.Key.Id).Distinct(StringComparer.Ordinal).Count() != ordered.Length)
@@ -53,7 +54,7 @@ internal sealed class HudOverlayGroupLayout : IDisposable
         RectangleF? resolved = context.Resolve(placement.TargetId);
         long revision = placement.TargetId == HudOverlayAnchorContext.ScreenTargetId ? context.Revision : context.GeometryRevision;
         bool parentChanged = !ReferenceEquals(Root.ParentBounds, context.WindowBounds);
-        if (!parentChanged && definition == group && contextRevision == revision && target == resolved && this.screenPosition == screenPosition && previous.SequenceEqual(ordered) && RenderOffsetsUnchanged())
+        if (!parentChanged && definition == group && contextRevision == revision && target == resolved && this.screenPosition == screenPosition && this.tree == tree && this.treePadding == treePadding && previous.SequenceEqual(ordered) && RenderOffsetsUnchanged())
             return false;
 
         // The native root is the only position authority; keep its parent stable across frames and detach on session replacement.
@@ -67,6 +68,8 @@ internal sealed class HudOverlayGroupLayout : IDisposable
         contextRevision = revision;
         target = resolved;
         this.screenPosition = screenPosition;
+        this.tree = tree;
+        this.treePadding = treePadding;
         previous = ordered;
         Revision++;
         RectangleF safe = context.SafeRectangle;
@@ -97,9 +100,17 @@ internal sealed class HudOverlayGroupLayout : IDisposable
 
         double scale = context.GuiScale;
         HudOverlayPacking packing = group.Packing;
-        int count = RetainedCount(ordered, packing, safe.Size, scale);
-        SizeF size = PackedSize(ordered, count, packing);
+        int count = tree == null ? RetainedCount(ordered, packing, safe.Size, scale) : ordered.Length;
+        var mixed = tree == null ? default : HudLayoutGeometry.Resolve(tree, ordered.ToDictionary(item => item.Key.Id, item => item.Value), treePadding ?? packing.Padding);
+        SizeF size = tree == null ? PackedSize(ordered, count, packing) : mixed.Size;
         SynchronizeChildren(ordered, count, packing, size);
+        if (tree != null)
+            foreach (var child in Members)
+            {
+                if (!mixed.Rectangles.TryGetValue(child.Registration.Id, out var rectangle)) continue;
+                child.Bounds.fixedX = rectangle.X; child.Bounds.fixedY = rectangle.Y;
+                child.Bounds.fixedWidth = rectangle.Width; child.Bounds.fixedHeight = rectangle.Height;
+            }
         Root.fixedWidth = size.Width;
         Root.fixedHeight = size.Height;
         PositionRoot(context, placement, resolved!.Value, size);

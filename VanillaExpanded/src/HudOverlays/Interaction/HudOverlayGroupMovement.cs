@@ -1,90 +1,87 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
-using Vintagestory.API.Client;
-using Vintagestory.API.MathTools;
+using System.Linq;
 
 namespace VanillaExpanded.HudOverlays.Interaction;
 
-/// <summary>Owns one group's native saved origin and cancellable drag preview, independently of its presentation.</summary>
+/// <summary>Tracks one native control target while shared containers own permission, membership, and persistence.</summary>
 internal sealed class HudOverlayGroupMovement
 {
-    public string Id { get; }
-    public string Key { get; }
-    private readonly IGuiAPI gui;
-    private PointF? saved;
-    private PointF? preview;
-    private PointF start;
-    private PointF pointerStart;
+    private readonly HudOverlayContainers containers;
+    private readonly string initialContainer;
+    private PointF start, pointerStart;
     private double dragScale;
-    public bool Movable { get; private set; }
+    public string? IndicatorId { get; }
+    public string Id => IndicatorId == null ? initialContainer : containers.Owner(IndicatorId)?.Id ?? initialContainer;
+    public string Key => "vanillaexpanded:hud:controls:" + (IndicatorId == null ? "container:" + initialContainer : "member:" + IndicatorId);
+    public bool Movable => !containers.ReadOnly && containers.Resolved.FirstOrDefault(item => item.Id == Id)?.Movable == true;
     public bool Dragging { get; private set; }
-    public PointF? Position => preview ?? saved;
+    public bool HasMultipleMembers => containers.Resolved.FirstOrDefault(item => item.Id == Id)?.Tree.Leaves().Count() > 1;
+    public PointF? Position
+    {
+        get
+        {
+            var item = containers.Resolved.FirstOrDefault(item => item.Id == Id);
+            return item == null ? null : containers.Origin(item);
+        }
+    }
+    public IReadOnlyDictionary<string, PointF> MemberOrigins { get; set; } = new Dictionary<string, PointF>();
+    public PointF ContainerOrigin { get; set; }
 
     #region Public API
-    #region Construction and mode
-    /// <summary>Restores native integer GUI-unit coordinates without writing settings during composition or rendering.</summary>
-    public HudOverlayGroupMovement(IGuiAPI gui, string groupId)
+    #region Binding and permission
+    /// <summary>Binds a stable group or individual grip without reading or writing native coordinates.</summary>
+    public HudOverlayGroupMovement(HudOverlayContainers containers, string containerId, string? indicator = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(groupId);
-        this.gui = gui;
-        Id = groupId;
-        Key = HudOverlayPositionKeys.Group(groupId);
-        var position = gui.GetDialogPosition(Key);
-        saved = position == null ? null : new PointF(position.X, position.Y);
-        Movable = saved.HasValue;
+        this.containers = containers;
+        initialContainer = containerId;
+        IndicatorId = indicator;
     }
 
-    /// <summary>Enables dragging, or restores registered placement and clears only this group's native key.</summary>
-    /// <param name="value">Whether the group accepts dragging.</param>
-    /// <param name="clearNativePosition">False when the native Fixed dropdown callback already cleared the key.</param>
-    public void SetMovable(bool value, bool clearNativePosition = true)
+    /// <summary>Changes only the effective owner's explicit permission at its current displayed content origin.</summary>
+    public void SetMovable(bool value)
     {
         Cancel();
-        if (!value)
-        {
-            if (clearNativePosition) gui.SetDialogPosition(Key, null!);
-            saved = null;
-        }
-        Movable = value;
+        containers.SetMovable(Id, value, ContainerOrigin);
     }
-    #endregion
 
+    #endregion
     #region Drag lifecycle
-    /// <summary>Captures the displayed content origin and scale so a cancelled drag can restore its prior preference.</summary>
+    /// <summary>Captures total pointer displacement and creates an atomic membership/position preview.</summary>
     public void Begin(PointF contentOrigin, PointF pointer, double scale)
     {
-        if (!Movable || Dragging) return;
+        if (Dragging || !Movable) return;
         if (!double.IsFinite(scale) || scale <= 0) throw new ArgumentOutOfRangeException(nameof(scale));
+        if (!containers.Begin(Id, IndicatorId, contentOrigin, MemberOrigins, ContainerOrigin)) return;
         start = contentOrigin;
         pointerStart = pointer;
         dragScale = scale;
-        preview = start;
         Dragging = true;
     }
 
-    /// <summary>Uses total pointer displacement, leaving screen clamping to the existing layout owner.</summary>
+    /// <summary>Derives preview geometry from the captured origin and total physical pointer delta.</summary>
     public void Move(PointF pointer)
     {
         if (!Dragging) return;
-        preview = new PointF(start.X + (float)((pointer.X - pointerStart.X) / dragScale),
-            start.Y + (float)((pointer.Y - pointerStart.Y) / dragScale));
+        containers.Move(new PointF(start.X + (float)((pointer.X - pointerStart.X) / dragScale),
+            start.Y + (float)((pointer.Y - pointerStart.Y) / dragScale)));
     }
 
-    /// <summary>Stores the displayed, clamped content origin using native truncation only on successful release.</summary>
+    /// <summary>Commits the displayed origin with the entire preview and ends local capture.</summary>
     public void Commit(PointF displayedOrigin)
     {
         if (!Dragging) return;
-        var position = new Vec2i((int)displayedOrigin.X, (int)displayedOrigin.Y);
-        gui.SetDialogPosition(Key, position);
-        saved = new PointF(position.X, position.Y);
-        Cancel();
+        containers.Commit(displayedOrigin);
+        Dragging = false;
     }
 
-    /// <summary>Discards transient geometry without modifying native position storage.</summary>
+    /// <summary>Restores starting membership and placement without saving a partial drag.</summary>
     public void Cancel()
     {
-        preview = null;
+        bool wasDragging = Dragging;
         Dragging = false;
+        if (wasDragging) containers.Cancel();
     }
     #endregion
     #endregion
