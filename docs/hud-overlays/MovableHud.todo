@@ -226,13 +226,15 @@ Depends on Phase 5. Outcome: the complete shared behavior is documented, validat
 
 Source: [MovableHudProposal.md](MovableHudProposal.md), Player interaction, Persistence, Validation expectations, and the complete approved design contract above.
 
-- [ ] Update permanent `HudOverlays.md`, README usage, and localized labels for grouping, permission-only Fixed/Movable, dragging away to ungroup, global Reset HUD layout, persistence, and migration; do not add partial-reset or ungroup-menu actions.
-  - [ ] Describe implemented behavior without historical change logs or staging language; reconcile proposal/checklist references.
-  - [ ] Remove obsolete named-container assumptions and input/layout paths; retain default templates and native controls where applicable.
-  - [ ] Check required XML comments, logic explanations, and visibility/family regions.
-- [ ] Run repository build and appropriate focused/full tests through subagents, followed by second review and independent completion audit.
-  - [ ] Cover host, layout, scheduler, styles, transitions, persistence recovery, membership changes, and repeated lifecycle cleanup.
-  - [ ] Keep tests about behavior and relationships rather than specific colors, opacity presets, or fixed visual dimensions.
+- [x] Update permanent `HudOverlays.md`, README usage, and localized labels for grouping, permission-only Fixed/Movable, dragging away to ungroup, global Reset HUD layout, persistence, and migration; do not add partial-reset or ungroup-menu actions.
+  - [x] Describe implemented behavior without historical change logs or staging language; reconcile proposal/checklist references.
+  - [x] Remove obsolete named-container assumptions and input/layout paths; retain default templates and native controls where applicable.
+  - [x] Check required XML comments, logic explanations, and visibility/family regions.
+- [x] Run repository build and appropriate focused/full tests through subagents, followed by second review and independent completion audit.
+  - [x] Cover host, layout, scheduler, styles, transitions, persistence recovery, membership changes, and repeated lifecycle cleanup.
+  - [x] Keep tests about behavior and relationships rather than specific colors, opacity presets, or fixed visual dimensions.
+- [x] Resolve acceptance feedback: reject overlapping alignment-only snaps, grouping snaps, and ordinary free drops unless Shift is held; allow direct dragging from visible indicator bodies with existing permission, foreground priority, clipped targeting, cancellation, and persistence. Preserve whole-group titlebar dragging and leave empty group space untargetable.
+  - [x] Add failing overlap regression and verify direct-body movement, member selection, Fixed/foreground restrictions, and rollback through native host integration; repeat focused/full verification and independent review.
 - [ ] Obtain user-run in-game acceptance; do not launch the game or infer appearance from headless tests.
   - [ ] Check every style, cursor/foreground-window behavior, titlebar reachability, selective input, and dragging outside bounds.
   - [ ] Check cross-feature grouping, insertion previews, group movement, ungroup/reset, visibility changes, and size/resolution changes.
@@ -240,6 +242,12 @@ Source: [MovableHudProposal.md](MovableHudProposal.md), Player interaction, Pers
   - [ ] Check permission toggles preserve placement/membership and global reset includes temporarily unavailable integrations without touching unrelated dialog settings.
   - [ ] Check grouping versus alignment, Shift bypass, hysteresis, cancellation, restart persistence, migration, and world/session transitions.
 
+Progress evidence:
+
+- README usage and permanent HUD architecture documentation describe native controls, arbitrary grouping, permission-only modes, detach, global reset, persistence/migration, and effective default templates. Existing localized reset/group labels and native Fixed/Movable translations cover the implemented controls; no additional menu actions were added.
+- Second source review and independent audit found no remaining required source/headless issue. The final canonical build passed without new warnings; focused HUD tests passed 335/335 and the full suite passed 2,292/2,292, with no failures or skips. Receipts: `artifacts/test-results/movable-hud-phase6/phase6-focused.trx` and `phase6-full.trx` (repository-relative). Final source edits only improve comments and regions; their build passed separately. Diff checks are clean.
+- Corrective implementation passed second review and independent audit after resolving alignment collisions, free-drop collisions, and source-remainder reflow collisions. Direct-body movement uses the existing cancellable transaction and preserves native chrome/foreground priority. A pre-fix regression failed as expected; final rebuilt focused coverage passed 354/354 and full coverage passed 2,311/2,311, with zero failures or skips. Receipts: `artifacts/test-results/movable-hud-acceptance-fixes/focused-final.trx` and `full-final.trx` in the same directory. No index changes were made.
+- User-run acceptance reported overlapping snaps and difficult titlebar targeting. Corrective work rejects overlapping drops unless Shift is held and adds direct indicator-body dragging; renewed live acceptance remains pending. No game was launched. The in-game acceptance tasks, final acceptance, and parent task remain unchecked; this is not completion of Phase 6.
 ## Final acceptance
 
 - [ ] Every source-proposal requirement and resolved grouping decision is implemented and verified.

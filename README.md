@@ -44,9 +44,17 @@ Compatibility evidence currently covers inspection of the Vintage Story **1.22.7
 
 Hold the Quick Tools hotkey (assign it in Controls) to open a radial menu of available tools, weapons, healing items, and light sources from your hotbar and backpack. Select an item to equip it instantly; use the center **Unequip** action to restore your previous item or stow the item currently held.
 
-### Approximate Time
+### Movable HUD Indicators
 
-Hover over any visible HUD indicator while the mouse is free (for example, with your inventory open) to see its title. HUD indicators release their space after fading out. Time, environmental temperature, calendar, and weather form a column at the top-right of the screen, in that order from top to bottom. Each bottom-left icon has a faint black circle that fades smoothly to transparent at its edge and hides with the icon.
+Free the mouse (for example, by opening your inventory) and hover a visible indicator to reveal its titlebar. Choose **Movable** from the titlebar dropdown, then drag the indicator itself or its title area. A separate group titlebar moves the whole group; dragging an individual away detaches it. **Fixed** locks both the group and its members without changing their placement or membership. The close icon dismisses the controls, leaving the indicators enabled.
+
+Snap an indicator beside another to create or join a group, or drag a whole group beside another to merge their arrangements. The preview shows the destination and insertion before release. All four sides support alignment selected by pointer position; snaps that would overlap visible indicators are rejected. Overlapping free drops are cancelled and restore the starting arrangement without saving. Hold Shift to permit intentional overlap. Screen, edge, and center guides align items without grouping them. Hold **Shift** to bypass snapping and grouping, or press **Escape** to cancel the drag.
+
+Choose **Reset HUD layout** from any titlebar dropdown to restore all built-in groups and positions, including saved overrides for temporarily unavailable integrations. Layouts and Fixed/Movable permissions persist in native client settings across restarts and worlds. Existing saved group positions migrate automatically. An unreadable or newer layout is preserved, with defaults shown read-only until you explicitly reset it.
+
+By default, time, environmental temperature, calendar, and weather form a column at the top-right, in that order. Hidden indicators release their space after fading out and return to their saved arrangement when visible again. Changing styles or display size preserves attachments and the group's top-left origin, subject to screen clamping. See [HUD overlay integration](docs/hud-overlays/HudOverlays.md) for layout and persistence details.
+
+### Approximate Time
 
 A workshop-style copper radial clock shows estimated time. Its 24 hourly segments are colored dynamically from the local calendar's day, dawn, dusk, and night phases. Noon is at the top and midnight at the bottom; a copper pointer follows the estimate. The immersive clock uses the shared 90 × 90 GUI-unit Clock size. Local skylight, including nighttime skylight, recalibrates the estimate; lack of skylight gradually introduces up to eight hours of error on a normal day. The server saves observation age across reconnects and world reloads. Multiplayer tracking requires the mod on the server. Toggle it live with `EnableApproximateTimeOverlay` and choose its presentation with `ApproximateTimeGaugeStyle`.
 

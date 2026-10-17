@@ -145,7 +145,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     public override void OnKeyPress(KeyEvent args) => ActiveControls?.OnKeyPress(args);
     /// <summary>Rechecks Shift bypass without requiring additional pointer movement.</summary>
     public override void OnKeyUp(KeyEvent args) { RefreshSnap(); }
-    /// <summary>Routes presses to the handle without consuming the content composer's entire rectangle.</summary>
+    /// <summary>Prioritizes native chrome, then allows direct dragging of visible indicators without capturing group gaps.</summary>
     public override void OnMouseDown(MouseEvent args)
     {
         var activeControl = ActiveControls;
@@ -153,6 +153,13 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         else foreach (var control in groupControls.Values.Reverse().ToArray())
         {
             control.OnMouseDown(capi, args);
+            if (args.Handled) break;
+        }
+        if (args.Handled || activeControl != null) return;
+        // Prefer member controls so a body press detaches only that indicator, even when its group is also hovered.
+        foreach (var control in groupControls.Values.Reverse().OrderByDescending(control => control.Movement.IndicatorId != null).ToArray())
+        {
+            control.OnContentMouseDown(capi, args);
             if (args.Handled) break;
         }
     }
@@ -258,9 +265,9 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     }
 
     /// <summary>Resolves against unsnapped native bounds before publishing a no-write membership preview.</summary>
-    private void UpdateSnap(HudOverlayGroupMovement movement, PointF pointer)
+    private bool UpdateSnap(HudOverlayGroupMovement movement, PointF pointer)
     {
-        if (updatingSnap || containers == null || snapping == null || !movement.Dragging) return;
+        if (updatingSnap || containers == null || snapping == null || !movement.Dragging) return false;
         updatingSnap = true;
         try
         {
@@ -273,6 +280,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
             snapping.Update(movement, pointer, shift, Vintagestory.API.Config.RuntimeEnv.GUIScale, viewport,
                 groups.Where(item => visibleGroups.Contains(item.Key)).ToDictionary(item => item.Key, item => item.Value), isDrawable);
             RequestLayout();
+            return snapping.DropAllowed;
         }
         finally { updatingSnap = false; }
     }

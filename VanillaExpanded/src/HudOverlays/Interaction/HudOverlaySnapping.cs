@@ -18,6 +18,7 @@ internal sealed class HudOverlaySnapping
     public HudSnapCandidate? Selected { get; private set; }
     public RectangleF Destination { get; private set; }
     public RectangleF Insertion { get; private set; }
+    public bool DropAllowed { get; private set; } = true;
 
     #region Public API
     /// <summary>Borrows the session's authoritative transaction owner.</summary>
@@ -30,6 +31,7 @@ internal sealed class HudOverlaySnapping
         capture = null;
         Selected = null;
         Destination = Insertion = RectangleF.Empty;
+        DropAllowed = true;
     }
 
     /// <summary>Applies the first valid ranked proposal using the same resolved geometry used by native layout.</summary>
@@ -72,6 +74,11 @@ internal sealed class HudOverlaySnapping
         // Use the raw total displacement, not the previous snap or the clamped native root, for acquisition.
         var raw = new RectangleF(viewport.X + movement.UnsnappedOrigin.X * (float)scale,
             viewport.Y + movement.UnsnappedOrigin.Y * (float)scale, (float)moving.Root.OuterWidth, (float)moving.Root.OuterHeight);
+        // Unsnapped drops must also be collision-free. Shift is the explicit override for intentional overlap.
+        DropAllowed = bypass || !Collides(moving.Members.Where(member => drawable(member.Registration)).Select(member =>
+            new RectangleF((float)member.Bounds.renderX, (float)member.Bounds.renderY,
+                (float)member.Bounds.OuterWidth, (float)member.Bounds.OuterHeight)), layouts, source.Id, string.Empty);
+        DropAllowed &= bypass || !RemainderCollides(movement, layouts, source.Id, string.Empty, drawable);
         foreach (var candidate in HudSnapGeometry.Candidates(raw, pointer, safe, targets, retained, bypass))
         {
             if (!candidate.Grouping)
@@ -81,7 +88,16 @@ internal sealed class HudOverlaySnapping
                 // Integer native checkpoints may lose an apparent alignment; never show a guide for that result.
                 bool xAxis = candidate.AlignsX;
                 if (Math.Abs(xAxis ? final.X - candidate.Origin.X : final.Y - candidate.Origin.Y) > .01f) continue;
+                // Alignment changes placement without membership, but must obey the same collision rule as grouping.
+                // Translate individual footprints rather than treating empty spaces in a mixed group as solid content.
+                var aligned = moving.Members.Where(member => drawable(member.Registration)).ToDictionary(
+                    member => member.Registration.Id, member => new RectangleF(
+                        final.X + (float)(member.Bounds.renderX - moving.Root.renderX),
+                        final.Y + (float)(member.Bounds.renderY - moving.Root.renderY),
+                        (float)member.Bounds.OuterWidth, (float)member.Bounds.OuterHeight));
+                if (!Valid(aligned, layouts, source.Id, string.Empty, safe) || RemainderCollides(movement, layouts, source.Id, string.Empty, drawable)) continue;
                 containers.Move(origin);
+                DropAllowed = true;
                 Selected = candidate;
                 Insertion = final;
                 break;
@@ -96,8 +112,9 @@ internal sealed class HudOverlaySnapping
             var rectangles = geometry.Rectangles.ToDictionary(item => item.Key, item => new RectangleF(
                 viewport.X + (originGui.X + item.Value.X) * (float)scale, viewport.Y + (originGui.Y + item.Value.Y) * (float)scale,
                 item.Value.Width * (float)scale, item.Value.Height * (float)scale));
-            if (!Valid(rectangles, layouts, source.Id, target.Id, safe)) continue;
+            if (!Valid(rectangles, layouts, source.Id, target.Id, safe) || RemainderCollides(movement, layouts, source.Id, target.Id, drawable)) continue;
             if (!containers.PreviewJoin(candidate, originGui)) continue;
+            DropAllowed = true;
             Selected = candidate;
             Destination = Union(rectangles.Where(item => !excluded.Contains(item.Key)).Select(item => item.Value));
             Insertion = Union(rectangles.Where(item => excluded.Contains(item.Key)).Select(item => item.Value));
@@ -130,13 +147,31 @@ internal sealed class HudOverlaySnapping
         {
             if (!viewport.Contains(values[i])) return false;
             for (int j = i + 1; j < values.Length; j++) if (Overlaps(values[i], values[j])) return false;
-            foreach (var other in layouts.Where(item => item.Key != source && item.Key != target && item.Value.Available))
-                foreach (var member in other.Value.Members)
-                    if (member.Clip.Width > 0 && member.Clip.Height > 0 && Overlaps(values[i], member.Clip)) return false;
         }
-        return true;
+        return !Collides(values, layouts, source, target);
     }
 
+    /// <summary>Checks visible peer content without treating empty group space or hover chrome as an obstacle.</summary>
+    private static bool Collides(IEnumerable<RectangleF> rectangles,
+        IReadOnlyDictionary<string, HudOverlayGroupLayout> layouts, string source, string target, string? additionalExcluded = null)
+    {
+        var peers = layouts.Where(item => item.Key != source && item.Key != target && item.Key != additionalExcluded && item.Value.Available)
+            .SelectMany(item => item.Value.Members).Where(member => member.Clip.Width > 0 && member.Clip.Height > 0)
+            .Select(member => member.Clip).ToArray();
+        return rectangles.Any(rectangle => peers.Any(peer => Overlaps(rectangle, peer)));
+    }
+
+    /// <summary>Checks reflowed source members against peers; a grouping target is tested through its final candidate geometry instead.</summary>
+    private static bool RemainderCollides(HudOverlayGroupMovement movement,
+        IReadOnlyDictionary<string, HudOverlayGroupLayout> layouts, string source, string target, Func<HudOverlayRegistration, bool> drawable)
+    {
+        // Stable members identify the remainder even when singleton normalization changes its container identity.
+        return layouts.Where(pair => pair.Key != source
+            && pair.Value.Members.Any(member => movement.StartingMembers.Contains(member.Registration.Id)))
+            .Any(pair => Collides(pair.Value.Members.Where(member => drawable(member.Registration)).Select(member => new RectangleF(
+                (float)member.Bounds.renderX, (float)member.Bounds.renderY,
+                (float)member.Bounds.OuterWidth, (float)member.Bounds.OuterHeight)), layouts, pair.Key, source, target));
+    }
     /// <summary>Allows touching edges while rejecting positive-area intersections.</summary>
     private static bool Overlaps(RectangleF a, RectangleF b) => Math.Min(a.Right, b.Right) - Math.Max(a.Left, b.Left) > .01f
         && Math.Min(a.Bottom, b.Bottom) - Math.Max(a.Top, b.Top) > .01f;
