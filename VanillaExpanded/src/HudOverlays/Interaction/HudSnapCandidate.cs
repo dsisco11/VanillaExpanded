@@ -13,6 +13,12 @@ internal sealed record HudSnapTarget(string Container, string? Member, Rectangle
 internal sealed record HudSnapCandidate(string Identity, HudSnapTarget? Target, HudSnapSide Side,
     HudOverlayCrossAlignment Alignment, PointF Origin, float Distance, RectangleF Guide)
 {
+    #region Public API
     public bool Grouping => Target != null;
     public bool AlignsX { get; init; }
+
+    /// <summary>Keeps a destination and attachment side stable while allowing its cross-axis alignment to change.</summary>
+    public bool RetainsAttachment(HudSnapCandidate? previous) => Grouping && previous?.Grouping == true
+        && Target!.Container == previous.Target!.Container && Target.Member == previous.Target.Member && Side == previous.Side;
+    #endregion
 }

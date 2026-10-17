@@ -95,11 +95,12 @@ Source: [ElementBounds](../../../vsapi/Client/UI/ElementBounds.cs), especially `
 
 Separate geometric candidate calculation from grouping changes. Geometry returns adjusted bounds, guides, and candidate identity; a grouping resolver determines create/join versus alignment-only behavior.
 
-- Use a 6-physical-pixel acquisition threshold and a 10-pixel release threshold. Retain a valid acquired candidate first; otherwise rank by distance, grouping before alignment at equal distance, then ordinal candidate identity. Thresholds remain independent of GUI scale.
+- Use a 16-physical-pixel acquisition threshold and a 26-pixel release threshold, independent of GUI scale. Valid nearby grouping candidates outrank alignment-only guides, including retained screen guides. Within each intent, retain a valid grouping target/member/side (or an alignment identity) first, then rank by distance and ordinal candidate identity. Target/side retention survives a change in cross-axis alignment. Perpendicular locality uses the corresponding acquisition/release band rather than switching off at a touching corner.
 - Derive unsnapped bounds from starting geometry and total pointer displacement; never accumulate snapped corrections.
 - Consider nearby visible item/group measured bounds and screen edges. Exclude the moving container and descendants, hidden content, handles, shadows, and tooltips; reject distant perpendicular spans.
 - Use normal packing gaps for adjacency. Preview the destination arrangement without saving membership or recreating feature artwork.
-- Reconcile clamping and native rounding before release. Remove a grouping candidate if its claimed adjacency no longer holds.
+- Cross-axis alignment uses target thirds with a hysteresis margin of the smaller of 6 physical pixels or one twelfth of the target span. Keep the acquired alignment until the pointer moves beyond its expanded zone; deliberate movement can select any of the three alignments without releasing the target/side.
+- Reconcile clamping and nearest-integer GUI origins before release. Alignment-only candidates may shift by up to one GUI unit for rounding and boundary clamping; move their guide to the actual resolved position rather than rejecting a fractional alignment. Reject larger shifts or invalid/colliding layouts. Guides and committed geometry must agree.
 - Commit membership and placement together only on successful release. All cancellation paths discard the entire preview, including changes to the source group.
 
 Grouped members subsequently move together; alignment-only snaps do not create relationships. Avoid nested groups and arbitrary inter-group attachment graphs.
