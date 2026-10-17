@@ -1,0 +1,96 @@
+using System;
+using HarmonyLib;
+using System.Drawing;
+using Vintagestory.API.Config;
+using Vintagestory.API.Client;
+using Vintagestory.API.Datastructures;
+using Cairo;
+using VanillaExpanded.HudOverlays.Rendering;
+using VanillaExpanded.RadialMenu;
+
+namespace VanillaExpanded.HudOverlays.Interaction;
+
+/// <summary>Uses compact orange titlebar artwork with the actual native Fixed/Movable dropdown and chrome behavior.</summary>
+internal sealed class HudOverlayNativeTitleBar : GuiElementDialogTitleBar
+{
+    // Native titlebars do not expose their menu or initial-render persistence flag. Keep version-sensitive
+    // access here, without patching the engine or copying its graphics and dropdown implementation.
+    private static readonly AccessTools.FieldRef<GuiElementDialogTitleBar, GuiElementListMenu> MenuField =
+        AccessTools.FieldRefAccess<GuiElementDialogTitleBar, GuiElementListMenu>("listMenu");
+    private static readonly AccessTools.FieldRef<GuiElementDialogTitleBar, bool> FirstRenderField =
+        AccessTools.FieldRefAccess<GuiElementDialogTitleBar, bool>("firstFrameRendered");
+    private static readonly AccessTools.FieldRef<GuiElementDialogTitleBar, Rectangled> MenuRectField =
+        AccessTools.FieldRefAccess<GuiElementDialogTitleBar, Rectangled>("menuIconRect");
+    private static readonly AccessTools.FieldRef<GuiElementDialogTitleBar, Rectangled> CloseRectField =
+        AccessTools.FieldRefAccess<GuiElementDialogTitleBar, Rectangled>("closeIconRect");
+    private static readonly AccessTools.FieldRef<GuiElementListMenu, double> MenuWidthField =
+        AccessTools.FieldRefAccess<GuiElementListMenu, double>("expandedBoxWidth");
+    private static readonly AccessTools.FieldRef<GuiElementListMenu, double> MenuHeightField =
+        AccessTools.FieldRefAccess<GuiElementListMenu, double>("expandedBoxHeight");
+
+    public GuiElementListMenu Menu => MenuField(this);
+
+    #region Public API
+    /// <summary>Retains native titlebar initialization with normal HUD lettering; content drops remain the persistence owner.</summary>
+    public HudOverlayNativeTitleBar(ICoreClientAPI api, string title, GuiComposer composer, Action dismiss, ElementBounds bounds)
+        : base(api, title, composer, dismiss, font: CairoFont.WhiteSmallText().WithFontSize(HudOverlaySizes.Text), bounds: bounds)
+    {
+        // The native first render saves its parent origin, which here is a transient hover-control origin.
+        // Suppress that one write rather than allowing it to overwrite the saved content position.
+        FirstRenderField(this) = true;
+    }
+
+    /// <summary>Initializes native menu resources, then paints a slimmer panel and centers its native glyphs and HUD text.</summary>
+    public override void ComposeTextElements(Context context, ImageSurface surface)
+    {
+        // Native composition owns restoration, dropdown preparation and hover textures. Replace only the static
+        // titlebar paint and register hit rectangles matching the compact geometry; never mutate global GUI style.
+        base.ComposeTextElements(context, surface);
+        context.Save();
+        context.Operator = Operator.Source;
+        var orange = RadialMenuWedgeStyle.HoverFill;
+        context.SetSourceRGBA(orange.X, orange.Y, orange.Z, .92);
+        context.Rectangle(Bounds.bgDrawX, Bounds.bgDrawY, Bounds.OuterWidth, Bounds.OuterHeight);
+        context.Fill();
+        context.Operator = Operator.Over;
+        Font.SetupContext(context);
+        DrawTextLineAt(context, text, scaled(6), (Bounds.InnerHeight - Font.GetFontExtents().Height) / 2);
+        double closeSize = scaled(unscaledCloseIconSize), menuSize = scaled(unscaledCloseIconSize + 2);
+        double closeX = Bounds.OuterWidth - closeSize - scaled(8);
+        double menuX = closeX - menuSize - scaled(8);
+        double closeY = (Bounds.InnerHeight - closeSize) / 2;
+        double menuY = (Bounds.InnerHeight - menuSize) / 2;
+        CloseRectField(this) = new Rectangled(closeX, closeY, closeSize, closeSize);
+        MenuRectField(this) = new Rectangled(menuX, menuY, menuSize, menuSize);
+        context.SetSourceRGBA(GuiStyle.DialogDefaultTextColor);
+        api.Gui.Icons.DrawCross(context, Bounds.drawX + closeX, Bounds.drawY + closeY, scaled(2), closeSize);
+        api.Gui.Icons.Drawmenuicon_svg(context, (int)(Bounds.drawX + menuX), (int)(Bounds.drawY + menuY),
+            (int)menuSize, (int)menuSize, GuiStyle.DialogDefaultTextColor);
+        context.Restore();
+        Menu.Bounds.fixedX = menuX / RuntimeEnv.GUIScale;
+        Menu.Bounds.MarkDirtyRecursive();
+        Menu.ComposeDynamicElements();
+    }
+
+    /// <summary>Identifies the native menu/close icons so their presses do not begin a content drag.</summary>
+    public bool IsChrome(int x, int y) => MenuRectField(this).PointInside(x - Bounds.absX, y - Bounds.absY)
+        || CloseRectField(this).PointInside(x - Bounds.absX, y - Bounds.absY);
+
+    /// <summary>Keeps the actual native dropdown reachable at screen edges without changing its artwork or selection rules.</summary>
+    public void FitMenu(RectangleF viewport)
+    {
+        if (!Menu.IsOpened) return;
+        double x = Math.Clamp(Menu.Bounds.renderX, viewport.Left,
+            Math.Max(viewport.Left, viewport.Right - MenuWidthField(Menu)));
+        double y = Math.Clamp(Menu.Bounds.renderY, viewport.Top,
+            Math.Max(viewport.Top, viewport.Bottom - Menu.Bounds.InnerHeight - MenuHeightField(Menu)));
+        if (x == Menu.Bounds.renderX && y == Menu.Bounds.renderY) return;
+        Menu.Bounds.fixedX += (x - Menu.Bounds.renderX) / RuntimeEnv.GUIScale;
+        Menu.Bounds.fixedY += (y - Menu.Bounds.renderY) / RuntimeEnv.GUIScale;
+        Menu.Bounds.MarkDirtyRecursive();
+        Menu.Bounds.CalcWorldBounds();
+        // Recompute the native scissor and scrollbar after moving the dropdown anchor.
+        Menu.ComposeDynamicElements();
+    }
+    #endregion
+}

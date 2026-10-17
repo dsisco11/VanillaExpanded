@@ -11,7 +11,7 @@ Do not add a VE layout file, serializer, persistent docking graph, automatic reg
 
 ## Assumptions and decisions to resolve
 
-- The native titlebar adapter is preferred but unproven. Phase 1 determines whether its private drag state, combined graphics/menu, and cancellation requirements permit narrow reuse. A small custom `GuiElement` using native position APIs is the approved fallback.
+- Use the native titlebar with its native Fixed/Movable dropdown and the approved compact orange skin: 22 GUI units high with shared 14-point HUD text. Adapt hover visibility, content-origin persistence, and cancellation around the widget; do not substitute a direct mode-toggle interaction.
 - Saved positions use native integer GUI-unit X/Y coordinates, not persisted screen-edge anchors or pivots. Position presence records individual detachment. Client settings apply across worlds.
 - Begin with a 6-physical-pixel snap threshold and Shift bypass. Select and document the wider release threshold and deterministic candidate tie-breaking during snapping work.
 - Resolve compact handle dimensions, title/menu presentation, and control-to-content origin mapping in the prototype; do not silently introduce resize, close-indicator, or docking behavior.
@@ -21,26 +21,35 @@ Do not add a VE layout file, serializer, persistent docking graph, automatic reg
 
 Outcome: one existing group can demonstrate hover controls, native persisted dragging, and safe cancellation before individual movement or snapping is built.
 
-- [ ] Reconfirm the owning seams in `HudOverlayHost`, `HudOverlayHoverLabels`, `HudOverlaySession`, `HudOverlayGroupLayout`, and native titlebar/composer input routing.
-  - [ ] Identify how group placement previews enter layout without being overwritten by ordinary per-frame synchronization.
-  - [ ] Keep the prototype restricted to one existing group, without changing feature overlays or presentation classes.
-- [ ] Prototype a separate native control composition around `GuiElementDialogTitleBar`.
-  - [ ] Use a distinct stable VE dialog key and native Fixed/Movable behavior, restore, and release-time persistence.
-  - [ ] Gate rendering/hit testing to free-cursor hover or active interaction; respect foreground dialogs and global HUD visibility.
-  - [ ] Keep controls visible while moving from content onto the handle and throughout dragging; place controls above content or below it near the screen edge.
-  - [ ] Establish consistent control/content origin mapping so moving the handle below the content never changes the saved content position.
-  - [ ] Route only handle/active-drag input, continue outside initial bounds, and avoid the default dialog methods' whole-composer event consumption.
-  - [ ] Preserve content measurements, packing, sampling, and prepared artwork while controls appear or positions change.
-- [ ] Verify cancellation restores starting placement without committing a position: Escape, cursor capture changes, GUI hiding, world exit, target removal, and loss of active interaction.
-- [ ] Record the adapter decision with source/headless evidence and user-run interaction evidence.
-  - [ ] Check native focus management with other dialogs open; `Focusable = false` alone is insufficient.
-  - [ ] If narrow reuse fails, implement the approved small native `GuiElement` handle using `GetDialogPosition`/`SetDialogPosition`, and verify the same behavior.
-  - [ ] Remove the rejected adapter path and temporary prototype-only scaffolding once the retained approach is established.
+- [x] Reconfirm the owning seams in `HudOverlayHost`, `HudOverlayHoverLabels`, `HudOverlaySession`, `HudOverlayGroupLayout`, and native titlebar/composer input routing.
+  - [x] Identify how group placement previews enter layout without being overwritten by ordinary per-frame synchronization.
+  - [x] Keep the prototype restricted to one existing group, without changing feature overlays or presentation classes.
+- [x] Prototype a separate native control composition around `GuiElementDialogTitleBar`.
+  - [x] Use a distinct stable VE dialog key and native Fixed/Movable behavior, restore, and release-time persistence.
+  - [x] Gate rendering/hit testing to free-cursor hover or active interaction; respect foreground dialogs and global HUD visibility.
+  - [x] Keep controls visible while moving from content onto the handle and throughout dragging; place controls above content or below it near the screen edge.
+  - [x] Establish consistent control/content origin mapping so moving the handle below the content never changes the saved content position.
+  - [x] Route only handle/active-drag input, continue outside initial bounds, and avoid the default dialog methods' whole-composer event consumption.
+  - [x] Preserve content measurements, packing, sampling, and prepared artwork while controls appear or positions change.
+  - [x] Paint the slim titlebar with radial-menu orange and normal HUD text; keep native menu/close hit geometry aligned with its glyphs.
+  - [x] Show a translucent orange panel over exact hovered group bounds behind the content, and an unfilled orange bounds outline whenever the cursor is free and that group is Movable.
+- [x] Verify cancellation restores starting placement without committing a position: Escape, cursor capture changes, GUI hiding, world exit, target removal, and loss of active interaction.
+- [x] Record the adapter decision with source/headless evidence and user-run interaction evidence.
+  - [x] Check native focus management with other dialogs open; `Focusable = false` alone is insufficient.
+  - [x] Reuse the actual native titlebar and dropdown while retaining safe content dragging, cancellation, and `GetDialogPosition`/`SetDialogPosition` persistence.
+  - [x] Remove the rejected adapter path and temporary prototype-only scaffolding once the retained approach is established.
 
 Completion criteria:
 
-- [ ] The retained approach supports one group, native persistence across client restart, reachable hover controls, selective input, and cancellation without a separate persistence system.
-- [ ] The user has validated the prototype's hover/input behavior, including foreground windows, before expansion to individual containers and snapping.
+- [x] The retained approach supports one group, native persistence across client restart, reachable hover controls, selective input, and cancellation without a separate persistence system.
+- [x] The user has validated the prototype's hover/input behavior, including foreground windows, before expansion to individual containers and snapping.
+
+Completion evidence:
+
+- The retained one-group integration uses the actual native titlebar and Fixed/Movable dropdown with the approved compact orange skin. Separate control bounds preserve content measurements and packing; native settings store the content origin rather than the temporary above/below titlebar origin.
+- Source and headless coverage verifies selective input, native dropdown navigation, foreground-window priority, reachable controls, cancellation without persistence, content-origin restoration, resource reuse, and lifecycle cleanup. Appearance is reviewed in game rather than asserted through visual presets.
+- The final full suite passed 2,199/2,199 tests with no failures or skips. Receipt: `artifacts/test-results/visual-policy/visual-policy-full.trx` (repository-relative). Second review and the independent completion audit found no remaining required source defect.
+- The user previously confirmed dragging and position persistence, and explicitly signed off this prototype by requesting that Phase 1 be marked complete on 2026-10-17. This records acceptance without attributing additional individual live-test observations to the user. No game was launched by the agent.
 
 ## Phase 2: Resolve persisted group positions through the shared runtime
 

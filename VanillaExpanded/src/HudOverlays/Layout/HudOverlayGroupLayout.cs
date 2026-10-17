@@ -18,6 +18,7 @@ internal sealed class HudOverlayGroupLayout : IDisposable
     private KeyValuePair<HudOverlayRegistration, SizeF>[] previous = Array.Empty<KeyValuePair<HudOverlayRegistration, SizeF>>();
     private HudOverlayGroup? definition;
     private RectangleF? target;
+    private PointF? screenPosition;
     private long contextRevision = -1;
     private readonly Dictionary<ElementBounds, (double X, double Y)> renderOffsets = new();
     private bool disposed;
@@ -30,7 +31,7 @@ internal sealed class HudOverlayGroupLayout : IDisposable
     /// <summary>Consumes sampled measurements and updates native layout only when placement or participating content changes.</summary>
     /// <returns>Whether bounds, membership, clips, or target availability changed.</returns>
     public bool Apply(HudOverlayAnchorContext context, HudOverlayGroup group,
-        IReadOnlyList<KeyValuePair<HudOverlayRegistration, SizeF>> eligibleMembers)
+        IReadOnlyList<KeyValuePair<HudOverlayRegistration, SizeF>> eligibleMembers, PointF? screenPosition = null)
     {
         if (Environment.CurrentManagedThreadId != threadId) throw new InvalidOperationException("Native layout requires the creating client main thread.");
         ObjectDisposedException.ThrowIf(disposed, this);
@@ -49,7 +50,7 @@ internal sealed class HudOverlayGroupLayout : IDisposable
         RectangleF? resolved = context.Resolve(group.Placement.TargetId);
         long revision = group.Placement.TargetId == HudOverlayAnchorContext.ScreenTargetId ? context.Revision : context.GeometryRevision;
         bool parentChanged = !ReferenceEquals(Root.ParentBounds, context.WindowBounds);
-        if (!parentChanged && definition == group && contextRevision == revision && target == resolved && previous.SequenceEqual(ordered) && RenderOffsetsUnchanged())
+        if (!parentChanged && definition == group && contextRevision == revision && target == resolved && this.screenPosition == screenPosition && previous.SequenceEqual(ordered) && RenderOffsetsUnchanged())
             return false;
 
         // The native root is the only position authority; keep its parent stable across frames and detach on session replacement.
@@ -62,6 +63,7 @@ internal sealed class HudOverlayGroupLayout : IDisposable
         definition = group;
         contextRevision = revision;
         target = resolved;
+        this.screenPosition = screenPosition;
         previous = ordered;
         Revision++;
         RectangleF safe = context.SafeRectangle;
@@ -98,6 +100,14 @@ internal sealed class HudOverlayGroupLayout : IDisposable
         Root.fixedWidth = size.Width;
         Root.fixedHeight = size.Height;
         PositionRoot(context, group.Placement, resolved!.Value, size);
+        if (screenPosition is { } position)
+        {
+            // A drag/saved origin is relative to the window, independent of native alignment margins.
+            Root.Alignment = EnumDialogArea.None;
+            Root.fixedOffsetX = Root.fixedOffsetY = 0;
+            Root.fixedX = position.X;
+            Root.fixedY = position.Y;
+        }
         Root.MarkDirtyRecursive();
         Root.CalcWorldBounds();
 

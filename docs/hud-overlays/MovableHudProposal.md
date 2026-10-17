@@ -4,7 +4,7 @@
 
 Reuse Vintage Story's HUD/dialog lifecycle, GUI event routing, native bounds and scaling, and native dialog-position persistence. Prefer the stock titlebar's drag behavior where it can be adapted to hover controls; extend the existing VE layout runtime for individual placement and geometric snapping. Individual feature overlays and their presentation classes should not implement dragging or persistence.
 
-This is a design proposal; the current HUD remains passive and automatically packed.
+This proposal describes the complete intended interaction. The current implementation provides group movement controls for `world-status`; other groups remain passive and packed. Individual movement and snapping are not yet implemented.
 
 Implementation checklist: [MovableHud.todo](MovableHud.todo).
 
@@ -23,7 +23,7 @@ The investigation used the local API source and the installed Vintage Story 1.22
 
 No general snapping or docking facility was found in the inspected native GUI API and window-drag path. Stock dragging changes positions freely; it does not calculate neighboring edges or snap relationships.
 
-The stock titlebar already supplies the essential dragging and persistence. Its direct use of native client settings is suitable. It is not a complete drop-in solution for the proposed hover-only handles: its movable/moving state and setup methods are private, it includes close/menu controls, and it exposes no public drag-completed callback. Prefer a narrow adapter around native event handling and parent bounds, with snapping applied before release stores the position. Hover rendering, small indicator dimensions, and cancellation need validation before claiming that the widget can be reused unchanged. If those constraints require a smaller custom handle, it should still use native position storage; a new persistence subsystem is unnecessary.
+The stock titlebar already supplies the essential dragging and persistence. Its direct use of native client settings is suitable. It is not a complete drop-in solution for the proposed hover-only handles: its movable/moving state and setup methods are private, it includes close/menu controls, and it exposes no public drag-completed callback. Prefer a narrow adapter around native event handling and parent bounds, with snapping applied before release stores the position. Hover rendering, small indicator dimensions, and cancellation need validation before claiming that the widget can be reused unchanged. Retain native titlebar and dropdown machinery through the compact skin; a new persistence subsystem is unnecessary.
 
 Native `GuiManager` dispatches mouse events through registered dialogs until one handles them. A handled mouse-down also invokes its focus-management path, which can unfocus another dialog even if the HUD itself is non-focusable. Interaction must respect foreground windows and must be checked with inventories and other dialogs open; setting `Focusable = false` alone does not guarantee that other dialog focus remains untouched.
 
@@ -48,7 +48,11 @@ Place the controls in a separate native control composition so their visibility 
 
 Prototype a narrow adapter around `GuiElementDialogTitleBar` that forwards native mouse events, gates rendering and hit testing to the hover/drag state, uses a stable dialog name for persistence, and observes the resulting parent bounds for layout updates and snapping. The control composition's origin and the persisted content origin must use a consistent mapping, including when the titlebar appears below an indicator near a screen edge.
 
-The adapter must preserve the native Fixed/Movable behavior while ensuring cancellation does not commit a position. If the widget's private state or combined graphics/menu behavior makes this require replacing most of its implementation, use a small custom `GuiElement` with the same native position API. This is a prototype decision, not an assumption that the stock widget can be reused unchanged.
+The adapter uses `GuiElementDialogTitleBar` with its actual native Fixed/Movable dropdown. Its titlebar skin is compact: 22 GUI units high, standard 14-point HUD text, and the radial menu's orange hover background. Native menu and close glyphs and their hit rectangles follow the slimmer geometry. Retain the native dropdown interaction rather than a direct mode-toggle button. Keep the proven cancellable content-drag integration around the widget so cancellation does not commit a position.
+
+The one-group implementation composes the native titlebar with this compact skin and uses its own `GuiElementListMenu`, including native menu selection callbacks. A small adapter isolates access to the titlebar's private menu/icon bounds and suppresses its first-render parent-position write: the temporary hover titlebar position is not the saved content position. Content dragging and cancellation remain owned by the shared movement integration rather than the titlebar's private drag state. Native initialization, menu resources, and dropdown behavior are reused without patching the engine. Native source/headless contract checks and user acceptance remain separate evidence requirements.
+
+Show a partly transparent orange panel behind the exact group bounds while hovered or interacting. While the cursor is free and the group is Movable, also show an unfilled orange line rectangle around those bounds, including when the pointer is elsewhere. Use the radial menu's orange palette for both. Keep these decorations outside measurements and placement calculations. Foreground windows suppress hover fill and controls at their pointer locations, but the movable outline remains a global free-cursor cue. Hide it for hidden HUDs, a grabbed cursor, unavailable content, or modal input capture.
 
 ## Placement and group behavior
 
@@ -106,7 +110,7 @@ Use `IGuiAPI.GetDialogPosition` and `SetDialogPosition`, backed by the game's cl
 
 Give each movable group and individual indicator a distinct, stable composer/dialog key, such as `vanillaexpanded:hud:group:world-status` and `vanillaexpanded:hud:indicator:vanillaexpanded:player-wetness`. Save native `Vec2i` GUI-unit positions. A missing group entry means its registered placement applies; a missing indicator entry means it participates in its registered group's packing. Presence of an individual position therefore also records detachment, without a separate membership file.
 
-Let the native titlebar restore and store its position where used. Any custom handle uses the same API after a successful drop. Reattachment or reset clears the relevant key with `SetDialogPosition(key, null)`; reset-all clears keys for the known VE groups and indicators. Do not erase another dialog's settings. Leave positions for temporarily unavailable integrations intact. Avoid writes on each mouse move and leave serialization and disk persistence to the engine. Validate restored positions and keep effective bounds reachable after viewport changes; match native coordinate rounding rather than introducing another position format.
+Use native position restoration and the same API after successful content drops; the hover titlebar must not persist its own temporary origin. Reattachment or reset clears the relevant key with `SetDialogPosition(key, null)`; reset-all clears keys for the known VE groups and indicators. Do not erase another dialog's settings. Leave positions for temporarily unavailable integrations intact. Avoid writes on each mouse move and leave serialization and disk persistence to the engine. Validate restored positions and keep effective bounds reachable after viewport changes; match native coordinate rounding rather than introducing another position format.
 
 ## Integration boundaries
 
