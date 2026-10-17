@@ -48,8 +48,8 @@ internal sealed class HudOverlayGroupControls : IDisposable
         this.relayout = relayout;
         highlight = new HudOverlayGroupHighlight(api);
         compositionBounds = ElementBounds.Fixed(0, 0, Width, HudOverlaySizes.TitleBarHeight).WithParent(api.Gui.WindowBounds);
-        composer = api.Gui.CreateCompo(HudOverlayGroupMovement.DialogKey, compositionBounds);
-        titleBar = new HudOverlayNativeTitleBar(api, Lang.Get("vanillaexpanded:hud-group-world-status"), composer,
+        composer = api.Gui.CreateCompo(movement.Key, compositionBounds);
+        titleBar = new HudOverlayNativeTitleBar(api, Lang.Get("vanillaexpanded:hud-group-" + movement.Id), composer,
             () => Cancel(), ElementBounds.Fixed(0, 0, Width, HudOverlaySizes.TitleBarHeight));
         composer.AddInteractiveElement(titleBar);
     }
@@ -57,7 +57,7 @@ internal sealed class HudOverlayGroupControls : IDisposable
     /// <summary>Tracks prepared group geometry and cancels controls when their target becomes unavailable.</summary>
     public void Synchronize(IReadOnlyDictionary<string, HudOverlayGroupLayout> layouts)
     {
-        layouts.TryGetValue(HudOverlayGroupMovement.GroupId, out group);
+        layouts.TryGetValue(movement.Id, out group);
         Refresh(false);
     }
 
@@ -248,7 +248,8 @@ internal sealed class HudOverlayGroupControls : IDisposable
         PositionComposition(viewport);
         if (visible)
         {
-            string title = Lang.Get("vanillaexpanded:hud-group-world-status");
+            string key = "vanillaexpanded:hud-group-" + movement.Id;
+            string title = Lang.HasTranslation(key) ? Lang.Get(key) : movement.Id;
             if (!composer.Composed || preparedScale != scale || caption != title)
             {
                 titleBar.Text = title;
