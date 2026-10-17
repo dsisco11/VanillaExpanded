@@ -55,7 +55,7 @@ internal sealed class HudOverlayNativeTitleBar : GuiElementDialogTitleBar
         MovableField(this) = movable;
         if (!Menu.IsOpened) Menu.SelectedIndex = movable ? 1 : 0;
     }
-    /// <summary>Initializes a captionless native titlebar; content drops remain the persistence owner.</summary>
+    /// <summary>Initializes native titlebar resources; the container supplies its caption and owns content persistence.</summary>
     public HudOverlayNativeTitleBar(ICoreClientAPI api, GuiComposer composer, Action dismiss, ElementBounds bounds)
         : base(api, string.Empty, composer, dismiss, font: CairoFont.WhiteSmallText().WithFontSize(HudOverlaySizes.Text), bounds: bounds)
     {
@@ -66,7 +66,7 @@ internal sealed class HudOverlayNativeTitleBar : GuiElementDialogTitleBar
 
     #endregion
     #region Composition and pointer geometry
-    /// <summary>Initializes native menu resources, then paints a captionless panel and centers its native glyphs.</summary>
+    /// <summary>Initializes native resources, then paints a slim captioned panel with aligned menu and close glyphs.</summary>
     public override void ComposeTextElements(Context context, ImageSurface surface)
     {
         // Native composition owns restoration, dropdown preparation and hover textures. Replace only the static
@@ -82,6 +82,13 @@ internal sealed class HudOverlayNativeTitleBar : GuiElementDialogTitleBar
         double closeSize = scaled(unscaledCloseIconSize), menuSize = scaled(unscaledCloseIconSize + 2);
         double closeX = Bounds.OuterWidth - closeSize - scaled(8);
         double menuX = closeX - menuSize - scaled(8);
+        // Keep long localized group names inside the drag area without painting over native menu/close controls.
+        context.Save();
+        context.Rectangle(Bounds.bgDrawX, Bounds.bgDrawY, Math.Max(0, menuX - scaled(6)), Bounds.InnerHeight);
+        context.Clip();
+        Font.SetupContext(context);
+        DrawTextLineAt(context, text, scaled(6), (Bounds.InnerHeight - Font.GetFontExtents().Height) / 2);
+        context.Restore();
         double closeY = (Bounds.InnerHeight - closeSize) / 2;
         double menuY = (Bounds.InnerHeight - menuSize) / 2;
         CloseRectField(this) = new Rectangled(closeX, closeY, closeSize, closeSize);

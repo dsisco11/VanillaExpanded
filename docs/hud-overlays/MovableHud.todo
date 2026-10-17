@@ -11,7 +11,7 @@ Persist arbitrary membership through a focused layout metadata boundary, reusing
 
 ## Assumptions and decisions to resolve
 
-- Use the native titlebar with its native Fixed/Movable dropdown and the approved compact orange skin: 22 GUI units high without caption text; retain the native dropdown and close controls. Adapt hover visibility, content-origin persistence, and cancellation around the widget; do not substitute a direct mode-toggle interaction.
+- Use the native titlebar with its native Fixed/Movable dropdown and the approved compact orange skin: 22 GUI units high with localized group captions at normal HUD text size; retain the native dropdown and close controls. Adapt hover visibility, content-origin persistence, and cancellation around the widget; do not substitute a direct mode-toggle interaction.
 - Saved positions use native integer GUI-unit X/Y coordinates, not persisted screen-edge anchors or pivots. Explicit membership metadata will distinguish defaults, independent items, and custom groups; coordinate presence alone is insufficient. Client settings apply across worlds.
 - Use 16-physical-pixel acquisition, 26-pixel release, and Shift bypass. Valid grouping outranks alignment guides. Within each intent, retain the target/member/side or alignment identity first, then distance and ordinal identity. Alignment-zone hysteresis is min(6 physical pixels, target cross-span / 12); native rounding moves guides to the resolved position within one GUI unit.
 - Resolve compact handle dimensions, title/menu presentation, and control-to-content origin mapping in the prototype; do not silently introduce resizing or close-indicator behavior.
