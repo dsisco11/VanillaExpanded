@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Drawing;
 using VanillaExpanded.HudOverlays.Layout;
 using VanillaExpanded.HudOverlays.Interaction;
 using VanillaExpanded.HudOverlays.Registration;
@@ -19,8 +20,12 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     private readonly IHudOverlayBackdropBatch? backdropBatch;
     private readonly Dictionary<string, HudOverlayGroupControls> groupControls = new(StringComparer.Ordinal);
     private readonly HudOverlayContainers? containers;
+    private readonly HudOverlaySnapping? snapping;
+    private readonly HudOverlayGroupHighlight snapHighlight;
+    private bool updatingSnap;
     private HudOverlayGroupControls? ActiveControls => groupControls.Values.FirstOrDefault(control => control.Active);
     private readonly Dictionary<string, HudOverlayGroupLayout> groups = new(StringComparer.Ordinal);
+    private HashSet<string> visibleGroups = new(StringComparer.Ordinal);
     private readonly Dictionary<HudOverlayMemberLayout, ElementBounds> clips = new();
     private HashSet<HudOverlayRegistration> active = new();
     private bool disposed, rendering, synchronizing;
@@ -42,6 +47,8 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         hoverLabels = new HudOverlayHoverLabels(api);
         this.backdropBatch = backdropBatch ?? api.ModLoader?.GetModSystem<HudOverlaySystem>()?.Backdrop;
         this.containers = containers;
+        snapping = containers == null ? null : new HudOverlaySnapping(containers);
+        snapHighlight = new HudOverlayGroupHighlight(api);
 
     }
     /// <summary>Registers a live session host through the native GUI lifecycle without taking focus.</summary>
@@ -54,12 +61,9 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     public void Synchronize(IReadOnlyDictionary<string, HudOverlayGroupLayout> layouts)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
-        foreach (string id in groups.Keys.Where(id => !layouts.ContainsKey(id)).ToArray())
-        {
-            Composers[id].Dispose();
-            Composers.Remove(id);
-            groups.Remove(id);
-        }
+        HashSet<string>? visibleControls = null;
+        visibleGroups = layouts.Keys.ToHashSet(StringComparer.Ordinal);
+        if (containers?.ActiveContainer == null) RetireContent(layouts);
         foreach (var pair in layouts)
         {
             if (!pair.Value.Available || groups.ContainsKey(pair.Key)) continue;
@@ -69,14 +73,18 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
                 .OnlyDynamic().AddInteractiveElement(element).Compose(false);
             groups.Add(pair.Key, pair.Value);
         }
-        var retained = layouts.Values.SelectMany(group => group.Members).ToHashSet();
+        var retained = (containers?.ActiveContainer != null ? groups.Values : layouts.Values)
+            .SelectMany(group => group.Members).ToHashSet();
         foreach (var member in clips.Keys.Where(member => !retained.Contains(member)).ToArray()) clips.Remove(member);
         if (containers != null)
         {
             var targets = new Dictionary<string, HudOverlayGroupMovement>(StringComparer.Ordinal);
             foreach (var pair in layouts)
             {
-                targets["container:" + pair.Key] = containers.Get(pair.Key);
+                var captured = groupControls.FirstOrDefault(item => item.Value.Movement.Dragging
+                    && item.Value.Movement.IndicatorId == null && item.Value.Movement.Id == pair.Key);
+                if (captured.Value != null) targets[captured.Key] = captured.Value.Movement;
+                else targets["container:" + pair.Key] = containers.Get(pair.Key);
                 // A singleton's container grip already moves just that indicator; multi-member groups expose separate grips.
                 bool multiple = containers.Resolved.FirstOrDefault(item => item.Id == pair.Key)?.Tree.Leaves().Count() > 1;
                 foreach (var member in pair.Value.Members.Where(member => isDrawable(member.Registration)))
@@ -88,15 +96,31 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
             }
             foreach (string id in groupControls.Keys.Where(id => !targets.ContainsKey(id)).ToArray())
             {
+                if (containers.ActiveContainer != null) continue;
                 groupControls[id].Dispose(); groupControls.Remove(id);
             }
             foreach (var target in targets)
                 if (!groupControls.ContainsKey(target.Key)) groupControls[target.Key] = new HudOverlayGroupControls(capi, this,
-                    target.Value, isDrawable, RequestLayout, () => containers.Reset());
+                    target.Value, isDrawable, RequestLayout, () => containers.Reset(), UpdateSnap);
+            visibleControls = targets.Keys.ToHashSet(StringComparer.Ordinal);
         }
         synchronizing = true;
-        try { foreach (var control in groupControls.Values.ToArray()) control.Synchronize(layouts); }
+        try
+        {
+            var empty = new Dictionary<string, HudOverlayGroupLayout>();
+            foreach (var pair in groupControls.ToArray())
+                pair.Value.Synchronize(visibleControls?.Contains(pair.Key) != false ? layouts : empty);
+        }
         finally { synchronizing = false; }
+        // Synchronizing an unavailable capture can cancel it. Release its caches in this same boundary.
+        if (containers?.ActiveContainer == null)
+        {
+            RetireContent(layouts);
+            foreach (string id in groupControls.Keys.Where(id => visibleControls?.Contains(id) == false).ToArray())
+            {
+                groupControls[id].Dispose(); groupControls.Remove(id);
+            }
+        }
     }
     #endregion
     #region Input
@@ -115,11 +139,12 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     {
         if (args.KeyCode == (int)GlKeys.Escape && OnEscapePressed()) args.Handled = true;
         else ActiveControls?.OnKeyDown(args);
+        RefreshSnap();
     }
     /// <summary>Routes characters only to an open native dropdown.</summary>
     public override void OnKeyPress(KeyEvent args) => ActiveControls?.OnKeyPress(args);
-    /// <summary>Ignores direct key-release delivery.</summary>
-    public override void OnKeyUp(KeyEvent args) { }
+    /// <summary>Rechecks Shift bypass without requiring additional pointer movement.</summary>
+    public override void OnKeyUp(KeyEvent args) { RefreshSnap(); }
     /// <summary>Routes presses to the handle without consuming the content composer's entire rectangle.</summary>
     public override void OnMouseDown(MouseEvent args)
     {
@@ -156,6 +181,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     {
         if (disposed) return;
         BeforeRender?.Invoke();
+        RefreshSnap();
         if (!IsOpened() || capi.HideGuis) return;
         // Keep consumers alive until all composer callbacks finish, including removals requested by drawing.
         rendering = true;
@@ -170,9 +196,21 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
                 try { backdropBatch?.Flush(capi.Render); }
                 catch (Exception error) { boundaryFailure?.Invoke(error); }
                 foreach (var control in groupControls.Values.ToArray()) control.DrawBackground();
-                foreach (var pair in Composers) if (groups[pair.Key].Available) pair.Value.Render(deltaTime);
-                hoverLabels.Draw(groups.Values, registration => active.Contains(registration) && isDrawable(registration), deltaTime);
+                if (ActiveControls?.Movement.Dragging == true && snapping?.Selected?.Grouping == true)
+                    snapHighlight.Draw(snapping.Destination, true, false);
+                foreach (var pair in Composers) if (visibleGroups.Contains(pair.Key) && groups[pair.Key].Available) pair.Value.Render(deltaTime);
+                hoverLabels.Draw(groups.Where(pair => visibleGroups.Contains(pair.Key)).Select(pair => pair.Value),
+                    registration => active.Contains(registration) && isDrawable(registration), deltaTime);
                 foreach (var control in groupControls.Values.ToArray()) control.Draw(deltaTime);
+                if (ActiveControls?.Movement.Dragging == true && snapping?.Selected is { } selected)
+                {
+                    if (selected.Grouping)
+                    {
+                        snapHighlight.Draw(snapping.Destination, false, true);
+                        snapHighlight.Draw(snapping.Insertion, false, true);
+                    }
+                    else snapHighlight.DrawGuide(selected.Guide);
+                }
             }
             finally { backdropBatch?.Clear(); capi.Render.GlPopMatrix(); active.Clear(); }
         }, boundaryFailure); }
@@ -191,6 +229,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         foreach (var control in groupControls.Values) TryRelease(control.Dispose, failures);
         groupControls.Clear();
         TryRelease(hoverLabels.Dispose, failures);
+        TryRelease(snapHighlight.Dispose, failures);
         TryRelease(() => TryClose(), failures);
         foreach (var composer in Composers.Values.ToArray()) TryRelease(composer.Dispose, failures);
         foreach (var pair in ((IEnumerable<KeyValuePair<string, GuiComposer>>)Composers).ToArray()) Composers.Remove(pair.Key);
@@ -201,6 +240,42 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     #endregion
     #endregion
     #region Private
+    #region Interaction and layout lifetime
+    /// <summary>Releases only compositions absent from the effective layout after a transaction has ended.</summary>
+    private void RetireContent(IReadOnlyDictionary<string, HudOverlayGroupLayout> layouts)
+    {
+        foreach (string id in groups.Keys.Where(id => !layouts.ContainsKey(id)).ToArray())
+        {
+            Composers[id].Dispose(); Composers.Remove(id); groups.Remove(id);
+        }
+    }
+    /// <summary>Rechecks targets during stationary drags, including Shift, visibility, and size changes.</summary>
+    private void RefreshSnap()
+    {
+        var movement = ActiveControls?.Movement;
+        if (movement?.Dragging == true) UpdateSnap(movement, new PointF(capi.Input.MouseX, capi.Input.MouseY));
+        else snapping?.Clear();
+    }
+
+    /// <summary>Resolves against unsnapped native bounds before publishing a no-write membership preview.</summary>
+    private void UpdateSnap(HudOverlayGroupMovement movement, PointF pointer)
+    {
+        if (updatingSnap || containers == null || snapping == null || !movement.Dragging) return;
+        updatingSnap = true;
+        try
+        {
+            containers.ClearSnap(movement.UnsnappedOrigin);
+            RequestLayout();
+            var window = capi.Gui.WindowBounds;
+            var viewport = new RectangleF((float)window.renderX, (float)window.renderY, (float)window.OuterWidth, (float)window.OuterHeight);
+            var keys = capi.Input.KeyboardKeyStateRaw;
+            bool shift = keys != null && (keys[(int)GlKeys.ShiftLeft] || keys[(int)GlKeys.ShiftRight]);
+            snapping.Update(movement, pointer, shift, Vintagestory.API.Config.RuntimeEnv.GUIScale, viewport,
+                groups.Where(item => visibleGroups.Contains(item.Key)).ToDictionary(item => item.Key, item => item.Value), isDrawable);
+            RequestLayout();
+        }
+        finally { updatingSnap = false; }
+    }
     /// <summary>Collects native cleanup failures while attempting every independent owned resource.</summary>
     private static void TryRelease(Action release, List<Exception> failures)
     {
@@ -211,6 +286,8 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     {
         if (!rendering && !synchronizing && !disposed) BeforeRender?.Invoke();
     }
+    #endregion
+    #region Prepared drawing
     /// <summary>Collects only visible prepared providers, applying the same membership and clipping gates as foreground drawing.</summary>
     private void CollectBackdrops()
     {
@@ -219,7 +296,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         foreach (var pair in groups)
         {
             var group = pair.Value;
-            if (!group.Available || !Composers[pair.Key].Enabled) continue;
+            if (!visibleGroups.Contains(pair.Key) || !group.Available || !Composers[pair.Key].Enabled) continue;
             foreach (var member in group.Members)
             {
                 if (!active.Contains(member.Registration) || !isDrawable(member.Registration)
@@ -251,5 +328,6 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
             finally { capi.Render.PopScissor(); }
         }
     }
+    #endregion
     #endregion
 }

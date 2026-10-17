@@ -81,9 +81,7 @@ internal sealed class HudOverlayAnchorContext
         rightMargin = right;
         float inset = (float)(SafeInset * scale);
         // Tiny viewports still yield a finite empty safe area rather than negative dimensions.
-        float insetX = Math.Min(inset, current.Width / 2), insetY = Math.Min(inset, current.Height / 2);
-        SafeRectangle = new RectangleF(current.X + insetX, current.Y + insetY,
-            Math.Max(0, current.Width - 2 * insetX), Math.Max(0, current.Height - 2 * insetY));
+        SafeRectangle = Inset(current, inset);
         this.visible = visible && !isHidden();
         frameTargets.Clear();
         frameStarted = true;
@@ -106,6 +104,13 @@ internal sealed class HudOverlayAnchorContext
         if (rectangle is { } value && !IsAvailable(value)) rectangle = null;
         frameTargets.Add(targetId, rectangle);
         return rectangle;
+    }
+
+    /// <summary>Shares physical-pixel reachability insets between native placement and snap reconciliation.</summary>
+    public static RectangleF Inset(RectangleF rectangle, double pixels)
+    {
+        float x = (float)Math.Min(pixels, rectangle.Width / 2), y = (float)Math.Min(pixels, rectangle.Height / 2);
+        return new RectangleF(rectangle.X + x, rectangle.Y + y, Math.Max(0, rectangle.Width - 2 * x), Math.Max(0, rectangle.Height - 2 * y));
     }
     #endregion
     #endregion
