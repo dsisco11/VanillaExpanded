@@ -20,6 +20,7 @@ internal sealed class HudOverlaySession : IDisposable
     private readonly Func<HudOverlayScheduler, HudOverlayAnchorContext, IHudOverlayHost> createHost;
     private readonly Func<long> clock;
     private readonly Func<bool> enabled;
+    private readonly Func<WorkshopGaugeText>? createEditText;
     private readonly Dictionary<string, HudOverlayGroupLayout> layouts = new(StringComparer.Ordinal);
     private long? tickId;
     private IClientWorldAccessor? world;
@@ -28,6 +29,7 @@ internal sealed class HudOverlaySession : IDisposable
     private IHudOverlayHost? host;
     private HudOverlayAnchorContext? anchors;
     private HudOverlayContainers? positions;
+    private HudOverlayEditPreviews? editPreviews;
     private bool disposed;
     public HudOverlayScheduler? Scheduler { get; private set; }
 
@@ -35,7 +37,7 @@ internal sealed class HudOverlaySession : IDisposable
     /// <summary>Stores borrowed services and a native-host creation boundary without allocating world resources.</summary>
     public HudOverlaySession(ICoreClientAPI api, HudOverlayRegistry registry,
         Func<HudOverlayScheduler, HudOverlayAnchorContext, IHudOverlayHost>? createHost = null,
-        Func<long>? clock = null, Func<bool>? enabled = null)
+        Func<long>? clock = null, Func<bool>? enabled = null, Func<WorkshopGaugeText>? createEditText = null)
     {
         ArgumentNullException.ThrowIfNull(api);
         ArgumentNullException.ThrowIfNull(registry);
@@ -43,8 +45,10 @@ internal sealed class HudOverlaySession : IDisposable
         this.registry = registry;
         this.clock = clock ?? (() => Environment.TickCount64);
         this.enabled = enabled ?? (() => true);
+        this.createEditText = createEditText;
         this.createHost = createHost ?? ((scheduler, _) => new HudOverlayHost(api, registry,
-            scheduler.IsDrawable, scheduler.ReportDrawFailure, scheduler.ReportBoundaryFailure, containers: positions));
+            registration => scheduler.IsDrawable(registration) || editPreviews?.IsDrawable(registration) == true,
+            scheduler.ReportDrawFailure, scheduler.ReportBoundaryFailure, containers: positions, editPreviews: editPreviews));
     }
 
     /// <summary>Starts one ready-world heartbeat, including a cheap wait when the player is not available yet.</summary>
@@ -111,6 +115,8 @@ internal sealed class HudOverlaySession : IDisposable
             catch (Exception failure) { Report("session binding", failure); }
             positions = new HudOverlayContainers(api, registry, failure => Report("layout persistence", failure));
             Scheduler = new HudOverlayScheduler(registry, clock, Report, effectiveTarget: positions.TargetId);
+            editPreviews = new HudOverlayEditPreviews(api, registry, Scheduler.IsDrawable,
+                () => IsCurrentSession() && enabled(), Report, createEditText);
             try
             {
                 anchors = new HudOverlayAnchorContext(api);
@@ -130,6 +136,7 @@ internal sealed class HudOverlaySession : IDisposable
         var preparation = new HudOverlayPreparationContext(api, anchors.GuiScale,
             Lang.CurrentLocale ?? "en", FontRevision());
         Scheduler!.Update(anchors, preparation, visible, enabled());
+        editPreviews!.Update(preparation);
         SynchronizeLayouts();
     }
 
@@ -154,6 +161,8 @@ internal sealed class HudOverlaySession : IDisposable
         }
         positions?.Cancel();
         positions = null;
+        if (editPreviews != null) TryCleanup(editPreviews.Dispose, ref failures);
+        editPreviews = null;
         foreach (var layout in layouts.Values) TryCleanup(layout.Dispose, ref failures);
         layouts.Clear();
         TryCleanup(registry.EndSession, ref failures);
@@ -185,14 +194,24 @@ internal sealed class HudOverlaySession : IDisposable
             layouts[id].Dispose(); layouts.Remove(id);
         }
         var measured = registry.GetGroups().SelectMany(group => Scheduler.GetMembers(group.Id))
-            .Where(member => Scheduler.IsDrawable(member.Key)).ToDictionary(member => member.Key.Id);
+            .Where(member => Scheduler.IsDrawable(member.Key))
+            .Concat(editPreviews?.GetMembers() ?? Array.Empty<KeyValuePair<HudOverlayRegistration, System.Drawing.SizeF>>())
+            .ToDictionary(member => member.Key.Id);
+        float fallbackY = (float)HudOverlayAnchorContext.SafeInset;
         foreach (var container in positions.Resolved)
         {
             if (!layouts.TryGetValue(container.Id, out var layout)) layouts[container.Id] = layout = new HudOverlayGroupLayout();
             var members = container.Tree.Leaves().Where(measured.ContainsKey).Select(id => measured[id]).ToArray();
-            layout.Apply(anchors, positions.Definition(container), members,
-                positions.Origin(container),
+            var definition = positions.Definition(container);
+            var origin = positions.Origin(container);
+            bool fallback = editPreviews?.Active == true && origin == null && !anchors.Resolve(definition.Placement.TargetId).HasValue;
+            // Missing native anchors must not make hidden items impossible to edit. This screen position is
+            // transient; only an explicit movement or permission change persists it through the normal transaction.
+            if (fallback) origin = new System.Drawing.PointF((float)HudOverlayAnchorContext.SafeInset, fallbackY);
+            layout.Apply(anchors, definition, members,
+                origin,
                 container.Tree, container.Padding);
+            if (fallback) fallbackY += (float)(layout.Root.fixedHeight + definition.Packing.Gap);
         }
         var effectiveLayouts = layouts.Where(item => live.Contains(item.Key)).ToDictionary(item => item.Key, item => item.Value);
         host.Synchronize(effectiveLayouts);

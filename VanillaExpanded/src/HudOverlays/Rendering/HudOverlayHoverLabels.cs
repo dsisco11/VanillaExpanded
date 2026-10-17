@@ -37,12 +37,13 @@ internal sealed class HudOverlayHoverLabels : IDisposable
     }
 
     /// <summary>Renders native hover text outside indicator scissors, rebuilding only for text or scale changes.</summary>
-    public void Draw(IEnumerable<HudOverlayGroupLayout> groups, Func<HudOverlayRegistration, bool> isDrawable, float dt)
+    public void Draw(IEnumerable<HudOverlayGroupLayout> groups, Func<HudOverlayRegistration, bool> isDrawable, float dt,
+        Func<HudOverlayRegistration, string>? label = null)
     {
         if (api.Input == null) return;
         var target = FindTarget(groups, isDrawable, api.Input.MouseGrabbed, new PointF(api.Input.MouseX, api.Input.MouseY));
         if (target == null) return;
-        string localized = Lang.Get(target.HoverLabelKey!);
+        string localized = label?.Invoke(target) ?? Lang.Get(target.HoverLabelKey!);
         // Resolve every hover in the current locale, but retain the GPU resources while the resolved label is unchanged.
         if (tooltip == null || text != localized || scale != RuntimeEnv.GUIScale)
         {
