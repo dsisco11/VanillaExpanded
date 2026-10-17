@@ -100,36 +100,43 @@ The completed foundation's Fixed-to-default reset behavior is superseded by the 
 
 ## Phase 3: Resolve arbitrary group semantics and persistence contract
 
-Depends on Phase 2. Outcome: settle the new membership model and storage contract before runtime implementation. Source: [MovableHudProposal.md](MovableHudProposal.md), Placement and group behavior, Native layout reuse assessment, Snapping and membership commits, Persistence.
+Depends on Phase 2. Outcome: settle the new membership model and storage contract before runtime implementation. The user approved the detailed pair-tree layout and authoritative native JSON snapshot contract on 2026-10-17. Source: [MovableHudProposal.md](MovableHudProposal.md), Placement and group behavior, Native layout reuse assessment, Approved detailed layout contract, Snapping and membership commits, Persistence.
 
-- [ ] Incorporate the approved design contract above and resolve only the outstanding design choices with the user before implementing them; do not reopen already approved decisions.
-  - [ ] Define which snaps create/join groups versus align only, insertion feedback, and Shift bypass.
-  - [ ] Define the remaining mixed-arrangement semantics: perpendicular insertion. Size changes preserve attachments, alignments, and gaps by repositioning connected neighbors; keep the group top-left origin fixed, subject to screen clamping. Hidden members collapse their space after normal visibility transitions release the footprint, retaining saved membership/attachments and reopening space when visible; temporary hiding must not dissolve groups. All four attachment sides and start/center/end alignment on each side are approved, selected by pointer position with a layout preview. Use the approved native GuiComposer/ElementBounds foundation; settle the VE attachment representation before implementation.
-  - [ ] Specify the approved global Reset HUD layout action: restore all built-in groups and positions, including unavailable indicators; preserve unrelated settings. No per-item/group reset or separate ungroup menu is required: dragging an individual away ungroups it. Fixed/Movable controls permission only and preserves placement/membership. Fixed targets accept joins and merges while retaining Fixed mode and their top-left origin, subject to screen clamping. Whole-group merging is approved: preserve both internal arrangements, preview the combined result, support Shift bypass, and restore both arrangements on cancellation.
-- [ ] Define a flat container model with stable opaque group IDs and exactly one container per indicator; built-in names are default templates only.
-  - [ ] Specify source removal, target insertion, singleton normalization, empty-group cleanup, and temporarily unavailable membership.
-  - [ ] Define attachment representation, dependency ordering, cycle/conflict handling, and overlap resolution for perpendicular insertions and merges. Distinguish internal layout relationships from prohibited nested player-facing groups or inter-group docking graphs.
-  - [ ] Define collapse/reappearance through hidden attachment intermediates and branches without deleting saved relationships; count saved members rather than only visible members when deciding singleton/empty cleanup.
-  - [ ] Define movement-permission ownership for individual grips, independent items, and merged containers, preserving the approved Fixed-target semantics. Specify persistence/defaults for this state rather than inferring permission from a saved position.
-  - [ ] Keep feature registrations and overlay lifetimes unchanged; do not duplicate sampling or drawing ownership.
-- [ ] Inspect native structured client settings and choose supported metadata persistence or a VE JSON file.
-  - [ ] Specify versioning, validation, unknown IDs, duplicate membership recovery, invalid attachment references, offscreen origins, and client-wide behavior across worlds. Preserve temporarily unavailable metadata during loading, migration, and configuration changes.
-  - [ ] Specify stable, distinct native keys for default containers, custom containers, and independent items. Persist IDs, membership, order, layout policy, and attachment descriptions; do not serialize bounds/composers or encode metadata in fake coordinate keys.
-  - [ ] Define authority and recoverable commit ordering across metadata and native position writes; previews never persist.
-  - [ ] Define migration/precedence for existing saved native group origins and global reset behavior, including clearing retained VE overrides for unavailable integrations without touching unrelated settings.
-- [ ] Reconcile the chosen decisions into the proposal and remaining tasks before implementation.
+- [x] Incorporate the approved design contract above and resolve only the outstanding design choices with the user before implementing them; do not reopen already approved decisions.
+  - [x] Define which snaps create/join groups versus align only, insertion feedback, and Shift bypass.
+  - [x] Define the remaining mixed-arrangement semantics: perpendicular insertion. Size changes preserve attachments, alignments, and gaps by repositioning connected neighbors; keep the group top-left origin fixed, subject to screen clamping. Hidden members collapse their space after normal visibility transitions release the footprint, retaining saved membership/attachments and reopening space when visible; temporary hiding must not dissolve groups. All four attachment sides and start/center/end alignment on each side are approved, selected by pointer position with a layout preview. Use the approved native GuiComposer/ElementBounds foundation; settle the VE attachment representation before implementation.
+  - [x] Specify the approved global Reset HUD layout action: restore all built-in groups and positions, including unavailable indicators; preserve unrelated settings. No per-item/group reset or separate ungroup menu is required: dragging an individual away ungroups it. Fixed/Movable controls permission only and preserves placement/membership. Fixed targets accept joins and merges while retaining Fixed mode and their top-left origin, subject to screen clamping. Whole-group merging is approved: preserve both internal arrangements, preview the combined result, support Shift bypass, and restore both arrangements on cancellation.
+- [x] Define a flat container model with stable opaque group IDs and exactly one container per indicator; built-in names are default templates only.
+  - [x] Specify source removal, target insertion, singleton normalization, empty-group cleanup, and temporarily unavailable membership.
+  - [x] Define attachment representation, dependency ordering, cycle/conflict handling, and overlap resolution for perpendicular insertions and merges. Distinguish internal layout relationships from prohibited nested player-facing groups or inter-group docking graphs.
+  - [x] Define collapse/reappearance through hidden attachment intermediates and branches without deleting saved relationships; count saved members rather than only visible members when deciding singleton/empty cleanup.
+  - [x] Define movement-permission ownership for individual grips, independent items, and merged containers, preserving the approved Fixed-target semantics. Fixed locks both group movement and member detachment; overlapping grouping snaps are rejected rather than rearranging existing items. Specify persistence/defaults for this state rather than inferring permission from a saved position.
+  - [x] Keep feature registrations and overlay lifetimes unchanged; do not duplicate sampling or drawing ownership.
+- [x] Inspect native structured client settings and choose supported metadata persistence or a VE JSON file.
+  - [x] Specify versioning, validation, unknown IDs, newly registered IDs absent from a snapshot, duplicate membership recovery, invalid attachment references, offscreen origins, and client-wide behavior across worlds. Preserve temporarily unavailable metadata during loading, migration, and configuration changes.
+  - [x] Specify stable, distinct native keys for default containers, custom containers, and independent items. Persist IDs, membership, order, layout policy, and attachment descriptions; do not serialize bounds/composers or encode metadata in fake coordinate keys.
+  - [x] Define authority and recoverable commit ordering across metadata and native position writes; previews never persist.
+  - [x] Define migration/precedence for existing saved native group origins and global reset behavior, including clearing retained VE overrides for unavailable integrations without touching unrelated settings. Define safe reset of malformed/newer metadata using only provably owned cleanup keys and authoritative initialized reset state.
+- [x] Reconcile the chosen decisions into the proposal and remaining tasks before implementation.
 
 Completion criteria:
 
-- [ ] Grouping, layout, reset, and persistence decisions are explicit and approved; no runtime policy is inferred from old named groups.
-- [ ] The model can represent and restore arbitrary groups without nested membership, orphaned items, or loss of unrelated settings.
-- [ ] The attachment model explicitly covers all approved sides/alignments, resize/collapse behavior, merge preservation, and movement permissions; storage and failure-recovery choices are settled before runtime writes.
+- [x] Grouping, layout, reset, and persistence decisions are explicit and approved; no runtime policy is inferred from old named groups.
+- [x] The model can represent and restore arbitrary groups without nested membership, orphaned items, or loss of unrelated settings.
+- [x] The attachment model explicitly covers all approved sides/alignments, resize/collapse behavior, merge preservation, and movement permissions; storage and failure-recovery choices are settled before runtime writes.
+
+Completion evidence:
+
+- The user approved the detailed pair-tree arrangement and authoritative versioned JSON snapshot contract on 2026-10-17, after separately approving rejected overlapping snaps and Fixed locking both group movement and member detachment.
+- Proposal sections Approved interaction decisions, Native layout reuse assessment, and Approved detailed layout contract specify flat membership, all attachment sides/alignments, native composition reuse, resize/collapse, create/join/merge/detach, permissions, stable keys, migration, global reset, validation, and interrupted-write recovery. The public ISettings/IGuiAPI/ICoreAPI sources and native bounds/composer implementation were inspected for the storage and layout boundaries.
+- The second review and independent completion audit passed after reconciling native coordinates as mirrors rather than the authority. Subsequent implementation/verification tasks reference the approved contract, including newly registered IDs, unavailable members, and malformed/newer metadata reset. Diff checks are clean.
+- This is design-contract completion only. No runtime code changed, no build/test run was needed, and later implementation and live acceptance remain unchecked.
 
 ## Phase 4: Implement effective containers and individual movement
 
 Depends on Phase 3. Outcome: indicators and groups use resolved membership and cancellable layout transactions.
 
-Source: [MovableHudProposal.md](MovableHudProposal.md), Player interaction, Placement and group behavior, Native layout reuse assessment, Persistence, Integration boundaries.
+Source: [MovableHudProposal.md](MovableHudProposal.md), Player interaction, Placement and group behavior, Native layout reuse assessment, Approved detailed layout contract, Persistence, Integration boundaries.
 
 - [ ] Resolve default, independent, and custom containers before packing, sharing effective placement with scheduler availability.
   - [ ] Remove the layout assumption that every member must share its registered GroupId, while retaining registration identities.
@@ -150,14 +157,14 @@ Source: [MovableHudProposal.md](MovableHudProposal.md), Player interaction, Plac
   - [ ] Cover Escape, cursor capture, GUI hiding, target removal, world/session exit, and loss of active interaction; restore source attachment descriptions and movement permission along with placement.
   - [ ] Free group movement retains current membership; grouping drops may merge the whole group. Independent items no longer follow former groups.
 - [ ] Implement approved metadata persistence, migration, recovery, singleton/empty cleanup, and the global Reset HUD layout action. Adapt native Fixed handling to preserve current placement and membership.
-  - [ ] Replace the foundation's native Fixed callback that clears position keys; mode toggles retain the current origin and membership. Remove superseded partial-reset paths and update their expectations.
+  - [ ] Implement the approved container-level movement permissions and explicit persisted mode; Fixed locks member detachment as well as group dragging. Replace the foundation's native Fixed callback that clears position keys; mode toggles retain the current origin and membership. Remove superseded partial-reset paths and update their expectations.
   - [ ] Global reset restores default templates and positions for all known/retained VE items, including unavailable integrations; subsequent reload must not resurrect cleared custom groups or coordinates.
   - [ ] Preserve unknown/unavailable members during ordinary operation; global reset clears all retained VE layout overrides. Always preserve unrelated native dialog settings.
   - [ ] Release all interaction/composition resources on removal and session replacement.
 - [ ] Verify mixed-registration containers, duplicate prevention, independent drawing/updating exactly once, packing, availability, configuration changes, recovery, and lifecycle cleanup.
   - [ ] Test every side/alignment with caller-supplied measurements, negative-origin normalization, attachment conflicts, size propagation, retained top-left origin, and screen clamping at multiple GUI scales.
   - [ ] Test fade-out then collapse, reappearance through hidden intermediates, all-hidden groups, and true member removal separately from temporary hiding.
-  - [ ] Test permission-only mode toggles, global reset including unavailable entries, restart/migration precedence, invalid metadata, and recovery at the defined write boundaries. Verify no writes during previews or effective viewport clamping.
+  - [ ] Test permission-only mode toggles and locked-member detachment, newly registered IDs with existing snapshots, global reset including unavailable entries and malformed/newer metadata, restart/migration precedence, invalid metadata, and recovery at the defined write boundaries. Verify no writes during previews or effective viewport clamping.
   - [ ] Verify repeated movement/repacking reuses presentations and cached readings, preserves registered identity, and releases session-owned controls/bounds without disposing feature-owned resources.
 
 Completion criteria:
@@ -170,7 +177,7 @@ Completion criteria:
 
 Depends on Phase 4. Outcome: individual snaps create/join groups and whole-group snaps merge containers while preserving internal arrangements.
 
-Source: [MovableHudProposal.md](MovableHudProposal.md), Proposed interaction defaults and decisions, Snapping and membership commits, Persistence.
+Source: [MovableHudProposal.md](MovableHudProposal.md), Approved interaction decisions, Snapping and membership commits, Persistence.
 
 - [ ] Implement geometry-only snap candidates with measured bounds, locality, deterministic tie-breaking, hysteresis, and Shift bypass.
   - [ ] Start with a 6-physical-pixel threshold; define the wider release threshold.
