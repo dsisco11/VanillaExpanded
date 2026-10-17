@@ -46,7 +46,7 @@ Hold the Quick Tools hotkey (assign it in Controls) to open a radial menu of ava
 
 ### Movable HUD Indicators
 
-Free the mouse (for example, by opening your inventory) and hover a visible indicator to reveal its titlebar. Choose **Movable** from the titlebar dropdown, then drag the indicator itself or its title area. A separate group titlebar moves the whole group; dragging an individual away detaches it. **Fixed** locks both the group and its members without changing their placement or membership. The close icon dismisses the controls, leaving the indicators enabled.
+Free the mouse (for example, by opening your inventory) and hover a visible indicator to reveal its group's titlebar. Choose **Movable** from that dropdown, then drag the indicator itself to move only that item, or drag the group titlebar to move the whole group. Individual members have no titlebars; dragging an individual away detaches it. **Fixed** locks both the group and its members without changing their placement or membership. The close icon dismisses the controls, leaving the indicators enabled.
 
 Snap an indicator beside another to create or join a group, or drag a whole group beside another to merge their arrangements. The preview shows the destination and insertion before release. All four sides support alignment selected by pointer position; snaps that would overlap visible indicators are rejected. Overlapping free drops are cancelled and restore the starting arrangement without saving. Hold Shift to permit intentional overlap. Screen, edge, and center guides align items without grouping them. Hold **Shift** to bypass snapping and grouping, or press **Escape** to cancel the drag.
 

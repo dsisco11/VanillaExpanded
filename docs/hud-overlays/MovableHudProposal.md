@@ -32,7 +32,7 @@ Source references: [titlebar](../../../vsapi/Client/UI/Elements/Impl/Interactive
 ## Player interaction
 
 - Show handles only while the mouse is ungrabbed, the HUD is visible, and no foreground dialog owns that pointer location. Normal gameplay keeps the existing passive behavior.
-- Hovering an indicator reveals its title and a small drag grip. A separate group grip identifies the containing group, so moving an indicator and moving its group are distinct actions.
+- Hovering an indicator reveals its container's titlebar. Individual members have no titlebar: drag their visible content to move them individually, or use the container titlebar to move the group. A singleton container retains its container menu for permission and reset access.
 - Handles are transient overlays. They do not enlarge measured indicator footprints, shift neighboring indicators, or trigger content preparation. Place them above the target when space permits and below it at the screen edge. Keep the handle visible while the pointer travels from the indicator to it, and throughout dragging.
 - Left-drag a grip to move its target, or drag a visible indicator itself to move that individual. A body drag detaches the member of a multi-member group; the group grip still moves the complete group. Native titlebar/menu interactions take priority. Content dragging uses drawable clipped bounds, requires Movable permission and a free cursor, and respects foreground windows. Empty group space is not a drag target. Consume pointer events only for an eligible body/grip interaction or active drag; leave clicks elsewhere unchanged. Continue the drag outside the original bounds until release.
 - A group drag moves its currently grouped members together and preserves their packing. Dragging an individual indicator away detaches it from automatic packing and gives it its own placement. Remaining members close the gap.
@@ -42,7 +42,7 @@ Source references: [titlebar](../../../vsapi/Client/UI/Elements/Impl/Interactive
 
 ### Hover control composition
 
-Use the existing hover targeting to find a drawable indicator under a free cursor. Its titlebar and the containing group's grip are distinct targets, with an explicit target identity for each interaction.
+Use the existing hover targeting to find a drawable indicator under a free cursor. Its visible body and the containing container's titlebar are distinct targets, with an explicit target identity for each interaction. Individual member controls never render, compose, or accept input through their own titlebar.
 
 Place the controls in a separate native control composition so their visibility never changes the measured content footprint or group packing. The control composition follows the target's effective bounds. Keep it visible while the pointer moves from the indicator onto the controls and throughout an active drag; hide it when neither region is hovered and no interaction remains active.
 
@@ -135,7 +135,7 @@ Explicit individual detachment removes its leaf and collapses its now-empty stru
 
 ### Movement permission and selection
 
-Permission belongs to the effective container and is stored explicitly. Fixed locks group movement and member detachment; its mode menu remains usable to unlock it. Incoming joins/merges remain allowed. Individual grips and container grips remain distinct interaction identities but consult the same container permission. A detached item inherits its source permission; a destination container keeps its permission on insertion/merge. Two independent items forming a group use the targeted item's permission.
+Permission belongs to the effective container and is stored explicitly. Fixed locks group movement and member detachment; its mode menu remains usable to unlock it. Incoming joins/merges remain allowed. Individual body targets and container titlebars remain distinct interaction identities but consult the same container permission. A detached item inherits its source permission; a destination container keeps its permission on insertion/merge. Two independent items forming a group use the targeted item's permission.
 
 Default templates start Fixed. Legacy saved group origins migrate as Movable, matching their existing behavior. Mode changes preserve the current displayed content origin and membership; changing an anchored default container's mode captures that origin as a screen placement so it cannot jump on the toggle. Global reset removes those overrides and recreates Fixed defaults. Permission is not inferred from position presence after migration.
 

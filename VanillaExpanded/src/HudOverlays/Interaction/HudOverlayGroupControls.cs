@@ -11,7 +11,7 @@ using EnumMouseButton = Vintagestory.API.Common.EnumMouseButton;
 
 namespace VanillaExpanded.HudOverlays.Interaction;
 
-/// <summary>Hosts the native titlebar and dropdown in a hover-only composition, independently of content measurements.</summary>
+/// <summary>Hosts container titlebars and direct member dragging independently of content measurements.</summary>
 internal sealed class HudOverlayGroupControls : IDisposable
 {
     private const double Width = 220;
@@ -34,6 +34,7 @@ internal sealed class HudOverlayGroupControls : IDisposable
     private RectangleF content;
     private readonly Action reset;
     private readonly Func<HudOverlayGroupMovement, PointF, bool>? snap;
+    private bool HasTitleBar => movement.IndicatorId == null;
     public HudOverlayGroupMovement Movement => movement;
     public bool Active => !disposed && (movement.Dragging || pressed || titleBar.Menu.IsOpened);
     public ElementBounds Bounds => titleBar.Bounds;
@@ -73,14 +74,14 @@ internal sealed class HudOverlayGroupControls : IDisposable
     public void Draw(float deltaTime)
     {
         Refresh(true);
-        if (visible) composer.Render(deltaTime);
+        if (visible && HasTitleBar) composer.Render(deltaTime);
     }
 
     /// <summary>Draws exact group bounds before indicator content, including outlines away from hover while movement is enabled.</summary>
     public void DrawBackground()
     {
         Refresh(true);
-        if (!disposed) highlight.Draw(groupBounds, hovered, showOutline);
+        if (!disposed && HasTitleBar) highlight.Draw(groupBounds, hovered, showOutline);
     }
     #endregion
     #region Pointer interaction
@@ -101,6 +102,7 @@ internal sealed class HudOverlayGroupControls : IDisposable
     /// <summary>Routes native dropdown selections and chrome presses separately from cancellable content dragging.</summary>
     public void OnMouseDown(ICoreClientAPI api, MouseEvent args)
     {
+        if (!HasTitleBar) return;
         Refresh(false);
         if (args.Handled || !visible || args.Button != EnumMouseButton.Left) return;
         if (titleBar.Menu.IsOpened)
@@ -126,7 +128,7 @@ internal sealed class HudOverlayGroupControls : IDisposable
     {
         if (args.Handled) { Cancel(); return; }
         Refresh(false);
-        if (visible) titleBar.Menu.OnMouseMove(api, args);
+        if (visible && HasTitleBar) titleBar.Menu.OnMouseMove(api, args);
         if (!Active) return;
         args.Handled = true;
         if (!movement.Dragging) return;
@@ -143,7 +145,7 @@ internal sealed class HudOverlayGroupControls : IDisposable
         if (!Active) return;
         args.Handled = true;
         if (args.Button != EnumMouseButton.Left) return;
-        titleBar.Menu.OnMouseUp(api, args);
+        if (HasTitleBar) titleBar.Menu.OnMouseUp(api, args);
         if (movement.Dragging)
         {
             movement.Move(new PointF(args.X, args.Y));
@@ -167,7 +169,7 @@ internal sealed class HudOverlayGroupControls : IDisposable
     public void OnMouseWheel(MouseWheelEventArgs args)
     {
         Refresh(false);
-        if (visible && titleBar.Menu.IsOpened) titleBar.Menu.OnMouseWheel(api, args);
+        if (visible && HasTitleBar && titleBar.Menu.IsOpened) titleBar.Menu.OnMouseWheel(api, args);
     }
     #endregion
     #region Keyboard and cancellation
@@ -175,7 +177,7 @@ internal sealed class HudOverlayGroupControls : IDisposable
     /// <summary>Preserves native dropdown keyboard navigation and observes its mode selection callbacks.</summary>
     public void OnKeyDown(KeyEvent args)
     {
-        if (disposed || !titleBar.Menu.IsOpened) return;
+        if (disposed || !HasTitleBar || !titleBar.Menu.IsOpened) return;
         titleBar.OnKeyDown(api, args);
         titleBar.SynchronizePermission(movement.Movable);
         relayout();
@@ -184,7 +186,7 @@ internal sealed class HudOverlayGroupControls : IDisposable
     /// <summary>Forwards native type-to-select behavior while the dropdown owns an active interaction.</summary>
     public void OnKeyPress(KeyEvent args)
     {
-        if (!disposed && titleBar.Menu.IsOpened) titleBar.Menu.OnKeyPress(api, args);
+        if (!disposed && HasTitleBar && titleBar.Menu.IsOpened) titleBar.Menu.OnKeyPress(api, args);
     }
 
     /// <summary>Discards preview and closes the native menu without writing a dragged position.</summary>
@@ -277,21 +279,22 @@ internal sealed class HudOverlayGroupControls : IDisposable
             return;
         }
         scale = currentScale;
-        var root = group!.Root;
+        bool overContent = group!.Members.Any(member => drawable(member.Registration)
+            && (movement.IndicatorId == null || member.Registration.Id == movement.IndicatorId) && member.Clip.Contains(pointer));
+        if (!HasTitleBar)
+        {
+            // Individual controls retain only direct body capture. They expose no invisible titlebar hit area,
+            // transit region, menu or hover panel, and never prepare the unused native composition.
+            handle = RectangleF.Empty;
+            visible = Active || overContent;
+            hovered = false;
+            return;
+        }
 
         var window = api.Gui.WindowBounds;
         var viewport = new RectangleF((float)window.renderX, (float)window.renderY,
             (float)window.OuterWidth, (float)window.OuterHeight);
         handle = PlaceHandle(content, viewport, scale);
-        if (movement.IndicatorId == null && movement.HasMultipleMembers)
-        {
-            float above = content.Top - 2 * (handle.Height + 2);
-            float below = content.Bottom + handle.Height + 4;
-            handle.Y = Math.Clamp(above >= viewport.Top ? above : below,
-                viewport.Top, Math.Max(viewport.Top, viewport.Bottom - handle.Height));
-        }
-        bool overContent = group!.Members.Any(member => drawable(member.Registration)
-            && (movement.IndicatorId == null || member.Registration.Id == movement.IndicatorId) && member.Clip.Contains(pointer));
         hovered = overContent || Active;
         visible = Active || overContent || (visible && RectangleF.Union(content, handle).Contains(pointer));
         PositionComposition(viewport);
