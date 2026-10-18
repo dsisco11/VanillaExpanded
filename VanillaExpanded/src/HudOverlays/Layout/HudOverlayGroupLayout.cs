@@ -14,7 +14,7 @@ namespace VanillaExpanded.HudOverlays.Layout;
 internal sealed class HudOverlayGroupLayout : IDisposable
 {
     private static readonly HudOverlayPlacement FreePlacement = new(HudOverlayAnchorContext.ScreenTargetId,
-        HudOverlayPoint.LeftTop, HudOverlayPoint.LeftTop);
+        HudOverlayPoint.LeftTop, HudOverlayPoint.LeftTop, screenPaddingPixels: 0);
     private readonly int threadId = Environment.CurrentManagedThreadId;
     private readonly Dictionary<string, HudOverlayMemberLayout> children = new(StringComparer.Ordinal);
     private KeyValuePair<HudOverlayRegistration, SizeF>[] previous = Array.Empty<KeyValuePair<HudOverlayRegistration, SizeF>>();

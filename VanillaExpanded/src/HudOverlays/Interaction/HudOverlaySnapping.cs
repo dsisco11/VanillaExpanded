@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using VanillaExpanded.HudOverlays.Layout;
-using VanillaExpanded.HudOverlays.Anchoring;
 using VanillaExpanded.HudOverlays.Registration;
 
 namespace VanillaExpanded.HudOverlays.Interaction;
@@ -51,7 +50,8 @@ internal sealed class HudOverlaySnapping
         if (!movement.Dragging || !layouts.TryGetValue(movement.Id, out var moving) || !moving.Available)
         { Clear(); return; }
         var source = containers.Resolved.First(item => item.Id == movement.Id);
-        var safe = HudOverlayAnchorContext.Inset(viewport, HudOverlayAnchorContext.SafeInset * scale);
+        // Player-positioned containers align with the actual viewport, not the default anchored HUD margin.
+        var safe = viewport;
         var excluded = source.Tree.Leaves().ToHashSet(StringComparer.Ordinal);
         var targets = new List<HudSnapTarget>();
         var sizes = new Dictionary<string, SizeF>(StringComparer.Ordinal);

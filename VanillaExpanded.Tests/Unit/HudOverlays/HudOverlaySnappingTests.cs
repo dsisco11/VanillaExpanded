@@ -298,18 +298,46 @@ public sealed class HudOverlaySnappingTests
         Assert.Equal(2, fixture.Containers.Resolved.Count);
     }
 
-    /// <summary>Screen-edge guides honor the same reachable boundary as native free-placement layout.</summary>
+    /// <summary>Every screen edge is reachable by preview, commit, and restored native placement without an inset.</summary>
     [Theory]
-    [InlineData(1)] [InlineData(1.5)]
-    public void ScreenEdgeGuideMatchesNativeClampedOrigin(float scale)
+    [InlineData(1, false)] [InlineData(1.5, false)] [InlineData(2, false)]
+    [InlineData(1, true)] [InlineData(1.5, true)] [InlineData(2, true)]
+    public void ScreenEdgeGuideMatchesNativeClampedOrigin(float scale, bool offsetWindow)
     {
-        using var fixture = new Fixture(scale, targetOrigin: PointF.Empty); fixture.Begin();
-        float nativeEdge = (float)fixture.Layouts["target"].Root.renderX;
-        fixture.Movement.Move(new PointF(nativeEdge + 2, 100 * scale)); fixture.Repack(); fixture.Update();
-        var selected = Assert.IsType<HudSnapCandidate>(fixture.Snapping.Selected); Assert.False(selected.Grouping); Assert.True(selected.AlignsX);
-        fixture.Movement.Commit(fixture.Movement.Position!.Value); fixture.Repack();
-        Assert.Equal(nativeEdge, (float)fixture.Layouts["source"].Root.renderX, 3);
-        Assert.Equal(selected.Origin.X, (float)fixture.Layouts["source"].Root.renderX, 3);
+        var viewport = new RectangleF(offsetWindow ? 31 : 0, offsetWindow ? 47 : 0, 800, 600);
+        foreach (var side in Enum.GetValues<HudSnapSide>())
+        {
+            using var fixture = new Fixture(scale, viewport: viewport); fixture.Begin();
+            var source = fixture.Layouts["source"].Root;
+            var desired = side switch {
+                HudSnapSide.Left => new PointF(viewport.Left, viewport.Top + 100),
+                HudSnapSide.Right => new PointF(viewport.Right - (float)source.OuterWidth, viewport.Top + 100),
+                HudSnapSide.Above => new PointF(viewport.Left + 100, viewport.Top),
+                _ => new PointF(viewport.Left + 100, viewport.Bottom - (float)source.OuterHeight) };
+            // The raw pointer remains slightly inside the acquisition zone on either axis.
+            var pointer = desired + new SizeF(2, 2);
+            fixture.Movement.Move(pointer); fixture.Repack();
+            fixture.Snapping.Update(fixture.Movement, pointer, false, scale, viewport, fixture.Layouts, _ => true);
+            var selected = Assert.IsType<HudSnapCandidate>(fixture.Snapping.Selected);
+            Assert.False(selected.Grouping); Assert.True(fixture.Snapping.DropAllowed);
+            fixture.Repack();
+            var preview = fixture.Layouts["source"].Root;
+            if (selected.AlignsX) Assert.InRange(Math.Abs(desired.X - (float)preview.renderX), 0, scale);
+            else Assert.InRange(Math.Abs(desired.Y - (float)preview.renderY), 0, scale);
+            fixture.Movement.Commit(fixture.Movement.Position!.Value); fixture.Repack();
+            Assert.Equal(selected.Origin.X, (float)fixture.Layouts["source"].Root.renderX, 3);
+            Assert.Equal(selected.Origin.Y, (float)fixture.Layouts["source"].Root.renderY, 3);
+            var restored = fixture.Restart();
+            using var restoredLayout = new HudOverlayGroupLayout();
+            var container = restored.Owner("test:a")!;
+            restoredLayout.Apply(fixture.Anchors, restored.Definition(container), fixture.Layouts["source"].Members.Select(member =>
+                new KeyValuePair<HudOverlayRegistration, SizeF>(member.Registration, new SizeF((float)member.Bounds.fixedWidth, (float)member.Bounds.fixedHeight))).ToArray(),
+                restored.Origin(container), container.Tree, container.Padding);
+            Assert.Equal(selected.Origin.X, (float)restoredLayout.Root.renderX, 3);
+            Assert.Equal(selected.Origin.Y, (float)restoredLayout.Root.renderY, 3);
+            Assert.All(restoredLayout.Members, member => Assert.Equal(new RectangleF((float)member.Bounds.renderX,
+                (float)member.Bounds.renderY, (float)member.Bounds.OuterWidth, (float)member.Bounds.OuterHeight), member.Clip));
+        }
     }
     #endregion
 
@@ -319,7 +347,7 @@ public sealed class HudOverlaySnappingTests
     {
         private readonly float previousScale = RuntimeEnv.GUIScale;
         private readonly HudLayoutFixture storage = new();
-        private readonly Window window = new();
+        private readonly Window window;
         private readonly HudOverlayAnchorContext anchors;
         private readonly List<HudOverlayRegistration> members = new();
         private readonly SizeF size;
@@ -328,11 +356,13 @@ public sealed class HudOverlaySnappingTests
         public readonly HudOverlayGroupMovement Movement;
         public readonly HudOverlaySnapping Snapping;
         public readonly Dictionary<string, HudOverlayGroupLayout> Layouts = new();
+        public HudOverlayAnchorContext Anchors => anchors;
         #region Public API
         /// <summary>Builds caller-defined instrument geometry at a selected native scale.</summary>
-        public Fixture(float scale, SizeF? measured = null, PointF? targetOrigin = null, bool paired = false, SizeF? sourceSize = null, bool individual = false)
+        public Fixture(float scale, SizeF? measured = null, PointF? targetOrigin = null, bool paired = false, SizeF? sourceSize = null, bool individual = false, RectangleF? viewport = null)
         {
             RuntimeEnv.GUIScale = scale; size = measured ?? new SizeF(40, 30);
+            window = new Window(viewport);
             this.sourceSize = sourceSize ?? size;
             members.Add(storage.Add("test:a", "source")); members.Add(storage.Add("test:b", "target"));
             if (paired) { members.Add(storage.Add("test:a2", "source")); members.Add(storage.Add("test:b2", "target")); }
@@ -342,7 +372,7 @@ public sealed class HudOverlaySnappingTests
             Movement = Containers.Get("source", individual ? "test:a" : null); Snapping = new HudOverlaySnapping(Containers); Repack();
         }
         /// <summary>Captures source movement without native titlebar hit testing.</summary>
-        public void Begin() => Movement.Begin(new PointF(30, 40), new PointF(30 * RuntimeEnv.GUIScale, 40 * RuntimeEnv.GUIScale), RuntimeEnv.GUIScale);
+        public void Begin() => Movement.Begin(new PointF(30, 40), new PointF((float)window.renderX + 30 * RuntimeEnv.GUIScale, (float)window.renderY + 40 * RuntimeEnv.GUIScale), RuntimeEnv.GUIScale);
         /// <summary>Places raw source bounds immediately beside the measured target.</summary>
         public void MoveBesideTarget(HudSnapSide side = HudSnapSide.Right)
         {
@@ -388,15 +418,16 @@ public sealed class HudOverlaySnappingTests
     /// <summary>Provides a deterministic native framebuffer parent.</summary>
     private sealed class Window : ElementBounds
     {
+        private readonly RectangleF viewport;
         #region Public API
         /// <summary>Marks the geometry root as a viewport.</summary>
-        public Window() { IsWindowBounds = true; CalcWorldBounds(); }
+        public Window(RectangleF? viewport = null) { this.viewport = viewport ?? new RectangleF(0, 0, 800, 600); IsWindowBounds = true; CalcWorldBounds(); }
         /// <summary>Provides the framebuffer origin.</summary>
-        public override double renderX => 0;
+        public override double renderX => viewport.X;
         /// <summary>Provides the framebuffer origin.</summary>
-        public override double renderY => 0;
+        public override double renderY => viewport.Y;
         /// <summary>Supplies caller-independent screen extents without platform access.</summary>
-        public override void CalcWorldBounds() { absInnerWidth = 800; absInnerHeight = 600; Initialized = true; requiresrelculation = false; }
+        public override void CalcWorldBounds() { absInnerWidth = viewport.Width; absInnerHeight = viewport.Height; Initialized = true; requiresrelculation = false; }
         #endregion
     }
     #endregion
