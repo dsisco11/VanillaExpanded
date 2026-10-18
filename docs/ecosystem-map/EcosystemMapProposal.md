@@ -142,18 +142,14 @@ Persist normally received inputs and the original shrub maps for use after regio
 
 The species catalogue continues to use client-local animal definitions. A supplemental server catalogue remains deferred to a follow-up; original shrub delivery is part of the initial implementation and does not introduce catalogue synchronization.
 
-## Persistence in the existing map database
+## Persistence in a dedicated ecosystem database
 
-Propose additional, namespaced tables in the existing client-local world-map SQLite database. Keep vanilla `MapPieceDB` serialization intact.
+Maintain a separate client-local SQLite database file owned by the Ecosystem feature and scoped to the current server/world identity. The feature owns its connection, schema, transactions, and lifecycle. Do not open, modify, or extend vanilla's map database file, connection, tables, or `MapPieceDB` serialization.
 
-Conceptually, the extension consists of `MapPartExt` environmental records. Store their data at its natural granularity: regional climate and vegetation once per region, with elevation and tile-specific completeness per map piece. Concrete type and table names remain implementation choices.
+Store environmental data at its natural granularity: climate and vegetation arrays once per region, with elevation and tile-specific completeness per map piece. Preserve array size and padding metadata alongside the original values. Concrete type, table, and file names remain implementation choices.
 
 ```mermaid
 erDiagram
-    VANILLA_MAP_PIECE {
-        long position PK
-        blob pixel_data
-    }
     ECOSYSTEM_MAP_PIECE {
         long position PK
         long region_position FK
@@ -169,17 +165,16 @@ erDiagram
         blob shrub_data
         int completeness
     }
-    VANILLA_MAP_PIECE ||--o| ECOSYSTEM_MAP_PIECE : "same tile key"
     ECOSYSTEM_REGION ||--o{ ECOSYSTEM_MAP_PIECE : "regional inputs"
 ```
 
-The relationships above describe logical association, not a requirement to alter vanilla tables or introduce database foreign-key constraints. Partial records may exist while other inputs are arriving.
+Both tables belong exclusively to the ecosystem database. Tile coordinates associate environmental records with displayed terrain in memory; there is no cross-database join or foreign-key dependency on vanilla's map tables. Partial records may exist while other inputs are arriving.
 
-Vanilla tile regeneration constructs a fresh pixel-only record and replaces its row. A separate table allows environmental information to survive redraws without patching every vanilla serialization path. The stored environmental inputs remain reusable when the player selects another species.
+Vanilla terrain redraws and pixel-record replacement do not affect ecosystem records. The stored environmental inputs remain reusable when the player selects another species. Persist normally received climate, forest, and elevation as well as separately delivered shrubs; vanilla's in-memory environmental arrays are not retained by its pixel cache.
 
-The existing map database uses WAL mode, but its connection is privately owned by the terrain layer. Implementation must choose between controlled integration with that owner and a separately owned connection to the same file. Either choice must respect connection threading, bounded transactions, shutdown, and database recreation. WAL alone does not provide application-level coordination.
+Serialize database access through the feature's storage owner, perform disk work off the render thread, and use bounded transactions. Incoming data is queued as safe snapshots. World exit must finish or safely cancel outstanding work, flush pending writes as appropriate, and close the feature-owned connection before releasing world-specific state. Keep records isolated between server/world identities.
 
-Integrate cache clearing with map purge: the vanilla purge deletes only its map-piece rows. Version environmental records explicitly, and invalidate derived highlight tiles when inputs or the habitat catalogue change. Avoid storing an independent permanent mask for every species when it can be rebuilt from shared environmental inputs.
+Coordinate ecosystem cache clearing with map purge without accessing vanilla's database: clear the feature's own records, pending writes, and derived highlights. Continue clipping highlights to currently explored map coverage. Version environmental records explicitly, and invalidate derived highlight tiles when inputs or the habitat catalogue change. Avoid storing an independent permanent mask for every species when it can be rebuilt from shared environmental inputs.
 
 ## Coverage, backfill, and historical compatibility
 
@@ -207,13 +202,13 @@ Snapshot data before background evaluation where game-owned arrays or API access
 
 Validation should demonstrate local catalogue construction and use without any server catalogue message, locally patched definitions and variant resolution, species deduplication across age, sex, and cosmetic variants, coverage of naturally spawning base-game wild mammals and birds, exclusion of fish, insects, supernatural creatures, domestic-only variants, and mod-added species, complete environmental-rule matching, boundary handling, independence from current weather and seasonal climate, and unknown-data behavior. Compare representative results with the inspected game habitat calculations, including reference-height climate and normalized elevation.
 
-Exercise persistence across tile redraw, map close/reopen, region unload, reconnect, purge, and version changes. Verify that panning over old uncached map images does not trigger saved-record retrieval or world loading, and that ordinary revisiting populates and retains ecosystem coverage. Confirm that server shrub arrays survive transport and persistence with unchanged values, size, padding, and region identity. Verify missing-server-support and missing-record behavior, correct routing to the Ecosystem layer, and that old map images without environmental records remain distinguishable from unsuitable habitat. Include a region with forced climate changes to ensure the existing shrub array is delivered rather than recomputed from the final climate map.
+Exercise persistence across tile redraw, map close/reopen, region unload, reconnect, purge, and version changes. Verify server/world isolation, pending-write handling at shutdown and purge, and that ecosystem storage never opens or modifies the vanilla map database. Verify that panning over old uncached map images does not trigger saved-record retrieval or world loading, and that ordinary revisiting populates and retains ecosystem coverage. Confirm that server shrub arrays survive transport and persistence with unchanged values, size, padding, and region identity. Verify missing-server-support and missing-record behavior, correct routing to the Ecosystem layer, and that old map images without environmental records remain distinguishable from unsuitable habitat. Include a region with forced climate changes to ensure the existing shrub array is delivered rather than recomputed from the final climate map.
 
 Measure map opening, panning, species switching, cache size, and client environmental capture and server shrub delivery with representative explored maps. Focused automated checks cannot establish visual quality or live performance. In-game acceptance should confirm readable terrain, correct dropdown visibility, stable highlights, and no reveal beyond mapped coverage. Verify that neither Ecosystem controls nor habitat highlights appear on the minimap, including while the layer is active and after closing the full map.
 
 ## Decisions remaining before an implementation plan
 
-Database connection ownership, after targeted technical verification.
+Database ownership is settled: use a dedicated client-local ecosystem database. No further product-scope decisions are currently identified; concrete storage and lifecycle hooks remain implementation details to verify.
 
 ## Evidence references
 
