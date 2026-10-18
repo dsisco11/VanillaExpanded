@@ -58,7 +58,8 @@ internal sealed class HudOverlayMenuInput : IDisposable
         var registration = match.Registration;
         var target = new HudMenuTarget(registration, () => groups.Any(layout => layout.Available && layout.Members.Any(member =>
             ReferenceEquals(member.Registration, registration) && drawable(registration))), () => movement.Locked,
-            value => SetLocked(registration, value), !containers.ReadOnly);
+            value => SetLocked(registration, value), !containers.ReadOnly,
+            containers.ReadOnly ? null : () => containers.ResetIndicator(registration.Id));
         if (!menu.Open(target, HudMenuPage.Toggles, new(args.X, args.Y), Environment())) return false;
         // Opening is separate from native row activation. Taking native focus gives Escape priority over inventory windows.
         previousFocus = api.Gui.OpenedGuis?.LastOrDefault(dialog => !ReferenceEquals(dialog, host) && dialog.IsOpened() && dialog.Focused);

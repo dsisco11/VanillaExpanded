@@ -79,18 +79,8 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
     [InlineData(false)] [InlineData(true)]
     public void IndicatorBodyDragCommitsOrCancels(bool cancel)
     {
-        movement.SetMovable(true); gui.Invocations.Clear();
-        var clip = Assert.Single(layout.Members).Clip;
-        pointer = new PointF(clip.Left + clip.Width / 2, clip.Top + clip.Height / 2);
-        var down = Event(EnumMouseButton.Left); controls.OnContentMouseDown(api.Object, down);
-        Assert.True(down.Handled); Assert.True(movement.Dragging);
-        var delta = new PointF(70, 45); pointer = new PointF(pointer.X + delta.X, pointer.Y + delta.Y);
-        controls.OnMouseMove(api.Object, Event(EnumMouseButton.None));
-        Assert.Equal(new PointF(initial.X + delta.X, initial.Y + delta.Y), Origin());
-        if (cancel) Assert.True(controls.Cancel()); else controls.OnMouseUp(api.Object, Event(EnumMouseButton.Left));
-        Assert.False(movement.Dragging);
-        Assert.Equal(cancel ? initial : new PointF(initial.X + delta.X, initial.Y + delta.Y), Origin());
-        gui.Verify(value => value.SetDialogPosition(It.IsAny<string>(), It.IsAny<Vec2i>()), cancel ? Times.Never() : Times.Once());
+        using var fixture = new HudOverlayGroupControlsTests(GroupId, structuralGroup: false);
+        fixture.ExerciseBodyDrag(cancel);
     }
 
     /// <summary>Direct content interaction respects movement permission, input ownership, visibility and the actual drawable clip.</summary>
@@ -140,7 +130,7 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
     public HudOverlayGroupControlsTests() : this(GroupId) { }
 
     /// <summary>Creates native controls for any registered group.</summary>
-    private HudOverlayGroupControlsTests(string groupId, float scale = 1)
+    private HudOverlayGroupControlsTests(string groupId, float scale = 1, bool structuralGroup = true)
     {
         RuntimeEnv.GUIScale = scale;
         var language = new Mock<ITranslationService>();
@@ -176,6 +166,7 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
         var strings = new Mock<ISettingsClass<string>>();
         HudLayoutFixture.BindSettings(api, strings, new Dictionary<string, string>());
         var registry = new HudOverlayRegistry(); registry.RegisterGroup(group); registry.Register(registration);
+        if (structuralGroup) registry.Register(new HudOverlayRegistration("test:fixture-hidden", Mock.Of<IHudOverlay>(), () => false, group.Id));
         movement = new HudOverlayContainers(api.Object, registry).Get(groupId);
         Relayout();
         initial = Origin();
@@ -194,14 +185,14 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
         if (english == null) Lang.AvailableLanguages.Remove("en"); else Lang.AvailableLanguages["en"] = english;
     }
 
-    /// <summary>Arbitrary identities retain the actual native dropdown and selective drag behavior.</summary>
+    /// <summary>Arbitrary identities retain group dragging and isolated native persistence.</summary>
     [Theory]
     [InlineData("held-item-status")]
     [InlineData("mod:custom")]
-    public void ArbitraryGroupsUseNativeControlsAndIsolatedPersistence(string groupId)
+    public void ArbitraryGroupsUseDragCaptionsAndIsolatedPersistence(string groupId)
     {
         using var fixture = new HudOverlayGroupControlsTests(groupId);
-        fixture.NativeTitlebarDropdownSelectsMovementMode();
+        fixture.movement.SetMovable(true);
         fixture.gui.Invocations.Clear();
         fixture.DragOutsideHandlePersistsContentOriginOnlyOnLeftRelease();
         fixture.gui.Verify(value => value.SetDialogPosition(It.Is<string>(key => key != HudOverlayPositionKeys.Group(groupId)), It.IsAny<Vec2i>()), Times.Never);
@@ -383,13 +374,39 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
         var groupControl = owned["container:" + group.Id]; var memberControl = owned["member:" + registration.Id];
         var composerField = typeof(HudOverlayGroupControls).GetField("composer", BindingFlags.Instance | BindingFlags.NonPublic)!;
         Assert.True(((GuiComposer)composerField.GetValue(groupControl)!).Composed);
-        Assert.False(((GuiComposer)composerField.GetValue(memberControl)!).Composed);
-        // Even a direct call bypassing host routing cannot revive a member's absent native grip or dropdown.
+        Assert.Null(composerField.GetValue(memberControl));
+        // Even a direct call bypassing host routing cannot revive a member's absent caption grip.
         pointer = new PointF((float)groupControl.Bounds.renderX + 5, (float)groupControl.Bounds.renderY + 5);
         var down = Event(EnumMouseButton.Left); memberControl.OnMouseDown(api.Object, down);
         Assert.False(down.Handled); Assert.False(containers.Get(group.Id, registration.Id).Dragging);
         var movement = containers.Get(group.Id); movement.Begin(initial, PointF.Empty, 1); movement.Move(new PointF(30, 40)); movement.Commit(new PointF(initial.X + 30, initial.Y + 40));
         Assert.Equal(new[] { "test:hidden", registration.Id }, Assert.Single(containers.Resolved).Tree.Leaves());
+    }
+
+    /// <summary>Structural grouping changes retire and recreate captions with the latest parent geometry.</summary>
+    [Fact]
+    public void CaptionRecreationReparentsBoundsAfterSingletonCycle()
+    {
+        using var registry = new HudOverlayRegistry(); registry.RegisterGroup(group); registry.Register(registration);
+        var second = new HudOverlayRegistration("test:cycle", Mock.Of<IHudOverlay>(), () => false, group.Id);
+        var handle = registry.Register(second);
+        var containers = new HudOverlayContainers(api.Object, registry);
+        using var cue = new HudOverlayGroupControls(api.Object, new Mock<GuiDialog>(api.Object).Object,
+            containers.Get(group.Id), _ => true, () => { });
+        pointer = new PointF(initial.X + 5, initial.Y + 5); cue.Synchronize(layouts);
+        var parent = cue.Bounds.ParentBounds;
+        Assert.NotNull(parent);
+        handle.Dispose(); containers.Synchronize(); cue.Synchronize(layouts);
+        var composerField = typeof(HudOverlayGroupControls).GetField("composer", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        Assert.Null(composerField.GetValue(cue));
+        using var returned = registry.Register(new HudOverlayRegistration("test:cycle", Mock.Of<IHudOverlay>(), () => false, group.Id)); containers.Synchronize();
+        var origin = new PointF(initial.X + 100, initial.Y + 70);
+        layout.Apply(anchors, group, new[] { new KeyValuePair<HudOverlayRegistration, SizeF>(registration, new SizeF(90, 90)) }, origin);
+        pointer = new PointF(origin.X + 5, origin.Y + 5); cue.Synchronize(layouts);
+        var composer = Assert.IsType<GuiComposer>(composerField.GetValue(cue));
+        Assert.NotSame(parent, cue.Bounds.ParentBounds); Assert.Same(composer.Bounds, cue.Bounds.ParentBounds);
+        Assert.Equal(composer.Bounds.renderX, cue.Bounds.renderX);
+        Assert.True(cue.Bounds.renderY < layout.Root.renderY || cue.Bounds.renderY >= layout.Root.renderY + layout.Root.OuterHeight);
     }
 
     /// <summary>Pointer activity away from controls remains untouched; hover rendering does not persist or prepare content.</summary>
@@ -416,7 +433,10 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
     public void HandleCanOnlyBeClickedAfterDrawableContentRevealsIt()
     {
         movement.SetMovable(true);
+        pointer = new PointF(initial.X + 5, initial.Y + 5);
+        controls.Synchronize(layouts);
         var handlePointer = new PointF((float)controls.Bounds.renderX + 5, (float)controls.Bounds.renderY + 5);
+        pointer = PointF.Empty; controls.Synchronize(layouts);
         pointer = handlePointer;
         var invisiblePress = Event(EnumMouseButton.Left);
         controls.OnMouseDown(api.Object, invisiblePress);
@@ -431,31 +451,9 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
         Assert.True(movement.Dragging);
     }
 
-    /// <summary>The actual native titlebar and its actual dropdown switch Fixed/Movable without a custom toggle or render-time save.</summary>
+    /// <summary>The group caption caches prepared artwork across frames without changing permission.</summary>
     [Fact]
-    public void NativeTitlebarDropdownSelectsMovementMode()
-    {
-        var titleBar = NativeTitleBar();
-        Assert.IsAssignableFrom<GuiElementDialogTitleBar>(titleBar);
-        Assert.IsType<GuiElementListMenu>(titleBar.Menu);
-        Assert.Equal(new[] { "auto", "manual", "reset-layout" }, titleBar.Menu.Values);
-        Assert.False(movement.Movable);
-        SelectNativeMode(1);
-        Assert.True(titleBar.Movable);
-        Assert.True(movement.Movable);
-        Assert.False(titleBar.Menu.IsOpened);
-        gui.Invocations.Clear(); controls.Draw(0);
-        gui.Verify(value => value.SetDialogPosition(It.IsAny<string>(), It.IsAny<Vec2i>()), Times.Never);
-        SelectNativeMode(0);
-        Assert.False(titleBar.Movable);
-        Assert.False(movement.Movable);
-        Assert.Equal(initial, movement.Position);
-        Assert.Equal(initial, movement.Position);
-    }
-
-    /// <summary>The real native bar caches prepared artwork across frames while preserving its dropdown interaction.</summary>
-    [Fact]
-    public void NativeBarCachesArtworkAndPreservesDropdownInteraction()
+    public void GroupBarCachesArtworkWithoutChangingPermission()
     {
         int uploads = 0;
         gui.Setup(value => value.LoadOrUpdateCairoTexture(It.IsAny<Cairo.ImageSurface>(), true, ref It.Ref<LoadedTexture>.IsAny))
@@ -468,8 +466,7 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
         int preparedUploads = uploads;
         controls.Draw(0); controls.Draw(0);
         Assert.Equal(preparedUploads, uploads);
-        SelectNativeMode(1);
-        Assert.True(movement.Movable);
+        Assert.False(movement.Movable);
     }
 
     /// <summary>Group and member permission cues draw in the foreground while backgrounds remain fill-only.</summary>
@@ -559,66 +556,6 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
         Assert.False(controls.Active);
     }
 
-    /// <summary>The real native popup and its clipping stay inside the viewport near every corner at both GUI scales.</summary>
-    [Theory]
-    [InlineData(1, 0, 0)]
-    [InlineData(1, 10000, 0)]
-    [InlineData(1, 0, 10000)]
-    [InlineData(1, 10000, 10000)]
-    [InlineData(2, 10000, 10000)]
-    public void NativePopupFitsViewportAndStillSelects(double scale, float x, float y)
-    {
-        RuntimeEnv.GUIScale = (float)scale;
-        movement.SetMovable(true);
-        movement.Begin(initial, PointF.Empty, scale);
-        movement.Commit(new PointF(x, y));
-        Relayout();
-        OpenNativeMenu();
-        var menu = NativeTitleBar().Menu;
-        var clip = (ElementBounds)typeof(GuiElementListMenu).GetField("visibleBounds", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
-        var viewport = gui.Object.WindowBounds;
-        Assert.InRange(clip.renderX, viewport.renderX, viewport.renderX + viewport.OuterWidth);
-        Assert.InRange(clip.renderY, viewport.renderY, viewport.renderY + viewport.OuterHeight);
-        Assert.True(clip.renderX + clip.OuterWidth <= viewport.renderX + viewport.OuterWidth + .01);
-        Assert.True(clip.renderY + clip.OuterHeight <= viewport.renderY + viewport.OuterHeight + .01);
-        ClickNativeRow(0);
-        Assert.False(movement.Movable);
-        Assert.False(menu.IsOpened);
-    }
-
-    /// <summary>Keyboard focus goes to the actual native menu and its navigation callbacks select Movable.</summary>
-    [Fact]
-    public void NativeDropdownSupportsKeyboardSelection()
-    {
-        OpenNativeMenu();
-        Assert.True(NativeTitleBar().Menu.HasFocus);
-        var end = new KeyEvent { KeyCode = (int)GlKeys.End };
-        controls.OnKeyDown(end);
-        controls.OnKeyDown(new KeyEvent { KeyCode = (int)GlKeys.Up });
-        Assert.True(end.Handled);
-        var enter = new KeyEvent { KeyCode = (int)GlKeys.Enter };
-        controls.OnKeyDown(enter);
-        Assert.True(enter.Handled);
-        Assert.True(movement.Movable);
-        Assert.False(NativeTitleBar().Menu.IsOpened);
-        Assert.Equal(initial, movement.Position);
-    }
-
-    /// <summary>Release and cancellation clear a captured native scrollbar instead of retaining its drag flag.</summary>
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void NativeScrollbarCaptureIsReleased(bool cancel)
-    {
-        OpenNativeMenu();
-        var scrollbar = (GuiElementCompactScrollbar)typeof(GuiElementListMenu)
-            .GetField("scrollbar", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(NativeTitleBar().Menu)!;
-        // Model an already captured native scrollbar; only release routing is under test here.
-        scrollbar.mouseDownOnScrollbarHandle = true;
-        if (cancel) controls.Cancel(); else controls.OnMouseUp(api.Object, Event(EnumMouseButton.Left));
-        Assert.False(scrollbar.mouseDownOnScrollbarHandle);
-    }
-
     /// <summary>Dragging continues outside the initial bounds, survives layout synchronization and writes only on left release.</summary>
     [Fact]
     public void DragOutsideHandlePersistsContentOriginOnlyOnLeftRelease()
@@ -705,6 +642,24 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
     #endregion
 
     #region Private
+    /// <summary>Routes standalone content dragging through existing commit and cancel boundaries.</summary>
+    private void ExerciseBodyDrag(bool cancel)
+    {
+        Assert.Null(typeof(HudOverlayGroupControls).GetField("composer", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(controls));
+        movement.SetMovable(true); gui.Invocations.Clear();
+        var clip = Assert.Single(layout.Members).Clip;
+        pointer = new PointF(clip.Left + clip.Width / 2, clip.Top + clip.Height / 2);
+        var down = Event(EnumMouseButton.Left); controls.OnContentMouseDown(api.Object, down);
+        Assert.True(down.Handled); Assert.True(movement.Dragging);
+        var delta = new PointF(70, 45); pointer = new PointF(pointer.X + delta.X, pointer.Y + delta.Y);
+        controls.OnMouseMove(api.Object, Event(EnumMouseButton.None));
+        Assert.Equal(new PointF(initial.X + delta.X, initial.Y + delta.Y), Origin());
+        if (cancel) Assert.True(controls.Cancel()); else controls.OnMouseUp(api.Object, Event(EnumMouseButton.Left));
+        Assert.False(movement.Dragging);
+        Assert.Equal(cancel ? initial : new PointF(initial.X + delta.X, initial.Y + delta.Y), Origin());
+        gui.Verify(value => value.SetDialogPosition(It.IsAny<string>(), It.IsAny<Vec2i>()), cancel ? Times.Never() : Times.Once());
+    }
+
     /// <summary>Exercises native drag routing with a freshly constructed, consistently scaled fixture.</summary>
     private void ExerciseGroupingPreview(bool cancel, int cancellation = 0, bool hiddenPlaceholder = false)
     {
@@ -744,14 +699,14 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
             var sourceClip = effective[group.Id].Members.Single().Clip;
             pointer = new PointF(sourceClip.Left + sourceClip.Width / 2, sourceClip.Top + sourceClip.Height / 2); control.Synchronize(effective);
             var handle = (RectangleF)typeof(HudOverlayGroupControls).GetField("handle", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(control)!;
-            if (!hiddenPlaceholder) pointer = new PointF(handle.X + handle.Width / 3, handle.Y + handle.Height / 2);
+
             var source = effective[group.Id].Root; var destination = effective[targetGroup.Id].Root;
             var delta = new PointF((float)(destination.renderX + destination.OuterWidth + targetGroup.Packing.Gap * RuntimeEnv.GUIScale - source.renderX), (float)(destination.renderY - source.renderY));
             if (cancellation is 6 or 7)
                 delta = new PointF((float)(destination.renderX + destination.OuterWidth / 2 - pointer.X), (float)(destination.renderY + destination.OuterHeight / 2 - pointer.Y));
             if (cancellation is not (6 or 7))
                 delta = new PointF((float)(destination.renderX + destination.OuterWidth - pointer.X), (float)(destination.renderY + destination.OuterHeight / 2 - pointer.Y));
-            if (hiddenPlaceholder) host.OnMouseDown(Event(EnumMouseButton.Left)); else control.OnMouseDown(api.Object, Event(EnumMouseButton.Left));
+            host.OnMouseDown(Event(EnumMouseButton.Left));
             var captured = cancellation == 8 && hiddenPlaceholder ? containers.Get(group.Id, registration.Id) : containers.Get(group.Id);
             Assert.True(captured.Dragging);
             var snapshot = stored.ToDictionary(pair => pair.Key, pair => pair.Value); int startingWrites = writes;
@@ -832,47 +787,6 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
 
     /// <summary>Matches the native ref-texture upload signature while keeping real Cairo composition active.</summary>
     private delegate void CairoUpload(Cairo.ImageSurface surface, bool linear, ref LoadedTexture texture);
-
-    /// <summary>Accesses the concrete production native widget rather than substituting a fake control.</summary>
-    private HudOverlayNativeTitleBar NativeTitleBar() =>
-        (HudOverlayNativeTitleBar)typeof(HudOverlayGroupControls).GetField("titleBar", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(controls)!;
-
-    /// <summary>Clicks the native menu glyph and the native dropdown row through production pointer routing.</summary>
-    private void SelectNativeMode(int index)
-    {
-        OpenNativeMenu();
-        ClickNativeRow(index);
-    }
-
-    /// <summary>Reveals the controls and clicks the actual native menu glyph through its composed hit rectangle.</summary>
-    private void OpenNativeMenu()
-    {
-        var clip = Assert.Single(layout.Members).Clip;
-        pointer = new PointF(clip.Left + 5, clip.Top + 5);
-        controls.Synchronize(layouts);
-        var titleBar = NativeTitleBar();
-        var menuRect = (Vintagestory.API.Datastructures.Rectangled)typeof(GuiElementDialogTitleBar)
-            .GetField("menuIconRect", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(titleBar)!;
-        pointer = new PointF((float)(titleBar.Bounds.absX + menuRect.X + menuRect.Width / 2),
-            (float)(titleBar.Bounds.absY + menuRect.Y + menuRect.Height / 2));
-        controls.OnMouseDown(api.Object, Event(EnumMouseButton.Left));
-        controls.OnMouseUp(api.Object, Event(EnumMouseButton.Left));
-        Assert.True(titleBar.Menu.IsOpened);
-        // The live session synchronizes controls after its layout callback; apply that same boundary before inspection.
-        controls.Synchronize(layouts);
-    }
-
-    /// <summary>Clicks the selected real native popup row using the active GUI scale.</summary>
-    private void ClickNativeRow(int index)
-    {
-        var titleBar = NativeTitleBar();
-        pointer = new PointF((float)titleBar.Menu.Bounds.renderX + 10,
-            (float)(titleBar.Menu.Bounds.renderY + titleBar.Menu.Bounds.InnerHeight + (30 * index + 15) * RuntimeEnv.GUIScale));
-        var selection = Event(EnumMouseButton.Left);
-        controls.OnMouseDown(api.Object, selection);
-        controls.OnMouseUp(api.Object, Event(EnumMouseButton.Left));
-        Assert.True(selection.Handled);
-    }
 
     /// <summary>Begins a left drag from the grip after persisting permission and clearing setup receipts.</summary>
     private void StartDrag()

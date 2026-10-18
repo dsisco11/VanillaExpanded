@@ -268,6 +268,19 @@ internal sealed class HudOverlayContainers
         return result;
     }
 
+    /// <summary>Returns one registered indicator to derived default membership without changing unrelated overrides.</summary>
+    public bool ResetIndicator(string indicator)
+    {
+        if (ReadOnly || registrations.All(item => item.Id != indicator)) return false;
+        Cancel();
+        // Remove only this leaf. Remaining custom trees retain their origin, attachment and permission;
+        // Resolve supplies the unassigned leaf from its registered template alongside other default members.
+        var records = Records().Select(item => (Container: item, Tree: item.Tree.Remove(indicator)))
+            .Where(item => item.Tree != null)
+            .Select(item => item.Container with { Tree = item.Tree! }).ToArray();
+        return Save(records);
+    }
+
     /// <summary>Returns the preview container identity for a member detached during its current drag.</summary>
     public string? ActiveContainer => active;
     #endregion

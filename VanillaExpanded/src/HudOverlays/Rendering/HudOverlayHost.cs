@@ -109,7 +109,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
             }
             foreach (var target in targets)
                 if (!groupControls.ContainsKey(target.Key)) groupControls[target.Key] = new HudOverlayGroupControls(capi, this,
-                    target.Value, isDrawable, RequestLayout, () => containers.Reset(), UpdateSnap);
+                    target.Value, isDrawable, RequestLayout, UpdateSnap);
             visibleControls = targets.Keys.ToHashSet(StringComparer.Ordinal);
         }
         synchronizing = true;
@@ -133,7 +133,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     }
     #endregion
     #region Input
-    /// <summary>Receives keyboard events during captured movement, titlebar dropdowns, or context-menu interaction.</summary>
+    /// <summary>Receives keyboard events during captured movement or context-menu interaction.</summary>
     public override bool ShouldReceiveKeyboardEvents() => menuInput?.Capturing == true || ActiveControls?.Active == true;
     /// <summary>Allows selective handle routing while retaining passive behavior for hosts without controls.</summary>
     public override bool ShouldReceiveMouseEvents() => groupControls.Count > 0 && IsOpened();
@@ -147,19 +147,17 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         if (menuInput?.Capturing == true) { menuInput.Escape(); return true; }
         return ActiveControls?.Cancel() == true;
     }
-    /// <summary>Routes native dropdown navigation, consuming Escape only when it cancels an active interaction.</summary>
+    /// <summary>Routes menu navigation and consumes Escape when it cancels an active interaction.</summary>
     public override void OnKeyDown(KeyEvent args)
     {
         if (menuInput?.Capturing == true) { menuInput.KeyDown(args); return; }
         if (args.KeyCode == (int)GlKeys.Escape && OnEscapePressed()) args.Handled = true;
-        else ActiveControls?.OnKeyDown(args);
         RefreshSnap();
     }
     /// <summary>Routes characters only to an open native dropdown.</summary>
     public override void OnKeyPress(KeyEvent args)
     {
         if (menuInput?.Capturing == true) menuInput.KeyPress(args);
-        else ActiveControls?.OnKeyPress(args);
     }
     /// <summary>Rechecks Shift bypass without requiring additional pointer movement.</summary>
     public override void OnKeyUp(KeyEvent args)
@@ -215,11 +213,10 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         if (menuInput?.Capturing == true) menuInput.MouseMove(args);
         else ActiveControls?.OnMouseMove(capi, args);
     }
-    /// <summary>Routes wheel input only to an open native dropdown under the pointer.</summary>
+    /// <summary>Routes wheel input only while the context menu owns input.</summary>
     public override void OnMouseWheel(MouseWheelEventArgs args)
     {
         if (menuInput?.Capturing == true) menuInput.MouseWheel(args);
-        else ActiveControls?.OnMouseWheel(args);
     }
     /// <summary>Discards active interaction when native dialog focus is transferred elsewhere.</summary>
     public override void UnFocus()

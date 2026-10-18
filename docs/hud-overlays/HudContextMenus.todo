@@ -4,21 +4,21 @@ Source: approved context-menu discussion. Native control reference: `vsapi/Clien
 
 ## Goal and contract
 
-Replace all overlay titlebars and their controls with right-click menus while the mouse is unlocked. Reuse native list-menu rendering and interaction through a small adapter and a shared controller. Preserve existing dragging, grouping, snapping, ghost previews, cancellation, persistence, and edit-mode bounds cues.
+Provide indicator settings through right-click menus while the mouse is unlocked. Retain titlebars for multi-member groups and whole-group dragging; standalone indicators have no titlebar. Reuse native list-menu rendering and interaction through a small adapter and a shared controller. Preserve existing dragging, grouping, snapping, ghost previews, cancellation, persistence, and edit-mode bounds cues.
 
 - Indicator options: Enabled, supported Style selections, and one checkable Lock option. Checked means locked.
 - Enabled and Style affect the selected indicator. Lock affects its effective container, including every member of a group.
 - Disabled registered indicators remain accessible through the existing edit proxies; menus must not fabricate readings or activate unavailable integrations.
 - Right-click during a drag cancels only; it must not also open a menu.
-- No individual or group titlebars remain. Movable corner handles, locked dashed borders, and group hover backgrounds remain.
-- Preserve global layout reset access. Do not add individual reset semantics or a separate settings file.
+- Only multi-member groups retain titlebars for whole-group dragging. Movable corner handles, locked dashed borders, and group hover backgrounds remain.
+- Reset applies only to the selected indicator; remove global reset access. Use existing layout persistence without a separate settings file. Resolve grouped-indicator reset semantics before implementation.
 - Use native switch/label controls for Enabled/Lock and an embedded native Style dropdown in the same panel. Its expanded choices reuse the bounded native selection list. The native list's multi-select mode owns private switch textures without disposing them; direct native switch ownership avoids that lifetime problem without reflection or engine patches. A replacement page, Style button, mixed-action list, and cascading submenus are not required.
 
 ## Decisions to settle before removing titlebars
 
-- [ ] Confirm the replacement gesture/access path for whole-group movement. Individual body dragging currently detaches members; removing the group titlebar must not silently remove whole-group dragging or change individual dragging semantics.
+- [x] Retain multi-member group titlebars for whole-group movement. Ordinary member body dragging still detaches the member; no modifier gesture is introduced.
 - [x] Confirm Style access: a native dropdown within the same context panel, alongside Enabled and Lock; choosing a style closes the menu.
-- [ ] Confirm how global Reset layout is exposed alongside the native controls. Present one concrete interaction design before implementing this choice.
+- [x] Reset layout is a native button in the selected indicator context menu. It removes that indicator from custom membership and restores derived default group/placement and default movement permission, preserving unrelated overrides and Enabled/Style settings. Customized peers keep their layouts; untouched default peers regroup normally. No global reset is exposed. Unreadable/newer snapshots remain untouched and layout mutation actions are omitted rather than discarding unrelated data.
 
 ## Phase 1: Define shared menu capabilities and settings ownership
 
@@ -75,26 +75,26 @@ Completion criteria:
 
 ## Phase 4: Replace titlebars and retain movement/reset access
 
-Outcome: menu access fully replaces titlebar controls without losing existing layout operations.
+Outcome: standalone indicators use menus and body dragging, groups retain drag titlebars, and reset affects only the selected indicator.
 
-- [ ] Implement the approved whole-group movement access path using the existing movement transaction, snapping, source reservation, and preview mechanisms.
-- [ ] Implement the approved global Reset layout access path using the existing reset operation; close stale menus after reset.
-- [ ] Remove titlebar creation, rendering, hit areas, native Fixed/Movable dropdown routing, caption-only resources, and titlebar-only layout offsets/constants where no longer used.
-- [ ] Remove HudOverlayNativeTitleBar and its reflection dependencies when no consumers remain; retain container position/settings persistence independently of native titlebar side effects.
-- [ ] Preserve corner handles, locked dashed borders, hover fill, member dragging/detachment, group merges, Shift bypass, Escape/right-click cancellation, and source ghosts/reservations.
-- [ ] Reconcile tests against the replacement interaction contracts; remove obsolete titlebar expectations rather than keeping compatibility scaffolding.
-- [ ] Verify existing saved layouts load unchanged and permissions/anchors survive lock toggles, reset, and restart.
+- [x] Retain multi-member group titlebar dragging using existing movement transactions, snapping, source reservation, and previews; suppress singleton titlebars.
+- [x] Implement approved individual Reset access, preserving unrelated indicators and persisting atomically; close stale menus after reset and remove global reset UI.
+- [x] Remove standalone titlebar creation, rendering, and hit areas; remove Fixed/Movable and reset dropdown controls while retaining group captions and drag areas. Lock remains in the context menu.
+- [x] Simplify the group titlebar implementation and remove unused reflection dependencies; retain position/settings persistence independently of titlebar side effects.
+- [x] Preserve corner handles, locked dashed borders, hover fill, member dragging/detachment, group merges, Shift bypass, Escape/right-click cancellation, and source ghosts/reservations.
+- [x] Reconcile tests against the replacement interaction contracts; remove obsolete titlebar expectations rather than keeping compatibility scaffolding.
+- [x] Verify existing saved layouts load unchanged and permissions/anchors survive lock toggles, reset, and restart.
 
 Completion criteria:
 
-- [ ] No overlay titlebars or Fixed/Movable UI choices remain; standalone and whole-group movement remain accessible.
-- [ ] Global reset and existing layout persistence retain their behavior.
+- [x] Only multi-member groups show titlebars, with no Fixed/Movable choices; standalone body dragging, member detachment, and group dragging remain accessible.
+- [x] Individual reset preserves unrelated layout state and existing persistence; no global reset UI remains.
 
 ## Phase 5: Documentation, validation, and user acceptance
 
 Outcome: implementation, current documentation, and shipped assets agree.
 
-- [ ] Update HudOverlays.md architecture/input descriptions and README user controls; document menu scope, Lock behavior, whole-group gesture, and reset access. Describe current behavior only.
+- [ ] Update HudOverlays.md architecture/input descriptions and README user controls; document menu scope, Lock behavior, group titlebar dragging, and individual reset access. Describe current behavior only.
 - [ ] Audit implementation against every contract above and remove stale titlebar references, unused localization, and resources only where unreferenced.
 - [ ] Run focused tests and appropriate full build/test/package checks through subagents. Follow test AGENTS.md: no assertions of chosen colors, opacity, font sizes, or hardcoded visual dimensions; synthetic setup geometry belongs in InlineData.
 - [ ] Verify packaged localization and any required resources using canonical repository tooling.
@@ -104,5 +104,5 @@ Outcome: implementation, current documentation, and shipped assets agree.
 Final acceptance:
 
 - [ ] Every approved requirement is implemented and validated, with any remaining decisions explicitly resolved.
-- [ ] Native popup reuse does not depend on removed titlebars, duplicate settings state, or a new layout persistence implementation.
+- [ ] Native popup reuse does not depend on group titlebars, duplicate settings state, or a new layout persistence implementation.
 - [ ] Build/test/package checks pass and user confirms the live interaction and appearance.

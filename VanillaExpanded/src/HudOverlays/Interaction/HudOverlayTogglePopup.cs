@@ -15,6 +15,7 @@ internal sealed class HudOverlayTogglePopup : IHudMenuPopup
     private readonly GuiComposer composer;
     private readonly List<GuiElementSwitch> switches = new();
     private readonly HudOverlayStyleDropDown? style;
+    private readonly List<GuiElementTextButton> actions = new();
     private readonly RectangleF panelBounds;
     private bool disposed;
     #region Public API
@@ -27,13 +28,14 @@ internal sealed class HudOverlayTogglePopup : IHudMenuPopup
         var font = CairoFont.WhiteSmallText().WithFontSize(HudOverlaySizes.Text);
         var toggles = entries.Where(entry => entry.Kind == HudMenuEntryKind.Toggle).ToArray();
         var choices = entries.Where(entry => entry.Kind == HudMenuEntryKind.StyleChoice).ToArray();
+        var commands = entries.Where(entry => entry.Kind == HudMenuEntryKind.Action).ToArray();
         string styleLabel = Lang.GetL(environment.Locale, "vanillaexpanded:hud-menu-style");
         double scale = environment.GuiScale;
         double row = Math.Max(30, font.GetFontExtents().Height / scale + 8);
         double width = entries.Max(entry => font.GetTextExtents(entry.Label).Width / scale) + row + 16;
         double styleLabelWidth = font.GetTextExtents(styleLabel).Width / scale + 12;
         if (choices.Length > 0) width += styleLabelWidth;
-        double height = row * (toggles.Length + (choices.Length > 0 ? 1 : 0));
+        double height = row * (toggles.Length + (choices.Length > 0 ? 1 : 0) + commands.Length);
         // Fit the compact panel uniformly only when required. The expanded dropdown scrolls independently.
         double fit = Math.Min(1, Math.Min(environment.Viewport.Width / (width * scale), environment.Viewport.Height / (height * scale)));
         if (!double.IsFinite(fit) || fit <= 0) throw new ArgumentOutOfRangeException(nameof(environment));
@@ -65,6 +67,15 @@ internal sealed class HudOverlayTogglePopup : IHudMenuPopup
                     ElementBounds.Fixed(labelWidth, toggles.Length * row, width - labelWidth, row), font, environment.Viewport);
                 composer.AddInteractiveElement(style);
             }
+            for (int index = 0; index < commands.Length; index++)
+            {
+                var command = commands[index];
+                string key = "action:" + index;
+                composer.AddButton(command.Label, () => { select(command.Code, true); return true; },
+                    ElementBounds.Fixed(0, (toggles.Length + (choices.Length > 0 ? 1 : 0) + index) * row, width, row),
+                    font, key: key);
+                actions.Add(composer.GetButton(key));
+            }
             composer.Compose();
             composer.FocusElement(0);
         }
@@ -73,7 +84,8 @@ internal sealed class HudOverlayTogglePopup : IHudMenuPopup
     /// <inheritdoc />
     public RectangleF VisibleBounds => style?.ExpandedBounds is { IsEmpty: false } expanded ? RectangleF.Union(panelBounds, expanded) : panelBounds;
     /// <inheritdoc />
-    public bool IsOpened => !disposed && (switches.Any(control => control.HasFocus) || style?.HasFocus == true);
+    public bool IsOpened => !disposed && (switches.Any(control => control.HasFocus) || style?.HasFocus == true
+        || actions.Any(control => control.HasFocus));
     #endregion
     #region Rendering and pointer delegation
     /// <inheritdoc />
@@ -100,7 +112,15 @@ internal sealed class HudOverlayTogglePopup : IHudMenuPopup
             style.OnMouseDown(api, args);
             return;
         }
-        int row = (int)((args.Y - panelBounds.Top) * (switches.Count + (style == null ? 0 : 1)) / panelBounds.Height);
+        for (int index = 0; index < actions.Count; index++)
+        {
+            if (!actions[index].IsPositionInside(args.X, args.Y)) continue;
+            composer.FocusElement(switches.Count + (style == null ? 0 : 1) + index);
+            actions[index].OnMouseDownOnElement(api, args);
+            args.Handled = true;
+            return;
+        }
+        int row = (int)((args.Y - panelBounds.Top) * (switches.Count + (style == null ? 0 : 1) + actions.Count) / panelBounds.Height);
         if (row < 0 || row >= switches.Count) return;
         composer.FocusElement(row);
         switches[row].OnMouseDownOnElement(api, args);

@@ -3,6 +3,7 @@ using Vintagestory.API.Config;
 using Moq;
 using VanillaExpanded.HudOverlays.Interaction;
 using Vintagestory.API.Client;
+using Vintagestory.API.Common;
 
 namespace VanillaExpanded.Tests.Unit.HudOverlays;
 
@@ -40,6 +41,7 @@ public sealed class HudOverlayListMenuTests
         float previous = RuntimeEnv.GUIScale; RuntimeEnv.GUIScale = scale;
         string previousLocale = Lang.CurrentLocale;
         var language = new Mock<ITranslationService>();
+        language.Setup(value => value.Get(It.IsAny<string>(), It.IsAny<object[]>())).Returns((string key, object[] _) => key);
         Lang.AvailableLanguages.TryGetValue("en", out var previousLanguage);
         Lang.AvailableLanguages["en"] = language.Object;
         typeof(Lang).GetProperty(nameof(Lang.CurrentLocale))!.SetValue(null, "en");
@@ -105,6 +107,31 @@ public sealed class HudOverlayListMenuTests
             dropdown.OnKeyDown(api.Object, new KeyEvent { KeyCode = (int)GlKeys.Enter });
             Assert.Equal("c", selected); Assert.Equal(selected, dropdown.SelectedValue);
             dropdown.Dispose(); dropdown.Dispose();
+            // The command is a real native text button: pointer activation occurs on release, keyboard on Enter.
+            gui.Setup(value => value.CreateCompo(It.IsAny<string>(), It.IsAny<ElementBounds>()))
+                .Returns((string name, ElementBounds bounds) => (GuiComposer)Activator.CreateInstance(typeof(GuiComposer),
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic, null,
+                    new object[] { api.Object, bounds, name }, null)!);
+            var assets = new Mock<IAssetManager>(); var asset = new Mock<IAsset>(); asset.SetupGet(value => value.Data).Returns(Array.Empty<byte>());
+            assets.Setup(value => value.Get(It.IsAny<AssetLocation>())).Returns(asset.Object); api.SetupGet(value => value.Assets).Returns(assets.Object);
+            render.Setup(value => value.BitmapCreateFromPng(It.IsAny<byte[]>())).Returns(() => new BitmapExternal(2, 2));
+            int resets = 0;
+            using var popup = new HudOverlayTogglePopup(api.Object,
+                new[] { new HudMenuEntry("reset", "Reset layout", false, HudMenuEntryKind.Action) },
+                (code, _) => { Assert.Equal("reset", code); resets++; }, PointF.Empty,
+                new HudMenuEnvironment(new object(), viewport, scale, "en", true));
+            var panel = popup.VisibleBounds;
+            Assert.True(viewport.Contains(panel));
+            var actionComposer = (GuiComposer)typeof(HudOverlayTogglePopup).GetField("composer", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(popup)!;
+            var actionBounds = actionComposer.GetButton("action:0").Bounds;
+            Assert.True(viewport.Contains(new RectangleF((float)actionBounds.renderX, (float)actionBounds.renderY, (float)actionBounds.OuterWidth, (float)actionBounds.OuterHeight)));
+            var click = new MouseEvent((int)(panel.Left + panel.Width / 2), (int)(panel.Top + panel.Height / 2),
+                Vintagestory.API.Common.EnumMouseButton.Left, 0);
+            var input = new Mock<IInputAPI>(); input.SetupGet(value => value.MouseX).Returns(click.X); input.SetupGet(value => value.MouseY).Returns(click.Y); api.SetupGet(value => value.Input).Returns(input.Object);
+            popup.MouseDown(click); Assert.Equal(0, resets);
+            popup.MouseUp(new MouseEvent(click.X, click.Y, click.Button, 0)); Assert.Equal(1, resets);
+            var enter = new KeyEvent { KeyCode = (int)GlKeys.Enter }; popup.KeyDown(enter);
+            Assert.True(enter.Handled); Assert.Equal(2, resets);
         }
         finally { RuntimeEnv.GUIScale = previous; typeof(Lang).GetProperty(nameof(Lang.CurrentLocale))!.SetValue(null, previousLocale);
             if (previousLanguage == null) Lang.AvailableLanguages.Remove("en"); else Lang.AvailableLanguages["en"] = previousLanguage; }
