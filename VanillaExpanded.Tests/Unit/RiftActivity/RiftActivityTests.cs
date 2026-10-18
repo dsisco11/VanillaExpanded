@@ -1,7 +1,9 @@
+using Vintagestory.API.Config;
 using System.Drawing;
 using HarmonyLib;
 using Moq;
 using VanillaExpanded.HudOverlays.Registration;
+using VanillaExpanded.HudOverlays.Rendering;
 using VanillaExpanded.RiftActivity;
 using VanillaExpanded.Tests.Unit.BowAmmunition;
 using Vintagestory.API.Client;
@@ -12,8 +14,21 @@ namespace VanillaExpanded.Tests.Unit.RiftActivity;
 
 /// <summary>Checks native packet mapping and cached presentation without graphics services.</summary>
 [Collection("HudOverlayGeometry")]
-public sealed class RiftActivityTests
+public sealed class RiftActivityTests : IDisposable
 {
+    private readonly ITranslationService? english = Lang.AvailableLanguages.GetValueOrDefault("en");
+    /// <summary>Provides headless localization for cached indicator labels.</summary>
+    public RiftActivityTests()
+    {
+        var language = new Mock<ITranslationService>();
+        language.Setup(value => value.Get(It.IsAny<string>(), It.IsAny<object[]>())).Returns("TEST");
+        Lang.AvailableLanguages["en"] = language.Object;
+    }
+    /// <summary>Restores the process language registry after each test.</summary>
+    public void Dispose()
+    {
+        if (english == null) Lang.AvailableLanguages.Remove("en"); else Lang.AvailableLanguages["en"] = english;
+    }
     private static readonly AccessTools.FieldRef<ModSystemRiftWeather, CurrentPattern> Pattern =
         AccessTools.FieldRefAccess<ModSystemRiftWeather, CurrentPattern>("curPattern");
 
@@ -50,12 +65,13 @@ public sealed class RiftActivityTests
         fixture.Api.SetupGet(value => value.ModLoader).Returns(loader.Object);
         var renderer = new Mock<IRenderAPI>();
         int loads = 0;
+        using var label = new HudOverlayIconTextPresentation((context, _) => new LoadedTexture(context.Api) { TextureId = 40, Width = 30, Height = 14 });
         using var overlay = new RiftActivityOverlay(context =>
         {
             loads++;
             return Enumerable.Range(1, 4).Select(id => new LoadedTexture(context.Api)
                 { TextureId = id, IgnoreUndisposed = true }).ToArray();
-        });
+        }, label: label);
         overlay.BeginSession(fixture.Api.Object);
         var preparation = new HudOverlayPreparationContext(fixture.Api.Object, 1, "en", 0);
         Assert.True(overlay.IsApplicable());
