@@ -434,7 +434,8 @@ public sealed class HudOverlayLayoutTests
             Near(gap, layout.Members[1].Bounds.renderX - layout.Members[0].Bounds.renderX - layout.Members[0].Bounds.OuterWidth);
             window.Resize(120, 110); context.BeginFrame();
             layout.Apply(context, group, new[] { Member("mod:a", 60, 45), Member("mod:b", 20, 25) }, origin);
-            Assert.InRange(root.renderX, context.SafeRectangle.Left, Math.Max(context.SafeRectangle.Left, context.SafeRectangle.Right - root.OuterWidth));
+            Assert.InRange(root.renderX, window.renderX, Math.Max(window.renderX, window.renderX + window.OuterWidth - root.OuterWidth));
+            Assert.InRange(root.renderY, window.renderY, Math.Max(window.renderY, window.renderY + window.OuterHeight - root.OuterHeight));
             window.Resize(900, 700); context.BeginFrame();
             layout.Apply(context, group, new[] { Member("mod:a", 60, 45), Member("mod:b", 20, 25) }, origin);
             Near(origin.X * scale, root.renderX); Near(origin.Y * scale, root.renderY);
