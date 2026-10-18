@@ -1,5 +1,6 @@
 using System;
 using VanillaExpanded.HudOverlays;
+using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.ModSystems;
 using Vintagestory.API.Client;
@@ -37,7 +38,12 @@ internal sealed class PlayerWetnessSystem : ModSystem, ILiveConfigurable
             registration = hud.Registry.Register(new HudOverlayRegistration(OverlayId, overlay,
                 () => overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays
                     && VanillaExpandedModSystem.Config.EnablePlayerWetnessOverlay), "player-status", order: 97, refreshIntervalMs: 300,
-                hoverLabelKey: "vanillaexpanded:hud-label-player-wetness"));
+                hoverLabelKey: "vanillaexpanded:hud-label-player-wetness",
+                menuSettings: new HudOverlayMenuSettings(
+                    new HudOverlaySetting<bool>(() => VanillaExpandedModSystem.Config.EnablePlayerWetnessOverlay,
+                        value => VanillaExpandedModSystem.Config.EnablePlayerWetnessOverlay = value, () => HudMenuConfiguration.Commit(api)),
+                    new HudOverlayStyleSetting<HudIndicatorStyle>(() => VanillaExpandedModSystem.Config.PlayerWetnessIndicatorStyle,
+                        value => VanillaExpandedModSystem.Config.PlayerWetnessIndicatorStyle = value, () => HudMenuConfiguration.Commit(api)))));
         }
         catch { overlay.Dispose(); throw; }
     }

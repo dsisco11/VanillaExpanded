@@ -1,5 +1,6 @@
 using System;
 using VanillaExpanded.HudOverlays;
+using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.ModSystems;
 using Vintagestory.API.Client;
@@ -36,7 +37,12 @@ internal sealed class ApproximateTimeSystem : ModSystem, ILiveConfigurable
             registration = hud.Registry.Register(new HudOverlayRegistration(OverlayId, overlay,
                 () => overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays
                     && VanillaExpandedModSystem.Config.EnableApproximateTimeOverlay), "world-status", order: 98, refreshIntervalMs: 300,
-                hoverLabelKey: "vanillaexpanded:hud-label-approximate-time"));
+                hoverLabelKey: "vanillaexpanded:hud-label-approximate-time",
+                menuSettings: new HudOverlayMenuSettings(
+                    new HudOverlaySetting<bool>(() => VanillaExpandedModSystem.Config.EnableApproximateTimeOverlay,
+                        value => VanillaExpandedModSystem.Config.EnableApproximateTimeOverlay = value, () => HudMenuConfiguration.Commit(api)),
+                    new HudOverlayStyleSetting<EnvironmentalGaugeStyle>(() => VanillaExpandedModSystem.Config.ApproximateTimeGaugeStyle,
+                        value => VanillaExpandedModSystem.Config.ApproximateTimeGaugeStyle = value, () => HudMenuConfiguration.Commit(api)))));
         }
         catch { overlay.Dispose(); throw; }
     }

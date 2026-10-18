@@ -23,18 +23,18 @@ Replace all overlay titlebars and their controls with right-click menus while th
 
 Outcome: menu options have explicit targets and use the same authoritative settings as existing configuration UI.
 
-- [ ] Inventory every registered indicator's enable setting, supported style enum, mutation path, persistence path, and refresh requirements.
-- [ ] Add optional menu capabilities to registration metadata or an adjacent registration-owned descriptor; retain compatibility with existing callers and integrations.
-- [ ] Expose supported actions through owning feature/configuration APIs; keep feature-specific switches out of the shared menu controller.
-- [ ] Distinguish configured Enabled from momentary gameplay visibility and integration availability. Omit unsupported settings rather than inventing setters.
-- [ ] Derive Lock from effective movement permission and translate it to the existing movement API without resetting position or changing saved layout format.
-- [ ] Add localized option/style labels and any group-scope explanation required to make Lock's scope clear.
-- [ ] Verify capabilities, enum round-trips, grouped/standalone permission scope, and persistence through focused tests.
+- [x] Inventory every registered indicator's enable setting, supported style enum, mutation path, persistence path, and refresh requirements.
+- [x] Add optional menu capabilities to registration metadata or an adjacent registration-owned descriptor; retain compatibility with existing callers and integrations.
+- [x] Expose supported actions through owning feature/configuration APIs; keep feature-specific switches out of the shared menu controller.
+- [x] Distinguish configured Enabled from momentary gameplay visibility and integration availability. Omit unsupported settings rather than inventing setters.
+- [x] Derive Lock from effective movement permission and translate it to the existing movement API without resetting position or changing saved layout format.
+- [x] Add localized option/style labels and any group-scope explanation required to make Lock's scope clear.
+- [x] Verify capabilities, enum round-trips, grouped/standalone permission scope, and persistence through focused tests.
 
 Completion criteria:
 
-- [ ] Each supported indicator has a documented settings binding; missing capabilities remain safe and usable.
-- [ ] Menu changes and external configuration changes share one authoritative state.
+- [x] Each supported indicator has a documented settings binding; missing capabilities remain safe and usable.
+- [x] Menu changes and external configuration changes share one authoritative state.
 
 ## Phase 2: Host native popup controls independently of titlebars
 

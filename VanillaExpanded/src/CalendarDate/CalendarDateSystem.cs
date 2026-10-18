@@ -1,5 +1,6 @@
 using System;
 using VanillaExpanded.HudOverlays;
+using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.ModSystems;
 using Vintagestory.API.Client;
@@ -37,7 +38,12 @@ internal sealed class CalendarDateSystem : ModSystem, ILiveConfigurable
             registration = hud.Registry.Register(new HudOverlayRegistration(OverlayId, overlay,
                 () => overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays
                     && VanillaExpandedModSystem.Config.EnableCalendarDateOverlay), "world-status", order: 100, refreshIntervalMs: 300,
-                hoverLabelKey: "vanillaexpanded:hud-label-calendar-date"));
+                hoverLabelKey: "vanillaexpanded:hud-label-calendar-date",
+                menuSettings: new HudOverlayMenuSettings(
+                    new HudOverlaySetting<bool>(() => VanillaExpandedModSystem.Config.EnableCalendarDateOverlay,
+                        value => VanillaExpandedModSystem.Config.EnableCalendarDateOverlay = value, () => HudMenuConfiguration.Commit(api)),
+                    new HudOverlayStyleSetting<EnvironmentalGaugeStyle>(() => VanillaExpandedModSystem.Config.CalendarDateGaugeStyle,
+                        value => VanillaExpandedModSystem.Config.CalendarDateGaugeStyle = value, () => HudMenuConfiguration.Commit(api)))));
         }
         catch { overlay.Dispose(); throw; }
     }

@@ -40,6 +40,26 @@ Placeholder lettering prepares on the heartbeat and remains cached through frame
 
 ## Runtime structure
 
+### Configured menu capabilities
+
+`HudOverlayRegistration.MenuSettings` optionally exposes a configured Enabled binding and enum-backed Style binding. Missing capabilities remain absent for integrations that do not offer them. Getters read the owning configuration directly; configured Enabled is independent of global HUD suppression, gameplay visibility, and integration availability. These capabilities do not themselves open menus or change input handling.
+
+| Indicator | Enabled configuration | Style configuration | Supported styles |
+|---|---|---|---|
+| Approximate time | EnableApproximateTimeOverlay | ApproximateTimeGaugeStyle | Immersive, Icon, Text |
+| Environmental temperature | EnableEnvironmentalTemperatureOverlay | EnvironmentalTemperatureGaugeStyle | Immersive, Icon, Text |
+| Calendar date | EnableCalendarDateOverlay | CalendarDateGaugeStyle | Immersive, Icon, Text |
+| Bow ammunition | EnableBowAmmunitionOverlay | BowAmmunitionIndicatorStyle | Icon, Text |
+| Body temperature | EnableBodyTemperatureOverlay | BodyTemperatureIndicatorStyle | Icon, Text |
+| Player wetness | EnablePlayerWetnessOverlay | PlayerWetnessIndicatorStyle | Icon, Text |
+| Weather conditions | EnableWeatherConditionsOverlay | WeatherConditionsIndicatorStyle | Icon, Text |
+| Rift activity | EnableRiftActivityOverlay | RiftActivityIndicatorStyle | Icon, Text |
+| Temporal storm | EnableTemporalStormOverlay | TemporalStormIndicatorStyle | Icon, Text |
+
+Each feature registers its own setters. Changed settings save the existing mod configuration before `LiveConfigReload.NotifyAll` synchronizes feature style/enable state, invalidates scheduled readings, and refreshes session layout. Unchanged values do not save or reload. Save failures restore the prior in-memory setting and propagate to the caller. Style bindings reject undefined values and values from another enum before mutation. Style names resolve through the `hud-menu-style-immersive`, `hud-menu-style-icon`, and `hud-menu-style-text` localization keys.
+
+`HudOverlayGroupMovement.Locked` is the inverse of effective movement permission. `SetLocked` uses the existing container permission operation and layout persistence; a member addresses its current owning container, so locking a group locks all members without resetting its position, attachment, or membership. Configuration capabilities do not duplicate this layout-owned state.
+
 The session owns the runtime bindings; the registry retains feature ownership across sessions. Solid arrows show ownership or contained data. Dashed arrows show borrowed dependencies and calls.
 
 ```mermaid

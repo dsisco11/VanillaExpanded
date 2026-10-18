@@ -1,5 +1,6 @@
 using System;
 using VanillaExpanded.HudOverlays;
+using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.ModSystems;
 using Vintagestory.API.Client;
@@ -36,7 +37,12 @@ internal sealed class RiftActivitySystem : ModSystem, ILiveConfigurable
             registration = hud.Registry.Register(new HudOverlayRegistration(OverlayId, overlay,
                 () => overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays
                     && VanillaExpandedModSystem.Config.EnableRiftActivityOverlay), "player-status", order: 90, refreshIntervalMs: 300,
-                hoverLabelKey: "vanillaexpanded:hud-label-rift-activity"));
+                hoverLabelKey: "vanillaexpanded:hud-label-rift-activity",
+                menuSettings: new HudOverlayMenuSettings(
+                    new HudOverlaySetting<bool>(() => VanillaExpandedModSystem.Config.EnableRiftActivityOverlay,
+                        value => VanillaExpandedModSystem.Config.EnableRiftActivityOverlay = value, () => HudMenuConfiguration.Commit(api)),
+                    new HudOverlayStyleSetting<HudIndicatorStyle>(() => VanillaExpandedModSystem.Config.RiftActivityIndicatorStyle,
+                        value => VanillaExpandedModSystem.Config.RiftActivityIndicatorStyle = value, () => HudMenuConfiguration.Commit(api)))));
         }
         catch { overlay.Dispose(); throw; }
     }

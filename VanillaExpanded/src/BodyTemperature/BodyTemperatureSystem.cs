@@ -1,5 +1,6 @@
 using System;
 using VanillaExpanded.HudOverlays;
+using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.ModSystems;
 using Vintagestory.API.Client;
@@ -38,7 +39,12 @@ internal sealed class BodyTemperatureSystem : ModSystem, ILiveConfigurable
             registration = hud.Registry.Register(new HudOverlayRegistration(OverlayId, overlay,
                 () => overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays
                     && VanillaExpandedModSystem.Config.EnableBodyTemperatureOverlay), "player-status", order: 98, refreshIntervalMs: 300,
-                hoverLabelKey: "vanillaexpanded:hud-label-body-temperature"));
+                hoverLabelKey: "vanillaexpanded:hud-label-body-temperature",
+                menuSettings: new HudOverlayMenuSettings(
+                    new HudOverlaySetting<bool>(() => VanillaExpandedModSystem.Config.EnableBodyTemperatureOverlay,
+                        value => VanillaExpandedModSystem.Config.EnableBodyTemperatureOverlay = value, () => HudMenuConfiguration.Commit(api)),
+                    new HudOverlayStyleSetting<HudIndicatorStyle>(() => VanillaExpandedModSystem.Config.BodyTemperatureIndicatorStyle,
+                        value => VanillaExpandedModSystem.Config.BodyTemperatureIndicatorStyle = value, () => HudMenuConfiguration.Commit(api)))));
         }
         catch { overlay.Dispose(); throw; }
     }
