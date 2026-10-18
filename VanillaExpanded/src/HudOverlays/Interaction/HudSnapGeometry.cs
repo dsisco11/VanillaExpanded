@@ -16,7 +16,8 @@ internal static class HudSnapGeometry
     #region Public API
     /// <summary>Prioritizes local grouping, retaining its target and side through alignment changes within a wider release band.</summary>
     public static IReadOnlyList<HudSnapCandidate> Candidates(RectangleF moving, PointF pointer,
-        RectangleF viewport, IEnumerable<HudSnapTarget> targets, HudSnapCandidate? retained, bool bypass)
+        RectangleF viewport, IEnumerable<HudSnapTarget> targets, HudSnapCandidate? retained, bool bypass,
+        IEnumerable<HudSnapBoundary>? boundaries = null)
     {
         if (bypass || moving.Width <= 0 || moving.Height <= 0) return Array.Empty<HudSnapCandidate>();
         var result = new List<HudSnapCandidate>();
@@ -54,6 +55,24 @@ internal static class HudSnapGeometry
             if (moving.Right >= b.Left - Release && moving.Left <= b.Right + Release)
                 AlignAxis(b, false, "target:" + key);
         }
+        foreach (var boundary in (boundaries ?? Array.Empty<HudSnapBoundary>()).OrderBy(item => item.Id, StringComparer.Ordinal))
+        {
+            var b = boundary.Bounds;
+            if (!float.IsFinite(b.X) || !float.IsFinite(b.Y) || !float.IsFinite(b.Width) || !float.IsFinite(b.Height)
+                || b.Width <= 0 || b.Height <= 0) continue;
+            string key = $"native:{boundary.Id.Length}:{boundary.Id}";
+            // Native HUDs supply geometry only. Exterior edges let an overlay sit beside a meter instead of covering it.
+            if (moving.Bottom >= b.Top - Release && moving.Top <= b.Bottom + Release)
+            {
+                AlignAxis(b, true, key, boundary);
+                AlignExterior(boundary, true, key);
+            }
+            if (moving.Right >= b.Left - Release && moving.Left <= b.Right + Release)
+            {
+                AlignAxis(b, false, key, boundary);
+                AlignExterior(boundary, false, key);
+            }
+        }
         AlignAxis(viewport, true, "screen");
         AlignAxis(viewport, false, "screen");
         // A screen guide cannot hold an indicator away from a nearby valid grouping target. Within each
@@ -69,7 +88,7 @@ internal static class HudSnapGeometry
             if (candidate.Distance <= (keep ? Release : Acquisition)) result.Add(candidate);
         }
         /// <summary>Offers matching start, center, and end positions with guides on one physical axis.</summary>
-        void AlignAxis(RectangleF reference, bool xAxis, string key)
+        void AlignAxis(RectangleF reference, bool xAxis, string key, HudSnapBoundary? boundary = null)
         {
             for (int index = 0; index < 3; index++)
             {
@@ -80,7 +99,25 @@ internal static class HudSnapGeometry
                 var guide = xAxis ? new RectangleF(coordinate + factor * moving.Width, Math.Min(moving.Top, reference.Top), 0, Math.Max(moving.Bottom, reference.Bottom) - Math.Min(moving.Top, reference.Top))
                     : new RectangleF(Math.Min(moving.Left, reference.Left), coordinate + factor * moving.Height, Math.Max(moving.Right, reference.Right) - Math.Min(moving.Left, reference.Left), 0);
                 Add(new HudSnapCandidate($"align:{key}:{xAxis}:{index}", null, default, default, origin,
-                    Math.Abs(xAxis ? moving.X - coordinate : moving.Y - coordinate), guide) { AlignsX = xAxis });
+                    Math.Abs(xAxis ? moving.X - coordinate : moving.Y - coordinate), guide) { AlignsX = xAxis, Boundary = boundary });
+            }
+        }
+
+        /// <summary>Offers outside-edge placement against a fixed HUD surface with no membership or persistent docking link.</summary>
+        void AlignExterior(HudSnapBoundary boundary, bool xAxis, string key)
+        {
+            var b = boundary.Bounds;
+            foreach (bool before in new[] { true, false })
+            {
+                float edge = xAxis ? before ? b.Left : b.Right : before ? b.Top : b.Bottom;
+                float coordinate = edge - (before ? xAxis ? moving.Width : moving.Height : 0);
+                var origin = xAxis ? new PointF(coordinate, moving.Y) : new PointF(moving.X, coordinate);
+                var side = xAxis ? before ? HudSnapSide.Left : HudSnapSide.Right : before ? HudSnapSide.Above : HudSnapSide.Below;
+                var guide = xAxis ? new RectangleF(edge, Math.Min(moving.Top, b.Top), 0, Math.Max(moving.Bottom, b.Bottom) - Math.Min(moving.Top, b.Top))
+                    : new RectangleF(Math.Min(moving.Left, b.Left), edge, Math.Max(moving.Right, b.Right) - Math.Min(moving.Left, b.Left), 0);
+                Add(new HudSnapCandidate($"align:{key}:outside:{side}", null, side, default, origin,
+                    Math.Abs(xAxis ? moving.X - coordinate : moving.Y - coordinate), guide)
+                    { AlignsX = xAxis, Boundary = boundary, Exterior = true });
             }
         }
     }

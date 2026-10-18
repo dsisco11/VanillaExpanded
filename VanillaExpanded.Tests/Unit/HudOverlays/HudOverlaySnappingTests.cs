@@ -15,6 +15,57 @@ namespace VanillaExpanded.Tests.Unit.HudOverlays;
 public sealed class HudOverlaySnappingTests
 {
     #region Public API
+    /// <summary>Fixed HUD exterior alignment remains separate membership and rounds away from native pixel overlap.</summary>
+    [Theory]
+    [InlineData(1)] [InlineData(1.5f)] [InlineData(1.75f)]
+    public void NativeBoundaryExteriorMatchesCommittedGeometry(float scale)
+    {
+        using var fixture = new Fixture(scale, targetOrigin: new PointF(350, 250));
+        fixture.Begin();
+        var boundary = new HudSnapBoundary("native:health", new RectangleF(230.25f, 255.25f, 130, 22));
+        var source = fixture.Layouts["source"].Root;
+        var pointer = new PointF(boundary.Bounds.Left + 12, boundary.Bounds.Top - (float)source.OuterHeight - 2);
+        fixture.Movement.Move(pointer); fixture.Repack();
+        fixture.Snapping.Update(fixture.Movement, pointer, false, scale, new RectangleF(0, 0, 800, 600), fixture.Layouts, _ => true, new[] { boundary });
+        var selected = Assert.IsType<HudSnapCandidate>(fixture.Snapping.Selected);
+        Assert.False(selected.Grouping); Assert.Equal(boundary, selected.Boundary); Assert.True(selected.Exterior);
+        Assert.True(fixture.Snapping.DropAllowed);
+        fixture.Movement.Commit(fixture.Movement.Position!.Value); fixture.Repack();
+        var actual = fixture.Layouts["source"].Root;
+        Assert.InRange(boundary.Bounds.Top - (float)(actual.renderY + actual.OuterHeight), 0, scale + .001f);
+        Assert.Equal(selected.Origin.Y, (float)actual.renderY, 3);
+        Assert.Equal(2, fixture.Containers.Resolved.Count);
+        Assert.Equal(2, fixture.Restart().Resolved.Count);
+    }
+
+    /// <summary>Native HUD surfaces reject overlapping free drops while Shift explicitly bypasses both magnets and obstacles.</summary>
+    [Theory]
+    [InlineData(false)] [InlineData(true)]
+    public void NativeBoundaryOverlapRequiresShift(bool bypass)
+    {
+        using var fixture = new Fixture(1); fixture.Begin();
+        var boundary = new HudSnapBoundary("native:hotbar", new RectangleF(100, 300, 180, 80));
+        var pointer = new PointF(157, 327);
+        fixture.Movement.Move(pointer); fixture.Repack();
+        fixture.Snapping.Update(fixture.Movement, pointer, bypass, 1, new RectangleF(0, 0, 800, 600), fixture.Layouts, _ => true, new[] { boundary });
+        Assert.Equal(bypass, fixture.Snapping.DropAllowed); Assert.Null(fixture.Snapping.Selected);
+        fixture.Containers.ClearSnap(fixture.Movement.UnsnappedOrigin); fixture.Repack();
+        fixture.Snapping.Update(fixture.Movement, pointer, false, 1, new RectangleF(0, 0, 800, 600), fixture.Layouts, _ => true, Array.Empty<HudSnapBoundary>());
+        Assert.True(fixture.Snapping.DropAllowed);
+    }
+
+    /// <summary>A valid overlay grouping magnet is rejected when its combined placement would cover a native HUD surface.</summary>
+    [Fact]
+    public void GroupingCannotGrowOverNativeHud()
+    {
+        using var fixture = new Fixture(1); fixture.Begin(); fixture.MoveBesideTarget();
+        var incoming = fixture.Layouts["source"].Root;
+        var native = new HudSnapBoundary("native:health", new RectangleF((float)incoming.renderX, (float)incoming.renderY,
+            (float)incoming.OuterWidth, (float)incoming.OuterHeight));
+        fixture.Snapping.Update(fixture.Movement, native.Bounds.Location, false, 1, new RectangleF(0, 0, 800, 600), fixture.Layouts, _ => true, new[] { native });
+        Assert.False(fixture.Snapping.Selected?.Grouping == true);
+        Assert.Equal(2, fixture.Containers.Resolved.Count);
+    }
     /// <summary>Insertion grows toward the incoming instrument while the existing destination stays in place.</summary>
     [Theory]
     [InlineData(1, false)] [InlineData(1.5, false)] [InlineData(2, false)]

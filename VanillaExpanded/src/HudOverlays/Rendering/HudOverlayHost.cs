@@ -21,6 +21,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     private readonly Dictionary<string, HudOverlayGroupControls> groupControls = new(StringComparer.Ordinal);
     private readonly HudOverlayContainers? containers;
     private readonly HudOverlaySnapping? snapping;
+    private readonly HudOverlayNativeBoundaries nativeBoundaries;
     private readonly HudOverlayGroupHighlight snapHighlight;
     private readonly HudOverlayEditPreviews? editPreviews;
     private bool updatingSnap;
@@ -51,6 +52,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         this.containers = containers;
         this.editPreviews = editPreviews;
         snapping = containers == null ? null : new HudOverlaySnapping(containers);
+        nativeBoundaries = new HudOverlayNativeBoundaries(api);
         snapHighlight = new HudOverlayGroupHighlight(api);
 
     }
@@ -283,7 +285,8 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
             var keys = capi.Input.KeyboardKeyStateRaw;
             bool shift = keys != null && (keys[(int)GlKeys.ShiftLeft] || keys[(int)GlKeys.ShiftRight]);
             snapping.Update(movement, pointer, shift, Vintagestory.API.Config.RuntimeEnv.GUIScale, viewport,
-                groups.Where(item => visibleGroups.Contains(item.Key)).ToDictionary(item => item.Key, item => item.Value), isDrawable);
+                groups.Where(item => visibleGroups.Contains(item.Key)).ToDictionary(item => item.Key, item => item.Value), isDrawable,
+                nativeBoundaries.Resolve());
             RequestLayout();
             return snapping.DropAllowed;
         }
