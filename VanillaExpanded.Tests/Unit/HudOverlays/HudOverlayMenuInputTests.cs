@@ -120,6 +120,39 @@ public sealed class HudOverlayMenuInputTests : IDisposable
         Assert.True(release.Handled); Assert.False(f.Host.CaptureAllInputs());
     }
 
+    /// <summary>A held modifier's protected release must not prevent another right-click menu in the same edit session.</summary>
+    [Theory]
+    [InlineData(GlKeys.AltLeft)]
+    [InlineData(GlKeys.ShiftLeft)]
+    public void PendingModifierReleaseAllowsReopeningAndRetainsOriginalFocus(GlKeys modifier)
+    {
+        using var f = new Fixture();
+        using var window = new Inventory(f.Layout.Api.Object, ElementBounds.Fixed(200, 200, 100, 100).WithParent(f.Layout.Gui.Object.WindowBounds));
+        f.Opened.Add(window); window.Focus();
+        f.Layout.Gui.Setup(api => api.RequestFocus(It.IsAny<GuiDialog>())).Callback<GuiDialog>(dialog =>
+        { if (ReferenceEquals(dialog, f.Host)) window.UnFocus(); dialog.Focus(); });
+        f.Host.OnMouseDown(f.Press()); f.Host.OnMouseUp(f.Press());
+        f.Host.OnKeyDown(new KeyEvent { KeyCode = (int)modifier });
+        f.Popup.Press = () => f.Select!("lock", false);
+        var point = f.Press();
+        var selection = new MouseEvent(point.X, point.Y, EnumMouseButton.Left, 0); f.Host.OnMouseDown(selection);
+        var selectionRelease = new MouseEvent(point.X, point.Y, EnumMouseButton.Left, 0); f.Host.OnMouseUp(selectionRelease);
+        Assert.True(selection.Handled); Assert.True(selectionRelease.Handled);
+        Assert.False(f.Menu.IsOpened); Assert.True(f.Host.CaptureAllInputs()); Assert.False(window.Focused);
+        f.Popup.Press = null;
+        var reopen = f.Press(); f.Host.OnMouseDown(reopen);
+        Assert.True(reopen.Handled); Assert.True(f.Menu.IsOpened);
+        var reopenRelease = f.Press(); f.Host.OnMouseUp(reopenRelease); Assert.True(reopenRelease.Handled);
+        f.Host.OnKeyDown(new KeyEvent { KeyCode = (int)GlKeys.Escape });
+        var escapeRelease = new KeyEvent { KeyCode = (int)GlKeys.Escape }; f.Host.OnKeyUp(escapeRelease);
+        Assert.True(escapeRelease.Handled); Assert.False(f.Menu.IsOpened);
+        Assert.False(window.Focused); Assert.True(f.Host.CaptureAllInputs());
+        var modifierRelease = new KeyEvent { KeyCode = (int)modifier }; f.Host.OnKeyUp(modifierRelease);
+        Assert.True(modifierRelease.Handled); Assert.True(window.Focused); Assert.False(f.Host.CaptureAllInputs());
+        f.Layout.Gui.Verify(api => api.RequestFocus(window), Times.Once);
+        Assert.Null(f.Containers.ActiveContainer);
+    }
+
     /// <summary>Disabled content remains a menu target through host-owned editable geometry without running the feature.</summary>
     [Fact]
     public void DisabledProxyOpensAndEnablesThroughOwnedSetting()

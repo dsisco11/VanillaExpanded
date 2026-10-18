@@ -26,7 +26,7 @@ The versioned JSON setting `vanillaexpanded:hud:layout` is authoritative for mem
 
 While dragging, the host draws a translucent copy of the dragged content at its captured starting bounds as well as a translucent moving preview. Source copies use immutable geometry and the same prepared presentation, with zero elapsed draw time; they never join layout, input, or snap discovery. Foreground, backdrop, and hidden-item placeholder opacity follow the same drag multiplier. Source traces draw after live content. Individual dragging reserves the original source outer footprint and sibling slots until commit or cancellation, without keeping a duplicate member in the layout tree. This also applies when the remainder becomes a singleton or retains unavailable integration IDs. A newly available member without a captured slot waits until that reservation ends to appear; its current measurement still participates in final drop validation. Snapping back into that source uses the resulting destination preview instead. Drop validation separately checks the collapsed post-commit remainder against the viewport, peers, incoming content, and native boundaries; Shift retains its overlap bypass. Commit, cancellation, lost capture, and teardown remove the trace and restore normal opacity.
 
-Titlebars occupy separate compositions above or below content and never change indicator measurements. Foreground dialogs take pointer priority; the HUD does not request a free cursor itself. Native focus transfer can unfocus another open window when a grip is clicked. Escape, right-click during a drag, cursor capture, hidden GUI, lost interaction, removal, and session exit cancel active dragging.
+Group titlebars occupy separate compositions above or below content and never change indicator measurements. Foreground dialogs take pointer priority; the HUD does not request a free cursor itself. Opening a context menu temporarily takes native keyboard focus, restoring the previous eligible window after dismissal. Escape, right-click during a drag, cursor capture, hidden GUI, lost interaction, removal, and session exit cancel active dragging.
 
 The group hover titlebar uses normal HUD lettering and the radial-menu orange palette. It is a drag-only caption, composed lazily for multi-member containers and released when a container becomes a singleton. Hovering a container shows a partly transparent orange panel behind its exact bounds. While the cursor is free, movable groups and members show orange corner handles; locked groups and members show a thin dashed gray border. These cues render over artwork and reflect effective container permission. Locked borders use a dedicated shader program on one quad. Decorations do not affect content measurements. Foreground pointer ownership suppresses hover controls and fill; permission cues remain visible away from hover. Hidden HUDs, a grabbed cursor, unavailable content, and modal input suppress movement cues.
 
@@ -66,7 +66,7 @@ Each feature registers its own setters. Changed settings save the existing mod c
 
 The toggle composer owns its switches directly because native list multi-select mode does not release its private switch textures. `HudOverlayStyleDropDown` retains native dropdown artwork while replacing its public list with `HudOverlayListMenu`, which exposes protected visible measurements, accounts for the invisible anchor row, and retains native scrolling when choices exceed viewport height. Physical popup bounds fit the supplied viewport on all sides. Oversized Style surfaces compress horizontally; panel controls fit uniformly only when the viewport cannot contain their natural size. Ordinary layouts use normal HUD lettering. Native rich-text children are released explicitly alongside list textures.
 
-`HudOverlayMenuInput` targets the topmost drawable clipped member in host draw order, including disabled edit proxies. It defers to modal input and foreground windows at the press position. An active drag consumes right-click as cancellation before menu opening; the opening press is never forwarded to a native row. While open, the host takes native keyboard focus and routes popup input before body dragging. Escape closes only the popup. Consumed presses retain input ownership through their matching releases even when selection has already closed the panel; afterward, the still-open previous window regains focus. Losing host focus or ending editing clears transient capture.
+`HudOverlayMenuInput` targets the topmost drawable clipped member in host draw order, including disabled edit proxies. It defers to modal input and foreground windows at the press position. An active drag consumes right-click as cancellation before menu opening; the opening press is never forwarded to a native row. While open, the host takes native keyboard focus and routes popup input before body dragging. Escape closes only the popup. Consumed presses retain input ownership through their matching releases even when selection has already closed the panel. An eligible right-click can reopen the menu while a previously captured key remains held, retaining the original window as the focus-restoration target. After dismissal and the remaining releases, that still-open previous window regains focus. Losing host focus or ending editing clears transient capture.
 
 The controller holds its target independently of hover. The host synchronizes conditions before rendering or input: unavailable editing/targets, session replacement, changed viewport/scale/locale, changed settings, or lost native focus close the popup rather than recreating graphics every frame. Selection, outside presses, Escape, explicit closure, and disposal retire owned graphics. Selection callbacks defer disposal until native input dispatch unwinds, so configuration reloads cannot destroy controls still executing. Session teardown disposes the controller with its host.
 
@@ -101,6 +101,12 @@ flowchart TB
 
     subgraph Interaction["Native compositions and controls"]
         Host --> Controls["HudOverlayGroupControls<br/>container titlebars and member body targets"]
+        Host --> MenuInput["HudOverlayMenuInput<br/>targeting, input capture and focus"]
+        MenuInput --> ContextMenu["HudOverlayContextMenu<br/>stable target and popup lifetime"]
+        ContextMenu --> Popup["HudOverlayTogglePopup<br/>native switches, Style dropdown and Reset button"]
+        Popup --> StyleList["HudOverlayListMenu<br/>bounded native Style choices"]
+        ContextMenu -. "feature-owned settings" .-> Features
+        MenuInput -. "lock and individual reset" .-> Containers
         Host --> NativeBounds["HudOverlayNativeBoundaries<br/>borrowed fixed vanilla HUD bounds"]
         NativeBounds -. "alignment and collision only" .-> Snapping
         Host --> Snapping["HudOverlaySnapping<br/>measured candidates and preview feedback"]
@@ -110,7 +116,7 @@ flowchart TB
         Host --> Composers["GuiComposer instances<br/>content compositions"]
         Controls --> ControlComposers["GuiComposer instances<br/>transient control compositions"]
         ControlComposers --> Titlebars["HudOverlayGroupTitleBar<br/>drag-only group caption"]
-        Controls -. "drag and permission requests" .-> Movement
+        Controls -. "drag requests" .-> Movement
         Movement -. "preview, commit or cancel" .-> Containers
         Host -. "draws edit-only placeholders" .-> EditPreviews
         Host -. "borrows prepared layouts" .-> Layouts
