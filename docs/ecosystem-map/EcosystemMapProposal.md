@@ -14,8 +14,8 @@ The agreed scope is:
 
 - Show the Ecosystem controls and habitat highlight only on the full world map; exclude the minimap.
 
-- Include all naturally spawning wild mammals and birds defined by the base game, with one dropdown entry per species combining age, sex, and cosmetic variants.
-- Exclude fish, insects, supernatural creatures, and domestic-only variants. Mod-added species are deferred to a follow-up.
+- Include all naturally spawning wildlife species defined by local game and mod assets, with one dropdown entry per species combining age, sex, and cosmetic variants.
+- Exclude fish, insects, supernatural creatures, and domestic-only variants. Mod-added wildlife participates through the same discovery and exclusion rules.
 - Omit backfill. Capture environmental coverage from data available during normal play, including already loaded areas, and persist it for later use.
 - Evaluate regional environmental requirements using worldgen temperature, rainfall, forest density, and shrub density, with terrain elevation checked separately. Current weather and seasonal climate do not drive habitat eligibility.
 - Ignore water, ground, clearance, light, population caps, player distance, and spawn chance.
@@ -65,13 +65,13 @@ The [prospecting layer](../../../../vssurvivalmod/Systems/Prospecting/OreMapLaye
 
 ## Species catalogue and habitat rules
 
-Build the initial catalogue of base-game wild mammals and birds from client-local animal definitions, including locally available asset patches for those supported species. Verify access to patched assets and reuse of the game's variant resolution; fully resolved spawn conditions on client runtime entities are not assumed. Define stable species identities independently of localized names and individual entity codes.
+Build the catalogue by discovering animal species from client-local game and mod definitions, including locally available asset patches. Verify access to patched assets and reuse of the game's variant resolution; fully resolved spawn conditions on client runtime entities are not assumed. Define stable species identities independently of localized names and individual entity codes.
 
 Local knowledge is the baseline and does not depend on a server catalogue. Server-only changes may differ from that baseline. A supplemental server-supplied catalogue is deferred to a follow-up; its protocol, precedence, and reconciliation rules are outside the initial implementation.
 
 For animals such as deer, retain the species `type` and combine `age` and `gender` variants. Names such as Elk, Caribou, and Fallow Deer remain separate species entries. Some included families need explicit normalization: chickens encode sex in their age variants. Combine cosmetic variants under their species identity as well. A generic entity-code suffix removal is insufficient.
 
-Use a narrowly owned species mapping for supported animals. Do not classify every land entity as wildlife or assume every `type` variant represents a separate species. The approved catalogue includes all naturally spawning base-game wild mammal and bird species. Exclude fish, insects, supernatural creatures, and domestic-only variants. Support for mod-added species is deferred until their species identities can be supplied reliably; local patches to supported base-game species remain applicable.
+Discover species from definition metadata and semantic variants; do not maintain a hardcoded supported-species or source-file list. Do not classify every land entity as wildlife or assume every `type` variant represents a separate species. The catalogue includes naturally spawning animal species from local game and mod assets. Exclude fish, insects, supernatural creatures, and domestic-only variants. Apply the same metadata exclusions to mod-added animals; local patches remain applicable. Definitions may supply species-group metadata to merge breed/cosmetic types; species without such metadata remain automatically discoverable. Reuse vanilla creature-name localization or an existing native group-name key instead of adding feature-owned species translations.
 
 Each species entry contains the relevant environmental limits and the entity identities from which they were derived. Where one species genuinely has multiple habitat rule sets, preserve those alternatives. A sample matches if it satisfies a complete applicable rule set; do not merge separate ranges into a larger interval that invents suitable habitat between them.
 
@@ -202,7 +202,7 @@ Snapshot data before background evaluation where game-owned arrays or API access
 
 ## Validation expectations
 
-Validation should demonstrate local catalogue construction and use without any server catalogue message, locally patched definitions and variant resolution, species deduplication across age, sex, and cosmetic variants, coverage of naturally spawning base-game wild mammals and birds, exclusion of fish, insects, supernatural creatures, domestic-only variants, and mod-added species, complete environmental-rule matching, boundary handling, independence from current weather and seasonal climate, and unknown-data behavior. Compare representative results with the inspected game habitat calculations, including reference-height climate and normalized elevation.
+Validation should demonstrate local catalogue construction and use without any server catalogue message, locally patched definitions and variant resolution, species deduplication across age, sex, and cosmetic variants, automatic discovery of local game and mod wildlife, exclusion of fish, insects, supernatural creatures, domestic-only variants, complete environmental-rule matching, boundary handling, independence from current weather and seasonal climate, and unknown-data behavior. Compare representative results with the inspected game habitat calculations, including reference-height climate and normalized elevation.
 
 Exercise persistence across tile redraw, map close/reopen, region unload, reconnect, purge, and version changes. Verify server/world isolation, persistence of pending environmental writes on normal shutdown, cancellation of disposable work, intentional record and pending-write removal on purge, and that ecosystem storage never opens or modifies the vanilla map database. Verify that panning over old uncached map images does not trigger server-side retrieval of saved world-region records or world loading, that previously captured local ecosystem records can still be read after reconnecting, and that ordinary revisiting populates and retains ecosystem coverage. Confirm that server shrub arrays survive transport and persistence with unchanged values, size, padding, and region identity. Verify missing-server-support and missing-record behavior, correct routing to the Ecosystem layer, and that old map images without environmental records remain distinguishable from unsuitable habitat. Include a region with forced climate changes to ensure the existing shrub array is delivered rather than recomputed from the final climate map.
 

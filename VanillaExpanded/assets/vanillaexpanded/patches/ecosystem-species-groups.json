@@ -1,0 +1,23 @@
+[
+  {
+    "file": "game:entities/animal/mammal/hooved/goat-*",
+    "op": "add",
+    "path": "/attributes/ecosystemMap",
+    "value": {
+      "speciesGroupByType": {
+        "goat-angora-*": "game:goat",
+        "goat-nubian-*": "game:goat",
+        "goat-sirohi-*": "game:goat",
+        "goat-valais-*": "game:goat",
+        "*": null
+      },
+      "nameKeyByType": {
+        "goat-angora-*": "game:creaturegroup-goat",
+        "goat-nubian-*": "game:creaturegroup-goat",
+        "goat-sirohi-*": "game:creaturegroup-goat",
+        "goat-valais-*": "game:creaturegroup-goat",
+        "*": null
+      }
+    }
+  }
+]

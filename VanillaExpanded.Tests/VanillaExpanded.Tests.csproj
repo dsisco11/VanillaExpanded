@@ -24,6 +24,18 @@
     <ProjectReference Include="..\VanillaExpanded\VanillaExpanded.csproj" />
   </ItemGroup>
 
+  <!-- Use the installed engine JSON binary: its patcher requires signatures absent from the test SDK dependency. -->
+  <ItemGroup>
+    <Reference Include="Tavis.JsonPatch">
+      <HintPath>$(VINTAGE_STORY)/Lib/Tavis.JsonPatch.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(VINTAGE_STORY)/Lib/Newtonsoft.Json.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
   <!-- VintageStory API references for testing -->
   <ItemGroup>
     <!-- Indicator state-boundary tests use the same OpenTK types as the engine without creating a graphics context. -->
@@ -85,5 +97,11 @@
       <Private>true</Private>
     </Reference>
   </ItemGroup>
+
+
+  <!-- TestHost resolves an older package with the same assembly identity. Vanilla patch integration must execute against the game's binary. -->
+  <Target Name="UseInstalledJsonForVanillaPatchTests" AfterTargets="Build">
+    <Copy SourceFiles="$(VINTAGE_STORY)/Lib/Newtonsoft.Json.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
 
 </Project>

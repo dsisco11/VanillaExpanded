@@ -6,7 +6,7 @@ Source proposal: [EcosystemMapProposal.md](EcosystemMapProposal.md). The proposa
 
 Deliver an Ecosystem toggle tab on the full world map, with a localized unique-species dropdown and a translucent suitable-habitat highlight. Show red crosshatching over explored areas with unavailable environmental data; leave confirmed mismatches unmarked. Neither overlay nor controls belong on the minimap.
 
-Use client-local definitions for all naturally spawning base-game wild mammals and birds, combining age, sex, and cosmetic variants. Exclude fish, insects, supernatural creatures, and domestic-only variants. Mod-added species and supplemental server catalogues are deferred. Local patches to supported species remain applicable; server-only catalogue differences are an acknowledged limitation.
+Discover naturally spawning animal species from all client-local definitions, combining age, sex, and cosmetic variants. Exclude fish, insects, supernatural creatures, and domestic-only variants. Mod-added wildlife participates through the same discovery rules. Supplemental server catalogues are deferred. Local patches remain applicable; server-only catalogue differences are an acknowledged limitation.
 
 Evaluate generated temperature, rainfall, forest, shrubs, and normalized elevation. Ignore water, ground, clearance, light, population caps, player distance, and spawn chance. This is habitat information, not sightings or spawn prediction. Do not add seasonal/weather eligibility or a worldgen/runtime selector.
 
@@ -98,9 +98,9 @@ No public purge event exists. Vanilla `.map purgedb` installs a command delegate
 
 WorldMapManager's LeaveWorld handler sets IsShuttingDown, waits up to one second for its own map thread, disposes the dialog, then calls each layer's OnShutDown and Dispose. Its bounded wait is not an ecosystem flush guarantee. Ecosystem OnShutDown must idempotently stop intake, detach receipt hooks/listeners, advance session cancellation, stop and join its own derived workers, drain accepted persistent writes on its own storage owner, close storage, and clear world state. Dispose is an idempotent fallback. Do not rely on ordering among unrelated LeaveWorld subscribers or use a fire-and-forget flush. Map close only cancels presentation work; capture/storage continue. Clear per-connection server obligations on disconnect/shutdown. Concrete worker shutdown/flush/purge receipts belong to Phases 3–4.
 
-**8. Directional ownership.** Planned source ownership under `src/EcosystemMap/`: Registration/EcosystemMapSystem owns registration and scoped adapter installation; Catalogue owns supported-species mapping, the isolated local asset view and resolved rule alternatives; Acquisition owns client receipt snapshots; Transport owns original server shrub delivery and payload validation; Storage owns records/identity/database/serialized durability; Evaluation owns sampling and bounded derived results; Presentation owns EcosystemMapLayer, dropdown, coverage adapter and render resources. Composition injects dependencies; Catalogue/Storage/Evaluation do not reference Presentation. Transport and Acquisition submit immutable records to Storage; Evaluation reads snapshots and rules; Presentation consumes prepared results plus ephemeral explored coverage. Version-sensitive member access is restricted to named adapters rather than spread through owners. Each file owns one responsibility; all new classes/methods require XML docs and nontrivial methods explain their process. No runtime stubs are necessary to establish these contracts.
+**8. Directional ownership.** Planned source ownership under `src/EcosystemMap/`: Registration/EcosystemMapSystem owns registration and scoped adapter installation; Catalogue owns species discovery and exclusions, the isolated local asset view and resolved rule alternatives; Acquisition owns client receipt snapshots; Transport owns original server shrub delivery and payload validation; Storage owns records/identity/database/serialized durability; Evaluation owns sampling and bounded derived results; Presentation owns EcosystemMapLayer, dropdown, coverage adapter and render resources. Composition injects dependencies; Catalogue/Storage/Evaluation do not reference Presentation. Transport and Acquisition submit immutable records to Storage; Evaluation reads snapshots and rules; Presentation consumes prepared results plus ephemeral explored coverage. Version-sensitive member access is restricted to named adapters rather than spread through owners. Each file owns one responsibility; all new classes/methods require XML docs and nontrivial methods explain their process. No runtime stubs are necessary to establish these contracts.
 
-**Remaining gates.** The isolated local patch context (Phase 2), snapshot synchronization including unload (Phase 4), command-wrapper behavior (Phase 3), rendering/coverage adapter behavior (Phase 6), and sampling/cache/queue measurements (Phases 5/7) require their implementation receipts. These are explicit dependent-work gates, not evidence that their runtime behavior already works. No backfill, server catalogue, or base-database access is authorized as a workaround.
+**Remaining gates.** The isolated local patch context is implemented and verified by the Phase 2 receipts below. Snapshot synchronization including unload (Phase 4), command-wrapper behavior (Phase 3), rendering/coverage adapter behavior (Phase 6), and sampling/cache/queue measurements (Phases 5/7) still require their implementation receipts. These are explicit dependent-work gates, not evidence that their runtime behavior already works. No backfill, server catalogue, or base-database access is authorized as a workaround.
 
 ## Phase 2: Construct the local species catalogue
 
@@ -108,16 +108,19 @@ Depends on Phase 1 asset and sampling contracts.
 
 Outcome: the client can obtain stable species identities and complete environmental rule alternatives without a server catalogue.
 
-- [ ] Inventory supported naturally spawning base-game wild mammals and birds and implement an explicit species mapping independent of localized names and entity-code suffix stripping.
-- [ ] Resolve locally patched definitions using the verified vanilla variant mechanism. Preserve source entity identities and environmental limits for each species.
-- [ ] Combine age, gender, and cosmetics while retaining genuine species distinctions, including deer types and chicken sex encoded in age variants. Exclude all out-of-scope entities.
-- [ ] Preserve complete alternative rule sets; never widen separate ranges into invented intermediate habitat. Retain applicable worldgen/ongoing-spawn alternatives under the reconciled sampling contract.
-- [ ] Provide localized display names and stable identities for later dropdown selection.
-- [ ] Add focused catalogue tests for inventory coverage, exclusions, local patches, variant normalization, alternative preservation, and operation without server catalogue messages.
+- [x] Discover all naturally spawning animal species from local definitions, including mod-added wildlife, and apply category/metadata exclusions rather than hardcoded supported species or source files.
+- [x] Resolve locally patched definitions using the verified vanilla variant mechanism. Preserve source entity identities and environmental limits for each species.
+- [x] Combine age, gender, and cosmetics while retaining genuine species distinctions, including deer types and chicken sex encoded in age variants. Exclude all out-of-scope entities.
+- [x] Preserve complete alternative rule sets; never widen separate ranges into invented intermediate habitat. Retain applicable worldgen/ongoing-spawn alternatives under the reconciled sampling contract.
+- [x] Provide stable identities and reuse vanilla creature-name localization for later dropdown selection; do not add species language entries.
+- [x] Add focused catalogue tests for inventory coverage, exclusions, local patches, variant normalization, alternative preservation, and operation without server catalogue messages.
 
 Completion criteria:
 
-- [ ] The supported-species inventory and focused receipts demonstrate one entry per species with traceable applicable rules; deferred catalogue work is not required.
+- [x] Discovery and exclusion receipts demonstrate one entry per species with traceable applicable rules; deferred catalogue work is not required.
+
+
+Implementation details: [SpeciesCatalogue.md](SpeciesCatalogue.md). Discovery covers local game and mod wildlife without a supported-species or source-file list. The approved definition metadata attributes.ecosystemMap.speciesGroup merges breed/cosmetic types, with optional nameKey referencing existing translations. Species without grouping metadata remain discoverable. Verification: main/test builds succeeded; 25/25 focused catalogue tests and 2,091/2,091 full regression tests passed with zero skips or failures. The focused tests execute the real vanilla patch/inheritance/byType implementations, automatic unknown-domain discovery, category exclusions, complete installed test-only inventory coverage, resolved handbook grouping, generic metadata merging and the shipped goat normalization asset. Tests use the installed Newtonsoft.Json/Tavis.JsonPatch binaries and native Lib path. A second review and independent completion audit passed against the revised discovery/metadata/native-name contract. No map UI, storage, live visual or performance completion is claimed.
 
 ## Phase 3: Implement environmental records and dedicated storage
 
@@ -211,7 +214,7 @@ Completion criteria:
 
 ## Final acceptance
 
-- [ ] Every proposal requirement is mapped to completed work above; only the explicitly deferred catalogue/mod-species work remains outside scope.
+- [ ] Every proposal requirement is mapped to completed work above; only the explicitly deferred supplemental server catalogue remains outside scope.
 - [ ] Persistent environmental data survives normal lifecycle transitions; disposable work can be discarded; explicit purge clears feature-owned state.
 - [ ] Full-map-only suitable/unavailable presentation, species scope, original shrub delivery, separate storage, and no-backfill behavior meet the proposal.
 - [ ] Linked documentation and checklist reflect verified completion without overstating source inspection, automated checks, or live-runtime evidence.
