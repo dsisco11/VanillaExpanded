@@ -53,11 +53,11 @@ public sealed class HudOverlaySystem : ModSystem, ILiveConfigurable
         Registry.RegisterGroup(new HudOverlayGroup("held-item-status",
             HudOverlayConfiguration.ResolveHeldItemStatusPlacement(VanillaExpandedModSystem.Config)));
         Registry.RegisterGroup(new HudOverlayGroup("player-status",
-            new HudOverlayPlacement(HudOverlayAnchorContext.HotbarTargetId,
+            new HudOverlayPlacement(HudOverlayTargets.Hotbar,
                 HudOverlayPoint.LeftBottom, HudOverlayPoint.RightBottom, 0, 4),
             new HudOverlayPacking(HudOverlayDirection.Horizontal, crossAlignment: HudOverlayCrossAlignment.End)));
         Registry.RegisterGroup(new HudOverlayGroup("world-status",
-            new HudOverlayPlacement(HudOverlayAnchorContext.ScreenTargetId,
+            new HudOverlayPlacement(HudOverlayTargets.Screen,
                 HudOverlayPoint.RightTop, HudOverlayPoint.RightTop, screenPaddingPixels: 3),
             new HudOverlayPacking(HudOverlayDirection.Vertical, padding: 0, crossAlignment: HudOverlayCrossAlignment.End)));
         session = new HudOverlaySession(api, Registry, enabled: () => VanillaExpandedModSystem.Config.EnableHudOverlays);

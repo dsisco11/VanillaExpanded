@@ -27,7 +27,7 @@ public sealed class EnvironmentalTemperatureSystemTests
         var group = Assert.Single(hud.Registry.GetGroups(), group => group.Id == "world-status");
         Assert.Equal("world-status", group.Id); Assert.Equal(HudOverlayDirection.Vertical, group.Packing.Direction);
         Assert.Equal(HudOverlayCrossAlignment.End, group.Packing.CrossAlignment);
-        Assert.Equal(HudOverlayAnchorContext.ScreenTargetId, group.Placement.TargetId);
+        Assert.Equal(HudOverlayTargets.Screen, group.Placement.TargetId);
         Assert.Equal(HudOverlayPoint.RightTop, group.Placement.Attachment);
         Assert.Equal(HudOverlayPoint.RightTop, group.Placement.Pivot);
 

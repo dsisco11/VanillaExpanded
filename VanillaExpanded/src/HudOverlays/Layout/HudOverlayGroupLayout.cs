@@ -13,7 +13,7 @@ namespace VanillaExpanded.HudOverlays.Layout;
 /// Position-only changes modify native bounds and clips, without calling presentation preparation.</remarks>
 internal sealed class HudOverlayGroupLayout : IDisposable
 {
-    private static readonly HudOverlayPlacement FreePlacement = new(HudOverlayAnchorContext.ScreenTargetId,
+    private static readonly HudOverlayPlacement FreePlacement = new(HudOverlayTargets.Screen,
         HudOverlayPoint.LeftTop, HudOverlayPoint.LeftTop, screenPaddingPixels: 0);
     private readonly int threadId = Environment.CurrentManagedThreadId;
     private readonly Dictionary<string, HudOverlayMemberLayout> children = new(StringComparer.Ordinal);
@@ -21,6 +21,7 @@ internal sealed class HudOverlayGroupLayout : IDisposable
     private HudOverlayGroup? definition;
     private RectangleF? target;
     private PointF? screenPosition;
+    private HudOverlayPlacement? attachment;
     private HudLayoutNode? tree;
     private double? treePadding;
     private long contextRevision = -1;
@@ -35,7 +36,7 @@ internal sealed class HudOverlayGroupLayout : IDisposable
     /// <summary>Consumes sampled measurements and updates native layout only when placement or participating content changes.</summary>
     /// <returns>Whether bounds, membership, clips, or target availability changed.</returns>
     public bool Apply(HudOverlayAnchorContext context, HudOverlayGroup group,
-        IReadOnlyList<KeyValuePair<HudOverlayRegistration, SizeF>> eligibleMembers, PointF? screenPosition = null, HudLayoutNode? tree = null, double? treePadding = null)
+        IReadOnlyList<KeyValuePair<HudOverlayRegistration, SizeF>> eligibleMembers, PointF? screenPosition = null, HudLayoutNode? tree = null, double? treePadding = null, HudOverlayPlacement? attachment = null)
     {
         if (Environment.CurrentManagedThreadId != threadId) throw new InvalidOperationException("Native layout requires the creating client main thread.");
         ObjectDisposedException.ThrowIf(disposed, this);
@@ -50,11 +51,14 @@ internal sealed class HudOverlayGroupLayout : IDisposable
         }
         if (ordered.Select(member => member.Key.Id).Distinct(StringComparer.Ordinal).Count() != ordered.Length)
             throw new ArgumentException("Members must have unique overlay IDs.", nameof(eligibleMembers));
-        var placement = screenPosition.HasValue ? FreePlacement : group.Placement;
+        var placement = attachment ?? (screenPosition.HasValue ? FreePlacement : group.Placement);
         RectangleF? resolved = context.Resolve(placement.TargetId);
-        long revision = placement.TargetId == HudOverlayAnchorContext.ScreenTargetId ? context.Revision : context.GeometryRevision;
+        // Keep a missing external target editable at its saved checkpoint; restore docking when it returns.
+        bool attached = attachment != null && resolved.HasValue;
+        if (attachment != null && !attached) { placement = FreePlacement; resolved = context.Resolve(placement.TargetId); }
+        long revision = placement.TargetId == HudOverlayTargets.Screen ? context.Revision : context.GeometryRevision;
         bool parentChanged = !ReferenceEquals(Root.ParentBounds, context.WindowBounds);
-        if (!parentChanged && definition == group && contextRevision == revision && target == resolved && this.screenPosition == screenPosition && this.tree == tree && this.treePadding == treePadding && previous.SequenceEqual(ordered) && RenderOffsetsUnchanged())
+        if (!parentChanged && definition == group && contextRevision == revision && target == resolved && this.attachment == attachment && this.screenPosition == screenPosition && this.tree == tree && this.treePadding == treePadding && previous.SequenceEqual(ordered) && RenderOffsetsUnchanged())
             return false;
 
         // The native root is the only position authority; keep its parent stable across frames and detach on session replacement.
@@ -68,12 +72,13 @@ internal sealed class HudOverlayGroupLayout : IDisposable
         contextRevision = revision;
         target = resolved;
         this.screenPosition = screenPosition;
+        this.attachment = attachment;
         this.tree = tree;
         this.treePadding = treePadding;
         previous = ordered;
         Revision++;
-        RectangleF safe = context.SafeRectangle;
-        if (placement.TargetId == HudOverlayAnchorContext.ScreenTargetId &&
+        RectangleF safe = attachment != null ? context.Resolve(HudOverlayTargets.Screen) ?? RectangleF.Empty : context.SafeRectangle;
+        if (placement.TargetId == HudOverlayTargets.Screen &&
             placement.ScreenPaddingPixels is double padding && resolved is RectangleF viewport)
         {
             // Pixel padding controls both positioning and clipping, including at non-unit GUI scales.
@@ -110,8 +115,8 @@ internal sealed class HudOverlayGroupLayout : IDisposable
             }
         Root.fixedWidth = size.Width;
         Root.fixedHeight = size.Height;
-        PositionRoot(context, placement, resolved!.Value, size);
-        if (screenPosition is { } position)
+        PositionRoot(context, placement, resolved!.Value, size, attached);
+        if (!attached && screenPosition is { } position)
         {
             // A drag/saved origin is relative to the window, independent of native alignment margins.
             Root.Alignment = EnumDialogArea.None;
@@ -259,14 +264,14 @@ internal sealed class HudOverlayGroupLayout : IDisposable
     #endregion
     #region Attachment
     /// <summary>Uses native screen alignment or converts named pixel attachment positions into fixed GUI units once.</summary>
-    private void PositionRoot(HudOverlayAnchorContext context, HudOverlayPlacement placement, RectangleF rectangle, SizeF size)
+    private void PositionRoot(HudOverlayAnchorContext context, HudOverlayPlacement placement, RectangleF rectangle, SizeF size, bool attached = false)
     {
         PointF attachment = HudOverlayPoints.Normalized(placement.Attachment);
         PointF pivot = HudOverlayPoints.Normalized(placement.Pivot);
         Root.fixedX = Root.fixedY = Root.fixedOffsetX = Root.fixedOffsetY = 0;
         Root.absMarginX = Root.absMarginY = Root.absOffsetX = Root.absOffsetY = 0;
         Root.fixedPaddingX = Root.fixedPaddingY = 0;
-        if (placement.TargetId == HudOverlayAnchorContext.ScreenTargetId)
+        if (!attached && placement.TargetId == HudOverlayTargets.Screen)
         {
             double inset = placement.ScreenPaddingPixels.HasValue
                 ? placement.ScreenPaddingPixels.Value / context.GuiScale : HudOverlayAnchorContext.SafeInset;
@@ -277,6 +282,14 @@ internal sealed class HudOverlayGroupLayout : IDisposable
         else
         {
             Root.Alignment = EnumDialogArea.None;
+            if (attached)
+            {
+                var origin = HudContainerAttachment.Position(placement, rectangle,
+                    new SizeF((float)(size.Width * context.GuiScale), (float)(size.Height * context.GuiScale)), context.Resolve(HudOverlayTargets.Screen)!.Value, context.GuiScale);
+                Root.fixedX = origin.X;
+                Root.fixedY = origin.Y;
+                return;
+            }
             // Native target render positions already contain ancestor render offsets; subtract the native window origin before parenting.
             Root.fixedX = (rectangle.X + attachment.X * rectangle.Width - context.WindowBounds.renderX) / context.GuiScale
                 - pivot.X * size.Width + placement.OffsetX;

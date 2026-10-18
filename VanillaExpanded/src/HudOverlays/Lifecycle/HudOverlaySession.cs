@@ -119,7 +119,8 @@ internal sealed class HudOverlaySession : IDisposable
                 () => IsCurrentSession() && enabled(), Report, createEditText);
             try
             {
-                anchors = new HudOverlayAnchorContext(api);
+                var boundaries = new HudOverlayNativeBoundaries(api);
+                anchors = new HudOverlayAnchorContext(api, id => boundaries.Resolve().FirstOrDefault(item => item.Id == id)?.Bounds);
                 host = createHost(Scheduler, anchors);
                 host.BeforeRender = BeforeRender;
             }
@@ -210,7 +211,7 @@ internal sealed class HudOverlaySession : IDisposable
             if (fallback) origin = new System.Drawing.PointF((float)HudOverlayAnchorContext.SafeInset, fallbackY);
             layout.Apply(anchors, definition, members,
                 origin,
-                container.Tree, container.Padding);
+                container.Tree, container.Padding, container.Attachment);
             if (fallback) fallbackY += (float)(layout.Root.fixedHeight + definition.Packing.Gap);
         }
         var effectiveLayouts = layouts.Where(item => live.Contains(item.Key)).ToDictionary(item => item.Key, item => item.Value);

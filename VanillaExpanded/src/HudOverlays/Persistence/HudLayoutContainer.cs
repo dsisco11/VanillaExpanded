@@ -1,4 +1,5 @@
 using VanillaExpanded.HudOverlays.Layout;
+using VanillaExpanded.HudOverlays.Anchoring;
 
 namespace VanillaExpanded.HudOverlays.Persistence;
 
@@ -11,6 +12,7 @@ internal sealed record HudLayoutContainer
     public bool Movable { get; init; }
     public int? X { get; init; }
     public int? Y { get; init; }
+    public HudOverlayPlacement? Attachment { get; init; }
     public double Padding { get; init; }
     public HudLayoutNode Tree { get; init; } = new();
 }

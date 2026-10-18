@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json.Serialization;
 using VanillaExpanded.HudOverlays.Layout;
+using VanillaExpanded.HudOverlays.Anchoring;
 
 namespace VanillaExpanded.HudOverlays.Persistence;
 
@@ -10,7 +11,7 @@ namespace VanillaExpanded.HudOverlays.Persistence;
 internal sealed record HudLayoutSnapshot
 {
     [JsonRequired]
-    public int Version { get; init; } = 1;
+    public int Version { get; init; } = 2;
     public long Revision { get; init; }
     [JsonRequired]
     public bool Initialized { get; init; } = true;
@@ -22,7 +23,7 @@ internal sealed record HudLayoutSnapshot
     /// <summary>Rejects inconsistent ownership and bounded tree shapes before any state is exposed or written.</summary>
     public void Validate()
     {
-        if (Version != 1 || !Initialized || Revision < 0 || Containers == null || RetiredKeys == null || Containers.Length > 4096)
+        if (Version is not (1 or 2) || !Initialized || Revision < 0 || Containers == null || RetiredKeys == null || Containers.Length > 4096)
             throw new InvalidOperationException("Unsupported or invalid HUD layout snapshot.");
         var ids = new HashSet<string>(StringComparer.Ordinal);
         var keys = new HashSet<string>(StringComparer.Ordinal);
@@ -35,6 +36,9 @@ internal sealed record HudLayoutSnapshot
                 || container.TemplateId != null && string.IsNullOrWhiteSpace(container.TemplateId)
                 || (container.TemplateId == null && !container.X.HasValue) || !MatchesIdentity(container))
                 throw new InvalidOperationException("Invalid HUD container.");
+            if (container.Attachment is { } attachment && (Version < 2 || !container.X.HasValue
+                || !HudContainerAttachment.IsSupported(attachment)))
+                throw new InvalidOperationException("Invalid HUD attachment.");
             ValidateTree(container.Tree, leaves, new HashSet<HudLayoutNode>(ReferenceEqualityComparer.Instance), 0);
         }
         if (RetiredKeys.Any(key => !OwnedKey(key))) throw new InvalidOperationException("Invalid HUD mirror ownership.");

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using VanillaExpanded.HudOverlays.Anchoring;
 using VanillaExpanded.HudOverlays.Layout;
 
 namespace VanillaExpanded.HudOverlays.Interaction;
@@ -79,8 +80,8 @@ internal static class HudSnapGeometry
                 AlignExterior(boundary, false, key);
             }
         }
-        AlignAxis(viewport, true, "screen");
-        AlignAxis(viewport, false, "screen");
+        AlignAxis(viewport, true, HudOverlayTargets.Screen);
+        AlignAxis(viewport, false, HudOverlayTargets.Screen);
         // A screen guide cannot hold an indicator away from a nearby valid grouping target. Within each
         // intent, retain the acquired destination/side before considering a closer competing destination.
         return result.OrderByDescending(item => item.Grouping)
@@ -96,8 +97,9 @@ internal static class HudSnapGeometry
         /// <summary>Offers matching start, center, and end positions with guides on one physical axis.</summary>
         void AlignAxis(RectangleF reference, bool xAxis, string key, HudSnapBoundary? boundary = null)
         {
-            for (int index = 0; index < 3; index++)
+            foreach (var alignment in Enum.GetValues<HudOverlayCrossAlignment>())
             {
+                int index = (int)alignment;
                 float factor = index * .5f;
                 float coordinate = xAxis ? reference.Left + factor * (reference.Width - moving.Width)
                     : reference.Top + factor * (reference.Height - moving.Height);
@@ -105,7 +107,7 @@ internal static class HudSnapGeometry
                 var guide = xAxis ? new RectangleF(coordinate + factor * moving.Width, Math.Min(moving.Top, reference.Top), 0, Math.Max(moving.Bottom, reference.Bottom) - Math.Min(moving.Top, reference.Top))
                     : new RectangleF(Math.Min(moving.Left, reference.Left), coordinate + factor * moving.Height, Math.Max(moving.Right, reference.Right) - Math.Min(moving.Left, reference.Left), 0);
                 Add(new HudSnapCandidate($"align:{key}:{xAxis}:{index}", null, default, default, origin,
-                    Math.Abs(xAxis ? moving.X - coordinate : moving.Y - coordinate), guide) { AlignsX = xAxis, Boundary = boundary });
+                    Math.Abs(xAxis ? moving.X - coordinate : moving.Y - coordinate), guide) { Axis = xAxis ? HudSnapAxis.X : HudSnapAxis.Y, GuideAlignment = alignment, Boundary = boundary });
             }
         }
 
@@ -123,7 +125,7 @@ internal static class HudSnapGeometry
                     : new RectangleF(Math.Min(moving.Left, b.Left), edge, Math.Max(moving.Right, b.Right) - Math.Min(moving.Left, b.Left), 0);
                 Add(new HudSnapCandidate($"align:{key}:outside:{side}", null, side, default, origin,
                     Math.Abs(xAxis ? moving.X - coordinate : moving.Y - coordinate), guide)
-                    { AlignsX = xAxis, Boundary = boundary, Exterior = true });
+                    { Axis = xAxis ? HudSnapAxis.X : HudSnapAxis.Y, Boundary = boundary, Exterior = true });
             }
         }
     }

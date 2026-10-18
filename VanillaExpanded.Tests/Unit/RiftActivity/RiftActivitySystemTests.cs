@@ -34,7 +34,7 @@ public sealed class RiftActivitySystemTests
             hud.StartClientSide(fixture.Api.Object);
             system.StartClientSide(fixture.Api.Object);
             var group = hud.Registry.GetGroups().Single(value => value.Id == "player-status");
-            Assert.Equal(HudOverlayAnchorContext.HotbarTargetId, group.Placement.TargetId);
+            Assert.Equal(HudOverlayTargets.Hotbar, group.Placement.TargetId);
             Assert.Equal(HudOverlayPoint.LeftBottom, group.Placement.Attachment);
             Assert.Equal(HudOverlayPoint.RightBottom, group.Placement.Pivot);
             Assert.Equal(VanillaExpanded.HudOverlays.Layout.HudOverlayDirection.Horizontal, group.Packing.Direction);

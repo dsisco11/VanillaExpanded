@@ -36,7 +36,7 @@ internal sealed class HudOverlaySaturationAnchor
         var composer = statbar.Composers["statbar"];
         if (composer == null || !composer.Enabled) return null;
         // The installed statbar composer exposes the actual meter element, avoiding toolbar offsets.
-        if (composer.GetElement("saturationstatbar") is not GuiElementStatbar meter) return null;
+        if (composer.GetElement(HudOverlayTargets.SaturationElement) is not GuiElementStatbar meter) return null;
         var bounds = meter.Bounds;
         if (bounds == null || !bounds.Initialized || bounds.RequiresRecalculation) return null;
         double x = bounds.renderX, y = bounds.renderY;
