@@ -35,7 +35,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
 
     #region Fields
     protected ICoreAPI? api;
-    protected IRadialProgressBar? progressBar;
+    protected IRadialProgressBar? progressBar => hold?.ProgressBar;
     protected AssetLocation stashSoundPath = new("game:sounds/player/poultice-applied");
     /// <summary>
     /// Tracks which players are currently stashing items.
@@ -43,6 +43,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     //protected HashSet<string> isStashing = [];
     protected EStashingState stashingState = EStashingState.None;
     private IProgressSystemProvider? progressSystem;
+    private HoldInteractionProgress? hold;
     #endregion
 
     #region Initialization
@@ -61,6 +62,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         base.OnLoaded(api);
         this.api = api;
         progressSystem ??= new ProgressSystemProvider(api);
+        hold = new HoldInteractionProgress(progressSystem, PreStashGracePeriodSeconds, "AutoStashing");
     }
     #endregion
 
@@ -78,7 +80,7 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             return true; // Server does not handle interaction
         }
 
-        setProgressVisibility(false);
+        hold!.Reset();
         BlockEntity? blockEntity = world.BlockAccessor.GetBlockEntity(blockSel.Position);
         HashSet<int> stashables = GetStashableItems(byPlayer.InventoryManager, blockEntity);
         bool hasStashableItems = stashables.Count != 0;
@@ -143,26 +145,22 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             return false; // Stop interacting
         }
 
-        if (secondsUsed >= PreStashGracePeriodSeconds)
-        {
-            setProgressVisibility(true);
-            setProgressPercentage(secondsUsed / StashDelaySeconds);
-            if (stashingState == EStashingState.PreStashGracePeriod)
-            {
-                stashingState = EStashingState.Stashing;
-            }
-        }
-
         if (stashingState >= EStashingState.PostStashGracePeriod)
         {
             return true;// Return here so we don't keep trying to stash after we've already done it.
         }
 
-        if (secondsUsed >= StashDelaySeconds)
+        bool completed = hold!.UpdateElapsed(secondsUsed, StashDelaySeconds,
+            VanillaExpandedModSystem.Config.AutoStashGuiRendersTopmost);
+        if (secondsUsed >= PreStashGracePeriodSeconds)
+        {
+            stashingState = EStashingState.Stashing;
+        }
+
+        if (completed)
         {
             stashingState = EStashingState.PostStashGracePeriod;
             world.Api.ModLoader.GetModSystem<AutoStashSystem_Client>().RequestAutoStash(blockSel.Position);
-            setProgressVisibility(false);
             handleDidMoveItems(byPlayer.Entity);
         }
 
@@ -172,14 +170,14 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     public override bool OnBlockInteractCancel(float secondsUsed, IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel, ref EnumHandling handling)
     {
         stashingState = EStashingState.None;
-        setProgressVisibility(false);
+        hold?.Reset();
         return base.OnBlockInteractCancel(secondsUsed, world, byPlayer, blockSel, ref handling);
     }
 
     public override void OnBlockInteractStop(float secondsUsed, IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel, ref EnumHandling handling)
     {
         stashingState = EStashingState.None;
-        setProgressVisibility(false);
+        hold?.Reset();
         handling = EnumHandling.Handled;
     }
     #endregion
@@ -322,42 +320,6 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
 
         AutoStashAssessment assessment = AssessTarget(playerInventory, blockEntity);
         return assessment.DisplayStacks.Length == 0 ? null : assessment.DisplayStacks;
-    }
-    #endregion
-
-    #region UI Management
-    /// <summary>Creates or releases the gesture display through its configured presentation owner.</summary>
-    private void setProgressVisibility(bool desiredVisibility)
-    {
-        if (api?.Side != EnumAppSide.Client)
-        {
-            return;
-        }
-        // The provider owns creation and removal; timing and display state remain in the interaction.
-        switch (desiredVisibility)
-        {
-            case true when progressBar is null:
-                {
-                    progressBar = progressSystem?.CreateProgressBar();
-                    break;
-                }
-            case false when progressBar is not null:
-                {
-                    progressSystem?.RemoveProgressBar(progressBar);
-                    progressBar = null;
-                    break;
-                }
-        }
-    }
-
-    private void setProgressPercentage(float progress)
-    {
-        if (api?.Side != EnumAppSide.Client || progressBar is null)
-        {
-            return;
-        }
-        progressBar.Progress = Math.Clamp(progress, 0f, 1f);
-        progressBar.Text = "AutoStashing";
     }
     #endregion
 

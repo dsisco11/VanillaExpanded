@@ -94,7 +94,7 @@ internal sealed class BlockGestureCase : IDisposable
         accessor.Setup(value => value.GetBlockEntity(Selection.Position)).Returns(target);
         Fixture.WorldMock.SetupGet(world => world.BlockAccessor).Returns(accessor.Object);
         Progress.SetupAllProperties();
-        ProgressProvider.Setup(provider => provider.CreateProgressBar()).Returns(Progress.Object);
+        ProgressProvider.Setup(provider => provider.CreateProgressBar(It.IsAny<bool>())).Returns(Progress.Object);
         Behavior = new GestureBlockBehavior(block, ProgressProvider.Object);
         Behavior.OnLoaded(Fixture.Api);
         Player.Object.Entity.Controls.CtrlKey = true;

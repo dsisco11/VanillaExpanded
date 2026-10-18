@@ -109,9 +109,9 @@ public static class EngineDispatchHarness
                 handled ? Times.Never() : Times.Once());
             Assert.Equal(handled ? EnumHandling.PreventSubsequent : EnumHandling.PassThrough, handling);
             Assert.Empty(test.Channel.SentPackets);
-            test.ProgressProvider.Verify(value => value.CreateProgressBar(), Times.Never());
+            test.ProgressProvider.Verify(value => value.CreateProgressBar(It.IsAny<bool>()), Times.Never());
             test.Tick(.1f);
-            test.ProgressProvider.Verify(value => value.CreateProgressBar(), handled ? Times.Once() : Times.Never());
+            test.ProgressProvider.Verify(value => value.CreateProgressBar(true), handled ? Times.Once() : Times.Never());
             Assert.Empty(test.Channel.SentPackets);
         }
         finally { attachment.Collectible.CollectibleBehaviors = originalBehaviors; }

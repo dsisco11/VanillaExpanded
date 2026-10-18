@@ -6,6 +6,7 @@ internal sealed class AutoStashTestScope : IDisposable
     private readonly VanillaExpandedConfig config = VanillaExpandedModSystem.Config;
     private readonly bool enabled;
     private readonly float delay;
+    private readonly bool rendersTopmost;
 
     #region Public API
     /// <summary>Captures settings and supplies deterministic defaults for a test.</summary>
@@ -13,8 +14,10 @@ internal sealed class AutoStashTestScope : IDisposable
     {
         enabled = config.EnableAutoStash;
         delay = config.AutoStashDelay;
+        rendersTopmost = config.AutoStashGuiRendersTopmost;
         config.EnableAutoStash = true;
         config.AutoStashDelay = 0.5f;
+        config.AutoStashGuiRendersTopmost = true;
     }
 
     /// <summary>Restores settings on the original configuration object.</summary>
@@ -22,6 +25,7 @@ internal sealed class AutoStashTestScope : IDisposable
     {
         config.EnableAutoStash = enabled;
         config.AutoStashDelay = delay;
+        config.AutoStashGuiRendersTopmost = rendersTopmost;
     }
     #endregion
 }

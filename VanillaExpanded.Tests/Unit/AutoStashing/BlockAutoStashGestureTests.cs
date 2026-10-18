@@ -24,7 +24,7 @@ public sealed class BlockAutoStashGestureTests
         Assert.Equal((true, expected), test.Start());
         Assert.Equal(EStashingState.PreStashGracePeriod, test.Behavior.State);
         test.AssertSubmission(0);
-        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(), Times.Never);
+        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(It.IsAny<bool>()), Times.Never);
     }
 
     /// <summary>All crate modifier combinations preserve vanilla interaction unless both modifiers and an unrelated active slot apply.</summary>
@@ -73,7 +73,7 @@ public sealed class BlockAutoStashGestureTests
         Assert.Equal(EStashingState.None, test.Behavior.State);
         Assert.Equal((true, EnumHandling.PassThrough), test.Step(5));
         test.AssertSubmission(0);
-        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(), Times.Never);
+        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(It.IsAny<bool>()), Times.Never);
         test.ProgressProvider.Verify(provider => provider.RemoveProgressBar(It.IsAny<VanillaExpanded.RadialProgress.IRadialProgressBar>()), Times.Never);
     }
     #endregion
@@ -94,11 +94,11 @@ public sealed class BlockAutoStashGestureTests
         Assert.Equal((true, EnumHandling.PreventSubsequent), test.Step(BlockBehaviorAutoStashable.PreStashGracePeriodSeconds - .001f));
         Assert.Equal(EStashingState.PreStashGracePeriod, test.Behavior.State);
         Assert.Null(test.Behavior.CurrentProgress);
-        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(), Times.Never);
+        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(It.IsAny<bool>()), Times.Never);
         Assert.Equal((true, EnumHandling.PreventSubsequent), test.Step(BlockBehaviorAutoStashable.PreStashGracePeriodSeconds));
         Assert.Equal(EStashingState.Stashing, test.Behavior.State);
         Assert.Same(test.Progress.Object, test.Behavior.CurrentProgress);
-        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(), Times.Once);
+        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(true), Times.Once);
         Assert.Equal(BlockBehaviorAutoStashable.PreStashGracePeriodSeconds / delay, test.Progress.Object.Progress);
         Assert.Equal("AutoStashing", test.Progress.Object.Text);
         Assert.Equal((true, EnumHandling.PreventSubsequent), test.Step(delay - .001f));
@@ -110,17 +110,16 @@ public sealed class BlockAutoStashGestureTests
         Assert.Equal(1, test.Progress.Object.Progress);
         Assert.Null(test.Behavior.CurrentProgress);
         test.ProgressProvider.Verify(provider => provider.RemoveProgressBar(test.Progress.Object), Times.Once);
-        // The current production order recreates progress before the post-stash state returns early.
         test.Step(delay + .001f);
-        Assert.Same(test.Progress.Object, test.Behavior.CurrentProgress);
-        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(), Times.Exactly(2));
+        Assert.Null(test.Behavior.CurrentProgress);
+        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(true), Times.Once);
         Assert.Equal((true, EnumHandling.PreventSubsequent), test.Step(delay + BlockBehaviorAutoStashable.PostStashGracePeriodSeconds));
         Assert.Equal((false, EnumHandling.PreventSubsequent), test.Step(delay + BlockBehaviorAutoStashable.PostStashGracePeriodSeconds + .001f));
         test.AssertSubmission(1);
         Assert.Equal(EnumHandling.Handled, test.End(false));
         Assert.Equal(EStashingState.None, test.Behavior.State);
         Assert.Null(test.Behavior.CurrentProgress);
-        test.ProgressProvider.Verify(provider => provider.RemoveProgressBar(test.Progress.Object), Times.Exactly(2));
+        test.ProgressProvider.Verify(provider => provider.RemoveProgressBar(test.Progress.Object), Times.Once);
     }
 
     /// <summary>Cancel and stop before submission reset state; a restart uses a fresh timing sequence.</summary>
@@ -146,7 +145,7 @@ public sealed class BlockAutoStashGestureTests
         test.Step(test.Behavior.StashDelaySeconds);
         test.AssertSubmission(1);
         Assert.Null(test.Behavior.CurrentProgress);
-        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(), Times.Exactly(2));
+        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(true), Times.Exactly(2));
         test.ProgressProvider.Verify(provider => provider.RemoveProgressBar(test.Progress.Object), Times.Exactly(2));
     }
 
@@ -158,7 +157,20 @@ public sealed class BlockAutoStashGestureTests
         Assert.NotNull(constructor);
         Assert.IsType<BlockBehaviorAutoStashable>(constructor.Invoke([new Vintagestory.GameContent.BlockGenericTypedContainer()]));
     }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Progress_UsesAutoStashLayeringPreference(bool rendersTopmost)
+    {
+        using var test = new BlockGestureCase("generic");
+        VanillaExpandedModSystem.Config.AutoStashGuiRendersTopmost = rendersTopmost;
+        test.Start();
+        test.Step(BlockBehaviorAutoStashable.PreStashGracePeriodSeconds);
+        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(rendersTopmost), Times.Once);
+        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(!rendersTopmost), Times.Never);
+        test.End(false);
+    }
     #endregion
     #endregion
 }
-

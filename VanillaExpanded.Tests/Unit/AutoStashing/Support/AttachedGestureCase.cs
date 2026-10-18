@@ -44,7 +44,7 @@ internal sealed class AttachedGestureCase : IDisposable
     public AttachedGestureCase()
     {
         Progress.SetupAllProperties();
-        ProgressProvider.Setup(provider => provider.CreateProgressBar()).Returns(Progress.Object);
+        ProgressProvider.Setup(provider => provider.CreateProgressBar(It.IsAny<bool>())).Returns(Progress.Object);
         System = new AutoStashSystem_Client(ProgressProvider.Object);
         Fixture.ClientApiMock!.Setup(api => api.Event).Returns(Events.Object);
         Fixture.ClientApiMock.Setup(api => api.Input).Returns(Input.Object);
@@ -148,7 +148,6 @@ internal sealed class AttachedGestureCase : IDisposable
     }
     #endregion
 }
-
 
 
 

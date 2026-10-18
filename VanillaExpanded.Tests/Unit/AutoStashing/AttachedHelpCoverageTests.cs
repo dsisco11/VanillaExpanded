@@ -63,7 +63,7 @@ public sealed class AttachedHelpCoverageTests
             before.AssertUnchangedExcept();
             before.AssertConserved();
             Assert.Empty(test.Channel.SentPackets);
-            test.ProgressProvider.Verify(value => value.CreateProgressBar(), Moq.Times.Never);
+            test.ProgressProvider.Verify(value => value.CreateProgressBar(Moq.It.IsAny<bool>()), Moq.Times.Never);
             test.Fixture.InventoryManagerMock.Verify(value => value.OpenInventory(Moq.It.IsAny<IInventory>()), Moq.Times.Never);
             test.Fixture.InventoryManagerMock.Verify(value => value.CloseInventoryAndSync(Moq.It.IsAny<IInventory>()), Moq.Times.Never);
         }
