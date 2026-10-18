@@ -12,12 +12,12 @@ Replace all overlay titlebars and their controls with right-click menus while th
 - Right-click during a drag cancels only; it must not also open a menu.
 - No individual or group titlebars remain. Movable corner handles, locked dashed borders, and group hover backgrounds remain.
 - Preserve global layout reset access. Do not add individual reset semantics or a separate settings file.
-- Use native toggle lists for Enabled/Lock and a separate native selection list for Style. Mixed-action rows and cascading submenus are not required.
+- Use native switch/label controls in a small composer for Enabled/Lock and a separate native selection list for Style. The native list's multi-select mode owns private switch textures without disposing them; direct native switch ownership avoids that lifetime problem without reflection or engine patches. Mixed-action rows and cascading submenus are not required.
 
 ## Decisions to settle before removing titlebars
 
 - [ ] Confirm the replacement gesture/access path for whole-group movement. Individual body dragging currently detaches members; removing the group titlebar must not silently remove whole-group dragging or change individual dragging semantics.
-- [ ] Confirm how the separate Style list is reached and how global Reset layout is exposed without mixing ordinary actions into the native toggle list. Present one concrete interaction design before implementing these choices.
+- [ ] Confirm how the separate Style list is reached and how global Reset layout is exposed alongside the native toggle controls. Present one concrete interaction design before implementing these choices.
 
 ## Phase 1: Define shared menu capabilities and settings ownership
 
@@ -40,19 +40,19 @@ Completion criteria:
 
 Outcome: a shared popup owner can display native controls at an arbitrary pointer location.
 
-- [ ] Implement a narrow GuiElementListMenu subclass exposing protected popup measurements needed for placement, without private-field reflection or engine patches.
-- [ ] Implement a shared controller owning the current target, native controls/composer, focus, and disposal. Keep input policy separate from feature settings bindings.
-- [ ] Populate native switch state from current Enabled/Lock settings; populate the separate Style selector from supported enum choices.
-- [ ] Account for the native list's anchor-row offset, GUI scale, scrolling, and downward expansion when calculating actual popup bounds.
-- [ ] Clamp the complete visible popup to every screen edge; support constrained viewports without inaccessible rows.
-- [ ] Close on selection as appropriate, outside click, Escape, mouse locking, HUD hiding, target removal, world/session replacement, and disposal. Keep the target stable when the pointer leaves its bounds.
-- [ ] Rebuild or close safely when locale, GUI scale, viewport, capabilities, or settings change. Avoid rebuilding textures every frame.
-- [ ] Test native-control delegation, bounds containment with synthetic InlineData geometry, toggle/selection routing, focus loss, and resource cleanup.
+- [x] Implement a narrow GuiElementListMenu subclass exposing protected popup measurements needed for placement, without private-field reflection or engine patches.
+- [x] Implement a shared controller owning the current target, native controls/composer, focus, and disposal. Keep input policy separate from feature settings bindings.
+- [x] Populate directly owned native switch/label controls from current Enabled/Lock settings; populate the separate Style selector from supported enum choices.
+- [x] Account for the native list's anchor-row offset, GUI scale, scrolling, and downward expansion when calculating actual popup bounds.
+- [x] Clamp the complete visible popup to every screen edge; support constrained viewports without inaccessible rows.
+- [x] Close on selection as appropriate, outside click, Escape, mouse locking, HUD hiding, target removal, world/session replacement, and disposal. Keep the target stable when the pointer leaves its bounds.
+- [x] Rebuild or close safely when locale, GUI scale, viewport, capabilities, or settings change. Avoid rebuilding textures every frame.
+- [x] Test native-control delegation, bounds containment with synthetic InlineData geometry, toggle/selection routing, focus loss, and resource cleanup.
 
 Completion criteria:
 
-- [ ] Popup placement and lifetime are independent of titlebar internals and transient hover geometry.
-- [ ] Controls use native artwork and ordinary HUD text conventions without custom mixed-menu rendering.
+- [x] Popup placement and lifetime are independent of titlebar internals and transient hover geometry.
+- [x] Controls use native artwork and ordinary HUD text conventions without custom mixed-menu rendering; owned switches and protected list children are disposed with the popup.
 
 ## Phase 3: Integrate pointer routing and settings changes
 
