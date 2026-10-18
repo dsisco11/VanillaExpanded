@@ -39,8 +39,7 @@ internal sealed class AutoLootTarget
         [NotNullWhen(true)] out AutoLootTarget? target)
     {
         target = null;
-        if (behavior.GetType() != typeof(EntityBehaviorHarvestable)
-            || behavior.entity is EntityPlayer || dialog is null || behavior.Inventory is null)
+        if (!IsSupportedCorpse(behavior) || dialog is null)
         {
             return false;
         }
@@ -55,12 +54,21 @@ internal sealed class AutoLootTarget
         return true;
     }
 
+    public static bool IsSupportedCorpse(EntityBehaviorHarvestable behavior)
+        => behavior.GetType() == typeof(EntityBehaviorHarvestable)
+            && behavior.entity is not EntityPlayer && !behavior.entity.Alive
+            && behavior.IsHarvested && behavior.Inventory is not null;
+
+    public static bool IsInReach(EntityPlayer player, Entity corpse, Vec3d hitPosition)
+        => corpse.Pos.XYZ.Add(hitPosition).SquareDistanceTo(player.Pos.XYZ.Add(player.LocalEyePos))
+            <= MaximumReachSquared;
+
     public bool IsValid(ICoreClientAPI api, IClientPlayer player)
     {
         if (api.Side != EnumAppSide.Client
             || !ReferenceEquals(player.Entity, looter)
             || Corpse.World.Side != EnumAppSide.Client
-            || Corpse.Alive || !behavior.IsHarvested
+            || !IsSupportedCorpse(behavior)
             || Corpse.EntityId != EntityId
             || !ReferenceEquals(api.World.GetEntityById(EntityId), Corpse)
             || !ReferenceEquals(Corpse.GetBehavior<EntityBehaviorHarvestable>(), behavior)
@@ -73,7 +81,6 @@ internal sealed class AutoLootTarget
             return false;
         }
 
-        return Corpse.Pos.XYZ.Add(hitPosition).SquareDistanceTo(looter.Pos.XYZ.Add(looter.LocalEyePos))
-            <= MaximumReachSquared;
+        return IsInReach(looter, Corpse, hitPosition);
     }
 }

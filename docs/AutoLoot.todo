@@ -1,7 +1,7 @@
 # AutoLoot Implementation Task List
 
 Proposal: [AutoLootProposal.md](./AutoLootProposal.md)
-Status: Phases 1-3 complete; settings/help integration and gameplay validation pending.
+Status: Phases 1-4 complete; final automated validation and gameplay acceptance pending.
 
 Conventions:
     [ ] Pending task.
@@ -177,7 +177,7 @@ Conventions:
         No in-game or unmodified-server gameplay verification is claimed.
 
 ## Phase 4: Configuration, Localization, and Documentation
-    [ ] AL-10: Integrate local AutoLoot settings.
+    [x] AL-10: Integrate local AutoLoot settings.
         Depends: AL-02, AL-06.
         Add EnableAutoLoot (default true) and AutoLootDelay (default 0.5 seconds).
         Follow existing delay validation/range conventions and ConfigLib patterns.
@@ -187,24 +187,47 @@ Conventions:
         Support independent AutoLoot/AutoStash enablement and cancel active work
         when AutoLoot is disabled.
         Keep the mod universal and requiredOnServer: false.
-        Phase 3 prerequisite already implemented: defaulted config properties,
-        fixed layering, and live-disable cancellation. ConfigLib integration and
-        its local-setting behavior still require this phase.
+        Completed: both settings now have clientSide=true ConfigLib definitions
+        in a dedicated Auto Loot section. EnableAutoLoot defaults true; delay
+        defaults 0.5 seconds with the existing 0.1-2, step 0.1 slider convention.
+        Shared timing validation rejects invalid manual delays with logging.
+        ConfigLib 1.10.12 IL inspection confirms client-side values are preserved
+        during server synchronization and ignored by server-setting updates.
+        No required dependency or server code was added; the universal manifest
+        retains requiredOnServer=false. Tests cover persistence/older files,
+        exact delay thresholds, and all four ConfigLib event paths for immediate
+        cancellation/re-enabling with AutoStash independently enabled or disabled.
+        Fixed topmost rendering remains independent of AutoStash configuration.
 
-    [ ] AL-11: Add localized text and interaction help.
+    [x] AL-11: Add localized text and interaction help.
         Depends: AL-02, AL-08, AL-09, AL-10.
         Add AutoLoot progress text, eligible-target interaction help, setting
         labels/descriptions, and any approved feedback using existing conventions.
         Do not replace vanilla harvesting or loot-window help.
-        Phase 3 prerequisite already implemented: English autoloot-progress key.
-        Interaction help and setting labels/descriptions remain pending.
+        Completed: English section, toggle, delay labels/tooltips, progress text,
+        and hold-to-collect help are supplied. A client-only native corpse-help
+        postfix appends without modifying vanilla entries or handling. Help uses
+        shared supported-corpse and reach checks, does not require/open a loot
+        session, and is absent for disabled/ineligible targets. Tests include
+        actual native help dispatch, preserved harvest help, null results,
+        eligibility/range gates, localization coverage, and scoped unpatching.
 
-    [ ] AL-12: Update feature documentation and proposal status.
+    [x] AL-12: Update feature documentation and proposal status.
         Depends: AL-08, AL-09, AL-10, AL-11.
         Document hold-to-loot, client-only installation, settings, eligibility,
         overflow behavior, and the distinction from harvesting.
         Update the proposal to match implemented decisions.
         Record the tested game version and any remaining compatibility limits.
+        Completed: README documents the gesture, optional client ConfigLib,
+        client-only installation, independent live settings, fixed layering,
+        eligibility, overflow, and vanilla harvesting/authority. The proposal
+        records Phase 4 implementation and ConfigLib 1.10.12 protocol inspection
+        alongside the previously inspected game version 1.22.7.
+        Verified 556 focused unit tests (29 new Phase 4 cases) and the existing
+        Cake ValidateJson task. No new AutoLoot compiler warnings; existing
+        unrelated compiler and Cake dependency-advisory warnings remain.
+        Final Phase 5 coverage/build work and all gameplay acceptance remain
+        pending; no unmodified-server gameplay verification is claimed.
 
 ## Phase 5: Automated Validation
     [ ] AL-13: Cover gesture, session, and feature lifecycle behavior.

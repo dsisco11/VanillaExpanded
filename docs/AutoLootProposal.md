@@ -1,6 +1,6 @@
 # AutoLoot Proposal
 
-Status: Phases 1-3 complete; settings/help integration and gameplay validation pending.
+Status: Phases 1-4 complete; final automated validation and gameplay acceptance pending.
 
 ## Summary
 
@@ -17,10 +17,10 @@ Reduce duplication by sharing hold timing, progress presentation, and low-level
 inventory operations. Keep corpse eligibility and loot transfer rules separate
 from AutoStash's matching-item policies.
 
-The client implementation and focused automated tests are complete.
+The client implementation, settings/help integration, and focused automated tests are complete.
 Installed-game inspection confirms the vanilla packet path needed for
-client-only collection. Configuration/help integration and in-game validation
-of the hold gesture, latency, and concurrent looting remain necessary.
+client-only collection. Final automated coverage/build checks and in-game
+validation of the hold gesture, latency, and concurrent looting remain necessary.
 
 ## Goals
 
@@ -384,35 +384,34 @@ Server-enforced AutoLoot timing is explicitly outside this client-only design.
 
 ## Configuration and Integration
 
-Recommended new settings:
+Implemented client-local settings:
 
-| Setting | Recommended default | Purpose |
+| Setting | Default | Purpose |
 | --- | --- | --- |
 | `EnableAutoLoot` | `true` | Enable corpse auto-looting. |
-| `AutoLootDelay` | `0.5` seconds | Hold duration, initially matching AutoStash's default. |
+| `AutoLootDelay` | `0.5` seconds | Hold duration; ConfigLib range 0.1-2 seconds, step 0.1, matching AutoStash. |
 
-The shared radial renderer currently reads `AutoStashGuiRendersTopmost`.
-Pass presentation preferences into progress creation so AutoLoot does not
-implicitly depend on an AutoStash setting. AutoLoot always supplies topmost=true,
-with no additional setting. Preserve the existing AutoStash setting and its
-behavior.
+The shared radial renderer receives explicit presentation preferences.
+AutoLoot always supplies topmost=true, with no additional setting or dependency
+on AutoStash. AutoStash retains its own `AutoStashGuiRendersTopmost` preference.
 
-Wire the feature through:
+The feature is wired through:
 
 - Client ModSystem lifecycle and feature gates.
 - Client-only corpse interaction postfix installation and scoped disposal.
 - Existing vanilla inventory and entity packet APIs; no AutoLoot packet
   registration in [VanillaExpandedModSystem](../VanillaExpanded/src/VanillaExpandedModSystem.cs).
 - Configuration properties and ConfigLib definitions.
-- Localized progress text, interaction help, and result feedback.
+- Localized progress text, interaction help, and neutral inventory-based feedback.
 - Feature and configuration documentation in the [README](../README.md).
 
 AutoLoot must work when AutoStash is disabled, and vice versa.
 
-The existing [mod manifest](../VanillaExpanded/modinfo.json) already declares
-`requiredOnServer: false`. Keep the mod universal for its other features; do not
-change its entire side to Client merely because AutoLoot is client-only.
-Verify that the new settings remain local preferences when ConfigLib is present.
+The [mod manifest](../VanillaExpanded/modinfo.json) retains Universal side and
+`requiredOnServer: false`; ConfigLib is not a required dependency. Both AutoLoot
+definitions explicitly use `clientSide: true`, so ConfigLib treats them as local
+preferences rather than server-controlled settings. Without ConfigLib, the
+client reads the same properties from its local configuration file.
 
 ## Delivery Plan
 
@@ -501,7 +500,7 @@ Validation:
   Unexpected timing/collection exceptions cancel the gesture and are logged.
 - Minimal `EnableAutoLoot=true`, `AutoLootDelay=0.5f`, and English progress text
   were pulled forward as implementation prerequisites. Full configuration/help
-  integration remains Phase 4. No server handler or custom AutoLoot packet was
+  integration was completed in Phase 4. No server handler or custom AutoLoot packet was
   introduced.
 
 Validation:
@@ -519,10 +518,55 @@ Validation:
   compiler warnings remain. These tests do not prove native server
   reconciliation, latency handling, or gameplay against an unmodified server.
 
-### Phase 4: Configuration, Localization, and Documentation
+### Phase 4: Configuration, Localization, and Documentation (Complete)
 
-Complete client-local ConfigLib settings and validation, eligible-target
-interaction help, setting labels/descriptions, and player-facing documentation.
+Completed 2026-10-18:
+
+- [ConfigLib definitions](../VanillaExpanded/assets/vanillaexpanded/config/configlib-patches.json)
+  place both controls in a localized Auto Loot section between Auto Stash and
+  Ignition Tools. Both explicitly declare `clientSide: true`; defaults match
+  the persisted properties, and the delay slider follows the existing
+  0.1-2-second, 0.1-step convention. The existing shared hold validation logs
+  and cancels invalid non-positive/non-finite manual delays; no silent fallback
+  or unrelated delay-policy changes were introduced.
+- Inspection of the installed optional ConfigLib **1.10.12** assembly confirms
+  `Config.SyncFromServer` preserves client-side settings and the client's
+  `OnServerSettingChanged` handler skips them. Existing ConfigLib event-bus
+  integration applies local changes and invokes live reload without any
+  AutoLoot-specific channel or server handler. ConfigLib and VanillaExpanded
+  remain unnecessary on the server for AutoLoot.
+- [Corpse interaction help](../VanillaExpanded/src/AutoLoot/AutoLootInteractionPatch.cs)
+  appends the localized right-button hold action to the original result,
+  including a null result. Shared native-corpse and eye-to-hit reach checks keep
+  the help consistent with collection eligibility while allowing it before
+  opening the inventory. Ineligible corpses and a disabled feature preserve the
+  original array unchanged. Vanilla harvesting help, handling, and click-to-open
+  remain untouched; patches share the existing client-scoped lifecycle.
+- [English localization](../VanillaExpanded/assets/vanillaexpanded/lang/en.json)
+  supplies section, setting labels/tooltips, hold help, and progress text.
+  The [README](../README.md) documents installation, gesture/cancellation,
+  supported corpses, overflow, independent live settings, fixed topmost
+  rendering, harvesting separation, and prediction versus server authority.
+
+Validation:
+
+- [Configuration tests](../VanillaExpanded.Tests/Unit/AutoLoot/AutoLootConfigurationTests.cs)
+  verify client-only metadata, grouping, defaults/range, localization keys,
+  manifest/dependency constraints, persistence and old-file defaults, exact
+  completion thresholds, and live disable/enable through all four ConfigLib
+  event paths with AutoStash enabled and disabled independently.
+- [Interaction-help tests](../VanillaExpanded.Tests/Unit/AutoLoot/AutoLootInteractionHelpTests.cs)
+  verify append-only behavior, no forced session opening, eligibility and reach
+  boundaries, and actual native Harmony help dispatch/unpatching.
+- `dotnet test .\VanillaExpanded.Tests\VanillaExpanded.Tests.csproj --no-restore --filter "FullyQualifiedName~AutoLoot|FullyQualifiedName~AutoStashing|FullyQualifiedName~HoldInteractionProgress|FullyQualifiedName~Configuration"`:
+  **556 passed**, zero failed or skipped, including 29 new Phase 4 cases. The
+  mod/test projects compile without new AutoLoot compiler warnings.
+- The existing Cake `ValidateJson` task passed. Existing unrelated compiler
+  warnings and Cake dependency advisories remain; no dependency changes were made.
+- Game protocol evidence remains version **1.22.7**, not in-game verification.
+  Live ConfigLib/game UI behavior, native server reconciliation, and
+  unmodified-server gameplay remain release-acceptance checks, not claimed
+  outcomes of these automated tests.
 
 ### Phase 5: Automated Validation
 
