@@ -100,7 +100,7 @@ WorldMapManager's LeaveWorld handler sets IsShuttingDown, waits up to one second
 
 **8. Directional ownership.** Planned source ownership under `src/EcosystemMap/`: Registration/EcosystemMapSystem owns registration and scoped adapter installation; Catalogue owns species discovery and exclusions, the isolated local asset view and resolved rule alternatives; Acquisition owns client receipt snapshots; Transport owns original server shrub delivery and payload validation; Storage owns records/identity/database/serialized durability; Evaluation owns sampling and bounded derived results; Presentation owns EcosystemMapLayer, dropdown, coverage adapter and render resources. Composition injects dependencies; Catalogue/Storage/Evaluation do not reference Presentation. Transport and Acquisition submit immutable records to Storage; Evaluation reads snapshots and rules; Presentation consumes prepared results plus ephemeral explored coverage. Version-sensitive member access is restricted to named adapters rather than spread through owners. Each file owns one responsibility; all new classes/methods require XML docs and nontrivial methods explain their process. No runtime stubs are necessary to establish these contracts.
 
-**Remaining gates.** The isolated local patch context is implemented and verified by the Phase 2 receipts below. Snapshot synchronization including unload (Phase 4), command-wrapper behavior (Phase 3), rendering/coverage adapter behavior (Phase 6), and sampling/cache/queue measurements (Phases 5/7) still require their implementation receipts. These are explicit dependent-work gates, not evidence that their runtime behavior already works. No backfill, server catalogue, or base-database access is authorized as a workaround.
+**Remaining gates.** The isolated local patch context is implemented and verified by the Phase 2 receipts below. Command-wrapper behavior is implemented and verified by the Phase 3 receipts below. Snapshot synchronization including unload and actual binding/lifecycle coordination (Phase 4), rendering/coverage adapter behavior (Phase 6), and sampling/cache/queue measurements (Phases 5/7) still require their implementation receipts. These are explicit dependent-work gates, not evidence that their runtime behavior already works. No backfill, server catalogue, or base-database access is authorized as a workaround.
 
 ## Phase 2: Construct the local species catalogue
 
@@ -128,18 +128,21 @@ Depends on Phase 1 storage and lifecycle contracts.
 
 Outcome: environmental snapshots can survive unload and reconnect independently of vanilla terrain pixels.
 
-- [ ] Define versioned regional climate/forest/shrub records preserving original array values, size, and padding; define tile elevation and completeness records. Support partial arrivals and explicit unavailable inputs.
-- [ ] Implement the feature-owned SQLite schema, connection, serialized access, bounded transactions, and off-render-thread disk work. Store regional arrays once per region and tile-specific elevation separately.
-- [ ] Scope records to verified server/world identity; use coordinates to associate records with displayed tiles in memory, without cross-database access.
-- [ ] Implement local cache reads, record updates, and explicit version handling. Unsupported records must not become valid samples; do not introduce historical backfill or a legacy migration subsystem.
-- [ ] Distinguish persistent environmental snapshots/metadata/completeness from disposable evaluation results, prepared tiles, and textures. Establish stop-acquisition, flush-pending-writes, close ordering for normal exit.
-- [ ] Establish purge handling that intentionally clears own records, pending writes, and derived state; prevent pre-purge pending work from restoring cleared records. Do not modify vanilla storage.
-- [ ] Add focused storage tests for exact array/layout round trips, partial records, reopen, identity isolation, version handling, normal-exit flush, and purge ordering.
+- [x] Define versioned regional climate/forest/shrub records preserving original array values, size, and padding; define tile elevation and completeness records. Support partial arrivals and explicit unavailable inputs.
+- [x] Implement the feature-owned SQLite schema, connection, serialized access, bounded transactions, and off-render-thread disk work. Store regional arrays once per region and tile-specific elevation separately.
+- [x] Scope records to verified server/world identity; use coordinates to associate records with displayed tiles in memory, without cross-database access.
+- [x] Implement local cache reads, record updates, and explicit version handling. Unsupported records must not become valid samples; do not introduce historical backfill or a legacy migration subsystem.
+- [x] Distinguish persistent environmental snapshots/metadata/completeness from disposable evaluation results, prepared tiles, and textures. Establish stop-acquisition, flush-pending-writes, close ordering for normal exit.
+- [x] Establish purge handling that intentionally clears own records, pending writes, and derived state; prevent pre-purge pending work from restoring cleared records. Do not modify vanilla storage.
+- [x] Add focused storage tests for exact array/layout round trips, partial records, reopen, identity isolation, version handling, normal-exit flush, and purge ordering.
 
 Completion criteria:
 
-- [ ] Storage receipts demonstrate independent persistence and lifecycle behavior; review confirms no ecosystem-owned access to vanilla's database file or connection.
+- [x] Storage receipts demonstrate independent persistence and lifecycle behavior; review confirms no ecosystem-owned access to vanilla's database file or connection.
 
+Verification and traceability: record/layout and partial/version tasks -> proposal [persistence](EcosystemMapProposal.md#persistence-in-a-dedicated-ecosystem-database) -> immutable regional/tile records, exact codecs and independent component reads; schema/identity/serialization tasks -> Integration contracts 7 and the same proposal section -> dedicated `EcosystemDatabase`, verified identity/geometry and bounded `EnvironmentalStorage` worker; lifetime/purge tasks -> proposal [lifecycle](EcosystemMapProposal.md#performance-and-lifecycle-expectations) and Integration contracts 7 -> epoch barriers, accepted-write drain and command-only purge binding. Current ownership and schema are described in [EnvironmentalStorage.md](EnvironmentalStorage.md).
+
+A second implementation review and independent `$audit-stage-completion` audit passed. Final installed-game validation: 23/23 focused storage/purge tests and 2,103/2,103 full regression tests, zero failures/skips; main/test build succeeded with existing warnings outside EcosystemMap. Tests cover exact values/layout, partial arrivals, local reopen, world/dimension isolation, incompatible records/schema, shutdown durability/reentry, stale-work purge prevention and untouched vanilla-file sentinel; source review confirms no vanilla database access. `git diff --check` passed. Actual acquisition attachment/shutdown coordination remains Phase 4; UI, package/live integration, appearance and measured performance are not established by these storage receipts.
 ## Phase 4: Capture ordinary world data and deliver original shrubs
 
 Depends on Phases 1 and 3.

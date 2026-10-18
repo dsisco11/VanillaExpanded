@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Reference Include="Microsoft.Data.Sqlite"><HintPath>$(VINTAGE_STORY)/Lib/Microsoft.Data.Sqlite.dll</HintPath><Private>false</Private></Reference>
     <InternalsVisibleTo Include="VanillaExpanded.Tests" />
     <!-- Allow Moq to observe internal lifecycle boundaries without making them public mod APIs. -->
     <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />

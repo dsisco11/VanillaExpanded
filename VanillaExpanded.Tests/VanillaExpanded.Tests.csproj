@@ -9,6 +9,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Reference Include="SQLitePCLRaw.provider.e_sqlite3"><HintPath>$(VINTAGE_STORY)/Lib/SQLitePCLRaw.provider.e_sqlite3.dll</HintPath><Private>true</Private></Reference>
+    <Reference Include="SQLitePCLRaw.batteries_v2"><HintPath>$(VINTAGE_STORY)/Lib/SQLitePCLRaw.batteries_v2.dll</HintPath><Private>true</Private></Reference>
+    <Reference Include="SQLitePCLRaw.core"><HintPath>$(VINTAGE_STORY)/Lib/SQLitePCLRaw.core.dll</HintPath><Private>true</Private></Reference>
+    <Reference Include="Microsoft.Data.Sqlite"><HintPath>$(VINTAGE_STORY)/Lib/Microsoft.Data.Sqlite.dll</HintPath><Private>true</Private></Reference>
     <PackageReference Include="coverlet.collector" Version="6.0.2" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageReference Include="Moq" Version="4.20.72" />
