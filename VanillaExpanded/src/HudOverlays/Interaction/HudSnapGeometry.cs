@@ -82,9 +82,10 @@ internal static class HudSnapGeometry
         }
         AlignAxis(viewport, true, HudOverlayTargets.Screen);
         AlignAxis(viewport, false, HudOverlayTargets.Screen);
-        // A screen guide cannot hold an indicator away from a nearby valid grouping target. Within each
-        // intent, retain the acquired destination/side before considering a closer competing destination.
+        // Grouping wins over alignment; native exterior docking wins over a single-axis guide that
+        // could otherwise preserve an accidental gap. Retain destinations within each intent.
         return result.OrderByDescending(item => item.Grouping)
+            .ThenByDescending(item => item.Exterior)
             .ThenByDescending(item => item.RetainsAttachment(retained) || item.Identity == retained?.Identity)
             .ThenBy(item => item.Distance).ThenBy(item => item.Identity, StringComparer.Ordinal).ToArray();
 
@@ -111,7 +112,7 @@ internal static class HudSnapGeometry
             }
         }
 
-        /// <summary>Offers outside-edge placement against a fixed HUD surface with no membership or persistent docking link.</summary>
+        /// <summary>Offers outside-edge docking and a compatible cross-axis guide against a fixed HUD surface.</summary>
         void AlignExterior(HudSnapBoundary boundary, bool xAxis, string key)
         {
             var b = boundary.Bounds;
@@ -119,7 +120,25 @@ internal static class HudSnapGeometry
             {
                 float edge = xAxis ? before ? b.Left : b.Right : before ? b.Top : b.Bottom;
                 float coordinate = edge - (before ? xAxis ? moving.Width : moving.Height : 0);
-                var origin = xAxis ? new PointF(coordinate, moving.Y) : new PointF(moving.X, coordinate);
+                // Exterior docking establishes the normal axis first. Combine the nearest matching
+                // cross-axis guide when it is within acquisition range, rather than allowing that
+                // guide to win alone and preserve an accidental gap along the docking axis.
+                float crossStart = xAxis ? moving.Y : moving.X;
+                float crossCoordinate = crossStart;
+                float crossDistance = float.PositiveInfinity;
+                foreach (var alignment in Enum.GetValues<HudOverlayCrossAlignment>())
+                {
+                    float factor = (int)alignment * .5f;
+                    float aligned = xAxis ? b.Top + factor * (b.Height - moving.Height)
+                        : b.Left + factor * (b.Width - moving.Width);
+                    float distance = Math.Abs(crossStart - aligned);
+                    if (distance <= Acquisition && distance < crossDistance)
+                    {
+                        crossDistance = distance;
+                        crossCoordinate = aligned;
+                    }
+                }
+                var origin = xAxis ? new PointF(coordinate, crossCoordinate) : new PointF(crossCoordinate, coordinate);
                 var side = xAxis ? before ? HudSnapSide.Left : HudSnapSide.Right : before ? HudSnapSide.Above : HudSnapSide.Below;
                 var guide = xAxis ? new RectangleF(edge, Math.Min(moving.Top, b.Top), 0, Math.Max(moving.Bottom, b.Bottom) - Math.Min(moving.Top, b.Top))
                     : new RectangleF(Math.Min(moving.Left, b.Left), edge, Math.Max(moving.Right, b.Right) - Math.Min(moving.Left, b.Left), 0);
