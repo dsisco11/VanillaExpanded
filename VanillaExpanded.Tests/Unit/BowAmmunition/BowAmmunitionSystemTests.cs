@@ -26,7 +26,7 @@ public sealed class BowAmmunitionSystemTests
         hud.StartClientSide(api.Object); feature.StartClientSide(api.Object);
         var group = Assert.Single(hud.Registry.GetGroups(), group => group.Id == "held-item-status");
         Assert.Equal("held-item-status", group.Id); Assert.Equal(HudOverlayDirection.Vertical, group.Packing.Direction);
-        Assert.Equal(HudOverlayAnchorContext.SaturationTargetId, group.Placement.TargetId);
+        Assert.Equal(HudOverlayTargets.Saturation, group.Placement.TargetId);
         Assert.Equal(HudOverlayPoint.LeftTop, group.Placement.Attachment);
         Assert.Equal(HudOverlayPoint.LeftBottom, group.Placement.Pivot);
         Assert.Equal(-4, group.Placement.OffsetX); Assert.Equal(0, group.Placement.OffsetY);

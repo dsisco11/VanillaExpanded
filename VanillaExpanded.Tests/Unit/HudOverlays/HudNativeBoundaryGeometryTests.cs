@@ -27,7 +27,7 @@ public sealed class HudNativeBoundaryGeometryTests
         var candidates = HudSnapGeometry.Candidates(moving, ideal, new RectangleF(0, 0, 900, 700), Array.Empty<HudSnapTarget>(), null, false, new[] { boundary });
         var candidate = Assert.Single(candidates, item => item.Boundary == boundary && item.Exterior && item.Side == side);
         Assert.False(candidate.Grouping); Assert.Null(candidate.Target);
-        if (candidate.AlignsX) Assert.Equal(ideal.X, candidate.Origin.X); else Assert.Equal(ideal.Y, candidate.Origin.Y);
+        if (candidate.Axis == HudSnapAxis.X) Assert.Equal(ideal.X, candidate.Origin.X); else Assert.Equal(ideal.Y, candidate.Origin.Y);
         Assert.Empty(HudSnapGeometry.Candidates(moving, ideal, new RectangleF(0, 0, 900, 700), Array.Empty<HudSnapTarget>(), candidate, true, new[] { boundary }));
     }
 
@@ -44,7 +44,7 @@ public sealed class HudNativeBoundaryGeometryTests
             : boundary.Bounds.Top + factor * (boundary.Bounds.Height - moving.Height);
         if (xAxis) moving.X = expected + 2; else moving.Y = expected + 2;
         var candidates = HudSnapGeometry.Candidates(moving, moving.Location, new RectangleF(0, 0, 900, 700), Array.Empty<HudSnapTarget>(), null, false, new[] { boundary });
-        var candidate = Assert.Single(candidates, item => item.Boundary == boundary && !item.Exterior && item.AlignsX == xAxis
+        var candidate = Assert.Single(candidates, item => item.Boundary == boundary && !item.Exterior && item.Axis == (xAxis ? HudSnapAxis.X : HudSnapAxis.Y)
             && Math.Abs((xAxis ? item.Origin.X : item.Origin.Y) - expected) < .001);
         Assert.False(candidate.Grouping); Assert.Null(candidate.Target);
     }

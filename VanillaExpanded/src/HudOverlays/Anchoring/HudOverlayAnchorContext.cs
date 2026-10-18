@@ -9,14 +9,12 @@ namespace VanillaExpanded.HudOverlays.Anchoring;
 /// <summary>Owns session window bounds and shares one target read per visible frame among groups.</summary>
 internal sealed class HudOverlayAnchorContext
 {
-    public const string ScreenTargetId = "screen";
-    public const string HotbarTargetId = "hotbar";
-    public const string SaturationTargetId = "saturation";
     public const double SafeInset = 12;
     private readonly int threadId = Environment.CurrentManagedThreadId;
     private readonly Func<double> readScale;
     private readonly Func<RectangleF?> readHotbar;
     private readonly Func<bool> isHidden;
+    private readonly Func<string, RectangleF?> readBoundary;
     private readonly Func<RectangleF?> readSaturation;
     private readonly Dictionary<string, RectangleF?> frameTargets = new(StringComparer.Ordinal);
     private RectangleF viewport;
@@ -35,27 +33,29 @@ internal sealed class HudOverlayAnchorContext
     #region Public API
     #region Construction
     /// <summary>Acquires the native window parent once; all engine services and target bounds remain borrowed.</summary>
-    public HudOverlayAnchorContext(ICoreClientAPI api)
+    public HudOverlayAnchorContext(ICoreClientAPI api, Func<string, RectangleF?>? readBoundary = null)
     {
         ArgumentNullException.ThrowIfNull(api);
         WindowBounds = api.Gui.WindowBounds;
         readScale = () => RuntimeEnv.GUIScale;
-        readHotbar = new HudOverlayHotbarAnchor(api).Resolve;
-        readSaturation = new HudOverlaySaturationAnchor(api).Resolve;
+        readHotbar = readBoundary == null ? new HudOverlayHotbarAnchor(api).Resolve : () => readBoundary(HudOverlayTargets.Hotbar);
+        readSaturation = readBoundary == null ? new HudOverlaySaturationAnchor(api).Resolve : () => readBoundary(HudOverlayTargets.SaturationElement);
         isHidden = () => api.HideGuis;
+        this.readBoundary = readBoundary ?? (_ => null);
     }
 
     /// <summary>Accepts native bounds and target readers for headless integration without a graphics context.</summary>
     internal HudOverlayAnchorContext(ElementBounds windowBounds, Func<double> readScale,
-        Func<RectangleF?> readHotbar, Func<bool>? isHidden = null, Func<RectangleF?>? readSaturation = null)
+        Func<RectangleF?> readHotbar, Func<bool>? isHidden = null, Func<RectangleF?>? readSaturation = null, Func<string, RectangleF?>? readBoundary = null)
     {
         ArgumentNullException.ThrowIfNull(windowBounds);
         ArgumentNullException.ThrowIfNull(readScale);
         ArgumentNullException.ThrowIfNull(readHotbar);
         WindowBounds = windowBounds;
+        this.readBoundary = readBoundary ?? (_ => null);
         this.readScale = readScale;
-        this.readHotbar = readHotbar;
-        this.readSaturation = readSaturation ?? (() => null);
+        this.readHotbar = readBoundary == null ? readHotbar : () => readBoundary(HudOverlayTargets.Hotbar);
+        this.readSaturation = readBoundary == null ? readSaturation ?? (() => null) : () => readBoundary(HudOverlayTargets.SaturationElement);
         this.isHidden = isHidden ?? (() => false);
     }
     #endregion
@@ -93,13 +93,14 @@ internal sealed class HudOverlayAnchorContext
         CheckThread();
         ArgumentException.ThrowIfNullOrWhiteSpace(targetId);
         if (!frameStarted) throw new InvalidOperationException("Begin a frame before resolving anchors.");
+        targetId = HudOverlayTargets.Canonical(targetId);
         if (frameTargets.TryGetValue(targetId, out var rectangle)) return rectangle;
         rectangle = !visible ? null : targetId switch
         {
-            ScreenTargetId => viewport,
-            HotbarTargetId => readHotbar(),
-            SaturationTargetId => readSaturation(),
-            _ => null
+            HudOverlayTargets.Screen => viewport,
+            HudOverlayTargets.Hotbar => readHotbar(),
+            HudOverlayTargets.Saturation => readSaturation(),
+            _ => HudOverlayTargets.Boundary(targetId) is { } boundary ? readBoundary(boundary) : null
         };
         if (rectangle is { } value && !IsAvailable(value)) rectangle = null;
         frameTargets.Add(targetId, rectangle);

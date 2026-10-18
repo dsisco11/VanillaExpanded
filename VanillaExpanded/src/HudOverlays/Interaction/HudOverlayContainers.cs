@@ -78,7 +78,7 @@ internal sealed class HudOverlayContainers
     public HudOverlayGroup Definition(HudLayoutContainer container)
     {
         var template = container.TemplateId != null ? templates.GetValueOrDefault(container.TemplateId) : null;
-        return new HudOverlayGroup(container.Id, template?.Placement ?? new HudOverlayPlacement("screen", HudOverlayPoint.LeftTop, HudOverlayPoint.LeftTop),
+        return new HudOverlayGroup(container.Id, template?.Placement ?? new HudOverlayPlacement(HudOverlayTargets.Screen, HudOverlayPoint.LeftTop, HudOverlayPoint.LeftTop),
             template?.Packing ?? new HudOverlayPacking(padding: container.Padding));
     }
 
@@ -86,7 +86,7 @@ internal sealed class HudOverlayContainers
     public string TargetId(HudOverlayRegistration registration)
     {
         var container = resolved.FirstOrDefault(item => item.Tree.Leaves().Contains(registration.Id, StringComparer.Ordinal));
-        return container == null || container.X.HasValue ? "screen" : Definition(container).Placement.TargetId;
+        return container == null || container.X.HasValue ? HudOverlayTargets.Screen : Definition(container).Placement.TargetId;
     }
 
     /// <summary>Finds the effective owner even when its feature came from a different default group.</summary>
@@ -132,7 +132,7 @@ internal sealed class HudOverlayContainers
                 string remaining = remainder.Indicator;
                 PointF origin = displayedMembers.GetValueOrDefault(remaining,
                     container.X.HasValue ? new PointF(container.X.Value, container.Y!.Value) : displayed);
-                records.Add(Independent(remaining, origin, container.Movable));
+                records.Add(Independent(remaining, origin, container.Movable) with { Attachment = container.Attachment, Padding = container.Attachment != null ? container.Padding : 0 });
             }
             else records.Add(container with { Tree = remainder, X = (int)(containerOrigin ?? displayed).X, Y = (int)(containerOrigin ?? displayed).Y });
             var detached = Independent(indicator, displayed, container.Movable);
@@ -141,7 +141,7 @@ internal sealed class HudOverlayContainers
         }
         else
         {
-            records.Add(container with { X = (int)displayed.X, Y = (int)displayed.Y });
+            records.Add(container with { X = (int)displayed.X, Y = (int)displayed.Y, Attachment = null });
             active = container.Id;
         }
         previewOrigin = displayed;
@@ -155,11 +155,12 @@ internal sealed class HudOverlayContainers
     }
 
     /// <summary>Updates only preview origin; publication and native persistence occur on successful release.</summary>
-    public void Move(PointF position)
+    public void Move(PointF position, HudOverlayPlacement? attachment = null)
     {
         if (preview == null || active == null) return;
         if (!float.IsFinite(position.X) || !float.IsFinite(position.Y)) throw new ArgumentOutOfRangeException(nameof(position));
         previewOrigin = position;
+        preview = preview.Select(item => item.Id == active ? item with { Attachment = attachment } : item).ToArray();
         Resolve();
     }
 
@@ -200,7 +201,7 @@ internal sealed class HudOverlayContainers
     public bool Commit(PointF displayed)
     {
         if (preview == null || active == null) return false;
-        Move(displayed);
+        previewOrigin = displayed;
         var candidate = preview.Select(item => item.Id == active ? item with { X = (int)displayed.X, Y = (int)displayed.Y } : item).ToArray();
         bool result = Save(candidate);
         Cancel();

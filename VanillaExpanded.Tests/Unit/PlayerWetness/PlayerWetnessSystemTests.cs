@@ -27,7 +27,7 @@ public sealed class PlayerWetnessSystemTests
         var group = Assert.Single(hud.Registry.GetGroups(), group => group.Id == "player-status");
         Assert.Equal("player-status", group.Id); Assert.Equal(HudOverlayDirection.Horizontal, group.Packing.Direction);
         Assert.Equal(HudOverlayCrossAlignment.End, group.Packing.CrossAlignment);
-        Assert.Equal(HudOverlayAnchorContext.HotbarTargetId, group.Placement.TargetId);
+        Assert.Equal(HudOverlayTargets.Hotbar, group.Placement.TargetId);
         Assert.Equal(HudOverlayPoint.LeftBottom, group.Placement.Attachment);
         Assert.Equal(HudOverlayPoint.RightBottom, group.Placement.Pivot);
         int visits = 0; hud.Registry.RunPass(registration =>

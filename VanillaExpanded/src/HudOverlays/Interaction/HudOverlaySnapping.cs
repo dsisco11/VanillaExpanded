@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using VanillaExpanded.HudOverlays.Anchoring;
 using System.Linq;
 using VanillaExpanded.HudOverlays.Layout;
 using VanillaExpanded.HudOverlays.Registration;
@@ -91,7 +92,7 @@ internal sealed class HudOverlaySnapping
                 var final = new RectangleF(viewport.X + origin.X * (float)scale, viewport.Y + origin.Y * (float)scale, raw.Width, raw.Height);
                 // Native integer checkpoints need not land exactly on a fractional guide. Keep the magnet within
                 // one GUI unit of the ideal and draw the guide at the actual placement, including boundary rounding.
-                bool xAxis = candidate.AlignsX;
+                bool xAxis = candidate.Axis == HudSnapAxis.X;
                 float correction = xAxis ? final.X - candidate.Origin.X : final.Y - candidate.Origin.Y;
                 if (Math.Abs(correction) > scale + .01f) continue;
                 // Alignment changes placement without membership, but must obey the same collision rule as grouping.
@@ -103,7 +104,7 @@ internal sealed class HudOverlaySnapping
                         (float)member.Bounds.OuterWidth, (float)member.Bounds.OuterHeight));
                 if (!Valid(aligned, layouts, source.Id, string.Empty, safe) || CrossesBoundary(aligned.Values, boundaries)
                     || RemainderCollides(movement, layouts, source.Id, string.Empty, drawable, boundaries)) continue;
-                containers.Move(origin);
+                containers.Move(origin, HudSnapAttachment.FromSnap(candidate, final, viewport, scale));
                 DropAllowed = true;
                 var guide = candidate.Guide;
                 if (xAxis) guide.X += correction; else guide.Y += correction;
@@ -118,6 +119,17 @@ internal sealed class HudOverlaySnapping
             var geometry = HudLayoutGeometry.Resolve(tree, sizes, target.Padding);
             var expandedSize = new SizeF(geometry.Size.Width * (float)scale, geometry.Size.Height * (float)scale);
             var originPixels = ExpandedOrigin(Bounds(targetLayout), expandedSize, candidate.Side, candidate.Alignment);
+            // Destination docking owns the outer pivot even when incoming membership changes its measured size.
+            if (target.Attachment is { } attachment)
+            {
+                RectangleF? anchor = HudOverlayTargets.Canonical(attachment.TargetId) == HudOverlayTargets.Screen ? viewport
+                    : boundaries.FirstOrDefault(item => item.Id == HudOverlayTargets.Boundary(attachment.TargetId))?.Bounds;
+                if (anchor.HasValue)
+                {
+                    var attached = HudContainerAttachment.Position(attachment, anchor.Value, expandedSize, viewport, scale);
+                    originPixels = new PointF(viewport.Left + attached.X * (float)scale, viewport.Top + attached.Y * (float)scale);
+                }
+            }
             var originGui = RoundedClamped(originPixels, expandedSize, viewport, safe, scale);
             var rectangles = geometry.Rectangles.ToDictionary(item => item.Key, item => new RectangleF(
                 viewport.X + (originGui.X + item.Value.X) * (float)scale, viewport.Y + (originGui.Y + item.Value.Y) * (float)scale,

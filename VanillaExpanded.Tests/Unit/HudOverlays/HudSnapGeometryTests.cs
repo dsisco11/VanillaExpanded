@@ -153,7 +153,7 @@ public sealed class HudSnapGeometryTests
     {
         var target = new HudSnapTarget("destination", member, new RectangleF(40, 200, 80, 60), 5);
         var moving = new RectangleF(5, 200, 30, 20);
-        var screen = Candidates(moving, moving.Location, Array.Empty<HudSnapTarget>()).First(value => value.AlignsX);
+        var screen = Candidates(moving, moving.Location, Array.Empty<HudSnapTarget>()).First(value => value.Axis == HudSnapAxis.X);
         var selected = Candidates(moving, new PointF(target.Bounds.Left, target.Bounds.Top + target.Bounds.Height / 2), new[] { target }, screen).First();
         Assert.True(selected.Grouping); Assert.Equal(target, selected.Target); Assert.Equal(HudSnapSide.Left, selected.Side);
     }

@@ -36,7 +36,7 @@ public sealed class WeatherConditionsSystemTests
             hud.StartClientSide(fixture.Api.Object);
             system.StartClientSide(fixture.Api.Object);
             var group = hud.Registry.GetGroups().Single(value => value.Id == "world-status");
-            Assert.Equal(HudOverlayAnchorContext.ScreenTargetId, group.Placement.TargetId);
+            Assert.Equal(HudOverlayTargets.Screen, group.Placement.TargetId);
             Assert.Equal(HudOverlayPoint.RightTop, group.Placement.Attachment);
             Assert.Equal(HudOverlayPoint.RightTop, group.Placement.Pivot);
             Assert.Equal(HudOverlayDirection.Vertical, group.Packing.Direction);

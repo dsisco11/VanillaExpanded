@@ -34,7 +34,7 @@ internal static class HudOverlayConfiguration
         // Offset fallback is independent per axis so one invalid value does not erase the other preference.
         return config.HeldItemStatusAnchor switch
         {
-            "hotbar" => new(HudOverlayAnchorContext.HotbarTargetId,
+            "hotbar" => new(HudOverlayTargets.Hotbar,
                 HudOverlayPoint.RightMiddle, HudOverlayPoint.LeftMiddle, x, y),
             "screen-left-top" => Screen(HudOverlayPoint.LeftTop, x, y),
             "screen-center-top" => Screen(HudOverlayPoint.CenterTop, x, y),
@@ -45,7 +45,7 @@ internal static class HudOverlayConfiguration
             "screen-left-bottom" => Screen(HudOverlayPoint.LeftBottom, x, y),
             "screen-center-bottom" => Screen(HudOverlayPoint.CenterBottom, x, y),
             "screen-right-bottom" => Screen(HudOverlayPoint.RightBottom, x, y),
-            _ => new(HudOverlayAnchorContext.SaturationTargetId,
+            _ => new(HudOverlayTargets.Saturation,
                 HudOverlayPoint.LeftTop, HudOverlayPoint.LeftBottom, x, y)
         };
     }
@@ -54,6 +54,6 @@ internal static class HudOverlayConfiguration
     #region Private
     /// <summary>Uses matching screen attachment and group pivot so offsets follow native alignment.</summary>
     private static HudOverlayPlacement Screen(HudOverlayPoint point, double x, double y) =>
-        new(HudOverlayAnchorContext.ScreenTargetId, point, point, x, y);
+        new(HudOverlayTargets.Screen, point, point, x, y);
     #endregion
 }

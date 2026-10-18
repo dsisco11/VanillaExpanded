@@ -15,6 +15,54 @@ namespace VanillaExpanded.Tests.Unit.HudOverlays;
 public sealed class HudOverlaySnappingTests
 {
     #region Public API
+    /// <summary>Shift removes the active external snap preview so a later free commit cannot retain stale docking.</summary>
+    [Theory]
+    [InlineData(1, 500, 280, 150, 30)] [InlineData(1.5f, 500, 280, 150, 30)]
+    public void ShiftBypassClearsExternalAttachment(float scale, float x, float y, float width, float height)
+    {
+        using var fixture = new Fixture(scale); fixture.Begin();
+        var boundary = new HudSnapBoundary("hotbar", new RectangleF(x, y, width, height));
+        fixture.Boundaries[boundary.Id] = boundary.Bounds;
+        var source = fixture.Layouts["source"].Root;
+        var pointer = new PointF(boundary.Bounds.Left + 12, boundary.Bounds.Top - (float)source.OuterHeight - 2);
+        fixture.Movement.Move(pointer); fixture.Repack();
+        fixture.Snapping.Update(fixture.Movement, pointer, false, scale, new RectangleF(0, 0, 800, 600), fixture.Layouts, _ => true, new[] { boundary });
+        Assert.NotNull(fixture.Snapping.Selected); Assert.NotNull(fixture.Containers.Owner("test:a")!.Attachment);
+        fixture.Containers.ClearSnap(fixture.Movement.UnsnappedOrigin); fixture.Repack();
+        fixture.Snapping.Update(fixture.Movement, pointer, true, scale, new RectangleF(0, 0, 800, 600), fixture.Layouts, _ => true, new[] { boundary });
+        Assert.Null(fixture.Snapping.Selected); Assert.True(fixture.Snapping.DropAllowed);
+        fixture.Movement.Commit(fixture.Movement.Position!.Value);
+        Assert.Null(fixture.Restart().Owner("test:a")!.Attachment);
+    }
+
+    /// <summary>A docked destination retains its external pivot and shows the same fractional-scale merge geometry it later commits.</summary>
+    [Theory]
+    [InlineData(1, 41, 31, 40, 30, 600, 260, 100, 40)]
+    [InlineData(1.5f, 41, 31, 40, 30, 600, 260, 100, 40)]
+    public void DockedMergePreviewMatchesMeasuredCommit(float scale, float sourceWidth, float sourceHeight, float targetWidth, float targetHeight,
+        float nativeX, float nativeY, float nativeWidth, float nativeHeight)
+    {
+        using var fixture = new Fixture(scale, measured: new SizeF(targetWidth, targetHeight), sourceSize: new SizeF(sourceWidth, sourceHeight));
+        var native = new RectangleF(nativeX, nativeY, nativeWidth, nativeHeight);
+        fixture.Boundaries["hotbar"] = native;
+        var attachment = new HudOverlayPlacement("native:hotbar", HudOverlayPoint.LeftMiddle, HudOverlayPoint.RightMiddle, screenPaddingPixels: 0);
+        fixture.DockTarget(attachment);
+        fixture.Begin(); fixture.MoveBesideTarget(HudSnapSide.Above); fixture.Update();
+        var selected = Assert.IsType<HudSnapCandidate>(fixture.Snapping.Selected);
+        Assert.True(selected.Grouping); Assert.True(fixture.Snapping.DropAllowed);
+        var insertion = fixture.Snapping.Insertion; var destination = fixture.Snapping.Destination;
+        fixture.Repack();
+        var joined = Assert.Single(fixture.Containers.Resolved);
+        Assert.Equal(attachment, joined.Attachment);
+        var actual = fixture.Layouts[joined.Id];
+        var source = actual.Members.Single(member => member.Registration.Id == "test:a");
+        var target = actual.Members.Single(member => member.Registration.Id == "test:b");
+        Assert.Equal(insertion, source.Clip); Assert.Equal(destination, target.Clip);
+        fixture.Movement.Commit(fixture.Containers.Origin(joined)!.Value); fixture.Repack();
+        Assert.Equal(insertion, fixture.Layouts[joined.Id].Members.Single(member => member.Registration.Id == "test:a").Clip);
+        Assert.Equal(attachment, Assert.Single(fixture.Restart().Resolved).Attachment);
+    }
+
     /// <summary>An edge-constrained member can move from the bottom to the top of its own stack and persist the reordered layout.</summary>
     [Theory]
     [InlineData(1, 800, 600, 80, 80, false)]
@@ -78,7 +126,8 @@ public sealed class HudOverlaySnappingTests
     {
         using var fixture = new Fixture(scale, targetOrigin: new PointF(350, 250));
         fixture.Begin();
-        var boundary = new HudSnapBoundary("native:health", new RectangleF(230.25f, 255.25f, 130, 22));
+        var boundary = new HudSnapBoundary("healthstatbar", new RectangleF(230.25f, 255.25f, 130, 22));
+        fixture.Boundaries[boundary.Id] = boundary.Bounds;
         var source = fixture.Layouts["source"].Root;
         var pointer = new PointF(boundary.Bounds.Left + 12, boundary.Bounds.Top - (float)source.OuterHeight - 2);
         fixture.Movement.Move(pointer); fixture.Repack();
@@ -92,6 +141,7 @@ public sealed class HudOverlaySnappingTests
         Assert.Equal(selected.Origin.Y, (float)actual.renderY, 3);
         Assert.Equal(2, fixture.Containers.Resolved.Count);
         Assert.Equal(2, fixture.Restart().Resolved.Count);
+        Assert.Equal(HudOverlayTargets.Target(boundary.Id), fixture.Restart().Owner("test:a")!.Attachment!.TargetId);
     }
 
     /// <summary>Native HUD surfaces reject overlapping free drops while Shift explicitly bypasses both magnets and obstacles.</summary>
@@ -312,7 +362,7 @@ public sealed class HudOverlaySnappingTests
         Assert.True(fixture.Snapping.DropAllowed);
         fixture.Movement.Commit(fixture.Movement.Position!.Value); fixture.Repack(); Assert.Equal(2, fixture.Containers.Resolved.Count);
         var committed = fixture.Layouts["source"].Root;
-        Assert.Equal(selected.AlignsX ? selected.Origin.X : selected.Origin.Y, (float)(selected.AlignsX ? committed.renderX : committed.renderY), 3);
+        Assert.Equal((selected.Axis == HudSnapAxis.X) ? selected.Origin.X : selected.Origin.Y, (float)((selected.Axis == HudSnapAxis.X) ? committed.renderX : committed.renderY), 3);
     }
 
     /// <summary>Edge alignment cannot advertise a snapped placement over another visible indicator.</summary>
@@ -346,12 +396,13 @@ public sealed class HudOverlaySnappingTests
     [InlineData(1.25f)] [InlineData(1.5f)] [InlineData(1.75f)]
     public void FractionalCenterKeepsResolvedAlignmentGuide(float scale)
     {
-        using var fixture = new Fixture(scale); fixture.Begin();
-        var viewport = new RectangleF(0, 0, 799, 600); var source = fixture.Layouts["source"].Root;
+        var viewport = new RectangleF(0, 0, 799, 600);
+        using var fixture = new Fixture(scale, viewport: viewport); fixture.Begin();
+        var source = fixture.Layouts["source"].Root;
         float center = (viewport.Width - (float)source.OuterWidth) / 2;
         fixture.Movement.Move(new PointF(center + 2, 50)); fixture.Repack();
         fixture.Snapping.Update(fixture.Movement, new PointF(center + 2, 50), false, scale, viewport, fixture.Layouts, _ => true);
-        var selected = Assert.IsType<HudSnapCandidate>(fixture.Snapping.Selected); Assert.False(selected.Grouping); Assert.True(selected.AlignsX);
+        var selected = Assert.IsType<HudSnapCandidate>(fixture.Snapping.Selected); Assert.False(selected.Grouping); Assert.Equal(HudSnapAxis.X, selected.Axis);
         fixture.Movement.Commit(fixture.Movement.Position!.Value); fixture.Repack();
         var actual = fixture.Layouts["source"].Root;
         Assert.Equal(selected.Origin.X, (float)actual.renderX, 3);
@@ -384,7 +435,7 @@ public sealed class HudOverlaySnappingTests
             Assert.False(selected.Grouping); Assert.True(fixture.Snapping.DropAllowed);
             fixture.Repack();
             var preview = fixture.Layouts["source"].Root;
-            if (selected.AlignsX) Assert.InRange(Math.Abs(desired.X - (float)preview.renderX), 0, scale);
+            if (selected.Axis == HudSnapAxis.X) Assert.InRange(Math.Abs(desired.X - (float)preview.renderX), 0, scale);
             else Assert.InRange(Math.Abs(desired.Y - (float)preview.renderY), 0, scale);
             fixture.Movement.Commit(fixture.Movement.Position!.Value); fixture.Repack();
             Assert.Equal(selected.Origin.X, (float)fixture.Layouts["source"].Root.renderX, 3);
@@ -419,6 +470,7 @@ public sealed class HudOverlaySnappingTests
         public readonly HudOverlayGroupMovement Movement;
         public readonly HudOverlaySnapping Snapping;
         public readonly Dictionary<string, HudOverlayGroupLayout> Layouts = new();
+        public readonly Dictionary<string, RectangleF> Boundaries = new();
         public HudOverlayAnchorContext Anchors => anchors;
         #region Public API
         /// <summary>Builds caller-defined instrument geometry at a selected native scale.</summary>
@@ -431,7 +483,8 @@ public sealed class HudOverlaySnappingTests
             if (paired) { members.Add(storage.Add("test:a2", "source")); members.Add(storage.Add("test:b2", "target")); }
             Containers = new HudOverlayContainers(storage.Api.Object, storage.Registry);
             Containers.SetMovable("source", true, new PointF(30, 40)); Containers.SetMovable("target", false, targetOrigin ?? new PointF(200, 120));
-            anchors = new HudOverlayAnchorContext(window, () => RuntimeEnv.GUIScale, () => null);
+            anchors = new HudOverlayAnchorContext(window, () => RuntimeEnv.GUIScale, () => Boundaries.TryGetValue(HudOverlayTargets.Hotbar, out var hotbar) ? hotbar : null,
+                readSaturation: () => Boundaries.TryGetValue(HudOverlayTargets.SaturationElement, out var saturation) ? saturation : null, readBoundary: id => Boundaries.TryGetValue(id, out var rectangle) ? rectangle : null);
             Movement = Containers.Get("source", individual ? "test:a" : null); Snapping = new HudOverlaySnapping(Containers); Repack();
         }
         /// <summary>Captures source movement without native titlebar hit testing.</summary>
@@ -456,7 +509,17 @@ public sealed class HudOverlaySnappingTests
         public HudOverlayContainers Restart() => new(storage.Api.Object, storage.Registry);
         /// <summary>Calculates feedback against native roots and drawable instrument measurements.</summary>
         public void Update(PointF? pointer = null) => Snapping.Update(Movement, pointer ?? attachmentPointer ?? Movement.UnsnappedOrigin, false,
-            RuntimeEnv.GUIScale, new RectangleF(0, 0, 800, 600), Layouts, _ => true);
+            RuntimeEnv.GUIScale, new RectangleF(0, 0, 800, 600), Layouts, _ => true,
+            Boundaries.Select(pair => new HudSnapBoundary(pair.Key, pair.Value)).ToArray());
+        /// <summary>Persists a target attachment through the same transaction contract used by a native snap.</summary>
+        public void DockTarget(HudOverlayPlacement attachment)
+        {
+            var origin = Containers.Origin(Containers.Owner("test:b")!)!.Value;
+            Assert.True(Containers.SetMovable("target", true, origin));
+            Assert.True(Containers.Begin("target", null, origin, new Dictionary<string, PointF>()));
+            Containers.Move(origin, attachment); Assert.True(Containers.Commit(origin));
+            Assert.True(Containers.SetMovable("target", false, origin)); Repack();
+        }
         /// <summary>Adds a separate measured obstacle in the proposed incoming footprint.</summary>
         public void AddObstacle()
         {
@@ -471,7 +534,7 @@ public sealed class HudOverlaySnappingTests
             foreach (var container in Containers.Resolved)
             {
                 if (!Layouts.TryGetValue(container.Id, out var layout)) Layouts[container.Id] = layout = new HudOverlayGroupLayout();
-                layout.Apply(anchors, Containers.Definition(container), members.Where(value => container.Tree.Leaves().Contains(value.Id)).Select(value => new KeyValuePair<HudOverlayRegistration, SizeF>(value, value.Id.StartsWith("test:a", StringComparison.Ordinal) ? sourceSize : size)).ToArray(), Containers.Origin(container), container.Tree, container.Padding);
+                layout.Apply(anchors, Containers.Definition(container), members.Where(value => container.Tree.Leaves().Contains(value.Id)).Select(value => new KeyValuePair<HudOverlayRegistration, SizeF>(value, value.Id.StartsWith("test:a", StringComparison.Ordinal) ? sourceSize : size)).ToArray(), Containers.Origin(container), container.Tree, container.Padding, container.Attachment);
             }
 
         }

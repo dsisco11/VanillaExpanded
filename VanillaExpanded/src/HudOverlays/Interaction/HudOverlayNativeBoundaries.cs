@@ -30,12 +30,12 @@ internal sealed class HudOverlayNativeBoundaries
             || api.World?.Player?.WorldData?.CurrentGameMode == EnumGameMode.Spectator) return result;
         if (hotbar.Resolve() is { } toolbar)
         {
-            result.Add(new("hotbar", toolbar));
+            result.Add(new(HudOverlayTargets.Hotbar, toolbar));
             // The native composer creates this hover element only when the temporal gear is enabled. Its public
             // hit area is a stable reference; do not duplicate the gear renderer's private offsets or jitter.
             foreach (var dialog in api.Gui.LoadedGuis)
                 if (dialog is HudHotbar native && native.Composers["hotbar"]?.GetElement("tempStabHoverText") is { } hover
-                    && ReadBounds(hover.Bounds) is { } gear) result.Add(new("temporal-stability", gear));
+                    && ReadBounds(hover.Bounds) is { } gear) result.Add(new(HudOverlayTargets.TemporalStability, gear));
         }
         HudStatbar? statbar = null;
         // Ambiguous replacements provide no authority. Re-read every drag update so resizing/rebinding cannot leave stale guides.
@@ -48,7 +48,7 @@ internal sealed class HudOverlayNativeBoundaries
         if (statbar == null || !statbar.IsOpened()) return result;
         var composer = statbar.Composers["statbar"];
         if (composer == null || !composer.Enabled || ReadBounds(composer.Bounds) == null) return result;
-        foreach (string key in new[] { "healthstatbar", "saturationstatbar" })
+        foreach (string key in new[] { HudOverlayTargets.HealthElement, HudOverlayTargets.SaturationElement })
             if (composer.GetElement(key) is GuiElementStatbar meter && ReadBounds(meter.Bounds) is { } rectangle)
                 result.Add(new(key, rectangle));
         return result;

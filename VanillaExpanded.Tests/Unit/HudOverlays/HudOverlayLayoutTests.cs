@@ -390,14 +390,14 @@ public sealed class HudOverlayLayoutTests
             var context = new HudOverlayAnchorContext(new Window(1800, 1000), () => scale, () => null,
                 readSaturation: () => { reads++; return target; });
             context.BeginFrame();
-            var group = Group(new(HudOverlayAnchorContext.SaturationTargetId, HudOverlayPoint.LeftTop, HudOverlayPoint.LeftBottom, -4, 0),
+            var group = Group(new(HudOverlayTargets.Saturation, HudOverlayPoint.LeftTop, HudOverlayPoint.LeftBottom, -4, 0),
                 new HudOverlayPacking(padding: 4));
             using var layout = new HudOverlayGroupLayout();
             layout.Apply(context, group, new[] { Member("mod:arrow", 40, 20) });
             var member = Assert.Single(layout.Members);
             Near(target.Left, member.Bounds.renderX);
             Near(target.Top - 4 * scale, member.Bounds.renderY + member.Bounds.OuterHeight);
-            context.Resolve(HudOverlayAnchorContext.SaturationTargetId);
+            context.Resolve(HudOverlayTargets.Saturation);
             Assert.Equal(1, reads);
         }
         finally { RuntimeEnv.GUIScale = old; }
