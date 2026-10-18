@@ -3,6 +3,8 @@
         ☐ Design a better separation of alloy calculator inventory ownership/liveness validation, transfer permissions, and storage-versus-machine access policy. Reconsider the storage-class whitelist without weakening ownership or withdrawal checks, and define coverage for vanilla and modded containers.
 
     ## Hud Indicators:
+        ☐ Replace HUD overlay titlebar controls with native right-click menus.
+            Implementation checklist: [HudContextMenus.todo](hud-overlays/HudContextMenus.todo)
         ☐ Make it so that the HUD indicators can be moved around freely by the player, just like the base-game windows are.
             Proposal: [MovableHudProposal.md](hud-overlays/MovableHudProposal.md)
             Implementation checklist: [MovableHud.todo](hud-overlays/MovableHud.todo)

@@ -1,0 +1,107 @@
+# HUD overlay context menus
+
+Source: approved context-menu discussion. Native control reference: `vsapi/Client/UI/Elements/Impl/Interactive/Controls/GuiElementListMenu.cs`.
+
+## Goal and contract
+
+Replace all overlay titlebars and their controls with right-click menus while the mouse is unlocked. Reuse native list-menu rendering and interaction through a small adapter and a shared controller. Preserve existing dragging, grouping, snapping, ghost previews, cancellation, persistence, and edit-mode bounds cues.
+
+- Indicator options: Enabled, supported Style selections, and one checkable Lock option. Checked means locked.
+- Enabled and Style affect the selected indicator. Lock affects its effective container, including every member of a group.
+- Disabled registered indicators remain accessible through the existing edit proxies; menus must not fabricate readings or activate unavailable integrations.
+- Right-click during a drag cancels only; it must not also open a menu.
+- No individual or group titlebars remain. Movable corner handles, locked dashed borders, and group hover backgrounds remain.
+- Preserve global layout reset access. Do not add individual reset semantics or a separate settings file.
+- Use native toggle lists for Enabled/Lock and a separate native selection list for Style. Mixed-action rows and cascading submenus are not required.
+
+## Decisions to settle before removing titlebars
+
+- [ ] Confirm the replacement gesture/access path for whole-group movement. Individual body dragging currently detaches members; removing the group titlebar must not silently remove whole-group dragging or change individual dragging semantics.
+- [ ] Confirm how the separate Style list is reached and how global Reset layout is exposed without mixing ordinary actions into the native toggle list. Present one concrete interaction design before implementing these choices.
+
+## Phase 1: Define shared menu capabilities and settings ownership
+
+Outcome: menu options have explicit targets and use the same authoritative settings as existing configuration UI.
+
+- [ ] Inventory every registered indicator's enable setting, supported style enum, mutation path, persistence path, and refresh requirements.
+- [ ] Add optional menu capabilities to registration metadata or an adjacent registration-owned descriptor; retain compatibility with existing callers and integrations.
+- [ ] Expose supported actions through owning feature/configuration APIs; keep feature-specific switches out of the shared menu controller.
+- [ ] Distinguish configured Enabled from momentary gameplay visibility and integration availability. Omit unsupported settings rather than inventing setters.
+- [ ] Derive Lock from effective movement permission and translate it to the existing movement API without resetting position or changing saved layout format.
+- [ ] Add localized option/style labels and any group-scope explanation required to make Lock's scope clear.
+- [ ] Verify capabilities, enum round-trips, grouped/standalone permission scope, and persistence through focused tests.
+
+Completion criteria:
+
+- [ ] Each supported indicator has a documented settings binding; missing capabilities remain safe and usable.
+- [ ] Menu changes and external configuration changes share one authoritative state.
+
+## Phase 2: Host native popup controls independently of titlebars
+
+Outcome: a shared popup owner can display native controls at an arbitrary pointer location.
+
+- [ ] Implement a narrow GuiElementListMenu subclass exposing protected popup measurements needed for placement, without private-field reflection or engine patches.
+- [ ] Implement a shared controller owning the current target, native controls/composer, focus, and disposal. Keep input policy separate from feature settings bindings.
+- [ ] Populate native switch state from current Enabled/Lock settings; populate the separate Style selector from supported enum choices.
+- [ ] Account for the native list's anchor-row offset, GUI scale, scrolling, and downward expansion when calculating actual popup bounds.
+- [ ] Clamp the complete visible popup to every screen edge; support constrained viewports without inaccessible rows.
+- [ ] Close on selection as appropriate, outside click, Escape, mouse locking, HUD hiding, target removal, world/session replacement, and disposal. Keep the target stable when the pointer leaves its bounds.
+- [ ] Rebuild or close safely when locale, GUI scale, viewport, capabilities, or settings change. Avoid rebuilding textures every frame.
+- [ ] Test native-control delegation, bounds containment with synthetic InlineData geometry, toggle/selection routing, focus loss, and resource cleanup.
+
+Completion criteria:
+
+- [ ] Popup placement and lifetime are independent of titlebar internals and transient hover geometry.
+- [ ] Controls use native artwork and ordinary HUD text conventions without custom mixed-menu rendering.
+
+## Phase 3: Integrate pointer routing and settings changes
+
+Outcome: indicators and edit proxies expose functional menus without breaking movement editing.
+
+- [ ] Route right-click through HudOverlayHost and controls: an active drag consumes it as cancellation before any menu-opening logic.
+- [ ] Hit-test visible indicator content/edit proxies deterministically, respecting foreground GUI ownership, modal input, clipping, and existing host ordering.
+- [ ] Capture input belonging to the open menu before drag initiation or gameplay actions; opening clicks must not also toggle a menu row.
+- [ ] Apply Enabled/Style using feature-owned setters and persist through existing configuration storage. Trigger the same lifecycle/refresh behavior as external configuration changes.
+- [ ] Keep a disabled target available as an edit proxy; handle style-dependent size changes through existing layout and attachment reflow.
+- [ ] Apply Lock atomically to the effective group or standalone container; refresh cues and menu state without moving the container.
+- [ ] Preserve keyboard navigation and dismissal without leaking Escape into unrelated cancellation or closing underlying windows.
+- [ ] Verify all supported styles, disabled targets, grouped scope, foreground windows, right-click cancellation, and settings changes while a menu is open.
+
+Completion criteria:
+
+- [ ] Every advertised menu action changes the intended authoritative setting and survives its applicable restart scope.
+- [ ] Ordinary right-clicks outside eligible editing targets retain their existing behavior.
+
+## Phase 4: Replace titlebars and retain movement/reset access
+
+Outcome: menu access fully replaces titlebar controls without losing existing layout operations.
+
+- [ ] Implement the approved whole-group movement access path using the existing movement transaction, snapping, source reservation, and preview mechanisms.
+- [ ] Implement the approved global Reset layout access path using the existing reset operation; close stale menus after reset.
+- [ ] Remove titlebar creation, rendering, hit areas, native Fixed/Movable dropdown routing, caption-only resources, and titlebar-only layout offsets/constants where no longer used.
+- [ ] Remove HudOverlayNativeTitleBar and its reflection dependencies when no consumers remain; retain container position/settings persistence independently of native titlebar side effects.
+- [ ] Preserve corner handles, locked dashed borders, hover fill, member dragging/detachment, group merges, Shift bypass, Escape/right-click cancellation, and source ghosts/reservations.
+- [ ] Reconcile tests against the replacement interaction contracts; remove obsolete titlebar expectations rather than keeping compatibility scaffolding.
+- [ ] Verify existing saved layouts load unchanged and permissions/anchors survive lock toggles, reset, and restart.
+
+Completion criteria:
+
+- [ ] No overlay titlebars or Fixed/Movable UI choices remain; standalone and whole-group movement remain accessible.
+- [ ] Global reset and existing layout persistence retain their behavior.
+
+## Phase 5: Documentation, validation, and user acceptance
+
+Outcome: implementation, current documentation, and shipped assets agree.
+
+- [ ] Update HudOverlays.md architecture/input descriptions and README user controls; document menu scope, Lock behavior, whole-group gesture, and reset access. Describe current behavior only.
+- [ ] Audit implementation against every contract above and remove stale titlebar references, unused localization, and resources only where unreferenced.
+- [ ] Run focused tests and appropriate full build/test/package checks through subagents. Follow test AGENTS.md: no assertions of chosen colors, opacity, font sizes, or hardcoded visual dimensions; synthetic setup geometry belongs in InlineData.
+- [ ] Verify packaged localization and any required resources using canonical repository tooling.
+- [ ] Obtain user-run in-game acceptance: all indicators/styles and edit proxies; every screen edge and GUI scale; inventory/modal overlap; native toggles and Style selection; whole-group and individual dragging; Lock scope; reset; cancellation; restart persistence.
+- [ ] Record what was checked headlessly versus in game; resolve reported failures before completion.
+
+Final acceptance:
+
+- [ ] Every approved requirement is implemented and validated, with any remaining decisions explicitly resolved.
+- [ ] Native popup reuse does not depend on removed titlebars, duplicate settings state, or a new layout persistence implementation.
+- [ ] Build/test/package checks pass and user confirms the live interaction and appearance.
