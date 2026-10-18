@@ -45,7 +45,7 @@ internal sealed class HudOverlayGroupControls : IDisposable
     /// <summary>Owns actual native titlebar graphics/menu while borrowing the group's content and position state.</summary>
     public HudOverlayGroupControls(ICoreClientAPI api, GuiDialog host, HudOverlayGroupMovement movement,
         Func<HudOverlayRegistration, bool> drawable, Action relayout, Action? reset = null,
-        Func<HudOverlayGroupMovement, PointF, bool>? snap = null)
+        Func<HudOverlayGroupMovement, PointF, bool>? snap = null, IHudOverlayDashedBorder? dashedBorder = null)
     {
         this.api = api;
         this.host = host;
@@ -54,7 +54,7 @@ internal sealed class HudOverlayGroupControls : IDisposable
         this.relayout = relayout;
         this.reset = reset ?? (() => { });
         this.snap = snap;
-        highlight = new HudOverlayGroupHighlight(api);
+        highlight = new HudOverlayGroupHighlight(api, dashedBorder);
         compositionBounds = ElementBounds.Fixed(0, 0, Width, HudOverlaySizes.TitleBarHeight).WithParent(api.Gui.WindowBounds);
         composer = api.Gui.CreateCompo(movement.Key, compositionBounds);
         titleBar = new HudOverlayNativeTitleBar(api, composer,
@@ -75,6 +75,7 @@ internal sealed class HudOverlayGroupControls : IDisposable
     public void Draw(float deltaTime)
     {
         Refresh(true);
+        if (!disposed && showOutline) highlight.DrawOutline(groupBounds, movement.Movable);
         if (visible && HasTitleBar) composer.Render(deltaTime);
     }
 
@@ -82,7 +83,7 @@ internal sealed class HudOverlayGroupControls : IDisposable
     public void DrawBackground()
     {
         Refresh(true);
-        if (!disposed && HasTitleBar) highlight.Draw(groupBounds, hovered, showOutline);
+        if (!disposed && HasTitleBar) highlight.Draw(groupBounds, hovered);
     }
     #endregion
     #region Pointer interaction
@@ -264,7 +265,7 @@ internal sealed class HudOverlayGroupControls : IDisposable
             && group.Members.Any(member => (movement.IndicatorId == null || member.Registration.Id == movement.IndicatorId) && drawable(member.Registration) && member.Clip.Width > 0 && member.Clip.Height > 0);
         // The outline is a global movement cue, independent of pointer hover over an unrelated window.
         // Modal input capture still disables movement; ordinary foreground windows only suppress hover controls.
-        showOutline = available && movement.IndicatorId == null && movement.Movable && !(api.Gui.OpenedGuis?.Any(dialog =>
+        showOutline = available && !(api.Gui.OpenedGuis?.Any(dialog =>
             !ReferenceEquals(dialog, host) && dialog.IsOpened() && dialog.CaptureAllInputs()) ?? false);
         if (available)
         {
