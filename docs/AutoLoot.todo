@@ -1,0 +1,206 @@
+# AutoLoot Implementation Task List
+
+Proposal: [AutoLootProposal.md](./AutoLootProposal.md)
+Status: Not started.
+
+Conventions:
+    [ ] Pending task.
+    Each task has a stable ID and explicit prerequisites.
+    "Depends: none" means the task can proceed independently.
+    Implementation and automated tests precede in-game acceptance testing.
+    The client-only API/protocol investigation is already complete for the
+    inspected game version; do not treat a new feasibility investigation or
+    in-game test of an unimplemented feature as a prerequisite.
+
+## Design Constraints
+    - Client-only AutoLoot; no custom server ModSystem, channel, or packets.
+    - Use the normal vanilla corpse interaction and inventory-open lifecycle.
+    - Send vanilla transfer packets through the corpse's entity-wrapped route.
+    - Collect available loot only; never harvest, generate drops, or bypass access.
+    - Transfer everything that fits; leave overflow intact on the corpse.
+    - One collection pass per continuous hold, not one packet per hold.
+    - Preserve normal click-to-open and all existing AutoStash behavior.
+    - Treat hold duration and feature enablement as local UX preferences.
+    - Do not present predicted movement as confirmed server success.
+    - Initial scope is standard harvested corpses, not arbitrary entity storage.
+
+## Phase 1: Resolve Integration Details
+    [ ] AL-01: Select the narrow client interaction hook.
+        Depends: none.
+        Inspect the existing interaction/input boundaries and choose how the
+        gesture starts while allowing vanilla interaction to open the inventory.
+        Account for held/released input after the loot dialog opens, including
+        immersive mouse mode. Do not suppress the server's normal open flow.
+        Prefer existing API hooks; use a client-only Harmony patch only if needed.
+        Record the selected approach in the proposal.
+
+    [ ] AL-02: Finalize eligibility and presentation decisions.
+        Depends: none.
+        Confirm first-release eligibility as the standard harvested-corpse path;
+        leave player corpses and other mod-specific inventory protocols excluded
+        unless explicitly approved and verified.
+        Decide whether AutoLoot exposes its own render-topmost preference or uses
+        a documented default independent of AutoStash's setting.
+        Define neutral completion/capacity feedback without an aggregate server
+        acknowledgement or an inferred access-denied reason.
+        Record these decisions in the proposal.
+
+## Phase 2: Share Hold and Progress Infrastructure
+    [ ] AL-03: Extract a small shared hold lifecycle with focused tests.
+        Depends: none.
+        Own elapsed time, grace-period visibility, clamped progress, label,
+        cancellation, cleanup, and submit-once completion state.
+        Keep input interpretation, target identity, eligibility, and dispatch in
+        feature adapters. Preserve callback-driven and tick-driven callers.
+        Test exact grace/completion thresholds, release/reset, repeated updates
+        after completion, unavailable rendering, and idempotent cleanup.
+        Avoid a general-purpose interaction framework.
+
+    [ ] AL-04: Decouple radial presentation from AutoStash configuration.
+        Depends: AL-02.
+        Allow callers to supply presentation preferences to progress creation.
+        Preserve existing AutoStashGuiRendersTopmost configuration and behavior.
+        Reuse IProgressSystemProvider, the current renderer, and existing shaders.
+        Update directly affected callers, mocks, and progress tests.
+
+    [ ] AL-05: Migrate AutoStash callers to shared hold behavior.
+        Depends: AL-03.
+        Migrate attached-container timing/progress ownership first; adapt block
+        interaction lifecycle where practical without forcing a shared input loop.
+        Preserve crate modifiers, attachment selection, block handling, pre/post
+        grace periods, animations, sounds, and current packet dispatch.
+        Keep matching policies and the server transfer executor stash-specific.
+        Run targeted block/attached-container interaction and lifecycle tests.
+
+## Phase 3: Implement Client AutoLoot
+    [ ] AL-06: Add a client-only feature lifecycle and corpse adapter.
+        Depends: AL-01, AL-02.
+        Resolve the current standard harvested corpse and its actual inventory.
+        Require a dead, eligible target with available loot; track entity identity
+        and the current vanilla-opened session rather than a copied inventory.
+        Observe open/close and invalidation; local OpenInventory alone must never
+        be treated as server authorization.
+        Register only required client hooks/listeners and release them on disposal.
+        Do not alter corpse drops, watched attributes, persistence, or cleanup.
+
+    [ ] AL-07: Add the vanilla client transfer coordinator.
+        Depends: AL-06.
+        Iterate current nonempty source slots using TryTransferAway with
+        onlyPlayerInventory: true and the appropriate ActingPlayer/operation.
+        Send each returned packet once via SendEntityPacketWithOffset using the
+        target entity and the verified corpse packet offset.
+        Do not also send an activate/shift-click packet for the same operation.
+        Preserve engine merge rules, stack attributes, restrictions, and partial
+        movement; never clone items and clear the source.
+        Continue to later loot stacks when another stack cannot move.
+        Stop on session/target invalidation and bound any additional retry loop.
+        Use TryTransferTo only if exact destination routing proves necessary.
+        Reuse client transfer prior art without extracting unused abstractions or
+        routing corpse operations through global SendPacketClient.
+
+    [ ] AL-08: Wire the hold gesture to one collection pass.
+        Depends: AL-03, AL-04, AL-06, AL-07.
+        Start only for eligible corpses and let normal click-to-open proceed.
+        Show localized radial progress after the grace period.
+        At completion, require the valid vanilla-opened session before collecting;
+        never substitute a locally forced open or an arbitrary readiness timeout.
+        Cancel on release, retargeting, lost reach, dimension change, closed
+        session, target invalidation, disablement, or disposal.
+        Require release before starting another pass after completion.
+        Preserve existing windows; do not close an already-open loot inventory.
+
+    [ ] AL-09: Implement prediction-aware feedback.
+        Depends: AL-02, AL-07, AL-08.
+        Distinguish neutral interaction completion from authoritative success.
+        Use local capacity information cautiously and observe vanilla corrections;
+        do not promise a confirmed collected count from predicted movement.
+        Do not add custom result packets or automatic endless correction retries.
+        Surface unexpected failures using existing logging conventions.
+
+## Phase 4: Configuration, Localization, and Documentation
+    [ ] AL-10: Integrate local AutoLoot settings.
+        Depends: AL-02, AL-06.
+        Add EnableAutoLoot (default true) and AutoLootDelay (default 0.5 seconds).
+        Follow existing delay validation/range conventions and ConfigLib patterns.
+        Wire the chosen presentation preference without coupling to AutoStash.
+        Verify ConfigLib does not turn these settings into a server dependency.
+        Support independent AutoLoot/AutoStash enablement and cancel active work
+        when AutoLoot is disabled.
+        Keep the mod universal and requiredOnServer: false.
+
+    [ ] AL-11: Add localized text and interaction help.
+        Depends: AL-02, AL-08, AL-09, AL-10.
+        Add AutoLoot progress text, eligible-target interaction help, setting
+        labels/descriptions, and any approved feedback using existing conventions.
+        Do not replace vanilla harvesting or loot-window help.
+
+    [ ] AL-12: Update feature documentation and proposal status.
+        Depends: AL-08, AL-09, AL-10, AL-11.
+        Document hold-to-loot, client-only installation, settings, eligibility,
+        overflow behavior, and the distinction from harvesting.
+        Update the proposal to match implemented decisions.
+        Record the tested game version and any remaining compatibility limits.
+
+## Phase 5: Automated Validation
+    [ ] AL-13: Cover gesture, session, and feature lifecycle behavior.
+        Depends: AL-05, AL-08, AL-10.
+        Use feature-organized tests and existing mocks; mark unit tests Category=Unit.
+        Cover short click, timing boundaries, repeated ticks/interactions, release,
+        retargeting, reach/dimension changes, empty/living/unharvested targets,
+        delayed session readiness, session closure, disablement, and disposal.
+        Assert at most one collection pass per hold and complete progress cleanup.
+        Verify AutoLoot and AutoStash work independently and do not leave orphaned
+        or overlapping indicators.
+
+    [ ] AL-14: Cover transfer correctness and packet transport.
+        Depends: AL-07, AL-09.
+        Prefer real InventoryGeneric instances and existing test infrastructure.
+        Cover sufficient/full/partial capacity, existing-stack merges, restricted
+        slots, rejected moves, multiple loot types, and attribute preservation.
+        Assert player-only destinations, no transfers into unrelated open
+        containers, correct entity-wrapped routing, and one send per returned packet.
+        Test invalidation during callbacks, bounded termination, and no duplicate
+        activate-plus-move submissions.
+        Verify predicted movement is not reported as confirmed server success.
+        Unit tests do not substitute for vanilla server reconciliation tests.
+
+    [ ] AL-15: Run targeted regression checks and build.
+        Depends: AL-04, AL-05, AL-09, AL-10, AL-11, AL-12, AL-13, AL-14.
+        Run AutoLoot, shared-progress, and affected AutoStash tests with one focused
+        runner/filter where possible; include client transfer regressions if shared
+        AlloyCalculator code changed.
+        Run the existing mod build and relevant asset/configuration validation.
+        Fix regressions caused by the change; expand suites only when warranted.
+
+## Phase 6: In-Game Release Acceptance (After Implementation)
+    [ ] AL-16: Validate normal interaction and full/partial collection.
+        Depends: AL-15.
+        Test ordinary and immersive mouse modes in a running game.
+        Confirm a click opens loot normally and holding survives dialog opening,
+        displays progress, collects once, and requires release to repeat.
+        Test release/retarget/cancel, inventory full, partial space, empty corpses,
+        and intact harvesting requirements.
+        Confirm AutoStash gestures and rendering remain unchanged.
+
+    [ ] AL-17: Confirm operation against a server without VanillaExpanded.
+        Depends: AL-15.
+        Install the feature on the client only and connect to a compatible server
+        without the mod. Confirm collection works and persists after reopening
+        the corpse inventory and reconnecting.
+        Verify no custom AutoLoot channel, packet handler, or server setting is
+        required and other clients observe the updated corpse contents.
+
+    [ ] AL-18: Validate latency, contention, and lifecycle edge cases.
+        Depends: AL-15.
+        Test two players looting the same corpse, delayed synchronization, rejected
+        or stale predictions, session closure, target disappearance, and lost reach.
+        Confirm vanilla reconciliation restores correct contents without item
+        duplication, loss, endless retries, or false confirmed-success feedback.
+        Confirm feature disablement and world exit leave no listeners or renderers.
+
+    [ ] AL-19: Record acceptance results and close implementation tasks.
+        Depends: AL-16, AL-17, AL-18.
+        Record tested client/server versions, settings, outcomes, and limitations
+        in the proposal or existing test documentation.
+        Mark tasks complete only with corresponding implementation/test evidence.
+        Leave unsupported corpse protocols explicitly out of scope.
