@@ -1,6 +1,6 @@
 # AutoLoot Proposal
 
-Status: Phases 1 and 2 complete; AutoLoot-specific implementation not started.
+Status: Phases 1-3 complete; settings/help integration and gameplay validation pending.
 
 ## Summary
 
@@ -17,10 +17,10 @@ Reduce duplication by sharing hold timing, progress presentation, and low-level
 inventory operations. Keep corpse eligibility and loot transfer rules separate
 from AutoStash's matching-item policies.
 
-This document describes the recommended design, not an implemented feature.
+The client implementation and focused automated tests are complete.
 Installed-game inspection confirms the vanilla packet path needed for
-client-only collection. In-game validation of the hold gesture, latency, and
-concurrent looting remains necessary.
+client-only collection. Configuration/help integration and in-game validation
+of the hold gesture, latency, and concurrent looting remain necessary.
 
 ## Goals
 
@@ -469,16 +469,73 @@ Validation:
 - The commands compile the mod and test projects. Existing unrelated compiler
   warnings remain; no in-game AutoLoot validation is claimed.
 
-### Phase 3: Implement AutoLoot
+### Phase 3: Implement Client AutoLoot (Complete)
 
-Add the corpse adapter, client interaction, vanilla transfer coordinator,
-configuration, localization, and documentation. Do not add server handlers or
-custom AutoLoot packets.
+- [AutoLootSystem_Client](../VanillaExpanded/src/ModSystems/AutoLootSystem_Client.cs)
+  loads only on clients and owns a separate Harmony patch owner, input/tick/world
+  listeners, live-disable cancellation, and cleanup. Its
+  [postfix](../VanillaExpanded/src/AutoLoot/AutoLootInteractionPatch.cs) preserves
+  the original native interaction and inventory-open handling.
+- [AutoLootTarget](../VanillaExpanded/src/AutoLoot/AutoLootTarget.cs) binds the
+  corpse, player, native inventory, open dialog, dimension, and copied local hit
+  point. It rechecks eligibility, session identity, and the native five-block
+  eye-to-hit reach without opening sessions or writing inventory state.
+  Initial support requires the exact native harvestable behavior; modded assets
+  using that unchanged behavior are eligible, but behavior subclasses and player
+  corpses are not.
+- [AutoLootClient](../VanillaExpanded/src/AutoLoot/AutoLootClient.cs) reuses the
+  shared hold lifecycle with a 0.1-second grace and fixed topmost rendering.
+  It observes raw right-button state and non-consuming release events, ignores
+  UI-only selection movement, and requires release after completion/cancellation.
+  It leaves the loot window open. Starting attached-container AutoStash cancels
+  pending AutoLoot until release so that the gestures cannot overlap.
+- [AutoLootTransferCoordinator](../VanillaExpanded/src/AutoLoot/AutoLootTransferCoordinator.cs)
+  makes one bounded source-slot pass, delegating merge/restriction/capacity rules
+  to player-only `TryTransferAway`. Returned packets are sent once through the
+  bound entity route with offset zero. Packets for already-predicted movement
+  are still sent if its callback invalidates the target; subsequent slots stop.
+  There are no additional activation packets or correction retry loops.
+- Feedback remains neutral: completion removes progress, existing inventories
+  show results, and vanilla handles authoritative corrections. No collected
+  count, success sound, or inferred full/access-denied result is presented.
+  Unexpected timing/collection exceptions cancel the gesture and are logged.
+- Minimal `EnableAutoLoot=true`, `AutoLootDelay=0.5f`, and English progress text
+  were pulled forward as implementation prerequisites. Full configuration/help
+  integration remains Phase 4. No server handler or custom AutoLoot packet was
+  introduced.
 
-### Phase 4: Validate End to End
+Validation:
+
+- [AutoLoot unit tests](../VanillaExpanded.Tests/Unit/AutoLoot/) cover eligibility,
+  target/session invalidation, timing/input, cleanup, unavailable rendering,
+  release latching, packet routing, partial capacity, attributes, errors, and
+  attached-stash precedence. A real Harmony test invokes native corpse
+  `OnInteract`, verifies vanilla opening/handling, dispatch, and scoped unpatching.
+- `dotnet test .\VanillaExpanded.Tests\VanillaExpanded.Tests.csproj --no-restore --filter "FullyQualifiedName~AutoLoot|FullyQualifiedName~AutoStashing|FullyQualifiedName~HoldInteractionProgress"`:
+  488 passed (52 AutoLoot), zero failed or skipped.
+- The isolated `HarmonyDispatchIntegrationTests` regression passed again:
+  one test, zero failed or skipped.
+- Both commands compile the mod and applicable tests. Existing unrelated
+  compiler warnings remain. These tests do not prove native server
+  reconciliation, latency handling, or gameplay against an unmodified server.
+
+### Phase 4: Configuration, Localization, and Documentation
+
+Complete client-local ConfigLib settings and validation, eligible-target
+interaction help, setting labels/descriptions, and player-facing documentation.
+
+### Phase 5: Automated Validation
 
 Add feature-organized tests using existing mocks and real `InventoryGeneric`
 instances where appropriate. Use the existing test category conventions.
+Extend the implemented checks to cover settings/help integration and run final
+regressions after Phase 4; the task list retains those tasks as pending.
+
+### Phase 6: In-Game Release Acceptance
+
+Verify the implemented hold/UI behavior, authoritative inventory reconciliation,
+overflow, latency, concurrent looters, and unmodified-server compatibility in
+game. These acceptance checks remain pending.
 
 ## Acceptance Criteria
 

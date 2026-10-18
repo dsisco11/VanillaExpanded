@@ -34,6 +34,7 @@ internal sealed class EntityAttachedContainerAutoStashClient : IDisposable
     /// <summary>Starts a target gesture, preserving an existing gesture for the same target.</summary>
     public void Begin(EntityBehaviorAttachable attachable, int attachmentSlotIndex)
     {
+        AutoLootSystem_Client.Active?.Client?.CancelUntilRelease();
         if (pendingEntityId == attachable.entity.EntityId
             && pendingAttachmentSlotIndex == attachmentSlotIndex)
         {

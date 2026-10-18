@@ -1,7 +1,7 @@
 # AutoLoot Implementation Task List
 
 Proposal: [AutoLootProposal.md](./AutoLootProposal.md)
-Status: Phases 1 and 2 complete; AutoLoot-specific implementation not started.
+Status: Phases 1-3 complete; settings/help integration and gameplay validation pending.
 
 Conventions:
     [ ] Pending task.
@@ -101,7 +101,7 @@ Conventions:
         integration test; mod and test projects compile successfully.
 
 ## Phase 3: Implement Client AutoLoot
-    [ ] AL-06: Add a client-only feature lifecycle and corpse adapter.
+    [x] AL-06: Add a client-only feature lifecycle and corpse adapter.
         Depends: AL-01, AL-02.
         Resolve the current standard harvested corpse and its actual inventory.
         Require a dead, eligible target with available loot; track entity identity
@@ -110,8 +110,14 @@ Conventions:
         be treated as server authorization.
         Register only required client hooks/listeners and release them on disposal.
         Do not alter corpse drops, watched attributes, persistence, or cleanup.
+        Completed: AutoLootSystem_Client owns client-only, separately scoped
+        Harmony registration, tick/input/world listeners, live-disable handling,
+        and disposal. AutoLootTarget binds the exact native harvestable behavior,
+        corpse identity, real inventory, dialog, player, dimension, and hit point.
+        Session, eligibility, and reach checks are read-only; vanilla alone opens
+        and authorizes the session. Custom behavior subclasses are excluded.
 
-    [ ] AL-07: Add the vanilla client transfer coordinator.
+    [x] AL-07: Add the vanilla client transfer coordinator.
         Depends: AL-06.
         Iterate current nonempty source slots using TryTransferAway with
         onlyPlayerInventory: true and the appropriate ActingPlayer/operation.
@@ -125,8 +131,14 @@ Conventions:
         Use TryTransferTo only if exact destination routing proves necessary.
         Reuse client transfer prior art without extracting unused abstractions or
         routing corpse operations through global SendPacketClient.
+        Completed: AutoLootTransferCoordinator makes one bounded source-slot pass
+        using TryTransferAway with player-only destinations and ActingPlayer.
+        Every returned packet is sent once to the bound entity with offset zero.
+        No duplicate activation packets, manual source mutation, custom channel,
+        or correction retries. Already-predicted packets are dispatched before
+        stopping an invalidated pass; subsequent slots require a valid session.
 
-    [ ] AL-08: Wire the hold gesture to one collection pass.
+    [x] AL-08: Wire the hold gesture to one collection pass.
         Depends: AL-03, AL-04, AL-06, AL-07.
         Start only for eligible corpses and let normal click-to-open proceed.
         Show localized radial progress after the grace period.
@@ -139,14 +151,30 @@ Conventions:
         consuming vanilla input or relying solely on InWorldMouseButton.
         Require release before starting another pass after completion.
         Preserve existing windows; do not close an already-open loot inventory.
+        Completed: native postfix preserves original opening/handling and starts
+        AutoLootClient's shared HoldInteractionProgress. Raw right-button polling
+        and non-consuming MouseUp observation maintain a release latch, including
+        over the GUI. The 0.1-second grace and configured delay use fixed topmost
+        rendering. World/session/input invalidation removes progress without
+        closing the loot window. Attached AutoStash takes precedence for a shared
+        hold, cancelling pending loot until release without changing stash rules.
 
-    [ ] AL-09: Implement prediction-aware feedback.
+    [x] AL-09: Implement prediction-aware feedback.
         Depends: AL-02, AL-07, AL-08.
         Distinguish neutral interaction completion from authoritative success.
         Use local capacity information cautiously and observe vanilla corrections;
         do not promise a confirmed collected count from predicted movement.
         Do not add custom result packets or automatic endless correction retries.
         Surface unexpected failures using existing logging conventions.
+        Completed: progress ends at dispatch, not confirmed success. Existing
+        inventory views and vanilla corrections provide results; no predicted
+        counts, success sounds, or inferred full/access-denied messages are added.
+        Unexpected collection/timing failures cancel and log the full exception.
+        Verified 52 AutoLoot tests within 488 passing focused unit tests, plus
+        one passing isolated AutoStash Harmony integration test. Tests include
+        native corpse postfix dispatch, lifecycle, transport, capacity/attributes,
+        bounded invalidation, error logging, and cross-feature progress cleanup.
+        No in-game or unmodified-server gameplay verification is claimed.
 
 ## Phase 4: Configuration, Localization, and Documentation
     [ ] AL-10: Integrate local AutoLoot settings.
@@ -159,12 +187,17 @@ Conventions:
         Support independent AutoLoot/AutoStash enablement and cancel active work
         when AutoLoot is disabled.
         Keep the mod universal and requiredOnServer: false.
+        Phase 3 prerequisite already implemented: defaulted config properties,
+        fixed layering, and live-disable cancellation. ConfigLib integration and
+        its local-setting behavior still require this phase.
 
     [ ] AL-11: Add localized text and interaction help.
         Depends: AL-02, AL-08, AL-09, AL-10.
         Add AutoLoot progress text, eligible-target interaction help, setting
         labels/descriptions, and any approved feedback using existing conventions.
         Do not replace vanilla harvesting or loot-window help.
+        Phase 3 prerequisite already implemented: English autoloot-progress key.
+        Interaction help and setting labels/descriptions remain pending.
 
     [ ] AL-12: Update feature documentation and proposal status.
         Depends: AL-08, AL-09, AL-10, AL-11.

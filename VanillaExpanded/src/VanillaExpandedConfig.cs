@@ -19,6 +19,9 @@ public class VanillaExpandedConfig
     /// </summary>
     public bool EnableAutoStash { get; set; } = true;
 
+    /// <summary>Collects available corpse loot by holding Interact on the client.</summary>
+    public bool EnableAutoLoot { get; set; } = true;
+
     /// <summary>
     /// Enable lighting fires using lanterns, candles, and oil lamps.
     /// </summary>
@@ -131,6 +134,9 @@ public class VanillaExpandedConfig
     /// Time in seconds to hold the interact key before auto-stashing begins.
     /// </summary>
     public float AutoStashDelay { get; set; } = 0.5f;
+
+    /// <summary>Client-side hold duration before collecting available corpse loot.</summary>
+    public float AutoLootDelay { get; set; } = 0.5f;
 
     /// <summary>
     /// Time in seconds to hold the interact key before igniting a fire.

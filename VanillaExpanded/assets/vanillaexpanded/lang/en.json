@@ -46,6 +46,7 @@
   "quicktool-binding-unavailable": "Bind Quick tools to a keyboard key or the middle or right mouse button.",
 
   "blockhelp-autostash-container": "[Hold] Deposit similar items",
+  "autoloot-progress": "Auto Looting",
   "blockhelp-autostash-full": "[AutoStash] Container is full",
   "blockhelp-autostash-bloomery": "[Hold] Deposit all",
   "ve-hotkey-equiplightsource-offhand": "[VE] Equip light source to offhand",
