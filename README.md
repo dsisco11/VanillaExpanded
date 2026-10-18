@@ -24,17 +24,19 @@ You can now bulk transfer matching items from your inventory into storage contai
 Collect available corpse loot without shift-clicking each stack:
 
 1. Harvest the corpse normally first. AutoLoot does not skin, butcher, generate loot, or bypass access restrictions.
-2. Hold right-click (default Interact) on a supported corpse. A normal click still opens the vanilla loot window.
-3. Keep holding while the radial **Auto Looting** indicator completes. It always renders above the loot window; moving the cursor over that window does not cancel the hold.
+2. Press and hold the right mouse button on a supported corpse. A normal click still opens the vanilla loot window; no extra hotkey or modifier is needed.
+3. Keep holding while the radial **Auto Looting** indicator completes (0.5 seconds by default). It always renders above the loot window; moving the cursor over that window does not cancel the hold.
 4. Everything that fits is transferred into your player storage. Overflow stays on the corpse, the loot window stays open, and you must release before holding again for another pass.
 
 Release, close the loot window, change world targets, move out of reach, or disable AutoLoot to cancel. Attached-container Auto-Stash takes precedence when its gesture is used.
 
+AutoLoot is enabled by default. To turn it off or adjust the hold duration, open **Pause menu > Mod Settings > VanillaExpanded > Auto Loot** with ConfigLib installed. For manual configuration, see [Auto Loot settings](#auto-loot-settings).
+
 AutoLoot runs entirely on the client: neither VanillaExpanded nor ConfigLib is required on the server for this feature. ConfigLib is optional for the client-side settings menu. AutoLoot and Auto-Stash can be enabled independently. Transfers use vanilla packets and server authorization; progress completion initiates collection, not a server-confirmed success notification.
 
-The client adds its own `EntityBehaviorAutoLootable` to synchronized client entity definitions with a harvestable behavior. The engine creates it normally for each instance; there is no per-entity attachment scan or patch on the vanilla harvestable behavior. Vanilla still opens and closes the loot inventory and supplies harvesting help.
+**Supported targets:** dead, harvested, non-player corpses with the standard game loot window. Modded creatures using the same vanilla harvesting behavior are supported; custom looting systems, attached bags, player corpses, and general containers are not AutoLoot targets.
 
-Initial support is limited to dead, harvested, non-player corpses using the unchanged native harvestable behavior. Modded assets using that same behavior are supported; custom corpse behavior subclasses, attached bags, player corpses, and general containers are not AutoLoot targets.
+**If nothing moves:** check that the corpse has been harvested, still contains loot, and its normal loot window is open. Make room in your inventory, stay within interaction range, then release and hold right-click again. AutoLoot makes one collection attempt per hold; it does not keep retrying when your inventory is full.
 
 Compatibility evidence currently covers inspection of the Vintage Story **1.22.7** native protocol and automated tests. In-game acceptance, including unmodified-server gameplay, latency, and simultaneous looters, remains pending; see the [AutoLoot proposal](docs/AutoLootProposal.md).
 
@@ -98,7 +100,7 @@ The sections and setting order below match the ConfigLib menu. Setting names are
 | `AutoStashDelay` | `0.5` | 0.1–2 | Time in seconds to hold the interact key before auto-stashing begins. |
 | `AutoStashGuiRendersTopmost` | `true` | `true`, `false` | Render the auto-stash progress bar above dialogs and other game UI. |
 
-#### Auto Loot
+#### Auto Loot Settings
 
 | Setting | Default | Range / choices | Description |
 | --- | --- | --- | --- |
