@@ -16,6 +16,7 @@ internal sealed class HudOverlaySnapping
     private long captureRevision;
     public HudSnapCandidate? Selected { get; private set; }
     public RectangleF Destination { get; private set; }
+    public RectangleF ConnectionTarget { get; private set; }
     public RectangleF Insertion { get; private set; }
     public bool DropAllowed { get; private set; } = true;
 
@@ -29,7 +30,7 @@ internal sealed class HudOverlaySnapping
         retained = null;
         capture = null;
         Selected = null;
-        Destination = Insertion = RectangleF.Empty;
+        Destination = Insertion = ConnectionTarget = RectangleF.Empty;
         DropAllowed = true;
     }
 
@@ -46,7 +47,7 @@ internal sealed class HudOverlaySnapping
             captureRevision = movement.DragRevision;
         }
         Selected = null;
-        Destination = Insertion = RectangleF.Empty;
+        Destination = Insertion = ConnectionTarget = RectangleF.Empty;
         if (!movement.Dragging || !layouts.TryGetValue(movement.Id, out var moving) || !moving.Available)
         { Clear(); return; }
         var source = containers.Resolved.First(item => item.Id == movement.Id);
@@ -127,6 +128,8 @@ internal sealed class HudOverlaySnapping
             DropAllowed = true;
             Selected = candidate;
             Destination = Union(rectangles.Where(item => !excluded.Contains(item.Key)).Select(item => item.Value));
+            // Nested insertion connects to the selected leaf, which need not touch the group's outer edge.
+            ConnectionTarget = candidate.Target.Member is { } memberId ? rectangles[memberId] : Destination;
             Insertion = Union(rectangles.Where(item => excluded.Contains(item.Key)).Select(item => item.Value));
             break;
         }

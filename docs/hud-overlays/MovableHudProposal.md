@@ -177,3 +177,7 @@ Start with a single draggable group prototype to establish whether the native ti
 Check coordinate conversion at multiple GUI scales; native saved-position round trips across client restarts; distinct group/indicator keys; reset behavior; resolution and style changes; group creation/insertion/removal and persistence recovery; consistent effective-anchor availability; snap tie-breaking and jitter; cancellation; and lifecycle cleanup. Position-only dragging must not refresh readings or recreate feature artwork.
 
 In-game acceptance must cover free-cursor access, titlebar reachability at every screen edge, overlapping windows and focus, drag continuation outside bounds, no gameplay click-through during a drag, and ordinary input remaining unaffected away from eligible indicator bodies and handles. Source inspection establishes feasibility, not the final interaction quality.
+
+### Snap feedback
+
+Grouping snaps show a static reddish connection band over the shared attachment span, strongest beside the target item and fading into the incoming item. Alignment-only snaps retain thin reddish guides. Feedback follows the current preview and clears on release, cancellation, or Shift bypass.
