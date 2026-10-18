@@ -120,7 +120,7 @@ internal sealed class HudOverlaySnapping
             var expandedSize = new SizeF(geometry.Size.Width * (float)scale, geometry.Size.Height * (float)scale);
             var originPixels = ExpandedOrigin(Bounds(targetLayout), expandedSize, candidate.Side, candidate.Alignment);
             // Destination docking owns the outer pivot even when incoming membership changes its measured size.
-            if (target.Attachment is { } attachment)
+            if (containers.Attachment(target) is { } attachment)
             {
                 RectangleF? anchor = HudOverlayTargets.Canonical(attachment.TargetId) == HudOverlayTargets.Screen ? viewport
                     : boundaries.FirstOrDefault(item => item.Id == HudOverlayTargets.Boundary(attachment.TargetId))?.Bounds;
