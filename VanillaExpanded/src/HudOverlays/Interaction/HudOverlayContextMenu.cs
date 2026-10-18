@@ -130,6 +130,7 @@ internal sealed class HudOverlayContextMenu : IDisposable
             if (settings?.Enabled is { } enabled) rows.Add(new("enabled", Label("enabled"), enabled.Value));
             if (target.CanChangeLock) rows.Add(new("lock", Label("lock"), target.IsLocked()));
             rows.AddRange(ReadStyleEntries());
+            if (target.ResetLayout != null) rows.Add(new("reset", Label("reset"), false, HudMenuEntryKind.Action));
             return rows.ToArray();
         }
         return ReadStyleEntries();
@@ -156,6 +157,7 @@ internal sealed class HudOverlayContextMenu : IDisposable
             {
                 if (code == "enabled") target.Registration.MenuSettings?.Enabled?.Set(selected);
                 else if (code == "lock" && target.CanChangeLock) target.SetLocked(selected);
+                else if (code == "reset" && selected) target.ResetLayout?.Invoke();
             }
         }
         finally { Close(); }

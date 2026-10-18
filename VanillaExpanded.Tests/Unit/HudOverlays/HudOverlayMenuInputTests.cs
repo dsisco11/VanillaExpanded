@@ -20,7 +20,7 @@ public sealed class HudOverlayMenuInputTests : IDisposable
     private readonly string previousLocale = Vintagestory.API.Config.Lang.CurrentLocale;
     private readonly Vintagestory.API.Config.ITranslationService? previousLanguage;
     #region Public API
-    /// <summary>Supplies native titlebar localization until its later removal.</summary>
+    /// <summary>Supplies native group-caption localization for host compositions.</summary>
     public HudOverlayMenuInputTests()
     {
         Vintagestory.API.Config.RuntimeEnv.GUIScale = 1;
@@ -50,6 +50,25 @@ public sealed class HudOverlayMenuInputTests : IDisposable
         var keyUp = new KeyEvent { KeyCode = key.KeyCode }; f.Host.OnKeyUp(keyUp);
         Assert.True(keyUp.Handled); Assert.False(f.Host.Focusable);
         Assert.Equal(1, f.Popup.Disposals);
+    }
+
+    /// <summary>Reset targets only the selected indicator and retires stale menu ownership after dispatch.</summary>
+    [Fact]
+    public void IndividualResetPreservesSiblingAndFeatureSettings()
+    {
+        using var f = new Fixture(disabled: true);
+        Assert.True(f.Containers.SetMovable("test", true, new PointF(120, 80)));
+        var owner = f.Containers.Owner("test:a")!;
+        f.Host.OnMouseDown(f.Press());
+        Assert.Contains(f.Rows, value => value.Code == "reset" && value.Kind == HudMenuEntryKind.Action);
+        f.Popup.Press = () => f.Select!("reset", true);
+        var click = new MouseEvent(1, 1, EnumMouseButton.Left, 0); f.Host.OnMouseDown(click);
+        Assert.False(f.Menu.IsOpened); Assert.Equal(1, f.Popup.Disposals);
+        Assert.False(f.EnabledState); Assert.Equal(0, f.SettingsWrites);
+        var selected = f.Containers.Owner("test:a")!;
+        Assert.Null(selected.X); Assert.False(selected.Movable);
+        Assert.Equal(owner with { Tree = owner.Tree.Remove("test:a")! }, f.Containers.Owner("test:b"));
+        f.Feature.VerifyNoOtherCalls();
     }
 
     /// <summary>Handled presses, unavailable content and foreground modal ownership cannot open menus.</summary>

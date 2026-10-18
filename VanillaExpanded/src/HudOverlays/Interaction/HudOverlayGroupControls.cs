@@ -20,31 +20,31 @@ internal sealed class HudOverlayGroupControls : IDisposable
     private readonly GuiDialog host;
     private readonly Action relayout;
     private readonly Func<HudOverlayRegistration, bool> drawable;
-    private readonly GuiComposer composer;
-    private readonly ElementBounds compositionBounds;
-    private readonly HudOverlayNativeTitleBar titleBar;
+    private GuiComposer? composer;
+    private ElementBounds? compositionBounds;
+    private HudOverlayGroupTitleBar? titleBar;
+    private readonly ElementBounds titleBounds = ElementBounds.Fixed(0, 0, Width, HudOverlaySizes.TitleBarHeight);
     private readonly HudOverlayGroupHighlight highlight;
     private HudOverlayGroupLayout? group;
     private string? caption;
     private double preparedScale;
-    private bool visible, pressed, menuPress, disposed;
+    private bool visible, disposed;
     private RectangleF handle;
     private RectangleF groupBounds;
     private bool hovered, showOutline;
     private double scale = 1;
     private RectangleF content;
-    private readonly Action reset;
     private readonly Func<HudOverlayGroupMovement, PointF, bool>? snap;
-    private bool HasTitleBar => movement.IndicatorId == null;
+    private bool HasTitleBar => movement.IndicatorId == null && movement.HasMultipleMembers;
     public HudOverlayGroupMovement Movement => movement;
-    public bool Active => !disposed && (movement.Dragging || pressed || titleBar.Menu.IsOpened);
-    public ElementBounds Bounds => titleBar.Bounds;
+    public bool Active => !disposed && movement.Dragging;
+    public ElementBounds Bounds => titleBounds;
 
     #region Public API
     #region Construction and synchronization
-    /// <summary>Owns actual native titlebar graphics/menu while borrowing the group's content and position state.</summary>
+    /// <summary>Owns movement cues and lazily composed group captions while borrowing container state.</summary>
     public HudOverlayGroupControls(ICoreClientAPI api, GuiDialog host, HudOverlayGroupMovement movement,
-        Func<HudOverlayRegistration, bool> drawable, Action relayout, Action? reset = null,
+        Func<HudOverlayRegistration, bool> drawable, Action relayout,
         Func<HudOverlayGroupMovement, PointF, bool>? snap = null, IHudOverlayDashedBorder? dashedBorder = null)
     {
         this.api = api;
@@ -52,15 +52,8 @@ internal sealed class HudOverlayGroupControls : IDisposable
         this.movement = movement;
         this.drawable = drawable;
         this.relayout = relayout;
-        this.reset = reset ?? (() => { });
         this.snap = snap;
         highlight = new HudOverlayGroupHighlight(api, dashedBorder);
-        compositionBounds = ElementBounds.Fixed(0, 0, Width, HudOverlaySizes.TitleBarHeight).WithParent(api.Gui.WindowBounds);
-        composer = api.Gui.CreateCompo(movement.Key, compositionBounds);
-        titleBar = new HudOverlayNativeTitleBar(api, composer,
-            () => Cancel(), ElementBounds.Fixed(0, 0, Width, HudOverlaySizes.TitleBarHeight));
-        titleBar.ConfigurePermission(value => movement.SetMovable(value), () => this.reset());
-        composer.AddInteractiveElement(titleBar);
     }
 
     /// <summary>Tracks prepared group geometry and cancels controls when their target becomes unavailable.</summary>
@@ -71,19 +64,19 @@ internal sealed class HudOverlayGroupControls : IDisposable
         Refresh(false);
     }
 
-    /// <summary>Renders the actual native composition only while hovered, interacting, or displaying its dropdown.</summary>
+    /// <summary>Renders permission cues and the hovered multi-member group's drag caption.</summary>
     public void Draw(float deltaTime)
     {
         Refresh(true);
         if (!disposed && showOutline) highlight.DrawOutline(groupBounds, movement.Movable);
-        if (visible && HasTitleBar) composer.Render(deltaTime);
+        if (visible && HasTitleBar) composer?.Render(deltaTime);
     }
 
     /// <summary>Draws exact group bounds before indicator content, including outlines away from hover while movement is enabled.</summary>
     public void DrawBackground()
     {
         Refresh(true);
-        if (!disposed && HasTitleBar) highlight.Draw(groupBounds, hovered);
+        if (!disposed && movement.IndicatorId == null) highlight.Draw(groupBounds, hovered);
     }
     #endregion
     #region Pointer interaction
@@ -101,7 +94,7 @@ internal sealed class HudOverlayGroupControls : IDisposable
         if (args.Handled) relayout();
     }
 
-    /// <summary>Routes native dropdown selections and chrome presses separately from cancellable content dragging.</summary>
+    /// <summary>Starts whole-group movement from its caption or cancels captured movement on right-click.</summary>
     public void OnMouseDown(ICoreClientAPI api, MouseEvent args)
     {
         // Cancellation belongs to the captured drag, including member bodies without a titlebar.
@@ -114,30 +107,17 @@ internal sealed class HudOverlayGroupControls : IDisposable
         if (!HasTitleBar) return;
         Refresh(false);
         if (args.Handled || !visible || args.Button != EnumMouseButton.Left) return;
-        if (titleBar.Menu.IsOpened)
-        {
-            menuPress = true;
-            titleBar.Menu.OnMouseDown(api, args);
-            if (!args.Handled) titleBar.Menu.OnFocusLost();
-
-            pressed = true;
-            args.Handled = true;
-            relayout();
-            return;
-        }
         if (!handle.Contains(args.X, args.Y)) return;
-        if (titleBar.IsChrome(args.X, args.Y)) pressed = true;
-        else if (movement.Movable) BeginMovement(new PointF(args.X, args.Y));
+        if (movement.Movable) BeginMovement(new PointF(args.X, args.Y));
         else return;
         args.Handled = true;
     }
 
-    /// <summary>Retains native dropdown hover behavior while updating content preview from total pointer displacement.</summary>
+    /// <summary>Updates content preview from total pointer displacement.</summary>
     public void OnMouseMove(ICoreClientAPI api, MouseEvent args)
     {
         if (args.Handled) { Cancel(); return; }
         Refresh(false);
-        if (visible && HasTitleBar) titleBar.Menu.OnMouseMove(api, args);
         if (!Active) return;
         args.Handled = true;
         if (!movement.Dragging) return;
@@ -146,7 +126,7 @@ internal sealed class HudOverlayGroupControls : IDisposable
         snap?.Invoke(movement, new PointF(args.X, args.Y));
     }
 
-    /// <summary>Persists a successful content drop or delegates menu/close icon release to the native titlebar.</summary>
+    /// <summary>Validates and persists a successful content drop or restores its source.</summary>
     public void OnMouseUp(ICoreClientAPI api, MouseEvent args)
     {
         if (args.Handled) { Cancel(); return; }
@@ -154,7 +134,6 @@ internal sealed class HudOverlayGroupControls : IDisposable
         if (!Active) return;
         args.Handled = true;
         if (args.Button != EnumMouseButton.Left) return;
-        if (HasTitleBar) titleBar.Menu.OnMouseUp(api, args);
         if (movement.Dragging)
         {
             movement.Move(new PointF(args.X, args.Y));
@@ -166,48 +145,18 @@ internal sealed class HudOverlayGroupControls : IDisposable
                 else movement.Cancel();
             }
         }
-        else if (pressed && !menuPress && handle.Contains(args.X, args.Y))
-            titleBar.OnMouseUpOnElement(api, args);
-        if (titleBar.Menu.IsOpened) titleBar.Menu.OnFocusGained();
-        pressed = menuPress = false;
         relayout();
         Refresh(false);
     }
 
-    /// <summary>Preserves native scrolling only while the hover dropdown is open.</summary>
-    public void OnMouseWheel(MouseWheelEventArgs args)
-    {
-        Refresh(false);
-        if (visible && HasTitleBar && titleBar.Menu.IsOpened) titleBar.Menu.OnMouseWheel(api, args);
-    }
     #endregion
     #region Keyboard and cancellation
-
-    /// <summary>Preserves native dropdown keyboard navigation and observes its mode selection callbacks.</summary>
-    public void OnKeyDown(KeyEvent args)
-    {
-        if (disposed || !HasTitleBar || !titleBar.Menu.IsOpened) return;
-        titleBar.OnKeyDown(api, args);
-        titleBar.SynchronizePermission(movement.Movable);
-        relayout();
-    }
-
-    /// <summary>Forwards native type-to-select behavior while the dropdown owns an active interaction.</summary>
-    public void OnKeyPress(KeyEvent args)
-    {
-        if (!disposed && HasTitleBar && titleBar.Menu.IsOpened) titleBar.Menu.OnKeyPress(api, args);
-    }
-
-    /// <summary>Discards preview and closes the native menu without writing a dragged position.</summary>
+    /// <summary>Discards preview without writing a dragged position.</summary>
     public bool Cancel()
     {
         if (disposed) return false;
         bool active = Active;
         movement.Cancel();
-        pressed = menuPress = false;
-        if (titleBar.Menu.IsOpened)
-            titleBar.Menu.OnMouseUp(api, new MouseEvent(api.Input.MouseX, api.Input.MouseY, EnumMouseButton.Left, 0));
-        titleBar.OnFocusLost();
         visible = false;
         hovered = false;
         if (active) relayout();
@@ -223,12 +172,11 @@ internal sealed class HudOverlayGroupControls : IDisposable
         visible = false;
         hovered = showOutline = false;
         movement.Cancel();
-        pressed = menuPress = false;
-        try { composer.Dispose(); }
+        try { ReleaseCaption(); }
         finally
         {
             try { highlight.Dispose(); }
-            finally { compositionBounds.ParentBounds?.ChildBounds.Remove(compositionBounds); group = null; }
+            finally { group = null; }
         }
     }
 
@@ -254,7 +202,7 @@ internal sealed class HudOverlayGroupControls : IDisposable
         movement.SourceGeometry = HudOverlaySourceReservation.Capture(group!, new PointF((float)window.renderX, (float)window.renderY), scale);
         movement.Begin(ContentOrigin(), pointer, scale);
     }
-    /// <summary>Uses visible content for initial targeting, retaining controls during pointer transit and open native menus.</summary>
+    /// <summary>Uses visible content for targeting and retains the group grip during pointer transit.</summary>
     private void Refresh(bool checkButton)
     {
         if (disposed) return;
@@ -289,7 +237,7 @@ internal sealed class HudOverlayGroupControls : IDisposable
         }
         bool eligible = available && !Blocked(pointer);
         if (!eligible || (Active && currentScale != scale)
-            || (checkButton && (movement.Dragging || pressed) && input.MouseButton is { Left: false }))
+            || (checkButton && movement.Dragging && input.MouseButton is { Left: false }))
         {
             Cancel();
             return;
@@ -299,11 +247,11 @@ internal sealed class HudOverlayGroupControls : IDisposable
             && (movement.IndicatorId == null || member.Registration.Id == movement.IndicatorId) && member.Clip.Contains(pointer));
         if (!HasTitleBar)
         {
-            // Individual controls retain only direct body capture. They expose no invisible titlebar hit area,
-            // transit region, menu or hover panel, and never prepare the unused native composition.
+            // Individual and singleton controls have no caption resources or invisible grip hit area.
+            ReleaseCaption();
             handle = RectangleF.Empty;
             visible = Active || overContent;
-            hovered = false;
+            hovered = movement.IndicatorId == null && overContent;
             return;
         }
 
@@ -313,38 +261,60 @@ internal sealed class HudOverlayGroupControls : IDisposable
         handle = PlaceHandle(content, viewport, scale);
         hovered = overContent || Active;
         visible = Active || overContent || (visible && RectangleF.Union(content, handle).Contains(pointer));
-        PositionComposition(viewport);
         if (visible)
         {
-            titleBar.SynchronizePermission(movement.Movable);
-            var indicator = !movement.HasMultipleMembers ? group!.Members.First().Registration : null;
-            string key = indicator == null ? "vanillaexpanded:hud-group-" + movement.Id : indicator.HoverLabelKey ?? indicator.Id;
-            string title = Lang.HasTranslation(key) ? Lang.Get(key) : indicator?.Id ?? Lang.Get("vanillaexpanded:hud-custom-group");
+            if (composer == null)
+            {
+                compositionBounds = ElementBounds.Fixed(0, 0, Width, HudOverlaySizes.TitleBarHeight).WithParent(api.Gui.WindowBounds);
+                composer = api.Gui.CreateCompo(movement.Key, compositionBounds);
+                titleBar = new HudOverlayGroupTitleBar(api, titleBounds);
+                composer.AddStaticElement(titleBar);
+            }
+            PositionComposition(viewport);
+            string key = "vanillaexpanded:hud-group-" + movement.Id;
+            string title = Lang.HasTranslation(key) ? Lang.Get(key) : Lang.Get("vanillaexpanded:hud-custom-group");
             // Retain the current label during transient snap identities rather than rebuilding chrome on each preview.
             if (movement.Dragging && caption != null) title = caption;
             if (!composer.Composed || preparedScale != scale || caption != title)
             {
-                titleBar.Text = title;
+                titleBar!.Text = title;
                 if (composer.Composed) composer.ReCompose(); else composer.Compose(false);
                 preparedScale = scale;
                 caption = title;
-                // Native composition restores its parent from settings. Reapply the transient control origin;
-                // successful drops still persist the content origin, never this above/below titlebar origin.
+                // Successful drops persist content origins, never the separate caption origin.
                 PositionComposition(viewport);
             }
-            titleBar.FitMenu(viewport);
         }
     }
 
     /// <summary>Updates the separate native composition without modifying the content layout hierarchy.</summary>
     private void PositionComposition(RectangleF viewport)
     {
-        compositionBounds.fixedX = (handle.X - viewport.X) / scale;
+        compositionBounds!.fixedX = (handle.X - viewport.X) / scale;
         compositionBounds.fixedY = (handle.Y - viewport.Y) / scale;
         compositionBounds.fixedWidth = Bounds.fixedWidth = handle.Width / scale;
         compositionBounds.fixedHeight = Bounds.fixedHeight = handle.Height / scale;
         compositionBounds.MarkDirtyRecursive();
         compositionBounds.CalcWorldBounds();
+    }
+
+    /// <summary>Releases caption-only resources when a container becomes a singleton.</summary>
+    private void ReleaseCaption()
+    {
+        var retired = composer;
+        composer = null;
+        titleBar = null;
+        caption = null;
+        try { retired?.Dispose(); }
+        finally
+        {
+            // Native WithChild preserves a non-null parent. Clear both ends before reusing the
+            // caption bounds after a singleton/group preview cycle, so the next composer owns them.
+            titleBounds.ParentBounds?.ChildBounds.Remove(titleBounds);
+            titleBounds.ParentBounds = null;
+            compositionBounds?.ParentBounds?.ChildBounds.Remove(compositionBounds);
+            compositionBounds = null;
+        }
     }
 
     /// <summary>Defers to foreground windows and modal input ownership before accepting HUD controls.</summary>
