@@ -1,10 +1,11 @@
 # AutoLoot Implementation Task List
 
 Proposal: [AutoLootProposal.md](./AutoLootProposal.md)
-Status: Not started.
+Status: Phase 1 complete; implementation not started.
 
 Conventions:
     [ ] Pending task.
+    [x] Completed task with evidence or decisions recorded in the proposal.
     Each task has a stable ID and explicit prerequisites.
     "Depends: none" means the task can proceed independently.
     Implementation and automated tests precede in-game acceptance testing.
@@ -25,7 +26,7 @@ Conventions:
     - Initial scope is standard harvested corpses, not arbitrary entity storage.
 
 ## Phase 1: Resolve Integration Details
-    [ ] AL-01: Select the narrow client interaction hook.
+    [x] AL-01: Select the narrow client interaction hook.
         Depends: none.
         Inspect the existing interaction/input boundaries and choose how the
         gesture starts while allowing vanilla interaction to open the inventory.
@@ -33,8 +34,14 @@ Conventions:
         immersive mouse mode. Do not suppress the server's normal open flow.
         Prefer existing API hooks; use a client-only Harmony patch only if needed.
         Record the selected approach in the proposal.
+        Completed 2026-10-18: selected a client-only postfix on the original
+        EntityBehaviorHarvestable.OnInteract, leaving vanilla opening unchanged.
+        Use raw button state plus non-consuming release observation, bind the
+        gesture to the corpse/session while its window is open, and distinguish
+        UI cursor movement from world retargeting. See proposal Phase 1 Decisions
+        for inspected API/IL evidence and lifecycle guards.
 
-    [ ] AL-02: Finalize eligibility and presentation decisions.
+    [x] AL-02: Finalize eligibility and presentation decisions.
         Depends: none.
         Confirm first-release eligibility as the standard harvested-corpse path;
         leave player corpses and other mod-specific inventory protocols excluded
@@ -44,6 +51,12 @@ Conventions:
         Define neutral completion/capacity feedback without an aggregate server
         acknowledgement or an inferred access-denied reason.
         Record these decisions in the proposal.
+        Completed 2026-10-18: standard dead, harvested, non-player corpses with
+        available loot and the vanilla-opened standard inventory/protocol only.
+        User selected fixed topmost rendering without an additional setting and
+        keeping the loot window open with a corpse-bound hold. Clear progress
+        after dispatch/cancel; use existing inventory views for capacity/results,
+        without predicted-success sounds/counts or inferred rejection messages.
 
 ## Phase 2: Share Hold and Progress Infrastructure
     [ ] AL-03: Extract a small shared hold lifecycle with focused tests.
@@ -104,8 +117,11 @@ Conventions:
         Show localized radial progress after the grace period.
         At completion, require the valid vanilla-opened session before collecting;
         never substitute a locally forced open or an arbitrary readiness timeout.
-        Cancel on release, retargeting, lost reach, dimension change, closed
-        session, target invalidation, disablement, or disposal.
+        Cancel on release, world retargeting, lost reach, dimension change, closed
+        session, target invalidation, focus loss, pause, disablement, or disposal.
+        Keep the original corpse/session bound while its window is open; UI-only
+        cursor movement is not retargeting. Observe release over the GUI without
+        consuming vanilla input or relying solely on InWorldMouseButton.
         Require release before starting another pass after completion.
         Preserve existing windows; do not close an already-open loot inventory.
 
@@ -122,7 +138,8 @@ Conventions:
         Depends: AL-02, AL-06.
         Add EnableAutoLoot (default true) and AutoLootDelay (default 0.5 seconds).
         Follow existing delay validation/range conventions and ConfigLib patterns.
-        Wire the chosen presentation preference without coupling to AutoStash.
+        Supply fixed topmost=true for AutoLoot without an additional setting or
+        coupling to AutoStashGuiRendersTopmost.
         Verify ConfigLib does not turn these settings into a server dependency.
         Support independent AutoLoot/AutoStash enablement and cancel active work
         when AutoLoot is disabled.

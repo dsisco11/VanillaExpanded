@@ -1,6 +1,6 @@
 # AutoLoot Proposal
 
-Status: Proposed
+Status: Phase 1 integration decisions complete; implementation not started.
 
 ## Summary
 
@@ -130,14 +130,119 @@ entity inventories are eligible merely because they contain items.
 A normal click should still open the vanilla loot interface. Holding Interact
 must coexist with that interface without repeatedly opening or closing it.
 
-Progress cancels when the player releases Interact, changes targets, moves out
-of reach, loses eligibility, or disables the feature. Completion sends only one
-request per continuous hold. Another attempt requires releasing and holding
-again.
+Progress cancels when the player releases Interact, closes the corpse window,
+changes the active world-interaction target, moves out of reach, loses
+eligibility, or disables the feature. Moving the cursor over the open loot
+window does not change the bound corpse or cancel the hold. Completion initiates
+one collection pass per continuous hold, potentially sending multiple vanilla
+packets. Another attempt requires releasing and holding again.
 
 Living entities and empty or otherwise ineligible corpses do not trigger
 progress. AutoLoot collects already-available loot; it does not bypass a
 harvesting prerequisite or generate drops.
+
+## Phase 1 Decisions
+
+Resolved on 2026-10-18. These decisions complete AL-01 and AL-02 in the
+[implementation task list](./AutoLoot.todo). They select the implementation
+contract; they do not claim a completed runtime implementation or gameplay test.
+
+### AL-01: Interaction Hook and Input Lifecycle
+
+Use a client-only Harmony postfix on the public virtual method
+`EntityBehaviorHarvestable.OnInteract(EntityAgent, ItemSlot, Vec3d,
+EnumInteractMode, ref EnumHandling)`.
+
+The public client event APIs expose input events, but no equivalent
+corpse-specific post-interaction event that establishes that this behavior
+actually ran and opened its inventory. A narrow postfix supplies that boundary
+without attaching new entity behaviors or intercepting all entity interactions.
+
+- Let the original method run unchanged. Do not return a prefix result, modify
+  `handled`, suppress the dialog, manufacture an open session, or replay the
+  original interaction later.
+- Install the patch from the client ModSystem lifecycle, not the shared
+  server/client selective-patch path. Its body also checks client side, feature
+  enablement, the local interacting player, interact mode rather than attack,
+  and the eligible corpse/session.
+- After the original returns, begin a gesture only when the normal client loot
+  dialog/session is open, Interact is still held, and loot is available. Merely
+  running a postfix is not evidence the original accepted the interaction.
+- Advance through one client game-tick listener, using the shared hold lifecycle
+  planned in Phase 2. Repeated callbacks for the same hold/target must not reset
+  elapsed time or submit another collection pass.
+- Observe `api.Input.MouseButton.Right` for the existing right-button gesture,
+  not `InWorldMouseButton.Right`. Raw button state continues to describe the
+  physical hold when a dialog captures input. Observe mouse-up without consuming
+  it so a release/repress between ticks cannot be mistaken for a continuous hold.
+- Keep the vanilla loot window open during progress and after collection.
+  Bind the gesture to the initiating corpse ID and its exact inventory/session.
+  UI cursor movement while the mouse is ungrabbed is not world retargeting.
+  A subsequent world interaction with another target cancels rather than silently
+  redirecting the pending pass. When mouse-grabbed world aiming is active,
+  changing away from the bound target cancels.
+- Recheck target existence, eligibility, session ownership, dimension, and vanilla
+  interaction reach as the hold advances and immediately before collecting.
+  Cancel on release, window/session closure, invalidation, feature disablement,
+  focus loss, pause, or disposal. Remove progress and require a fresh eligible
+  interaction before starting again.
+- Gate behavior through live client configuration so enabling/disabling does not
+  depend on restarting solely to install/remove this hook. Keep patch/listener
+  disposal scoped so it does not remove other feature patches.
+
+Additional installed-game inspection supporting this choice:
+
+- `InputAPI.get_MouseButton` returns `ClientMain.MouseStateRaw`, whereas
+  `get_InWorldMouseButton` returns `InWorldMouseState`.
+- `ClientMain.OnMouseUpRaw` updates button state; `OnFocusChanged` clears mouse
+  states, allowing the tick to cancel a hold after focus loss. Public
+  `IClientEventAPI.MouseUp` provides release observation without consuming vanilla
+  input; the inspected public event API does not expose a window-focus event.
+- `SystemMouseInWorldInteractions.UpdateCurrentSelection` uses a mouse-coordinate
+  picking ray when the mouse is not grabbed. This is why blindly comparing
+  `CurrentEntitySelection` during loot-window cursor movement would incorrectly
+  cancel or redirect the gesture.
+
+The normal interaction and open packets remain responsible for server session
+establishment. The client session is not a server acknowledgement; send transfers
+after the normal open flow and let vanilla rejection/reconciliation remain
+authoritative. Do not introduce an arbitrary readiness delay or custom handshake.
+
+### AL-02: Eligibility, Rendering, and Feedback
+
+First-release eligibility:
+
+- A non-player entity that is dead and exposes the standard
+  `EntityBehaviorHarvestable` corpse-loot inventory/protocol.
+- `IsHarvested` is true and that inventory has at least one available loot stack.
+- The local player's normal vanilla corpse interaction has opened the inventory,
+  with valid reach and dimension.
+- Player corpses, attached bags, generic entity containers, unharvested bodies,
+  and mod-specific inventory protocols are excluded. Do not infer compatibility
+  from the presence of an inventory alone. A modded creature using the unchanged
+  standard behavior/protocol is not excluded solely because its asset is modded.
+
+User-confirmed presentation:
+
+- Always render AutoLoot progress topmost.
+- Do not add `AutoLootGuiRendersTopmost` or read `AutoStashGuiRendersTopmost` for
+  AutoLoot. Supply the fixed preference through shared progress creation while
+  preserving AutoStash's existing configurable preference.
+- Keep the corpse loot window visible and bind progress to that corpse rather
+  than interpreting movement over the window as a new world target.
+
+Feedback contract:
+
+- Show the localized progress label while holding; remove the indicator on
+  cancellation or after initiating the single collection pass.
+- Do not play an item-collected success sound, claim a confirmed item count, or
+  announce "all looted" based only on timer completion or predicted movement.
+- Initially use the existing loot and player inventories to display remaining
+  items/capacity; no new aggregate completion, full-inventory, or access-denied
+  notification is required. In particular, a zero predicted move is not proof of
+  an access denial or server-confirmed full inventory.
+- Let vanilla authoritative updates/corrections reconcile contents without
+  automatic resubmission. Unexpected failures use standard logging.
 
 ## Existing Infrastructure and Reuse
 
@@ -194,7 +299,8 @@ concerns.
 
 - Detect an eligible corpse and start the shared hold lifecycle.
 - Preserve normal click-to-open behavior and vanilla harvesting interactions.
-- Track the selected entity throughout the hold.
+- Track the bound corpse/session throughout the hold without treating movement
+  over the open loot window as world retargeting.
 - Initiate vanilla inventory transfers when the hold completes.
 - Remove progress on cancellation, feature disablement, and disposal.
 
@@ -210,8 +316,8 @@ inventory changes.
 - Leave dirty marking, synchronization, persistence, and depletion behavior to
   the vanilla implementation.
 
-Prefer an existing behavior/API boundary over a broad entity patch. If Harmony
-is necessary, patch the narrowest verified corpse-loot interaction boundary.
+Use the client-only `EntityBehaviorHarvestable.OnInteract` postfix selected in
+Phase 1 rather than a broad entity patch.
 
 ### Client AutoLoot Transfer Coordinator
 
@@ -261,9 +367,10 @@ AutoLoot validation code. The verified entity packet path checks an open session
 and entity access before delegating inventory movement. The normal interaction
 path checks the harvesting prerequisite and interaction distance.
 
-The client additionally cancels its gesture on target invalidation, loss of
-reach, or a dimension change. Do not assume every movement packet independently
-rechecks every condition of the original interaction.
+The client additionally cancels its gesture on target invalidation, a new
+world-interaction target, loss of reach, or a dimension change. UI-only cursor
+movement does not invalidate the bound target. Do not assume every movement
+packet independently rechecks every condition of the original interaction.
 
 Concurrent looting and stale predictions are handled through ordinary vanilla
 inventory movement and reconciliation, not an AutoLoot transaction. Validate
@@ -286,14 +393,14 @@ Recommended new settings:
 
 The shared radial renderer currently reads `AutoStashGuiRendersTopmost`.
 Pass presentation preferences into progress creation so AutoLoot does not
-implicitly depend on an AutoStash setting. Preserve the existing AutoStash
-setting and its behavior; decide whether AutoLoot exposes its own setting or
-uses a documented default.
+implicitly depend on an AutoStash setting. AutoLoot always supplies topmost=true,
+with no additional setting. Preserve the existing AutoStash setting and its
+behavior.
 
 Wire the feature through:
 
 - Client ModSystem lifecycle and feature gates.
-- Client-only patch installation and disposal, if a patch is needed.
+- Client-only corpse interaction postfix installation and scoped disposal.
 - Existing vanilla inventory and entity packet APIs; no AutoLoot packet
   registration in [VanillaExpandedModSystem](../VanillaExpanded/src/VanillaExpandedModSystem.cs).
 - Configuration properties and ConfigLib definitions.
@@ -309,21 +416,15 @@ Verify that the new settings remain local preferences when ConfigLib is present.
 
 ## Delivery Plan
 
-### Phase 1: Validate the Confirmed Vanilla Contract In Game
+### Phase 1: Resolve Integration Details (Complete)
 
-The installed-game packet and inventory path is confirmed above. Validate the
-remaining interaction and runtime details:
+AL-01 and AL-02 are resolved in the Phase 1 Decisions section above: use the
+client-only corpse interaction postfix, raw held-button state, a bound
+corpse/session while its window is open, standard harvested-corpse eligibility,
+fixed topmost rendering, and neutral prediction-aware feedback.
 
-- How lootability differs from harvestability.
-- When drops become available and whether opening an inventory generates them.
-- How normal click-to-open and held interaction are dispatched.
-- How holding Interact continues to be observed after the loot dialog opens,
-  including immersive mouse mode.
-- How session opening, slot changes, and corrections behave under latency.
-- How empty-corpse cleanup and session closing behave after collection.
-
-Use those findings to choose the narrow integration hook and finalize supported
-corpse types.
+In-game checks are acceptance tests after implementation, not prerequisites to
+starting implementation or another feasibility investigation.
 
 ### Phase 2: Extract Shared Primitives
 
@@ -352,7 +453,9 @@ instances where appropriate. Use the existing test category conventions.
 - Normal clicks retain vanilla loot-window behavior.
 - Progress appears only after the grace period and completes at the configured
   delay.
-- Release, retargeting, loss of reach, disablement, and disposal clear progress.
+- Release, world retargeting, session closure, loss of reach, focus loss,
+  disablement, and disposal clear progress.
+- Cursor movement over the open loot window does not cancel or retarget the hold.
 - One continuous hold initiates at most one collection pass, which may send
   multiple vanilla inventory-transfer packets.
 - AutoLoot and AutoStash do not leave overlapping or orphaned progress displays.
@@ -380,13 +483,11 @@ instances where appropriate. Use the existing test category conventions.
 - Packets follow the vanilla entity-wrapped corpse inventory route.
 - Vanilla rejection/correction under latency does not trigger endless retries.
 
-## Decisions to Confirm Before Implementation
+## Deferred Scope
 
-1. Which additional corpse types, if any, are supported beyond the confirmed
-   standard harvested-corpse path, including player and modded corpses.
-2. How hold-to-loot coexists with the vanilla loot window without consuming
-   normal clicks or interfering with harvesting.
-3. Whether AutoLoot exposes an independent render-topmost setting.
+Support for player corpses or additional mod-specific corpse protocols is not
+part of this implementation. Consider it separately only after verifying the
+relevant interaction, access, and packet contracts.
 
 Recommended overflow policy is fixed for the first release: transfer everything
 that fits and leave the rest on the corpse. Do not drop overflow into the world
