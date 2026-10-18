@@ -24,6 +24,7 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
     private readonly ITranslationService? english = Lang.AvailableLanguages.GetValueOrDefault("en");
     private readonly Mock<ICoreClientAPI> api = new() { DefaultValue = DefaultValue.Mock };
     private readonly Mock<IGuiAPI> gui = new();
+    private readonly Mock<IHudOverlayDashedBorder> dashed = new();
     private readonly Mock<IInputAPI> input = new();
     private readonly Mock<IHudOverlay> overlay = new();
     private readonly HudOverlayGroupMovement movement;
@@ -180,7 +181,7 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
         initial = Origin();
         layouts[group.Id] = layout;
         controls = new HudOverlayGroupControls(api.Object, new Mock<GuiDialog>(api.Object).Object, movement,
-            _ => drawable, Relayout);
+            _ => drawable, Relayout, dashedBorder: dashed.Object);
         controls.Synchronize(layouts);
     }
 
@@ -471,9 +472,39 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
         Assert.True(movement.Movable);
     }
 
-    /// <summary>Movable outlines remain visible away from hover, use exact group bounds, and disappear when eligibility is lost.</summary>
+    /// <summary>Group and member permission cues draw in the foreground while backgrounds remain fill-only.</summary>
     [Theory]
-    [InlineData("fixed")]
+    [InlineData(true, false)] [InlineData(false, false)]
+    [InlineData(true, true)] [InlineData(false, true)]
+    public void PermissionCuesCoverGroupsAndIndividualMembers(bool movable, bool individual)
+    {
+        using var registry = new HudOverlayRegistry();
+        registry.RegisterGroup(group); registry.Register(registration);
+        var second = new HudOverlayRegistration("test:second", Mock.Of<IHudOverlay>(), () => true, group.Id);
+        registry.Register(second);
+        var containers = new HudOverlayContainers(api.Object, registry);
+        containers.SetMovable(group.Id, movable, initial);
+        var target = containers.Get(group.Id, individual ? registration.Id : null);
+        using var cue = new HudOverlayGroupControls(api.Object, new Mock<GuiDialog>(api.Object).Object,
+            target, _ => true, () => { }, dashedBorder: dashed.Object);
+        cue.Synchronize(layouts);
+        pointer = PointF.Empty;
+        var renderer = Mock.Get(api.Object.Render);
+        renderer.Invocations.Clear();
+        dashed.Invocations.Clear();
+        cue.DrawBackground();
+        Assert.DoesNotContain(renderer.Invocations, call => call.Method.Name == nameof(IRenderAPI.RenderRectangle));
+        dashed.Verify(value => value.Draw(It.IsAny<RectangleF>(), It.IsAny<float>()), Times.Never);
+        cue.Draw(0);
+        if (movable) Assert.Contains(renderer.Invocations, call => call.Method.Name == nameof(IRenderAPI.RenderRectangle));
+        else dashed.Verify(value => value.Draw(It.IsAny<RectangleF>(), It.IsAny<float>()), Times.Once);
+        grabbed = true; renderer.Invocations.Clear(); dashed.Invocations.Clear();
+        cue.Draw(0);
+        Assert.Empty(renderer.Invocations);
+        Assert.Empty(dashed.Invocations);
+    }
+    /// <summary>Permission outlines remain visible away from hover and disappear when interaction eligibility is lost.</summary>
+    [Theory]
     [InlineData("grabbed")]
     [InlineData("hidden")]
     [InlineData("undrawable")]
@@ -485,16 +516,11 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
         pointer = PointF.Empty;
         var renderer = Mock.Get(api.Object.Render);
         renderer.Invocations.Clear();
-        controls.DrawBackground();
-        var outline = Assert.Single(renderer.Invocations, call => call.Method.Name == nameof(IRenderAPI.RenderRectangle));
-        Assert.Equal((float)layout.Root.renderX, outline.Arguments[0]);
-        Assert.Equal((float)layout.Root.renderY, outline.Arguments[1]);
-        Assert.Equal((float)layout.Root.OuterWidth, outline.Arguments[3]);
-        Assert.Equal((float)layout.Root.OuterHeight, outline.Arguments[4]);
+        controls.Draw(0);
+        Assert.Contains(renderer.Invocations, call => call.Method.Name == nameof(IRenderAPI.RenderRectangle));
         Assert.DoesNotContain(renderer.Invocations, call => call.Method.Name == nameof(IRenderAPI.Render2DTexturePremultipliedAlpha));
         switch (unavailable)
         {
-            case "fixed": movement.SetMovable(false); break;
             case "grabbed": grabbed = true; break;
             case "hidden": hidden = true; break;
             case "undrawable": drawable = false; break;
@@ -506,7 +532,7 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
                 opened.Add(modal.Object); break;
         }
         renderer.Invocations.Clear();
-        controls.DrawBackground();
+        controls.Draw(0);
         Assert.Empty(renderer.Invocations);
     }
 
@@ -524,12 +550,8 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
         pointer = new PointF(origin.X + 10, origin.Y + 10);
         var renderer = Mock.Get(api.Object.Render);
         renderer.Invocations.Clear();
-        controls.DrawBackground();
-        var outline = Assert.Single(renderer.Invocations, call => call.Method.Name == nameof(IRenderAPI.RenderRectangle));
-        Assert.Equal((float)layout.Root.renderX, outline.Arguments[0]);
-        Assert.Equal((float)layout.Root.renderY, outline.Arguments[1]);
-        Assert.Equal((float)layout.Root.OuterWidth, outline.Arguments[3]);
-        Assert.Equal((float)layout.Root.OuterHeight, outline.Arguments[4]);
+        controls.Draw(0);
+        Assert.Contains(renderer.Invocations, call => call.Method.Name == nameof(IRenderAPI.RenderRectangle));
         Assert.DoesNotContain(renderer.Invocations, call => call.Method.Name == nameof(IRenderAPI.Render2DTexturePremultipliedAlpha));
         var down = Event(EnumMouseButton.Left);
         controls.OnMouseDown(api.Object, down);

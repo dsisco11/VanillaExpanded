@@ -19,7 +19,6 @@ internal sealed class HudOverlayEditPreviews : IDisposable
     private readonly Func<bool> enabled;
     private readonly Action<string, Exception> diagnostic;
     private readonly Func<WorkshopGaugeText> createText;
-    private readonly HudOverlayGroupHighlight highlight;
     private readonly Dictionary<string, (HudOverlayRegistration Registration, WorkshopGaugeText Text, SizeF Size, string Label)> entries = new(StringComparer.Ordinal);
     private readonly HashSet<string> reported = new(StringComparer.Ordinal);
     private bool disposed;
@@ -36,7 +35,6 @@ internal sealed class HudOverlayEditPreviews : IDisposable
         this.enabled = enabled;
         this.diagnostic = diagnostic;
         this.createText = createText ?? (() => new WorkshopGaugeText());
-        highlight = new HudOverlayGroupHighlight(api);
     }
 
     /// <summary>Gates edit-only drawing immediately when pointer capture, global HUD visibility, or session availability changes.</summary>
@@ -97,12 +95,11 @@ internal sealed class HudOverlayEditPreviews : IDisposable
     #endregion
 
     #region Drawing and lifetime
-    /// <summary>Draws cached edit lettering and an outline without feature calls, visibility animations, or fabricated readings.</summary>
+    /// <summary>Draws cached edit lettering without feature calls, visibility animations, or fabricated readings.</summary>
     public void Draw(HudOverlayRegistration registration, IRenderAPI renderer, ElementBounds bounds)
     {
         if (!IsDrawable(registration)) return;
         var rectangle = new RectangleF((float)bounds.renderX, (float)bounds.renderY, (float)bounds.OuterWidth, (float)bounds.OuterHeight);
-        highlight.Draw(rectangle, false, true);
         entries[registration.Id].Text.Draw(renderer, rectangle, 50);
     }
 
@@ -112,7 +109,6 @@ internal sealed class HudOverlayEditPreviews : IDisposable
         if (disposed) return;
         disposed = true;
         Clear();
-        highlight.Dispose();
     }
     #endregion
     #endregion
