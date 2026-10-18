@@ -18,6 +18,8 @@ internal sealed class HudOverlayGroupMovement
         : IndicatorId == null ? initialContainer : containers.Owner(IndicatorId)?.Id ?? initialContainer;
     public string Key => "vanillaexpanded:hud:controls:" + (IndicatorId == null ? "container:" + initialContainer : "member:" + IndicatorId);
     public bool Movable => !containers.ReadOnly && containers.Resolved.FirstOrDefault(item => item.Id == Id)?.Movable == true;
+    /// <summary>Gets effective lock state for this member's current container.</summary>
+    public bool Locked => !Movable;
     public bool Dragging { get; private set; }
     public bool HasMultipleMembers => containers.Resolved.FirstOrDefault(item => item.Id == Id)?.Tree.Leaves().Count() > 1;
     public PointF? Position
@@ -51,6 +53,9 @@ internal sealed class HudOverlayGroupMovement
         Cancel();
         containers.SetMovable(Id, value, ContainerOrigin);
     }
+
+    /// <summary>Changes the effective container permission without resetting placement or membership.</summary>
+    public void SetLocked(bool locked) => SetMovable(!locked);
 
     #endregion
     #region Drag lifecycle

@@ -1,5 +1,6 @@
 using System;
 using VanillaExpanded.HudOverlays;
+using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.ModSystems;
 using Vintagestory.API.Client;
@@ -37,7 +38,12 @@ internal sealed class BowAmmunitionSystem : ModSystem, ILiveConfigurable
             registration = hud.Registry.Register(new HudOverlayRegistration(OverlayId, overlay,
                 () => overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays
                     && VanillaExpandedModSystem.Config.EnableBowAmmunitionOverlay), "held-item-status", refreshIntervalMs: 300,
-                hoverLabelKey: "vanillaexpanded:hud-label-bow-ammunition"));
+                hoverLabelKey: "vanillaexpanded:hud-label-bow-ammunition",
+                menuSettings: new HudOverlayMenuSettings(
+                    new HudOverlaySetting<bool>(() => VanillaExpandedModSystem.Config.EnableBowAmmunitionOverlay,
+                        value => VanillaExpandedModSystem.Config.EnableBowAmmunitionOverlay = value, () => HudMenuConfiguration.Commit(api)),
+                    new HudOverlayStyleSetting<HudIndicatorStyle>(() => VanillaExpandedModSystem.Config.BowAmmunitionIndicatorStyle,
+                        value => VanillaExpandedModSystem.Config.BowAmmunitionIndicatorStyle = value, () => HudMenuConfiguration.Commit(api)))));
         }
         catch { overlay.Dispose(); throw; }
     }

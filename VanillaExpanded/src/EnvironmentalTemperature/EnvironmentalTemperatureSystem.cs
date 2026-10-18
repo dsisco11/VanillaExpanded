@@ -1,5 +1,6 @@
 using System;
 using VanillaExpanded.HudOverlays;
+using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.ModSystems;
 using Vintagestory.API.Client;
@@ -37,7 +38,12 @@ internal sealed class EnvironmentalTemperatureSystem : ModSystem, ILiveConfigura
             registration = hud.Registry.Register(new HudOverlayRegistration(OverlayId, overlay,
                 () => overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays
                     && VanillaExpandedModSystem.Config.EnableEnvironmentalTemperatureOverlay), "world-status", order: 99, refreshIntervalMs: 300,
-                hoverLabelKey: "vanillaexpanded:hud-label-environmental-temperature"));
+                hoverLabelKey: "vanillaexpanded:hud-label-environmental-temperature",
+                menuSettings: new HudOverlayMenuSettings(
+                    new HudOverlaySetting<bool>(() => VanillaExpandedModSystem.Config.EnableEnvironmentalTemperatureOverlay,
+                        value => VanillaExpandedModSystem.Config.EnableEnvironmentalTemperatureOverlay = value, () => HudMenuConfiguration.Commit(api)),
+                    new HudOverlayStyleSetting<EnvironmentalGaugeStyle>(() => VanillaExpandedModSystem.Config.EnvironmentalTemperatureGaugeStyle,
+                        value => VanillaExpandedModSystem.Config.EnvironmentalTemperatureGaugeStyle = value, () => HudMenuConfiguration.Commit(api)))));
         }
         catch { overlay.Dispose(); throw; }
     }

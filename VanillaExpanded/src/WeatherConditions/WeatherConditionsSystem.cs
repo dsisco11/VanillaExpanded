@@ -1,5 +1,6 @@
 using System;
 using VanillaExpanded.HudOverlays;
+using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.ModSystems;
 using Vintagestory.API.Client;
@@ -37,7 +38,12 @@ internal sealed class WeatherConditionsSystem : ModSystem, ILiveConfigurable
             registration = hud.Registry.Register(new HudOverlayRegistration(OverlayId, overlay,
                 () => overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays
                     && VanillaExpandedModSystem.Config.EnableWeatherConditionsOverlay), "world-status", order: 101, refreshIntervalMs: 300,
-                hoverLabelKey: "vanillaexpanded:hud-label-weather-conditions"));
+                hoverLabelKey: "vanillaexpanded:hud-label-weather-conditions",
+                menuSettings: new HudOverlayMenuSettings(
+                    new HudOverlaySetting<bool>(() => VanillaExpandedModSystem.Config.EnableWeatherConditionsOverlay,
+                        value => VanillaExpandedModSystem.Config.EnableWeatherConditionsOverlay = value, () => HudMenuConfiguration.Commit(api)),
+                    new HudOverlayStyleSetting<HudIndicatorStyle>(() => VanillaExpandedModSystem.Config.WeatherConditionsIndicatorStyle,
+                        value => VanillaExpandedModSystem.Config.WeatherConditionsIndicatorStyle = value, () => HudMenuConfiguration.Commit(api)))));
         }
         catch { overlay.Dispose(); throw; }
     }

@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using VanillaExpanded.HudOverlays.Configuration;
 
 namespace VanillaExpanded.HudOverlays.Registration;
 
@@ -17,10 +18,20 @@ public sealed record HudOverlayRegistration
     public string? HoverLabelKey { get; }
     /// <summary>Optional fixed GUI-unit footprint used while drawable; effective containers still collapse hidden members.</summary>
     public SizeF? ReservedSize { get; }
+    /// <summary>Optional configured settings; these do not describe gameplay visibility or integration availability.</summary>
+    public HudOverlayMenuSettings? MenuSettings { get; }
     #region Public API
     /// <summary>Defines identity, live visibility, ordering, refresh interval, optional hover label and optional fixed layout reservation.</summary>
     public HudOverlayRegistration(string id, IHudOverlay overlay, Func<bool> isEnabled, string groupId, int order = 0,
         int refreshIntervalMs = DefaultRefreshIntervalMs, string? hoverLabelKey = null, SizeF? reservedSize = null)
+        : this(id, overlay, isEnabled, groupId, null, order, refreshIntervalMs, hoverLabelKey, reservedSize)
+    {
+    }
+
+    /// <summary>Defines a registration with optional feature-owned menu capabilities while preserving the original constructor contract.</summary>
+    public HudOverlayRegistration(string id, IHudOverlay overlay, Func<bool> isEnabled, string groupId,
+        HudOverlayMenuSettings? menuSettings, int order = 0, int refreshIntervalMs = DefaultRefreshIntervalMs,
+        string? hoverLabelKey = null, SizeF? reservedSize = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         int separator = id.IndexOf(':');
@@ -40,6 +51,7 @@ public sealed record HudOverlayRegistration
         RefreshIntervalMs = refreshIntervalMs;
         HoverLabelKey = hoverLabelKey;
         ReservedSize = reservedSize;
+        MenuSettings = menuSettings;
     }
     #endregion
     #region Private

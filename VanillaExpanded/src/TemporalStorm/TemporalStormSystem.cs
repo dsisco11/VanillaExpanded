@@ -1,5 +1,6 @@
 using System;
 using VanillaExpanded.HudOverlays;
+using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.ModSystems;
 using Vintagestory.API.Client;
@@ -36,7 +37,12 @@ internal sealed class TemporalStormSystem : ModSystem, ILiveConfigurable
             registration = hud.Registry.Register(new HudOverlayRegistration(OverlayId, overlay,
                 () => overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays
                     && VanillaExpandedModSystem.Config.EnableTemporalStormOverlay), "player-status", order: 95, refreshIntervalMs: 300,
-                hoverLabelKey: "vanillaexpanded:hud-label-temporal-storm"));
+                hoverLabelKey: "vanillaexpanded:hud-label-temporal-storm",
+                menuSettings: new HudOverlayMenuSettings(
+                    new HudOverlaySetting<bool>(() => VanillaExpandedModSystem.Config.EnableTemporalStormOverlay,
+                        value => VanillaExpandedModSystem.Config.EnableTemporalStormOverlay = value, () => HudMenuConfiguration.Commit(api)),
+                    new HudOverlayStyleSetting<HudIndicatorStyle>(() => VanillaExpandedModSystem.Config.TemporalStormIndicatorStyle,
+                        value => VanillaExpandedModSystem.Config.TemporalStormIndicatorStyle = value, () => HudMenuConfiguration.Commit(api)))));
         }
         catch { overlay.Dispose(); throw; }
     }
