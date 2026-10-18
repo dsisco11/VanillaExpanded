@@ -46,6 +46,25 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
     [InlineData(false)] [InlineData(true)]
     public void HiddenPlaceholderBodySupportsGrouping(bool cancel) => ExerciseGroupingPreview(cancel, hiddenPlaceholder: true);
 
+    /// <summary>Right presses cancel captured host and titlebar-free body drags, including a joined topology preview.</summary>
+    [Theory]
+    [InlineData(false)] [InlineData(true)]
+    public void RightClickCancelsJoinedPreviewThroughHost(bool hiddenPlaceholder) =>
+        ExerciseGroupingPreview(true, 8, hiddenPlaceholder);
+
+    /// <summary>A right press outside a drag remains available to ordinary HUD and game interaction.</summary>
+    [Fact]
+    public void IdleRightClickRemainsUnhandled()
+    {
+        var clip = Assert.Single(layout.Members).Clip;
+        pointer = new PointF(clip.Left + clip.Width / 2, clip.Top + clip.Height / 2);
+        var down = Event(EnumMouseButton.Right);
+        controls.OnMouseDown(api.Object, down);
+        Assert.False(down.Handled);
+        Assert.False(controls.Active);
+        gui.Verify(value => value.SetDialogPosition(It.IsAny<string>(), It.IsAny<Vec2i>()), Times.Never);
+    }
+
     /// <summary>A raw overlapping release rolls back without persistence, while Shift explicitly permits the same placement.</summary>
     [Theory]
     [InlineData(false)] [InlineData(true)]
@@ -645,7 +664,12 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
     /// <summary>Exercises native drag routing with a freshly constructed, consistently scaled fixture.</summary>
     private void ExerciseGroupingPreview(bool cancel, int cancellation = 0, bool hiddenPlaceholder = false)
     {
+        var stored = new Dictionary<string, string>(); int writes = 0;
+        HudLayoutFixture.BindSettings(api, new Mock<ISettingsClass<string>>(), stored, () => writes++);
         using var registry = new HudOverlayRegistry(); registry.RegisterGroup(group); var sourceRegistration = registry.Register(registration);
+        // A retained collapsed sibling forces body routing through the individual control with no titlebar.
+        if (cancellation == 8 && hiddenPlaceholder)
+            registry.Register(new HudOverlayRegistration("test:collapsed", Mock.Of<IHudOverlay>(), () => false, group.Id));
         var targetGroup = new HudOverlayGroup("target", new HudOverlayPlacement("screen", HudOverlayPoint.LeftTop, HudOverlayPoint.LeftTop, 300, 200));
         var target = new HudOverlayRegistration("test:target", Mock.Of<IHudOverlay>(), () => true, targetGroup.Id); registry.RegisterGroup(targetGroup); registry.Register(target);
         var containers = new HudOverlayContainers(api.Object, registry); containers.SetMovable(group.Id, true, initial);
@@ -682,7 +706,9 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
             if (cancellation is 6 or 7)
                 delta = new PointF((float)(destination.renderX + 13 - source.renderX), (float)(destination.renderY + 13 - source.renderY));
             if (hiddenPlaceholder) host.OnMouseDown(Event(EnumMouseButton.Left)); else control.OnMouseDown(api.Object, Event(EnumMouseButton.Left));
-            Assert.True(containers.Get(group.Id).Dragging);
+            var captured = cancellation == 8 && hiddenPlaceholder ? containers.Get(group.Id, registration.Id) : containers.Get(group.Id);
+            Assert.True(captured.Dragging);
+            var snapshot = stored.ToDictionary(pair => pair.Key, pair => pair.Value); int startingWrites = writes;
             if (cancellation == 7) keys[(int)GlKeys.ShiftLeft] = true;
             gui.Invocations.Clear(); pointer = new PointF(pointer.X + delta.X, pointer.Y + delta.Y); host.OnMouseMove(Event(EnumMouseButton.None));
             if (cancellation is 6 or 7)
@@ -704,7 +730,22 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
                 }
                 return;
             }
-            Assert.Single(containers.Resolved); Assert.Same(control, owned["container:" + group.Id]); Assert.True(containers.Get(group.Id).Dragging);
+            Assert.Equal(cancellation == 8 && hiddenPlaceholder ? 2 : 1, containers.Resolved.Count);
+            if (cancellation == 8 && hiddenPlaceholder)
+            {
+                var right = Event(EnumMouseButton.Right); host.OnMouseDown(right);
+                Assert.True(right.Handled); Assert.False(captured.Dragging);
+                host.OnMouseUp(Event(EnumMouseButton.Left));
+                Assert.Equal(startingWrites, writes);
+                Assert.Equal(snapshot.OrderBy(pair => pair.Key), stored.OrderBy(pair => pair.Key));
+                Assert.Equal(new[] { "test:collapsed", registration.Id }, containers.Resolved.Single(value => value.Id == group.Id).Tree.Leaves());
+                Assert.Equal(new[] { target.Id }, containers.Resolved.Single(value => value.Id == targetGroup.Id).Tree.Leaves());
+                Assert.Equal(initial.X, (float)effective[group.Id].Root.renderX);
+                Assert.Equal(initial.Y, (float)effective[group.Id].Root.renderY);
+                gui.Verify(value => value.SetDialogPosition(It.IsAny<string>(), It.IsAny<Vec2i>()), Times.Never);
+                return;
+            }
+            Assert.Same(control, owned["container:" + group.Id]); Assert.True(containers.Get(group.Id).Dragging);
             gui.Verify(value => value.SetDialogPosition(It.IsAny<string>(), It.IsAny<Vec2i>()), Times.Never);
             keys[(int)GlKeys.ShiftLeft] = true; host.OnMouseMove(Event(EnumMouseButton.None)); Assert.Equal(2, containers.Resolved.Count);
             keys[(int)GlKeys.ShiftLeft] = false; host.OnMouseMove(Event(EnumMouseButton.None)); Assert.Single(containers.Resolved);
@@ -720,6 +761,19 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
                 case 3: host.UnFocus(); break;
                 case 4: sourceRegistration.Dispose(); members.Remove(registration); containers.Synchronize(); repack(); host.OnMouseMove(Event(EnumMouseButton.None)); break;
                 case 5: host.Dispose(); break;
+                case 8:
+                    var right = Event(EnumMouseButton.Right); host.OnMouseDown(right);
+                    Assert.True(right.Handled);
+                    Assert.False(control.Active);
+                    host.OnMouseUp(Event(EnumMouseButton.Left));
+                    Assert.Equal(startingWrites, writes);
+                    Assert.Equal(snapshot.OrderBy(pair => pair.Key), stored.OrderBy(pair => pair.Key));
+                    Assert.Equal(initial.X, (float)effective[group.Id].Root.renderX);
+                    Assert.Equal(initial.Y, (float)effective[group.Id].Root.renderY);
+                    Assert.Equal(new[] { registration.Id }, containers.Resolved.Single(value => value.Id == group.Id).Tree.Leaves());
+                    Assert.Equal(new[] { target.Id }, containers.Resolved.Single(value => value.Id == targetGroup.Id).Tree.Leaves());
+                    gui.Verify(value => value.SetDialogPosition(It.IsAny<string>(), It.IsAny<Vec2i>()), Times.Never);
+                    break;
                 default: Assert.True(host.OnEscapePressed()); break;
             }
             Assert.False(containers.Get(group.Id).Dragging); Assert.Equal(cancel ? 2 : 1, containers.Resolved.Count);
