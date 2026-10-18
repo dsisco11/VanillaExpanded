@@ -103,6 +103,13 @@ internal sealed class HudOverlayGroupControls : IDisposable
     /// <summary>Routes native dropdown selections and chrome presses separately from cancellable content dragging.</summary>
     public void OnMouseDown(ICoreClientAPI api, MouseEvent args)
     {
+        // Cancellation belongs to the captured drag, including member bodies without a titlebar.
+        if (movement.Dragging && args.Button == EnumMouseButton.Right)
+        {
+            Cancel();
+            args.Handled = true;
+            return;
+        }
         if (!HasTitleBar) return;
         Refresh(false);
         if (args.Handled || !visible || args.Button != EnumMouseButton.Left) return;
