@@ -95,7 +95,7 @@ internal sealed class HudOverlayGroupControls : IDisposable
         if (movement.IndicatorId == null && movement.HasMultipleMembers) return;
         if (group?.Members.Any(member => (movement.IndicatorId == null || member.Registration.Id == movement.IndicatorId)
             && drawable(member.Registration) && member.Clip.Contains(args.X, args.Y)) != true) return;
-        movement.Begin(ContentOrigin(), new PointF(args.X, args.Y), scale);
+        BeginMovement(new PointF(args.X, args.Y));
         args.Handled = movement.Dragging;
         if (args.Handled) relayout();
     }
@@ -126,7 +126,7 @@ internal sealed class HudOverlayGroupControls : IDisposable
         }
         if (!handle.Contains(args.X, args.Y)) return;
         if (titleBar.IsChrome(args.X, args.Y)) pressed = true;
-        else if (movement.Movable) movement.Begin(ContentOrigin(), new PointF(args.X, args.Y), scale);
+        else if (movement.Movable) BeginMovement(new PointF(args.X, args.Y));
         else return;
         args.Handled = true;
     }
@@ -246,6 +246,13 @@ internal sealed class HudOverlayGroupControls : IDisposable
 
     #region Private
     #region Target geometry and eligibility
+    /// <summary>Captures source slots once, immediately before detachment can change native group geometry.</summary>
+    private void BeginMovement(PointF pointer)
+    {
+        var window = api.Gui.WindowBounds;
+        movement.SourceGeometry = HudOverlaySourceReservation.Capture(group!, new PointF((float)window.renderX, (float)window.renderY), scale);
+        movement.Begin(ContentOrigin(), pointer, scale);
+    }
     /// <summary>Uses visible content for initial targeting, retaining controls during pointer transit and open native menus.</summary>
     private void Refresh(bool checkButton)
     {

@@ -29,6 +29,8 @@ internal sealed class HudOverlayContainers
     private string? active;
     private PointF? previewOrigin;
     private string? draggedIndicator;
+    private HudOverlaySourceReservation? sourceReservation;
+    private HashSet<string> sourceReservationMembers = new(StringComparer.Ordinal);
     private HudLayoutContainer[] resolved = Array.Empty<HudLayoutContainer>();
     public IReadOnlyList<HudLayoutContainer> Resolved => resolved;
     public bool ReadOnly => store.ReadOnly;
@@ -127,6 +129,14 @@ internal sealed class HudOverlayContainers
         return placement;
     }
 
+    /// <summary>Reserves only the detached source remainder, never an incoming item or its joined destination.</summary>
+    public HudOverlaySourceReservation? Reservation(HudLayoutContainer container)
+    {
+        if (sourceReservation == null || draggedIndicator == null) return null;
+        var members = container.Tree.Leaves().ToArray();
+        return members.Length > 0 && members.All(id => id != draggedIndicator && sourceReservationMembers.Contains(id))
+            ? sourceReservation : null;
+    }
     #region Transactions
     /// <summary>Changes permission only, capturing an anchored origin without moving content or changing membership.</summary>
     public bool SetMovable(string id, bool movable, PointF displayed)
@@ -140,7 +150,7 @@ internal sealed class HudOverlayContainers
     }
 
     /// <summary>Captures complete effective membership for cancellation and previews independent detachment when requested.</summary>
-    public bool Begin(string id, string? indicator, PointF displayed, IReadOnlyDictionary<string, PointF> displayedMembers, PointF? containerOrigin = null)
+    public bool Begin(string id, string? indicator, PointF displayed, IReadOnlyDictionary<string, PointF> displayedMembers, PointF? containerOrigin = null, HudOverlaySourceReservation? reservation = null)
     {
         if (ReadOnly || active != null) return false;
         var container = indicator == null ? resolved.FirstOrDefault(item => item.Id == id) : Owner(indicator);
@@ -150,6 +160,8 @@ internal sealed class HudOverlayContainers
         records.RemoveAll(item => item.Id == container.Id);
         if (indicator != null && container.Tree.Leaves().Count() > 1)
         {
+            sourceReservation = reservation;
+            sourceReservationMembers = container.Tree.Leaves().ToHashSet(StringComparer.Ordinal);
             var remainder = container.Tree.Remove(indicator)!;
             if (remainder.Indicator != null)
             {
@@ -235,6 +247,8 @@ internal sealed class HudOverlayContainers
     /// <summary>Discards the complete preview without changing saved membership, mode, or origins.</summary>
     public void Cancel()
     {
+        sourceReservation = null;
+        sourceReservationMembers.Clear();
         preview = null;
         dragBase = null;
         dragContainer = newGroupId = null;

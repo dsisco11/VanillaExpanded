@@ -22,6 +22,7 @@ internal sealed class HudOverlayGroupLayout : IDisposable
     private RectangleF? target;
     private PointF? screenPosition;
     private HudOverlayPlacement? attachment;
+    private HudOverlaySourceReservation? reservation;
     private HudLayoutNode? tree;
     private double? treePadding;
     private long contextRevision = -1;
@@ -31,12 +32,14 @@ internal sealed class HudOverlayGroupLayout : IDisposable
     public IReadOnlyList<HudOverlayMemberLayout> Members { get; private set; } = Array.Empty<HudOverlayMemberLayout>();
     public bool Available { get; private set; }
     public long Revision { get; private set; }
+    /// <summary>Gets current sampled member sizes independently of any transient source-slot reservation.</summary>
+    public IReadOnlyList<KeyValuePair<HudOverlayRegistration, SizeF>> Measurements => previous;
 
     #region Public API
     /// <summary>Consumes sampled measurements and updates native layout only when placement or participating content changes.</summary>
     /// <returns>Whether bounds, membership, clips, or target availability changed.</returns>
     public bool Apply(HudOverlayAnchorContext context, HudOverlayGroup group,
-        IReadOnlyList<KeyValuePair<HudOverlayRegistration, SizeF>> eligibleMembers, PointF? screenPosition = null, HudLayoutNode? tree = null, double? treePadding = null, HudOverlayPlacement? attachment = null)
+        IReadOnlyList<KeyValuePair<HudOverlayRegistration, SizeF>> eligibleMembers, PointF? screenPosition = null, HudLayoutNode? tree = null, double? treePadding = null, HudOverlayPlacement? attachment = null, HudOverlaySourceReservation? reservation = null)
     {
         if (Environment.CurrentManagedThreadId != threadId) throw new InvalidOperationException("Native layout requires the creating client main thread.");
         ObjectDisposedException.ThrowIf(disposed, this);
@@ -51,6 +54,8 @@ internal sealed class HudOverlayGroupLayout : IDisposable
         }
         if (ordered.Select(member => member.Key.Id).Distinct(StringComparer.Ordinal).Count() != ordered.Length)
             throw new ArgumentException("Members must have unique overlay IDs.", nameof(eligibleMembers));
+        // A source reservation preserves its old outer bounds and sibling slots until the transaction ends.
+        if (reservation != null) { screenPosition = reservation.Origin; attachment = null; }
         var placement = attachment ?? (screenPosition.HasValue ? FreePlacement : group.Placement);
         RectangleF? resolved = context.Resolve(placement.TargetId);
         // Keep a missing external target editable at its saved checkpoint; restore docking when it returns.
@@ -58,7 +63,7 @@ internal sealed class HudOverlayGroupLayout : IDisposable
         if (attachment != null && !attached) { placement = FreePlacement; resolved = context.Resolve(placement.TargetId); }
         long revision = placement.TargetId == HudOverlayTargets.Screen ? context.Revision : context.GeometryRevision;
         bool parentChanged = !ReferenceEquals(Root.ParentBounds, context.WindowBounds);
-        if (!parentChanged && definition == group && contextRevision == revision && target == resolved && this.attachment == attachment && this.screenPosition == screenPosition && this.tree == tree && this.treePadding == treePadding && previous.SequenceEqual(ordered) && RenderOffsetsUnchanged())
+        if (!parentChanged && definition == group && contextRevision == revision && target == resolved && this.reservation == reservation && this.attachment == attachment && this.screenPosition == screenPosition && this.tree == tree && this.treePadding == treePadding && previous.SequenceEqual(ordered) && RenderOffsetsUnchanged())
             return false;
 
         // The native root is the only position authority; keep its parent stable across frames and detach on session replacement.
@@ -73,6 +78,7 @@ internal sealed class HudOverlayGroupLayout : IDisposable
         target = resolved;
         this.screenPosition = screenPosition;
         this.attachment = attachment;
+        this.reservation = reservation;
         this.tree = tree;
         this.treePadding = treePadding;
         previous = ordered;
@@ -104,12 +110,15 @@ internal sealed class HudOverlayGroupLayout : IDisposable
         HudOverlayPacking packing = group.Packing;
         int count = tree == null ? RetainedCount(ordered, packing, safe.Size, scale) : ordered.Length;
         var mixed = tree == null ? default : HudLayoutGeometry.Resolve(tree, ordered.ToDictionary(item => item.Key.Id, item => item.Value), treePadding ?? packing.Padding);
-        SizeF size = tree == null ? PackedSize(ordered, count, packing) : mixed.Size;
-        SynchronizeChildren(ordered, count, packing, size);
+        SizeF size = reservation?.Size ?? (tree == null ? PackedSize(ordered, count, packing) : mixed.Size);
+        // A newly available integration has no captured slot. Keep its measurement for drop validation,
+        // but defer showing it in the frozen source until the reservation ends.
+        var visible = reservation == null ? ordered : ordered.Where(member => reservation.Rectangles.ContainsKey(member.Key.Id)).ToArray();
+        SynchronizeChildren(visible, reservation == null ? count : visible.Length, packing, size);
         if (tree != null)
             foreach (var child in Members)
             {
-                if (!mixed.Rectangles.TryGetValue(child.Registration.Id, out var rectangle)) continue;
+                if (!(reservation?.Rectangles ?? mixed.Rectangles).TryGetValue(child.Registration.Id, out var rectangle)) continue;
                 child.Bounds.fixedX = rectangle.X; child.Bounds.fixedY = rectangle.Y;
                 child.Bounds.fixedWidth = rectangle.Width; child.Bounds.fixedHeight = rectangle.Height;
             }

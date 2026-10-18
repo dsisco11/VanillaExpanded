@@ -279,8 +279,8 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
         overlay.Verify(value => value.Prepare(It.IsAny<HudOverlayPreparationContext>()), Times.Never);
     }    /// <summary>Member body drags survive host repacking into singleton controls and can either commit or cancel atomically.</summary>
     [Theory]
-    [InlineData(false, false)] [InlineData(true, false)] [InlineData(false, true)] [InlineData(true, true)]
-    public void IndividualBodyDragSurvivesPreviewHostSynchronization(bool cancel, bool hidden)
+    [InlineData(false, false, false)] [InlineData(true, false, false)] [InlineData(false, true, false)] [InlineData(true, true, false)] [InlineData(true, false, true)]
+    public void IndividualBodyDragSurvivesPreviewHostSynchronization(bool cancel, bool hidden, bool rightCancel)
     {
         using var registry = new HudOverlayRegistry(); registry.RegisterGroup(group); registry.Register(registration);
         var second = new HudOverlayRegistration("test:second", Mock.Of<IHudOverlay>(), () => true, group.Id); registry.Register(second);
@@ -299,7 +299,7 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
                 if (!effective.TryGetValue(container.Id, out var item)) effective[container.Id] = item = new HudOverlayGroupLayout();
                 var measured = members.Where(value => container.Tree.Leaves().Contains(value.Id)).Select(value => new KeyValuePair<HudOverlayRegistration, SizeF>(value,
                     hidden && value == registration ? previews.GetMembers().Single().Value : new SizeF(50, 35))).ToArray();
-                item.Apply(anchors, containers.Definition(container), measured, containers.Origin(container), container.Tree, container.Padding);
+                item.Apply(anchors, containers.Definition(container), measured, containers.Origin(container), container.Tree, container.Padding, container.Attachment, containers.Reservation(container));
             }
             host.Synchronize(effective.Where(pair => containers.Resolved.Any(value => value.Id == pair.Key)).ToDictionary(pair => pair.Key, pair => pair.Value));
         };
@@ -309,16 +309,38 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
             var owned = (Dictionary<string, HudOverlayGroupControls>)typeof(HudOverlayHost).GetField("groupControls", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(host)!;
             var control = owned["member:" + registration.Id]; var member = effective[group.Id].Members.Single(value => value.Registration.Id == registration.Id);
             pointer = new PointF((float)member.Bounds.renderX + 5, (float)member.Bounds.renderY + 5); control.Synchronize(effective);
+            var originalBounds = new RectangleF((float)member.Bounds.renderX, (float)member.Bounds.renderY, (float)member.Bounds.OuterWidth, (float)member.Bounds.OuterHeight);
+            var sourceRoot = effective[group.Id].Root;
+            var originalGroup = new RectangleF((float)sourceRoot.renderX, (float)sourceRoot.renderY, (float)sourceRoot.OuterWidth, (float)sourceRoot.OuterHeight);
+            var siblingBounds = effective[group.Id].Members.Single(value => value.Registration == second).Clip;
             var down = Event(EnumMouseButton.Left);
             host.OnMouseDown(down);
             Assert.True(down.Handled);
+            var dragCopy = (HudOverlayDragPreview)typeof(HudOverlayHost).GetField("dragPreview", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(host)!;
+            var frozen = Assert.Single(dragCopy.Originals);
+            Assert.Same(registration, frozen.Registration);
+            Assert.Equal(originalBounds, new RectangleF((float)frozen.Bounds.renderX, (float)frozen.Bounds.renderY, (float)frozen.Bounds.OuterWidth, (float)frozen.Bounds.OuterHeight));
             Assert.True(containers.Get(group.Id, registration.Id).Dragging);
             pointer = new PointF(pointer.X + 110, pointer.Y + 80); var move = Event(EnumMouseButton.None); host.OnMouseMove(move);
             Assert.True(move.Handled); Assert.Same(control, owned["member:" + registration.Id]); Assert.True(containers.Get(group.Id, registration.Id).Dragging);
-            if (cancel) Assert.True(host.OnEscapePressed()); else { var up = Event(EnumMouseButton.Left); host.OnMouseUp(up); Assert.True(up.Handled); }
+            Assert.Equal(originalBounds, new RectangleF((float)frozen.Bounds.renderX, (float)frozen.Bounds.renderY, (float)frozen.Bounds.OuterWidth, (float)frozen.Bounds.OuterHeight));
+            var remainderLayout = effective[containers.Owner(second.Id)!.Id];
+            Assert.Equal(originalGroup, new RectangleF((float)remainderLayout.Root.renderX, (float)remainderLayout.Root.renderY, (float)remainderLayout.Root.OuterWidth, (float)remainderLayout.Root.OuterHeight));
+            Assert.Equal(siblingBounds, Assert.Single(remainderLayout.Members).Clip);
+            if (cancel)
+            {
+                if (rightCancel) { var right = Event(EnumMouseButton.Right); host.OnMouseDown(right); Assert.True(right.Handled); }
+                else Assert.True(host.OnEscapePressed());
+            }
+            else { var up = Event(EnumMouseButton.Left); host.OnMouseUp(up); Assert.True(up.Handled); }
+            repack();
             Assert.False(containers.Get(group.Id, registration.Id).Dragging);
+            Assert.Empty(dragCopy.Originals);
             Assert.Equal(cancel ? 1 : 2, containers.Resolved.Count);
             Assert.Equal(cancel, containers.Owner(registration.Id)!.Id == group.Id);
+            Assert.Null(containers.Reservation(containers.Owner(second.Id)!));
+            var finalRoot = effective[containers.Owner(second.Id)!.Id].Root;
+            Assert.Equal(cancel, finalRoot.OuterWidth == originalGroup.Width && finalRoot.OuterHeight == originalGroup.Height);
             overlay.Verify(value => value.Refresh(), Times.Never); overlay.Verify(value => value.Prepare(It.IsAny<HudOverlayPreparationContext>()), Times.Never);
         }
         finally { foreach (var item in effective.Values) item.Dispose(); }
