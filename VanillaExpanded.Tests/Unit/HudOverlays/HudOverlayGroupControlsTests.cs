@@ -704,7 +704,9 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
             var source = effective[group.Id].Root; var destination = effective[targetGroup.Id].Root;
             var delta = new PointF((float)(destination.renderX + destination.OuterWidth + targetGroup.Packing.Gap * RuntimeEnv.GUIScale - source.renderX), (float)(destination.renderY - source.renderY));
             if (cancellation is 6 or 7)
-                delta = new PointF((float)(destination.renderX + 13 - source.renderX), (float)(destination.renderY + 13 - source.renderY));
+                delta = new PointF((float)(destination.renderX + destination.OuterWidth / 2 - pointer.X), (float)(destination.renderY + destination.OuterHeight / 2 - pointer.Y));
+            if (cancellation is not (6 or 7))
+                delta = new PointF((float)(destination.renderX + destination.OuterWidth - pointer.X), (float)(destination.renderY + destination.OuterHeight / 2 - pointer.Y));
             if (hiddenPlaceholder) host.OnMouseDown(Event(EnumMouseButton.Left)); else control.OnMouseDown(api.Object, Event(EnumMouseButton.Left));
             var captured = cancellation == 8 && hiddenPlaceholder ? containers.Get(group.Id, registration.Id) : containers.Get(group.Id);
             Assert.True(captured.Dragging);
@@ -725,7 +727,8 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
                 }
                 else
                 {
-                    Assert.Equal(initial.X + delta.X, (float)restored.renderX); Assert.Equal(initial.Y + delta.Y, (float)restored.renderY);
+                    // A fractional grab offset is rounded to native integer GUI coordinates on commit.
+                    Assert.InRange(Math.Abs(initial.X + delta.X - (float)restored.renderX), 0, RuntimeEnv.GUIScale / 2); Assert.InRange(Math.Abs(initial.Y + delta.Y - (float)restored.renderY), 0, RuntimeEnv.GUIScale / 2);
                     gui.Verify(value => value.SetDialogPosition(It.IsAny<string>(), It.IsAny<Vec2i>()), Times.AtLeastOnce);
                 }
                 return;

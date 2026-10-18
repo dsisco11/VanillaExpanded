@@ -31,12 +31,6 @@ internal static class HudSnapGeometry
                 bool horizontal = side is HudSnapSide.Left or HudSnapSide.Right;
                 bool sameAttachment = retained?.Grouping == true && retained.Target!.Container == target.Container
                     && retained.Target.Member == target.Member && retained.Side == side;
-                float reach = sameAttachment ? Release : Acquisition;
-                // Nearby corners acquire naturally; the wider retained band also prevents a one-pixel span exit
-                // from abruptly losing a destination while its normal edge remains within magnetic reach.
-                bool local = horizontal ? moving.Bottom >= b.Top - reach && moving.Top <= b.Bottom + reach
-                    : moving.Right >= b.Left - reach && moving.Left <= b.Right + reach;
-                if (!local) continue;
                 float fraction = horizontal ? (pointer.Y - b.Top) / b.Height : (pointer.X - b.Left) / b.Width;
                 var alignment = SelectAlignment(fraction, horizontal ? b.Height : b.Width,
                     sameAttachment ? retained!.Alignment : null);
@@ -45,15 +39,27 @@ internal static class HudSnapGeometry
                     : b.Left + factor * (b.Width - moving.Width);
                 float y = horizontal ? b.Top + factor * (b.Height - moving.Height)
                     : side == HudSnapSide.Above ? b.Top - target.Gap - moving.Height : b.Bottom + target.Gap;
-                float distance = Math.Abs(horizontal ? moving.X - x : moving.Y - y);
+                // Grouping intent follows the pointer, independently of incoming size and grab offset.
+                // Distance to the finite edge also prevents distant corner/span acquisition.
+                float edge = side switch
+                {
+                    HudSnapSide.Left => b.Left,
+                    HudSnapSide.Right => b.Right,
+                    HudSnapSide.Above => b.Top,
+                    _ => b.Bottom
+                };
+                float normal = (horizontal ? pointer.X : pointer.Y) - edge;
+                float cross = horizontal ? pointer.Y - Math.Clamp(pointer.Y, b.Top, b.Bottom)
+                    : pointer.X - Math.Clamp(pointer.X, b.Left, b.Right);
+                float distance = MathF.Sqrt(normal * normal + cross * cross);
                 string identity = $"group:{key}:{side}:{alignment}";
                 Add(new HudSnapCandidate(identity, target, side, alignment, new PointF(x, y), distance, b));
             }
             // Matching edges and centers are alignment-only and require a nearby perpendicular span.
             if (moving.Bottom >= b.Top - Release && moving.Top <= b.Bottom + Release)
-                AlignAxis(b, true, "target:" + key);
+                AlignAxis(b, true, $"target:{key}");
             if (moving.Right >= b.Left - Release && moving.Left <= b.Right + Release)
-                AlignAxis(b, false, "target:" + key);
+                AlignAxis(b, false, $"target:{key}");
         }
         foreach (var boundary in (boundaries ?? Array.Empty<HudSnapBoundary>()).OrderBy(item => item.Id, StringComparer.Ordinal))
         {

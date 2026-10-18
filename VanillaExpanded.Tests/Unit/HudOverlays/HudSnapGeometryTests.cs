@@ -9,6 +9,45 @@ public sealed class HudSnapGeometryTests
 {
     #region Public API
     #region Acquisition and candidate geometry
+    /// <summary>A pointer constrained to a viewport edge can attach outside a flush target without requiring an offscreen grab point.</summary>
+    [Theory]
+    [InlineData(0, 0, 180, -40, 180, 0, 210, 1)]
+    [InlineData(1, 920, 180, 960, 180, 1000, 210, 1)]
+    [InlineData(2, 900, 0, 900, -40, 940, 0, 1)]
+    [InlineData(3, 900, 720, 900, 760, 940, 800, 1)]
+    [InlineData(0, 0, 180, -40, 180, 0, 210, 2)]
+    [InlineData(1, 920, 180, 960, 180, 1000, 210, 2)]
+    [InlineData(2, 900, 0, 900, -40, 940, 0, 2)]
+    [InlineData(3, 900, 720, 900, 760, 940, 800, 2)]
+    public void ViewportEdgeCanAcquireExteriorGrouping(int side, float targetX, float targetY,
+        float movingX, float movingY, float pointerX, float pointerY, float scale)
+    {
+        var viewport = new RectangleF(0, 0, 1000 * scale, 800 * scale);
+        var target = new HudSnapTarget("destination", "leaf",
+            new RectangleF(targetX * scale, targetY * scale, 80 * scale, 80 * scale), 5 * scale);
+        var moving = new RectangleF(movingX * scale, movingY * scale, 80 * scale, 80 * scale);
+        var pointer = new PointF(pointerX * scale, pointerY * scale);
+        var candidates = HudSnapGeometry.Candidates(moving, pointer, viewport, new[] { target }, null, false);
+        var acquired = Assert.Single(candidates, candidate => candidate.Grouping && candidate.Side == (HudSnapSide)side);
+        Assert.Equal(target, acquired.Target);
+        Assert.DoesNotContain(HudSnapGeometry.Candidates(moving, pointer, viewport, new[] { target }, acquired, true),
+            candidate => candidate.Grouping);
+    }
+
+    /// <summary>A distant pointer cannot acquire the finite target edge.</summary>
+    [Theory]
+    [InlineData(0, 200, -40, 0, 0, 0, 500, 300)]
+    [InlineData(200, 0, 160, -40, 400, 0, 80, 80)]
+    public void PointerMustBeNearFiniteTargetEdge(float targetX, float targetY,
+        float movingX, float movingY, float pointerX, float pointerY, float movingWidth, float movingHeight)
+    {
+        var target = new HudSnapTarget("destination", "leaf", new RectangleF(targetX, targetY, 80, 80), 5);
+        var moving = new RectangleF(movingX, movingY, movingWidth, movingHeight);
+        var candidates = HudSnapGeometry.Candidates(moving, new PointF(pointerX, pointerY), new RectangleF(0, 0, 1000, 800),
+            new[] { target }, null, false);
+        Assert.DoesNotContain(candidates, candidate => candidate.Grouping && candidate.Side == HudSnapSide.Left);
+    }
+
     /// <summary>All four sides expose every cross-axis alignment and retain the supplied normal gap.</summary>
     [Theory]
     [InlineData(0)]
@@ -26,7 +65,7 @@ public sealed class HudSnapGeometryTests
             bool horizontal = side is HudSnapSide.Left or HudSnapSide.Right;
             var expected = new PointF(horizontal ? side == HudSnapSide.Left ? target.Bounds.Left - target.Gap - size.Width : target.Bounds.Right + target.Gap : target.Bounds.Left + factor * (target.Bounds.Width - size.Width),
                 horizontal ? target.Bounds.Top + factor * (target.Bounds.Height - size.Height) : side == HudSnapSide.Above ? target.Bounds.Top - target.Gap - size.Height : target.Bounds.Bottom + target.Gap);
-            var pointer = new PointF(target.Bounds.Left + factor * target.Bounds.Width, target.Bounds.Top + factor * target.Bounds.Height);
+            var pointer = new PointF(horizontal ? side == HudSnapSide.Left ? target.Bounds.Left : target.Bounds.Right : target.Bounds.Left + factor * target.Bounds.Width, horizontal ? target.Bounds.Top + factor * target.Bounds.Height : side == HudSnapSide.Above ? target.Bounds.Top : target.Bounds.Bottom);
             var candidate = Assert.Single(Candidates(new RectangleF(expected, size), pointer, new[] { target }), value => value.Grouping && value.Side == side);
             Assert.Equal(alignment, candidate.Alignment); Assert.Equal(expected, candidate.Origin); Assert.Equal(target, candidate.Target);
         }
@@ -38,13 +77,13 @@ public sealed class HudSnapGeometryTests
     {
         var target = new HudSnapTarget("destination", "leaf", new RectangleF(200, 200, 80, 60), 5);
         var moving = new RectangleF(target.Bounds.Right + target.Gap, target.Bounds.Top, 30, 20);
-        var pointer = target.Bounds.Location;
+        var pointer = new PointF(target.Bounds.Right, target.Bounds.Top + target.Bounds.Height / 2);
         var retained = Candidates(moving, pointer, new[] { target }).First(value => value.Grouping);
-        moving.X += (HudSnapGeometry.Acquisition + HudSnapGeometry.Release) / 2;
+        pointer.X += (HudSnapGeometry.Acquisition + HudSnapGeometry.Release) / 2;
         Assert.DoesNotContain(Candidates(moving, pointer, new[] { target }), value => value.Identity == retained.Identity);
         Assert.Equal(retained.Identity, Candidates(moving, pointer, new[] { target }, retained).First().Identity);
         Assert.Empty(HudSnapGeometry.Candidates(moving, pointer, new RectangleF(0, 0, 1000, 800), new[] { target }, retained, true));
-        moving.X += HudSnapGeometry.Release;
+        pointer.X += HudSnapGeometry.Release;
         Assert.DoesNotContain(Candidates(moving, pointer, new[] { target }, retained), value => value.Identity == retained.Identity);
     }
 
@@ -59,8 +98,8 @@ public sealed class HudSnapGeometryTests
         var reverse = Candidates(moving, a.Bounds.Location, new[] { b, a });
         Assert.Equal(forward.Select(value => value.Identity), reverse.Select(value => value.Identity));
         Assert.Equal("a", forward.First(value => value.Grouping).Target!.Container);
-        moving.Y += a.Bounds.Height * 4;
-        Assert.DoesNotContain(Candidates(moving, a.Bounds.Location, new[] { a }), value => value.Grouping);
+        var farPointer = new PointF(a.Bounds.Left, a.Bounds.Bottom + a.Bounds.Height * 4);
+        Assert.DoesNotContain(Candidates(moving, farPointer, new[] { a }), value => value.Grouping);
         Assert.DoesNotContain(Candidates(moving, a.Bounds.Location, new[] { a with { Bounds = RectangleF.Empty } }), value => value.Grouping);
     }
 
@@ -74,6 +113,38 @@ public sealed class HudSnapGeometryTests
     }
 
     #endregion
+    /// <summary>Pointer intent selects the same attachment for different incoming dimensions and grab offsets.</summary>
+    [Theory]
+    [InlineData(0, 0, 30, 20, 200, 230, 0)]
+    [InlineData(700, 500, 150, 100, 200, 230, 0)]
+    [InlineData(0, 0, 30, 20, 280, 230, 1)]
+    [InlineData(700, 500, 150, 100, 280, 230, 1)]
+    [InlineData(0, 0, 30, 20, 240, 200, 2)]
+    [InlineData(700, 500, 150, 100, 240, 200, 2)]
+    [InlineData(0, 0, 30, 20, 240, 260, 3)]
+    [InlineData(700, 500, 150, 100, 240, 260, 3)]
+    public void PointerIntentIsIndependentOfIncomingGeometry(float x, float y, float width, float height,
+        float pointerX, float pointerY, int side)
+    {
+        var target = new HudSnapTarget("destination", "leaf", new RectangleF(200, 200, 80, 60), 5);
+        var selected = Candidates(new RectangleF(x, y, width, height), new PointF(pointerX, pointerY), new[] { target }).First();
+        Assert.True(selected.Grouping); Assert.Equal((HudSnapSide)side, selected.Side);
+        Assert.Equal(HudOverlayCrossAlignment.Center, selected.Alignment);
+        Assert.Equal(target, selected.Target);
+    }
+
+    /// <summary>Incoming edges cannot manufacture grouping when the pointer is elsewhere.</summary>
+    [Theory]
+    [InlineData(165, 200, 600, 500)]
+    [InlineData(285, 200, 600, 500)]
+    [InlineData(200, 175, 600, 500)]
+    [InlineData(200, 265, 600, 500)]
+    public void IncomingEdgeDoesNotAcquireDistantPointer(float x, float y, float pointerX, float pointerY)
+    {
+        var target = new HudSnapTarget("destination", "leaf", new RectangleF(200, 200, 80, 60), 5);
+        Assert.DoesNotContain(Candidates(new RectangleF(x, y, 30, 20), new PointF(pointerX, pointerY), new[] { target }), candidate => candidate.Grouping);
+    }
+
     #region Magnetic intent and retention
     /// <summary>Attachments preempt retained screen guides for individual and whole-group targets.</summary>
     [Theory]
@@ -83,7 +154,7 @@ public sealed class HudSnapGeometryTests
         var target = new HudSnapTarget("destination", member, new RectangleF(40, 200, 80, 60), 5);
         var moving = new RectangleF(5, 200, 30, 20);
         var screen = Candidates(moving, moving.Location, Array.Empty<HudSnapTarget>()).First(value => value.AlignsX);
-        var selected = Candidates(moving, target.Bounds.Location, new[] { target }, screen).First();
+        var selected = Candidates(moving, new PointF(target.Bounds.Left, target.Bounds.Top + target.Bounds.Height / 2), new[] { target }, screen).First();
         Assert.True(selected.Grouping); Assert.Equal(target, selected.Target); Assert.Equal(HudSnapSide.Left, selected.Side);
     }
 
@@ -110,9 +181,10 @@ public sealed class HudSnapGeometryTests
     {
         var target = new HudSnapTarget("destination", "leaf", new RectangleF(200, 200, 80, 60), 5);
         var moving = new RectangleF(target.Bounds.Right + target.Gap, target.Bounds.Bottom + HudSnapGeometry.Acquisition / 2, 30, 20);
-        Assert.Contains(Candidates(moving, target.Bounds.Location, new[] { target }), value => value.Grouping && value.Side == HudSnapSide.Right);
-        moving.Y += HudSnapGeometry.Release * 2;
-        Assert.DoesNotContain(Candidates(moving, target.Bounds.Location, new[] { target }), value => value.Grouping);
+        var pointer = new PointF(target.Bounds.Right, moving.Y);
+        Assert.Contains(Candidates(moving, pointer, new[] { target }), value => value.Grouping && value.Side == HudSnapSide.Right);
+        pointer.Y += HudSnapGeometry.Release * 2;
+        Assert.DoesNotContain(Candidates(moving, pointer, new[] { target }), value => value.Grouping);
     }
 
     /// <summary>Retention stabilizes competing destinations until the acquired attachment leaves its release band.</summary>
@@ -122,12 +194,13 @@ public sealed class HudSnapGeometryTests
         var target = new HudSnapTarget("a", "leaf", new RectangleF(200, 200, 80, 60), 5);
         var other = target with { Container = "b", Bounds = new RectangleF(210, 200, 80, 60) };
         var moving = new RectangleF(target.Bounds.Right + target.Gap, target.Bounds.Top, 30, 20);
-        var retained = Candidates(moving, target.Bounds.Location, new[] { target }).First(value => value.Grouping);
-        moving.X = other.Bounds.Right + other.Gap;
-        Assert.Equal(target, Candidates(moving, target.Bounds.Location, new[] { other, target }, retained).First().Target);
-        moving.X = target.Bounds.Right + target.Gap + HudSnapGeometry.Release + 1;
-        other = other with { Bounds = new RectangleF(moving.X - other.Gap - other.Bounds.Width, 200, 80, 60) };
-        Assert.Equal(other, Candidates(moving, target.Bounds.Location, new[] { target, other }, retained).First().Target);
+        var pointer = new PointF(target.Bounds.Right, target.Bounds.Top + target.Bounds.Height / 2);
+        var retained = Candidates(moving, pointer, new[] { target }).First(value => value.Grouping);
+        pointer.X = other.Bounds.Right;
+        Assert.Equal(target, Candidates(moving, pointer, new[] { other, target }, retained).First().Target);
+        pointer.X = target.Bounds.Right + HudSnapGeometry.Release + 1;
+        other = other with { Bounds = new RectangleF(pointer.X - other.Bounds.Width, 200, 80, 60) };
+        Assert.Equal(other, Candidates(moving, pointer, new[] { target, other }, retained).First().Target);
     }
 
     /// <summary>Both alignment boundaries resist jitter in both directions along either attachment axis.</summary>
