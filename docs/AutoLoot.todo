@@ -1,7 +1,7 @@
 # AutoLoot Implementation Task List
 
 Proposal: [AutoLootProposal.md](./AutoLootProposal.md)
-Status: Phases 1-4 complete; final automated validation and gameplay acceptance pending.
+Status: Phases 1-5 complete; in-game release acceptance pending.
 
 Conventions:
     [ ] Pending task.
@@ -237,8 +237,8 @@ Conventions:
         Initially verified 556 focused unit tests (29 new Phase 4 cases) and the existing
         Cake ValidateJson task. No new AutoLoot compiler warnings; existing
         unrelated compiler and Cake dependency-advisory warnings remain.
-        Final Phase 5 coverage/build work and all gameplay acceptance remain
-        pending; no unmodified-server gameplay verification is claimed.
+        Phase 5 coverage/build results are recorded below. Gameplay acceptance
+        remains pending; no unmodified-server gameplay verification is claimed.
         The subsequent definition-driven owned-behavior revision passes 575
         focused unit tests, including 100 AutoLoot tests for synchronized client
         definitions, idempotence, registry aliases, untouched server arrays,
@@ -246,7 +246,7 @@ Conventions:
         inventory-close lifecycle. See the proposal revision section.
 
 ## Phase 5: Automated Validation
-    [ ] AL-13: Cover gesture, session, and feature lifecycle behavior.
+    [x] AL-13: Cover gesture, session, and feature lifecycle behavior.
         Depends: AL-05, AL-08, AL-10.
         Use feature-organized tests and existing mocks; mark unit tests Category=Unit.
         Cover short click, timing boundaries, repeated ticks/interactions, release,
@@ -255,8 +255,14 @@ Conventions:
         Assert at most one collection pass per hold and complete progress cleanup.
         Verify AutoLoot and AutoStash work independently and do not leave orphaned
         or overlapping indicators.
+        Completed 2026-10-18: added delayed readiness without forced opening or
+        accrued time, polled release without MouseUp, explicit corpse retargeting,
+        and captured entity/ID/behavior/inventory/player replacement regressions.
+        Extended listener-detachment and one-pass/cleanup checks for full and
+        successful predicted collection. Existing timing, eligibility, live
+        configuration, and cross-feature precedence checks remain passing.
 
-    [ ] AL-14: Cover transfer correctness and packet transport.
+    [x] AL-14: Cover transfer correctness and packet transport.
         Depends: AL-07, AL-09.
         Prefer real InventoryGeneric instances and existing test infrastructure.
         Cover sufficient/full/partial capacity, existing-stack merges, restricted
@@ -267,14 +273,30 @@ Conventions:
         activate-plus-move submissions.
         Verify predicted movement is not reported as confirmed server success.
         Unit tests do not substitute for vanilla server reconciliation tests.
+        Completed 2026-10-18: exercised the installed vanilla
+        PlayerInventoryManager.TryTransferAway with real InventoryGeneric slots
+        exposed through owned-inventory adapters. Covered multiple loot types,
+        real full/partial capacity, storage/slot limits, attribute-sensitive merges,
+        and unrelated open-container exclusion (with an unrestricted control).
+        Added null/empty packet results, source-array growth bounds, invalidation
+        during callbacks, and transport-failure logging without retry/success
+        feedback. Verified move packets rather than duplicate activation packets;
+        all packets already predicted are sent once before stopping the next slot.
 
-    [ ] AL-15: Run targeted regression checks and build.
+    [x] AL-15: Run targeted regression checks and build.
         Depends: AL-04, AL-05, AL-09, AL-10, AL-11, AL-12, AL-13, AL-14.
         Run AutoLoot, shared-progress, and affected AutoStash tests with one focused
         runner/filter where possible; include client transfer regressions if shared
         AlloyCalculator code changed.
         Run the existing mod build and relevant asset/configuration validation.
         Fix regressions caused by the change; expand suites only when warranted.
+        Completed 2026-10-18: 594 focused tests passed (including 119 AutoLoot),
+        with zero failures/skips; the isolated real-Harmony AutoStash dispatch
+        regression also passed (1 test). Cake target Build passed ValidateJson
+        and Release compilation/publish, without running Package or cleaning
+        existing releases. Existing unrelated compiler warnings and Cake's
+        System.Security.Cryptography.Pkcs advisories remain. See the proposal
+        for commands, test boundaries, and the pending gameplay acceptance scope.
 
 ## Phase 6: In-Game Release Acceptance (After Implementation)
     [ ] AL-16: Validate normal interaction and full/partial collection.

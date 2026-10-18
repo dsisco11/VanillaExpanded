@@ -5,6 +5,7 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
+using Vintagestory.GameContent;
 using Vintagestory.Server;
 
 namespace VanillaExpanded.Tests.Unit.AutoLoot;
@@ -133,6 +134,73 @@ public sealed class AutoLootClientTests
     }
 
     [Fact]
+    public void DelayedSessionReadiness_DoesNotAccumulateTimeOrForceOpening()
+    {
+        using var test = new AutoLootTestCase();
+        test.Inventory.Close(test.Player.Object);
+        test.Fixture.InventoryManagerMock.Setup(manager => manager.OpenedInventories).Returns([]);
+        test.Begin();
+        test.Tick(2);
+        test.Inventory.Open(test.Player.Object);
+        test.Begin();
+        test.Tick(2);
+        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(It.IsAny<bool>()), Times.Never);
+        Assert.Empty(test.Attempts);
+
+        test.Fixture.InventoryManagerMock.Setup(manager => manager.OpenedInventories).Returns([test.Inventory]);
+        test.Tick(2);
+        Assert.Empty(test.Attempts);
+        test.Begin();
+        test.Tick(0.25f);
+        Assert.Equal(0.5f, test.Progress.Object.Progress);
+        Assert.Empty(test.Sent);
+        test.Tick(0.25f);
+        Assert.Single(test.Sent);
+        test.Fixture.InventoryManagerMock.Verify(manager => manager.OpenInventory(It.IsAny<IInventory>()), Times.Never);
+        test.ProgressProvider.Verify(provider => provider.RemoveProgressBar(test.Progress.Object), Times.Once);
+    }
+
+    [Fact]
+    public void PolledReleaseWithoutMouseEvent_CleansUpAndRestartsTheEntireDelay()
+    {
+        using var test = new AutoLootTestCase();
+        test.Begin();
+        test.Tick(0.25f);
+        test.Mouse.Right = false;
+        test.Tick(0);
+        test.ProgressProvider.Verify(provider => provider.RemoveProgressBar(test.Progress.Object), Times.Once);
+        test.Mouse.Right = true;
+        test.Tick(1);
+        Assert.Empty(test.Sent);
+        test.Begin();
+        test.Tick(0.25f);
+        Assert.Empty(test.Sent);
+        test.Tick(0.25f);
+        Assert.Single(test.Sent);
+        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(true), Times.Exactly(2));
+        test.ProgressProvider.Verify(provider => provider.RemoveProgressBar(test.Progress.Object), Times.Exactly(2));
+    }
+
+    [Fact]
+    public void InteractingWithAnotherCorpse_CancelsRatherThanRetargetingTheHold()
+    {
+        using var test = new AutoLootTestCase();
+        test.Begin();
+        test.Tick(0.25f);
+        var other = new EntityAgent { EntityId = 43, World = test.Fixture.World, Api = test.Fixture.Api };
+        test.Controller.OnInteract(new EntityBehaviorHarvestable(other),
+            test.PlayerEntity, new Vec3d(), EnumInteractMode.Interact);
+        test.ProgressProvider.Verify(provider => provider.RemoveProgressBar(test.Progress.Object), Times.Once);
+        test.Begin();
+        test.Tick(1);
+        Assert.Empty(test.Attempts);
+        test.Release();
+        test.Begin();
+        test.Tick(0.5f);
+        Assert.Single(test.Sent);
+    }
+
+    [Fact]
     public void ClosingLocalInventory_CancelsImmediatelyAndReopeningStillRequiresRelease()
     {
         using var test = new AutoLootTestCase();
@@ -202,11 +270,56 @@ public sealed class AutoLootClientTests
         test.ProgressProvider.Verify(value => value.CreateProgressBar(It.IsAny<bool>()), Times.Never);
     }
 
-    [Fact]
-    public void TransferFailure_IsLoggedAndDoesNotRepeatOrClaimSuccess()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PredictionResult_IsOnePassPerHoldAndDoesNotClaimConfirmedSuccess(bool full)
     {
         using var test = new AutoLootTestCase();
-        test.TransferOverride = (_, _) => throw new InvalidOperationException("transfer failed");
+        test.UseVanillaTransfers();
+        if (full)
+        {
+            foreach (ItemSlot slot in test.Fixture.BackpackInventory.Concat(test.Fixture.HotbarInventory))
+            {
+                slot.Itemstack = test.Inventory[0].Itemstack!.Clone();
+                slot.Itemstack.StackSize = 64;
+            }
+        }
+
+        test.Begin();
+        test.Tick(0.5f);
+        test.Begin();
+        test.Tick(1);
+        Assert.Single(test.Attempts);
+        Assert.Equal(full ? 0 : 1, test.Sent.Count);
+        Assert.Equal(full ? 3 : 0, test.Inventory[0].StackSize);
+        Assert.True(test.Dialog.IsOpened());
+        test.ProgressProvider.Verify(provider => provider.RemoveProgressBar(test.Progress.Object), Times.Once);
+        test.Fixture.ClientApiMock!.Verify(api => api.ShowChatMessage(It.IsAny<string>()), Times.Never);
+        test.Fixture.ClientApiMock.Verify(api => api.TriggerIngameError(
+            It.IsAny<object>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+        Assert.DoesNotContain(test.Fixture.WorldMock.Invocations, invocation => invocation.Method.Name.StartsWith("PlaySound"));
+        test.Player.Verify(player => player.TriggerFpAnimation(It.IsAny<EnumHandInteract>()), Times.Never);
+        test.Fixture.InventoryManagerMock.Verify(manager => manager.CloseInventoryAndSync(It.IsAny<IInventory>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData("prediction")]
+    [InlineData("transport")]
+    public void TransferFailure_IsLoggedAndDoesNotRepeatOrClaimSuccess(string failure)
+    {
+        using var test = new AutoLootTestCase();
+        if (failure == "prediction")
+        {
+            test.TransferOverride = (_, _) => throw new InvalidOperationException("prediction failed");
+        }
+        else
+        {
+            test.UseVanillaTransfers();
+            test.Fixture.ClientNetworkMock!.Setup(network => network.SendEntityPacketWithOffset(
+                It.IsAny<long>(), It.IsAny<int>(), It.IsAny<object>()))
+                .Throws(new InvalidOperationException("transport failed"));
+        }
         test.Begin();
         test.Tick(0.5f);
         test.Begin();
@@ -231,6 +344,8 @@ public sealed class AutoLootClientTests
         test.Begin();
         test.Tick(1);
         test.Events.Verify(events => events.UnregisterGameTickListener(71), Times.Once);
+        test.Events.VerifyRemove(events => events.MouseUp -= It.IsAny<MouseEventDelegate>(), Times.Once);
+        test.Events.VerifyRemove(events => events.LeaveWorld -= It.IsAny<Action>(), Times.Once);
         test.ProgressProvider.Verify(value => value.RemoveProgressBar(test.Progress.Object), Times.Once);
         Assert.Empty(test.Sent);
         Assert.True(test.Dialog.IsOpened());

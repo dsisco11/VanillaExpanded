@@ -9,6 +9,7 @@ using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
+using Vintagestory.Common;
 using Vintagestory.GameContent;
 using Vintagestory.Server;
 
@@ -149,6 +150,35 @@ internal sealed class AutoLootTestCase : IDisposable
             if (source.StackSize < before && packet is not null) packets.Add(packet);
         }
         return packets.Count == 0 ? null : packets.ToArray();
+    }
+
+    public PlayerInventoryManager UseVanillaTransfers(params InventoryBase[] otherInventories)
+    {
+        var inventories = new Vintagestory.API.Datastructures.OrderedDictionary<string, InventoryBase>
+        {
+            [Inventory.InventoryID] = Inventory
+        };
+        foreach (InventoryGeneric inventory in new[] { Fixture.BackpackInventory, Fixture.HotbarInventory })
+        {
+            // Expose the existing real slots as owned inventories for vanilla's player-only filter.
+            var owned = new Mock<InventoryBasePlayer>(inventory.ClassName, Player.Object.PlayerUID, null!)
+            {
+                CallBase = true
+            };
+            owned.Object.Api = Fixture.Api;
+            owned.SetupGet(value => value.Count).Returns(inventory.Count);
+            owned.Setup(value => value[It.IsAny<int>()]).Returns((int index) => inventory[index]);
+            inventories.Add(owned.Object.InventoryID, owned.Object);
+        }
+        foreach (InventoryBase inventory in otherInventories)
+        {
+            inventory.Open(Player.Object);
+            inventories.Add(inventory.InventoryID, inventory);
+        }
+        var manager = new Mock<PlayerInventoryManager>(inventories, Player.Object) { CallBase = true }.Object;
+        TransferOverride = (ItemSlot source, ItemStackMoveOperation operation) =>
+            manager.TryTransferAway(source, ref operation, onlyPlayerInventory: true, slotNotifyEffect: false);
+        return manager;
     }
 
     public MouseEvent Release(EnumMouseButton button = EnumMouseButton.Right)

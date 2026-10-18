@@ -1,6 +1,6 @@
 # AutoLoot Proposal
 
-Status: Phases 1-4 complete; final automated validation and gameplay acceptance pending.
+Status: Phases 1-5 complete; in-game release acceptance pending.
 
 ## Summary
 
@@ -17,10 +17,11 @@ Reduce duplication by sharing hold timing, progress presentation, and low-level
 inventory operations. Keep corpse eligibility and loot transfer rules separate
 from AutoStash's matching-item policies.
 
-The client implementation, settings/help integration, and focused automated tests are complete.
-Installed-game inspection confirms the vanilla packet path needed for
-client-only collection. Final automated coverage/build checks and in-game
-validation of the hold gesture, latency, and concurrent looting remain necessary.
+The client implementation, settings/help integration, automated coverage, and
+Release build are complete. Installed-game inspection confirms the vanilla
+packet path needed for client-only collection. In-game validation of the hold
+gesture, latency, concurrent looting, and unmodified-server operation remains
+necessary.
 
 ## Goals
 
@@ -629,12 +630,65 @@ release-before-reopening, and independent viewer-close checks also pass.
 The mod and tests compile without new AutoLoot warnings. No in-game or
 unmodified-server gameplay verification is claimed.
 
-### Phase 5: Automated Validation
+### Phase 5: Automated Validation (Complete)
 
-Add feature-organized tests using existing mocks and real `InventoryGeneric`
-instances where appropriate. Use the existing test category conventions.
-Extend the implemented checks to cover settings/help integration and run final
-regressions after Phase 4; the task list retains those tasks as pending.
+Completed 2026-10-18; AL-13 through AL-15 are complete. Added 19 AutoLoot test
+cases and strengthened existing transfer and disposal checks without changing
+production behavior.
+
+- [AutoLootClientTests](../VanillaExpanded.Tests/Unit/AutoLoot/AutoLootClientTests.cs)
+  now covers delayed readiness without forced opening or time accumulated before
+  a valid session, raw polled release without a mouse event, explicit interaction
+  with another corpse, listener detachment, and one pass per hold for both full
+  inventory and successful prediction. Prediction and transport failures are
+  logged without retrying; neither successful nor rejected predictions produce
+  confirmed-success chat, sound, animation, or forced dialog closure.
+- [AutoLootTargetTests](../VanillaExpanded.Tests/Unit/AutoLoot/AutoLootTargetTests.cs)
+  verifies cancellation and progress cleanup when the captured entity, entity ID,
+  behavior, inventory, or player entity is replaced.
+- [AutoLootTransferTests](../VanillaExpanded.Tests/Unit/AutoLoot/AutoLootTransferTests.cs)
+  uses the installed vanilla `PlayerInventoryManager.TryTransferAway` with real
+  `InventoryGeneric` slots exposed through owned-inventory adapters in
+  [AutoLootTestCase](../VanillaExpanded.Tests/Unit/AutoLoot/Support/AutoLootTestCase.cs).
+  Only unused abstract manager members are mocked on this path; destination
+  selection, capacity checks, attribute-sensitive merging, slot restrictions,
+  prediction, and move-packet creation execute vanilla code.
+  Checks cover multiple item types, sufficient/full/partial capacity, overflow,
+  and an unrelated open container that becomes a valid destination only when
+  player-only routing is explicitly disabled in the control assertion.
+- Packet-boundary tests additionally cover null/empty results, empty source
+  slots, bounded termination when callbacks append slots, and invalidation
+  during prediction. Every already-generated packet is sent once through the
+  entity route before the next source slot is abandoned. No duplicate activation
+  or global packet submission occurs.
+
+Verified commands:
+
+```powershell
+dotnet test .\VanillaExpanded.Tests\VanillaExpanded.Tests.csproj --no-restore --filter 'FullyQualifiedName~AutoLoot|FullyQualifiedName~AutoStashing|FullyQualifiedName~HoldInteractionProgress|FullyQualifiedName~Configuration' --verbosity minimal
+# 594 passed, zero failed or skipped.
+
+dotnet test .\VanillaExpanded.Tests\VanillaExpanded.Tests.csproj --no-restore --no-build --filter 'FullyQualifiedName~AutoLoot' --verbosity quiet
+# 119 passed, zero failed or skipped.
+
+dotnet test .\VanillaExpanded.IntegrationTests\VanillaExpanded.IntegrationTests.csproj --no-restore --filter 'FullyQualifiedName~HarmonyDispatchIntegrationTests' --verbosity quiet
+# 1 passed, zero failed or skipped.
+
+Set-Location .\CakeBuild
+dotnet run --project .\CakeBuild.csproj --no-restore -- --target=Build
+# ValidateJson and Release compile/publish succeeded.
+```
+
+The build intentionally targets `Build`, not `Package`, so existing release
+packages are not cleaned. Existing unrelated compiler warnings and Cake's
+`System.Security.Cryptography.Pkcs` 10.0.12 dependency advisories (NU1902/NU1903)
+remain; no new AutoLoot compiler warnings were emitted.
+
+These tests exercise client prediction and packet boundaries against the
+installed Vintage Story 1.22.7 assemblies, not a running vanilla server. They do
+not prove authoritative reconciliation, persistence, concurrent-looter safety,
+live UI/input ordering, or successful client-only gameplay against an
+unmodified server. Phase 6 remains pending.
 
 ### Phase 6: In-Game Release Acceptance
 

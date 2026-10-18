@@ -1,3 +1,4 @@
+using System.Reflection;
 using Moq;
 using VanillaExpanded.AutoLoot;
 using VanillaExpanded.Tests.Unit.AutoLoot.Support;
@@ -88,6 +89,51 @@ public sealed class AutoLootTargetTests
         Assert.Equal(attributes, test.Corpse.WatchedAttributes.ToJsonToken().ToString());
         test.Fixture.InventoryManagerMock.Verify(manager => manager.OpenInventory(It.IsAny<IInventory>()), Times.Never);
         Assert.Empty(test.Sent);
+    }
+
+    [Theory]
+    [InlineData("entity")]
+    [InlineData("entityid")]
+    [InlineData("behavior")]
+    [InlineData("inventory")]
+    [InlineData("player")]
+    public void ReplacedIdentity_InvalidatesCapturedTargetAndCleansUpPendingHold(string replaced)
+    {
+        using var test = new AutoLootTestCase();
+        AutoLootTarget target = test.ResolveTarget();
+        test.Begin();
+        test.Tick(0.25f);
+        switch (replaced)
+        {
+            case "entity":
+                test.WorldEntity = new EntityAgent { EntityId = test.Corpse.EntityId };
+                break;
+            case "entityid":
+                test.Corpse.EntityId++;
+                break;
+            case "behavior":
+                test.Corpse.SidedProperties.Behaviors.Remove(test.Behavior);
+                test.Corpse.SidedProperties.Behaviors.Add(new EntityBehaviorHarvestable(test.Corpse));
+                break;
+            case "inventory":
+                typeof(EntityBehaviorHarvestable).GetField("inv", BindingFlags.Instance | BindingFlags.NonPublic)!
+                    .SetValue(test.Behavior, new InventoryGeneric(3, "harvestableContents", "42", null!));
+                break;
+            case "player":
+                test.Player.Setup(player => player.Entity).Returns(new EntityPlayer
+                {
+                    World = test.Fixture.World, Api = test.Fixture.Api
+                });
+                break;
+        }
+
+        Assert.False(target.IsValid(test.Fixture.ClientApi, test.Player.Object));
+        test.Tick(1);
+        test.Tick(1);
+        Assert.Empty(test.Attempts);
+        Assert.Empty(test.Sent);
+        Assert.Equal(3, test.Inventory[0].StackSize);
+        test.ProgressProvider.Verify(provider => provider.RemoveProgressBar(test.Progress.Object), Times.Once);
     }
 
     private sealed class NonStandardHarvestable(Entity entity) : EntityBehaviorHarvestable(entity);
