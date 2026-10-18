@@ -42,7 +42,7 @@ public sealed class AutoLootTargetTests
             case "server": test.Fixture.WorldMock.Setup(world => world.Side).Returns(EnumAppSide.Server); break;
         }
         Assert.False(AutoLootTarget.TryCreate(test.Fixture.ClientApi, test.Player.Object,
-            test.Behavior, test.Dialog, new Vec3d(), out _));
+            test.Behavior, new Vec3d(), out _));
         test.Begin();
         test.Tick(1);
         Assert.Empty(test.Sent);
@@ -55,11 +55,9 @@ public sealed class AutoLootTargetTests
         using var test = new AutoLootTestCase();
         var playerCorpse = new EntityPlayer { World = test.Fixture.World, Api = test.Fixture.Api, Alive = false };
         Assert.False(AutoLootTarget.TryCreate(test.Fixture.ClientApi, test.Player.Object,
-            new EntityBehaviorHarvestable(playerCorpse), test.Dialog, new Vec3d(), out _));
+            new EntityBehaviorHarvestable(playerCorpse), new Vec3d(), out _));
         Assert.False(AutoLootTarget.TryCreate(test.Fixture.ClientApi, test.Player.Object,
-            new NonStandardHarvestable(test.Corpse), test.Dialog, new Vec3d(), out _));
-        Assert.False(AutoLootTarget.TryCreate(test.Fixture.ClientApi, test.Player.Object,
-            test.Behavior, null, new Vec3d(), out _));
+            new NonStandardHarvestable(test.Corpse), new Vec3d(), out _));
     }
 
     [Fact]
@@ -69,7 +67,7 @@ public sealed class AutoLootTargetTests
         test.PlayerEntity.Pos.X = 6;
         var hit = new Vec3d(1, 0, 0);
         Assert.True(AutoLootTarget.TryCreate(test.Fixture.ClientApi, test.Player.Object,
-            test.Behavior, test.Dialog, hit, out AutoLootTarget? target));
+            test.Behavior, hit, out AutoLootTarget? target));
         hit.X = -100;
         Assert.True(target.IsValid(test.Fixture.ClientApi, test.Player.Object));
         test.PlayerEntity.Pos.X = 6.001;

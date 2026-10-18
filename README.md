@@ -32,6 +32,8 @@ Release, close the loot window, change world targets, move out of reach, or disa
 
 AutoLoot runs entirely on the client: neither VanillaExpanded nor ConfigLib is required on the server for this feature. ConfigLib is optional for the client-side settings menu. AutoLoot and Auto-Stash can be enabled independently. Transfers use vanilla packets and server authorization; progress completion initiates collection, not a server-confirmed success notification.
 
+The client adds its own `EntityBehaviorAutoLootable` to synchronized client entity definitions with a harvestable behavior. The engine creates it normally for each instance; there is no per-entity attachment scan or patch on the vanilla harvestable behavior. Vanilla still opens and closes the loot inventory and supplies harvesting help.
+
 Initial support is limited to dead, harvested, non-player corpses using the unchanged native harvestable behavior. Modded assets using that same behavior are supported; custom corpse behavior subclasses, attached bags, player corpses, and general containers are not AutoLoot targets.
 
 Compatibility evidence currently covers inspection of the Vintage Story **1.22.7** native protocol and automated tests. In-game acceptance, including unmodified-server gameplay, latency, and simultaneous looters, remains pending; see the [AutoLoot proposal](docs/AutoLootProposal.md).

@@ -1,3 +1,4 @@
+using System.Reflection;
 using Moq;
 using VanillaExpanded.AutoLoot;
 using VanillaExpanded.Tests.Unit.AutoLoot.Support;
@@ -14,25 +15,24 @@ namespace VanillaExpanded.Tests.Unit.AutoLoot;
 public sealed class AutoLootInteractionHelpTests
 {
     [Fact]
-    public void EligibleHelp_AppendsWithoutChangingVanillaEntriesOrRequiringAnOpenSession()
+    public void EligibleHelp_AggregatesWithOtherHelpWithoutRequiringAnOpenSession()
     {
         using var test = new AutoLootTestCase();
+        PrepareNativeHelp(test, []);
         test.Inventory.Close(test.Player.Object);
         test.Dialog.TryClose();
         test.Fixture.InventoryManagerMock.Setup(manager => manager.OpenedInventories).Returns([]);
         var vanilla = new WorldInteraction { ActionLangCode = "game:loot" };
-        WorldInteraction[] original = [vanilla];
-        WorldInteraction[]? result = original;
+        var lootBehavior = test.LootBehavior;
+        test.Corpse.RemoveBehavior(lootBehavior);
+        test.Corpse.AddBehavior(new OtherHelp(test.Corpse, vanilla));
+        test.Corpse.AddBehavior(lootBehavior);
         var selection = new EntitySelection { Entity = test.Corpse, HitPosition = new Vec3d() };
 
-        AutoLootInteractionPatch.AppendInteractionHelp(test.Behavior, test.Fixture.ClientApi.World, selection,
-            test.Player.Object, ref result);
+        WorldInteraction[] result = test.Corpse.GetInteractionHelp(test.Fixture.ClientApi.World, selection, test.Player.Object);
 
-        Assert.NotNull(result);
-        Assert.NotSame(original, result);
         Assert.Equal(2, result.Length);
         Assert.Same(vanilla, result[0]);
-        Assert.Same(vanilla, Assert.Single(original));
         Assert.Equal("vanillaexpanded:entityhelp-autoloot", result[1].ActionLangCode);
         Assert.Equal(EnumMouseButton.Right, result[1].MouseButton);
         Assert.True(result[1].HotKeyCodes is null or { Length: 0 });
@@ -53,10 +53,11 @@ public sealed class AutoLootInteractionHelpTests
     [InlineData("hit")]
     [InlineData("custom")]
     [InlineData("player")]
-    public void IneligibleHelp_PreservesOriginalArray(string reason)
+    [InlineData("disposed")]
+    public void IneligibleHelp_ProducesNoAdditionalHelpOrHandling(string reason)
     {
         using var test = new AutoLootTestCase();
-        EntityBehaviorHarvestable behavior = test.Behavior;
+        EntityBehaviorAutoLootable behavior = test.LootBehavior;
         var selection = new EntitySelection { Entity = test.Corpse, HitPosition = new Vec3d() };
         switch (reason)
         {
@@ -70,17 +71,22 @@ public sealed class AutoLootInteractionHelpTests
             case "selection": selection.Entity = new EntityAgent(); break;
             case "missing": test.WorldEntity = null; break;
             case "hit": selection.HitPosition = null!; break;
-            case "custom": behavior = new CustomHarvestable(test.Corpse); break;
-            case "player": behavior = new EntityBehaviorHarvestable(
-                new EntityPlayer { World = test.Fixture.World, Alive = false }); break;
+            case "custom":
+                test.Corpse.RemoveBehavior(test.Behavior);
+                test.Corpse.AddBehavior(new CustomHarvestable(test.Corpse));
+                break;
+            case "player":
+                var corpse = new EntityPlayer { World = test.Fixture.World, Alive = false };
+                typeof(Entity).GetProperty(nameof(Entity.Properties))!.SetValue(corpse,
+                    new EntityProperties { Client = new EntityClientProperties([], new Dictionary<string, Vintagestory.API.Datastructures.JsonObject>()) });
+                corpse.AddBehavior(new EntityBehaviorHarvestable(corpse));
+                behavior = new EntityBehaviorAutoLootable(corpse);
+                break;
+            case "disposed": test.System.Dispose(); break;
         }
-        WorldInteraction[] original = [new WorldInteraction { ActionLangCode = "game:harvest" }];
-        WorldInteraction[]? result = original;
-        AutoLootInteractionPatch.AppendInteractionHelp(behavior, test.Fixture.ClientApi.World, selection,
-            test.Player.Object, ref result);
-        Assert.Same(original, result);
-        Assert.NotNull(result);
-        Assert.Equal("game:harvest", Assert.Single(result).ActionLangCode);
+        EnumHandling handling = EnumHandling.PassThrough;
+        Assert.Null(behavior.GetInteractionHelp(test.Fixture.ClientApi.World, selection, test.Player.Object, ref handling));
+        Assert.Equal(EnumHandling.PassThrough, handling);
     }
 
     [Fact]
@@ -89,52 +95,50 @@ public sealed class AutoLootInteractionHelpTests
         using var test = new AutoLootTestCase();
         test.PlayerEntity.Pos.X = 6;
         var selection = new EntitySelection { Entity = test.Corpse, HitPosition = new Vec3d(1, 0, 0) };
-        WorldInteraction[]? result = null;
-        AutoLootInteractionPatch.AppendInteractionHelp(test.Behavior, test.Fixture.ClientApi.World, selection,
-            test.Player.Object, ref result);
+        EnumHandling handling = EnumHandling.PassThrough;
+        WorldInteraction[]? result = test.LootBehavior.GetInteractionHelp(test.Fixture.ClientApi.World,
+            selection, test.Player.Object, ref handling);
         Assert.NotNull(result);
         Assert.Single(result);
     }
 
     [Fact]
-    public void RealHelpPostfix_PreservesHarvestHelpAndAddsLootHelpOnlyWhileEnabled()
+    public void RealBehaviorHelp_PreservesHarvestHelpAndAddsLootHelpOnlyWhileEnabled()
     {
         using var test = new AutoLootTestCase();
-        test.Controller.Dispose();
         var harvestHelp = new WorldInteraction { ActionLangCode = "game:harvest" };
+        PrepareNativeHelp(test, [harvestHelp]);
+        var selection = new EntitySelection { Entity = test.Corpse, HitPosition = new Vec3d() };
+        test.Corpse.WatchedAttributes.SetBool("harvested", false);
+        WorldInteraction[] original = test.Corpse.GetInteractionHelp(test.Fixture.ClientApi.World,
+            selection, test.Player.Object);
+        Assert.Same(harvestHelp, Assert.Single(original));
+        test.Corpse.WatchedAttributes.SetBool("harvested", true);
+        WorldInteraction[] result = test.Corpse.GetInteractionHelp(test.Fixture.ClientApi.World,
+            selection, test.Player.Object);
+        Assert.Equal("vanillaexpanded:entityhelp-autoloot", Assert.Single(result).ActionLangCode);
+        VanillaExpandedModSystem.Config.EnableAutoLoot = false;
+        Assert.Empty(test.Corpse.GetInteractionHelp(test.Fixture.ClientApi.World, selection, test.Player.Object));
+        VanillaExpandedModSystem.Config.EnableAutoLoot = true;
+        test.System.Dispose();
+        Assert.Empty(test.Corpse.GetInteractionHelp(test.Fixture.ClientApi.World, selection, test.Player.Object));
+    }
+
+    private static void PrepareNativeHelp(AutoLootTestCase test, WorldInteraction[] help)
+    {
         test.Fixture.WorldMock.Setup(world => world.Api).Returns(test.Fixture.Api);
         test.Fixture.ApiMock.Setup(api => api.ObjectCache).Returns(new Dictionary<string, object>
         {
-            ["harvestableEntityInteractions"] = new[] { harvestHelp }
+            ["harvestableEntityInteractions"] = help
         });
-        var system = new AutoLootSystem_Client(test.ProgressProvider.Object);
-        var selection = new EntitySelection { Entity = test.Corpse, HitPosition = new Vec3d() };
-        try
-        {
-            system.StartClientSide(test.Fixture.ClientApi);
-            EnumHandling handling = EnumHandling.PassThrough;
-            test.Corpse.WatchedAttributes.SetBool("harvested", false);
-            WorldInteraction[] original = test.Behavior.GetInteractionHelp(test.Fixture.ClientApi.World,
-                selection, test.Player.Object, ref handling);
-            Assert.Same(harvestHelp, Assert.Single(original));
-            test.Corpse.WatchedAttributes.SetBool("harvested", true);
-            WorldInteraction[] result = test.Behavior.GetInteractionHelp(test.Fixture.ClientApi.World,
-                selection, test.Player.Object, ref handling);
-            Assert.Equal("vanillaexpanded:entityhelp-autoloot", Assert.Single(result).ActionLangCode);
-            Assert.Equal(EnumHandling.PassThrough, handling);
-            VanillaExpandedModSystem.Config.EnableAutoLoot = false;
-            Assert.Null(test.Behavior.GetInteractionHelp(test.Fixture.ClientApi.World,
-                selection, test.Player.Object, ref handling));
-        }
-        finally
-        {
-            system.Dispose();
-        }
-        VanillaExpandedModSystem.Config.EnableAutoLoot = true;
-        EnumHandling restoredHandling = EnumHandling.PassThrough;
-        Assert.Null(test.Behavior.GetInteractionHelp(test.Fixture.ClientApi.World,
-            selection, test.Player.Object, ref restoredHandling));
     }
 
     private sealed class CustomHarvestable(Entity entity) : EntityBehaviorHarvestable(entity);
+
+    private sealed class OtherHelp(Entity entity, WorldInteraction help) : EntityBehavior(entity)
+    {
+        public override string PropertyName() => "test-help";
+        public override WorldInteraction[] GetInteractionHelp(IClientWorldAccessor world, EntitySelection es,
+            IClientPlayer player, ref EnumHandling handled) => [help];
+    }
 }

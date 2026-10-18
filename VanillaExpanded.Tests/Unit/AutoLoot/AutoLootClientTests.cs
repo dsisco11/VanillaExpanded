@@ -5,6 +5,7 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
+using Vintagestory.Server;
 
 namespace VanillaExpanded.Tests.Unit.AutoLoot;
 
@@ -132,6 +133,39 @@ public sealed class AutoLootClientTests
     }
 
     [Fact]
+    public void ClosingLocalInventory_CancelsImmediatelyAndReopeningStillRequiresRelease()
+    {
+        using var test = new AutoLootTestCase();
+        test.Begin();
+        test.Tick(0.25f);
+        test.Inventory.Close(test.Player.Object);
+        test.ProgressProvider.Verify(provider => provider.RemoveProgressBar(test.Progress.Object), Times.Once);
+        test.Inventory.Open(test.Player.Object);
+        test.Begin();
+        test.Tick(1);
+        Assert.Empty(test.Sent);
+        test.Release();
+        test.Begin();
+        test.Tick(0.5f);
+        Assert.Single(test.Sent);
+    }
+
+    [Fact]
+    public void ClosingAnotherViewersInventory_DoesNotCancelLocalHold()
+    {
+        using var test = new AutoLootTestCase();
+        var otherPlayer = new Mock<ServerPlayer>((ServerMain)null!, new ServerWorldPlayerData()).As<IClientPlayer>();
+        otherPlayer.Setup(player => player.PlayerUID).Returns("other-player");
+        test.Inventory.Open(otherPlayer.Object);
+        test.Begin();
+        test.Tick(0.25f);
+        test.Inventory.Close(otherPlayer.Object);
+        test.ProgressProvider.Verify(provider => provider.RemoveProgressBar(test.Progress.Object), Times.Never);
+        test.Tick(0.25f);
+        Assert.Single(test.Sent);
+    }
+
+    [Fact]
     public void EmptyInventoryAfterCollection_DoesNotRearmFromServerCorrection()
     {
         using var test = new AutoLootTestCase();
@@ -160,7 +194,7 @@ public sealed class AutoLootClientTests
         if (reason == "disabled") VanillaExpandedModSystem.Config.EnableAutoLoot = false;
         if (reason == "pause") test.Paused = true;
         if (reason == "notheld") test.Mouse.Right = false;
-        test.Controller.OnInteract(test.Behavior, test.Dialog,
+        test.Controller.OnInteract(test.Behavior,
             reason == "otherplayer" ? new EntityPlayer() : test.PlayerEntity, new Vec3d(),
             reason == "attack" ? EnumInteractMode.Attack : EnumInteractMode.Interact);
         test.Tick(1);

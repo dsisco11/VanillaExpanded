@@ -149,25 +149,29 @@ contract; they do not claim a completed runtime implementation or gameplay test.
 
 ### AL-01: Interaction Hook and Input Lifecycle
 
-Use a client-only Harmony postfix on the public virtual method
-`EntityBehaviorHarvestable.OnInteract(EntityAgent, ItemSlot, Vec3d,
-EnumInteractMode, ref EnumHandling)`.
+Revised on 2026-10-18 at the user's request: replace the initially selected
+Harmony postfix with VE-owned
+[EntityBehaviorAutoLootable](../VanillaExpanded/src/AutoLoot/EntityBehaviorAutoLootable.cs).
+AutoLoot no longer patches `EntityBehaviorHarvestable`.
 
-The public client event APIs expose input events, but no equivalent
-corpse-specific post-interaction event that establishes that this behavior
-actually ran and opened its inventory. A narrow postfix supplies that boundary
-without attaching new entity behaviors or intercepting all entity interactions.
-
-- Let the original method run unchanged. Do not return a prefix result, modify
-  `handled`, suppress the dialog, manufacture an open session, or replay the
-  original interaction later.
-- Install the patch from the client ModSystem lifecycle, not the shared
-  server/client selective-patch path. Its body also checks client side, feature
-  enablement, the local interacting player, interact mode rather than attack,
-  and the eligible corpse/session.
-- After the original returns, begin a gesture only when the normal client loot
-  dialog/session is open, Interact is still held, and loot is available. Merely
-  running a postfix is not evidence the original accepted the interaction.
+- Register `VEAutoLootable` in the client feature's `Start`. At
+  `BlockTexturesLoaded`, after synchronized entity definitions are available,
+  append its descriptor to each matching `EntityProperties.Client.BehaviorsAsJsonObj`.
+  The registry identifies native harvestable behaviors and their aliases or
+  subclasses. Inject independently of the feature toggle and avoid duplicates.
+  The engine then clones definitions and constructs/initializes behaviors for
+  each instance; no entity-loaded listener or per-instance scan is needed.
+- Append after the existing behaviors so normal vanilla interaction gets the
+  first opportunity to open the loot inventory. Do not modify `handled`,
+  suppress the dialog, manufacture a session, or replay the original method.
+  Earlier behaviors can still prevent subsequent interactions normally.
+- The owned behavior forwards to the client gesture controller, which checks
+  client side, feature enablement, the local interacting player, interact mode
+  rather than attack, and the eligible corpse/session.
+- Begin only when the actual native inventory reports the player as an opener
+  and is present in the player's opened inventories, Interact is still held,
+  and loot is available. Merely receiving the behavior callback is not evidence
+  the original accepted the interaction. No private dialog field is inspected.
 - Advance through one client game-tick listener, using the shared hold lifecycle
   planned in Phase 2. Repeated callbacks for the same hold/target must not reset
   elapsed time or submit another collection pass.
@@ -186,9 +190,12 @@ without attaching new entity behaviors or intercepting all entity interactions.
   Cancel on release, window/session closure, invalidation, feature disablement,
   focus loss, pause, or disposal. Remove progress and require a fresh eligible
   interaction before starting again.
+- Observe the public inventory-close event for immediate cancellation when
+  vanilla closes the local loot session; another viewer closing does not cancel
+  the local gesture.
 - Gate behavior through live client configuration so enabling/disabling does not
-  depend on restarting solely to install/remove this hook. Keep patch/listener
-  disposal scoped so it does not remove other feature patches.
+  depend on restarting solely to attach this behavior. Dispose the feature's own
+  listeners/controller without altering any other feature's Harmony patches.
 
 Additional installed-game inspection supporting this choice:
 
@@ -316,8 +323,8 @@ inventory changes.
 - Leave dirty marking, synchronization, persistence, and depletion behavior to
   the vanilla implementation.
 
-Use the client-only `EntityBehaviorHarvestable.OnInteract` postfix selected in
-Phase 1 rather than a broad entity patch.
+Use the owned `EntityBehaviorAutoLootable` attached on the client, not a patch on
+`EntityBehaviorHarvestable` or a broad entity patch.
 
 ### Client AutoLoot Transfer Coordinator
 
@@ -398,7 +405,7 @@ on AutoStash. AutoStash retains its own `AutoStashGuiRendersTopmost` preference.
 The feature is wired through:
 
 - Client ModSystem lifecycle and feature gates.
-- Client-only corpse interaction postfix installation and scoped disposal.
+- Client-only entity behavior registration/definition amendment and listener disposal.
 - Existing vanilla inventory and entity packet APIs; no AutoLoot packet
   registration in [VanillaExpandedModSystem](../VanillaExpanded/src/VanillaExpandedModSystem.cs).
 - Configuration properties and ConfigLib definitions.
@@ -418,7 +425,7 @@ client reads the same properties from its local configuration file.
 ### Phase 1: Resolve Integration Details (Complete)
 
 AL-01 and AL-02 are resolved in the Phase 1 Decisions section above: use the
-client-only corpse interaction postfix, raw held-button state, a bound
+client-only owned entity behavior, raw held-button state, a bound
 corpse/session while its window is open, standard harvested-corpse eligibility,
 fixed topmost rendering, and neutral prediction-aware feedback.
 
@@ -471,12 +478,12 @@ Validation:
 ### Phase 3: Implement Client AutoLoot (Complete)
 
 - [AutoLootSystem_Client](../VanillaExpanded/src/ModSystems/AutoLootSystem_Client.cs)
-  loads only on clients and owns a separate Harmony patch owner, input/tick/world
-  listeners, live-disable cancellation, and cleanup. Its
-  [postfix](../VanillaExpanded/src/AutoLoot/AutoLootInteractionPatch.cs) preserves
-  the original native interaction and inventory-open handling.
+  loads only on clients and owns entity behavior registration/definition amendment,
+  input/tick/world listeners, live-disable cancellation, and cleanup.
+  [EntityBehaviorAutoLootable](../VanillaExpanded/src/AutoLoot/EntityBehaviorAutoLootable.cs)
+  preserves the original native interaction and inventory-open handling.
 - [AutoLootTarget](../VanillaExpanded/src/AutoLoot/AutoLootTarget.cs) binds the
-  corpse, player, native inventory, open dialog, dimension, and copied local hit
+  corpse, player, native inventory/session, dimension, and copied local hit
   point. It rechecks eligibility, session identity, and the native five-block
   eye-to-hit reach without opening sessions or writing inventory state.
   Initial support requires the exact native harvestable behavior; modded assets
@@ -508,8 +515,10 @@ Validation:
 - [AutoLoot unit tests](../VanillaExpanded.Tests/Unit/AutoLoot/) cover eligibility,
   target/session invalidation, timing/input, cleanup, unavailable rendering,
   release latching, packet routing, partial capacity, attributes, errors, and
-  attached-stash precedence. A real Harmony test invokes native corpse
-  `OnInteract`, verifies vanilla opening/handling, dispatch, and scoped unpatching.
+  attached-stash precedence. Native entity-dispatch tests invoke corpse
+  `OnInteract`, verify vanilla opening followed by the owned behavior, and check
+  controller/listener disposal. Initial Phase 3 validation below preceded the
+  owned-behavior revision; updated validation is recorded after Phase 4.
 - `dotnet test .\VanillaExpanded.Tests\VanillaExpanded.Tests.csproj --no-restore --filter "FullyQualifiedName~AutoLoot|FullyQualifiedName~AutoStashing|FullyQualifiedName~HoldInteractionProgress"`:
   488 passed (52 AutoLoot), zero failed or skipped.
 - The isolated `HarmonyDispatchIntegrationTests` regression passed again:
@@ -535,13 +544,13 @@ Completed 2026-10-18:
   integration applies local changes and invokes live reload without any
   AutoLoot-specific channel or server handler. ConfigLib and VanillaExpanded
   remain unnecessary on the server for AutoLoot.
-- [Corpse interaction help](../VanillaExpanded/src/AutoLoot/AutoLootInteractionPatch.cs)
-  appends the localized right-button hold action to the original result,
-  including a null result. Shared native-corpse and eye-to-hit reach checks keep
+- [Corpse interaction help](../VanillaExpanded/src/AutoLoot/EntityBehaviorAutoLootable.cs)
+  supplies the localized right-button hold action through the normal entity
+  behavior aggregation. Shared native-corpse and eye-to-hit reach checks keep
   the help consistent with collection eligibility while allowing it before
-  opening the inventory. Ineligible corpses and a disabled feature preserve the
-  original array unchanged. Vanilla harvesting help, handling, and click-to-open
-  remain untouched; patches share the existing client-scoped lifecycle.
+  opening the inventory. Ineligible corpses and a disabled/disposed feature
+  supply no additional help. Vanilla harvesting help, handling, and click-to-open
+  remain untouched; the behavior uses the existing client-scoped controller.
 - [English localization](../VanillaExpanded/assets/vanillaexpanded/lang/en.json)
   supplies section, setting labels/tooltips, hold help, and progress text.
   The [README](../README.md) documents installation, gesture/cancellation,
@@ -556,10 +565,11 @@ Validation:
   completion thresholds, and live disable/enable through all four ConfigLib
   event paths with AutoStash enabled and disabled independently.
 - [Interaction-help tests](../VanillaExpanded.Tests/Unit/AutoLoot/AutoLootInteractionHelpTests.cs)
-  verify append-only behavior, no forced session opening, eligibility and reach
-  boundaries, and actual native Harmony help dispatch/unpatching.
+  verify additive help aggregation, no forced session opening, eligibility and
+  reach boundaries, and actual native entity behavior dispatch/disposal.
 - `dotnet test .\VanillaExpanded.Tests\VanillaExpanded.Tests.csproj --no-restore --filter "FullyQualifiedName~AutoLoot|FullyQualifiedName~AutoStashing|FullyQualifiedName~HoldInteractionProgress|FullyQualifiedName~Configuration"`:
-  **556 passed**, zero failed or skipped, including 29 new Phase 4 cases. The
+  Initial Phase 4 validation: **556 passed**, zero failed or skipped, including
+  29 new Phase 4 cases, before the owned-behavior revision below. The
   mod/test projects compile without new AutoLoot compiler warnings.
 - The existing Cake `ValidateJson` task passed. Existing unrelated compiler
   warnings and Cake dependency advisories remain; no dependency changes were made.
@@ -567,6 +577,57 @@ Validation:
   Live ConfigLib/game UI behavior, native server reconciliation, and
   unmodified-server gameplay remain release-acceptance checks, not claimed
   outcomes of these automated tests.
+
+### Owned Behavior Integration Revision (Complete)
+
+On 2026-10-18, replaced both AutoLoot Harmony postfixes with the VE-owned entity
+behavior requested by the user, then moved injection from entity-loaded callbacks
+to synchronized client entity definitions. Registration and idempotent definition
+amendment leave server definitions, vanilla behavior methods, and other mods'
+patch ownership untouched. Definition amendment is independent of current loot
+eligibility so living/unharvested creatures and a currently disabled feature
+remain ready for later harvesting or live enablement.
+
+The lifecycle boundary is the public client `BlockTexturesLoaded` event, not
+`StartClientSide` or an early asset edit that server synchronization could replace.
+The inspected game 1.22.7 startup path loads entity definitions into
+`ClientMain.EntityClassesByCode` in `HandleServerAssets_Step1`, then emits the
+public texture-ready event through the client systems' all-assets-loaded phase.
+The public `EntityTypes` list references these same prototypes.
+`EntityClientProperties.Clone` carries their behavior descriptors to each
+instance, and `EntitySidedProperties.loadBehaviors` creates and initializes
+registered behavior classes in descriptor order.
+
+Only the client behavior array is replaced, with the owned descriptor appended.
+Original entries/order and server arrays remain untouched, even when the
+original client/server arrays share a reference. Repeated ready notifications
+do not duplicate an existing descriptor; newly synchronized definitions can
+still be amended. No per-entity injection lookup, manual attachment, or
+loaded-event subscription is retained in production.
+
+The native entity dispatcher aggregates help and runs vanilla interaction before
+the appended behavior. The controller observes the public `OnInventoryClosed`
+event instead of retaining or reflecting the private corpse dialog. Native
+`GuiDialogCreatureContents.OnGuiClosed` uses `CloseInventoryAndSync`, so closing
+the window still cancels immediately while normal inventory/session checks
+remain authoritative for client eligibility.
+
+Definition matching also recognizes harvestable subclasses, but collection/help
+retain the previously approved exact-native protocol restriction. No custom
+server code, network channel, entity-type asset patch, or new dependency is
+needed. The client definition-ready listener is detached on disposal, and remaining
+owned behaviors cannot start work or advertise help without an active controller.
+
+Validation: **575 focused unit tests passed**, including **100 AutoLoot tests**,
+using the combined AutoLoot/AutoStash/shared-progress/configuration filter above.
+Coverage includes waiting for synchronized definitions, idempotent amendment,
+disabled-feature independence, registered aliases/subclasses, non-harvestable
+and server-only exclusion, unchanged shared server arrays, normal cloning and
+native behavior initialization for independent instances, and listener cleanup.
+Existing native interaction/help, immediate local session-close cancellation,
+release-before-reopening, and independent viewer-close checks also pass.
+The mod and tests compile without new AutoLoot warnings. No in-game or
+unmodified-server gameplay verification is claimed.
 
 ### Phase 5: Automated Validation
 

@@ -34,8 +34,10 @@ Conventions:
         immersive mouse mode. Do not suppress the server's normal open flow.
         Prefer existing API hooks; use a client-only Harmony patch only if needed.
         Record the selected approach in the proposal.
-        Completed 2026-10-18: selected a client-only postfix on the original
-        EntityBehaviorHarvestable.OnInteract, leaving vanilla opening unchanged.
+        Completed 2026-10-18; revised to the user-requested VE-owned behavior:
+        register EntityBehaviorAutoLootable and append its descriptor to matching
+        synchronized client entity definitions at BlockTexturesLoaded, after
+        existing behaviors, leaving vanilla opening/handling unchanged.
         Use raw button state plus non-consuming release observation, bind the
         gesture to the corpse/session while its window is open, and distinguish
         UI cursor movement from world retargeting. See proposal Phase 1 Decisions
@@ -110,12 +112,19 @@ Conventions:
         be treated as server authorization.
         Register only required client hooks/listeners and release them on disposal.
         Do not alter corpse drops, watched attributes, persistence, or cleanup.
-        Completed: AutoLootSystem_Client owns client-only, separately scoped
-        Harmony registration, tick/input/world listeners, live-disable handling,
+        Completed: AutoLootSystem_Client owns client-only behavior registration,
+        idempotent synchronized-definition amendment, tick/input/world listeners,
+        live-disable handling,
         and disposal. AutoLootTarget binds the exact native harvestable behavior,
-        corpse identity, real inventory, dialog, player, dimension, and hit point.
+        corpse identity, real inventory/session, player, dimension, and hit point.
         Session, eligibility, and reach checks are read-only; vanilla alone opens
         and authorizes the session. Custom behavior subclasses are excluded.
+        Client definitions with registered harvestable behavior classes, aliases,
+        or subclasses receive the owned descriptor. The engine constructs and
+        initializes it normally on cloned entity definitions; no per-instance
+        scan/attachment listener remains. Only collection eligibility applies
+        the exact-native restriction. Definition amendment is independent of the
+        enable toggle so live enabling works. No AutoLoot Harmony patch remains.
 
     [x] AL-07: Add the vanilla client transfer coordinator.
         Depends: AL-06.
@@ -151,13 +160,15 @@ Conventions:
         consuming vanilla input or relying solely on InWorldMouseButton.
         Require release before starting another pass after completion.
         Preserve existing windows; do not close an already-open loot inventory.
-        Completed: native postfix preserves original opening/handling and starts
+        Completed: appended owned behavior preserves original opening/handling and starts
         AutoLootClient's shared HoldInteractionProgress. Raw right-button polling
         and non-consuming MouseUp observation maintain a release latch, including
         over the GUI. The 0.1-second grace and configured delay use fixed topmost
         rendering. World/session/input invalidation removes progress without
         closing the loot window. Attached AutoStash takes precedence for a shared
         hold, cancelling pending loot until release without changing stash rules.
+        Public OnInventoryClosed replaces private dialog access/subscriptions:
+        local closure cancels immediately, another viewer closing does not.
 
     [x] AL-09: Implement prediction-aware feedback.
         Depends: AL-02, AL-07, AL-08.
@@ -170,9 +181,9 @@ Conventions:
         inventory views and vanilla corrections provide results; no predicted
         counts, success sounds, or inferred full/access-denied messages are added.
         Unexpected collection/timing failures cancel and log the full exception.
-        Verified 52 AutoLoot tests within 488 passing focused unit tests, plus
+        Initially verified 52 AutoLoot tests within 488 passing focused unit tests, plus
         one passing isolated AutoStash Harmony integration test. Tests include
-        native corpse postfix dispatch, lifecycle, transport, capacity/attributes,
+        native corpse dispatch, lifecycle, transport, capacity/attributes,
         bounded invalidation, error logging, and cross-feature progress cleanup.
         No in-game or unmodified-server gameplay verification is claimed.
 
@@ -205,12 +216,12 @@ Conventions:
         labels/descriptions, and any approved feedback using existing conventions.
         Do not replace vanilla harvesting or loot-window help.
         Completed: English section, toggle, delay labels/tooltips, progress text,
-        and hold-to-collect help are supplied. A client-only native corpse-help
-        postfix appends without modifying vanilla entries or handling. Help uses
+        and hold-to-collect help are supplied. The client-owned behavior supplies
+        additive help without modifying vanilla entries or handling. Help uses
         shared supported-corpse and reach checks, does not require/open a loot
         session, and is absent for disabled/ineligible targets. Tests include
-        actual native help dispatch, preserved harvest help, null results,
-        eligibility/range gates, localization coverage, and scoped unpatching.
+        actual entity help aggregation, preserved harvest help, no additional
+        help when ineligible, reach gates, localization coverage, and disposal.
 
     [x] AL-12: Update feature documentation and proposal status.
         Depends: AL-08, AL-09, AL-10, AL-11.
@@ -223,11 +234,16 @@ Conventions:
         eligibility, overflow, and vanilla harvesting/authority. The proposal
         records Phase 4 implementation and ConfigLib 1.10.12 protocol inspection
         alongside the previously inspected game version 1.22.7.
-        Verified 556 focused unit tests (29 new Phase 4 cases) and the existing
+        Initially verified 556 focused unit tests (29 new Phase 4 cases) and the existing
         Cake ValidateJson task. No new AutoLoot compiler warnings; existing
         unrelated compiler and Cake dependency-advisory warnings remain.
         Final Phase 5 coverage/build work and all gameplay acceptance remain
         pending; no unmodified-server gameplay verification is claimed.
+        The subsequent definition-driven owned-behavior revision passes 575
+        focused unit tests, including 100 AutoLoot tests for synchronized client
+        definitions, idempotence, registry aliases, untouched server arrays,
+        native cloning/behavior initialization, entity dispatch/help, and public
+        inventory-close lifecycle. See the proposal revision section.
 
 ## Phase 5: Automated Validation
     [ ] AL-13: Cover gesture, session, and feature lifecycle behavior.

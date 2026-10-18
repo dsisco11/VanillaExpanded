@@ -27,7 +27,7 @@ internal sealed class AutoLootClient : IDisposable
         api.Event.LeaveWorld += OnLeaveWorld;
     }
 
-    public void OnInteract(EntityBehaviorHarvestable behavior, GuiDialog? dialog,
+    public void OnInteract(EntityBehaviorHarvestable behavior,
         EntityAgent byEntity, Vec3d hitPosition, EnumInteractMode mode)
     {
         if (disposed || api.World.Player is not IClientPlayer player
@@ -48,7 +48,7 @@ internal sealed class AutoLootClient : IDisposable
             return;
         }
 
-        if (!AutoLootTarget.TryCreate(api, player, behavior, dialog, hitPosition, out AutoLootTarget? target))
+        if (!AutoLootTarget.TryCreate(api, player, behavior, hitPosition, out AutoLootTarget? target))
         {
             return;
         }
@@ -56,7 +56,7 @@ internal sealed class AutoLootClient : IDisposable
         hold.Reset();
         pending = target;
         requiresRelease = true;
-        target.Dialog.OnClosed += Cancel;
+        target.Inventory.OnInventoryClosed += OnInventoryClosed;
     }
 
     public void Cancel()
@@ -65,7 +65,7 @@ internal sealed class AutoLootClient : IDisposable
         pending = null;
         if (target is not null)
         {
-            target.Dialog.OnClosed -= Cancel;
+            target.Inventory.OnInventoryClosed -= OnInventoryClosed;
         }
         hold.Reset();
     }
@@ -74,6 +74,14 @@ internal sealed class AutoLootClient : IDisposable
     {
         requiresRelease = true;
         Cancel();
+    }
+
+    private void OnInventoryClosed(IPlayer player)
+    {
+        if (player.PlayerUID == api.World.Player?.PlayerUID)
+        {
+            Cancel();
+        }
     }
 
     public void Dispose()

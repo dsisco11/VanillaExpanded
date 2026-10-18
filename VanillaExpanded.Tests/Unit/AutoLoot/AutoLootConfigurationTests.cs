@@ -122,7 +122,7 @@ public sealed class AutoLootConfigurationTests
         {
             system.StartClientSide(test.Fixture.ClientApi);
             integration.Start(test.Fixture.Api);
-            system.Client!.OnInteract(test.Behavior, test.Dialog, test.PlayerEntity, new Vec3d(), EnumInteractMode.Interact);
+            system.Client!.OnInteract(test.Behavior, test.PlayerEntity, new Vec3d(), EnumInteractMode.Interact);
             test.Tick(0.25f);
             EnumHandling handling = EnumHandling.PassThrough;
             listeners[eventName](eventName, ref handling, new StringAttribute("{\"EnableAutoLoot\":\"false\"}"));
@@ -134,7 +134,7 @@ public sealed class AutoLootConfigurationTests
             Assert.Empty(test.Sent);
             listeners[eventName](eventName, ref handling, new StringAttribute("{\"EnableAutoLoot\":\"true\"}"));
             test.Release();
-            system.Client.OnInteract(test.Behavior, test.Dialog, test.PlayerEntity, new Vec3d(), EnumInteractMode.Interact);
+            system.Client.OnInteract(test.Behavior, test.PlayerEntity, new Vec3d(), EnumInteractMode.Interact);
             test.Tick(0.5f);
             Assert.Single(test.Sent);
             Assert.Equal(stashEnabled, VanillaExpandedModSystem.Config.EnableAutoStash);

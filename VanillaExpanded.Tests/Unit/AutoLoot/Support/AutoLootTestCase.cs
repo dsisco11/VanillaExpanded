@@ -33,6 +33,11 @@ internal sealed class AutoLootTestCase : IDisposable
     public InventoryGeneric Inventory { get; }
     public TestLootDialog Dialog { get; }
     public AutoLootClient Controller { get; }
+    public AutoLootSystem_Client System { get; }
+    public Mock<IClassRegistryAPI> ClassRegistry { get; } = new();
+    public List<EntityProperties> EntityTypes { get; } = [];
+    public EntityBehaviorAutoLootable LootBehavior => Assert.IsType<EntityBehaviorAutoLootable>(
+        Corpse.GetBehavior<EntityBehaviorAutoLootable>());
     public MouseButtonState Mouse { get; } = new() { Right = true };
     public Mock<IRadialProgressBar> Progress { get; } = new();
     public Mock<IProgressSystemProvider> ProgressProvider { get; } = new();
@@ -70,6 +75,14 @@ internal sealed class AutoLootTestCase : IDisposable
         Fixture.ClientWorldMock!.Setup(world => world.Player).Returns(Player.Object);
         Fixture.WorldMock.Setup(world => world.PlayerByUid(It.IsAny<string>())).Returns(Player.Object);
         Fixture.WorldMock.Setup(world => world.Config).Returns(new TreeAttribute());
+        Fixture.WorldMock.Setup(world => world.EntityTypes).Returns(EntityTypes);
+        Fixture.ApiMock.Setup(api => api.ClassRegistry).Returns(ClassRegistry.Object);
+        ClassRegistry.Setup(registry => registry.GetEntityBehaviorClass("harvestable"))
+            .Returns(typeof(EntityBehaviorHarvestable));
+        EntityTypes.Add(new EntityProperties
+        {
+            Client = new EntityClientProperties([JsonObject.FromJson("{\"code\":\"harvestable\"}")], null)
+        });
         Corpse = new EntityAgent { EntityId = 42, Api = Fixture.Api, World = Fixture.World, Alive = false };
         typeof(Entity).GetProperty(nameof(Entity.Properties))!.SetValue(Corpse,
             new EntityProperties { Client = new EntityClientProperties([], new Dictionary<string, JsonObject>()) });
@@ -89,7 +102,7 @@ internal sealed class AutoLootTestCase : IDisposable
         var item = Fixture.CreateNonLightSource(1);
         item.MaxStackSize = 64;
         Inventory[0].Itemstack = new ItemStack(item, 3);
-        Dialog = new TestLootDialog(Fixture.ClientApi);
+        Dialog = new TestLootDialog(Fixture.ClientApi, () => Inventory.Close(Player.Object));
         Progress.SetupAllProperties();
         ProgressProvider.Setup(provider => provider.CreateProgressBar(true)).Returns(Progress.Object);
         Fixture.ClientNetworkMock!.Setup(network => network.SendEntityPacketWithOffset(
@@ -108,14 +121,19 @@ internal sealed class AutoLootTestCase : IDisposable
                 return TransferOverride is not null
                     ? TransferOverride(source, operation) : TransferToPlayer(source, operation);
             });
-        Controller = new AutoLootClient(Fixture.ClientApi, ProgressProvider.Object);
+        System = new AutoLootSystem_Client(ProgressProvider.Object);
+        System.Start(Fixture.ClientApi);
+        System.StartClientSide(Fixture.ClientApi);
+        Controller = System.Client!;
+        Events.Raise(events => events.BlockTexturesLoaded += null);
+        Corpse.AddBehavior(new EntityBehaviorAutoLootable(Corpse));
     }
 
-    public void Begin() => Controller.OnInteract(Behavior, Dialog, PlayerEntity, new Vec3d(), EnumInteractMode.Interact);
+    public void Begin() => Controller.OnInteract(Behavior, PlayerEntity, new Vec3d(), EnumInteractMode.Interact);
 
     public AutoLootTarget ResolveTarget()
     {
-        Assert.True(AutoLootTarget.TryCreate(Fixture.ClientApi, Player.Object, Behavior, Dialog,
+        Assert.True(AutoLootTarget.TryCreate(Fixture.ClientApi, Player.Object, Behavior,
             new Vec3d(), out AutoLootTarget? target));
         return target;
     }
@@ -144,7 +162,7 @@ internal sealed class AutoLootTestCase : IDisposable
     {
         try
         {
-            Controller.Dispose();
+            System.Dispose();
         }
         finally
         {
@@ -161,6 +179,16 @@ internal sealed class AutoLootTestCase : IDisposable
     internal sealed class TestLootDialog : GuiDialog
     {
         public override string ToggleKeyCombinationCode => "test-autoloot";
-        public TestLootDialog(ICoreClientAPI api) : base(api) => opened = true;
+        private readonly Action closeInventory;
+        public TestLootDialog(ICoreClientAPI api, Action closeInventory) : base(api)
+        {
+            this.closeInventory = closeInventory;
+            opened = true;
+        }
+        public override void OnGuiClosed()
+        {
+            base.OnGuiClosed();
+            closeInventory();
+        }
     }
 }

@@ -20,10 +20,9 @@ internal sealed class AutoLootTarget
     public Entity Corpse => behavior.entity;
     public long EntityId { get; }
     public InventoryBase Inventory { get; }
-    public GuiDialog Dialog { get; }
     public bool HasLoot => Inventory.FirstNonEmptySlot is not null;
 
-    private AutoLootTarget(EntityBehaviorHarvestable behavior, GuiDialog dialog, EntityPlayer looter, Vec3d hitPosition)
+    private AutoLootTarget(EntityBehaviorHarvestable behavior, EntityPlayer looter, Vec3d hitPosition)
     {
         this.behavior = behavior;
         this.looter = looter;
@@ -31,20 +30,19 @@ internal sealed class AutoLootTarget
         dimension = looter.Pos.Dimension;
         EntityId = behavior.entity.EntityId;
         Inventory = behavior.Inventory;
-        Dialog = dialog;
     }
 
     public static bool TryCreate(ICoreClientAPI api, IClientPlayer player,
-        EntityBehaviorHarvestable behavior, GuiDialog? dialog, Vec3d hitPosition,
+        EntityBehaviorHarvestable behavior, Vec3d hitPosition,
         [NotNullWhen(true)] out AutoLootTarget? target)
     {
         target = null;
-        if (!IsSupportedCorpse(behavior) || dialog is null)
+        if (!IsSupportedCorpse(behavior))
         {
             return false;
         }
 
-        var candidate = new AutoLootTarget(behavior, dialog, player.Entity, hitPosition);
+        var candidate = new AutoLootTarget(behavior, player.Entity, hitPosition);
         if (!candidate.IsValid(api, player) || !candidate.HasLoot)
         {
             return false;
@@ -74,7 +72,6 @@ internal sealed class AutoLootTarget
             || !ReferenceEquals(Corpse.GetBehavior<EntityBehaviorHarvestable>(), behavior)
             || !ReferenceEquals(behavior.Inventory, Inventory)
             || looter.Pos.Dimension != dimension || Corpse.Pos.Dimension != dimension
-            || !Dialog.IsOpened()
             || !Inventory.HasOpened(player)
             || player.InventoryManager.OpenedInventories?.Contains(Inventory) != true)
         {
