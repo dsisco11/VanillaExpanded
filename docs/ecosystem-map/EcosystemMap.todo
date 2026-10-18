@@ -1,0 +1,153 @@
+# Ecosystem map implementation checklist
+
+Source proposal: [EcosystemMapProposal.md](EcosystemMapProposal.md). The proposal governs scope and behavior; this checklist governs execution and completion evidence. All work is pending. Creating this plan does not authorize or establish implementation completion.
+
+## Goal and boundaries
+
+Deliver an Ecosystem toggle tab on the full world map, with a localized unique-species dropdown and a translucent suitable-habitat highlight. Show red crosshatching over explored areas with unavailable environmental data; leave confirmed mismatches unmarked. Neither overlay nor controls belong on the minimap.
+
+Use client-local definitions for all naturally spawning base-game wild mammals and birds, combining age, sex, and cosmetic variants. Exclude fish, insects, supernatural creatures, and domestic-only variants. Mod-added species and supplemental server catalogues are deferred. Local patches to supported species remain applicable; server-only catalogue differences are an acknowledged limitation.
+
+Evaluate generated temperature, rainfall, forest, shrubs, and normalized elevation. Ignore water, ground, clearance, light, population caps, player distance, and spawn chance. This is habitat information, not sightings or spawn prediction. Do not add seasonal/weather eligibility or a worldgen/runtime selector.
+
+Receive original server shrub arrays; do not reproduce shrub generation. Capture other inputs through normal client delivery. Omit backfill, remote region loading, terrain generation, and server-side saved-region retrieval to fill old map-only gaps. Reading previously captured local ecosystem records is required and permitted.
+
+Own a separate client-local ecosystem SQLite file per server/world identity. Never open or modify vanilla's map database, connection, tables, or serialized records. Do not infer environmental inputs from rendered map pixels.
+
+## Technical questions to resolve before dependent work
+
+- Target-version asset resolution, regional delivery hooks, full-map identification, explored-coverage access, purge notification, and shutdown ordering require source verification.
+- Resolve exact worldgen/runtime rainfall sampling, temperature clamps, elevation sample and surface offset against vanilla behavior; this is technical reconciliation of the approved habitat semantics, not a new product mode.
+- Choose concrete paths, types, payload/schema versions, storage identity, and safe array snapshot points after inspecting existing project conventions.
+- Determine sample density, queue/batch bounds, and cache limits through representative accuracy and performance measurements rather than speculative fixed budgets.
+
+## Phase 1: Verify integration contracts and establish ownership
+
+Outcome: implementation can use verified target-version entry points without relying on guessed APIs.
+
+- [ ] Inspect applicable repository instructions, current feature registration, localization, test, and packaging conventions; record the target game version and relevant source symbols.
+- [ ] Verify patched client-local animal asset access and reuse of vanilla variant resolution; do not assume client runtime entity spawn conditions are populated.
+- [ ] Trace generated climate and vegetation sampling in both spawn paths, including reference-height climate, rainfall differences, lower temperature clamps, normalized elevation, and surface offset. Record the reconciled evaluation contract and representative expected values.
+- [ ] Verify map-layer registration, tab grouping, extra composer lifecycle, full-map versus minimap rendering, and access to explored coverage without querying vanilla's database.
+- [ ] Verify ordinary region/chunk receipt and already-loaded enumeration; identify safe snapshot timing and server shrub delivery hooks that work while the tab is closed.
+- [ ] Verify routing through SendMapDataToClient, MapLayerData/MapLayerUpdate, and OnDataFromServer. If a request is necessary, establish player identity without assuming OnDataFromClient supplies it.
+- [ ] Verify separate database identity/path selection, map-purge notification, and acquisition-stop/flush/close ordering.
+- [ ] Define directional ownership for species classification, acquisition, shrub delivery, storage, evaluation, and presentation. Keep registration thin and each source file focused; follow project commenting and region conventions.
+
+Completion criteria:
+
+- [ ] Record source-backed findings and unresolved blockers beside this checklist; dependent tasks remain blocked when their required hook or data contract is unverified. No scope changes are silently substituted for missing capabilities.
+
+## Phase 2: Construct the local species catalogue
+
+Depends on Phase 1 asset and sampling contracts.
+
+Outcome: the client can obtain stable species identities and complete environmental rule alternatives without a server catalogue.
+
+- [ ] Inventory supported naturally spawning base-game wild mammals and birds and implement an explicit species mapping independent of localized names and entity-code suffix stripping.
+- [ ] Resolve locally patched definitions using the verified vanilla variant mechanism. Preserve source entity identities and environmental limits for each species.
+- [ ] Combine age, gender, and cosmetics while retaining genuine species distinctions, including deer types and chicken sex encoded in age variants. Exclude all out-of-scope entities.
+- [ ] Preserve complete alternative rule sets; never widen separate ranges into invented intermediate habitat. Retain applicable worldgen/ongoing-spawn alternatives under the reconciled sampling contract.
+- [ ] Provide localized display names and stable identities for later dropdown selection.
+- [ ] Add focused catalogue tests for inventory coverage, exclusions, local patches, variant normalization, alternative preservation, and operation without server catalogue messages.
+
+Completion criteria:
+
+- [ ] The supported-species inventory and focused receipts demonstrate one entry per species with traceable applicable rules; deferred catalogue work is not required.
+
+## Phase 3: Implement environmental records and dedicated storage
+
+Depends on Phase 1 storage and lifecycle contracts.
+
+Outcome: environmental snapshots can survive unload and reconnect independently of vanilla terrain pixels.
+
+- [ ] Define versioned regional climate/forest/shrub records preserving original array values, size, and padding; define tile elevation and completeness records. Support partial arrivals and explicit unavailable inputs.
+- [ ] Implement the feature-owned SQLite schema, connection, serialized access, bounded transactions, and off-render-thread disk work. Store regional arrays once per region and tile-specific elevation separately.
+- [ ] Scope records to verified server/world identity; use coordinates to associate records with displayed tiles in memory, without cross-database access.
+- [ ] Implement local cache reads, record updates, and explicit version handling. Unsupported records must not become valid samples; do not introduce historical backfill or a legacy migration subsystem.
+- [ ] Distinguish persistent environmental snapshots/metadata/completeness from disposable evaluation results, prepared tiles, and textures. Establish stop-acquisition, flush-pending-writes, close ordering for normal exit.
+- [ ] Establish purge handling that intentionally clears own records, pending writes, and derived state; prevent pre-purge pending work from restoring cleared records. Do not modify vanilla storage.
+- [ ] Add focused storage tests for exact array/layout round trips, partial records, reopen, identity isolation, version handling, normal-exit flush, and purge ordering.
+
+Completion criteria:
+
+- [ ] Storage receipts demonstrate independent persistence and lifecycle behavior; review confirms no ecosystem-owned access to vanilla's database file or connection.
+
+## Phase 4: Capture ordinary world data and deliver original shrubs
+
+Depends on Phases 1 and 3.
+
+Outcome: normal exploration and already-loaded areas populate persistent environmental records even when the Ecosystem tab is closed.
+
+- [ ] Capture safe snapshots of normally received climate, forest, and elevation data, including relevant regions/chunks already loaded at initialization. Reject API placeholders and absent arrays as unavailable.
+- [ ] Read existing server IMapRegion.ShrubMap values and safely snapshot original coordinates, integers, size, padding, and payload version. Do not call shrub generation or resample its output.
+- [ ] Deliver through the existing map-layer envelope and decode in the Ecosystem layer; validate payload completeness and layout before accepting records.
+- [ ] Coordinate delivery with ordinary region availability and player receipt; avoid unnecessary unchanged resends while allowing reconnects and missing client records to acquire available data normally.
+- [ ] Persist incoming components independently of tab visibility and arrival order. Treat missing server support as unavailable shrub coverage unless valid local cached data exists; leave unrelated mod features usable.
+- [ ] Connect acquisition shutdown and map purge to the storage lifecycle; finish queued persistent writes on normal exit, and prevent late work from leaking into a new world or restoring purged state.
+- [ ] Add integration checks for exact transport/storage preservation, already-loaded capture, tab-closed capture, delayed shrubs, missing server support, and a region whose climate was forced after shrub generation.
+- [ ] Verify that old map-only panning initiates no remote retrieval/loading/generation, ordinary revisiting supplies missing inputs, and local cached records remain usable after region unload and reconnect.
+
+Completion criteria:
+
+- [ ] Capture/transport/storage evidence shows original server shrub values survive unchanged and all missing-input states remain explicit, with no backfill path.
+
+## Phase 5: Evaluate habitat and prepare bounded results
+
+Depends on Phases 2–4.
+
+Outcome: mapped samples yield suitable, unsuitable, or unavailable results from reusable environmental inputs.
+
+- [ ] Implement complete-rule matching for min/max generated temperature, rainfall, forest, shrubs, normalized elevation, and max(forest, shrubs) >= MinForestOrShrubs. Match any complete applicable alternative without mixing its clauses with others.
+- [ ] Apply the verified game conversions and sampling conventions, including reference-height climate and separately sampled terrain elevation. Preserve unavailable state instead of substituting zero or placeholders.
+- [ ] Evaluate safe snapshots in bounded background batches; reuse regional arrays and cache prepared results. Keep world queries out of the render loop.
+- [ ] Invalidate disposable results on species, input, or catalogue changes; prevent stale background results from replacing the current selection or updated coverage. Species switching reuses source data; zoom changes presentation resolution, not the predicate.
+- [ ] Select sample density using boundary comparisons, especially steep terrain; do not classify a whole chunk solely from its center. Bound caches and jobs using measurements.
+- [ ] Add independent expected-value tests for thresholds, elevation normalization, climate conversions/clamps, separated alternative ranges, unknown data, and seasonal/weather independence. Compare representative outputs against vanilla habitat calculations.
+
+Completion criteria:
+
+- [ ] Focused receipts demonstrate the reconciled environmental semantics and correct result invalidation; recorded boundary comparisons justify sampling density without claiming live visual or frame-time acceptance.
+
+## Phase 6: Integrate full-map controls and overlays
+
+Depends on Phases 1, 2, 4, and 5.
+
+Outcome: players can select species and distinguish suitable habitat, unsuitable habitat, and unavailable mapped areas.
+
+- [ ] Register the Ecosystem toggle layer and extra composer. Sort the dropdown by localized names and retain selection across recomposition and reopen within a session.
+- [ ] Render one translucent habitat highlight for the selected species, preserving readability of terrain, landmarks, and other layers.
+- [ ] Render a red crosshatched overlay for unavailable environmental coverage. Leave complete-data mismatches unmarked; replace crosshatching with evaluated results when inputs become available.
+- [ ] Clip both overlays to current explored coverage even when regional arrays extend farther. Suppress controls and both overlays on the minimap and when the Ecosystem tab is inactive.
+- [ ] Upload/release textures on the appropriate client thread. Map close cancels unnecessary disposable presentation work without dropping pending environmental writes; world exit follows the established persistent-data flush contract.
+- [ ] Add focused checks for selection retention, sorting, result transitions, coverage clipping, full-map gating, resource disposal, and stale-result rejection during rapid selection/view changes.
+
+Completion criteria:
+
+- [ ] Automated integration evidence covers UI state and rendering eligibility. Visual appearance remains pending until the user-run acceptance in Phase 7.
+
+## Phase 7: Validate the integrated feature and reconcile documentation
+
+Depends on Phases 1–6.
+
+Outcome: completion is supported by separate automated, packaged, performance, and live visual evidence.
+
+- [ ] Use subagents for required build/test tools, following repository instructions. Record exact commands, target version, results, and limitations; resolve failures before marking related work complete.
+- [ ] Verify client/server packaging and registration using the repository's existing workflow, including shrub-delivery support and operation of unrelated features when that support is absent.
+- [ ] Exercise the integrated lifecycle across redraw, map close/reopen, unload, reconnect, purge, version changes, normal shutdown with pending writes, and server/world switches. Confirm ecosystem storage never accesses vanilla's database.
+- [ ] Measure map opening, panning, species switching, environmental capture, shrub delivery, and cache size on representative explored maps. Record workloads and measured results; adjust bounds based on evidence.
+- [ ] Obtain user-run in-game acceptance for readable terrain, dropdown visibility and selection retention, stable habitat highlighting, and red crosshatching in mixed-coverage views. Do not launch the game on the user's behalf for visual acceptance.
+- [ ] Confirm live disappearance of crosshatching as inputs arrive; confirm no overlay on unexplored terrain, minimap, or inactive tab, including after full-map close. Confirm old uncached areas remain unavailable until normally revisited.
+- [ ] Update permanent feature documentation to describe implemented behavior, missing-data presentation, server support, dedicated cache, and no-backfill limits. Keep historical/staging details in planning evidence only.
+- [ ] Reconcile the implementation and completion receipts against every proposal requirement and this checklist. Keep unmet gates unchecked; report blockers rather than replacing required runtime evidence with headless checks.
+
+Completion criteria:
+
+- [ ] Build/test and package receipts, measured performance evidence, and user-run visual acceptance are separately recorded and satisfactory; no required gate remains pending.
+
+## Final acceptance
+
+- [ ] Every proposal requirement is mapped to completed work above; only the explicitly deferred catalogue/mod-species work remains outside scope.
+- [ ] Persistent environmental data survives normal lifecycle transitions; disposable work can be discarded; explicit purge clears feature-owned state.
+- [ ] Full-map-only suitable/unavailable presentation, species scope, original shrub delivery, separate storage, and no-backfill behavior meet the proposal.
+- [ ] Linked documentation and checklist reflect verified completion without overstating source inspection, automated checks, or live-runtime evidence.

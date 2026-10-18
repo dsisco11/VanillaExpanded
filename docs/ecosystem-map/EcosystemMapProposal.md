@@ -1,5 +1,7 @@
 # Ecosystem map overlay proposal
 
+Implementation checklist: [EcosystemMap.todo](EcosystemMap.todo).
+
 Status: client-side habitat evaluation with server-supplied original shrub arrays and omission of backfill approved; remaining design decisions are for review. This document describes the intended behavior and proposed integration boundaries. It is not an implementation checklist.
 
 ## Intended result
