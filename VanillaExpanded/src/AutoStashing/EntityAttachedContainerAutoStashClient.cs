@@ -17,10 +17,7 @@ internal sealed class EntityAttachedContainerAutoStashClient : IDisposable
     private readonly long tickListenerId;
     private long pendingEntityId;
     private int pendingAttachmentSlotIndex = -1;
-    private float pendingSeconds;
-    private bool requestSent;
-    private IRadialProgressBar? progressBar;
-    private readonly IProgressSystemProvider progressSystem;
+    private readonly HoldInteractionProgress hold;
 
     #region Public API
     /// <summary>Registers gesture ticks with the supplied or default progress ownership service.</summary>
@@ -29,7 +26,8 @@ internal sealed class EntityAttachedContainerAutoStashClient : IDisposable
     {
         this.api = api;
         this.requestAutoStash = requestAutoStash;
-        this.progressSystem = progressSystem ?? new ProgressSystemProvider(api);
+        hold = new HoldInteractionProgress(progressSystem ?? new ProgressSystemProvider(api),
+            BlockBehaviorAutoStashable.PreStashGracePeriodSeconds, "AutoStashing");
         tickListenerId = api.Event?.RegisterGameTickListener(OnGameTick, 20) ?? 0;
     }
 
@@ -90,31 +88,13 @@ internal sealed class EntityAttachedContainerAutoStashClient : IDisposable
             return;
         }
 
-        if (requestSent)
+        if (!hold.Advance(deltaTime, VanillaExpandedModSystem.Config.AutoStashDelay,
+            VanillaExpandedModSystem.Config.AutoStashGuiRendersTopmost))
         {
             return;
         }
 
-        // Only a continuously held gesture accumulates time; submitted gestures retain their target until cancellation.
-        pendingSeconds += deltaTime;
-        if (pendingSeconds >= BlockBehaviorAutoStashable.PreStashGracePeriodSeconds)
-        {
-            progressBar ??= progressSystem.CreateProgressBar();
-            if (progressBar is not null)
-            {
-                progressBar.Progress = Math.Clamp(pendingSeconds / VanillaExpandedModSystem.Config.AutoStashDelay, 0f, 1f);
-                progressBar.Text = "AutoStashing";
-            }
-        }
-
-        if (pendingSeconds < VanillaExpandedModSystem.Config.AutoStashDelay)
-        {
-            return;
-        }
-
-        requestSent = true;
         requestAutoStash(pendingEntityId, pendingAttachmentSlotIndex);
-        RemoveProgressBar();
         api.World.PlaySoundAt(new AssetLocation("game:sounds/player/poultice-applied"), player.Entity, null, false, 16, volume: 1f);
         player.TriggerFpAnimation(EnumHandInteract.HeldItemInteract);
     }
@@ -124,21 +104,7 @@ internal sealed class EntityAttachedContainerAutoStashClient : IDisposable
     {
         pendingEntityId = 0;
         pendingAttachmentSlotIndex = -1;
-        pendingSeconds = 0;
-        requestSent = false;
-        RemoveProgressBar();
-    }
-
-    /// <summary>Releases the active progress display through its supplied or production owner.</summary>
-    private void RemoveProgressBar()
-    {
-        if (progressBar is null)
-        {
-            return;
-        }
-
-        progressSystem.RemoveProgressBar(progressBar);
-        progressBar = null;
+        hold.Reset();
     }
     #endregion
 }

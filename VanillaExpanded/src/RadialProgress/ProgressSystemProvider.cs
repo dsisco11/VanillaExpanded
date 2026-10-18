@@ -15,9 +15,9 @@ internal sealed class ProgressSystemProvider : IProgressSystemProvider
     }
 
     /// <inheritdoc />
-    public IRadialProgressBar? CreateProgressBar()
+    public IRadialProgressBar? CreateProgressBar(bool rendersTopmost)
     {
-        return api.ModLoader.GetModSystem<ModSystemRadialProgressBar>()?.AddProgressBar();
+        return api.ModLoader.GetModSystem<ModSystemRadialProgressBar>()?.AddProgressBar(rendersTopmost);
     }
 
     /// <inheritdoc />

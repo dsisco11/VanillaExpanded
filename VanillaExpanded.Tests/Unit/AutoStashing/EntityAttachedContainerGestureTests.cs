@@ -1,4 +1,5 @@
 using Moq;
+using VanillaExpanded.AutoStashing;
 using VanillaExpanded.Network;
 using VanillaExpanded.Tests.Unit.AutoStashing.Support;
 using Vintagestory.API.Common;
@@ -27,7 +28,7 @@ public sealed class EntityAttachedContainerGestureTests
         float justBefore = MathF.BitDecrement(delay);
         test.Tick(justBefore);
         Assert.Empty(test.Channel.SentPackets);
-        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(), Times.Once);
+        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(true), Times.Once);
         Assert.Equal(justBefore / delay, test.Progress.Object.Progress);
         Assert.Equal("AutoStashing", test.Progress.Object.Text);
         test.Tick(delay - justBefore);
@@ -38,7 +39,7 @@ public sealed class EntityAttachedContainerGestureTests
         test.ProgressProvider.Verify(provider => provider.RemoveProgressBar(test.Progress.Object), Times.Once);
         test.Tick(1);
         Assert.Single(test.Channel.SentPackets);
-        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(), Times.Once);
+        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(true), Times.Once);
         test.ProgressProvider.Verify(provider => provider.RemoveProgressBar(test.Progress.Object), Times.Once);
         test.Player.Verify(player => player.TriggerFpAnimation(EnumHandInteract.HeldItemInteract), Times.Once);
     }
@@ -67,9 +68,9 @@ public sealed class EntityAttachedContainerGestureTests
         float grace = VanillaExpanded.AutoStashing.BlockBehaviorAutoStashable.PreStashGracePeriodSeconds;
         float before = MathF.BitDecrement(grace);
         test.Tick(before);
-        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(), Times.Never);
+        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(It.IsAny<bool>()), Times.Never);
         test.Tick(grace - before);
-        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(), Times.Once);
+        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(true), Times.Once);
         Assert.Equal(grace / VanillaExpandedModSystem.Config.AutoStashDelay, test.Progress.Object.Progress);
         Assert.Equal("AutoStashing", test.Progress.Object.Text);
         test.Mouse.Right = false;
@@ -121,7 +122,7 @@ public sealed class EntityAttachedContainerGestureTests
         test.Controller.Begin(test.Attachable, 1);
         test.Tick(0.25f);
         test.ProgressProvider.Verify(provider => provider.RemoveProgressBar(test.Progress.Object), Times.Once);
-        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(), Times.Exactly(2));
+        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(true), Times.Exactly(2));
         Assert.Empty(test.Channel.SentPackets);
         test.Tick(0.25f);
         Assert.Single(test.Channel.SentPackets);
@@ -142,7 +143,7 @@ public sealed class EntityAttachedContainerGestureTests
         test.Tick(0.25f);
         var packet = Assert.IsType<Packet_RequestEntityAutoStash>(Assert.Single(test.Channel.SentPackets));
         Assert.Equal(99, packet.EntityId);
-        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(), Times.Exactly(2));
+        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(true), Times.Exactly(2));
         test.ProgressProvider.Verify(provider => provider.RemoveProgressBar(test.Progress.Object), Times.Exactly(2));
     }
 
@@ -161,7 +162,7 @@ public sealed class EntityAttachedContainerGestureTests
         test.Tick(0.25f);
         var packet = Assert.IsType<Packet_RequestEntityAutoStash>(Assert.Single(test.Channel.SentPackets));
         Assert.Equal(0, packet.AttachmentSlotIndex);
-        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(), Times.Exactly(2));
+        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(true), Times.Exactly(2));
         test.ProgressProvider.Verify(provider => provider.RemoveProgressBar(test.Progress.Object), Times.Exactly(2));
     }
 
@@ -177,6 +178,19 @@ public sealed class EntityAttachedContainerGestureTests
         test.ProgressProvider.Verify(provider => provider.RemoveProgressBar(test.Progress.Object), Times.Once);
         test.Tick(1);
         Assert.Empty(test.Channel.SentPackets);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Progress_UsesAutoStashLayeringPreference(bool rendersTopmost)
+    {
+        using var test = new AttachedGestureCase();
+        VanillaExpandedModSystem.Config.AutoStashGuiRendersTopmost = rendersTopmost;
+        test.Controller.Begin(test.Attachable, 1);
+        test.Tick(BlockBehaviorAutoStashable.PreStashGracePeriodSeconds);
+        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(rendersTopmost), Times.Once);
+        test.ProgressProvider.Verify(provider => provider.CreateProgressBar(!rendersTopmost), Times.Never);
     }
     #endregion
     #region Interaction entry
@@ -234,7 +248,5 @@ public sealed class EntityAttachedContainerGestureTests
     #endregion
     #endregion
 }
-
-
 
 

@@ -76,7 +76,13 @@ public sealed class ModSystemRadialProgressBar : ModSystem
     /// <returns>The progress bar interface for controlling the display.</returns>
     public IRadialProgressBar? AddProgressBar()
     {
-        return AddProgressBar(DefaultStartOffset, DefaultClockwise);
+        return AddProgressBar(rendersTopmost: true);
+    }
+
+    /// <summary>Creates a default-position display using the caller's layering preference.</summary>
+    public IRadialProgressBar? AddProgressBar(bool rendersTopmost)
+    {
+        return AddProgressBar(DefaultStartOffset, DefaultClockwise, rendersTopmost);
     }
 
     /// <summary>
@@ -87,6 +93,12 @@ public sealed class ModSystemRadialProgressBar : ModSystem
     /// <returns>The progress bar interface for controlling the display, or null if creation failed.</returns>
     public IRadialProgressBar? AddProgressBar(float startOffset01, bool clockwise)
     {
+        return AddProgressBar(startOffset01, clockwise, rendersTopmost: true);
+    }
+
+    /// <summary>Creates a display with explicit geometry and layering preferences.</summary>
+    public IRadialProgressBar? AddProgressBar(float startOffset01, bool clockwise, bool rendersTopmost)
+    {
         if (capi is null || isDisposed)
         {
             return null;
@@ -95,7 +107,6 @@ public sealed class ModSystemRadialProgressBar : ModSystem
         RadialProgressBarRenderer renderer;
         try
         {
-            bool rendersTopmost = VanillaExpandedModSystem.Config?.AutoStashGuiRendersTopmost ?? true;
             renderer = new RadialProgressBarRenderer(capi, startOffset01, clockwise, rendersTopmost);
         }
         catch (InvalidOperationException ex)

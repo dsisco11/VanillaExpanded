@@ -141,6 +141,10 @@ public class AutoStashInteractionStateTests : IDisposable
         public TestableAutoStashBehavior()
             : base(null!)
         {
+            var api = new Mock<ICoreAPI>();
+            api.SetupGet(value => value.Side).Returns(EnumAppSide.Client);
+            api.SetupGet(value => value.ModLoader).Returns(Mock.Of<IModLoader>());
+            OnLoaded(api.Object);
         }
 
         public EStashingState State => stashingState;

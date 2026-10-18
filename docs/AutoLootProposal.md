@@ -1,6 +1,6 @@
 # AutoLoot Proposal
 
-Status: Phase 1 integration decisions complete; implementation not started.
+Status: Phases 1 and 2 complete; AutoLoot-specific implementation not started.
 
 ## Summary
 
@@ -426,14 +426,48 @@ fixed topmost rendering, and neutral prediction-aware feedback.
 In-game checks are acceptance tests after implementation, not prerequisites to
 starting implementation or another feasibility investigation.
 
-### Phase 2: Extract Shared Primitives
+### Phase 2: Extract Shared Primitives (Complete)
 
-Extract the hold lifecycle. Add or extract client transfer helpers only where
-existing APIs and shared callers justify them; do not relocate AutoStash's
-server transfer layer solely for AutoLoot. Migrate AutoStash callers without
-changing existing behavior.
-Validate existing block and attached-container regression tests before adding
-AutoLoot behavior.
+Completed 2026-10-18:
+
+- [HoldInteractionProgress](../VanillaExpanded/src/RadialProgress/HoldInteractionProgress.cs)
+  owns elapsed time, grace-period visibility, progress/label, completion-once
+  state, and reset/removal. It accepts either total elapsed callback time or
+  tick deltas; input and target policy remain outside the shared component.
+- [EntityAttachedContainerAutoStashClient](../VanillaExpanded/src/AutoStashing/EntityAttachedContainerAutoStashClient.cs)
+  and [BlockBehaviorAutoStashable](../VanillaExpanded/src/AutoStashing/BlockBehaviorAutoStashable.cs)
+  use the shared lifecycle while retaining their existing modifiers, target
+  eligibility, interaction handling, packet dispatch, sounds, animations, and
+  block post-stash grace duration.
+- [IProgressSystemProvider](../VanillaExpanded/src/RadialProgress/IProgressSystemProvider.cs)
+  now accepts an explicit `rendersTopmost` preference, forwarded through
+  [ProgressSystemProvider](../VanillaExpanded/src/RadialProgress/ProgressSystemProvider.cs)
+  into the radial manager. Rendering no longer reads AutoStash configuration.
+  Existing geometry/default radial overloads remain available with a
+  feature-neutral topmost default. AutoStash passes its existing setting
+  explicitly; future AutoLoot calls will pass fixed true.
+- Completion no longer recreates a block's finished progress indicator during
+  the post-stash grace period. This tightly coupled presentation correction is
+  covered by the block gesture regression tests; request timing and grace
+  handling remain unchanged.
+- No transfer policies, inventory execution services, or server handlers were
+  changed or generalized.
+
+Validation:
+
+- [HoldInteractionProgressTests](../VanillaExpanded.Tests/Unit/RadialProgress/HoldInteractionProgressTests.cs)
+  covers exact grace/completion thresholds, delta accumulation, reset/restart,
+  overshoot/clamping, completion before grace, unavailable rendering and
+  recovery, repeated completion, invalid timing inputs, and cleanup failures.
+- Block and attached gesture tests cover both layering preferences while
+  retaining existing target, timing, cancellation, request, and feedback checks.
+- `dotnet test .\VanillaExpanded.Tests\VanillaExpanded.Tests.csproj --no-restore --filter "FullyQualifiedName~AutoStashing|FullyQualifiedName~HoldInteractionProgress"`:
+  436 passed, zero failed or skipped.
+- `dotnet test .\VanillaExpanded.IntegrationTests\VanillaExpanded.IntegrationTests.csproj --filter "FullyQualifiedName~HarmonyDispatchIntegrationTests"`:
+  one passed, exercising actual crate/bloomery and attached-container Harmony
+  dispatch in an isolated test host.
+- The commands compile the mod and test projects. Existing unrelated compiler
+  warnings remain; no in-game AutoLoot validation is claimed.
 
 ### Phase 3: Implement AutoLoot
 

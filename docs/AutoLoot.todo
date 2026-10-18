@@ -1,7 +1,7 @@
 # AutoLoot Implementation Task List
 
 Proposal: [AutoLootProposal.md](./AutoLootProposal.md)
-Status: Phase 1 complete; implementation not started.
+Status: Phases 1 and 2 complete; AutoLoot-specific implementation not started.
 
 Conventions:
     [ ] Pending task.
@@ -59,7 +59,7 @@ Conventions:
         without predicted-success sounds/counts or inferred rejection messages.
 
 ## Phase 2: Share Hold and Progress Infrastructure
-    [ ] AL-03: Extract a small shared hold lifecycle with focused tests.
+    [x] AL-03: Extract a small shared hold lifecycle with focused tests.
         Depends: none.
         Own elapsed time, grace-period visibility, clamped progress, label,
         cancellation, cleanup, and submit-once completion state.
@@ -68,15 +68,24 @@ Conventions:
         Test exact grace/completion thresholds, release/reset, repeated updates
         after completion, unavailable rendering, and idempotent cleanup.
         Avoid a general-purpose interaction framework.
+        Completed 2026-10-18: HoldInteractionProgress owns absolute/delta timing,
+        grace visibility, label, clamped progress, submit-once completion, and
+        idempotent reset/removal. Focused tests cover exact boundaries, restart,
+        overshoot, unavailable rendering/recovery, and cleanup failures.
 
-    [ ] AL-04: Decouple radial presentation from AutoStash configuration.
+    [x] AL-04: Decouple radial presentation from AutoStash configuration.
         Depends: AL-02.
         Allow callers to supply presentation preferences to progress creation.
         Preserve existing AutoStashGuiRendersTopmost configuration and behavior.
         Reuse IProgressSystemProvider, the current renderer, and existing shaders.
         Update directly affected callers, mocks, and progress tests.
+        Completed 2026-10-18: CreateProgressBar accepts explicit rendersTopmost;
+        the provider forwards it into radial creation without reading feature
+        configuration. Feature-neutral radial defaults are topmost=true.
+        Both AutoStash adapters pass their existing setting explicitly, with
+        tests for true and false. AutoLoot can later pass fixed true.
 
-    [ ] AL-05: Migrate AutoStash callers to shared hold behavior.
+    [x] AL-05: Migrate AutoStash callers to shared hold behavior.
         Depends: AL-03.
         Migrate attached-container timing/progress ownership first; adapt block
         interaction lifecycle where practical without forcing a shared input loop.
@@ -84,6 +93,12 @@ Conventions:
         grace periods, animations, sounds, and current packet dispatch.
         Keep matching policies and the server transfer executor stash-specific.
         Run targeted block/attached-container interaction and lifecycle tests.
+        Completed 2026-10-18: attached ticks and block elapsed callbacks now use
+        the shared lifecycle; target/input policies and packet dispatch remain
+        feature-owned. Completion keeps progress removed during the block's
+        existing post-stash grace instead of recreating the completed indicator.
+        Verified 436 focused unit tests and one isolated real-Harmony dispatch
+        integration test; mod and test projects compile successfully.
 
 ## Phase 3: Implement Client AutoLoot
     [ ] AL-06: Add a client-only feature lifecycle and corpse adapter.
