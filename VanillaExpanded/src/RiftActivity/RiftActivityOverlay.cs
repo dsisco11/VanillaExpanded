@@ -32,9 +32,10 @@ internal sealed class RiftActivityOverlay : IHudOverlay, IHudOverlayBackdropProv
     #region Lifecycle
     /// <summary>Creates the presentation with optional headless texture loading.</summary>
     public RiftActivityOverlay(System.Func<HudOverlayPreparationContext, LoadedTexture[]>? load = null,
-        System.Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null)
+        System.Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null,
+        HudOverlayIconTextPresentation? label = null)
     {
-        presentation = new RiftActivityPresentation(load, loadBackdrop);
+        presentation = new RiftActivityPresentation(load, loadBackdrop, label: label);
     }
     /// <summary>Binds the native packet provider for the current client world.</summary>
     public void BeginSession(ICoreClientAPI api)

@@ -1,3 +1,4 @@
+using Vintagestory.API.Config;
 using Moq;
 using VanillaExpanded.HudOverlays.Rendering;
 using Vintagestory.API.Client;
@@ -6,8 +7,22 @@ using Vintagestory.Client.NoObf;
 namespace VanillaExpanded.Tests.Unit.HudOverlays;
 
 /// <summary>Checks lazy backdrop ownership and stage construction without invoking graphics operations.</summary>
-public sealed class HudOverlayBackdropShaderProgramTests
+[Collection("HudOverlayGeometry")]
+public sealed class HudOverlayBackdropShaderProgramTests : IDisposable
 {
+    private readonly ITranslationService? english = Lang.AvailableLanguages.GetValueOrDefault("en");
+    /// <summary>Provides headless localization for cached indicator labels.</summary>
+    public HudOverlayBackdropShaderProgramTests()
+    {
+        var language = new Mock<ITranslationService>();
+        language.Setup(value => value.Get(It.IsAny<string>(), It.IsAny<object[]>())).Returns("TEST");
+        Lang.AvailableLanguages["en"] = language.Object;
+    }
+    /// <summary>Restores the process language registry after each test.</summary>
+    public void Dispose()
+    {
+        if (english == null) Lang.AvailableLanguages.Remove("en"); else Lang.AvailableLanguages["en"] = english;
+    }
     #region Public API
     /// <summary>The custom program supplies only its file-backed stages and does not compile during construction.</summary>
     [Fact]
@@ -112,7 +127,7 @@ public sealed class HudOverlayBackdropShaderProgramTests
                 collect = () => { }; owner = time; prepare = () => time.Prepare(context); draw = () => time.Draw(renderer.Object, bounds); reset = time.Reset;
                 break;
             default:
-                var rift = new VanillaExpanded.RiftActivity.RiftActivityPresentation(Load, _ => backdrop.Object);
+                var rift = new VanillaExpanded.RiftActivity.RiftActivityPresentation(Load, _ => backdrop.Object, label: new HudOverlayIconTextPresentation((preparation, _) => new LoadedTexture(preparation.Api) { TextureId = 30, Width = 20, Height = 10 }));
                 rift.SetContent(VanillaExpanded.RiftActivity.RiftActivityLevel.Low);
                 collect = () => rift.CollectBackdrops(renderer.Object, bounds); owner = rift; prepare = () => rift.Prepare(context); draw = () => rift.Draw(renderer.Object, bounds); reset = rift.Reset;
                 break;
