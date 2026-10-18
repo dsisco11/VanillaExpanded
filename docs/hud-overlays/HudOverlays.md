@@ -60,6 +60,14 @@ Each feature registers its own setters. Changed settings save the existing mod c
 
 `HudOverlayGroupMovement.Locked` is the inverse of effective movement permission. `SetLocked` uses the existing container permission operation and layout persistence; a member addresses its current owning container, so locking a group locks all members without resetting its position, attachment, or membership. Configuration capabilities do not duplicate this layout-owned state.
 
+### Native popup ownership
+
+`HudOverlayContextMenu` provides an independently owned popup controller. Its caller supplies a stable registration target, live availability and lock bindings, and a session/viewport/scale/locale editing context. Explicit Toggles and Styles pages use native switch/label controls in a composer and a single-selection `GuiElementListMenu`, respectively. The controller does not perform overlay hit-testing or replace the host's existing titlebar input path.
+
+The toggle composer owns its switches directly because native list multi-select mode does not release its private switch textures. `HudOverlayListMenu` exposes protected visible measurements, accounts for the invisible anchor row, and retains native scrolling when the Style list exceeds viewport height. Physical popup bounds fit the supplied viewport on all sides. Oversized Style surfaces compress horizontally; toggle controls fit uniformly only when the viewport cannot contain their natural size. Ordinary layouts use normal HUD lettering. Native rich-text children are released explicitly alongside list textures.
+
+The controller holds its target independently of hover. Callers synchronize host conditions before rendering or input: unavailable editing/targets, session replacement, changed viewport/scale/locale, changed page settings, or lost native focus close the popup rather than recreating graphics every frame. Selection, outside presses, Escape, explicit closure, and disposal retire owned graphics. Selection callbacks defer disposal until native input dispatch unwinds, so configuration reloads cannot destroy controls still executing. The caller owns session teardown and must dispose the controller with its host.
+
 The session owns the runtime bindings; the registry retains feature ownership across sessions. Solid arrows show ownership or contained data. Dashed arrows show borrowed dependencies and calls.
 
 ```mermaid
