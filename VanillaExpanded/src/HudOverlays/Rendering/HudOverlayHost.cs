@@ -24,6 +24,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     private readonly HudOverlayNativeBoundaries nativeBoundaries;
     private readonly HudSnapHighlight snapHighlight;
     private readonly HudOverlayEditPreviews? editPreviews;
+    private readonly HudOverlayMenuInput? menuInput;
     private readonly HudOverlayDragPreview dragPreview = new();
     private bool updatingSnap;
     private HudOverlayGroupControls? ActiveControls => groupControls.Values.FirstOrDefault(control => control.Active);
@@ -33,7 +34,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     private HashSet<HudOverlayRegistration> active = new();
     private bool disposed, rendering, synchronizing;
     public Action? BeforeRender { get; set; }
-    public override bool Focusable => false;
+    public override bool Focusable => menuInput?.Capturing == true;
     public override bool UnregisterOnClose => true;
     public override double DrawOrder => .1;
     #region Public API
@@ -42,7 +43,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     public HudOverlayHost(ICoreClientAPI api, HudOverlayRegistry registry, Func<HudOverlayRegistration, bool> isDrawable,
         Action<HudOverlayRegistration, Exception> failure, Action<Exception>? boundaryFailure = null,
         IHudOverlayBackdropBatch? backdropBatch = null, HudOverlayContainers? containers = null,
-        HudOverlayEditPreviews? editPreviews = null) : base(api)
+        HudOverlayEditPreviews? editPreviews = null, HudOverlayContextMenu? contextMenu = null) : base(api)
     {
         this.registry = registry;
         this.isDrawable = isDrawable;
@@ -52,6 +53,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         this.backdropBatch = backdropBatch ?? api.ModLoader?.GetModSystem<HudOverlaySystem>()?.Backdrop;
         this.containers = containers;
         this.editPreviews = editPreviews;
+        menuInput = containers == null ? null : new HudOverlayMenuInput(api, this, containers, isDrawable, contextMenu);
         snapping = containers == null ? null : new HudOverlaySnapping(containers);
         nativeBoundaries = new HudOverlayNativeBoundaries(api);
         snapHighlight = new HudSnapHighlight(api);
@@ -127,34 +129,57 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
                 groupControls[id].Dispose(); groupControls.Remove(id);
             }
         }
+        menuInput?.Synchronize(Composers.Where(pair => layouts.ContainsKey(pair.Key)).Select(pair => layouts[pair.Key]).ToArray());
     }
     #endregion
     #region Input
-    /// <summary>Receives keyboard events only during dragging or native dropdown interaction.</summary>
-    public override bool ShouldReceiveKeyboardEvents() => ActiveControls?.Active == true;
+    /// <summary>Receives keyboard events during captured movement, titlebar dropdowns, or context-menu interaction.</summary>
+    public override bool ShouldReceiveKeyboardEvents() => menuInput?.Capturing == true || ActiveControls?.Active == true;
     /// <summary>Allows selective handle routing while retaining passive behavior for hosts without controls.</summary>
     public override bool ShouldReceiveMouseEvents() => groupControls.Count > 0 && IsOpened();
-    /// <summary>Leaves general input ownership with the engine.</summary>
-    public override bool CaptureAllInputs() => false;
+    /// <summary>Captures general input only while a context menu owns native focus.</summary>
+    public override bool CaptureAllInputs() => menuInput?.Capturing == true;
     /// <summary>Leaves raw mouse ownership with the engine.</summary>
     public override bool CaptureRawMouse() => false;
     /// <summary>Cancels active dragging instead of closing the HUD or saving its preview.</summary>
-    public override bool OnEscapePressed() => ActiveControls?.Cancel() == true;
+    public override bool OnEscapePressed()
+    {
+        if (menuInput?.Capturing == true) { menuInput.Escape(); return true; }
+        return ActiveControls?.Cancel() == true;
+    }
     /// <summary>Routes native dropdown navigation, consuming Escape only when it cancels an active interaction.</summary>
     public override void OnKeyDown(KeyEvent args)
     {
+        if (menuInput?.Capturing == true) { menuInput.KeyDown(args); return; }
         if (args.KeyCode == (int)GlKeys.Escape && OnEscapePressed()) args.Handled = true;
         else ActiveControls?.OnKeyDown(args);
         RefreshSnap();
     }
     /// <summary>Routes characters only to an open native dropdown.</summary>
-    public override void OnKeyPress(KeyEvent args) => ActiveControls?.OnKeyPress(args);
+    public override void OnKeyPress(KeyEvent args)
+    {
+        if (menuInput?.Capturing == true) menuInput.KeyPress(args);
+        else ActiveControls?.OnKeyPress(args);
+    }
     /// <summary>Rechecks Shift bypass without requiring additional pointer movement.</summary>
-    public override void OnKeyUp(KeyEvent args) { RefreshSnap(); }
+    public override void OnKeyUp(KeyEvent args)
+    {
+        if (menuInput?.Capturing == true) menuInput.KeyUp(args);
+        RefreshSnap();
+    }
     /// <summary>Prioritizes native chrome, then allows direct dragging of visible indicators without capturing group gaps.</summary>
     public override void OnMouseDown(MouseEvent args)
     {
         var activeControl = ActiveControls;
+        // A captured drag owns cancellation before popup targeting. An already open popup owns the next
+        // press before chrome or body dragging, and opening never forwards that same press into a row.
+        if (activeControl?.Movement.Dragging == true && args.Button == Vintagestory.API.Common.EnumMouseButton.Right)
+        {
+            activeControl.OnMouseDown(capi, args);
+            return;
+        }
+        if (menuInput?.Capturing == true) { menuInput.MouseDown(args); return; }
+        if (activeControl == null && menuInput?.TryOpen(args) == true) return;
         var starting = activeControl == null && args.Button == Vintagestory.API.Common.EnumMouseButton.Left && !args.Handled
             && groupControls.Count > 0 && !capi.Input.MouseGrabbed && !capi.HideGuis ? HudOverlayDragPreview.Capture(groups.Where(pair => visibleGroups.Contains(pair.Key)).Select(pair => pair.Value)) : null;
         try
@@ -179,20 +204,34 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         }
     }
     /// <summary>Routes active release delivery even after the pointer leaves the starting bounds.</summary>
-    public override void OnMouseUp(MouseEvent args) => ActiveControls?.OnMouseUp(capi, args);
+    public override void OnMouseUp(MouseEvent args)
+    {
+        if (menuInput?.Capturing == true) menuInput.MouseUp(args);
+        else ActiveControls?.OnMouseUp(capi, args);
+    }
     /// <summary>Routes active pointer movement without taking ordinary gameplay mouse ownership.</summary>
-    public override void OnMouseMove(MouseEvent args) => ActiveControls?.OnMouseMove(capi, args);
+    public override void OnMouseMove(MouseEvent args)
+    {
+        if (menuInput?.Capturing == true) menuInput.MouseMove(args);
+        else ActiveControls?.OnMouseMove(capi, args);
+    }
     /// <summary>Routes wheel input only to an open native dropdown under the pointer.</summary>
-    public override void OnMouseWheel(MouseWheelEventArgs args) => ActiveControls?.OnMouseWheel(args);
+    public override void OnMouseWheel(MouseWheelEventArgs args)
+    {
+        if (menuInput?.Capturing == true) menuInput.MouseWheel(args);
+        else ActiveControls?.OnMouseWheel(args);
+    }
     /// <summary>Discards active interaction when native dialog focus is transferred elsewhere.</summary>
     public override void UnFocus()
     {
+        menuInput?.Close(false);
         foreach (var control in groupControls.Values.ToArray()) control.Cancel();
         base.UnFocus();
     }
     /// <summary>Cancels transient positioning before native close and deregistration.</summary>
     public override bool TryClose()
     {
+        menuInput?.Close();
         foreach (var control in groupControls.Values.ToArray()) control.Cancel();
         return base.TryClose();
     }
@@ -203,6 +242,8 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     {
         if (disposed) return;
         BeforeRender?.Invoke();
+        // Lifecycle invalidation also runs when hidden GUI suppresses normal drawing.
+        _ = menuInput?.IsOpened;
         RefreshSnap();
         dragPreview.Refresh();
         if (!IsOpened() || capi.HideGuis) return;
@@ -241,6 +282,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
                     }
                     else snapHighlight.DrawGuide(selected.Guide);
                 }
+                menuInput?.Draw(deltaTime);
             }
             finally { backdropBatch?.Clear(); capi.Render.GlPopMatrix(); active.Clear(); }
         }, boundaryFailure); }
@@ -258,6 +300,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         // A failing native release must not strand the other controls or compositions on session replacement.
         foreach (var control in groupControls.Values) TryRelease(control.Dispose, failures);
         groupControls.Clear();
+        if (menuInput != null) TryRelease(menuInput.Dispose, failures);
         TryRelease(hoverLabels.Dispose, failures);
         TryRelease(snapHighlight.Dispose, failures);
         TryRelease(() => TryClose(), failures);

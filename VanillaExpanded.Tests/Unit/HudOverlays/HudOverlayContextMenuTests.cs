@@ -21,7 +21,7 @@ public sealed class HudOverlayContextMenuTests
     {
         using var fixture = new Fixture();
         Assert.True(fixture.Open(HudMenuPage.Toggles));
-        Assert.Equal(new[] { "enabled", "lock" }, fixture.Rows.Select(row => row.Code));
+        Assert.Equal(new[] { "enabled", "lock", "style:0", "style:1" }, fixture.Rows.Select(row => row.Code));
         Assert.True(fixture.Rows[0].Selected); Assert.False(fixture.Rows[1].Selected);
         fixture.Popup.Press = () =>
         {
@@ -40,8 +40,8 @@ public sealed class HudOverlayContextMenuTests
     {
         using var fixture = new Fixture(); Assert.True(fixture.Open(HudMenuPage.Styles));
         Assert.Equal(Enum.GetValues<TestStyle>().Length, fixture.Rows.Count);
-        Assert.True(fixture.Rows.Single(row => row.Code == "0").Selected);
-        fixture.Popup.Press = () => fixture.Select!("1", true);
+        Assert.True(fixture.Rows.Single(row => row.Code == "style:0").Selected);
+        fixture.Popup.Press = () => fixture.Select!("style:1", true);
         fixture.Menu.OnMouseDown(new MouseEvent(1, 1, EnumMouseButton.Left, 0));
         Assert.Equal(TestStyle.Second, fixture.Style); Assert.False(fixture.Menu.IsOpened);
     }
@@ -204,6 +204,3 @@ public sealed class HudOverlayContextMenuTests
     }
     #endregion
 }
-
-
-

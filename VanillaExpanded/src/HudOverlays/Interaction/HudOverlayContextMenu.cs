@@ -128,13 +128,19 @@ internal sealed class HudOverlayContextMenu : IDisposable
         {
             var rows = new List<HudMenuEntry>();
             if (settings?.Enabled is { } enabled) rows.Add(new("enabled", Label("enabled"), enabled.Value));
-            rows.Add(new("lock", Label("lock"), target.IsLocked()));
+            if (target.CanChangeLock) rows.Add(new("lock", Label("lock"), target.IsLocked()));
+            rows.AddRange(ReadStyleEntries());
             return rows.ToArray();
         }
-        var style = settings?.Style;
-        return style == null ? Array.Empty<HudMenuEntry>() : style.Choices.Select((value, index) =>
-            new HudMenuEntry(index.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                Label("style-" + value.ToString().ToLowerInvariant()), value.Equals(style.Value))).ToArray();
+        return ReadStyleEntries();
+        // Keep enum identities inside the feature binding. Only stable per-popup codes cross native GUI delegates.
+        HudMenuEntry[] ReadStyleEntries()
+        {
+            var style = settings?.Style;
+            return style == null ? Array.Empty<HudMenuEntry>() : style.Choices.Select((value, index) =>
+                new HudMenuEntry("style:" + index.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    Label("style-" + value.ToString().ToLowerInvariant()), value.Equals(style.Value), HudMenuEntryKind.StyleChoice)).ToArray();
+        }
     }
 
     /// <summary>Applies only current target settings and defers disposal until native callbacks finish using their controls.</summary>
@@ -143,13 +149,14 @@ internal sealed class HudOverlayContextMenu : IDisposable
         if (target == null || target.IsAvailable() != true || !entries.SequenceEqual(ReadEntries())) { Close(); return; }
         try
         {
-            if (page == HudMenuPage.Toggles)
+            if (selected && code.StartsWith("style:", StringComparison.Ordinal)
+                && int.TryParse(code.AsSpan(6), out int index) && target.Registration.MenuSettings?.Style is { } style
+                && index >= 0 && index < style.Choices.Count) style.Set(style.Choices[index]);
+            else if (page == HudMenuPage.Toggles)
             {
                 if (code == "enabled") target.Registration.MenuSettings?.Enabled?.Set(selected);
-                else if (code == "lock") target.SetLocked(selected);
+                else if (code == "lock" && target.CanChangeLock) target.SetLocked(selected);
             }
-            else if (selected && int.TryParse(code, out int index) && target.Registration.MenuSettings?.Style is { } style
-                && index >= 0 && index < style.Choices.Count) style.Set(style.Choices[index]);
         }
         finally { Close(); }
     }

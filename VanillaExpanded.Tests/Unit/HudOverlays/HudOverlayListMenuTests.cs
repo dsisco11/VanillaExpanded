@@ -86,6 +86,25 @@ public sealed class HudOverlayListMenuTests
             list.KeyDown(new KeyEvent { KeyCode = (int)GlKeys.End });
             list.KeyDown(new KeyEvent { KeyCode = (int)GlKeys.Enter });
             Assert.Equal("c", selected); Assert.False(list.IsOpened);
+
+            // Exercise the actual embedded dropdown boundary with the same constrained native viewport.
+            selected = null;
+            gui.Object.WindowBounds.IsDrawingSurface = true;
+            var field = ElementBounds.Fixed(x / scale, y / scale, width / scale, height / scale).WithParent(gui.Object.WindowBounds);
+            using var dropdown = new HudOverlayStyleDropDown(api.Object, new[] { "a", "b", "c" }, new[] { "First", "Second", "Third" },
+                0, (code, _) => selected = code, field, CairoFont.WhiteSmallText(), viewport);
+            using var surface = new Cairo.ImageSurface(Cairo.Format.Argb32, 800, 600);
+            using var context = new Cairo.Context(surface);
+            dropdown.ComposeElements(context, surface);
+            dropdown.OnFocusGained();
+            var opening = new MouseEvent((int)x + 1, (int)y + 1, Vintagestory.API.Common.EnumMouseButton.Left, 0);
+            dropdown.OnMouseDown(api.Object, opening);
+            Assert.True(opening.Handled); Assert.True(dropdown.listMenu.IsOpened); Assert.Null(selected);
+            Assert.True(viewport.Contains(dropdown.ExpandedBounds));
+            dropdown.OnKeyDown(api.Object, new KeyEvent { KeyCode = (int)GlKeys.End });
+            dropdown.OnKeyDown(api.Object, new KeyEvent { KeyCode = (int)GlKeys.Enter });
+            Assert.Equal("c", selected); Assert.Equal(selected, dropdown.SelectedValue);
+            dropdown.Dispose(); dropdown.Dispose();
         }
         finally { RuntimeEnv.GUIScale = previous; typeof(Lang).GetProperty(nameof(Lang.CurrentLocale))!.SetValue(null, previousLocale);
             if (previousLanguage == null) Lang.AvailableLanguages.Remove("en"); else Lang.AvailableLanguages["en"] = previousLanguage; }
@@ -108,6 +127,3 @@ public sealed class HudOverlayListMenuTests
     }
     #endregion
 }
-
-
-
