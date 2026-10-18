@@ -150,11 +150,17 @@ public sealed class HudOverlaySnappingTests
             Assert.NotNull(fixture.Snapping.Selected.Target!.Member);
             fixture.Repack(); var joined = fixture.Containers.Owner("test:b")!;
             var after = fixture.Layouts[joined.Id].Root;
+            var selectedMember = fixture.Layouts[joined.Id].Members.Single(member =>
+                member.Registration.Id == fixture.Snapping.Selected.Target.Member).Bounds;
+            Assert.Equal(new RectangleF((float)selectedMember.renderX, (float)selectedMember.renderY,
+                (float)selectedMember.OuterWidth, (float)selectedMember.OuterHeight), fixture.Snapping.ConnectionTarget);
             double expected = side switch { HudSnapSide.Left => before.Right, HudSnapSide.Above => before.Bottom,
                 HudSnapSide.Right => before.Left, _ => before.Top };
             double actual = side switch { HudSnapSide.Left => after.renderX + after.OuterWidth,
                 HudSnapSide.Above => after.renderY + after.OuterHeight, HudSnapSide.Right => after.renderX, _ => after.renderY };
             Assert.Equal(expected, actual, 3);
+            fixture.Snapping.Clear();
+            Assert.Equal(RectangleF.Empty, fixture.Snapping.ConnectionTarget);
         }
     }
 

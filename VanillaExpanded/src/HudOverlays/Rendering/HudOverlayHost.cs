@@ -22,7 +22,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     private readonly HudOverlayContainers? containers;
     private readonly HudOverlaySnapping? snapping;
     private readonly HudOverlayNativeBoundaries nativeBoundaries;
-    private readonly HudOverlayGroupHighlight snapHighlight;
+    private readonly HudSnapHighlight snapHighlight;
     private readonly HudOverlayEditPreviews? editPreviews;
     private bool updatingSnap;
     private HudOverlayGroupControls? ActiveControls => groupControls.Values.FirstOrDefault(control => control.Active);
@@ -53,7 +53,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         this.editPreviews = editPreviews;
         snapping = containers == null ? null : new HudOverlaySnapping(containers);
         nativeBoundaries = new HudOverlayNativeBoundaries(api);
-        snapHighlight = new HudOverlayGroupHighlight(api);
+        snapHighlight = new HudSnapHighlight(api);
 
     }
     /// <summary>Registers a live session host through the native GUI lifecycle without taking focus.</summary>
@@ -208,8 +208,6 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
                 try { backdropBatch?.Flush(capi.Render); }
                 catch (Exception error) { boundaryFailure?.Invoke(error); }
                 foreach (var control in groupControls.Values.ToArray()) control.DrawBackground();
-                if (ActiveControls?.Movement.Dragging == true && snapping?.Selected?.Grouping == true)
-                    snapHighlight.Draw(snapping.Destination, true, false);
                 foreach (var pair in Composers) if (visibleGroups.Contains(pair.Key) && groups[pair.Key].Available) pair.Value.Render(deltaTime);
                 hoverLabels.Draw(groups.Where(pair => visibleGroups.Contains(pair.Key)).Select(pair => pair.Value),
                     registration => active.Contains(registration) && isDrawable(registration), deltaTime,
@@ -220,8 +218,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
                 {
                     if (selected.Grouping)
                     {
-                        snapHighlight.Draw(snapping.Destination, false, true);
-                        snapHighlight.Draw(snapping.Insertion, false, true);
+                        snapHighlight.DrawConnection(snapping.ConnectionTarget, snapping.Insertion, selected.Side);
                     }
                     else snapHighlight.DrawGuide(selected.Guide);
                 }
