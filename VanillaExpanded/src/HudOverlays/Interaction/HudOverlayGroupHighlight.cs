@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using Cairo;
 using VanillaExpanded.RadialMenu;
+using VanillaExpanded.HudOverlays.Rendering;
 using Vintagestory.API.Client;
 using Vintagestory.API.MathTools;
 
@@ -45,7 +46,8 @@ internal sealed class HudOverlayGroupHighlight : IDisposable
             api.Render.Render2DTexturePremultipliedAlpha(pixel.TextureId, bounds.X, bounds.Y,
                 bounds.Width, bounds.Height, 0, fill);
         }
-        if (movable) api.Render.RenderRectangle(bounds.X, bounds.Y, 1, bounds.Width, bounds.Height, border);
+        if (movable) api.Render.RenderRectangle(bounds.X, bounds.Y, 1, bounds.Width, bounds.Height,
+            (border & 0x00FFFFFF) | ((int)(((uint)border >> 24) * HudOverlayDrawOpacity.Current) << 24));
     }
 
     /// <summary>Draws an alignment axis as a one-pixel strip, avoiding degenerate native rectangle meshes.</summary>

@@ -24,6 +24,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     private readonly HudOverlayNativeBoundaries nativeBoundaries;
     private readonly HudSnapHighlight snapHighlight;
     private readonly HudOverlayEditPreviews? editPreviews;
+    private readonly HudOverlayDragPreview dragPreview = new();
     private bool updatingSnap;
     private HudOverlayGroupControls? ActiveControls => groupControls.Values.FirstOrDefault(control => control.Active);
     private readonly Dictionary<string, HudOverlayGroupLayout> groups = new(StringComparer.Ordinal);
@@ -73,13 +74,13 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         {
             if (!pair.Value.Available || groups.ContainsKey(pair.Key)) continue;
             var dispatchBounds = ElementBounds.Fill.WithParent(pair.Value.Root);
-            var element = new HudOverlayGroupElement(capi, dispatchBounds, dt => DrawGroup(pair.Value, dt));
+            var element = new HudOverlayGroupElement(capi, dispatchBounds, dt => DrawGroup(pair.Value.Members, dt));
             Composers[pair.Key] = capi.Gui.CreateCompo("vanillaexpanded:hud:content:group:" + pair.Key, pair.Value.Root)
                 .OnlyDynamic().AddInteractiveElement(element).Compose(false);
             groups.Add(pair.Key, pair.Value);
         }
         var retained = (containers?.ActiveContainer != null ? groups.Values : layouts.Values)
-            .SelectMany(group => group.Members).ToHashSet();
+            .SelectMany(group => group.Members).Concat(dragPreview.Originals).ToHashSet();
         foreach (var member in clips.Keys.Where(member => !retained.Contains(member)).ToArray()) clips.Remove(member);
         if (containers != null)
         {
@@ -154,18 +155,27 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     public override void OnMouseDown(MouseEvent args)
     {
         var activeControl = ActiveControls;
-        if (activeControl != null) activeControl.OnMouseDown(capi, args);
-        else foreach (var control in groupControls.Values.Reverse().ToArray())
+        var starting = activeControl == null && args.Button == Vintagestory.API.Common.EnumMouseButton.Left && !args.Handled
+            && groupControls.Count > 0 && !capi.Input.MouseGrabbed && !capi.HideGuis ? HudOverlayDragPreview.Capture(groups.Where(pair => visibleGroups.Contains(pair.Key)).Select(pair => pair.Value)) : null;
+        try
         {
-            control.OnMouseDown(capi, args);
-            if (args.Handled) break;
+            if (activeControl != null) activeControl.OnMouseDown(capi, args);
+            else foreach (var control in groupControls.Values.Reverse().ToArray())
+            {
+                control.OnMouseDown(capi, args);
+                if (args.Handled) break;
+            }
+            if (args.Handled || activeControl != null) return;
+            // Member bodies detach one item; the container titlebar continues to move the complete group.
+            foreach (var control in groupControls.Values.Reverse().OrderByDescending(control => control.Movement.IndicatorId != null).ToArray())
+            {
+                control.OnContentMouseDown(capi, args);
+                if (args.Handled) break;
+            }
         }
-        if (args.Handled || activeControl != null) return;
-        // Prefer member controls so a body press detaches only that indicator, even when its group is also hovered.
-        foreach (var control in groupControls.Values.Reverse().OrderByDescending(control => control.Movement.IndicatorId != null).ToArray())
+        finally
         {
-            control.OnContentMouseDown(capi, args);
-            if (args.Handled) break;
+            if (starting != null && ActiveControls?.Movement is { Dragging: true } movement) dragPreview.Begin(movement, starting);
         }
     }
     /// <summary>Routes active release delivery even after the pointer leaves the starting bounds.</summary>
@@ -194,6 +204,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         if (disposed) return;
         BeforeRender?.Invoke();
         RefreshSnap();
+        dragPreview.Refresh();
         if (!IsOpened() || capi.HideGuis) return;
         // Keep consumers alive until all composer callbacks finish, including removals requested by drawing.
         rendering = true;
@@ -209,6 +220,14 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
                 catch (Exception error) { boundaryFailure?.Invoke(error); }
                 foreach (var control in groupControls.Values.ToArray()) control.DrawBackground();
                 foreach (var pair in Composers) if (visibleGroups.Contains(pair.Key) && groups[pair.Key].Available) pair.Value.Render(deltaTime);
+                if (dragPreview.Originals.Count > 0)
+                {
+                    CollectBackdrops(true);
+                    try { backdropBatch?.Flush(capi.Render); }
+                    catch (Exception error) { boundaryFailure?.Invoke(error); }
+                }
+                // Keep the source trace visible even when the detached remainder reflows over its old slot.
+                DrawGroup(dragPreview.Originals, 0);
                 hoverLabels.Draw(groups.Where(pair => visibleGroups.Contains(pair.Key)).Select(pair => pair.Value),
                     registration => active.Contains(registration) && isDrawable(registration), deltaTime,
                     registration => editPreviews?.IsDrawable(registration) == true ? editPreviews.Label(registration)
@@ -245,6 +264,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         foreach (var composer in Composers.Values.ToArray()) TryRelease(composer.Dispose, failures);
         foreach (var pair in ((IEnumerable<KeyValuePair<string, GuiComposer>>)Composers).ToArray()) Composers.Remove(pair.Key);
         TryRelease(() => base.Dispose(), failures);
+        dragPreview.Clear();
         groups.Clear(); clips.Clear(); active.Clear();
         if (failures.Count > 0) throw new AggregateException(failures);
     }
@@ -302,30 +322,29 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     #endregion
     #region Prepared drawing
     /// <summary>Collects only visible prepared providers, applying the same membership and clipping gates as foreground drawing.</summary>
-    private void CollectBackdrops()
+    private void CollectBackdrops(bool original = false)
     {
         if (backdropBatch == null) return;
         backdropBatch.Clear();
-        foreach (var pair in groups)
+        IEnumerable<HudOverlayMemberLayout> members = original ? dragPreview.Originals
+            : groups.Where(pair => visibleGroups.Contains(pair.Key) && pair.Value.Available && Composers[pair.Key].Enabled)
+                .SelectMany(pair => pair.Value.Members);
+        foreach (var member in members)
         {
-            var group = pair.Value;
-            if (!visibleGroups.Contains(pair.Key) || !group.Available || !Composers[pair.Key].Enabled) continue;
-            foreach (var member in group.Members)
-            {
-                if (!active.Contains(member.Registration) || !isDrawable(member.Registration)
-                    || editPreviews?.IsDrawable(member.Registration) == true
-                    || member.Clip.Width <= 0 || member.Clip.Height <= 0
-                    || member.Registration.Overlay is not IHudOverlayBackdropProvider provider) continue;
-                using var opacity = new HudOverlayDrawOpacity(member.Registration.Overlay);
-                try { backdropBatch.Collect(member.Clip, () => provider.CollectBackdrops(capi.Render, member.Bounds)); }
-                catch (Exception error) { failure(member.Registration, error); }
-            }
+            if (!active.Contains(member.Registration) || !isDrawable(member.Registration)
+                || editPreviews?.IsDrawable(member.Registration) == true
+                || member.Clip.Width <= 0 || member.Clip.Height <= 0
+                || member.Registration.Overlay is not IHudOverlayBackdropProvider provider) continue;
+            using var opacity = new HudOverlayDrawOpacity(member.Registration.Overlay,
+                dragPreview.Contains(member.Registration) ? HudOverlayDragPreview.Opacity : 1);
+            try { backdropBatch.Collect(member.Clip, () => provider.CollectBackdrops(capi.Render, member.Bounds)); }
+            catch (Exception error) { failure(member.Registration, error); }
         }
     }
     /// <summary>Applies the engine scissor stack around each bounded presentation, restoring it even after a consumer error.</summary>
-    private void DrawGroup(HudOverlayGroupLayout group, float deltaTime)
+    private void DrawGroup(IEnumerable<HudOverlayMemberLayout> members, float deltaTime)
     {
-        foreach (var member in group.Members)
+        foreach (var member in members)
         {
             if (!active.Contains(member.Registration) || !isDrawable(member.Registration) || member.Clip.Width <= 0 || member.Clip.Height <= 0) continue;
             if (!clips.TryGetValue(member, out var clip)) clips[member] = clip = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
@@ -339,10 +358,11 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
             capi.Render.PushScissor(clip, true);
             try
             {
+                using var opacity = new HudOverlayDrawOpacity(preview ? (object)editPreviews! : member.Registration.Overlay,
+                    dragPreview.Contains(member.Registration) ? HudOverlayDragPreview.Opacity : 1);
                 if (preview) editPreviews!.Draw(member.Registration, capi.Render, member.Bounds);
                 else
                 {
-                    using var opacity = new HudOverlayDrawOpacity(member.Registration.Overlay);
                     member.Registration.Overlay.Draw(capi.Render, member.Bounds, member.Clip, deltaTime);
                 }
             }

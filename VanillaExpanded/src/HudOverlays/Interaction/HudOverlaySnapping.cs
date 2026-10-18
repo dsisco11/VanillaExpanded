@@ -62,7 +62,12 @@ internal sealed class HudOverlaySnapping
             if (!pair.Value.Available) continue;
             var record = containers.Resolved.FirstOrDefault(item => item.Id == pair.Key);
             if (record == null) continue;
-            foreach (var member in pair.Value.Members.Where(item => drawable(item.Registration)))
+            if (containers.Reservation(record) != null)
+            {
+                // Frozen slots remain the pointer targets, but a joined preview must use current sampled sizes.
+                foreach (var member in pair.Value.Measurements.Where(item => drawable(item.Key))) sizes[member.Key.Id] = member.Value;
+            }
+            else foreach (var member in pair.Value.Members.Where(item => drawable(item.Registration)))
                 sizes[member.Registration.Id] = new SizeF((float)member.Bounds.fixedWidth, (float)member.Bounds.fixedHeight);
             if (pair.Key == source.Id || record.Tree.Leaves().Any(excluded.Contains)) continue;
             float gap = (float)(containers.Definition(record).Packing.Gap * scale);
@@ -83,7 +88,7 @@ internal sealed class HudOverlaySnapping
             new RectangleF((float)member.Bounds.renderX, (float)member.Bounds.renderY,
                 (float)member.Bounds.OuterWidth, (float)member.Bounds.OuterHeight)).ToArray();
         DropAllowed = bypass || !Collides(movingRectangles, layouts, source.Id, string.Empty) && !CrossesBoundary(movingRectangles, boundaries);
-        DropAllowed &= bypass || !RemainderCollides(movement, layouts, source.Id, string.Empty, drawable, boundaries);
+        DropAllowed &= bypass || !RemainderCollides(movement, layouts, source.Id, string.Empty, drawable, boundaries, viewport, scale, movingRectangles);
         foreach (var candidate in HudSnapGeometry.Candidates(raw, pointer, safe, targets, retained, bypass, boundaries))
         {
             if (!candidate.Grouping)
@@ -103,7 +108,7 @@ internal sealed class HudOverlaySnapping
                         final.Y + (float)(member.Bounds.renderY - moving.Root.renderY),
                         (float)member.Bounds.OuterWidth, (float)member.Bounds.OuterHeight));
                 if (!Valid(aligned, layouts, source.Id, string.Empty, safe) || CrossesBoundary(aligned.Values, boundaries)
-                    || RemainderCollides(movement, layouts, source.Id, string.Empty, drawable, boundaries)) continue;
+                    || RemainderCollides(movement, layouts, source.Id, string.Empty, drawable, boundaries, viewport, scale, aligned.Values)) continue;
                 containers.Move(origin, HudSnapAttachment.FromSnap(candidate, final, viewport, scale));
                 DropAllowed = true;
                 var guide = candidate.Guide;
@@ -135,7 +140,7 @@ internal sealed class HudOverlaySnapping
                 viewport.X + (originGui.X + item.Value.X) * (float)scale, viewport.Y + (originGui.Y + item.Value.Y) * (float)scale,
                 item.Value.Width * (float)scale, item.Value.Height * (float)scale));
             if (!Valid(rectangles, layouts, source.Id, target.Id, safe) || CrossesBoundary(rectangles.Values, boundaries)
-                || RemainderCollides(movement, layouts, source.Id, target.Id, drawable, boundaries)) continue;
+                || RemainderCollides(movement, layouts, source.Id, target.Id, drawable, boundaries, viewport, scale, rectangles.Values)) continue;
             if (!containers.PreviewJoin(candidate, originGui)) continue;
             DropAllowed = true;
             Selected = candidate;
@@ -207,22 +212,43 @@ internal sealed class HudOverlaySnapping
     }
 
     /// <summary>Checks reflowed source members against peers; a grouping target is tested through its final candidate geometry instead.</summary>
-    private static bool RemainderCollides(HudOverlayGroupMovement movement,
+    private bool RemainderCollides(HudOverlayGroupMovement movement,
         IReadOnlyDictionary<string, HudOverlayGroupLayout> layouts, string source, string target, Func<HudOverlayRegistration, bool> drawable,
-        IReadOnlyList<HudSnapBoundary> boundaries)
+        IReadOnlyList<HudSnapBoundary> boundaries, RectangleF viewport, double scale, IEnumerable<RectangleF> incoming)
     {
-        // Stable members identify the remainder even when singleton normalization changes its container identity.
-        return layouts.Where(pair => pair.Key != source
-            && pair.Value.Members.Any(member => movement.StartingMembers.Contains(member.Registration.Id)))
-            .Any(pair =>
+        // Validate the geometry that will be committed, not the reserved source slots shown during dragging.
+        foreach (var pair in layouts.Where(pair => pair.Key != source && pair.Key != target))
+        {
+            var record = containers.Resolved.FirstOrDefault(item => item.Id == pair.Key);
+            if (record == null || !record.Tree.Leaves().Any(movement.StartingMembers.Contains)) continue;
+            RectangleF[] rectangles;
+            if (containers.Reservation(record) != null)
             {
-                var rectangles = pair.Value.Members.Where(member => drawable(member.Registration)).Select(member => new RectangleF(
+                var geometry = HudLayoutGeometry.Resolve(record.Tree, pair.Value.Measurements.Where(member => drawable(member.Key))
+                    .ToDictionary(member => member.Key.Id, member => member.Value), record.Padding);
+                var size = new SizeF(geometry.Size.Width * (float)scale, geometry.Size.Height * (float)scale);
+                var origin = containers.Origin(record) ?? PointF.Empty;
+                if (containers.Attachment(record) is { } attachment &&
+                    (HudOverlayTargets.Canonical(attachment.TargetId) == HudOverlayTargets.Screen ? viewport
+                        : boundaries.FirstOrDefault(item => item.Id == HudOverlayTargets.Boundary(attachment.TargetId))?.Bounds) is RectangleF anchor)
+                    origin = HudContainerAttachment.Position(attachment, anchor, size, viewport, scale);
+                else
+                    // Unchanged free checkpoints clamp in physical space without acquiring a new integer checkpoint.
+                    origin = new PointF((float)Math.Clamp(origin.X, 0, Math.Max(0, (viewport.Width - size.Width) / scale)),
+                        (float)Math.Clamp(origin.Y, 0, Math.Max(0, (viewport.Height - size.Height) / scale)));
+                rectangles = geometry.Rectangles.Values.Select(rectangle => new RectangleF(
+                    viewport.Left + (origin.X + rectangle.X) * (float)scale, viewport.Top + (origin.Y + rectangle.Y) * (float)scale,
+                    rectangle.Width * (float)scale, rectangle.Height * (float)scale)).ToArray();
+            }
+            else
+                rectangles = pair.Value.Members.Where(member => drawable(member.Registration)).Select(member => new RectangleF(
                     (float)member.Bounds.renderX, (float)member.Bounds.renderY,
                     (float)member.Bounds.OuterWidth, (float)member.Bounds.OuterHeight)).ToArray();
-                return Collides(rectangles, layouts, pair.Key, source, target) || CrossesBoundary(rectangles, boundaries);
-            });
+            if (rectangles.Any(rectangle => !viewport.Contains(rectangle)) || Collides(rectangles, layouts, pair.Key, source, target) || CrossesBoundary(rectangles, boundaries)
+                || rectangles.Any(rectangle => incoming.Any(item => Overlaps(rectangle, item)))) return true;
+        }
+        return false;
     }
-
     /// <summary>Protects fixed native surfaces without adding native elements to VE membership or position persistence.</summary>
     private static bool CrossesBoundary(IEnumerable<RectangleF> rectangles, IReadOnlyList<HudSnapBoundary> boundaries) =>
         rectangles.Any(rectangle => boundaries.Any(boundary => Overlaps(rectangle, boundary.Bounds)));

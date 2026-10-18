@@ -17,11 +17,11 @@ internal readonly struct HudOverlayDrawOpacity : IDisposable
     public static int ItemColor => unchecked(((int)Math.Round(Current * 255) << 24) | 0xFFFFFF);
 
     #region Public API
-    /// <summary>Captures the previous scope and applies this overlay's transition opacity.</summary>
-    public HudOverlayDrawOpacity(object overlay)
+    /// <summary>Captures the previous scope and combines transition opacity with the caller-supplied draw multiplier.</summary>
+    public HudOverlayDrawOpacity(object overlay, float multiplier = 1)
     {
         previous = Current;
-        Current = overlay is IHudOverlayVisibilityTransition animated ? animated.Visibility.Opacity : 1;
+        Current = (overlay is IHudOverlayVisibilityTransition animated ? animated.Visibility.Opacity : 1) * multiplier;
     }
     /// <summary>Multiplies an existing straight-alpha tint without altering its owning presentation.</summary>
     public static Vec4f Multiply(Vec4f tint) => Current == 1 ? tint : new(tint.X, tint.Y, tint.Z, tint.W * Current);

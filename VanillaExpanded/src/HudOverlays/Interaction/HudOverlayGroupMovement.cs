@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using VanillaExpanded.HudOverlays.Layout;
 
 namespace VanillaExpanded.HudOverlays.Interaction;
 
@@ -28,6 +29,7 @@ internal sealed class HudOverlayGroupMovement
         }
     }
     public IReadOnlyDictionary<string, PointF> MemberOrigins { get; set; } = new Dictionary<string, PointF>();
+    public HudOverlaySourceReservation? SourceGeometry { get; set; }
     public PointF ContainerOrigin { get; set; }
     public PointF UnsnappedOrigin { get; private set; }
     public long DragRevision { get; private set; }
@@ -59,7 +61,7 @@ internal sealed class HudOverlayGroupMovement
         if (!double.IsFinite(scale) || scale <= 0) throw new ArgumentOutOfRangeException(nameof(scale));
         string source = Id;
         var members = containers.Resolved.First(item => item.Id == source).Tree.Leaves().ToArray();
-        if (!containers.Begin(source, IndicatorId, contentOrigin, MemberOrigins, ContainerOrigin)) return;
+        if (!containers.Begin(source, IndicatorId, contentOrigin, MemberOrigins, ContainerOrigin, SourceGeometry)) return;
         StartingMembers = members;
         start = contentOrigin;
         UnsnappedOrigin = contentOrigin;

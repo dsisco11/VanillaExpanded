@@ -186,7 +186,7 @@ public sealed class HudOverlayHostTests : IDisposable
         ((HashSet<HudOverlayRegistration>)typeof(HudOverlayHost).GetField("active", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(host)!).Add(registration);
         var member = layout.Members.Single();
         overlay.Setup(x => x.Draw(render.Object, member.Bounds, member.Clip, .1f)).Throws(new InvalidOperationException());
-        typeof(HudOverlayHost).GetMethod("DrawGroup", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(host, new object[] { layout, .1f });
+        typeof(HudOverlayHost).GetMethod("DrawGroup", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(host, new object[] { layout.Members, .1f });
         Assert.Equal(1, failures);
         render.Verify(x => x.PushScissor(It.Is<ElementBounds>(bounds => bounds.renderX == member.Clip.X && bounds.renderY == member.Clip.Y
             && bounds.OuterWidth == member.Clip.Width && bounds.OuterHeight == member.Clip.Height), true), Times.Once);

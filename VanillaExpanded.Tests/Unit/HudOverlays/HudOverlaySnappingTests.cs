@@ -15,6 +15,135 @@ namespace VanillaExpanded.Tests.Unit.HudOverlays;
 public sealed class HudOverlaySnappingTests
 {
     #region Public API
+    /// <summary>An empty reserved remainder still validates an integration that returns before commit.</summary>
+    [Theory]
+    [InlineData(false, 100, 100, 20, 20, 100, 30, 130, 100, 300, 200)]
+    [InlineData(true, 100, 100, 20, 20, 100, 30, 130, 100, 300, 200)]
+    public void ReturningOnlySourceMemberStillValidatesFinalOverlap(bool bypass, float sourceX, float sourceY, float width, float height,
+        float restoredWidth, float restoredHeight, float peerX, float peerY, float dragX, float dragY)
+    {
+        float previousScale = RuntimeEnv.GUIScale; RuntimeEnv.GUIScale = 1;
+        using var storage = new HudLayoutFixture();
+        var members = new List<HudOverlayRegistration> { storage.Add("test:a", "source"), storage.Add("test:peer", "peer") };
+        storage.Values[HudLayoutStore.SettingKey] = JsonSerializer.Serialize(new HudLayoutSnapshot { Containers = new[] {
+            new HudLayoutContainer { Id = "source", Key = HudOverlayPositionKeys.Group("source"), TemplateId = "source", X = (int)sourceX, Y = (int)sourceY, Movable = true,
+                Tree = new() { First = new() { Indicator = "test:a" }, Second = new() { Indicator = "missing:integration" } } },
+            new HudLayoutContainer { Id = "peer", Key = HudOverlayPositionKeys.Group("peer"), TemplateId = "peer", X = (int)peerX, Y = (int)peerY, Tree = new() { Indicator = "test:peer" } } } });
+        var containers = new HudOverlayContainers(storage.Api.Object, storage.Registry);
+        var anchors = new HudOverlayAnchorContext(new Window(), () => 1, () => null);
+        var layouts = new Dictionary<string, HudOverlayGroupLayout>();
+        var movement = containers.Get("source", "test:a");
+        try
+        {
+            Repack();
+            movement.SourceGeometry = HudOverlaySourceReservation.Capture(layouts["source"], PointF.Empty, 1);
+            movement.ContainerOrigin = new PointF(sourceX, sourceY);
+            movement.MemberOrigins = new Dictionary<string, PointF> { ["test:a"] = new(sourceX, sourceY) };
+            movement.Begin(new PointF(sourceX, sourceY), PointF.Empty, 1); movement.Move(new PointF(dragX, dragY)); Repack();
+            members.Add(storage.Add("missing:integration", "source")); containers.Synchronize(); Repack();
+            var remainder = layouts[containers.Owner("missing:integration")!.Id];
+            Assert.Empty(remainder.Members); Assert.Single(remainder.Measurements);
+            var snapping = new HudOverlaySnapping(containers);
+            snapping.Update(movement, new PointF(sourceX + dragX, sourceY + dragY), bypass, 1, new RectangleF(0, 0, 800, 600), layouts, _ => true);
+            Assert.Equal(bypass, snapping.DropAllowed); Assert.Null(snapping.Selected);
+        }
+        finally { movement.Cancel(); foreach (var layout in layouts.Values) layout.Dispose(); RuntimeEnv.GUIScale = previousScale; }
+
+        /// <summary>Publishes current integration measurements while forwarding the source reservation.</summary>
+        void Repack()
+        {
+            anchors.BeginFrame();
+            foreach (var container in containers.Resolved)
+            {
+                if (!layouts.TryGetValue(container.Id, out var layout)) layouts[container.Id] = layout = new HudOverlayGroupLayout();
+                layout.Apply(anchors, containers.Definition(container), members.Where(member => container.Tree.Leaves().Contains(member.Id)).Select(member =>
+                    new KeyValuePair<HudOverlayRegistration, SizeF>(member, member.Id == "missing:integration" ? new(restoredWidth, restoredHeight) : new(width, height))).ToArray(),
+                    containers.Origin(container), container.Tree, container.Padding, container.Attachment, containers.Reservation(container));
+            }
+        }
+    }
+
+    /// <summary>A returning integration gains a measured size immediately but no unreserved source slot until dragging ends.</summary>
+    [Theory]
+    [InlineData(false, 1.5f, 43, 31, 400, 350)]
+    [InlineData(true, 2, 40, 30, 400, 350)]
+    public void ReturningIntegrationWaitsForSourceReservationToEnd(bool cancel, float scale, float width, float height, float dragX, float dragY)
+    {
+        using var fixture = new Fixture(scale, measured: new SizeF(width, height), paired: true, individual: true, sourceThird: true);
+        fixture.Begin(); fixture.Movement.Move(new PointF(dragX, dragY)); fixture.Repack();
+        var source = fixture.Layouts[fixture.Containers.Owner("test:a2")!.Id];
+        var frozen = source.Members.ToDictionary(member => member.Registration.Id, member => member.Clip);
+        fixture.RegisterIntegration(); fixture.Repack();
+        Assert.Contains(source.Measurements, member => member.Key.Id == "missing:integration");
+        Assert.DoesNotContain(source.Members, member => member.Registration.Id == "missing:integration");
+        Assert.All(source.Members, member => Assert.Equal(frozen[member.Registration.Id], member.Clip));
+        if (cancel) fixture.Movement.Cancel(); else fixture.Movement.Commit(fixture.Movement.Position!.Value);
+        fixture.Repack();
+        Assert.Contains(fixture.Layouts[fixture.Containers.Owner("missing:integration")!.Id].Members, member => member.Registration.Id == "missing:integration");
+    }
+
+    /// <summary>Rejoining a reserved source uses current measured sizes while its drag targets retain their original slots.</summary>
+    [Theory]
+    [InlineData(1.5f, 40, 30, 76, 48, 400, 350)]
+    [InlineData(2, 43, 31, 65, 50, 400, 350)]
+    public void RejoiningReservedSourceUsesCurrentMeasuredSize(float scale, float width, float height, float changedWidth, float changedHeight, float dragX, float dragY)
+    {
+        using var fixture = new Fixture(scale, measured: new SizeF(width, height), paired: true, individual: true);
+        fixture.Begin(); fixture.Movement.Move(new PointF(dragX, dragY)); fixture.Repack();
+        var sibling = fixture.Layouts[fixture.Containers.Owner("test:a2")!.Id].Members.Single();
+        var frozen = sibling.Clip;
+        fixture.MeasurementOverrides["test:a2"] = new SizeF(changedWidth, changedHeight); fixture.Repack();
+        Assert.Equal(frozen, sibling.Clip);
+        var pointer = new PointF(frozen.Right, frozen.Top + frozen.Height / 2);
+        fixture.Movement.Move(pointer); fixture.Repack(); fixture.Update(pointer);
+        Assert.True(fixture.Snapping.Selected?.Grouping); Assert.Equal("test:a2", fixture.Snapping.Selected!.Target!.Member);
+        var insertion = fixture.Snapping.Insertion; var target = fixture.Snapping.ConnectionTarget;
+        fixture.Repack();
+        var joined = fixture.Containers.Owner("test:a")!;
+        var preview = fixture.Layouts[joined.Id];
+        Assert.Equal(insertion, preview.Members.Single(member => member.Registration.Id == "test:a").Clip);
+        Assert.Equal(target, preview.Members.Single(member => member.Registration.Id == "test:a2").Clip);
+        Assert.Equal(changedWidth * scale, target.Width); Assert.Equal(changedHeight * scale, target.Height);
+        Assert.False(insertion.IntersectsWith(target));
+        fixture.Movement.Commit(fixture.Containers.Origin(joined)!.Value); fixture.Repack();
+        Assert.Equal(insertion, fixture.Layouts[joined.Id].Members.Single(member => member.Registration.Id == "test:a").Clip);
+        Assert.Equal(target, fixture.Layouts[joined.Id].Members.Single(member => member.Registration.Id == "test:a2").Clip);
+    }
+
+    /// <summary>Source siblings retain their pre-drag slots until a detached or joined transaction commits or cancels.</summary>
+    [Theory]
+    [InlineData(1, false, false, false, 40, 30, 300, 200)]
+    [InlineData(1.5f, true, false, false, 43, 31, 300, 200)]
+    [InlineData(2, false, true, false, 40, 30, 300, 200)]
+    [InlineData(1.5f, true, true, true, 43, 31, 300, 200)]
+    public void SourceFootprintIsReservedUntilTransactionEnds(float scale, bool third, bool join, bool cancel, float width, float height, float targetX, float targetY)
+    {
+        using var fixture = new Fixture(scale, measured: new SizeF(width, height), paired: true, individual: true, sourceThird: third, targetOrigin: new PointF(targetX, targetY));
+        var original = fixture.Layouts["source"];
+        var bounds = new RectangleF((float)original.Root.renderX, (float)original.Root.renderY, (float)original.Root.OuterWidth, (float)original.Root.OuterHeight);
+        var siblings = original.Members.Where(member => member.Registration.Id != "test:a").ToDictionary(member => member.Registration.Id, member => member.Clip);
+        fixture.Begin(); fixture.Movement.Move(new PointF(400, 350)); fixture.Repack();
+        AssertReserved();
+        if (join) { fixture.MoveBesideTarget(); fixture.Update(); fixture.Repack(); Assert.True(fixture.Snapping.Selected?.Grouping); AssertReserved(); }
+        if (cancel) fixture.Movement.Cancel(); else fixture.Movement.Commit(fixture.Movement.Position!.Value);
+        fixture.Repack();
+        var remainder = fixture.Containers.Owner("test:a2")!;
+        Assert.Null(fixture.Containers.Reservation(remainder));
+        var final = fixture.Layouts[remainder.Id];
+        if (cancel) { Assert.Equal(bounds, ReadRectangle(final.Root)); Assert.Contains(final.Members, member => member.Registration.Id == "test:a"); }
+        else { Assert.True(final.Root.OuterWidth < bounds.Width || final.Root.OuterHeight < bounds.Height); Assert.DoesNotContain(final.Members, member => member.Registration.Id == "test:a"); }
+        Assert.Equal(cancel ? "source" : fixture.Containers.Owner("test:a")!.Id, fixture.Restart().Owner("test:a")!.Id);
+
+        // The reservation is a footprint only; the source has no duplicate live member.
+        void AssertReserved()
+        {
+            var source = fixture.Layouts[fixture.Containers.Owner("test:a2")!.Id];
+            Assert.Equal(bounds, ReadRectangle(source.Root));
+            Assert.DoesNotContain(source.Members, member => member.Registration.Id == "test:a");
+            Assert.All(source.Members, member => Assert.Equal(siblings[member.Registration.Id], member.Clip));
+        }
+    }
+
     /// <summary>Shift removes the active external snap preview so a later free commit cannot retain stale docking.</summary>
     [Theory]
     [InlineData(1, 500, 280, 150, 30)] [InlineData(1.5f, 500, 280, 150, 30)]
@@ -299,7 +428,7 @@ public sealed class HudOverlaySnappingTests
             {
                 if (!layouts.TryGetValue(item.Id, out var layout)) layouts[item.Id] = layout = new HudOverlayGroupLayout();
                 layout.Apply(anchors, containers.Definition(item), members.Where(member => item.Tree.Leaves().Contains(member.Id))
-                    .Select(member => new KeyValuePair<HudOverlayRegistration, SizeF>(member, sizes[member.Id])).ToArray(), containers.Origin(item), item.Tree, item.Padding);
+                    .Select(member => new KeyValuePair<HudOverlayRegistration, SizeF>(member, sizes[member.Id])).ToArray(), containers.Origin(item), item.Tree, item.Padding, item.Attachment, containers.Reservation(item));
             }
         };
         try
@@ -308,10 +437,11 @@ public sealed class HudOverlaySnappingTests
             var peerClip = Assert.Single(layouts["peer"].Members).Clip;
             Assert.All(original, member => Assert.False(member.Clip.IntersectsWith(peerClip)));
             var movement = containers.Get("source", "test:a"); movement.ContainerOrigin = new PointF(100, 100);
+            movement.SourceGeometry = HudOverlaySourceReservation.Capture(layouts["source"], PointF.Empty, 1);
             movement.MemberOrigins = original.ToDictionary(member => member.Registration.Id,
                 member => new PointF((float)member.Bounds.renderX, (float)member.Bounds.renderY));
             movement.Begin(movement.MemberOrigins["test:a"], PointF.Empty, 1); movement.Move(new PointF(300, 200)); repack();
-            Assert.Contains(layouts["source"].Members, member => member.Clip.IntersectsWith(peerClip));
+            Assert.All(layouts["source"].Members, member => Assert.False(member.Clip.IntersectsWith(peerClip)));
             var snapping = new HudOverlaySnapping(containers);
             snapping.Update(movement, new PointF(400, 300), bypass, 1, new RectangleF(0, 0, 800, 600), layouts, _ => true);
             Assert.Equal(bypass, snapping.DropAllowed); Assert.Null(snapping.Selected); Assert.Equal(0, storage.Writes);
@@ -455,6 +585,9 @@ public sealed class HudOverlaySnappingTests
     #endregion
 
     #region Private
+    /// <summary>Reads physical native root geometry independently of presentation dimensions.</summary>
+    private static RectangleF ReadRectangle(ElementBounds bounds) => new((float)bounds.renderX, (float)bounds.renderY, (float)bounds.OuterWidth, (float)bounds.OuterHeight);
+
     /// <summary>Owns synthetic registrations and native bounds while borrowing no feature rendering resources.</summary>
     private sealed class Fixture : IDisposable
     {
@@ -471,20 +604,32 @@ public sealed class HudOverlaySnappingTests
         public readonly HudOverlaySnapping Snapping;
         public readonly Dictionary<string, HudOverlayGroupLayout> Layouts = new();
         public readonly Dictionary<string, RectangleF> Boundaries = new();
+        public readonly Dictionary<string, SizeF> MeasurementOverrides = new();
         public HudOverlayAnchorContext Anchors => anchors;
         #region Public API
         /// <summary>Builds caller-defined instrument geometry at a selected native scale.</summary>
-        public Fixture(float scale, SizeF? measured = null, PointF? targetOrigin = null, bool paired = false, SizeF? sourceSize = null, bool individual = false, RectangleF? viewport = null)
+        public Fixture(float scale, SizeF? measured = null, PointF? targetOrigin = null, bool paired = false, SizeF? sourceSize = null, bool individual = false, RectangleF? viewport = null, bool sourceThird = false)
         {
             RuntimeEnv.GUIScale = scale; size = measured ?? new SizeF(40, 30);
             window = new Window(viewport);
             this.sourceSize = sourceSize ?? size;
             members.Add(storage.Add("test:a", "source")); members.Add(storage.Add("test:b", "target"));
             if (paired) { members.Add(storage.Add("test:a2", "source")); members.Add(storage.Add("test:b2", "target")); }
+            if (sourceThird) members.Add(storage.Add("test:a3", "source"));
             // These geometry fixtures start with explicit free positions rather than registered default anchors.
             storage.Positions[HudOverlayPositionKeys.Group("source")] = new(30, 40);
             var targetPosition = targetOrigin ?? new PointF(200, 120);
             storage.Positions[HudOverlayPositionKeys.Group("target")] = new((int)targetPosition.X, (int)targetPosition.Y);
+            if (sourceThird)
+            {
+                // A temporarily unavailable integration remains structurally present without measured artwork.
+                storage.Values[HudLayoutStore.SettingKey] = JsonSerializer.Serialize(new HudLayoutSnapshot { Containers = new[] {
+                    new HudLayoutContainer { Id = "source", Key = HudOverlayPositionKeys.Group("source"), TemplateId = "source", X = 30, Y = 40, Movable = true,
+                        Tree = new() { First = new() { Indicator = "test:a" }, Second = new() { First = new() { Indicator = "test:a2" },
+                            Second = new() { First = new() { Indicator = "test:a3" }, Second = new() { Indicator = "missing:integration" } } } } },
+                    new HudLayoutContainer { Id = "target", Key = HudOverlayPositionKeys.Group("target"), TemplateId = "target", X = (int)targetPosition.X, Y = (int)targetPosition.Y,
+                        Tree = new() { First = new() { Indicator = "test:b" }, Second = new() { Indicator = "test:b2" } } } } });
+            }
             Containers = new HudOverlayContainers(storage.Api.Object, storage.Registry);
             Containers.SetMovable("source", true, new PointF(30, 40)); Containers.SetMovable("target", false, targetOrigin ?? new PointF(200, 120));
             anchors = new HudOverlayAnchorContext(window, () => RuntimeEnv.GUIScale, () => Boundaries.TryGetValue(HudOverlayTargets.Hotbar, out var hotbar) ? hotbar : null,
@@ -492,7 +637,15 @@ public sealed class HudOverlaySnappingTests
             Movement = Containers.Get("source", individual ? "test:a" : null); Snapping = new HudOverlaySnapping(Containers); Repack();
         }
         /// <summary>Captures source movement without native titlebar hit testing.</summary>
-        public void Begin() => Movement.Begin(new PointF(30, 40), new PointF((float)window.renderX + 30 * RuntimeEnv.GUIScale, (float)window.renderY + 40 * RuntimeEnv.GUIScale), RuntimeEnv.GUIScale);
+        public void Begin()
+        {
+            var layout = Layouts["source"];
+            Movement.SourceGeometry = HudOverlaySourceReservation.Capture(layout, new PointF((float)window.renderX, (float)window.renderY), RuntimeEnv.GUIScale);
+            Movement.ContainerOrigin = Movement.SourceGeometry.Origin;
+            Movement.MemberOrigins = layout.Members.ToDictionary(member => member.Registration.Id, member => new PointF(
+                (float)((member.Bounds.renderX - window.renderX) / RuntimeEnv.GUIScale), (float)((member.Bounds.renderY - window.renderY) / RuntimeEnv.GUIScale)));
+            Movement.Begin(new PointF(30, 40), new PointF((float)window.renderX + 30 * RuntimeEnv.GUIScale, (float)window.renderY + 40 * RuntimeEnv.GUIScale), RuntimeEnv.GUIScale);
+        }
         /// <summary>Places raw source bounds immediately beside the measured target.</summary>
         public void MoveBesideTarget(HudSnapSide side = HudSnapSide.Right)
         {
@@ -511,6 +664,12 @@ public sealed class HudOverlaySnappingTests
         }
         /// <summary>Reloads the authoritative committed snapshot without changing its native mirrors.</summary>
         public HudOverlayContainers Restart() => new(storage.Api.Object, storage.Registry);
+        /// <summary>Simulates registration of an optional integration retained in the authoritative tree.</summary>
+        public void RegisterIntegration()
+        {
+            members.Add(storage.Add("missing:integration", "source"));
+            Containers.Synchronize();
+        }
         /// <summary>Calculates feedback against native roots and drawable instrument measurements.</summary>
         public void Update(PointF? pointer = null) => Snapping.Update(Movement, pointer ?? attachmentPointer ?? Movement.UnsnappedOrigin, false,
             RuntimeEnv.GUIScale, new RectangleF(0, 0, 800, 600), Layouts, _ => true,
@@ -543,7 +702,7 @@ public sealed class HudOverlaySnappingTests
             foreach (var container in Containers.Resolved)
             {
                 if (!Layouts.TryGetValue(container.Id, out var layout)) Layouts[container.Id] = layout = new HudOverlayGroupLayout();
-                layout.Apply(anchors, Containers.Definition(container), members.Where(value => container.Tree.Leaves().Contains(value.Id)).Select(value => new KeyValuePair<HudOverlayRegistration, SizeF>(value, value.Id.StartsWith("test:a", StringComparison.Ordinal) ? sourceSize : size)).ToArray(), Containers.Origin(container), container.Tree, container.Padding, container.Attachment);
+                layout.Apply(anchors, Containers.Definition(container), members.Where(value => container.Tree.Leaves().Contains(value.Id)).Select(value => new KeyValuePair<HudOverlayRegistration, SizeF>(value, MeasurementOverrides.TryGetValue(value.Id, out var changed) ? changed : value.Id.StartsWith("test:a", StringComparison.Ordinal) ? sourceSize : size)).ToArray(), Containers.Origin(container), container.Tree, container.Padding, container.Attachment, Containers.Reservation(container));
             }
 
         }
