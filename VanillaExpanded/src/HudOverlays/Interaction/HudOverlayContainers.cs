@@ -7,6 +7,7 @@ using VanillaExpanded.HudOverlays.Layout;
 using VanillaExpanded.HudOverlays.Persistence;
 using VanillaExpanded.HudOverlays.Registration;
 using Vintagestory.API.Client;
+using Vintagestory.API.Config;
 
 namespace VanillaExpanded.HudOverlays.Interaction;
 
@@ -105,6 +106,27 @@ internal sealed class HudOverlayContainers
     public PointF? Origin(HudLayoutContainer container) => active == container.Id && previewOrigin.HasValue
         ? previewOrigin : container.X.HasValue ? new PointF(container.X.Value, container.Y!.Value) : null;
 
+    /// <summary>Retains explicit docking or the registered default anchor until a free position overrides it.</summary>
+    public HudOverlayPlacement? Attachment(HudLayoutContainer container)
+    {
+        var placement = Definition(container).Placement;
+        if (container.Attachment != null) return container.Attachment;
+        if (container.X.HasValue || !HudOverlayTargets.IsExternal(placement.TargetId)) return null;
+        // Native screen alignment includes dialog margins. Capture that residual offset when materializing
+        // its external attachment, so permission changes and incoming joins do not move the existing group.
+        if (placement.TargetId == HudOverlayTargets.Screen)
+        {
+            float x = HudOverlayPoints.Normalized(placement.Attachment).X;
+            double margin = x == 0 ? GuiStyle.LeftDialogMargin : x == 1 ? -GuiStyle.RightDialogMargin : 0;
+            double scale = RuntimeEnv.GUIScale;
+            // Before native GUI initialization there is no scaled margin; keep the unscaled placement valid.
+            double offset = margin == 0 || !double.IsFinite(scale) || scale <= 0 ? 0 : margin / scale;
+            return new HudOverlayPlacement(placement.TargetId, placement.Attachment, placement.Pivot,
+                placement.OffsetX + offset, placement.OffsetY, placement.ScreenPaddingPixels);
+        }
+        return placement;
+    }
+
     #region Transactions
     /// <summary>Changes permission only, capturing an anchored origin without moving content or changing membership.</summary>
     public bool SetMovable(string id, bool movable, PointF displayed)
@@ -112,7 +134,9 @@ internal sealed class HudOverlayContainers
         Cancel();
         var container = resolved.FirstOrDefault(item => item.Id == id);
         if (container == null || ReadOnly) return false;
-        return Save(Replace(Records(), container with { Movable = movable, X = (int)displayed.X, Y = (int)displayed.Y }));
+        // Permission toggles materialize a default placement without converting its attachment into a free position.
+        var attachment = Attachment(container);
+        return Save(Replace(Records(), container with { Movable = movable, X = (int)displayed.X, Y = (int)displayed.Y, Attachment = attachment }));
     }
 
     /// <summary>Captures complete effective membership for cancellation and previews independent detachment when requested.</summary>
@@ -186,7 +210,7 @@ internal sealed class HudOverlayContainers
         bool independent = destination.Tree.Indicator != null;
         string id = independent ? newGroupId! : destination.Id;
         var joined = destination with { Id = id, Key = independent ? "vanillaexpanded:hud:custom:" + id : destination.Key,
-            Tree = tree, X = (int)destinationOrigin.X, Y = (int)destinationOrigin.Y };
+            Tree = tree, X = (int)destinationOrigin.X, Y = (int)destinationOrigin.Y, Attachment = Attachment(destination) };
         var records = dragBase.Where(item => item.Id != incoming.Id && item.Id != destination.Id).Append(joined).ToArray();
         try { new HudLayoutSnapshot { Containers = records }.Validate(); }
         catch (InvalidOperationException) { return false; }

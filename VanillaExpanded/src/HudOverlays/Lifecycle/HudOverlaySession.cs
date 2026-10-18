@@ -211,7 +211,7 @@ internal sealed class HudOverlaySession : IDisposable
             if (fallback) origin = new System.Drawing.PointF((float)HudOverlayAnchorContext.SafeInset, fallbackY);
             layout.Apply(anchors, definition, members,
                 origin,
-                container.Tree, container.Padding, container.Attachment);
+                container.Tree, container.Padding, positions.Attachment(container));
             if (fallback) fallbackY += (float)(layout.Root.fixedHeight + definition.Packing.Gap);
         }
         var effectiveLayouts = layouts.Where(item => live.Contains(item.Key)).ToDictionary(item => item.Key, item => item.Value);

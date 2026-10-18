@@ -481,6 +481,10 @@ public sealed class HudOverlaySnappingTests
             this.sourceSize = sourceSize ?? size;
             members.Add(storage.Add("test:a", "source")); members.Add(storage.Add("test:b", "target"));
             if (paired) { members.Add(storage.Add("test:a2", "source")); members.Add(storage.Add("test:b2", "target")); }
+            // These geometry fixtures start with explicit free positions rather than registered default anchors.
+            storage.Positions[HudOverlayPositionKeys.Group("source")] = new(30, 40);
+            var targetPosition = targetOrigin ?? new PointF(200, 120);
+            storage.Positions[HudOverlayPositionKeys.Group("target")] = new((int)targetPosition.X, (int)targetPosition.Y);
             Containers = new HudOverlayContainers(storage.Api.Object, storage.Registry);
             Containers.SetMovable("source", true, new PointF(30, 40)); Containers.SetMovable("target", false, targetOrigin ?? new PointF(200, 120));
             anchors = new HudOverlayAnchorContext(window, () => RuntimeEnv.GUIScale, () => Boundaries.TryGetValue(HudOverlayTargets.Hotbar, out var hotbar) ? hotbar : null,
@@ -523,8 +527,13 @@ public sealed class HudOverlaySnappingTests
         /// <summary>Adds a separate measured obstacle in the proposed incoming footprint.</summary>
         public void AddObstacle()
         {
-            var target = Layouts["target"].Root; members.Add(storage.Add("test:obstacle", "obstacle")); Containers.Synchronize();
-            Containers.SetMovable("obstacle", false, new PointF((float)(target.renderX + target.OuterWidth + 6), (float)target.renderY)); Repack();
+            var target = Layouts["target"].Root; members.Add(storage.Add("test:obstacle", "obstacle"));
+            Containers.Synchronize();
+            var position = new PointF((float)(target.renderX + target.OuterWidth + 6), (float)target.renderY);
+            Containers.SetMovable("obstacle", true, position);
+            Assert.True(Containers.Begin("obstacle", null, position, new Dictionary<string, PointF>()));
+            Assert.True(Containers.Commit(position));
+            Containers.SetMovable("obstacle", false, position); Repack();
         }
         /// <summary>Applies effective container trees using the same native layout boundary as the runtime.</summary>
         public void Repack()
