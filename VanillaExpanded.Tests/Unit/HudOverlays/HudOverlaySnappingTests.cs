@@ -273,6 +273,35 @@ public sealed class HudOverlaySnappingTests
         Assert.Equal(HudOverlayTargets.Target(boundary.Id), fixture.Restart().Owner("test:a")!.Attachment!.TargetId);
     }
 
+    /// <summary>A matched horizontal guide cannot preserve a vertical docking gap through update, commit, or reload.</summary>
+    [Theory]
+    [InlineData(1, 6, 300, 400, 240, 20)]
+    [InlineData(1.5f, 6, 300, 400, 240, 20)]
+    [InlineData(2, 6, 300, 400, 240, 20)]
+    public void NativeDockingClosesGapAndPersistsBothAxes(float scale, float gap,
+        float x, float y, float width, float height)
+    {
+        using var fixture = new Fixture(scale);
+        var boundary = new HudSnapBoundary("saturationstatbar", new RectangleF(x, y, width, height));
+        fixture.Boundaries[boundary.Id] = boundary.Bounds;
+        fixture.Begin();
+        var source = fixture.Layouts["source"].Root;
+        var pointer = new PointF(boundary.Bounds.Left, boundary.Bounds.Top - (float)source.OuterHeight - gap);
+        fixture.Movement.Move(pointer); fixture.Repack(); fixture.Update(pointer);
+        var selected = Assert.IsType<HudSnapCandidate>(fixture.Snapping.Selected);
+        Assert.True(selected.Exterior);
+        Assert.Equal(HudSnapSide.Above, selected.Side);
+        Assert.True(fixture.Snapping.DropAllowed);
+        fixture.Movement.Commit(fixture.Movement.Position!.Value); fixture.Repack();
+        var actual = fixture.Layouts["source"].Root;
+        Assert.Equal(boundary.Bounds.Left, (float)actual.renderX, 3);
+        Assert.InRange(boundary.Bounds.Top - (float)(actual.renderY + actual.OuterHeight), 0, scale);
+        var attachment = fixture.Containers.Owner("test:a")!.Attachment!;
+        Assert.Equal(0, attachment.OffsetX);
+        Assert.InRange(Math.Abs(attachment.OffsetY), 0, 1);
+        Assert.Equal(attachment, fixture.Restart().Owner("test:a")!.Attachment);
+    }
+
     /// <summary>Native HUD surfaces reject overlapping free drops while Shift explicitly bypasses both magnets and obstacles.</summary>
     [Theory]
     [InlineData(false)] [InlineData(true)]
