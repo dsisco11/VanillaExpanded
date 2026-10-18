@@ -62,7 +62,10 @@ internal sealed class HudOverlayMenuInput : IDisposable
             containers.ReadOnly ? null : () => containers.ResetIndicator(registration.Id));
         if (!menu.Open(target, HudMenuPage.Toggles, new(args.X, args.Y), Environment())) return false;
         // Opening is separate from native row activation. Taking native focus gives Escape priority over inventory windows.
-        previousFocus = api.Gui.OpenedGuis?.LastOrDefault(dialog => !ReferenceEquals(dialog, host) && dialog.IsOpened() && dialog.Focused);
+        // Reopening while an earlier consumed key is still held belongs to the same focus lease.
+        // Keep its original return target instead of replacing it with the already-focused HUD.
+        if (!ownsFocus)
+            previousFocus = api.Gui.OpenedGuis?.LastOrDefault(dialog => !ReferenceEquals(dialog, host) && dialog.IsOpened() && dialog.Focused);
         ownsFocus = true;
         pressedButtons.Add(args.Button);
         api.Gui.RequestFocus(host);
@@ -79,6 +82,9 @@ internal sealed class HudOverlayMenuInput : IDisposable
         SynchronizeEnvironment();
         if (!menu.IsOpened)
         {
+            // Pending releases still belong to us, but must not prevent a new context-menu gesture.
+            // In particular, the cursor-unlock modifier can remain held across multiple selections.
+            if (TryOpen(args)) return;
             if (pressedButtons.Count > 0 || pressedKeys.Count > 0) { pressedButtons.Add(args.Button); args.Handled = true; }
             return;
         }

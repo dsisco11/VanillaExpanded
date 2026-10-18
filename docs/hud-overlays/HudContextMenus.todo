@@ -94,15 +94,20 @@ Completion criteria:
 
 Outcome: implementation, current documentation, and shipped assets agree.
 
-- [ ] Update HudOverlays.md architecture/input descriptions and README user controls; document menu scope, Lock behavior, group titlebar dragging, and individual reset access. Describe current behavior only.
-- [ ] Audit implementation against every contract above and remove stale titlebar references, unused localization, and resources only where unreferenced.
-- [ ] Run focused tests and appropriate full build/test/package checks through subagents. Follow test AGENTS.md: no assertions of chosen colors, opacity, font sizes, or hardcoded visual dimensions; synthetic setup geometry belongs in InlineData.
-- [ ] Verify packaged localization and any required resources using canonical repository tooling.
-- [ ] Obtain user-run in-game acceptance: all indicators/styles and edit proxies; every screen edge and GUI scale; inventory/modal overlap; native toggles and Style selection; whole-group and individual dragging; Lock scope; reset; cancellation; restart persistence.
-- [ ] Record what was checked headlessly versus in game; resolve reported failures before completion.
+- [x] Update HudOverlays.md architecture/input descriptions and README user controls; document menu scope, Lock behavior, group titlebar dragging, and individual reset access. Describe current behavior only.
+- [x] Audit implementation against every contract above and remove stale titlebar references, unused localization, and resources only where unreferenced.
+- [x] Run focused tests and appropriate full build/test/package checks through subagents. Follow test AGENTS.md: no assertions of chosen colors, opacity, font sizes, or hardcoded visual dimensions; parameterized geometry cases supply synthetic setup values in InlineData rather than selecting them with switches inside the test body. Shared fixture geometry remains synthetic input, not an assertion of the chosen visual design.
+- [x] Verify packaged localization and any required resources using canonical repository tooling.
+- [x] Obtain user-run in-game acceptance: all indicators/styles and edit proxies; every screen edge and GUI scale; inventory/modal overlap; native toggles and Style selection; whole-group and individual dragging; Lock scope; reset; cancellation; restart persistence.
+- [x] Record what was checked headlessly versus in game; resolve reported failures before completion.
 
 Final acceptance:
 
-- [ ] Every approved requirement is implemented and validated, with any remaining decisions explicitly resolved.
-- [ ] Native popup reuse does not depend on group titlebars, duplicate settings state, or a new layout persistence implementation.
-- [ ] Build/test/package checks pass and user confirms the live interaction and appearance.
+- [x] Every approved requirement is implemented and validated, with any remaining decisions explicitly resolved.
+- [x] Native popup reuse does not depend on group titlebars, duplicate settings state, or a new layout persistence implementation.
+- [x] Build/test/package checks pass and user confirms the live interaction and appearance.
+
+Verification status:
+
+- Headless: the retained-modifier reopening regressions failed before the fix and pass afterward. Updated focused HUD tests: 630 passed; full suite: 2,733 passed. Receipts: artifacts/test-results/hud-context-menu-phase4/menu-reopen-focused.trx and menu-reopen-full.trx. Canonical Release JSON validation/build/package passed; the assembly and all 159 assets (including 28 shaders and required menu localization) match the package. Package receipts: artifacts/test-results/hud-context-menu-phase5-fix-package/.
+- In game: user confirmed that reopening is fixed and all listed acceptance checks passed, including styles/edit proxies, viewport edges and GUI scales, foreground/modal behavior, settings, dragging/snapping/cancellation, individual reset, and restart persistence. The retained-key capture regression is resolved; final independent completion audit passed.
