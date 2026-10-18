@@ -4,18 +4,23 @@ Status: Proposed
 
 ## Summary
 
-Add AutoLoot as a server-authoritative bulk transfer from a lootable entity
-corpse into the player's inventory. Holding Interact displays the same radial
-progress indicator used by AutoStash; completing the hold requests collection
-of all available loot.
+Add AutoLoot as a client-side convenience feature that transfers loot from an
+entity corpse into the player's inventory using vanilla inventory packets.
+Holding Interact displays the same radial progress indicator used by AutoStash;
+completing the hold initiates collection of all available loot.
+
+No AutoLoot code or mod installation is required on the server. The vanilla
+server remains authoritative for inventory changes, just as it is when a player
+manually transfers items from the corpse loot window.
 
 Reduce duplication by sharing hold timing, progress presentation, and low-level
 inventory operations. Keep corpse eligibility and loot transfer rules separate
 from AutoStash's matching-item policies.
 
 This document describes the recommended design, not an implemented feature.
-The vanilla corpse interaction and inventory lifecycle must be verified against
-the supported game version before choosing the final integration hooks.
+Installed-game inspection confirms the vanilla packet path needed for
+client-only collection. In-game validation of the hold gesture, latency, and
+concurrent looting remains necessary.
 
 ## Goals
 
@@ -25,6 +30,83 @@ the supported game version before choosing the final integration hooks.
   and corpse lifecycle behavior.
 - Reuse existing radial rendering and inventory movement infrastructure.
 - Preserve existing AutoStash gestures, timing, and transfer behavior.
+- Work with an unmodified server without custom AutoLoot packets or handlers.
+
+## Client-Only Feasibility Investigation
+
+### Conclusion and Evidence Scope
+
+Client-only AutoLoot is supported by the inspected vanilla inventory path for
+standard harvested corpses. The feature can automate the existing loot-window
+operations rather than introduce a new server operation.
+
+Investigation date: 2026-10-18.
+
+Evidence was obtained by inspecting local game assembly IL with Mono.Cecil:
+`VSEssentials.dll` reports version `1.22.7.0`; inventory/network implementations
+were inspected in the accompanying `VintagestoryLib.dll`. Public API source and
+existing client inventory code in this repository were also checked.
+
+This is implementation-level confirmation of the available API/protocol path,
+not a completed in-game proof. It does not establish compatibility with every
+older game version or third-party corpse implementation.
+
+### Verified Vanilla Flow
+
+1. `EntityBehaviorHarvestable.Initialize` creates an engine-owned
+   `InventoryGeneric` named `harvestableContents-{entityId}`. It loads contents
+   from the synchronized `harvestableInv` attribute and locks item insertion.
+2. `EntityBehaviorHarvestable.OnInteract` requires `IsHarvested` and an
+   interaction-distance check before opening the inventory through the player
+   inventory manager. On the client it opens `GuiDialogCreatureContents` and
+   sends the vanilla inventory-open packet.
+3. `GuiDialogCreatureContents.DoSendPacket` forwards inventory operations using
+   `IClientNetworkAPI.SendEntityPacketWithOffset(entityId, packetIdOffset,
+   packet)`. The inspected corpse dialog uses the default offset of zero.
+4. `EntityBehaviorHarvestable.OnReceivedClientPacket` accepts inventory packets
+   below ID 1000 only when the player has opened that inventory and the vanilla
+   entity access check succeeds. It delegates to
+   `Inventory.InvNetworkUtil.HandleClientPacket`.
+5. `PlayerInventoryManager.TryTransferAway` selects destination slots, predicts
+   movement locally, and returns vanilla movement packets. Its
+   `onlyPlayerInventory` argument can restrict destinations to player storage.
+   `TryTransferTo` similarly predicts a specific slot transfer and returns its
+   packet.
+6. `InventoryNetworkUtil.handleMoveItemStackPacket` processes those packets on
+   the server, uses the engine's `TryMoveItemStack` path, and sends inventory
+   updates or corrections. AutoLoot does not need to implement these operations.
+7. The corpse's existing server-side `Inv_SlotModified` callback stores the
+   inventory in `harvestableInv` and marks that watched attribute dirty.
+   Client `onDropsModified` reloads the inventory and updates an open dialog.
+   `GuiDialogCreatureContents.OnGuiClosed` closes and synchronizes the session.
+
+Relevant public API contracts:
+
+- `IPlayerInventoryManager.TryTransferAway` returns packets to send for
+  synchronization and supports player-only destination selection.
+- `IPlayerInventoryManager.TryTransferTo` returns a vanilla transfer packet.
+- `IClientNetworkAPI.SendEntityPacketWithOffset` wraps an existing packet for
+  an entity's packet handler; it does not require a custom mod channel.
+
+There is also repository prior art:
+[ClientInventorySlotReconciler](../VanillaExpanded/src/AlloyCalculator/ClientInventorySlotReconciler.cs)
+uses `TryTransferTo` and sends its returned vanilla packet. AutoLoot should use
+the corpse dialog's entity-wrapped transport instead of copying that helper's
+global `SendPacketClient` transport.
+
+### Important Limits
+
+- The inventory must be opened through normal vanilla interaction on both
+  sides before collection. Calling `OpenInventory` only on the client is not
+  sufficient authorization.
+- Preserve entity-wrapped packet routing so the corpse behavior's access checks
+  remain in the path. Do not replace it with global raw movement packets.
+- The hold delay and feature toggle are client preferences, not server-enforced
+  rules. Enforcing AutoLoot-specific timing or policy would require server code.
+- There is no custom atomic "loot all" operation or aggregate result packet.
+  Collection consists of ordinary transfers subject to vanilla reconciliation.
+- Leave corpse persistence, synchronization, and cleanup to the existing game
+  handlers. Do not write synchronized attributes or generate drops locally.
 
 ## First-Release Scope
 
@@ -40,8 +122,9 @@ entity inventories are eligible merely because they contain items.
 1. The player holds Interact while targeting an eligible corpse.
 2. After a short grace period, a radial indicator appears with a localized
    "Auto Looting" label.
-3. When the configured delay completes, the client requests the transfer.
-4. The server transfers every item it can into the player's inventory.
+3. When the configured delay completes, the client initiates vanilla transfers
+   from the already-open corpse inventory.
+4. The vanilla server processes the transfers and synchronizes inventory state.
 5. Items that do not fit remain on the corpse.
 
 A normal click should still open the vanilla loot interface. Holding Interact
@@ -63,8 +146,9 @@ harvesting prerequisite or generate drops.
 | Radial rendering | [ModSystemRadialProgressBar](../VanillaExpanded/src/RadialProgress/ModSystemRadialProgressBar.cs) and [IProgressSystemProvider](../VanillaExpanded/src/RadialProgress/IProgressSystemProvider.cs) | Reuse the renderer, shaders, and progress ownership boundary. |
 | Entity hold interaction | [EntityAttachedContainerAutoStashClient](../VanillaExpanded/src/AutoStashing/EntityAttachedContainerAutoStashClient.cs) | Extract timing, progress ownership, cancellation, and submit-once state into a shared component. |
 | Block hold interaction | [BlockBehaviorAutoStashable](../VanillaExpanded/src/AutoStashing/BlockBehaviorAutoStashable.cs) | Adapt to the shared lifecycle where practical, preserving block-specific handling and the post-stash grace period. |
-| Slot movement | [InventoryTransferExecutor](../VanillaExpanded/src/AutoStashing/Transfers/InventoryTransferExecutor.cs) | Reuse engine-owned slot transfers; relocate feature-neutral transfer types into a shared inventory namespace. |
-| Inventory session ownership | [AutoStashInventorySession](../VanillaExpanded/src/AutoStashing/Targets/AutoStashInventorySession.cs) | Generalize and reuse if corpse transfers require a session, preserving already-open inventories. |
+| Client slot movement | [ClientInventorySlotReconciler](../VanillaExpanded/src/AlloyCalculator/ClientInventorySlotReconciler.cs) | Reuse the vanilla prediction/packet pattern. Prefer the existing `TryTransferAway` API for player-only routing; extract a shared client helper only if both callers genuinely benefit. |
+| Direct slot movement | [InventoryTransferExecutor](../VanillaExpanded/src/AutoStashing/Transfers/InventoryTransferExecutor.cs) | Keep for AutoStash's direct engine-slot execution. It does not produce the packets a client-only AutoLoot implementation needs. |
+| Inventory session ownership | [AutoStashInventorySession](../VanillaExpanded/src/AutoStashing/Targets/AutoStashInventorySession.cs) | Reuse the ownership principle, not blindly the implementation. Preserve the vanilla corpse interaction/open/close protocol and already-open windows. |
 | Stash orchestration | [AutoStashService](../VanillaExpanded/src/AutoStashing/AutoStashService.cs) | Retain as stash-specific orchestration rather than reversing it for looting. |
 
 ### Shared Hold Lifecycle
@@ -87,9 +171,18 @@ class. Extract only behavior used by AutoStash and AutoLoot.
 
 ### Shared Inventory Primitives
 
-Use the existing engine-slot transfer boundary for actual movement. Reuse
-session ownership and finalization primitives only where the corpse lifecycle
-has the same requirements.
+Use the vanilla client inventory manager for predicted movement and packet
+creation. A direct call to the AutoStash transfer executor is not a substitute:
+local slot mutation alone does not request an authoritative server transfer.
+
+Prefer `TryTransferAway` with `onlyPlayerInventory: true`, forwarding each
+returned packet through the corpse's entity packet transport. Set
+`ActingPlayer` and normal inventory-operation settings as required by the API.
+If exact destination control becomes necessary, use `TryTransferTo` with the
+same transport rather than implementing slot mutation manually.
+
+Do not send both an activate/shift-click packet and the movement packets for
+the same predicted action. Choose one vanilla operation path.
 
 Do not move crate policies, bloomery routing, attached-bag persistence, or
 matching-item selection into a generic loot engine. These remain AutoStash
@@ -102,77 +195,85 @@ concerns.
 - Detect an eligible corpse and start the shared hold lifecycle.
 - Preserve normal click-to-open behavior and vanilla harvesting interactions.
 - Track the selected entity throughout the hold.
-- Submit a request identifying the entity when the hold completes.
+- Initiate vanilla inventory transfers when the hold completes.
 - Remove progress on cancellation, feature disablement, and disposal.
 
-Client eligibility is advisory. It must not authorize inventory changes.
+Client eligibility is advisory. The vanilla server handles authorization and
+inventory changes.
 
 ### Corpse-Loot Adapter
 
 - Resolve the engine-owned loot inventory for a supported corpse.
 - Check the applicable vanilla access and harvesting prerequisites.
-- Integrate with inventory session ownership when required.
-- Preserve dirty marking, synchronization, persistence, and depletion behavior.
+- Observe normal inventory session opening and closing.
+- Use the corpse dialog's entity packet transport.
+- Leave dirty marking, synchronization, persistence, and depletion behavior to
+  the vanilla implementation.
 
 Prefer an existing behavior/API boundary over a broad entity patch. If Harmony
 is necessary, patch the narrowest verified corpse-loot interaction boundary.
 
-### AutoLoot Service
+### Client AutoLoot Transfer Coordinator
 
-- Resolve the live corpse inventory on the server.
+- Resolve the current client view of the vanilla-opened corpse inventory.
 - Iterate its current nonempty slots.
 - Use engine destination selection to route items into eligible player storage.
-- Move items directly between engine slots.
+- Let the player inventory manager predict transfers and construct packets,
+  then send them through `SendEntityPacketWithOffset`.
 - Continue through partial transfers and other loot stacks when capacity allows.
 - Bound retries when destinations reject movement.
-- Report actual movement and remaining loot.
+- Stop when the session closes or the target becomes invalid.
+- Treat immediate movement counts as prediction, not server confirmation.
 
 Destination selection must be limited to player storage, not unrelated open
 containers, and must preserve engine slot restrictions and merge behavior.
 
-Do not clone loot into the player inventory and then clear the corpse. Direct
-slot movement preserves stack attributes, partial-transfer behavior, capacity
-limits, and modification callbacks.
+Do not clone loot into the player inventory and then clear the corpse. Use
+vanilla transfers to preserve stack attributes, partial-transfer behavior,
+capacity limits, and modification callbacks.
 
 ### Network Boundary
 
-Add request and result packets using the existing mod channel and packet naming
-conventions. The request identifies the corpse by entity ID; it does not supply
-trusted item stacks, quantities, or destination slots.
+Do not add an AutoLoot request packet, result packet, network channel, or server
+ModSystem. Send the vanilla packets returned by the player inventory manager
+through the same entity-wrapped transport used by the corpse loot dialog.
 
-Return enough information to distinguish:
+Use local state and vanilla inventory updates to provide feedback for:
 
 - Completed collection.
 - Partial collection with loot remaining.
 - No available player capacity.
 - Empty or unavailable target.
-- Access denied.
+- Cancellation or server correction.
 
-Success feedback should follow confirmed movement, not merely client timer
-completion. Expected rejection outcomes should produce appropriate feedback;
-unexpected failures should use the repository's logging conventions.
+The vanilla protocol does not provide a feature-specific aggregate completion
+or access-denied result. Do not promise an exact confirmed item count or infer
+a precise rejection reason from local prediction. Completing the timer can
+produce neutral interaction feedback; definitive success feedback requires
+observing authoritative inventory updates.
 
-## Server Authority
+Unexpected failures should use the repository's logging conventions.
 
-Validate each request against current server state:
+## Vanilla Server Authority
 
-- AutoLoot is enabled.
-- The entity exists, is dead, and exposes a supported loot inventory.
-- The player is within permitted interaction reach and in the same dimension.
-- Applicable vanilla access restrictions and harvesting prerequisites are met.
-- The inventory and available player capacity are resolved afresh.
+Rely on the existing server corpse and inventory handlers rather than adding
+AutoLoot validation code. The verified entity packet path checks an open session
+and entity access before delegating inventory movement. The normal interaction
+path checks the harvesting prerequisite and interaction distance.
 
-Perform movement through the normal server execution path so concurrent looters
-operate on live slots rather than independently applying stale snapshots.
-Repeated or stale requests must never duplicate items.
+The client additionally cancels its gesture on target invalidation, loss of
+reach, or a dimension change. Do not assume every movement packet independently
+rechecks every condition of the original interaction.
+
+Concurrent looting and stale predictions are handled through ordinary vanilla
+inventory movement and reconciliation, not an AutoLoot transaction. Validate
+these cases in multiplayer before release.
 
 Do not immediately despawn an emptied corpse unless the vanilla lifecycle
 requires it. Preserve existing cleanup and decay behavior.
 
 The client hold timer is a UX mechanism, not proof that the player waited.
-Before implementation, decide whether the delay also needs server enforcement.
-If it does, use a server-tracked start/completion interaction rather than
-trusting a duration submitted by the client.
+Server-enforced AutoLoot timing is explicitly outside this client-only design.
 
 ## Configuration and Integration
 
@@ -191,41 +292,53 @@ uses a documented default.
 
 Wire the feature through:
 
-- Client and server ModSystem lifecycle and feature gates.
-- Packet registration in [VanillaExpandedModSystem](../VanillaExpanded/src/VanillaExpandedModSystem.cs).
-- Conditional behavior/patch installation and disposal.
+- Client ModSystem lifecycle and feature gates.
+- Client-only patch installation and disposal, if a patch is needed.
+- Existing vanilla inventory and entity packet APIs; no AutoLoot packet
+  registration in [VanillaExpandedModSystem](../VanillaExpanded/src/VanillaExpandedModSystem.cs).
 - Configuration properties and ConfigLib definitions.
 - Localized progress text, interaction help, and result feedback.
 - Feature and configuration documentation in the [README](../README.md).
 
 AutoLoot must work when AutoStash is disabled, and vice versa.
 
+The existing [mod manifest](../VanillaExpanded/modinfo.json) already declares
+`requiredOnServer: false`. Keep the mod universal for its other features; do not
+change its entire side to Client merely because AutoLoot is client-only.
+Verify that the new settings remain local preferences when ConfigLib is present.
+
 ## Delivery Plan
 
-### Phase 1: Verify the Vanilla Contract
+### Phase 1: Validate the Confirmed Vanilla Contract In Game
 
-Confirm the supported game's corpse behavior and inventory implementation:
+The installed-game packet and inventory path is confirmed above. Validate the
+remaining interaction and runtime details:
 
 - How lootability differs from harvestability.
 - When drops become available and whether opening an inventory generates them.
 - How normal click-to-open and held interaction are dispatched.
-- Which APIs enforce access and interaction reach.
-- How slot changes synchronize, persist, and affect empty-corpse cleanup.
+- How holding Interact continues to be observed after the loot dialog opens,
+  including immersive mouse mode.
+- How session opening, slot changes, and corrections behave under latency.
+- How empty-corpse cleanup and session closing behave after collection.
 
 Use those findings to choose the narrow integration hook and finalize supported
 corpse types.
 
 ### Phase 2: Extract Shared Primitives
 
-Extract the hold lifecycle and relocate genuinely feature-neutral inventory
-primitives. Migrate AutoStash callers without changing existing behavior.
+Extract the hold lifecycle. Add or extract client transfer helpers only where
+existing APIs and shared callers justify them; do not relocate AutoStash's
+server transfer layer solely for AutoLoot. Migrate AutoStash callers without
+changing existing behavior.
 Validate existing block and attached-container regression tests before adding
 AutoLoot behavior.
 
 ### Phase 3: Implement AutoLoot
 
-Add the corpse adapter, client interaction, server service, request/result
-packets, configuration, localization, and documentation.
+Add the corpse adapter, client interaction, vanilla transfer coordinator,
+configuration, localization, and documentation. Do not add server handlers or
+custom AutoLoot packets.
 
 ### Phase 4: Validate End to End
 
@@ -240,7 +353,8 @@ instances where appropriate. Use the existing test category conventions.
 - Progress appears only after the grace period and completes at the configured
   delay.
 - Release, retargeting, loss of reach, disablement, and disposal clear progress.
-- One continuous hold submits at most one request.
+- One continuous hold initiates at most one collection pass, which may send
+  multiple vanilla inventory-transfer packets.
 - AutoLoot and AutoStash do not leave overlapping or orphaned progress displays.
 
 ### Inventory Correctness
@@ -258,19 +372,21 @@ instances where appropriate. Use the existing test category conventions.
 - Simultaneous looters cannot receive the same items.
 - Missing entities, living entities, denied access, out-of-reach requests, and
   stale or repeated requests are handled safely.
-- Server-confirmed outcomes drive success and partial/full-inventory feedback.
+- Local prediction is not presented as a confirmed server result.
 - Inventory changes synchronize correctly to the looter and other viewers.
 - Feature disablement and world shutdown release listeners and progress.
 - Existing AutoStash gestures, timing, and transfers remain unchanged.
+- AutoLoot works against a server without VanillaExpanded installed.
+- Packets follow the vanilla entity-wrapped corpse inventory route.
+- Vanilla rejection/correction under latency does not trigger endless retries.
 
 ## Decisions to Confirm Before Implementation
 
-1. Whether the hold delay is purely UX or must be enforced on the server.
-2. Which corpse behavior types are supported after verifying the vanilla
-   lifecycle, including explicit treatment of player and modded corpses.
-3. How hold-to-loot coexists with the vanilla loot window without consuming
+1. Which additional corpse types, if any, are supported beyond the confirmed
+   standard harvested-corpse path, including player and modded corpses.
+2. How hold-to-loot coexists with the vanilla loot window without consuming
    normal clicks or interfering with harvesting.
-4. Whether AutoLoot exposes an independent render-topmost setting.
+3. Whether AutoLoot exposes an independent render-topmost setting.
 
 Recommended overflow policy is fixed for the first release: transfer everything
 that fits and leave the rest on the corpse. Do not drop overflow into the world
