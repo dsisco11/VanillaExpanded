@@ -9,6 +9,9 @@ internal enum HudSnapSide { Left, Right, Above, Below }
 /// <summary>A measured visible destination; a null member denotes a whole-container target.</summary>
 internal sealed record HudSnapTarget(string Container, string? Member, RectangleF Bounds, float Gap);
 
+/// <summary>A borrowed fixed HUD rectangle used for alignment and collision checks, never group membership.</summary>
+internal sealed record HudSnapBoundary(string Id, RectangleF Bounds);
+
 /// <summary>A geometry-only proposal; identity remains stable while the acquisition distance changes.</summary>
 internal sealed record HudSnapCandidate(string Identity, HudSnapTarget? Target, HudSnapSide Side,
     HudOverlayCrossAlignment Alignment, PointF Origin, float Distance, RectangleF Guide)
@@ -16,6 +19,8 @@ internal sealed record HudSnapCandidate(string Identity, HudSnapTarget? Target, 
     #region Public API
     public bool Grouping => Target != null;
     public bool AlignsX { get; init; }
+    public HudSnapBoundary? Boundary { get; init; }
+    public bool Exterior { get; init; }
 
     /// <summary>Keeps a destination and attachment side stable while allowing its cross-axis alignment to change.</summary>
     public bool RetainsAttachment(HudSnapCandidate? previous) => Grouping && previous?.Grouping == true

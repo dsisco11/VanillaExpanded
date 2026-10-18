@@ -36,8 +36,10 @@ internal sealed class HudOverlaySnapping
 
     /// <summary>Applies the first valid ranked proposal using the same resolved geometry used by native layout.</summary>
     public void Update(HudOverlayGroupMovement movement, PointF pointer, bool bypass, double scale, RectangleF viewport,
-        IReadOnlyDictionary<string, HudOverlayGroupLayout> layouts, Func<HudOverlayRegistration, bool> drawable)
+        IReadOnlyDictionary<string, HudOverlayGroupLayout> layouts, Func<HudOverlayRegistration, bool> drawable,
+        IReadOnlyList<HudSnapBoundary>? boundaries = null)
     {
+        boundaries ??= Array.Empty<HudSnapBoundary>();
         if (!ReferenceEquals(capture, movement) || captureRevision != movement.DragRevision)
         {
             retained = null;
@@ -75,15 +77,16 @@ internal sealed class HudOverlaySnapping
         var raw = new RectangleF(viewport.X + movement.UnsnappedOrigin.X * (float)scale,
             viewport.Y + movement.UnsnappedOrigin.Y * (float)scale, (float)moving.Root.OuterWidth, (float)moving.Root.OuterHeight);
         // Unsnapped drops must also be collision-free. Shift is the explicit override for intentional overlap.
-        DropAllowed = bypass || !Collides(moving.Members.Where(member => drawable(member.Registration)).Select(member =>
+        var movingRectangles = moving.Members.Where(member => drawable(member.Registration)).Select(member =>
             new RectangleF((float)member.Bounds.renderX, (float)member.Bounds.renderY,
-                (float)member.Bounds.OuterWidth, (float)member.Bounds.OuterHeight)), layouts, source.Id, string.Empty);
-        DropAllowed &= bypass || !RemainderCollides(movement, layouts, source.Id, string.Empty, drawable);
-        foreach (var candidate in HudSnapGeometry.Candidates(raw, pointer, safe, targets, retained, bypass))
+                (float)member.Bounds.OuterWidth, (float)member.Bounds.OuterHeight)).ToArray();
+        DropAllowed = bypass || !Collides(movingRectangles, layouts, source.Id, string.Empty) && !CrossesBoundary(movingRectangles, boundaries);
+        DropAllowed &= bypass || !RemainderCollides(movement, layouts, source.Id, string.Empty, drawable, boundaries);
+        foreach (var candidate in HudSnapGeometry.Candidates(raw, pointer, safe, targets, retained, bypass, boundaries))
         {
             if (!candidate.Grouping)
             {
-                var origin = RoundedClamped(candidate.Origin, raw.Size, viewport, safe, scale);
+                var origin = RoundedClamped(candidate.Origin, raw.Size, viewport, safe, scale, candidate.Exterior ? candidate.Side : null);
                 var final = new RectangleF(viewport.X + origin.X * (float)scale, viewport.Y + origin.Y * (float)scale, raw.Width, raw.Height);
                 // Native integer checkpoints need not land exactly on a fractional guide. Keep the magnet within
                 // one GUI unit of the ideal and draw the guide at the actual placement, including boundary rounding.
@@ -97,7 +100,8 @@ internal sealed class HudOverlaySnapping
                         final.X + (float)(member.Bounds.renderX - moving.Root.renderX),
                         final.Y + (float)(member.Bounds.renderY - moving.Root.renderY),
                         (float)member.Bounds.OuterWidth, (float)member.Bounds.OuterHeight));
-                if (!Valid(aligned, layouts, source.Id, string.Empty, safe) || RemainderCollides(movement, layouts, source.Id, string.Empty, drawable)) continue;
+                if (!Valid(aligned, layouts, source.Id, string.Empty, safe) || CrossesBoundary(aligned.Values, boundaries)
+                    || RemainderCollides(movement, layouts, source.Id, string.Empty, drawable, boundaries)) continue;
                 containers.Move(origin);
                 DropAllowed = true;
                 var guide = candidate.Guide;
@@ -117,7 +121,8 @@ internal sealed class HudOverlaySnapping
             var rectangles = geometry.Rectangles.ToDictionary(item => item.Key, item => new RectangleF(
                 viewport.X + (originGui.X + item.Value.X) * (float)scale, viewport.Y + (originGui.Y + item.Value.Y) * (float)scale,
                 item.Value.Width * (float)scale, item.Value.Height * (float)scale));
-            if (!Valid(rectangles, layouts, source.Id, target.Id, safe) || RemainderCollides(movement, layouts, source.Id, target.Id, drawable)) continue;
+            if (!Valid(rectangles, layouts, source.Id, target.Id, safe) || CrossesBoundary(rectangles.Values, boundaries)
+                || RemainderCollides(movement, layouts, source.Id, target.Id, drawable, boundaries)) continue;
             if (!containers.PreviewJoin(candidate, originGui)) continue;
             DropAllowed = true;
             Selected = candidate;
@@ -149,12 +154,16 @@ internal sealed class HudOverlaySnapping
     }
 
     /// <summary>Reconciles integer native origins with the same reachability clamp as the native layout.</summary>
-    private static PointF RoundedClamped(PointF pixels, SizeF size, RectangleF viewport, RectangleF safe, double scale)
+    private static PointF RoundedClamped(PointF pixels, SizeF size, RectangleF viewport, RectangleF safe, double scale,
+        HudSnapSide? outside = null)
     {
         double x = (pixels.X - viewport.X) / scale, y = (pixels.Y - viewport.Y) / scale;
         double left = (safe.Left - viewport.Left) / scale, top = (safe.Top - viewport.Top) / scale;
-        return new PointF((int)Math.Clamp(Math.Round(x, MidpointRounding.AwayFromZero), left, Math.Min(int.MaxValue, Math.Max(left, (safe.Right - viewport.Left - size.Width) / scale))),
-            (int)Math.Clamp(Math.Round(y, MidpointRounding.AwayFromZero), top, Math.Min(int.MaxValue, Math.Max(top, (safe.Bottom - viewport.Top - size.Height) / scale))));
+        // Exterior snaps round away from the native surface; nearest rounding could cover a fractional sliver of a meter.
+        x = outside == HudSnapSide.Left ? Math.Floor(x) : outside == HudSnapSide.Right ? Math.Ceiling(x) : Math.Round(x, MidpointRounding.AwayFromZero);
+        y = outside == HudSnapSide.Above ? Math.Floor(y) : outside == HudSnapSide.Below ? Math.Ceiling(y) : Math.Round(y, MidpointRounding.AwayFromZero);
+        return new PointF((int)Math.Clamp(x, left, Math.Min(int.MaxValue, Math.Max(left, (safe.Right - viewport.Left - size.Width) / scale))),
+            (int)Math.Clamp(y, top, Math.Min(int.MaxValue, Math.Max(top, (safe.Bottom - viewport.Top - size.Height) / scale))));
     }
 
     #endregion
@@ -184,15 +193,24 @@ internal sealed class HudOverlaySnapping
 
     /// <summary>Checks reflowed source members against peers; a grouping target is tested through its final candidate geometry instead.</summary>
     private static bool RemainderCollides(HudOverlayGroupMovement movement,
-        IReadOnlyDictionary<string, HudOverlayGroupLayout> layouts, string source, string target, Func<HudOverlayRegistration, bool> drawable)
+        IReadOnlyDictionary<string, HudOverlayGroupLayout> layouts, string source, string target, Func<HudOverlayRegistration, bool> drawable,
+        IReadOnlyList<HudSnapBoundary> boundaries)
     {
         // Stable members identify the remainder even when singleton normalization changes its container identity.
         return layouts.Where(pair => pair.Key != source
             && pair.Value.Members.Any(member => movement.StartingMembers.Contains(member.Registration.Id)))
-            .Any(pair => Collides(pair.Value.Members.Where(member => drawable(member.Registration)).Select(member => new RectangleF(
-                (float)member.Bounds.renderX, (float)member.Bounds.renderY,
-                (float)member.Bounds.OuterWidth, (float)member.Bounds.OuterHeight)), layouts, pair.Key, source, target));
+            .Any(pair =>
+            {
+                var rectangles = pair.Value.Members.Where(member => drawable(member.Registration)).Select(member => new RectangleF(
+                    (float)member.Bounds.renderX, (float)member.Bounds.renderY,
+                    (float)member.Bounds.OuterWidth, (float)member.Bounds.OuterHeight)).ToArray();
+                return Collides(rectangles, layouts, pair.Key, source, target) || CrossesBoundary(rectangles, boundaries);
+            });
     }
+
+    /// <summary>Protects fixed native surfaces without adding native elements to VE membership or position persistence.</summary>
+    private static bool CrossesBoundary(IEnumerable<RectangleF> rectangles, IReadOnlyList<HudSnapBoundary> boundaries) =>
+        rectangles.Any(rectangle => boundaries.Any(boundary => Overlaps(rectangle, boundary.Bounds)));
     /// <summary>Allows touching edges while rejecting positive-area intersections.</summary>
     private static bool Overlaps(RectangleF a, RectangleF b) => Math.Min(a.Right, b.Right) - Math.Max(a.Left, b.Left) > .01f
         && Math.Min(a.Bottom, b.Bottom) - Math.Max(a.Top, b.Top) > .01f;
