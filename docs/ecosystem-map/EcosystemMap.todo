@@ -198,17 +198,17 @@ Depends on Phases 1, 2, 4, and 5.
 
 Outcome: players can select species and distinguish suitable habitat, unsuitable habitat, and unavailable mapped areas.
 
-- [ ] Register the Ecosystem toggle layer and extra composer. Sort the dropdown by localized names and retain selection across recomposition and reopen within a session.
-- [ ] Render one translucent habitat highlight for the selected species, preserving readability of terrain, landmarks, and other layers.
-- [ ] Render a red crosshatched overlay for unavailable environmental coverage. Leave complete-data mismatches unmarked; replace crosshatching with evaluated results when inputs become available.
-- [ ] Clip both overlays to current explored coverage even when regional arrays extend farther. Suppress controls and both overlays on the minimap and when the Ecosystem tab is inactive.
-- [ ] Upload/release textures on the appropriate client thread. Map close cancels unnecessary disposable presentation work without dropping pending environmental writes; world exit follows the established persistent-data flush contract.
-- [ ] Add focused checks for selection retention, sorting, result transitions, coverage clipping, full-map gating, resource disposal, and stale-result rejection during rapid selection/view changes.
-- [ ] Verify shader loading/reload and backend lifecycle through the normal map integration, including graphics-thread upload/disposal and preservation of caller render state. Verify sampling and threshold behavior against Integration contract 3, including GPU float precision, missing-data crosshatching and explored clipping. Keep live visual acceptance in Phase 10; no standalone GPU harness is required.
+- [x] Register the Ecosystem toggle layer and extra composer. Sort the dropdown by localized names and retain selection across recomposition and reopen within a session.
+- [x] Render one translucent habitat highlight for the selected species, preserving readability of terrain, landmarks, and other layers.
+- [x] Render a red crosshatched overlay for unavailable environmental coverage. Leave complete-data mismatches unmarked; replace crosshatching with evaluated results when inputs become available.
+- [x] Clip both overlays to current explored coverage even when regional arrays extend farther. Suppress controls and both overlays on the minimap and when the Ecosystem tab is inactive.
+- [x] Upload/release textures on the appropriate client thread. Map close cancels unnecessary disposable presentation work without dropping pending environmental writes; world exit follows the established persistent-data flush contract.
+- [x] Add focused checks for selection retention, sorting, result transitions, coverage clipping, full-map gating, resource disposal, and stale-result rejection during rapid selection/view changes.
+- [x] Verify shader registration/reload wiring, backend lifecycle, graphics-thread upload/disposal, caller-state preservation and Integration contract 3 sampling/threshold behavior through source review, focused checks and available normal-map/capture evidence. Retain the complete user-run shader-reload, sampling/clipping and lifecycle acceptance checklist in Phase 10; no standalone GPU harness is required.
 
 Completion criteria:
 
-- [ ] Integration evidence covers UI state, rendering eligibility, shader/backend lifecycle and sampling/threshold behavior. Visual appearance remains pending until the user-run acceptance in Phase 10; measured resource/performance acceptance also belongs to Phase 10.
+- [x] Integration evidence covers UI state, rendering eligibility, shader/backend lifecycle and sampling/threshold behavior. Visual appearance remains pending until the user-run acceptance in Phase 10; measured resource/performance acceptance also belongs to Phase 10.
 
 Implementation and review (2026-10-19): the native layer is wired to localized controls, live explored coverage and disposable GPU resource ownership. The approved criteria policy prefers ongoing-spawn definitions, with worldgen fallback and a stable ordinal entity representative; no ranges are merged. A second source review and independent `$audit-stage-completion` review found and resolved wide-view cache churn: source, receipt and texture retention now covers the complete finite explored view, shrinking when the view closes; queue admission remains bounded. A 130-chunk/17-region regression confirms complete steady frames without repeated local reads. No other implementation findings remain.
 
@@ -227,7 +227,7 @@ RenderDoc diagnosis: user-supplied `C:/Users/Sisco/Desktop/ecosystem-capture.rdc
 
 User rendering confirmation and cleanup: the user reports that the projection fix restores rendering. At their request, temporary GPU readback/query diagnostics and selection/first-draw debug notifications are removed; drawing now calls the normal mesh renderer directly. Error reporting, projection ownership, depth composition and sampler-state preservation remain. The cleanup passes 79 focused tests and canonical Release JSON validation/build/packaging; the full suite was not repeated for diagnostic removal. This confirms the reported rendering fault is resolved, without implying that every outstanding integration or acceptance check has been exercised.
 
-Required evidence gap: the final task/completion criterion still requires normal active-map shader execution, including shader reload, sampling/threshold behavior, crosshatching/clipping and graphics state/resource lifecycle. The first live attempt proves normal shader loading but failed before the overlay draw completed. Headless/native checks substantiate the correction; the user confirms normal-map rendering after the projection fix, while shader reload and the remaining integrated sampling/clipping/lifecycle checks still require verification. The independent audit therefore does not support full completion yet. Keep Phase 6 markers unchecked pending user-run normal-map verification of the packaged candidate; broader visual/performance acceptance and complete package qualification remain Phase 10.
+Completion accepted at the user's explicit direction after confirmation that the projection fix restores normal-map rendering. Phase 6 implementation is complete on the recorded source review, independent implementation audits, focused/regression/build evidence, RenderDoc diagnosis and user rendering confirmation. This acceptance does not claim that every live integration scenario has been exercised: the complete shader-reload, sampling/threshold, crosshatching/clipping and lifecycle acceptance checklist remains in Phase 10. Shared-pass state refactoring, ocean suppression and incremental view retention remain unchecked in Phases 7–9. The current native creature labels, including their male/female qualifiers, are retained by the user's decision.
 
 ## Phase 7: Refactor overlay rendering into one graphics pass
 
