@@ -24,7 +24,7 @@ uniform vec2 temperatureRange;
 uniform vec2 rainfallRange;
 uniform vec2 forestRange;
 uniform vec2 shrubRange;
-uniform vec2 elevationRange;
+uniform vec2 surfaceHeightRange;
 uniform float minForestOrShrubs;
 uniform vec4 suitableColor;
 uniform vec4 unavailableColor;
@@ -89,12 +89,12 @@ void main() {
     float rainfall = float(rain)/255.0;
     float y = float(texelFetch(terrainMap,column,0).r)+1.0;
     if (terrainAvailable!=0 && y>=worldHeight) discard;
-    float elevation = y<=seaLevel ? y/seaLevel : 1.0+(y-seaLevel)/(worldHeight-seaLevel);
+    // Surface heights and supplied inclusive limits are exact integers in this texture range.
     // A known mismatch is transparent even if another required input is unavailable.
     if ((climateOk && (!inside(temperature,temperatureRange)||!inside(rainfall,rainfallRange))) ||
         (forestOk && !inside(forest,forestRange)) || (shrubOk && !inside(shrubs,shrubRange)) ||
         (forestOk && shrubOk && max(forest,shrubs)<minForestOrShrubs) ||
-        (terrainAvailable!=0 && !inside(elevation,elevationRange))) discard;
+        (terrainAvailable!=0 && !inside(y,surfaceHeightRange))) discard;
     if (!climateOk || !forestOk || !shrubOk || terrainAvailable==0) {
         vec2 pixel = gl_FragCoord.xy;
         bool hatch = mod(pixel.x+pixel.y,8.0)<1.5 || mod(pixel.x-pixel.y,8.0)<1.5;

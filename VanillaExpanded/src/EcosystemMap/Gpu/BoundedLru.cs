@@ -6,7 +6,7 @@ namespace VanillaExpanded.EcosystemMap.Gpu;
 /// <summary>A count-bounded LRU used only under the preparation owner's lock.</summary>
 internal sealed class BoundedLru<TKey, TValue> where TKey : notnull where TValue : class
 {
-    private readonly int capacity;
+    private int capacity;
     private readonly Dictionary<TKey, (TValue Value, LinkedListNode<TKey> Node)> entries = new();
     private readonly LinkedList<TKey> order = new();
     internal int Count => entries.Count;
@@ -16,6 +16,15 @@ internal sealed class BoundedLru<TKey, TValue> where TKey : notnull where TValue
     /// <summary>Sets the caller-supplied maximum retained entry count; workload tuning is separate.</summary>
     internal BoundedLru(int capacity) { this.capacity = capacity; }
 
+    /// <summary>Changes retention to cover the current visible working set, returning entries removed during shrink.</summary>
+    internal TValue[] Resize(int capacity)
+    {
+        if (capacity <= 0) throw new System.ArgumentOutOfRangeException(nameof(capacity));
+        this.capacity = capacity;
+        var removed = new List<TValue>();
+        while (entries.Count > capacity) removed.Add(Remove(order.Last!.Value)!);
+        return removed.ToArray();
+    }
     /// <summary>Promotes a retained entry so repeated visible requests reuse it.</summary>
     internal bool TryGet(TKey key, out TValue? value)
     {

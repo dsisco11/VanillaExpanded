@@ -21,7 +21,6 @@ internal sealed record HabitatRanges(float MinTemperature, float MaxTemperature,
         program.Uniform("rainfallRange", MinRainfall, MaxRainfall);
         program.Uniform("forestRange", MinForest, MaxForest);
         program.Uniform("shrubRange", MinShrubs, MaxShrubs);
-        program.Uniform("elevationRange", MinElevation, MaxElevation);
         program.Uniform("minForestOrShrubs", MinForestOrShrubs);
         program.Uniform("samplingPath", Sampling == HabitatSpawnPath.Worldgen ? 0 : 1);
     }

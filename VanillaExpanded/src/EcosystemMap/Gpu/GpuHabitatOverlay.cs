@@ -12,6 +12,8 @@ internal sealed class GpuHabitatOverlay : IDisposable
     private readonly int thread = Environment.CurrentManagedThreadId;
     private IShaderProgram? shader;
     private MeshRef? quad;
+    private (float Minimum, float Maximum, int SeaLevel, int WorldHeight)? heightCriteria;
+    private HabitatHeightRange heightRange;
 
     #region Public API
     /// <summary>Creates an owner on the graphics thread; no shader/texture allocation occurs on background input workers.</summary>
@@ -29,6 +31,7 @@ internal sealed class GpuHabitatOverlay : IDisposable
             replacement.FragmentShader = api.Shader.NewShader(EnumShaderType.FragmentShader);
             api.Shader.RegisterFileShaderProgram("ecosystem_habitat", replacement);
             if (!replacement.Compile()) { replacement.Dispose(); return false; }
+            GpuHabitatSamplers.Register(replacement);
         }
         catch { replacement.Dispose(); throw; }
         shader?.Dispose(); shader = replacement;
@@ -42,7 +45,8 @@ internal sealed class GpuHabitatOverlay : IDisposable
     {
         CheckThread();
         if (!fullMapActive || shader == null) return;
-        EnsureQuad();
+        int vertexArray = GL.GetInteger(GetPName.VertexArrayBinding);
+        int arrayBuffer = GL.GetInteger(GetPName.ArrayBufferBinding);
         var previous = api.Render.CurrentActiveShader;
         bool depth = GL.IsEnabled(EnableCap.DepthTest), cull = GL.IsEnabled(EnableCap.CullFace);
         bool blend = GL.IsEnabled(IndexedEnableCap.Blend, 0);
@@ -56,13 +60,22 @@ internal sealed class GpuHabitatOverlay : IDisposable
         previous?.Stop();
         try
         {
+            EnsureQuad();
             GL.Disable(EnableCap.DepthTest); GL.Disable(EnableCap.CullFace); GL.DepthMask(false);
             GL.Enable(IndexedEnableCap.Blend, 0);
             GL.BlendEquationSeparate(0, BlendEquationMode.FuncAdd, BlendEquationMode.FuncAdd);
             GL.BlendFuncSeparate(0, BlendingFactorSrc.SrcAlpha, BlendingFactorDest.OneMinusSrcAlpha, BlendingFactorSrc.One, BlendingFactorDest.OneMinusSrcAlpha);
             shader.Use();
             region.Bind(shader); tile.Bind(shader); ranges.Apply(shader);
+            var criteria = (ranges.MinElevation, ranges.MaxElevation, bundle.World.SeaLevel, bundle.World.WorldHeight);
+            if (heightCriteria != criteria)
+            {
+                heightRange = HabitatHeightRange.From(criteria.MinElevation, criteria.MaxElevation, criteria.SeaLevel, criteria.WorldHeight);
+                heightCriteria = criteria;
+            }
+            shader.Uniform("surfaceHeightRange", (float)heightRange.Minimum, heightRange.Maximum);
             shader.UniformMatrix("projectionMatrix", projection);
+            shader.UniformMatrix("modelViewMatrix", api.Render.CurrentModelviewMatrix);
             shader.Uniform("screenBounds", x, y, width, height);
             shader.Uniform("tileOrigin", (float)((long)bundle.Key.X * bundle.World.ChunkSize), (float)((long)bundle.Key.Z * bundle.World.ChunkSize));
             shader.Uniform("worldSize", (float)bundle.World.WorldWidth, bundle.World.WorldDepth);
@@ -80,6 +93,8 @@ internal sealed class GpuHabitatOverlay : IDisposable
         finally
         {
             shader.Stop();
+            GL.BindVertexArray(vertexArray);
+            GL.BindBuffer(BufferTarget.ArrayBuffer, arrayBuffer);
             for (int i = 0; i < 5; i++) { GL.ActiveTexture(TextureUnit.Texture0 + i); GL.BindTexture(TextureTarget.Texture2D, bindings[i]); }
             GL.ActiveTexture((TextureUnit)activeUnit);
             GL.BlendFuncSeparate(0, (BlendingFactorSrc)srcRgb, (BlendingFactorDest)dstRgb, (BlendingFactorSrc)srcAlpha, (BlendingFactorDest)dstAlpha);

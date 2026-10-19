@@ -18,6 +18,7 @@ public sealed class EcosystemMapSystem : ModSystem
     private IClientNetworkChannel? cacheResetChannel;
     private ServerShrubSource? server;
     internal EcosystemClientSession? Client { get; private set; }
+    internal event Action? Stopping;
 
     #region Public API
     #region Registration and side initialization
@@ -85,7 +86,11 @@ public sealed class EcosystemMapSystem : ModSystem
     {
         if (clientApi != null) clientApi.Event.LeaveWorld -= StopWorld;
         receipt?.Stop();
-        try { Client?.Dispose(); }
+        try
+        {
+            try { Stopping?.Invoke(); }
+            finally { Client?.Dispose(); }
+        }
         finally
         {
             Client = null;

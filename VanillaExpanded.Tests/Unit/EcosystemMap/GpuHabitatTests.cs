@@ -87,7 +87,6 @@ public sealed class GpuHabitatTests
         shader.Setup(value => value.Uniform("rainfallRange", .2f, .8f));
         shader.Setup(value => value.Uniform("forestRange", .1f, .9f));
         shader.Setup(value => value.Uniform("shrubRange", .3f, .7f));
-        shader.Setup(value => value.Uniform("elevationRange", .5f, 1.5f));
         shader.Setup(value => value.Uniform("minForestOrShrubs", .4f));
         shader.Setup(value => value.Uniform("samplingPath", 0));
         ranges.Apply(shader.Object);

@@ -12,6 +12,7 @@ internal sealed class GpuHabitatPreparation : IDisposable
 {
     private readonly object gate = new();
     private readonly EnvironmentalStorage storage;
+    private readonly GpuHabitatLimits limits;
     private readonly BoundedLru<EcosystemRegionKey, EnvironmentalInput<RegionalEnvironment>> regions;
     private readonly BoundedLru<EcosystemTileKey, EnvironmentalInput<TileEnvironment>> tiles;
     private readonly BoundedLru<EcosystemTileKey, GpuHabitatBundle> bundles;
@@ -32,7 +33,7 @@ internal sealed class GpuHabitatPreparation : IDisposable
     /// <summary>Starts one worker with bounded nonblocking admission and explicitly chosen workload limits.</summary>
     internal GpuHabitatPreparation(EnvironmentalStorage storage, GpuHabitatLimits limits)
     {
-        this.storage = storage;
+        this.storage = storage; this.limits = limits;
         regions = new(limits.Regions); tiles = new(limits.SourceTiles); bundles = new(limits.Bundles);
         jobs = Channel.CreateBounded<GpuHabitatJob>(new BoundedChannelOptions(limits.PendingJobs)
             { SingleReader = true, FullMode = BoundedChannelFullMode.Wait, AllowSynchronousContinuations = false });
@@ -40,6 +41,22 @@ internal sealed class GpuHabitatPreparation : IDisposable
         worker = Task.Run(ProcessAsync);
     }
 
+    /// <summary>Retains the entire finite explored view, using configured counts only as off-view cache floors.</summary>
+    internal GpuHabitatLimits SetView(IReadOnlyCollection<EcosystemTileKey> visible)
+    {
+        var regionKeys = new HashSet<EcosystemRegionKey>();
+        foreach (var tile in visible) regionKeys.Add(storage.Identity.RegionFor(tile));
+        var retained = new GpuHabitatLimits(Math.Max(limits.Regions, regionKeys.Count),
+            Math.Max(limits.SourceTiles, visible.Count), Math.Max(limits.Bundles, visible.Count), limits.PendingJobs);
+        lock (gate)
+        {
+            // Shrinking may revoke off-view snapshots. A stable view always fits, so ordinary admission cannot evict its inputs.
+            foreach (var input in regions.Resize(retained.Regions)) input.Valid = false;
+            foreach (var input in tiles.Resize(retained.SourceTiles)) input.Valid = false;
+            bundles.Resize(retained.Bundles);
+        }
+        return retained;
+    }
     /// <summary>Revokes old view/coverage receipts, optionally suspending admission on map close; cached source data remains reusable.</summary>
     internal void ChangeView(bool suspend = false)
     {

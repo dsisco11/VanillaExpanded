@@ -2,7 +2,7 @@ using System;
 
 namespace VanillaExpanded.EcosystemMap.Gpu;
 
-/// <summary>Count bounds for original snapshot reuse, upload bundles and queued local reads.</summary>
+/// <summary>Off-view retention floors and queue bounds; the visible working set can expand retention without expanding job admission.</summary>
 internal sealed record GpuHabitatLimits
 {
     internal static GpuHabitatLimits Client { get; } = new(8, 128, 128, 4);
