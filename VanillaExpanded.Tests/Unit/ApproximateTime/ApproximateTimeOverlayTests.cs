@@ -28,12 +28,12 @@ public sealed class ApproximateTimeOverlayTests
         var fixture = new BowAmmunitionSamplerTests.Fixture();
         var dial = new Mock<IApproximateTimeDialRenderer>();
         using var presentation = new ApproximateTimePresentation(context =>
-            Enumerable.Range(0, 3).Select(index => new LoadedTexture(context.Api)
+            Enumerable.Range(0, 2).Select(index => new LoadedTexture(context.Api)
                 { TextureId = index + 1, IgnoreUndisposed = true }).ToArray(), dial.Object, CreateFace);
         presentation.SetContent(ApproximateTimePeriod.Noon, day);
         presentation.Prepare(new HudOverlayPreparationContext(fixture.Api.Object, 1, "en", 0));
         presentation.Draw(Mock.Of<IRenderAPI>(), ElementBounds.Fixed(0, 0, 24, 24).WithEmptyParent());
-        dial.Verify(x => x.Draw(It.IsAny<IRenderAPI>(), 2, It.IsAny<RectangleF>(), 1,
+        dial.Verify(x => x.Draw(It.IsAny<IRenderAPI>(), 1, It.IsAny<RectangleF>(), 1,
             It.Is<float>(angle => Math.Abs(angle - expected) < .00001)), Times.Once);
         presentation.Reset();
     }
@@ -68,7 +68,7 @@ public sealed class ApproximateTimeOverlayTests
         using var overlay = new ApproximateTimeOverlay(new ApproximateTimePresentation(context =>
         {
             uploads++;
-            return Enumerable.Range(0, 3).Select(index => new LoadedTexture(context.Api)
+            return Enumerable.Range(0, 2).Select(index => new LoadedTexture(context.Api)
                 { TextureId = index + 1, Width = 96, Height = 96, IgnoreUndisposed = true }).ToArray();
         }, Mock.Of<IApproximateTimeDialRenderer>(), CreateFace));
         overlay.BeginSession(fixture.Api.Object);
@@ -86,8 +86,8 @@ public sealed class ApproximateTimeOverlayTests
         blocks.Invocations.Clear(); calendar.Invocations.Clear();
         overlay.Draw(renderer.Object, ElementBounds.Fixed(0, 0, 40, 14).WithEmptyParent(), new RectangleF(0, 0, 40, 14), 0);
         Assert.Empty(blocks.Invocations); Assert.Empty(calendar.Invocations);
-        var iconCall = Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture" && (float)call.Arguments[5] == 50);
-        Assert.Equal(1, (int)Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture" && (float)call.Arguments[5] == 50).Arguments[0]);
+        Assert.DoesNotContain(renderer.Invocations, call => call.Method.Name == "RenderTexture" && (float)call.Arguments[5] == 50);
+        Assert.Equal(20, (int)Assert.Single(renderer.Invocations, call => call.Method.Name == "Render2DTexturePremultipliedAlpha" && (float)call.Arguments[5] == 51).Arguments[0]);
         sunlight = 10; sun.Y = -1; hours = 19;
         overlay.Refresh(); overlay.Prepare(preparation);
         Assert.Equal(1, uploads);
@@ -102,19 +102,19 @@ public sealed class ApproximateTimeOverlayTests
         overlay.Refresh(); overlay.Prepare(preparation);
         renderer.Invocations.Clear();
         overlay.Draw(renderer.Object, ElementBounds.Fixed(0, 0, 24, 24).WithEmptyParent(), new RectangleF(0, 0, 24, 24), 0);
-        Assert.Equal(1, (int)Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture" && (float)call.Arguments[5] == 50).Arguments[0]);
+        Assert.Equal(20, (int)Assert.Single(renderer.Invocations, call => call.Method.Name == "Render2DTexturePremultipliedAlpha" && (float)call.Arguments[5] == 51).Arguments[0]);
         overlay.SetEnabled(false);
         overlay.SetEnabled(true); sunlight = 0;
         overlay.Refresh(); overlay.Prepare(preparation);
         Assert.NotEqual(SizeF.Empty, overlay.Measure());
         renderer.Invocations.Clear();
         overlay.Draw(renderer.Object, ElementBounds.Fixed(0, 0, 24, 24).WithEmptyParent(), new RectangleF(0, 0, 24, 24), 0);
-        Assert.Equal(1, (int)Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture" && (float)call.Arguments[5] == 50).Arguments[0]);
+        Assert.Equal(20, (int)Assert.Single(renderer.Invocations, call => call.Method.Name == "Render2DTexturePremultipliedAlpha" && (float)call.Arguments[5] == 51).Arguments[0]);
         hours = double.NaN;
         Assert.Equal(HudOverlayChange.None, overlay.Refresh());
         renderer.Invocations.Clear();
         overlay.Draw(renderer.Object, ElementBounds.Fixed(0, 0, 24, 24).WithEmptyParent(), new RectangleF(0, 0, 24, 24), 0);
-        Assert.Equal(1, (int)Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture" && (float)call.Arguments[5] == 50).Arguments[0]);
+        Assert.Equal(20, (int)Assert.Single(renderer.Invocations, call => call.Method.Name == "Render2DTexturePremultipliedAlpha" && (float)call.Arguments[5] == 51).Arguments[0]);
         fixture.Entity.Alive = false;
         Assert.False(overlay.IsApplicable()); Assert.Equal(SizeF.Empty, overlay.Measure());
         overlay.EndSession(); Assert.False(overlay.IsApplicable());

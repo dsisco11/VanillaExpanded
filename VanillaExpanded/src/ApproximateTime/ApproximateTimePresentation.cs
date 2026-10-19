@@ -13,6 +13,7 @@ internal sealed class ApproximateTimePresentation : HudIndicatorPresentation<Env
     private readonly Func<HudOverlayPreparationContext, LoadedTexture[]> load;
     private readonly IApproximateTimeDialRenderer dial;
     private readonly Func<HudOverlayPreparationContext, ApproximateTimeDayPhases, LoadedTexture> createFace;
+    private readonly ApproximateTimeFaceArtwork? artwork;
     private LoadedTexture[]? icons;
     private LoadedTexture? face;
     private ApproximateTimeDayPhases phases = ApproximateTimeDayPhases.Neutral;
@@ -32,9 +33,10 @@ internal sealed class ApproximateTimePresentation : HudIndicatorPresentation<Env
         : base(EnvironmentalGaugeStyle.Immersive, EnvironmentalGaugeStyle.Text, textStyle)
     {
         this.load = load ?? (preparation => WorkshopGaugeArtwork.Load(preparation,
-            RadialGaugeLayout.Backing, "clock/layer-1", RadialGaugeLayout.Glass));
+            "clock/layer-1", RadialGaugeLayout.Glass));
         this.dial = dial ?? new ApproximateTimeDialRenderer();
-        this.createFace = createFace ?? ApproximateTimeFaceArtwork.Create;
+        if (createFace == null) artwork = new ApproximateTimeFaceArtwork();
+        this.createFace = createFace ?? artwork!.Create;
         this.compact = compact ?? new();
     }
 
@@ -68,10 +70,10 @@ internal sealed class ApproximateTimePresentation : HudIndicatorPresentation<Env
         }
         bool apiChanged = !ReferenceEquals(Context?.Api, preparation.Api);
         if (icons == null || apiChanged) icons = load(preparation);
-        if (face == null || faceDirty || apiChanged)
+        if (face == null || faceDirty || apiChanged || artwork?.Dirty == true)
         {
             var replacement = createFace(preparation, phases);
-            face?.Dispose();
+            if (artwork == null && !ReferenceEquals(face, replacement)) face?.Dispose();
             face = replacement;
             faceDirty = false;
         }
@@ -80,7 +82,7 @@ internal sealed class ApproximateTimePresentation : HudIndicatorPresentation<Env
         Visibility.Show();
     }
 
-    /// <summary>Draws the backing, colored face, rotated pointer, and glass in sandwich order.</summary>
+    /// <summary>Draws the cached background, rotated pointer, and glass in sandwich order.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds)
     {
         if (!period.HasValue || Context == null) return;
@@ -89,10 +91,9 @@ internal sealed class ApproximateTimePresentation : HudIndicatorPresentation<Env
         if (icons == null || face == null) return;
         float pixels = (float)(HudOverlaySizes.Clock * Context.GuiScale);
         var screen = new RectangleF((float)bounds.renderX, (float)(bounds.renderY + (bounds.OuterHeight - pixels) / 2), pixels, pixels);
-        renderer.RenderTexture(icons[0].TextureId, screen.X, screen.Y, pixels, pixels, 50, HudOverlayDrawOpacity.Tint);
         renderer.Render2DTexturePremultipliedAlpha(face.TextureId, screen.X, screen.Y, pixels, pixels, 51, HudOverlayDrawOpacity.PremultipliedTint);
-        dial.Draw(renderer, icons[1].TextureId, screen, HudOverlayDrawOpacity.Current, rotation);
-        renderer.RenderTexture(icons[2].TextureId, screen.X, screen.Y, pixels, pixels, 53, HudOverlayDrawOpacity.Tint);
+        dial.Draw(renderer, icons[0].TextureId, screen, HudOverlayDrawOpacity.Current, rotation);
+        renderer.RenderTexture(icons[1].TextureId, screen.X, screen.Y, pixels, pixels, 53, HudOverlayDrawOpacity.Tint);
     }
 
     #endregion
@@ -111,7 +112,10 @@ internal sealed class ApproximateTimePresentation : HudIndicatorPresentation<Env
     /// <summary>Releases feature artwork without changing sampled content or feature timers.</summary>
     protected override void ReleaseArtwork()
     {
-        compact.Reset(); icons = null; face?.Dispose(); face = null; faceDirty = true;
+        compact.Reset(); icons = null;
+        if (artwork != null) artwork.Reset();
+        else face?.Dispose();
+        face = null; faceDirty = true;
     }
 
     /// <summary>Clears feature contents after a completed exit or world change.</summary>

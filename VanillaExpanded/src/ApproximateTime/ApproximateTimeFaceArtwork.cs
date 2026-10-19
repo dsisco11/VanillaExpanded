@@ -1,41 +1,125 @@
 using System;
-using Cairo;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering;
 using Vintagestory.API.Client;
+using Vintagestory.API.MathTools;
 
 namespace VanillaExpanded.ApproximateTime;
 
-/// <summary>Prepares runtime solar tints and dividers in the registered circular face aperture.</summary>
-internal static class ApproximateTimeFaceArtwork
+/// <summary>Owns GPU composition of the cached clock housing, solar face, and seasonal scenery.</summary>
+internal sealed class ApproximateTimeFaceArtwork : IDisposable
 {
+    private ICoreClientAPI? api;
+    private ApproximateTimeFaceShaderProgram? shader;
+    private LoadedTexture[]? layers;
+    private MeshRef? quad;
+    private FrameBufferRef? target;
+    private LoadedTexture? texture;
+
     #region Public API
-    /// <summary>Prepares the colored face and dividers as owned pixels outside the draw path.</summary>
-    public static LoadedTexture Create(HudOverlayPreparationContext preparation, ApproximateTimeDayPhases phases)
+    /// <summary>Indicates that a shader reload or reset requires another cached composition.</summary>
+    public bool Dirty { get; private set; } = true;
+
+    /// <summary>Renders changed solar metadata into persistent GPU storage and returns its borrowed texture.</summary>
+    public LoadedTexture Create(HudOverlayPreparationContext preparation, ApproximateTimeDayPhases phases)
     {
-        using var surface = new ImageSurface(Format.Argb32, RadialGaugeLayout.Canvas, RadialGaugeLayout.Canvas);
-        using var drawing = new Context(surface);
-        // Keep a fine separation between hourly colors without exposing broad dark spokes.
-        const double segmentInset = .002;
-        for (int hour = 0; hour < 24; hour++)
+        if (!ReferenceEquals(api, preparation.Api))
         {
-            double start = (hour - 12.5) * Math.PI / 12 - Math.PI / 2;
-            drawing.MoveTo(RadialGaugeLayout.CenterX, RadialGaugeLayout.CenterY);
-            drawing.Arc(RadialGaugeLayout.CenterX, RadialGaugeLayout.CenterY, RadialGaugeLayout.ApertureRadius - 2,
-                start + segmentInset, start + Math.PI / 12 - segmentInset);
-            drawing.ClosePath();
-            if (ReferenceEquals(phases, ApproximateTimeDayPhases.Neutral)) drawing.SetSourceRGB(.18, .18, .17);
-            else drawing.SetSourceRGB(phases.Channel(hour, 0), phases.Channel(hour, 1), phases.Channel(hour, 2));
-            drawing.Fill();
+            Reset();
+            api = preparation.Api;
+            api.Event.ReloadShader += ReloadShader;
         }
-        var texture = new LoadedTexture(preparation.Api);
+        using var state = new ApproximateTimeFaceRenderState(api.Render);
         try
         {
-            preparation.Api.Gui.LoadOrUpdateCairoTexture(surface, true, ref texture);
-            return HudOverlayTextureFiltering.Prepare(texture);
+            state.ConfigureComposition();
+            EnsureResources(preparation);
+            api.Render.CurrentFrameBuffer = target!;
+            api.Render.GlViewport(0, 0, target!.Width, target.Height);
+            api.Render.CurrentActiveShader?.Stop();
+            shader!.Use();
+            shader.HousingTextureId = layers![0].TextureId;
+            shader.DaySceneryTextureId = layers[1].TextureId;
+            shader.NightSceneryTextureId = layers[2].TextureId;
+            shader.FaceGeometry = new Vec4f(RadialGaugeLayout.CenterX, RadialGaugeLayout.CenterY,
+                RadialGaugeLayout.ApertureRadius - 2, RadialGaugeLayout.Canvas);
+            shader.SegmentInset = .002f;
+            shader.SetDistribution(phases);
+            api.Render.RenderMesh(quad!);
+            shader.Stop();
+            HudOverlayTextureFiltering.Prepare(texture!);
+            Dirty = false;
+            return texture!;
         }
-        catch { texture.Dispose(); throw; }
+        catch { Dirty = true; throw; }
+    }
+
+    /// <summary>Unsubscribes reload handling and releases owned resources while dropping borrowed artwork.</summary>
+    public void Reset()
+    {
+        api?.Event.ReloadShader -= ReloadShader;
+        if (target != null) api!.Render.DestroyFrameBuffer(target);
+        target = null;
+        texture?.Dispose(); texture = null;
+        shader?.Dispose(); shader = null;
+        if (quad != null) api!.Render.DeleteMesh(quad);
+        quad = null; layers = null; api = null; Dirty = true;
+    }
+
+    /// <summary>Releases resources when the presentation ends.</summary>
+    public void Dispose() => Reset();
+    #endregion
+
+    #region Private
+    /// <summary>Allocates geometry and storage once per client binding, borrowing source PNG textures.</summary>
+    private void EnsureResources(HudOverlayPreparationContext preparation)
+    {
+        if (shader == null && !ReloadShader()) throw new InvalidOperationException("Could not compile the clock face shader.");
+        layers ??= WorkshopGaugeArtwork.Load(preparation, RadialGaugeLayout.Backing, "clock/day-scenery", "clock/night-scenery");
+        if (quad == null)
+        {
+            var mesh = new MeshData(4, 6, withRgba: false, withFlags: false);
+            mesh.AddVertex(-1, -1, 0, 0, 0);
+            mesh.AddVertex(1, -1, 0, 1, 0);
+            mesh.AddVertex(1, 1, 0, 1, 1);
+            mesh.AddVertex(-1, 1, 0, 0, 1);
+            foreach (int index in new[] { 0, 1, 2, 0, 2, 3 }) mesh.AddIndex(index);
+            quad = api!.Render.UploadMesh(mesh);
+        }
+        if (target == null)
+        {
+            var attributes = new FramebufferAttrs("vanillaexpanded-clock-face", RadialGaugeLayout.Canvas, RadialGaugeLayout.Canvas)
+            {
+                Attachments =
+                [
+                    new FramebufferAttrsAttachment
+                    {
+                        AttachmentType = EnumFramebufferAttachment.ColorAttachment0,
+                        Texture = new RawTexture { Width = RadialGaugeLayout.Canvas, Height = RadialGaugeLayout.Canvas }
+                    }
+                ]
+            };
+            target = api!.Render.CreateFrameBuffer(attributes);
+            // The public DestroyFrameBuffer API deletes only the FBO; this owner must release its color texture.
+            texture = new LoadedTexture(api) { TextureId = target.ColorTextureIds[0], Width = target.Width,
+                Height = target.Height };
+        }
+    }
+
+    /// <summary>Recompiles the file shader and invalidates the cached composition for the next preparation.</summary>
+    private bool ReloadShader()
+    {
+        Dirty = true;
+        shader?.Dispose(); shader = null;
+        var program = new ApproximateTimeFaceShaderProgram(api!);
+        try
+        {
+            api!.Shader.RegisterFileShaderProgram(ApproximateTimeFaceShaderProgram.ShaderName, program);
+            if (!program.Compile()) { program.Dispose(); return false; }
+            shader = program;
+            return true;
+        }
+        catch { program.Dispose(); throw; }
     }
     #endregion
 }
-
