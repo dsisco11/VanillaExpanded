@@ -7,6 +7,8 @@ using VanillaExpanded.EcosystemMap.Gpu;
 using VanillaExpanded.EcosystemMap.Presentation;
 using VanillaExpanded.EcosystemMap.Storage;
 using Vintagestory.API.Client;
+using Vintagestory.API.Datastructures;
+using Vintagestory.Client.NoObf;
 using Vintagestory.API.MathTools;
 using Vintagestory.GameContent;
 
@@ -137,16 +139,59 @@ public sealed class MapPresentationTests
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
         while (true)
         {
-            graphics.FrameKeys.Clear(); presentation.Render(view, ranges, Array.Empty<float>());
+            graphics.FrameKeys.Clear(); presentation.Render(view, ranges, new float[16]);
             if (graphics.FrameKeys.Count == view.Length) break;
             await Task.Delay(1, timeout.Token);
         }
         var work = preparation.Work;
         for (int i = 0; i < 3; i++)
         {
-            graphics.FrameKeys.Clear(); presentation.Render(view, ranges, Array.Empty<float>());
+            graphics.FrameKeys.Clear(); presentation.Render(view, ranges, new float[16]);
             Assert.Equal(view.Length, graphics.FrameKeys.Count);
             Assert.Equal(work, preparation.Work);
+        }
+    }
+    /// <summary>Native matrix getters share scratch storage; all tile draws retain the frame projection despite model-view getter mutation.</summary>
+    [Fact]
+    public async Task NativeBorrowedProjectionSurvivesModelViewReadsAcrossTileDraws()
+    {
+        using var fixture = new StorageFixture();
+        await using var storage = fixture.Open();
+        using var preparation = new GpuHabitatPreparation(storage, new(2, 4, 4, 2));
+        var game = (ClientMain)RuntimeHelpers.GetUninitializedObject(typeof(ClientMain));
+        game.PMatrix = new StackMatrix4();
+        game.MvMatrix = new StackMatrix4();
+        var expected = Enumerable.Range(1, 16).Select(value => (float)value).ToArray();
+        var modelView = Enumerable.Range(101, 16).Select(value => (float)value).ToArray();
+        game.PMatrix.Push(expected.Select(value => (double)value).ToArray());
+        game.MvMatrix.Push(modelView.Select(value => (double)value).ToArray());
+        typeof(ClientMain).GetField("tmpMatrix", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(game, new float[16]);
+        var recorded = new List<float[]>();
+        var graphics = new Mock<IHabitatMapGraphics>();
+        graphics.Setup(item => item.Draw(It.IsAny<GpuHabitatReceipt>(), It.IsAny<HabitatMapTile>(),
+            It.IsAny<HabitatRanges>(), It.IsAny<float[]>())).Callback<GpuHabitatReceipt, HabitatMapTile, HabitatRanges, float[]>(
+            (receipt, tile, ranges, projection) =>
+            {
+                // Match the real graphics boundary: obtaining model-view overwrites the engine's borrowed projection buffer.
+                recorded.Add(projection.ToArray());
+                _ = game.CurrentModelViewMatrix;
+            });
+        using var presentation = new HabitatMapPresentation(preparation, graphics.Object, error => throw error);
+        var ranges = HabitatRanges.From(Species("game:a", "game:a").Alternatives[0]);
+        var tiles = new[] { new HabitatMapTile(new(0, 0), 0, 0, 32, 32), new HabitatMapTile(new(1, 0), 32, 0, 32, 32) };
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        while (true)
+        {
+            recorded.Clear();
+            float[] borrowed = game.CurrentProjectionMatrix;
+            presentation.Render(tiles, ranges, borrowed);
+            if (recorded.Count == tiles.Length)
+            {
+                Assert.Equal(modelView, borrowed);
+                Assert.All(recorded, projection => Assert.Equal(expected, projection));
+                break;
+            }
+            await Task.Delay(1, timeout.Token);
         }
     }
     /// <summary>Preserves server double elevation comparisons at float rule boundaries without GPU float division ambiguity.</summary>
@@ -181,7 +226,7 @@ public sealed class MapPresentationTests
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         while (graphics.Draws == before)
         {
-            presentation.Render(new[] { tile }, ranges, Array.Empty<float>());
+            presentation.Render(new[] { tile }, ranges, new float[16]);
             await Task.Delay(1, timeout.Token);
         }
     }

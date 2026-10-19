@@ -75,7 +75,13 @@ public sealed class ClientReceiptAdapterTests
             var taskField = AccessTools.Field(typeof(ClientMain), "MainThreadTasks");
             taskField.SetValue(client.Game, Activator.CreateInstance(taskField.FieldType));
             AccessTools.Field(typeof(ClientMain), "MainThreadTasksLock").SetValue(client.Game, new object());
-            var climate = new Packet_IntMap { Size = 3, TopLeftPadding = 1, Data = StorageFixture.Map().Values.ToArray() };
+            var originalClimate = new Packet_IntMap
+                { Size = 3, TopLeftPadding = 1, Data = StorageFixture.Map().Values.ToArray(), DataCount = 9, DataLength = 9 };
+            // Exercise the actual wire decoder: it allocates capacity 16 for nine logical map values.
+            byte[] climateBytes = Packet_IntMapSerializer.SerializeToBytes(originalClimate);
+            var climate = Packet_IntMapSerializer.DeserializeBuffer(climateBytes, climateBytes.Length, new Packet_IntMap());
+            Assert.Equal(9, climate.DataCount);
+            Assert.Equal(16, climate.Data.Length);
             var other = new Packet_IntMap { Size = 1, Data = new[] { 123 } };
             var packet = new Packet_Server
             {

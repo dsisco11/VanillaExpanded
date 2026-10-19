@@ -55,17 +55,20 @@ internal sealed class GpuHabitatOverlay : IDisposable
         int rgbEquation = GL.GetInteger(GetPName.BlendEquationRgb), alphaEquation = GL.GetInteger(GetPName.BlendEquationAlpha);
         bool writeDepth = GL.GetBoolean(GetPName.DepthWritemask);
         int activeUnit = GL.GetInteger(GetPName.ActiveTexture);
-        int[] bindings = new int[5];
-        for (int i = 0; i < 5; i++) { GL.ActiveTexture(TextureUnit.Texture0 + i); bindings[i] = GL.GetInteger(GetPName.TextureBinding2D); }
+        int[] bindings = new int[5], samplers = new int[5];
+        for (int i = 0; i < 5; i++) { GL.ActiveTexture(TextureUnit.Texture0 + i); bindings[i] = GL.GetInteger(GetPName.TextureBinding2D); samplers[i] = GL.GetInteger(GetPName.SamplerBinding); }
         previous?.Stop();
         try
         {
             EnsureQuad();
-            GL.Disable(EnableCap.DepthTest); GL.Disable(EnableCap.CullFace); GL.DepthMask(false);
+            // Native map terrain uses Z=50 and markers Z=60; participate in GUI depth ordering between them.
+            GL.Enable(EnableCap.DepthTest); GL.Disable(EnableCap.CullFace); GL.DepthMask(true);
             GL.Enable(IndexedEnableCap.Blend, 0);
             GL.BlendEquationSeparate(0, BlendEquationMode.FuncAdd, BlendEquationMode.FuncAdd);
             GL.BlendFuncSeparate(0, BlendingFactorSrc.SrcAlpha, BlendingFactorDest.OneMinusSrcAlpha, BlendingFactorSrc.One, BlendingFactorDest.OneMinusSrcAlpha);
             shader.Use();
+            // Integer textures require nearest sampling; inherited sampler objects can override the texture parameters.
+            for (int i = 0; i < 5; i++) GL.BindSampler(i, 0);
             region.Bind(shader); tile.Bind(shader); ranges.Apply(shader);
             var criteria = (ranges.MinElevation, ranges.MaxElevation, bundle.World.SeaLevel, bundle.World.WorldHeight);
             if (heightCriteria != criteria)
@@ -95,7 +98,7 @@ internal sealed class GpuHabitatOverlay : IDisposable
             shader.Stop();
             GL.BindVertexArray(vertexArray);
             GL.BindBuffer(BufferTarget.ArrayBuffer, arrayBuffer);
-            for (int i = 0; i < 5; i++) { GL.ActiveTexture(TextureUnit.Texture0 + i); GL.BindTexture(TextureTarget.Texture2D, bindings[i]); }
+            for (int i = 0; i < 5; i++) { GL.ActiveTexture(TextureUnit.Texture0 + i); GL.BindTexture(TextureTarget.Texture2D, bindings[i]); GL.BindSampler(i, samplers[i]); }
             GL.ActiveTexture((TextureUnit)activeUnit);
             GL.BlendFuncSeparate(0, (BlendingFactorSrc)srcRgb, (BlendingFactorDest)dstRgb, (BlendingFactorSrc)srcAlpha, (BlendingFactorDest)dstAlpha);
             GL.BlendEquationSeparate(0, (BlendEquationMode)rgbEquation, (BlendEquationMode)alphaEquation);

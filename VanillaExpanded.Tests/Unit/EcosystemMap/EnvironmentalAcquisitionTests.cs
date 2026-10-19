@@ -43,6 +43,18 @@ public sealed class EnvironmentalAcquisitionTests
         Assert.Null(EnvironmentalSnapshots.Tile(new(0, 0), chunk.Object, 32));
     }
 
+    /// <summary>Normal network map capacity can exceed logical map cells without making the original data unavailable.</summary>
+    [Fact]
+    public void SnapshotCopiesLogicalMapFromOversizedNetworkBuffer()
+    {
+        var values = Enumerable.Range(0, 16).ToArray();
+        var snapshot = EnvironmentalSnapshots.Map(new() { Size = 3, TopLeftPadding = 1, Data = values });
+        Assert.NotNull(snapshot);
+        Assert.Equal(Enumerable.Range(0, 9), snapshot.Values);
+        values[0] = 999;
+        Assert.Equal(0, snapshot.Values[0]);
+        Assert.Null(EnvironmentalSnapshots.Map(new() { Size = 5, Data = values }));
+    }
     /// <summary>Normal tab-closed acquisition merges delayed shrubs and drains both bounded stages before reconnect reads.</summary>
     [Fact]
     public async Task DelayedShrubsAndElevationSurviveAcquisitionShutdown()

@@ -12,6 +12,7 @@ internal sealed class HabitatMapPresentation : IDisposable
 {
     private readonly GpuHabitatPreparation preparation;
     private readonly IHabitatMapGraphics graphics;
+    private readonly float[] projectionSnapshot = new float[16];
     private readonly Action<Exception> report;
     private readonly Dictionary<EcosystemTileKey, Task<GpuHabitatReceipt?>> pending = new();
     private readonly BoundedLru<EcosystemTileKey, GpuHabitatReceipt> receipts = new(128);
@@ -27,6 +28,8 @@ internal sealed class HabitatMapPresentation : IDisposable
     internal void Render(IReadOnlyList<HabitatMapTile> tiles, HabitatRanges ranges, float[] projection)
     {
         if (disposed) return;
+        // Native projection/model-view getters share scratch storage; retain an owned projection before any tile draw.
+        Array.Copy(projection, projectionSnapshot, projectionSnapshot.Length);
         var current = tiles.Select(tile => tile.Key).ToHashSet();
         if (suspended || !visible.SetEquals(current))
         {
@@ -53,7 +56,7 @@ internal sealed class HabitatMapPresentation : IDisposable
                     pending[tile.Key] = next;
             }
             // Recheck immediately before upload; committed inputs, purge or shutdown can revoke leases.
-            if (receipt != null && preparation.IsCurrent(receipt)) graphics.Draw(receipt, tile, ranges, projection);
+            if (receipt != null && preparation.IsCurrent(receipt)) graphics.Draw(receipt, tile, ranges, projectionSnapshot);
         }
     }
 

@@ -8,7 +8,7 @@
 
 Packet 17 captures the completed generated terrain heights and coordinates. Packet 42 captures the actual climate/forest arrays after insertion, before vanilla's deferred region event. Capturing there retains receipt-time provenance even if a queued region event runs after purge. Initial regional keys undo vanilla's signed-X regional index addition; initial tile positions use vanilla's map-size-based chunk-index conversion.
 
-`EnvironmentalSnapshots` checks each original array and its sampling layout independently and copies it. Missing arrays, empty placeholders and invalid layouts remain unavailable. The client never obtains environmental samples through climate APIs that supply fallback values. Shrubs arrive separately.
+`EnvironmentalSnapshots` checks each original array and its sampling layout independently and copies its logical square cells. Vanilla network decoders may retain backing arrays larger than Size × Size; unused capacity is excluded from the snapshot, while arrays shorter than the logical map remain unavailable. Missing arrays, empty placeholders and invalid layouts remain unavailable. The client never obtains environmental samples through climate APIs that supply fallback values. Shrubs arrive separately.
 
 ```mermaid
 flowchart LR
