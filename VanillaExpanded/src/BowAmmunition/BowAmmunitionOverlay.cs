@@ -37,7 +37,7 @@ internal sealed class BowAmmunitionOverlay : IHudOverlay, IHudOverlayVisibilityT
         HudOverlayIconTextPresentation? emptyPresentation = null, HudIndicatorTextPresentation? textStyle = null)
     {
         this.invalidate = invalidate;
-        this.presentation = presentation ?? new(iconSize: HudOverlaySizes.Standard, gap: HudOverlaySizes.ReadingGap, fontSize: HudOverlaySizes.CountText, circularIconBackground: true, useItemPresentation: true)
+        this.presentation = presentation ?? new(iconSize: HudOverlaySizes.Small, gap: HudOverlaySizes.ReadingGap, fontSize: HudOverlaySizes.Text, circularIconBackground: true, useItemPresentation: true)
         { Direction = VanillaExpanded.HudOverlays.Layout.HudOverlayDirection.Vertical };
         this.emptyPresentation = emptyPresentation ?? new(CreateMutedText);
         this.textStyle = textStyle ?? new();
@@ -179,7 +179,7 @@ internal sealed class BowAmmunitionOverlay : IHudOverlay, IHudOverlayVisibilityT
     /// <summary>Renders the generic arrow glyph and localized empty state with muted accessible contrast.</summary>
     private static LoadedTexture CreateMutedText(HudOverlayPreparationContext context, string text)
     {
-        var font = CairoFont.WhiteSmallText().WithFontSize(14).WithColor(new double[] { .7, .7, .7, 1 })
+        var font = CairoFont.WhiteSmallText().WithFontSize(HudOverlaySizes.Text).WithColor(new double[] { .7, .7, .7, 1 })
             .WithStroke(new double[] { 0, 0, 0, .85 }, 1.5);
         return context.Api.Gui.TextTexture.GenTextTexture(text, font);
     }
