@@ -7,7 +7,7 @@ public static class HudOverlaySizes
     public const float Small = 24;
     /// <summary>Standard square indicator footprint.</summary>
     public const float Standard = 36;
-    /// <summary>Compact environmental icon with a normal-size temperature or abbreviated date alongside it.</summary>
+    /// <summary>Wide compact-reading footprint available for environmental displays.</summary>
     public const float EnvironmentalIconReadingWidth = 96;
     /// <summary>Large item artwork.</summary>
     public const float Large = 48;

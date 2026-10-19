@@ -139,16 +139,47 @@ public sealed class EnvironmentalGaugeStyleTests : IDisposable
         var context = new HudOverlayPreparationContext(api.Object, scale, "en");
         compact.Prepare(context, "icon.svg", "25°C"); compact.Prepare(context, "icon.svg", "25°C");
         var bounds = ElementBounds.Fixed(0, 0, 96, 36).WithEmptyParent();
-        bounds.absInnerWidth = 96 * scale; bounds.absInnerHeight = 36 * scale; bounds.Initialized = true;
+        bounds.absInnerWidth = compact.Size.Width * scale; bounds.absInnerHeight = compact.Size.Height * scale; bounds.Initialized = true;
         var renderer = new Mock<IRenderAPI>();
         compact.Draw(renderer.Object, bounds);
         Assert.Equal(1, loads);
         var icon = Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture");
-        Assert.True((double)icon.Arguments[1] < (double)renderer.Invocations.Last().Arguments[1]);
+
         var text = Assert.Single(renderer.Invocations, call => call.Method.Name == "Render2DTexturePremultipliedAlpha");
-        Assert.True((double)text.Arguments[3] > 0);
+        Assert.True((double)text.Arguments[2] > (double)icon.Arguments[2] + (double)icon.Arguments[4]);
+        Assert.Equal((double)icon.Arguments[1] + (double)icon.Arguments[3] / 2, (double)text.Arguments[1] + (double)text.Arguments[3] / 2, 5);
         compact.Reset();
         Assert.True(owned.Disposed);
+    }
+    /// <summary>Wide and narrow readings remain centered below compact artwork without changing prepared pixel size.</summary>
+    [Theory]
+    [InlineData(1, 11, 9)]
+    [InlineData(1.5, 93, 17)]
+    [InlineData(2, 46, 24)]
+    public void CompactReadingUsesStackedFootprint(double scale, int width, int height)
+    {
+        var api = new Mock<ICoreClientAPI> { DefaultValue = DefaultValue.Mock };
+        int uploads = 0;
+        using var compact = new HudOverlayIconReading(new WorkshopGaugeText((context, _) =>
+        {
+            uploads++;
+            return new LoadedTexture(context.Api) { TextureId = 6, Width = width, Height = height };
+        }), (context, _) => new LoadedTexture(context.Api) { TextureId = 5 });
+        var preparation = new HudOverlayPreparationContext(api.Object, scale, "en");
+        compact.Prepare(preparation, "icon.svg", "reading");
+        compact.Prepare(preparation, "icon.svg", "reading");
+        var bounds = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
+        bounds.absFixedX = 18; bounds.absFixedY = 27;
+        bounds.absInnerWidth = compact.Size.Width * scale;
+        bounds.absInnerHeight = compact.Size.Height * scale; bounds.Initialized = true;
+        var renderer = new Mock<IRenderAPI>(); compact.Draw(renderer.Object, bounds);
+        var icon = Assert.Single(renderer.Invocations, value => value.Method.Name == "RenderTexture");
+        var text = Assert.Single(renderer.Invocations, value => value.Method.Name == "Render2DTexturePremultipliedAlpha");
+        Assert.True((double)text.Arguments[2] > (double)icon.Arguments[2] + (double)icon.Arguments[4]);
+        Assert.Equal((double)icon.Arguments[1] + (double)icon.Arguments[3] / 2, (double)text.Arguments[1] + (double)text.Arguments[3] / 2, 5);
+        Assert.Equal((double)width, text.Arguments[3]); Assert.Equal((double)height, text.Arguments[4]);
+        Assert.Equal(bounds.renderY + bounds.OuterHeight, (double)text.Arguments[2] + height, 5);
+        Assert.Equal(1, uploads);
     }
     #endregion
 

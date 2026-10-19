@@ -37,7 +37,8 @@ internal sealed class BowAmmunitionOverlay : IHudOverlay, IHudOverlayVisibilityT
         HudOverlayIconTextPresentation? emptyPresentation = null, HudIndicatorTextPresentation? textStyle = null)
     {
         this.invalidate = invalidate;
-        this.presentation = presentation ?? new(iconSize: HudOverlaySizes.Standard, textBeforeIcon: true, gap: 1.5f, fontSize: HudOverlaySizes.CountText, circularIconBackground: true, useItemPresentation: true);
+        this.presentation = presentation ?? new(iconSize: HudOverlaySizes.Standard, gap: HudOverlaySizes.ReadingGap, fontSize: HudOverlaySizes.CountText, circularIconBackground: true, useItemPresentation: true)
+        { Direction = VanillaExpanded.HudOverlays.Layout.HudOverlayDirection.Vertical };
         this.emptyPresentation = emptyPresentation ?? new(CreateMutedText);
         this.textStyle = textStyle ?? new();
     }

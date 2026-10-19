@@ -1,6 +1,7 @@
 using System.Drawing;
 using Moq;
 using VanillaExpanded.HudOverlays.Registration;
+using VanillaExpanded.HudOverlays.Layout;
 using VanillaExpanded.HudOverlays.Rendering;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -50,6 +51,39 @@ public sealed class HudOverlayIconTextPresentationTests : IDisposable
             Assert.Equal(102d - width, (double)text.Arguments[1]);
             renderer.Invocations.Clear();
         }
+    }
+    /// <summary>Stacked item readings preserve native text pixels, align centers, and reuse prepared resources.</summary>
+    [Theory]
+    [InlineData(1, 22, 7, 14, 5)]
+    [InlineData(1.5, 30, 3, 58, 16)]
+    [InlineData(2, 16, 4, 27, 9)]
+    public void VerticalReadingCentersBelowItem(double scale, float iconSize, float gap, int textWidth, int textHeight)
+    {
+        var api = new Mock<ICoreClientAPI>(); var renderer = new Mock<IRenderAPI>();
+        api.SetupGet(value => value.Render).Returns(renderer.Object);
+        int builds = 0;
+        using var presentation = new HudOverlayIconTextPresentation((_, _) =>
+        {
+            builds++;
+            return new LoadedTexture(api.Object) { Width = textWidth, Height = textHeight };
+        }, iconSize: iconSize, gap: gap) { Direction = HudOverlayDirection.Vertical };
+        presentation.SetContent(new ItemStack(new Item { Code = new AssetLocation("game:arrow-flint") }), "reading");
+        var context = new HudOverlayPreparationContext(api.Object, scale, "en");
+        presentation.Prepare(context); presentation.Prepare(context);
+        var bounds = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
+        bounds.absFixedX = 21; bounds.absFixedY = 34;
+        bounds.absInnerWidth = presentation.Size.Width * scale;
+        bounds.absInnerHeight = presentation.Size.Height * scale;
+        bounds.Initialized = true;
+        presentation.Draw(renderer.Object, bounds, new(0, 0, 1000, 1000), .1f);
+        var icon = Assert.Single(renderer.Invocations, value => value.Method.Name == "RenderItemstackToGui");
+        var text = Assert.Single(renderer.Invocations, value => value.Method.Name == "Render2DTexturePremultipliedAlpha");
+        double textX = (double)text.Arguments[1], textY = (double)text.Arguments[2];
+        Assert.Equal((double)icon.Arguments[1], textX + textWidth / 2d, 5);
+        Assert.Equal(bounds.renderY + iconSize * scale + gap * scale, textY, 5);
+        Assert.Equal((double)textWidth, text.Arguments[3]); Assert.Equal((double)textHeight, text.Arguments[4]);
+        Assert.True(bounds.renderY + bounds.OuterHeight >= textY + textHeight);
+        Assert.Equal(1, builds);
     }
     /// <summary>Unchanged contexts reuse text while relevant locale, font, scale and content changes rebuild once.</summary>
     [Fact]

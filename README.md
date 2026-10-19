@@ -85,19 +85,19 @@ A fractured iris icon beside the toolbar's bottom-left edge, between rift activi
 
 ### Body Temperature Warning
 
-A compact thermometer appears just left of the toolbar, aligned with its bottom edge, when body temperature becomes too low or high. Its colored column rises with temperature, and the adjacent reading shows whole degrees (for example, `34°C`). The icon has an outline for contrast.
+A compact thermometer appears just left of the toolbar, aligned with its bottom edge, when body temperature becomes too low or high. Its colored column rises with temperature, and the reading below it shows whole degrees (for example, `34°C`). The icon has an outline for contrast.
 
 Two slim blue drops immediately left of temperature show player wetness, with a whole-number percentage centered beneath them. The drops stay fully filled; the percentage shows the game's synchronized wetness value. It uses the same height as the other status icons, refreshes every 300 ms, and fades out and collapses when dry. It stays hidden for dead players and in Creative or Spectator mode. Toggle it live through `EnablePlayerWetnessOverlay`.
 
 Cold warnings follow the game’s synchronized freezing effect: the icon appears while that effect is active, and its blue color deepens with the effect’s intensity. Elevated-temperature warnings use the converted reading and appear in orange above 42°C and red above 44°C for the default player. Vanilla’s normal warmth ceiling does not reach these thresholds. The numeric reading uses the character panel’s temperature conversion, rounded to whole degrees. Heat warnings are informational: the game has no native overheating-damage threshold. A quarter-degree recovery margin prevents the heat warning flickering near its visibility boundary.
 
-While a temperature warning is visible, orange chevrons above the reading indicate warming and blue chevrons below it indicate cooling. One chevron means slow change; two vertically stacked chevrons mean fast change. The reading uses normal HUD text size, and the whole indicator keeps the same height as the other status icons. When the reading is hidden, the chevrons remain beside the thermometer.
+While a temperature warning is visible, orange chevrons above the reading indicate warming and blue chevrons below it indicate cooling. One chevron means slow change; two vertically stacked chevrons mean fast change. The reading uses normal HUD text size below the icon, with the chevrons stacked around the reading. When the reading is hidden, active chevrons remain below the thermometer.
 
 The warning uses synchronized body temperature and stays hidden in Creative and Spectator modes. Toggle it through `EnableBodyTemperatureOverlay`, or turn off `ShowBodyTemperatureReading` for the icon alone.
 
 ### Bow Ammunition
 
-While holding a supported base-game bow in your main hand, a compact `<count>x <arrow icon>` indicator shows the next arrow type and its total positive quantity in inventories eligible for bow selection.
+While holding a supported base-game bow in your main hand, an arrow icon with its ammunition count centered beneath it shows the next arrow type and its total positive quantity in inventories eligible for bow selection.
 
 The arrow icon focuses on the arrowhead over a translucent black circular background. The default placement is just above the saturation meter, aligned with its left edge. With no eligible arrows, it shows a muted arrow symbol and localized `No arrows / 0`. Unsupported custom or derived bows hide the indicator.
 
@@ -266,7 +266,7 @@ There is no AutoLoot layering option: its progress always renders above dialogs,
 | `EnableBowAmmunitionOverlay` | `true`       | `true`, `false`                                                                                                                                                                                                              | Show the next-arrow type and type-total quantity while holding a supported bow.         |
 | `EnableBodyTemperatureOverlay` | `true` | `true`, `false` | Show the dynamic thermometer when too cold or hot; applies live. |
 | `EnablePlayerWetnessOverlay` | `true` | `true`, `false` | Show player wetness and a percentage in the selected style; applies live. |
-| `ShowBodyTemperatureReading` | `true` | `true`, `false` | Show whole degrees beside the thermometer; disable for the icon alone. |
+| `ShowBodyTemperatureReading` | `true` | `true`, `false` | Show whole degrees below the thermometer; disable for the icon alone. |
 | `HeldItemStatusAnchor`       | `saturation` | `saturation`, `hotbar`, `screen-left-top`, `screen-center-top`, `screen-right-top`, `screen-left-middle`, `screen-center-middle`, `screen-right-middle`, `screen-left-bottom`, `screen-center-bottom`, `screen-right-bottom` | Select native docking or a screen position. Unknown values fall back to saturation.     |
 | `HeldItemStatusOffsetX`      | `-4`         | -2048–2048 in ConfigLib                                                                                                                                                                                                      | Horizontal offset in GUI units; positive moves right. Nonfinite values fall back to -4. |
 | `HeldItemStatusOffsetY`      | `0`          | -2048–2048 in ConfigLib                                                                                                                                                                                                      | Vertical offset in GUI units; positive moves down. Nonfinite values fall back to 0.     |

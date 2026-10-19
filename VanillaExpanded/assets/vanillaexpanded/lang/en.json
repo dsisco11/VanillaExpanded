@@ -226,7 +226,7 @@
   "config-quick-swap-menu-size-tooltip": "Scale the quick-swap radial menu from 0.15 to 2.5. 1 keeps the default size. Changes take effect immediately.",
   "body-temperature-reading": "{0}°C",
   "config-show-body-temperature-reading": "Show temperature reading",
-  "config-show-body-temperature-reading-tooltip": "Show whole degrees beside the thermometer. Disable for an icon-only warning. Changes take effect immediately.",
+  "config-show-body-temperature-reading-tooltip": "Show whole degrees below the thermometer. Disable for an icon-only warning. Changes take effect immediately.",
   "config-enable-body-temperature-overlay": "Show body temperature warning",
   "config-enable-body-temperature-overlay-tooltip": "Shows body-temperature warnings at the toolbar’s bottom-left using the selected icon or text style. Cold warnings follow the native freezing effect. Heat warnings begin above normal plus 5°C and strengthen above plus 7°C; they indicate elevated temperature, not native heat damage. Changes take effect immediately.",
   "bow-ammunition-count": "{0}x",
