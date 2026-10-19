@@ -366,6 +366,8 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
                 {
                     capi.Render.GlTranslate(0, 0, 100);
                     foreach (var control in groupControls.Values.ToArray()) control.Draw(deltaTime);
+                    if (menuInput?.HoveredMember() is { } hovered)
+                        HudOverlayHoverBorder.Draw(capi.Render, hovered.Clip);
                     if (ActiveControls?.Movement.Dragging == true && snapping?.Selected is { } selected)
                     {
                         if (selected.Grouping) snapHighlight.DrawConnection(snapping.ConnectionTarget, snapping.Insertion, selected.Side);

@@ -112,8 +112,11 @@ internal sealed class BowAmmunitionOverlay : IHudOverlay, IHudOverlayVisibilityT
     public HudOverlayChange Refresh()
     {
         if (!IsApplicable()) return HudOverlayChange.None;
+        if (player is null) return HudOverlayChange.None;
+        if (player.InventoryManager?.ActiveHotbarSlot?.Itemstack is null) return HudOverlayChange.None;
+
         subscriptions?.Reconcile();
-        ItemBow bow = (ItemBow)player!.InventoryManager.ActiveHotbarSlot.Itemstack.Collectible;
+        ItemBow bow = (ItemBow)player.InventoryManager.ActiveHotbarSlot.Itemstack.Collectible;
         BowAmmunitionSample next = BowAmmunitionSampler.Sample(bow, player.Entity!);
         bool changed = styleChanged || Sample == null || Sample.Quantity != next.Quantity
             || !ReferenceEquals(Sample.Icon?.Collectible, next.Icon?.Collectible)
