@@ -1,5 +1,6 @@
 using System;
 using VanillaExpanded.EcosystemMap.Storage;
+using VanillaExpanded.EcosystemMap.Gpu;
 using VanillaExpanded.EcosystemMap.Transport;
 using Vintagestory.API.Client;
 using Vintagestory.API.Config;
@@ -15,6 +16,7 @@ internal sealed class EcosystemClientSession : IDisposable
     private readonly EcosystemMapPurgeBinding? purge;
     private bool disposed;
     internal EnvironmentalStorage Storage { get; }
+    internal GpuHabitatPreparation Preparation { get; }
     internal event Action? Purged;
 
     #region Public API
@@ -36,17 +38,19 @@ internal sealed class EcosystemClientSession : IDisposable
         this.receipt = receipt;
         Storage = storage;
         acquisition = new EnvironmentalAcquisition(Storage, 1, Report);
+        Preparation = new GpuHabitatPreparation(Storage, GpuHabitatLimits.Client);
         try
         {
             Storage.WaitUntilReadyAsync().GetAwaiter().GetResult();
-            purge = EcosystemMapPurgeBinding.Attach(api, Storage, () => Purged?.Invoke());
+            purge = EcosystemMapPurgeBinding.Attach(api, Storage, () => { Preparation.Reset(); Purged?.Invoke(); });
             receipt.Start(acquisition, chunkSize);
         }
         catch
         {
             receipt.Stop();
             purge?.Dispose();
-            acquisition.ShutdownAsync().GetAwaiter().GetResult();
+            try { Preparation.Dispose(); }
+            finally { acquisition.ShutdownAsync().GetAwaiter().GetResult(); }
             throw;
         }
     }
@@ -68,8 +72,12 @@ internal sealed class EcosystemClientSession : IDisposable
         disposed = true;
         receipt.Stop();
         purge?.Dispose();
-        try { acquisition.ShutdownAsync().GetAwaiter().GetResult(); }
-        finally { Purged = null; }
+        try { Preparation.Dispose(); }
+        finally
+        {
+            try { acquisition.ShutdownAsync().GetAwaiter().GetResult(); }
+            finally { Purged = null; }
+        }
     }
     #endregion
 

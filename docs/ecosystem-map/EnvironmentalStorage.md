@@ -24,7 +24,7 @@ flowchart LR
 
 The caller chooses queue capacity for its acquisition workload and awaits submissions for backpressure. One worker serializes reads and updates. Each write transaction contains one regional or tile record; purge uses one transaction to clear both environmental tables. Disk work never executes on a render callback. No measured throughput or final acquisition queue budget is implied by this component.
 
-Every producer and read result carries a `StorageEpoch`. Consumers check `IsCurrent` before publishing derived results and observe the epoch's disposable-work cancellation token. Evaluation results, prepared tiles and textures belong to their presentation owners and are not persisted by storage.
+Every producer and read result carries a `StorageEpoch`. Consumers check `IsCurrent` before publishing derived results and observe the epoch's disposable-work cancellation token. [GpuHabitatPreparation](HabitatEvaluation.md) owns disposable original-input bundles for GPU upload; rendering resources belong to presentation. None are persisted by storage. Successful commits notify GPU input preparation for targeted source/bundle invalidation.
 
 Normal shutdown closes admission, cancels disposable work, drains accepted persistent operations and closes the connection. It preserves the persistent generation so accepted writes remain durable. Later producers are rejected. Synchronous and asynchronous disposal join the same shutdown task.
 

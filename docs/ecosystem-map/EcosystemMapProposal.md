@@ -2,7 +2,7 @@
 
 Implementation checklist: [EcosystemMap.todo](EcosystemMap.todo).
 
-Status: client-side habitat evaluation with server-supplied original shrub arrays and omission of backfill approved; remaining design decisions are for review. This document describes the intended behavior and proposed integration boundaries. It is not an implementation checklist.
+Status: client-side GPU habitat evaluation with server-supplied original shrub arrays and omission of backfill approved; remaining design decisions are for review. This document describes the intended behavior and proposed integration boundaries. It is not an implementation checklist.
 
 ## Intended result
 
@@ -19,7 +19,7 @@ The agreed scope is:
 - Omit backfill. Capture environmental coverage from data available during normal play, including already loaded areas, and persist it for later use.
 - Evaluate regional environmental requirements using worldgen temperature, rainfall, forest density, and shrub density, with terrain elevation checked separately. Current weather and seasonal climate do not drive habitat eligibility.
 - Ignore water, ground, clearance, light, population caps, player distance, and spawn chance.
-- Use the existing map layer system with client-side habitat evaluation and persistence. Receive the server's original regional shrub arrays through the existing map-layer transport; this requires a server component for shrub delivery.
+- Use the existing map layer system with client-side GPU habitat evaluation and persistence. Receive the server's original regional shrub arrays through the existing map-layer transport; this requires a server component for shrub delivery.
 - Use client-local animal definitions as the baseline catalogue. A supplemental server-supplied catalogue is deferred to a follow-up.
 
 ```mermaid
@@ -27,8 +27,8 @@ flowchart LR
     Map[World map] --> Tab[Ecosystem tab active]
     Tab --> Species[Unique-species dropdown]
     Species --> Selection[Selected species]
-    Selection --> Evaluation[Evaluate environmental requirements]
-    Environment[Cached regional environment and elevation] --> Evaluation
+    Selection --> Evaluation[GPU range comparisons]
+    Environment[Uploaded original regional and elevation textures] --> Evaluation
     Evaluation --> Highlight[Habitat highlight over mapped terrain]
 ```
 
@@ -36,7 +36,7 @@ flowchart LR
 
 The Ecosystem tab follows the existing map's toggle-layer behavior. Its dropdown is visible while the tab is active. The selected species controls one translucent highlight, with terrain, landmarks, and other map layers remaining readable.
 
-Changing the selection uses cached environmental data locally. Panning or zooming prepares highlights from cached data and any normally received world data available for the displayed mapped area. It does not request remote environmental backfill. Rendering consumes prepared highlight textures rather than performing world queries each frame.
+Changing the selection uses cached environmental data locally. Panning or zooming prepares highlights from cached data and any normally received world data available for the displayed mapped area. It does not request remote environmental backfill. Rendering samples uploaded environmental textures and performs the comparisons on the GPU, without world queries or CPU-generated suitability grids.
 
 Proposed presentation behavior:
 
@@ -73,7 +73,7 @@ For animals such as deer, retain the species `type` and combine `age` and `gende
 
 Discover species from definition metadata and semantic variants; do not maintain a hardcoded supported-species or source-file list. Do not classify every land entity as wildlife or assume every `type` variant represents a separate species. The catalogue includes naturally spawning animal species from local game and mod assets. Exclude fish, insects, supernatural creatures, and domestic-only variants. Apply the same metadata exclusions to mod-added animals; local patches remain applicable. Definitions may supply species-group metadata to merge breed/cosmetic types; species without such metadata remain automatically discoverable. Reuse vanilla creature-name localization or an existing native group-name key instead of adding feature-owned species translations.
 
-Each species entry contains the relevant environmental limits and the entity identities from which they were derived. Where one species genuinely has multiple habitat rule sets, preserve those alternatives. A sample matches if it satisfies a complete applicable rule set; do not merge separate ranges into a larger interval that invents suitable habitat between them.
+The catalogue retains species definition provenance. The renderer receives exactly one active set of min/max environmental ranges for the selected species. The GPU does not receive a species catalogue or arrays of spawn alternatives. Species switching updates comparison uniforms while reusing source textures. Do not silently union differing definitions into a wider interval; the controls must supply the chosen active criteria set.
 
 The environmental predicate covers:
 
@@ -96,7 +96,7 @@ The inspected runtime animal spawner evaluates climate at a reference height of 
 
 Use worldgen environmental values for habitat eligibility. The inspected base-game animal definitions retain the default `ClimateValueMode.WorldGenValues`; temperature matching reads `WorldGenTemperature`, and ongoing spawning samples generated forest and shrub maps. Spawning during world generation and spawning during ongoing play both use generated environmental values. They are not alternative sources of seasonal or current-weather data.
 
-Preserve any applicable environmental rule alternatives and reconcile differences in vanilla sampling against the agreed behavior: highlight where the species can spawn under those environmental requirements. This is an implementation reconciliation, not an outstanding player-facing policy choice. Do not introduce a worldgen/runtime mode selector.
+The single active criteria set uses one sampling convention consistent with its definition. Perform sampling, climate conversion and the actual comparisons in the GPU shader. Do not introduce a worldgen/runtime mode selector or evaluate multiple alternatives in the shader.
 
 The client climate lookup can return placeholder values when regional data is missing. Validate source availability explicitly; placeholders and absent shrub data must never become valid habitat samples.
 
@@ -112,7 +112,7 @@ Missing shrub data remains unavailable until received or recovered from this wor
 
 ## Data ownership and transport
 
-Keep registration thin. Species classification, environmental acquisition, server shrub delivery, storage, habitat evaluation, and presentation each have a separate owner. The renderer consumes prepared results and does not own persistence or species policy.
+Keep registration thin. Species classification, environmental acquisition, server shrub delivery, storage, habitat evaluation, and presentation each have a separate owner. The renderer consumes original GPU textures and one active comparison range set, and does not own persistence or species policy.
 
 ```mermaid
 flowchart TB
@@ -127,10 +127,11 @@ flowchart TB
         Definitions[Local animal definitions] --> Rules[Baseline species habitat catalogue]
         LocalMaps --> Cache[Environmental cache]
         Receive --> Cache
-        Cache --> Evaluate[Habitat evaluator]
-        Rules --> Evaluate
-        Selected[Selected species] --> Evaluate
-        Evaluate --> Prepared[Prepared highlight tiles]
+        Cache --> Evaluate[GPU comparison shader]
+        SelectedRanges[One active criteria set] --> Evaluate
+        Selected[Selected species] --> SelectedRanges
+        Rules --> SelectedRanges
+        Evaluate --> Prepared[GPU highlight and unavailable pattern]
         Coverage[Explored map coverage] --> Render[Map overlay renderer]
         Prepared --> Render
     end
@@ -174,7 +175,7 @@ Both tables belong exclusively to the ecosystem database. Tile coordinates assoc
 
 Vanilla terrain redraws and pixel-record replacement do not affect ecosystem records. The stored environmental inputs remain reusable when the player selects another species. Persist normally received climate, forest, and elevation as well as separately delivered shrubs; vanilla's in-memory environmental arrays are not retained by its pixel cache.
 
-Serialize database access through the feature's storage owner, perform disk work off the render thread, and use bounded transactions. Incoming data is queued as safe snapshots. Captured climate, forest, shrub, and elevation inputs, their layout metadata, and completeness records are persistent data; pending writes for these records must be flushed on normal world exit before closing the connection. Habitat evaluation jobs, derived highlight tiles, and presentation textures are disposable data that can be cancelled or discarded and rebuilt from persisted inputs. Stop acquisition before the final flush so no new writes arrive after storage closes. Keep records isolated between server/world identities. Explicit cache purge intentionally discards persisted records and pending writes, as described below.
+Serialize database access through the feature's storage owner, perform disk work off the render thread, and use bounded transactions. Incoming data is queued as safe snapshots. Captured climate, forest, shrub, and elevation inputs, their layout metadata, and completeness records are persistent data; pending writes for these records must be flushed on normal world exit before closing the connection. GPU input-preparation jobs and GPU presentation resources are disposable data that can be cancelled or discarded and rebuilt from persisted inputs. Stop acquisition before the final flush so no new writes arrive after storage closes. Keep records isolated between server/world identities. Explicit cache purge intentionally discards persisted records and pending writes, as described below.
 
 Coordinate ecosystem cache clearing with map purge without accessing vanilla's database: clear the feature's own records, pending writes, and derived highlights. Continue clipping highlights to currently explored map coverage. Version environmental records explicitly, and invalidate derived highlight tiles when inputs or the habitat catalogue change. Avoid storing an independent permanent mask for every species when it can be rebuilt from shared environmental inputs.
 
@@ -188,21 +189,21 @@ Without backfill, existing worlds remain usable: areas available during normal p
 
 **Historical shrub-generation compatibility** requires no client reproduction of old algorithms: the server supplies the shrub array already held by the region, including historical or server-specific results. For an unloaded old region, capture its shrub record when the region becomes available through normal play.
 
-Approved scope: omit backfill. Do not add server-side retrieval of saved world-region records, remote region loading, or terrain generation to fill missing environmental coverage for old map-only areas. Reading previously captured records from the local ecosystem database is permitted and is required for reuse across sessions. Background processing may evaluate and cache available environmental inputs for mapped areas; it does not trigger world loading to obtain missing inputs.
+Approved scope: omit backfill. Do not add server-side retrieval of saved world-region records, remote region loading, or terrain generation to fill missing environmental coverage for old map-only areas. Reading previously captured records from the local ecosystem database is permitted and is required for reuse across sessions. Background processing may read and cache original environmental inputs for GPU upload; it does not trigger world loading to obtain missing inputs.
 
 Clip the highlight to explored coverage even when a cached regional array extends beyond it.
 
 ## Performance and lifecycle expectations
 
-Evaluate bounded batches of visible map samples, reuse regional arrays, and cache prepared highlight tiles. Selecting another species invalidates the derived highlight rather than reloading the environmental source data. Zooming may require a different presentation resolution, but does not change the underlying habitat predicate.
+Prepare bounded original-input bundles for upload, share regional GPU textures and retain tile-specific height/coverage textures. The GPU evaluates the selected ranges and generates the mask/highlight. Species switching updates uniforms without rebuilding input textures. Zoom changes presentation scale rather than selecting a CPU sampling density.
 
 Choose sampling density against habitat-boundary accuracy, particularly where elevation changes rapidly. Avoid marking a whole chunk suitable from a single centre sample. Exact sampling resolution, cache limits, and batch sizes require measurement rather than fixed speculative budgets.
 
-Snapshot data before background evaluation where game-owned arrays or API access cannot safely be shared. Upload and release rendering resources on the appropriate client thread. Closing the map stops unnecessary presentation work without discarding pending environmental writes. On normal world exit, cancel disposable evaluation and presentation work, flush captured environmental records, then close storage and clear world-specific state, following the persistence lifecycle above.
+Snapshot original arrays before asynchronous local reads/upload preparation where game-owned arrays or API access cannot safely be shared. Upload and release rendering resources on the appropriate client thread. Closing the map stops unnecessary presentation work without discarding pending environmental writes. On normal world exit, cancel disposable evaluation and presentation work, flush captured environmental records, then close storage and clear world-specific state, following the persistence lifecycle above.
 
 ## Validation expectations
 
-Validation should demonstrate local catalogue construction and use without any server catalogue message, locally patched definitions and variant resolution, species deduplication across age, sex, and cosmetic variants, automatic discovery of local game and mod wildlife, exclusion of fish, insects, supernatural creatures, domestic-only variants, complete environmental-rule matching, boundary handling, independence from current weather and seasonal climate, and unknown-data behavior. Compare representative results with the inspected game habitat calculations, including reference-height climate and normalized elevation.
+Validation should demonstrate local catalogue construction and use without any server catalogue message, locally patched definitions and variant resolution, species deduplication across age, sex, and cosmetic variants, automatic discovery of local game and mod wildlife, exclusion of fish, insects, supernatural creatures, domestic-only variants, GPU comparison of the single selected criteria set, boundary handling, independence from current weather and seasonal climate, and unknown-data behavior. Compare representative results with the inspected game habitat calculations, including reference-height climate and normalized elevation.
 
 Exercise persistence across tile redraw, map close/reopen, region unload, reconnect, purge, and version changes. Verify server/world isolation, persistence of pending environmental writes on normal shutdown, cancellation of disposable work, intentional record and pending-write removal on purge, and that ecosystem storage never opens or modifies the vanilla map database. Verify that panning over old uncached map images does not trigger server-side retrieval of saved world-region records or world loading, that previously captured local ecosystem records can still be read after reconnecting, and that ordinary revisiting populates and retains ecosystem coverage. Confirm that server shrub arrays survive transport and persistence with unchanged values, size, padding, and region identity. Verify missing-server-support and missing-record behavior, correct routing to the Ecosystem layer, and that old map images without environmental records remain distinguishable from unsuitable habitat. Include a region with forced climate changes to ensure the existing shrub array is delivered rather than recomputed from the final climate map.
 

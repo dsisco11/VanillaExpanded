@@ -10,6 +10,9 @@ namespace VanillaExpanded.EcosystemMap.Storage;
 internal sealed class EnvironmentalStorage : IDisposable, IAsyncDisposable
 {
     private readonly Channel<StorageCommand> queue;
+    private readonly ILogger logger;
+    internal EcosystemStorageIdentity Identity { get; }
+    internal event Action<EnvironmentalChange>? Changed;
     private readonly SemaphoreSlim admission = new(1, 1);
     private readonly object shutdownLock = new();
     private readonly EcosystemDatabase database;
@@ -27,6 +30,8 @@ internal sealed class EnvironmentalStorage : IDisposable, IAsyncDisposable
     internal EnvironmentalStorage(string dataPath, EcosystemStorageIdentity identity, ILogger logger, int queueCapacity)
     {
         if (queueCapacity <= 0) throw new ArgumentOutOfRangeException(nameof(queueCapacity));
+        Identity = identity;
+        this.logger = logger;
         database = new EcosystemDatabase(dataPath, identity, logger);
         queue = Channel.CreateBounded<StorageCommand>(new BoundedChannelOptions(queueCapacity)
         { SingleReader = true, FullMode = BoundedChannelFullMode.Wait, AllowSynchronousContinuations = false });
@@ -40,11 +45,11 @@ internal sealed class EnvironmentalStorage : IDisposable, IAsyncDisposable
 
     /// <summary>Queues an immutable partial regional update, returning false if its producer belongs to a purged/closed session.</summary>
     internal Task<bool> WriteRegionAsync(RegionalEnvironment record, StorageEpoch producer) =>
-        SubmitAsync(producer, db => { db.WriteRegion(record); return true; }, false);
+        SubmitAsync(producer, db => { db.WriteRegion(record); Notify(new(Region: record.Key)); return true; }, false);
 
     /// <summary>Queues original elevation data under the producer's session ticket.</summary>
     internal Task<bool> WriteTileAsync(TileEnvironment tile, StorageEpoch producer) =>
-        SubmitAsync(producer, db => { db.WriteTile(tile); return true; }, false);
+        SubmitAsync(producer, db => { db.WriteTile(tile); Notify(new(Tile: tile.Key)); return true; }, false);
 
     /// <summary>Reads previously captured local environmental records without loading any game region.</summary>
     internal async Task<StorageRead<RegionalEnvironment>> ReadRegionAsync(EcosystemRegionKey key)
@@ -100,6 +105,13 @@ internal sealed class EnvironmentalStorage : IDisposable, IAsyncDisposable
 
     #region Private
     #region Admission and worker
+    /// <summary>Notifies disposable consumers only after commit; observer failure must not turn a durable write into a failed receipt.</summary>
+    private void Notify(EnvironmentalChange change)
+    {
+        try { Changed?.Invoke(change); }
+        catch (Exception error) { logger.Error("Ecosystem input invalidation observer failed: {0}", error); }
+    }
+
     /// <summary>Uses bounded async backpressure and serial admission so purge barriers cannot be overtaken by new-generation writes.</summary>
     private async Task<T> SubmitAsync<T>(StorageEpoch producer, System.Func<EcosystemDatabase, T> operation, T unavailable)
     {
