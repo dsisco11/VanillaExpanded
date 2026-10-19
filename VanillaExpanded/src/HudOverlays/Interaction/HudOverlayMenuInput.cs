@@ -47,10 +47,8 @@ internal sealed class HudOverlayMenuInput : IDisposable
     /// <summary>Opens only unclaimed right presses over the topmost eligible clipped member.</summary>
     public bool TryOpen(MouseEvent args)
     {
-        if (args.Handled || args.Button != Vintagestory.API.Common.EnumMouseButton.Right || !Environment().EditingAvailable
-            || Blocked(new(args.X, args.Y))) return false;
-        var match = groups.Where(group => group.Available).SelectMany(group => group.Members).Reverse()
-            .FirstOrDefault(member => drawable(member.Registration) && member.Clip.Contains(args.X, args.Y));
+        if (args.Handled || args.Button != Vintagestory.API.Common.EnumMouseButton.Right) return false;
+        var match = FindTarget(new(args.X, args.Y));
         if (match == null) return false;
         var owner = containers.Owner(match.Registration.Id);
         if (owner == null) return false;
@@ -72,6 +70,8 @@ internal sealed class HudOverlayMenuInput : IDisposable
         args.Handled = true;
         return true;
     }
+    /// <summary>Finds the topmost editable indicator under the cursor, excluding popup and foreground-window ownership.</summary>
+    public HudOverlayMemberLayout? HoveredMember() => menu.IsOpened ? null : FindTarget(new(api.Input.MouseX, api.Input.MouseY));
     #endregion
     #region Rendering and pointer delegation
     /// <summary>Draws the prepared popup after indicator content and chrome.</summary>
@@ -168,6 +168,14 @@ internal sealed class HudOverlayMenuInput : IDisposable
     #endregion
     #endregion
     #region Private
+    /// <summary>Shares clipped content targeting between context menus and the edit-mode hover cue.</summary>
+    private HudOverlayMemberLayout? FindTarget(PointF pointer)
+    {
+        if (!Environment().EditingAvailable || Blocked(pointer)) return null;
+        return groups.Where(group => group.Available).SelectMany(group => group.Members).Reverse()
+            .FirstOrDefault(member => drawable(member.Registration) && member.Clip.Contains(pointer));
+    }
+
     /// <summary>Captures the latest displayed owner origin before the existing permission operation persists it.</summary>
     private void SetLocked(HudOverlayRegistration registration, bool locked)
     {

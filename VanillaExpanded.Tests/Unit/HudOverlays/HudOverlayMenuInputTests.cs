@@ -219,6 +219,45 @@ public sealed class HudOverlayMenuInputTests : IDisposable
         Assert.Equal(expected, f.Menu.TargetId);
     }
 
+    /// <summary>Hover uses each topmost clipped indicator even without a tooltip label and never selects its entire group.</summary>
+    [Theory]
+    [InlineData(true, "test:b")]
+    [InlineData(false, "test:a")]
+    public void HoverFindsClippedMemberWithoutTooltipMetadata(bool overlap, string expected)
+    {
+        using var f = new Fixture();
+        var press = f.Press();
+        Mock.Get(f.Layout.Api.Object.Input).SetupGet(value => value.MouseX).Returns(press.X);
+        Mock.Get(f.Layout.Api.Object.Input).SetupGet(value => value.MouseY).Returns(press.Y);
+        f.Group.Members[1].Clip = overlap ? f.Group.Members[0].Clip : RectangleF.Empty;
+        var input = (HudOverlayMenuInput)typeof(HudOverlayHost).GetField("menuInput", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(f.Host)!;
+        var hovered = input.HoveredMember();
+        Assert.NotNull(hovered);
+        Assert.Equal(expected, hovered.Registration.Id);
+        Assert.Null(hovered.Registration.HoverLabelKey);
+        Assert.Same(f.Group.Members.Single(value => value.Registration.Id == expected), hovered);
+    }
+
+    /// <summary>Native interaction ownership and edit eligibility suppress the indicator hover target.</summary>
+    [Theory]
+    [InlineData(true, false, false, false)]
+    [InlineData(false, true, false, false)]
+    [InlineData(false, false, true, false)]
+    [InlineData(false, false, false, true)]
+    public void HoverYieldsToLockedMouseForegroundModalAndPopup(bool grabbed, bool foreground, bool modal, bool popup)
+    {
+        using var f = new Fixture();
+        var press = f.Press();
+        var mouse = Mock.Get(f.Layout.Api.Object.Input);
+        mouse.SetupGet(value => value.MouseX).Returns(press.X);
+        mouse.SetupGet(value => value.MouseY).Returns(press.Y);
+        mouse.SetupGet(value => value.MouseGrabbed).Returns(grabbed);
+        if (foreground) f.Opened.Add(new Inventory(f.Layout.Api.Object, f.Group.Root.FlatCopy().WithParent(f.Layout.Gui.Object.WindowBounds)));
+        if (modal) f.Opened.Add(new Modal(f.Layout.Api.Object));
+        if (popup) f.Host.OnMouseDown(press);
+        var input = (HudOverlayMenuInput)typeof(HudOverlayHost).GetField("menuInput", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(f.Host)!;
+        Assert.Null(input.HoveredMember());
+    }
     /// <summary>Ordinary inventory bounds block only overlapping targets, preserving edit access elsewhere.</summary>
     [Theory]
     [InlineData(0, 0, 100, 100, false)]
