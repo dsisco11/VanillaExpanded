@@ -1,19 +1,13 @@
 using System;
 using System.Drawing;
-using VanillaExpanded.RadialMenu;
 using Vintagestory.API.Client;
-using Vintagestory.API.MathTools;
 
 namespace VanillaExpanded.HudOverlays.Rendering;
 
 /// <summary>Draws a continuous edit-mode outline around the current indicator's visible bounds.</summary>
 internal static class HudOverlayHoverBorder
 {
-    // Blend the shared orange outline equally with white to retain warmth and improve contrast.
-    private static readonly int HoverColor = ColorUtil.ToRgba(255,
-        (int)((RadialMenuWedgeStyle.HoverBorder.X + 1) * .5f * 255),
-        (int)((RadialMenuWedgeStyle.HoverBorder.Y + 1) * .5f * 255),
-        (int)((RadialMenuWedgeStyle.HoverBorder.Z + 1) * .5f * 255));
+    private const int HoverColor = unchecked((int)0xFFFFFFFF);
 
     #region Public API
     /// <summary>Draws four solid edges inside the supplied clipped footprint without allocating textures.</summary>
