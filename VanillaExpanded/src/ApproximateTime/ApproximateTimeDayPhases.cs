@@ -5,18 +5,20 @@ namespace VanillaExpanded.ApproximateTime;
 /// <summary>Stores the daily solar distribution as 24 independently tinted hourly segments.</summary>
 internal sealed class ApproximateTimeDayPhases : IEquatable<ApproximateTimeDayPhases>
 {
-    private const int SamplesPerHour = 12;
+    internal const int SamplesPerHour = 12;
     private readonly double[] colors;
+    private readonly byte[] scenery;
 
     #region Public API
     /// <summary>Gets the untinted fallback used before a valid solar distribution is available.</summary>
-    public static ApproximateTimeDayPhases Neutral { get; } = new(new double[72]);
+    public static ApproximateTimeDayPhases Neutral { get; } = new(new double[72], new byte[24 * SamplesPerHour]);
 
     /// <summary>Samples the native solar path at five-minute intervals and blends phase coverage within each hour.</summary>
     public static ApproximateTimeDayPhases? Sample(double totalDays, Func<double, float> sunHeight)
     {
         if (!double.IsFinite(totalDays)) return null;
         var colors = new double[72];
+        var scenery = new byte[24 * SamplesPerHour];
         double day = Math.Floor(totalDays);
         for (int hour = 0; hour < 24; hour++)
         for (int sample = 0; sample < SamplesPerHour; sample++)
@@ -26,6 +28,12 @@ internal sealed class ApproximateTimeDayPhases : IEquatable<ApproximateTimeDayPh
             float earlier = sunHeight(instant - 1d / 1440), current = sunHeight(instant), later = sunHeight(instant + 1d / 1440);
             if (!float.IsFinite(earlier) || !float.IsFinite(current) || !float.IsFinite(later)) return null;
             var phase = ApproximateTimeSolarPeriod.FromSunHeight(earlier, current, later);
+            scenery[hour * SamplesPerHour + sample] = phase switch
+            {
+                ApproximateTimePeriod.Night => 2,
+                ApproximateTimePeriod.Morning or ApproximateTimePeriod.Noon or ApproximateTimePeriod.Afternoon => 1,
+                _ => 0
+            };
             var rgb = phase switch
             {
                 ApproximateTimePeriod.Night => (52d, 69d, 83d),
@@ -37,14 +45,18 @@ internal sealed class ApproximateTimeDayPhases : IEquatable<ApproximateTimeDayPh
             colors[hour * 3 + 1] += rgb.Item2 / (255 * SamplesPerHour);
             colors[hour * 3 + 2] += rgb.Item3 / (255 * SamplesPerHour);
         }
-        return new(colors);
+        return new(colors, scenery);
     }
 
     /// <summary>Returns one normalized RGB channel for a fixed hour position.</summary>
     public double Channel(int hour, int channel) => colors[hour * 3 + channel];
 
+    /// <summary>Identifies scenery allowed at a five-minute solar sample; twilight and fallback allow neither.</summary>
+    public bool AllowsScenery(int hour, int sample, bool night) => scenery[hour * SamplesPerHour + sample] == (night ? 2 : 1);
+
     /// <summary>Compares display colors so unchanged solar coverage reuses its texture.</summary>
-    public bool Equals(ApproximateTimeDayPhases? other) => other != null && colors.AsSpan().SequenceEqual(other.colors);
+    public bool Equals(ApproximateTimeDayPhases? other) => other != null && colors.AsSpan().SequenceEqual(other.colors)
+        && scenery.AsSpan().SequenceEqual(other.scenery);
     /// <summary>Compares daily phase content by value.</summary>
     public override bool Equals(object? other) => other is ApproximateTimeDayPhases phases && Equals(phases);
     /// <summary>Hashes the complete distribution consistently with value equality.</summary>
@@ -52,12 +64,17 @@ internal sealed class ApproximateTimeDayPhases : IEquatable<ApproximateTimeDayPh
     {
         var hash = new HashCode();
         foreach (double value in colors) hash.Add(value);
+        foreach (byte value in scenery) hash.Add(value);
         return hash.ToHashCode();
     }
 
     #endregion
     #region Private
     /// <summary>Constructs a complete distribution with privately owned color data.</summary>
-    private ApproximateTimeDayPhases(double[] colors) => this.colors = colors;
+    private ApproximateTimeDayPhases(double[] colors, byte[] scenery)
+    {
+        this.colors = colors;
+        this.scenery = scenery;
+    }
     #endregion
 }

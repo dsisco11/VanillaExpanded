@@ -40,6 +40,68 @@ public sealed class ApproximateTimeDayPhasesTests
         Assert.Null(ApproximateTimeDayPhases.Sample(0, _ => float.NaN));
     }
 
+    /// <summary>Scenery follows seasonal daylight expansion and the corresponding contraction of night.</summary>
+    [Fact]
+    public void SceneryCoverageExpandsAndContractsWithSeasonalSunPath()
+    {
+        var summer = ApproximateTimeDayPhases.Sample(0, day => .4f + (float)Math.Cos((day - .5) * 2 * Math.PI))!;
+        var winter = ApproximateTimeDayPhases.Sample(0, day => -.4f + (float)Math.Cos((day - .5) * 2 * Math.PI))!;
+        int summerDay = 0, winterDay = 0, summerNight = 0, winterNight = 0;
+        // Compare every clipping sample so boundary hours retain their partial seasonal coverage.
+        for (int hour = 0; hour < 24; hour++)
+        for (int sample = 0; sample < ApproximateTimeDayPhases.SamplesPerHour; sample++)
+        {
+            summerDay += summer.AllowsScenery(hour, sample, false) ? 1 : 0;
+            winterDay += winter.AllowsScenery(hour, sample, false) ? 1 : 0;
+            summerNight += summer.AllowsScenery(hour, sample, true) ? 1 : 0;
+            winterNight += winter.AllowsScenery(hour, sample, true) ? 1 : 0;
+        }
+        Assert.True(summerDay > winterDay);
+        Assert.True(summerNight < winterNight);
+    }
+
+    /// <summary>Polar daylight and darkness reject opposite scenery, while twilight and fallback show neither.</summary>
+    [Fact]
+    public void PolarTwilightAndNeutralSceneryRespectSolarClassification()
+    {
+        var polarDay = ApproximateTimeDayPhases.Sample(0, _ => .5f)!;
+        var polarNight = ApproximateTimeDayPhases.Sample(0, _ => -.5f)!;
+        var twilight = ApproximateTimeDayPhases.Sample(0, _ => -.05f)!;
+        for (int hour = 0; hour < 24; hour++)
+        for (int sample = 0; sample < ApproximateTimeDayPhases.SamplesPerHour; sample++)
+        {
+            Assert.True(polarDay.AllowsScenery(hour, sample, false));
+            Assert.False(polarDay.AllowsScenery(hour, sample, true));
+            Assert.True(polarNight.AllowsScenery(hour, sample, true));
+            Assert.False(polarNight.AllowsScenery(hour, sample, false));
+            Assert.False(twilight.AllowsScenery(hour, sample, false));
+            Assert.False(twilight.AllowsScenery(hour, sample, true));
+            Assert.False(ApproximateTimeDayPhases.Neutral.AllowsScenery(hour, sample, false));
+            Assert.False(ApproximateTimeDayPhases.Neutral.AllowsScenery(hour, sample, true));
+        }
+    }
+
+    /// <summary>A renderer may refresh its cached texture in place without presentation disposing that shared identity.</summary>
+    [Fact]
+    public void CoverageChangeRetainsSameCachedTextureUntilReset()
+    {
+        var api = new Mock<ICoreClientAPI> { DefaultValue = DefaultValue.Mock };
+        var face = new LoadedTexture(api.Object) { TextureId = 40 };
+        int refreshes = 0;
+        using var presentation = new ApproximateTimePresentation(context => Enumerable.Range(1, 3)
+            .Select(id => new LoadedTexture(context.Api) { TextureId = id, IgnoreUndisposed = true }).ToArray(),
+            Mock.Of<IApproximateTimeDialRenderer>(), (_, _) => { refreshes++; return face; });
+        var context = new HudOverlayPreparationContext(api.Object, 1, "en");
+        presentation.SetContent(ApproximateTimePeriod.Noon, .5, ApproximateTimeDayPhases.Sample(0, _ => .5f));
+        presentation.Prepare(context);
+        presentation.SetContent(ApproximateTimePeriod.Night, .9, ApproximateTimeDayPhases.Sample(0, _ => -.5f));
+        presentation.Prepare(context);
+        Assert.Equal(2, refreshes);
+        Assert.False(face.Disposed);
+        presentation.Reset();
+        Assert.True(face.Disposed);
+    }
+
     /// <summary>Pointer refreshes reuse the face; changed coverage replaces it and reset releases owned resources.</summary>
     [Fact]
     public void PointerChangesReuseFaceWhileCoverageChangesReplaceOwnedPixels()
