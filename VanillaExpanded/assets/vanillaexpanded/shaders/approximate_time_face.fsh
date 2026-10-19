@@ -33,8 +33,9 @@ void main()
     float edgeAngle = min(segmentPosition, 1.0 - segmentPosition) * pi / 12.0;
     float angleWidth = min(pi / 24.0, 1.0 / max(radius, 1.0));
     float dividers = smoothstep(segmentInset - angleWidth * 0.5, segmentInset + angleWidth * 0.5, edgeAngle);
+    float lineCoverage = min(1.0, (1.0 - dividers) * 1.2);
     float aperture = 1.0 - smoothstep(faceGeometry.z - 0.5, faceGeometry.z + 0.5, radius);
-    float coverage = aperture * dividers;
+    float coverage = aperture * (1.0 - lineCoverage);
 
     // Sample before selection so implicit mip derivatives remain valid across solar boundaries.
     vec4 day = texture(dayScenery, uv);
@@ -42,5 +43,9 @@ void main()
     vec4 scene = solar == 1.0 ? day : solar == 2.0 ? night : vec4(0.0);
     vec3 face = mix(hourColors[hour].rgb, scene.rgb, scene.a);
     vec4 backing = premultiply(texture(housing, uv));
-    fragColor = vec4(face * coverage, coverage) + backing * (1.0 - coverage);
+    // Night dividers use pale blue-gray ink instead of exposing the dark housing beneath the face.
+    vec4 dial = solar == 2.0
+        ? vec4(mix(face, vec3(0.72, 0.79, 0.84), lineCoverage) * aperture, aperture)
+        : vec4(face * coverage, coverage);
+    fragColor = dial + backing * (1.0 - dial.a);
 }
