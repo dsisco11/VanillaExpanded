@@ -143,6 +143,7 @@ public sealed class BodyTemperatureThermometerTests : IDisposable
         presentation.Prepare(new(api.Object, 1, "en"));
         var bounds = Bounds(1);
         bounds.absInnerWidth = presentation.Size.Width;
+        bounds.absInnerHeight = presentation.Size.Height;
         var renderer = new Mock<IRenderAPI>();
         presentation.Draw(renderer.Object, bounds, new RectangleF(0, 0, 1000, 1000), .1f);
         var outline = Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture" && (int)call.Arguments[0] == 1);
@@ -160,10 +161,10 @@ public sealed class BodyTemperatureThermometerTests : IDisposable
         }
     }
 
-    /// <summary>Stacked trends stay beside the thermometer and outside fitted text at different GUI scales.</summary>
+    /// <summary>Stacked trends stay below the thermometer and outside fitted text at different GUI scales.</summary>
     [Theory]
     [InlineData(1, 2)] [InlineData(1.5, -2)] [InlineData(2, 1)] [InlineData(2, -1)]
-    public void ChevronsAndTallReadingFitTheSameIconHeight(double scale, int trend)
+    public void ReadingAndTrendsFitBelowThermometer(double scale, int trend)
     {
         var api = new Mock<ICoreClientAPI>() { DefaultValue = DefaultValue.Mock };
         var text = new HudOverlayIconTextPresentation((context, _) => new LoadedTexture(context.Api)
@@ -174,20 +175,57 @@ public sealed class BodyTemperatureThermometerTests : IDisposable
         presentation.Prepare(new(api.Object, scale, "en"));
         var bounds = Bounds(scale);
         bounds.absInnerWidth = presentation.Size.Width * scale;
+        bounds.absInnerHeight = presentation.Size.Height * scale;
         var renderer = new Mock<IRenderAPI>();
         presentation.Draw(renderer.Object, bounds, new RectangleF(0, 0, 1000, 1000), .1f);
         var reading = Assert.Single(renderer.Invocations, call => call.Method.Name == "Render2DTexturePremultipliedAlpha");
         double textTop = (double)reading.Arguments[2], textBottom = textTop + (double)reading.Arguments[4];
+        var outline = Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture" && (int)call.Arguments[0] == 1);
+        double iconBottom = (double)outline.Arguments[2] + (double)outline.Arguments[4];
+        Assert.True(textTop > iconBottom);
+        Assert.Equal((double)outline.Arguments[1] + (double)outline.Arguments[3] / 2, (double)reading.Arguments[1] + (double)reading.Arguments[3] / 2, 5);
         Assert.InRange(textTop, bounds.renderY, bounds.renderY + bounds.OuterHeight);
         Assert.InRange(textBottom, bounds.renderY, bounds.renderY + bounds.OuterHeight);
         foreach (var arrow in renderer.Invocations.Where(call => call.Method.Name == "RenderTexture" && (int)call.Arguments[0] == (trend > 0 ? 3 : 4)))
         {
             double arrowTop = (double)arrow.Arguments[2], arrowBottom = arrowTop + (double)arrow.Arguments[4];
             Assert.True(trend > 0 ? arrowBottom < textTop : arrowTop > textBottom);
+            Assert.True(arrowTop > iconBottom);
             Assert.InRange((double)arrow.Arguments[1], bounds.renderX, bounds.renderX + bounds.OuterWidth - (double)arrow.Arguments[3]);
         }
     }
 
+    /// <summary>Changing trend direction or strength preserves the stacked reading footprint and icon placement.</summary>
+    [Theory]
+    [InlineData(1, 18, 12)]
+    [InlineData(2, 82, 21)]
+    public void ReadingFootprintStaysStableAcrossTrends(double scale, int width, int height)
+    {
+        var api = new Mock<ICoreClientAPI> { DefaultValue = DefaultValue.Mock };
+        var text = new HudOverlayIconTextPresentation((context, _) => new LoadedTexture(context.Api)
+            { Width = width, Height = height });
+        using var presentation = new BodyTemperatureThermometerPresentation(text,
+            context => Enumerable.Range(1, 4).Select(id => new LoadedTexture(context.Api) { TextureId = id, IgnoreUndisposed = true }).ToArray());
+        SizeF? expected = null;
+        RectangleF? expectedIcon = null;
+        foreach (int trend in new[] { 0, 1, 2, -1, -2 })
+        {
+            presentation.SetContent(new(34, 37, BodyTemperatureRisk.Cold, .25f, trend), true);
+            presentation.Prepare(new(api.Object, scale, "en"));
+            expected ??= presentation.Size;
+            Assert.Equal(expected.Value, presentation.Size);
+            var bounds = Bounds(scale);
+            bounds.absInnerWidth = presentation.Size.Width * scale;
+            bounds.absInnerHeight = presentation.Size.Height * scale;
+            var renderer = new Mock<IRenderAPI>();
+            presentation.Draw(renderer.Object, bounds, new(0, 0, 1000, 1000), .1f);
+            var outline = Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture" && (int)call.Arguments[0] == 1);
+            var icon = new RectangleF((float)(double)outline.Arguments[1], (float)(double)outline.Arguments[2],
+                (float)(double)outline.Arguments[3], (float)(double)outline.Arguments[4]);
+            expectedIcon ??= icon;
+            Assert.Equal(expectedIcon.Value, icon);
+        }
+    }
     /// <summary>The fill scissor intersects the host member clip and always restores it when rendering fails.</summary>
     [Fact]
     public void FillCropIntersectsHostAndRestoresAfterFailure()

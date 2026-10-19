@@ -26,8 +26,9 @@ internal sealed class HudOverlayIconReading : IDisposable
     }
 
     /// <summary>Gets the compact footprint in unscaled GUI units.</summary>
-    public SizeF Size => new(hasReading ? HudOverlaySizes.EnvironmentalIconReadingWidth : HudOverlaySizes.Standard,
-        HudOverlaySizes.Standard);
+    public SizeF Size => hasReading
+        ? new SizeF(Math.Max(HudOverlaySizes.Small, text.Size.Width), HudOverlaySizes.Small + HudOverlaySizes.ReadingGap + text.Size.Height)
+        : new SizeF(HudOverlaySizes.Standard, HudOverlaySizes.Standard);
 
     /// <summary>Loads only changed artwork and prepares the optional reading outside drawing.</summary>
     public void Prepare(HudOverlayPreparationContext preparation, string assetPath, string? reading = null)
@@ -47,19 +48,18 @@ internal sealed class HudOverlayIconReading : IDisposable
         context = preparation;
     }
 
-    /// <summary>Draws the icon beside its reading using only cached resources and shared opacity.</summary>
+    /// <summary>Centers the icon above its reading using only cached resources and shared opacity.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds)
     {
         if (icon == null || context == null) return;
         double scale = context.GuiScale;
         double diameter = (hasReading ? HudOverlaySizes.Small : HudOverlaySizes.Standard) * scale;
-        double y = bounds.renderY + (bounds.OuterHeight - diameter) / 2;
-        renderer.RenderTexture(icon.TextureId, bounds.renderX, y, diameter, diameter, 50, HudOverlayDrawOpacity.Tint);
+        double y = bounds.renderY + (bounds.OuterHeight - Size.Height * scale) / 2;
+        renderer.RenderTexture(icon.TextureId, bounds.renderX + (bounds.OuterWidth - diameter) / 2, y, diameter, diameter, 50, HudOverlayDrawOpacity.Tint);
         if (hasReading)
         {
-            double offset = (HudOverlaySizes.Small + HudOverlaySizes.ReadingGap) * scale;
-            text.Draw(renderer, new RectangleF((float)(bounds.renderX + offset), (float)bounds.renderY,
-                (float)(Size.Width * scale - offset), (float)bounds.OuterHeight), 51);
+            text.Draw(renderer, new RectangleF((float)bounds.renderX, (float)(y + diameter + HudOverlaySizes.ReadingGap * scale),
+                (float)bounds.OuterWidth, (float)(text.Size.Height * scale)), 51);
         }
     }
 

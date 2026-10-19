@@ -258,14 +258,16 @@ public sealed class BodyTemperatureOverlayTests : IDisposable
         var context = new HudOverlayPreparationContext(fixture.Api.Object, 1, "en"); overlay.Prepare(context);
         var withReading = overlay.Measure();
         Assert.NotEqual(SizeF.Empty, withReading);
-        var bounds = ElementBounds.Fixed(100, 200, 45, 24).WithEmptyParent(); bounds.CalcWorldBounds();
+        var bounds = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
+        bounds.absFixedX = 100; bounds.absFixedY = 200;
+        bounds.absInnerWidth = withReading.Width; bounds.absInnerHeight = withReading.Height; bounds.Initialized = true;
         var renderer = new Mock<IRenderAPI>(); overlay.Draw(renderer.Object, bounds, new RectangleF(0, 0, 1000, 1000), .1f);
         var calls = renderer.Invocations.Where(call => call.Method.Name == "Render2DTexturePremultipliedAlpha" || call.Method.Name == "RenderTexture" && (float)call.Arguments[5] != 49).ToArray();
         Assert.Equal(3, calls.Length);
         Assert.True((double)calls[2].Arguments[1] >= bounds.renderX);
         Assert.Equal(new[] { "PushScissor", "RenderTexture", "PopScissor", "RenderTexture", "Render2DTexturePremultipliedAlpha" }, renderer.Invocations.Where(call => call.Method.Name != "RenderTexture" || (float)call.Arguments[5] != 49).Select(call => call.Method.Name));
         overlay.SetShowReading(false); Assert.NotEqual(HudOverlayChange.None, overlay.Refresh()); overlay.Prepare(context);
-        Assert.True(overlay.Measure().Width < withReading.Width); Assert.True(ownedText[0].Disposed);
+        Assert.True(overlay.Measure().Height < withReading.Height); Assert.True(ownedText[0].Disposed);
         Assert.Equal(1, artBuilds); Assert.Equal(1, textBuilds);
         overlay.SetShowReading(true); overlay.Refresh(); overlay.Prepare(context);
         Assert.Equal(1, artBuilds); Assert.Equal(2, textBuilds); Assert.Equal(withReading, overlay.Measure());

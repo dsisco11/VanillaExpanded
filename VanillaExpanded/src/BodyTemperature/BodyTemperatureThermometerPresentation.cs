@@ -86,7 +86,9 @@ internal sealed class BodyTemperatureThermometerPresentation : HudIndicatorPrese
         readingWidth = showReading ? text.Size.Width * Math.Min(1, ReadingHeight / Math.Max(1, text.Size.Height)) : 0;
         float trendWidth = sample.Trend == 0 ? 0 : ChevronWidth;
         columnWidth = Math.Max(readingWidth, trendWidth);
-        Size = new SizeF(Math.Max(HudOverlaySizes.Standard, 7.5f + IconWidth + (columnWidth > 0 ? Gap + columnWidth : 0)), IconHeight);
+        // Keep the existing reading/chevron column together, below the icon instead of beside it.
+        // Its stable height reserves both trend strengths without moving the thermometer.
+        Size = new SizeF(Math.Max(HudOverlaySizes.Standard, columnWidth), IconHeight + (columnWidth > 0 ? Gap + IconHeight : 0));
         Visibility.Show();
     }
     /// <summary>Draws the tinted full mask through a fill scissor, then the outline through native texture rendering within the host clip.</summary>
@@ -97,7 +99,9 @@ internal sealed class BodyTemperatureThermometerPresentation : HudIndicatorPrese
         if (icons == null) return;
         double scale = Context.GuiScale;
         // Center the narrow thermometer within the same HudOverlaySizes.Standard-unit circle used by the other status icons.
-        double x = bounds.renderX + 7.5 * scale, y = bounds.renderY + (bounds.OuterHeight - IconHeight * scale) / 2;
+        double x = bounds.renderX + (bounds.OuterWidth - IconWidth * scale) / 2;
+        double y = bounds.renderY + (bounds.OuterHeight - Size.Height * scale) / 2;
+        double columnY = y + (IconHeight + Gap) * scale;
         // Reveal the full mask upward while retaining the bulb at the minimum temperature fill.
         double fillTop = y + 23.25 * (1 - sample.Fill) * scale;
         double left = Math.Max(x, clip.Left), top = Math.Max(fillTop, clip.Top);
@@ -118,9 +122,8 @@ internal sealed class BodyTemperatureThermometerPresentation : HudIndicatorPrese
             bool warming = sample.Trend > 0;
             int count = Math.Abs(sample.Trend);
             double stackHeight = (count * ChevronHeight + (count - 1) * ChevronGap) * scale;
-            double columnX = x + (IconWidth + Gap) * scale;
-            double arrowX = columnX + (columnWidth - ChevronWidth) * scale / 2;
-            double arrowY = warming ? y : y + IconHeight * scale - stackHeight;
+            double arrowX = bounds.renderX + (bounds.OuterWidth - ChevronWidth * scale) / 2;
+            double arrowY = warming ? columnY : columnY + IconHeight * scale - stackHeight;
             for (int index = 0; index < Math.Abs(sample.Trend); index++)
             {
                 renderer.RenderTexture(icons[warming ? 2 : 3].TextureId, arrowX, arrowY + index * (ChevronHeight + ChevronGap) * scale,
@@ -130,9 +133,9 @@ internal sealed class BodyTemperatureThermometerPresentation : HudIndicatorPrese
         if (showReading)
         {
             // Use an independent cached bounds object only for the text's native draw coordinates.
-            textBounds.absFixedX = x + (IconWidth + Gap + (columnWidth - readingWidth) / 2) * scale;
+            textBounds.absFixedX = bounds.renderX + (bounds.OuterWidth - readingWidth * scale) / 2;
             // Reserve the stacked-arrow band on the active trend side; neutral text remains vertically centered.
-            textBounds.absFixedY = y + (sample.Trend > 0 ? IconHeight - ReadingHeight : sample.Trend < 0 ? 0 : (IconHeight - ReadingHeight) / 2) * scale;
+            textBounds.absFixedY = columnY + (sample.Trend > 0 ? IconHeight - ReadingHeight : sample.Trend < 0 ? 0 : (IconHeight - ReadingHeight) / 2) * scale;
             textBounds.absInnerWidth = readingWidth * scale;
             textBounds.absInnerHeight = ReadingHeight * scale;
             textBounds.Initialized = true;
@@ -145,8 +148,8 @@ internal sealed class BodyTemperatureThermometerPresentation : HudIndicatorPrese
     {
         if (sample == null || icons == null || Context == null) return;
         double pixels = HudOverlaySizes.Standard * Context.GuiScale;
-        double y = bounds.renderY + (bounds.OuterHeight - pixels) / 2;
-        backdrop?.Queue(renderer, bounds.renderX, y, Context.GuiScale);
+        double y = bounds.renderY + (bounds.OuterHeight - Size.Height * Context.GuiScale) / 2;
+        backdrop?.Queue(renderer, bounds.renderX + (bounds.OuterWidth - pixels) / 2, y, Context.GuiScale);
     }
     #region Lifecycle
     /// <summary>Ends shared presentation ownership and disposes feature-owned helpers.</summary>

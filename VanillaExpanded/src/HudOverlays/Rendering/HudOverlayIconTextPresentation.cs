@@ -4,6 +4,7 @@ using System.Linq;
 using Cairo;
 using VanillaExpanded.ItemRendering;
 using VanillaExpanded.HudOverlays.Registration;
+using VanillaExpanded.HudOverlays.Layout;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -31,6 +32,8 @@ public sealed class HudOverlayIconTextPresentation : IDisposable
     private bool disposed;
     private double scale = 1;
     public SizeF Size { get; private set; }
+    /// <summary>Selects whether the cached reading is beside or below its item icon.</summary>
+    public HudOverlayDirection Direction { get; init; } = HudOverlayDirection.Horizontal;
     #region Public API
     #region Content and preparation
     /// <summary>Uses native contrast text with optional backdrop and shared asset-authored item presentation.</summary>
@@ -69,6 +72,7 @@ public sealed class HudOverlayIconTextPresentation : IDisposable
     {
         ObjectDisposedException.ThrowIf(disposed, this);
         ArgumentNullException.ThrowIfNull(preparation);
+        if (!Enum.IsDefined(Direction)) throw new ArgumentOutOfRangeException(nameof(Direction));
         if (!dirty && context == preparation) return;
         // The backdrop depends only on scale and API ownership; count and locale changes reuse it.
         if (createIconBackground != null && (iconBackground == null || context?.GuiScale != preparation.GuiScale || !ReferenceEquals(context?.Api, preparation.Api)))
@@ -87,8 +91,12 @@ public sealed class HudOverlayIconTextPresentation : IDisposable
         context = preparation;
         scale = preparation.GuiScale;
         float iconWidth = slot.Itemstack == null ? 0 : iconSize;
-        Size = new SizeF(iconWidth + (text == null ? 0 : (iconWidth > 0 ? gap : 0) + (float)(text.Width / scale)),
-            Math.Max(iconWidth, text == null ? 0 : (float)(text.Height / scale)));
+        float textWidth = text == null ? 0 : (float)(text.Width / scale);
+        float textHeight = text == null ? 0 : (float)(text.Height / scale);
+        float spacing = iconWidth > 0 && text != null ? gap : 0;
+        Size = Direction == HudOverlayDirection.Vertical
+            ? new SizeF(Math.Max(iconWidth, textWidth), iconWidth + spacing + textHeight)
+            : new SizeF(iconWidth + spacing + textWidth, Math.Max(iconWidth, textHeight));
         dirty = false;
     }
     #endregion
@@ -109,7 +117,17 @@ public sealed class HudOverlayIconTextPresentation : IDisposable
         // Keep the text and icon centered independently within the allocated native bounds.
         double textX = x;
         double iconX = x;
-        if (slot.Itemstack != null)
+        double iconY = y + (height - iconSize * scale) / 2;
+        double textY = y + (height - textHeight) / 2;
+        if (Direction == HudOverlayDirection.Vertical)
+        {
+            // Reserve the full stacked footprint; text retains its prepared font size and both rows share a center.
+            iconX += (bounds.OuterWidth - iconSize * scale) / 2;
+            iconY = y + (height - Size.Height * scale) / 2;
+            textX += (bounds.OuterWidth - textWidth) / 2;
+            textY = iconY + (slot.Itemstack == null ? 0 : (iconSize + gap) * scale);
+        }
+        else if (slot.Itemstack != null)
         {
             if (textBeforeIcon)
             {
@@ -119,12 +137,12 @@ public sealed class HudOverlayIconTextPresentation : IDisposable
             }
             else if (text != null) textX += (iconSize + gap) * scale;
         }
-        if (text != null) renderer.Render2DTexturePremultipliedAlpha(text.TextureId, textX, y + (height - textHeight) / 2,
+        if (text != null) renderer.Render2DTexturePremultipliedAlpha(text.TextureId, textX, textY,
             textWidth, textHeight, textDepth, HudOverlayDrawOpacity.PremultipliedTint);
         if (slot.Itemstack != null && iconBackground != null)
-            renderer.Render2DTexturePremultipliedAlpha(iconBackground.TextureId, iconX, y + (height - iconSize * scale) / 2,
+            renderer.Render2DTexturePremultipliedAlpha(iconBackground.TextureId, iconX, iconY,
                 iconSize * scale, iconSize * scale, 49, HudOverlayDrawOpacity.PremultipliedTint);
-        if (slot.Itemstack != null) DrawItem(renderer, iconX, y + (height - iconSize * scale) / 2, clip, deltaTime);
+        if (slot.Itemstack != null) DrawItem(renderer, iconX, iconY, clip, deltaTime);
     }
     /// <summary>Releases session-owned textures and sampled copies without disposing borrowed engine resources.</summary>
     public void Reset()
