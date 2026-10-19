@@ -32,7 +32,7 @@ internal sealed class ToolHeadRenderState : IDisposable
     {
         this.render = render;
         this.shader = shader;
-        uniforms = ToolHeadShaderUniformState.Capture(render, shader);
+        uniforms = ToolHeadShaderUniformState.Capture(shader);
         activeTexture = GL.GetInteger(GetPName.ActiveTexture);
         for (int i = 0; i < 2; i++)
         {
