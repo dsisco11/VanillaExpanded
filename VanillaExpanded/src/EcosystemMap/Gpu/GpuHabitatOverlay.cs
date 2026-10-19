@@ -2,10 +2,11 @@ using System;
 using OpenTK.Graphics.OpenGL4;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using VanillaExpanded.EcosystemMap.Storage;
 
 namespace VanillaExpanded.EcosystemMap.Gpu;
 
-/// <summary>Draws one tile's comparison mask using a single active criteria set; GUI eligibility and scissoring belong to the caller.</summary>
+/// <summary>Draws a shared comparison pass using one active criteria set; GUI eligibility and scissoring belong to the caller.</summary>
 internal sealed class GpuHabitatOverlay : IDisposable
 {
     private readonly ICoreClientAPI api;
@@ -14,6 +15,8 @@ internal sealed class GpuHabitatOverlay : IDisposable
     private MeshRef? quad;
     private (float Minimum, float Maximum, int SeaLevel, int WorldHeight)? heightCriteria;
     private HabitatHeightRange heightRange;
+    private GpuRegionalTextures? boundRegion;
+    private readonly float[] modelViewSnapshot = new float[16];
 
     #region Public API
     /// <summary>Creates an owner on the graphics thread; no shader/texture allocation occurs on background input workers.</summary>
@@ -38,28 +41,15 @@ internal sealed class GpuHabitatOverlay : IDisposable
         return true;
     }
 
-    /// <summary>Performs GPU sampling and comparisons in the caller's framebuffer and existing map scissor.</summary>
-    internal void Draw(GpuHabitatBundle bundle, GpuRegionalTextures region, GpuTileTextures tile,
-        HabitatRanges ranges, float[] projection, float x, float y, float width, float height,
-        bool fullMapActive)
+    /// <summary>Establishes common state and uniforms once after all source uploads have finished.</summary>
+    internal IDisposable Begin(EcosystemStorageIdentity world, HabitatRanges ranges, float[] projection)
     {
         CheckThread();
-        if (!fullMapActive || shader == null) return;
-        int vertexArray = GL.GetInteger(GetPName.VertexArrayBinding);
-        int arrayBuffer = GL.GetInteger(GetPName.ArrayBufferBinding);
-        var previous = api.Render.CurrentActiveShader;
-        bool depth = GL.IsEnabled(EnableCap.DepthTest), cull = GL.IsEnabled(EnableCap.CullFace);
-        bool blend = GL.IsEnabled(IndexedEnableCap.Blend, 0);
-        int srcRgb = GL.GetInteger(GetPName.BlendSrcRgb), dstRgb = GL.GetInteger(GetPName.BlendDstRgb);
-        int srcAlpha = GL.GetInteger(GetPName.BlendSrcAlpha), dstAlpha = GL.GetInteger(GetPName.BlendDstAlpha);
-        int rgbEquation = GL.GetInteger(GetPName.BlendEquationRgb), alphaEquation = GL.GetInteger(GetPName.BlendEquationAlpha);
-        bool writeDepth = GL.GetBoolean(GetPName.DepthWritemask);
-        int activeUnit = GL.GetInteger(GetPName.ActiveTexture);
-        int[] bindings = new int[5], samplers = new int[5];
-        for (int i = 0; i < 5; i++) { GL.ActiveTexture(TextureUnit.Texture0 + i); bindings[i] = GL.GetInteger(GetPName.TextureBinding2D); samplers[i] = GL.GetInteger(GetPName.SamplerBinding); }
-        previous?.Stop();
+        if (shader == null) throw new InvalidOperationException("Habitat shader is unavailable.");
+        var state = new GpuHabitatPassState(api, shader);
         try
         {
+            api.Render.CurrentActiveShader?.Stop();
             EnsureQuad();
             // Native map terrain uses Z=50 and markers Z=60; participate in GUI depth ordering between them.
             GL.Enable(EnableCap.DepthTest); GL.Disable(EnableCap.CullFace); GL.DepthMask(true);
@@ -69,8 +59,9 @@ internal sealed class GpuHabitatOverlay : IDisposable
             shader.Use();
             // Integer textures require nearest sampling; inherited sampler objects can override the texture parameters.
             for (int i = 0; i < 5; i++) GL.BindSampler(i, 0);
-            region.Bind(shader); tile.Bind(shader); ranges.Apply(shader);
-            var criteria = (ranges.MinElevation, ranges.MaxElevation, bundle.World.SeaLevel, bundle.World.WorldHeight);
+            boundRegion = null;
+            ranges.Apply(shader);
+            var criteria = (ranges.MinElevation, ranges.MaxElevation, world.SeaLevel, world.WorldHeight);
             if (heightCriteria != criteria)
             {
                 heightRange = HabitatHeightRange.From(criteria.MinElevation, criteria.MaxElevation, criteria.SeaLevel, criteria.WorldHeight);
@@ -78,38 +69,38 @@ internal sealed class GpuHabitatOverlay : IDisposable
             }
             shader.Uniform("surfaceHeightRange", (float)heightRange.Minimum, heightRange.Maximum);
             shader.UniformMatrix("projectionMatrix", projection);
-            shader.UniformMatrix("modelViewMatrix", api.Render.CurrentModelviewMatrix);
-            shader.Uniform("screenBounds", x, y, width, height);
-            shader.Uniform("tileOrigin", (float)((long)bundle.Key.X * bundle.World.ChunkSize), (float)((long)bundle.Key.Z * bundle.World.ChunkSize));
-            shader.Uniform("worldSize", (float)bundle.World.WorldWidth, bundle.World.WorldDepth);
-            shader.Uniform("chunkSize", (float)bundle.World.ChunkSize);
-            shader.Uniform("regionSize", (float)bundle.World.RegionSize);
-            shader.Uniform("seaLevel", (float)bundle.World.SeaLevel);
-            shader.Uniform("worldHeight", (float)bundle.World.WorldHeight);
+            Array.Copy(api.Render.CurrentModelviewMatrix, modelViewSnapshot, modelViewSnapshot.Length);
+            shader.UniformMatrix("modelViewMatrix", modelViewSnapshot);
+            shader.Uniform("worldSize", (float)world.WorldWidth, world.WorldDepth);
+            shader.Uniform("chunkSize", (float)world.ChunkSize);
+            shader.Uniform("regionSize", (float)world.RegionSize);
+            shader.Uniform("seaLevel", (float)world.SeaLevel);
+            shader.Uniform("worldHeight", (float)world.WorldHeight);
             shader.Uniform("temperatureScale", Climate.TemperatureScaleConversion);
-            shader.Uniform("worldgenTemperatureDistance", (int)(bundle.World.SeaLevel * 0.09));
-            shader.Uniform("runtimeReferenceHeight", (int)(bundle.World.SeaLevel * 1.09));
+            shader.Uniform("worldgenTemperatureDistance", (int)(world.SeaLevel * 0.09));
+            shader.Uniform("runtimeReferenceHeight", (int)(world.SeaLevel * 1.09));
             shader.Uniform("suitableColor", 0.25f, 0.8f, 0.35f, 0.3f);
             shader.Uniform("unavailableColor", 0.9f, 0.1f, 0.1f, 0.55f);
-            api.Render.RenderMesh(quad!);
+            return state;
         }
-        finally
-        {
-            shader.Stop();
-            GL.BindVertexArray(vertexArray);
-            GL.BindBuffer(BufferTarget.ArrayBuffer, arrayBuffer);
-            for (int i = 0; i < 5; i++) { GL.ActiveTexture(TextureUnit.Texture0 + i); GL.BindTexture(TextureTarget.Texture2D, bindings[i]); GL.BindSampler(i, samplers[i]); }
-            GL.ActiveTexture((TextureUnit)activeUnit);
-            GL.BlendFuncSeparate(0, (BlendingFactorSrc)srcRgb, (BlendingFactorDest)dstRgb, (BlendingFactorSrc)srcAlpha, (BlendingFactorDest)dstAlpha);
-            GL.BlendEquationSeparate(0, (BlendEquationMode)rgbEquation, (BlendEquationMode)alphaEquation);
-            if (blend) GL.Enable(IndexedEnableCap.Blend, 0); else GL.Disable(IndexedEnableCap.Blend, 0);
-            GL.DepthMask(writeDepth);
-            if (depth) GL.Enable(EnableCap.DepthTest); else GL.Disable(EnableCap.DepthTest);
-            if (cull) GL.Enable(EnableCap.CullFace); else GL.Disable(EnableCap.CullFace);
-            previous?.Use();
-        }
+        catch { state.Dispose(); throw; }
     }
 
+    /// <summary>Updates only changing regional bindings and tile inputs within the active pass.</summary>
+    internal void Draw(GpuHabitatBundle bundle, GpuRegionalTextures region, GpuTileTextures tile,
+        float x, float y, float width, float height)
+    {
+        CheckThread();
+        if (!ReferenceEquals(boundRegion, region))
+        {
+            region.Bind(shader!);
+            boundRegion = region;
+        }
+        tile.Bind(shader!);
+        shader!.Uniform("screenBounds", x, y, width, height);
+        shader.Uniform("tileOrigin", (float)((long)bundle.Key.X * bundle.World.ChunkSize), (float)((long)bundle.Key.Z * bundle.World.ChunkSize));
+        api.Render.RenderMesh(quad!);
+    }
     /// <summary>Releases shader and mesh resources on the creating graphics thread.</summary>
     public void Dispose()
     {

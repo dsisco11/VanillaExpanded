@@ -196,7 +196,7 @@ Clip the highlight to explored coverage even when a cached regional array extend
 
 ## Performance and lifecycle expectations
 
-Prepare bounded original-input bundles for upload, share regional GPU textures and retain tile-specific height/coverage textures. The GPU evaluates the selected ranges and generates the mask/highlight. Species switching updates uniforms without rebuilding input textures. Zoom changes presentation scale rather than selecting a CPU sampling density.
+Prepare bounded original-input bundles for upload, share regional GPU textures and retain tile-specific height/coverage textures. The GPU evaluates the selected ranges and generates the mask/highlight. Species switching updates uniforms without rebuilding input textures. Acquire missing textures before one shared graphics pass per full-map render; capture/setup/restore caller state and bind common uniforms once, updating only tile inputs and changed regional bindings inside the pass. Zoom changes presentation scale rather than selecting a CPU sampling density.
 
 Choose sampling density against habitat-boundary accuracy, particularly where elevation changes rapidly. Avoid marking a whole chunk suitable from a single centre sample. Exact sampling resolution, cache limits, and batch sizes require measurement rather than fixed speculative budgets.
 

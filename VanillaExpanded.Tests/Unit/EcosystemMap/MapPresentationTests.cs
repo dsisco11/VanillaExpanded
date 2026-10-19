@@ -151,7 +151,7 @@ public sealed class MapPresentationTests
             Assert.Equal(work, preparation.Work);
         }
     }
-    /// <summary>Native matrix getters share scratch storage; all tile draws retain the frame projection despite model-view getter mutation.</summary>
+    /// <summary>Native matrix getters share scratch storage; the shared pass retains the frame projection despite model-view getter mutation.</summary>
     [Fact]
     public async Task NativeBorrowedProjectionSurvivesModelViewReadsAcrossTileDraws()
     {
@@ -167,28 +167,30 @@ public sealed class MapPresentationTests
         game.MvMatrix.Push(modelView.Select(value => (double)value).ToArray());
         typeof(ClientMain).GetField("tmpMatrix", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(game, new float[16]);
         var recorded = new List<float[]>();
+        int draws = 0;
         var graphics = new Mock<IHabitatMapGraphics>();
-        graphics.Setup(item => item.Draw(It.IsAny<GpuHabitatReceipt>(), It.IsAny<HabitatMapTile>(),
-            It.IsAny<HabitatRanges>(), It.IsAny<float[]>())).Callback<GpuHabitatReceipt, HabitatMapTile, HabitatRanges, float[]>(
-            (receipt, tile, ranges, projection) =>
+        graphics.Setup(item => item.Begin(It.IsAny<GpuHabitatReceipt>(), It.IsAny<HabitatRanges>(), It.IsAny<float[]>()))
+            .Callback<GpuHabitatReceipt, HabitatRanges, float[]>((receipt, ranges, projection) =>
             {
-                // Match the real graphics boundary: obtaining model-view overwrites the engine's borrowed projection buffer.
+                // Match the native pass setup: model-view reads overwrite the borrowed projection scratch buffer.
                 recorded.Add(projection.ToArray());
                 _ = game.CurrentModelViewMatrix;
-            });
+            }).Returns(Mock.Of<IDisposable>());
+        graphics.Setup(item => item.Draw(It.IsAny<GpuHabitatReceipt>(), It.IsAny<HabitatMapTile>()))
+            .Callback(() => draws++);
         using var presentation = new HabitatMapPresentation(preparation, graphics.Object, error => throw error);
         var ranges = HabitatRanges.From(Species("game:a", "game:a").Alternatives[0]);
         var tiles = new[] { new HabitatMapTile(new(0, 0), 0, 0, 32, 32), new HabitatMapTile(new(1, 0), 32, 0, 32, 32) };
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         while (true)
         {
-            recorded.Clear();
+            recorded.Clear(); draws = 0;
             float[] borrowed = game.CurrentProjectionMatrix;
             presentation.Render(tiles, ranges, borrowed);
-            if (recorded.Count == tiles.Length)
+            if (draws == tiles.Length)
             {
                 Assert.Equal(modelView, borrowed);
-                Assert.All(recorded, projection => Assert.Equal(expected, projection));
+                Assert.Equal(expected, Assert.Single(recorded));
                 break;
             }
             await Task.Delay(1, timeout.Token);
@@ -244,9 +246,14 @@ public sealed class MapPresentationTests
         public bool Reload() => true;
         /// <summary>Accepts finite view resource retention without allocating graphics in the fixture.</summary>
         public void SetView(int regions, int tiles) { }
+        /// <summary>Accepts source acquisition without allocating graphics in this fixture.</summary>
+        public void Prepare(GpuHabitatReceipt receipt) { }
+        /// <summary>Records shared criteria once at the normal pass boundary.</summary>
+        public IDisposable Begin(GpuHabitatReceipt first, HabitatRanges ranges, float[] projection)
+        { Ranges = ranges; return Mock.Of<IDisposable>(); }
         /// <summary>Records exact input lease and selected uniform criteria.</summary>
-        public void Draw(GpuHabitatReceipt receipt, HabitatMapTile tile, HabitatRanges ranges, float[] projection)
-        { Draws++; Last = receipt; Ranges = ranges; FrameKeys.Add(tile.Key); }
+        public void Draw(GpuHabitatReceipt receipt, HabitatMapTile tile)
+        { Draws++; Last = receipt; FrameKeys.Add(tile.Key); }
         /// <summary>Records disposable texture release.</summary>
         public void Clear() => Clears++;
         /// <summary>Records graphics-owner disposal.</summary>

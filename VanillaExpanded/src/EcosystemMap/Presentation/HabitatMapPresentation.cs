@@ -12,6 +12,7 @@ internal sealed class HabitatMapPresentation : IDisposable
 {
     private readonly GpuHabitatPreparation preparation;
     private readonly IHabitatMapGraphics graphics;
+    private readonly List<(GpuHabitatReceipt Receipt, HabitatMapTile Tile)> ready = new();
     private readonly float[] projectionSnapshot = new float[16];
     private readonly Action<Exception> report;
     private readonly Dictionary<EcosystemTileKey, Task<GpuHabitatReceipt?>> pending = new();
@@ -39,6 +40,7 @@ internal sealed class HabitatMapPresentation : IDisposable
             receipts.Resize(retained.Bundles); graphics.SetView(retained.Regions, retained.SourceTiles);
             DropPending(); receipts.Clear(); visible = current; suspended = false;
         }
+        ready.Clear();
         foreach (var tile in tiles)
         {
             if (!receipts.TryGet(tile.Key, out var receipt) || !preparation.IsCurrent(receipt!))
@@ -56,15 +58,28 @@ internal sealed class HabitatMapPresentation : IDisposable
                     pending[tile.Key] = next;
             }
             // Recheck immediately before upload; committed inputs, purge or shutdown can revoke leases.
-            if (receipt != null && preparation.IsCurrent(receipt)) graphics.Draw(receipt, tile, ranges, projectionSnapshot);
+            if (receipt != null && preparation.IsCurrent(receipt))
+            {
+                graphics.Prepare(receipt);
+                ready.Add((receipt, tile));
+            }
         }
+        // Source acquisition finishes before any draw binding is tracked; late invalidation cannot publish stale inputs.
+        ready.RemoveAll(item => !preparation.IsCurrent(item.Receipt));
+        if (ready.Count == 0) return;
+        try
+        {
+            using var pass = graphics.Begin(ready[0].Receipt, ranges, projectionSnapshot);
+            foreach (var item in ready)
+                if (preparation.IsCurrent(item.Receipt)) graphics.Draw(item.Receipt, item.Tile);
+        }
+        finally { ready.Clear(); }
     }
-
     /// <summary>Cancels disposable reads and releases textures while leaving durable acquisition/storage running.</summary>
     internal void Suspend()
     {
         if (disposed) return;
-        preparation.ChangeView(true); preparation.SetView(Array.Empty<EcosystemTileKey>()); DropPending(); receipts.Clear(); visible.Clear(); suspended = true;
+        preparation.ChangeView(true); preparation.SetView(Array.Empty<EcosystemTileKey>()); DropPending(); receipts.Clear(); ready.Clear(); visible.Clear(); suspended = true;
         graphics.Clear();
     }
     /// <summary>Reloads through the game's normal shader event on the graphics thread.</summary>

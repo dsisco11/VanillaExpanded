@@ -30,7 +30,7 @@ internal sealed class HabitatMapGraphics : IHabitatMapGraphics
         foreach (var texture in this.tiles.Resize(tiles)) texture.Dispose();
     }
     /// <summary>Reuses original textures independently of species and uploads only newly encountered source leases.</summary>
-    public void Draw(GpuHabitatReceipt receipt, HabitatMapTile tile, HabitatRanges ranges, float[] projection)
+    public void Prepare(GpuHabitatReceipt receipt)
     {
         var bundle = receipt.Bundle;
         if (!regions.TryGet(bundle.Region, out var region))
@@ -46,7 +46,17 @@ internal sealed class HabitatMapGraphics : IHabitatMapGraphics
             heights = new(bundle.Elevation.Value, bundle.World.ChunkSize, explored);
             tiles.Put(bundle.Elevation, heights)?.Dispose();
         }
-        overlay.Draw(bundle, region!, heights!, ranges, projection, tile.X, tile.Y, tile.Width, tile.Height, fullMapActive: true);
+    }
+    /// <summary>Begins the shared state lifetime only after texture acquisition has completed.</summary>
+    public IDisposable Begin(GpuHabitatReceipt first, HabitatRanges ranges, float[] projection) => overlay.Begin(first.Bundle.World, ranges, projection);
+
+    /// <summary>Uses acquired resources without allocations or uploads that could disturb pass bindings.</summary>
+    public void Draw(GpuHabitatReceipt receipt, HabitatMapTile tile)
+    {
+        var bundle = receipt.Bundle;
+        if (!regions.TryGet(bundle.Region, out var region) || !tiles.TryGet(bundle.Elevation, out var heights))
+            throw new InvalidOperationException("Habitat textures must be acquired before the pass begins.");
+        overlay.Draw(bundle, region!, heights!, tile.X, tile.Y, tile.Width, tile.Height);
     }
     /// <summary>Releases all original textures on close, purge or coverage invalidation.</summary>
     public void Clear()
