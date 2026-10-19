@@ -15,12 +15,14 @@ internal static class ApproximateTimeFaceArtwork
     {
         using var surface = new ImageSurface(Format.Argb32, RadialGaugeLayout.Canvas, RadialGaugeLayout.Canvas);
         using var drawing = new Context(surface);
+        // Keep a fine separation between hourly colors without exposing broad dark spokes.
+        const double segmentInset = .002;
         for (int hour = 0; hour < 24; hour++)
         {
             double start = (hour - 12.5) * Math.PI / 12 - Math.PI / 2;
             drawing.MoveTo(RadialGaugeLayout.CenterX, RadialGaugeLayout.CenterY);
             drawing.Arc(RadialGaugeLayout.CenterX, RadialGaugeLayout.CenterY, RadialGaugeLayout.ApertureRadius - 2,
-                start + .007, start + Math.PI / 12 - .007);
+                start + segmentInset, start + Math.PI / 12 - segmentInset);
             drawing.ClosePath();
             if (ReferenceEquals(phases, ApproximateTimeDayPhases.Neutral)) drawing.SetSourceRGB(.18, .18, .17);
             else drawing.SetSourceRGB(phases.Channel(hour, 0), phases.Channel(hour, 1), phases.Channel(hour, 2));
