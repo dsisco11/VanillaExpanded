@@ -29,11 +29,12 @@ internal sealed class ToolHeadShaderUniformState : IDisposable
     }
 
     /// <summary>Captures actual GL values; the engine keeps locations but no uniform-value cache.</summary>
-    internal static ToolHeadShaderUniformState Capture(IRenderAPI render, IShaderProgram shader)
+    internal static ToolHeadShaderUniformState Capture(IShaderProgram shader)
     {
         return new(shader, (name, count, integer) =>
         {
-            int location = render.GetUniformLocation(shader.ProgramId, name);
+            // ProgramId is an OpenGL handle. The engine render API instead expects a shader registry ID.
+            int location = GL.GetUniformLocation(shader.ProgramId, name);
             var values = new float[count];
             if (location < 0) return values; // Engine metadata also includes uniforms optimized out by the linker.
             if (integer)
@@ -46,7 +47,7 @@ internal sealed class ToolHeadShaderUniformState : IDisposable
             return values;
         }, (name, integer, values) =>
         {
-            int location = render.GetUniformLocation(shader.ProgramId, name);
+            int location = GL.GetUniformLocation(shader.ProgramId, name);
             if (location < 0) return;
             if (integer) GL.Uniform1(location, (int)values[0]);
             else if (values.Length == 16) GL.UniformMatrix4(location, 1, false, values);
