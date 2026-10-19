@@ -85,7 +85,7 @@ public sealed class EcosystemMapSystem : ModSystem
     internal void StopWorld()
     {
         if (clientApi != null) clientApi.Event.LeaveWorld -= StopWorld;
-        receipt?.Stop();
+        // Session detaches and joins ocean intake before stopping receipt snapshots and draining durable writes.
         try
         {
             try { Stopping?.Invoke(); }

@@ -106,6 +106,9 @@ internal sealed class EcosystemDatabase : SQLiteDBConnection
     internal void WriteTile(TileEnvironment tile)
     {
         if (tile.Size != identity.ChunkSize) throw new ArgumentException("Tile layout differs from this world.", nameof(tile));
+        // Independent packet and surface observations must not erase each other when they arrive in either order.
+        var previous = ReadTile(tile.Key);
+        tile = new TileEnvironment(tile.Key, tile.Size, tile.HasElevation ? tile.Elevation : previous?.Elevation, tile.Ocean ?? previous?.Ocean);
         var region = identity.RegionFor(tile.Key);
         using var transaction = sqliteConn.BeginTransaction();
         using var command = sqliteConn.CreateCommand();
@@ -134,7 +137,7 @@ internal sealed class EcosystemDatabase : SQLiteDBConnection
         AddKey(command, key.X, key.Z, key.Dimension);
         using var reader = command.ExecuteReader();
         var region = identity.RegionFor(key);
-        if (!reader.Read() || reader.GetInt32(0) != TileEnvironment.Version
+        if (!reader.Read() || (reader.GetInt32(0) != 1 && reader.GetInt32(0) != TileEnvironment.Version)
             || reader.GetInt32(1) != region.X || reader.GetInt32(2) != region.Z) return null;
         return EnvironmentalRecordCodec.DecodeTile(key, (byte[])reader.GetValue(3), identity.ChunkSize);
     }

@@ -27,6 +27,7 @@ internal sealed class ClientReceiptAdapter : IDisposable
     private EnvironmentalAcquisition? acquisition;
     private int chunkSize;
     private bool disposed;
+    internal event Action<EcosystemTileKey, StorageEpoch, long>? TileReceived;
 
     #region Public API
     /// <summary>Installs synchronization before normal world receipt; capture starts only when storage identity is ready.</summary>
@@ -76,6 +77,34 @@ internal sealed class ClientReceiptAdapter : IDisposable
         }
         // Backpressure and storage joins must never run under the dictionary synchronization gate.
         foreach (var snapshot in snapshots) owner.Submit(snapshot);
+    }
+
+    /// <summary>Copies coordinate-only startup/overflow inventory under the same receipt/unload gate.</summary>
+    internal EcosystemTileKey[] LoadedTileKeys()
+    {
+        lock (gate)
+        {
+            if (disposed) return Array.Empty<EcosystemTileKey>();
+            var keys = new List<EcosystemTileKey>();
+            foreach (long index in ((Dictionary<long, ClientMapChunk>)ChunksField.GetValue(game.WorldMap)!).Keys)
+            {
+                var pos = game.WorldMap.ChunkPosFromChunkIndex2D(index);
+                keys.Add(new(pos.X, pos.Z));
+            }
+            return keys.ToArray();
+        }
+    }
+
+    /// <summary>Runs a loaded-only background snapshot while original map receipt and voxel unload are excluded.</summary>
+    internal TileEnvironment? CaptureOcean(EcosystemTileKey key, NativeOceanClassifier classifier)
+    {
+        lock (gate)
+        {
+            if (disposed || acquisition == null) return null;
+            var chunks = (Dictionary<long, ClientMapChunk>)ChunksField.GetValue(game.WorldMap)!;
+            return chunks.TryGetValue(game.WorldMap.MapChunkIndex2D(key.X, key.Z), out var chunk)
+                ? classifier.Capture(key, chunk) : null;
+        }
     }
 
     /// <summary>Stops capture before the acquisition owner drains; an already-copied late job retains its original ticket.</summary>
@@ -143,7 +172,12 @@ internal sealed class ClientReceiptAdapter : IDisposable
         Monitor.Exit(__state.Adapter.gate);
         if (__exception == null && __state.Capture != null)
         {
-            try { __state.Owner!.Submit(__state.Capture); }
+            try
+            {
+                __state.Owner!.Submit(__state.Capture);
+                if (__state.Capture.Tile is { } tile)
+                    __state.Adapter.TileReceived?.Invoke(tile.Key, __state.Capture.Epoch, __state.Capture.Sequence);
+            }
             catch (Exception error) { __state.Adapter.report(error); }
         }
         return __exception;
@@ -177,7 +211,8 @@ internal sealed class ClientReceiptAdapter : IDisposable
         internal StorageEpoch? Epoch { get; }
         internal CapturedEnvironment? Capture { get; set; }
         internal long Sequence { get; }
-        /// <summary>Stores receipt-time identity before the original packet mutation begins.</summary>
+
+    /// <summary>Stores receipt-time identity before the original packet mutation begins.</summary>
         internal Receipt(ClientReceiptAdapter adapter, EnvironmentalAcquisition? owner, StorageEpoch? epoch, long sequence)
             { Adapter = adapter; Owner = owner; Epoch = epoch; Sequence = sequence; }
     }

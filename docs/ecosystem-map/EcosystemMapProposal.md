@@ -146,6 +146,8 @@ Persist normally received inputs and the original shrub maps for use after regio
 
 The species catalogue continues to use client-local animal definitions. A supplemental server catalogue remains deferred to a follow-up; original shrub delivery is part of the initial implementation and does not introduce catalogue synchronization.
 
+Ocean suppression uses independently available per-column semantic categories from normally loaded client chunks. Observe normal chunk notifications and map-chunk arrivals, and inspect currently loaded data on a background worker using the native rain-height/fluid-or-solid/snow-step surface rules and resolved terrain category lookup. The image generator has no standalone category operation and depends on map-open image queues; do not invoke it for ecosystem data or copy its shading/decorating loop. Use canonical parchment surface semantics in color-accurate mode as well. Unknown classification stays distinct from known non-ocean. Persist classification alongside independently arriving heights and suppress confirmed ocean before any habitat or unavailable-data output, including when height/climate/vegetation are absent. These captures do not depend on opening the Ecosystem tab.
+
 ## Persistence in a dedicated ecosystem database
 
 Maintain a separate client-local SQLite database file owned by the Ecosystem feature and scoped to the current server/world identity. The feature owns its connection, schema, transactions, and lifecycle. Do not open, modify, or extend vanilla's map database file, connection, tables, or `MapPieceDB` serialization.

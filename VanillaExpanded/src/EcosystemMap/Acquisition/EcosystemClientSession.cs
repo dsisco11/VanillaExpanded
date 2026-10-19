@@ -14,6 +14,7 @@ internal sealed class EcosystemClientSession : IDisposable
     private readonly ClientReceiptAdapter receipt;
     private readonly EnvironmentalAcquisition acquisition;
     private readonly EcosystemMapPurgeBinding? purge;
+    private readonly OceanCaptureSource? oceans;
     private bool disposed;
     internal EnvironmentalStorage Storage { get; }
     internal GpuHabitatPreparation Preparation { get; }
@@ -42,15 +43,20 @@ internal sealed class EcosystemClientSession : IDisposable
         try
         {
             Storage.WaitUntilReadyAsync().GetAwaiter().GetResult();
-            purge = EcosystemMapPurgeBinding.Attach(api, Storage, () => { Preparation.Reset(); Purged?.Invoke(); });
+            purge = EcosystemMapPurgeBinding.Attach(api, Storage, () => { Preparation.Reset(); oceans?.RefreshLoaded(); Purged?.Invoke(); });
             receipt.Start(acquisition, chunkSize);
+            oceans = OceanCaptureSource.Attach(api, receipt, acquisition, chunkSize, Report);
         }
         catch
         {
-            receipt.Stop();
-            purge?.Dispose();
-            try { Preparation.Dispose(); }
-            finally { acquisition.ShutdownAsync().GetAwaiter().GetResult(); }
+            try { oceans?.Dispose(); }
+            finally
+            {
+                receipt.Stop();
+                purge?.Dispose();
+                try { Preparation.Dispose(); }
+                finally { acquisition.ShutdownAsync().GetAwaiter().GetResult(); }
+            }
             throw;
         }
     }
@@ -70,13 +76,17 @@ internal sealed class EcosystemClientSession : IDisposable
     {
         if (disposed) return;
         disposed = true;
-        receipt.Stop();
-        purge?.Dispose();
-        try { Preparation.Dispose(); }
+        try { oceans?.Dispose(); }
         finally
         {
-            try { acquisition.ShutdownAsync().GetAwaiter().GetResult(); }
-            finally { Purged = null; }
+            receipt.Stop();
+            purge?.Dispose();
+            try { Preparation.Dispose(); }
+            finally
+            {
+                try { acquisition.ShutdownAsync().GetAwaiter().GetResult(); }
+                finally { Purged = null; }
+            }
         }
     }
     #endregion

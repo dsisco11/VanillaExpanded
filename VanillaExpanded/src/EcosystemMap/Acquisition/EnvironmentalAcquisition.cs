@@ -19,7 +19,7 @@ internal sealed class EnvironmentalAcquisition
     private int stopped;
     private long sequence;
     private readonly Dictionary<(EcosystemRegionKey, EnvironmentalCompleteness), long> regionSequences = new();
-    private readonly Dictionary<EcosystemTileKey, long> tileSequences = new();
+    private readonly Dictionary<(EcosystemTileKey, EnvironmentalCompleteness), long> tileSequences = new();
 
     #region Public API
     /// <summary>Creates a bounded copied-snapshot queue; capacity is an explicit workload policy supplied by registration.</summary>
@@ -80,10 +80,13 @@ internal sealed class EnvironmentalAcquisition
                         if (ordered.Completeness != EnvironmentalCompleteness.None)
                             await storage.WriteRegionAsync(ordered, capture.Epoch).ConfigureAwait(false);
                     }
-                    if (capture.Tile is { } tile && (!tileSequences.TryGetValue(tile.Key, out long prior) || capture.Sequence >= prior))
+                    if (capture.Tile is { } tile)
                     {
-                        await storage.WriteTileAsync(tile, capture.Epoch).ConfigureAwait(false);
-                        tileSequences[tile.Key] = capture.Sequence;
+                        var ordered = new TileEnvironment(tile.Key, tile.Size,
+                            NewerTile(tile.Key, EnvironmentalCompleteness.Elevation, tile.HasElevation ? tile.Elevation : null, capture.Sequence),
+                            NewerTile(tile.Key, EnvironmentalCompleteness.Ocean, tile.Ocean, capture.Sequence));
+                        if (ordered.Completeness != EnvironmentalCompleteness.None)
+                            await storage.WriteTileAsync(ordered, capture.Epoch).ConfigureAwait(false);
                     }
                 }
                 catch (Exception error) { report(error); }
@@ -95,6 +98,14 @@ internal sealed class EnvironmentalAcquisition
             queue.Writer.TryComplete(error);
             throw;
         }
+    }
+
+    /// <summary>Orders height and ocean observations independently so either partial arrival preserves the other.</summary>
+    private T? NewerTile<T>(EcosystemTileKey key, EnvironmentalCompleteness component, T? value, long ordinal) where T : class
+    {
+        if (value == null || (tileSequences.TryGetValue((key, component), out long previous) && ordinal < previous)) return null;
+        tileSequences[(key, component)] = ordinal;
+        return value;
     }
 
     /// <summary>Retains only the latest available component when source capture and bounded submission interleave.</summary>

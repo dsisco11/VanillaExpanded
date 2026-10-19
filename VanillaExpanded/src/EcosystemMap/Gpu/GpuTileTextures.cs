@@ -12,13 +12,15 @@ internal sealed class GpuTileTextures : IDisposable
     private GpuIntegerTexture? elevation, coverage;
     private readonly int size;
     private readonly bool available;
+    private readonly OceanMask? ocean;
 
     #region Public API
     /// <summary>Uploads original unsigned heights plus the current per-column explored mask; no habitat pixels are computed.</summary>
     internal GpuTileTextures(TileEnvironment? terrain, int size, byte[] explored)
     {
         this.size = size;
-        available = terrain != null && terrain.Size == size;
+        available = terrain != null && terrain.Size == size && terrain.HasElevation;
+        ocean = terrain?.Size == size ? terrain.Ocean : null;
         try
         {
             elevation = new GpuIntegerTexture(available ? terrain!.Elevation.ToArray() : new ushort[checked(size * size)],
@@ -31,7 +33,7 @@ internal sealed class GpuTileTextures : IDisposable
     /// <summary>Replaces only the coverage texture when explored applicability changes, leaving environmental inputs intact.</summary>
     internal void UpdateCoverage(byte[] explored)
     {
-        var replacement = new GpuIntegerTexture(explored, size, PixelInternalFormat.R8ui, PixelType.UnsignedByte);
+        var replacement = new GpuIntegerTexture(HabitatCoverageFlags.Pack(explored, ocean, size), size, PixelInternalFormat.R8ui, PixelType.UnsignedByte);
         coverage?.Dispose(); coverage = replacement;
     }
 

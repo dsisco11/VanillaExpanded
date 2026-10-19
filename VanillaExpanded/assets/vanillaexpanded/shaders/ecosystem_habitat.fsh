@@ -71,7 +71,10 @@ bool inside(float value, vec2 range) { return value >= range.x && value <= range
 /** Evaluates one active range set and emits highlight or unavailable crosshatching on explored columns. */
 void main() {
     ivec2 column = clamp(ivec2(floor(habitatUv * chunkSize)), ivec2(0), ivec2(chunkSize-1.0));
-    if (texelFetch(exploredMap,column,0).r == 0u) discard;
+    uint coverage = texelFetch(exploredMap,column,0).r;
+    if ((coverage & 1u) == 0u) discard;
+    // Ocean suppression precedes all habitat and unavailable-data output, even without height or climate.
+    if ((coverage & 4u) != 0u) discard;
     vec2 worldPos = tileOrigin + vec2(column);
     if (any(lessThan(worldPos,vec2(0))) || any(greaterThanEqual(worldPos,worldSize))) discard;
     bool climateOk, forestOk, shrubOk;
@@ -95,7 +98,7 @@ void main() {
         (forestOk && !inside(forest,forestRange)) || (shrubOk && !inside(shrubs,shrubRange)) ||
         (forestOk && shrubOk && max(forest,shrubs)<minForestOrShrubs) ||
         (terrainAvailable!=0 && !inside(y,surfaceHeightRange))) discard;
-    if (!climateOk || !forestOk || !shrubOk || terrainAvailable==0) {
+    if ((coverage & 2u)==0u || !climateOk || !forestOk || !shrubOk || terrainAvailable==0) {
         vec2 pixel = gl_FragCoord.xy;
         bool hatch = mod(pixel.x+pixel.y,8.0)<1.5 || mod(pixel.x-pixel.y,8.0)<1.5;
         if (!hatch) discard;

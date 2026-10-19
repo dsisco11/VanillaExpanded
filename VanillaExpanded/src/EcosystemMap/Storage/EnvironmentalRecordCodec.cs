@@ -35,29 +35,61 @@ internal static class EnvironmentalRecordCodec
     }
     #endregion
 
-    #region Tile elevation
+    #region Tile inputs
     /// <summary>Preserves every unsigned height and the grid size, without confusing terrain height with surface candidate Y.</summary>
     internal static byte[] EncodeTile(TileEnvironment tile)
     {
-        byte[] bytes = new byte[checked(12 + tile.Elevation.Count * 2)];
+        int oceanLength = tile.Ocean == null ? 0 : (tile.Ocean.Columns.Count + 3) / 4;
+        int offset = checked(12 + tile.Elevation.Count * 2);
+        byte[] bytes = new byte[checked(offset + 4 + oceanLength)];
         WriteInt(bytes, 0, TileEnvironment.Version);
         WriteInt(bytes, 4, tile.Size);
         WriteInt(bytes, 8, tile.Elevation.Count);
         for (int i = 0; i < tile.Elevation.Count; i++)
             BinaryPrimitives.WriteUInt16LittleEndian(bytes.AsSpan(12 + i * 2, 2), tile.Elevation[i]);
+        // Two bits preserve unknown/non-ocean/ocean states without storing any species-dependent result.
+        WriteInt(bytes, offset, oceanLength);
+        if (tile.Ocean != null)
+            for (int i = 0; i < tile.Ocean.Columns.Count; i++)
+                bytes[offset + 4 + i / 4] |= (byte)(tile.Ocean.Columns[i] << ((i % 4) * 2));
         return bytes;
     }
 
-    /// <summary>Validates the complete blob and geometry before exposing a tile as an available input.</summary>
+    /// <summary>Retains valid height-only records and independently decodes compact semantic classification when present.</summary>
     internal static TileEnvironment? DecodeTile(EcosystemTileKey key, byte[]? bytes, int expectedSize)
     {
-        if (bytes == null || bytes.Length < 12 || ReadInt(bytes, 0) != TileEnvironment.Version || ReadInt(bytes, 4) != expectedSize)
-            return null;
-        int count = ReadInt(bytes, 8);
-        if (count < 0 || 12L + count * 2L != bytes.Length || (long)expectedSize * expectedSize != count) return null;
+        if (bytes == null || bytes.Length < 12 || ReadInt(bytes, 4) != expectedSize || expectedSize <= 0) return null;
+        int version = ReadInt(bytes, 0), count = ReadInt(bytes, 8);
+        long cells = (long)expectedSize * expectedSize;
+        if (version != 1 && version != TileEnvironment.Version) return null;
+        if (count < 0 || (count != cells && (version == 1 || count != 0))) return null;
+        long offset = 12L + count * 2L;
+        if (offset > bytes.Length || (version == 1 && offset != bytes.Length)) return null;
         ushort[] values = new ushort[count];
         for (int i = 0; i < count; i++) values[i] = BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(12 + i * 2, 2));
-        return new TileEnvironment(key, expectedSize, values);
+        OceanMask? ocean = null;
+        if (version == TileEnvironment.Version)
+        {
+            if (offset + 4 > bytes.Length) return null;
+            int length = ReadInt(bytes, (int)offset);
+            if (length < 0 || offset + 4 + length != bytes.Length) return null;
+            if (length != 0)
+            {
+                // A damaged optional component must not erase otherwise valid terrain heights.
+                if (length == (cells + 3) / 4)
+                {
+                    byte[] columns = new byte[(int)cells];
+                    bool valid = true;
+                    for (int i = 0; i < columns.Length; i++)
+                    {
+                        columns[i] = (byte)((bytes[(int)offset + 4 + i / 4] >> ((i % 4) * 2)) & 3);
+                        valid &= columns[i] <= 2;
+                    }
+                    if (valid) ocean = new OceanMask(expectedSize, columns);
+                }
+            }
+        }
+        return new TileEnvironment(key, expectedSize, values, ocean);
     }
     #endregion
     #endregion
