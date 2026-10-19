@@ -18,7 +18,8 @@ The agreed scope is:
 - Exclude fish, insects, supernatural creatures, and domestic-only variants. Mod-added wildlife participates through the same discovery and exclusion rules.
 - Omit backfill. Capture environmental coverage from data available during normal play, including already loaded areas, and persist it for later use.
 - Evaluate regional environmental requirements using worldgen temperature, rainfall, forest density, and shrub density, with terrain elevation checked separately. Current weather and seasonal climate do not drive habitat eligibility.
-- Ignore water, ground, clearance, light, population caps, player distance, and spawn chance.
+- Suppress surface columns classified as ocean by the native terrain map category, using captured surface classification rather than an elevation cutoff or rendered pixel colors. This exclusion does not extend to freshwater.
+- Otherwise ignore water, ground, clearance, light, population caps, player distance, and spawn chance.
 - Use the existing map layer system with client-side GPU habitat evaluation and persistence. Receive the server's original regional shrub arrays through the existing map-layer transport; this requires a server component for shrub delivery.
 - Use client-local animal definitions as the baseline catalogue. A supplemental server-supplied catalogue is deferred to a follow-up.
 
