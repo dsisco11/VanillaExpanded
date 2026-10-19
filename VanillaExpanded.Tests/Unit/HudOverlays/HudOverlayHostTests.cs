@@ -58,18 +58,18 @@ public sealed class HudOverlayHostTests : IDisposable
         int failures = 0;
         using var host = new HudOverlayHost(api.Object, registry, r => r.Id != "mod:hidden", (_, _) => failures++, backdropBatch: batch.Object);
         host.Synchronize(new Dictionary<string, HudOverlayGroupLayout> { [group.Id] = layout });
-        host.TryOpen(false); host.OnRenderGUI(.1f);
+        host.TryOpen(false); HudOverlayNativeRenderPass.Render(host, .1f);
         Assert.Equal(1, failures); Assert.Equal(1, calls.Count(x => x == "flush"));
         Assert.DoesNotContain("collect:hidden", calls); Assert.DoesNotContain("collect:empty", calls);
         Assert.All(calls.Where(x => x.StartsWith("collect:")), x => Assert.True(calls.IndexOf(x) < calls.IndexOf("flush")));
         Assert.All(calls.Where(x => x.StartsWith("draw:")), x => Assert.True(calls.IndexOf(x) > calls.IndexOf("flush")));
         Assert.Contains("collect:b", calls); Assert.Contains("draw:b", calls);
         batch.Verify(x => x.Clear(), Times.Exactly(2));
-        calls.Clear(); host.Composers[group.Id].Enabled = false; host.OnRenderGUI(.1f);
+        calls.Clear(); host.Composers[group.Id].Enabled = false; HudOverlayNativeRenderPass.Render(host, .1f);
         Assert.Equal(new[] { "flush" }, calls);
         calls.Clear(); host.Composers[group.Id].Enabled = true;
         typeof(HudOverlayGroupLayout).GetProperty(nameof(HudOverlayGroupLayout.Available))!.SetValue(layout, false);
-        host.OnRenderGUI(.1f);
+        HudOverlayNativeRenderPass.Render(host, .1f);
         Assert.Equal(new[] { "flush" }, calls);
         registry.RunPass(_ => { });
     }
@@ -115,7 +115,7 @@ public sealed class HudOverlayHostTests : IDisposable
         var member = layout.Members.Single(value => value.Registration.Id == "mod:time");
         using var host = new HudOverlayHost(api.Object, registry, scheduler.IsDrawable, (_, error) => throw error);
         host.Synchronize(new Dictionary<string, HudOverlayGroupLayout> { [group.Id] = layout });
-        host.TryOpen(false); host.OnRenderGUI(.1f);
+        host.TryOpen(false); HudOverlayNativeRenderPass.Render(host, .1f);
         time.Verify(value => value.Draw(renderer.Object, member.Bounds, member.Clip, .1f), Times.Once);
         weather.Verify(value => value.Draw(It.IsAny<IRenderAPI>(), It.IsAny<ElementBounds>(), It.IsAny<RectangleF>(), It.IsAny<float>()), Times.Never);
         renderer.Verify(value => value.RenderTexture(1, It.IsAny<double>(), It.IsAny<double>(), HudOverlaySizes.Clock, HudOverlaySizes.Clock, 50, null), Times.Once);
@@ -129,7 +129,7 @@ public sealed class HudOverlayHostTests : IDisposable
             host.Synchronize(new Dictionary<string, HudOverlayGroupLayout> { [group.Id] = layout });
             Assert.Same(composer, host.Composers[group.Id]);
             Assert.True(layout.Members.Single(value => value.Registration.Id == "mod:time").Clip.Width > 0);
-            host.OnRenderGUI(.1f);
+            HudOverlayNativeRenderPass.Render(host, .1f);
         }
         renderer.Verify(value => value.RenderTexture(1, It.IsAny<double>(), It.IsAny<double>(), HudOverlaySizes.Clock, HudOverlaySizes.Clock, 50, null), Times.Exactly(3));
     }
@@ -153,16 +153,32 @@ public sealed class HudOverlayHostTests : IDisposable
         Assert.False(host.CaptureRawMouse());
         Assert.False(host.OnEscapePressed());
         Assert.False(host.PrefersUngrabbedMouse);
-        Assert.Equal(.1, host.DrawOrder);
+
         Assert.True(host.UnregisterOnClose);
+        var artwork = (GuiDialog)typeof(HudOverlayHost).GetField("artworkDialog", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(host)!;
+        Assert.False(artwork.Focusable);
+        Assert.True(artwork.DrawOrder < host.DrawOrder);
+        Assert.False(artwork.ShouldReceiveKeyboardEvents());
+        Assert.False(artwork.ShouldReceiveMouseEvents());
+        Assert.False(artwork.CaptureAllInputs());
+        Assert.False(artwork.CaptureRawMouse());
+        Assert.True(artwork.UnregisterOnClose);
         host.TryOpen(false);
+        Assert.True(artwork.IsOpened());
         host.TryClose();
+        Assert.False(artwork.IsOpened());
         host.TryOpen(false);
         host.Dispose();
         host.Dispose();
         Assert.Empty(loaded);
+        Assert.False(artwork.IsOpened());
+        int staleCallbacks = 0;
+        host.BeforeRender = () => staleCallbacks++;
+        artwork.OnRenderGUI(.1f);
+        Assert.Equal(0, staleCallbacks);
         gui.Verify(x => x.RequestFocus(It.IsAny<GuiDialog>()), Times.Never);
         gui.Verify(x => x.TriggerDialogClosed(host), Times.Exactly(2));
+        gui.Verify(x => x.TriggerDialogClosed(artwork), Times.Exactly(2));
     }
     /// <summary>Assigned oversized clipping is supplied to the native scissor and restored on consumer failure.</summary>
     [Fact]
@@ -264,13 +280,13 @@ public sealed class HudOverlayHostTests : IDisposable
             a.Verify(x => x.Dispose(), Times.Never);
         }).Throws(new InvalidOperationException());
         host.TryOpen(false);
-        host.OnRenderGUI(.1f);
+        HudOverlayNativeRenderPass.Render(host, .1f);
         b.Verify(x => x.Draw(renderer.Object, It.IsAny<ElementBounds>(), It.IsAny<RectangleF>(), .1f), Times.Once);
         a.Verify(x => x.Refresh(), Times.Never);
         a.Verify(x => x.Prepare(It.IsAny<HudOverlayPreparationContext>()), Times.Never);
-        renderer.Verify(x => x.GlTranslate(0, 0, -150), Times.Once);
-        renderer.Verify(x => x.GlPushMatrix(), Times.Once);
-        renderer.Verify(x => x.GlPopMatrix(), Times.Once);
+        renderer.Verify(x => x.GlTranslate(0, 0, It.Is<float>(depth => depth < 0)), Times.Once);
+        renderer.Verify(x => x.GlPushMatrix(), Times.Exactly(2));
+        renderer.Verify(x => x.GlPopMatrix(), Times.Exactly(2));
         renderer.Verify(x => x.PopScissor(), Times.Exactly(2));
         a.Verify(x => x.Dispose(), Times.Never);
         registry.RunPass(_ => { });

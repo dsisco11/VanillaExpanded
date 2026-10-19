@@ -100,7 +100,7 @@ public sealed class HudOverlayDragPreviewTests : IDisposable
                 });
             storage.Registry.BeginSession(storage.Api.Object);
             if (remove) registrationHandle.Dispose();
-            host.TryOpen(false); host.OnRenderGUI(.1f);
+            host.TryOpen(false); HudOverlayNativeRenderPass.Render(host, .1f);
             if (remove || drawable) { Assert.Empty(draws); Assert.Empty(backdrops); }
             else
             {
@@ -115,7 +115,7 @@ public sealed class HudOverlayDragPreviewTests : IDisposable
                 Assert.All(draws, draw => Assert.InRange(draw.Opacity, float.Epsilon, MathF.BitDecrement(1)));
                 Assert.Equal(draws[0].Opacity, draws[1].Opacity); Assert.Equal(failSource ? 1 : 0, failures);
                 renderer.Verify(value => value.PopScissor(), Times.Exactly(draws.Count));
-                movement.Cancel(); draws.Clear(); host.OnRenderGUI(.1f);
+                movement.Cancel(); draws.Clear(); HudOverlayNativeRenderPass.Render(host, .1f);
                 Assert.Single(draws); Assert.Equal(1, draws[0].Opacity);
             }
             Assert.Equal(1, HudOverlayDrawOpacity.Current);
