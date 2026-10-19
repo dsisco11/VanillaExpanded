@@ -27,7 +27,8 @@ internal sealed class HudOverlayDashedBorder : IHudOverlayDashedBorder
         Prepare();
         var renderer = api.Render;
         var previous = renderer.CurrentActiveShader;
-        bool depth = GL.IsEnabled(EnableCap.DepthTest), cull = GL.IsEnabled(EnableCap.CullFace);
+        bool cull = GL.IsEnabled(EnableCap.CullFace);
+        bool depthWrite = GL.GetBoolean(GetPName.DepthWritemask);
         bool blend = GL.IsEnabled(IndexedEnableCap.Blend, 0);
         int sourceRgb = GL.GetInteger(GetPName.BlendSrcRgb), targetRgb = GL.GetInteger(GetPName.BlendDstRgb);
         int sourceAlpha = GL.GetInteger(GetPName.BlendSrcAlpha), targetAlpha = GL.GetInteger(GetPName.BlendDstAlpha);
@@ -35,7 +36,8 @@ internal sealed class HudOverlayDashedBorder : IHudOverlayDashedBorder
         previous?.Stop();
         try
         {
-            renderer.GLDisableDepthTest();
+            // Test against native windows, but never let transparent gaps write an occluding quad.
+            renderer.GLDepthMask(false);
             GL.Disable(EnableCap.CullFace);
             GL.Enable(IndexedEnableCap.Blend, 0);
             GL.BlendEquationSeparate(0, BlendEquationMode.FuncAdd, BlendEquationMode.FuncAdd);
@@ -61,8 +63,8 @@ internal sealed class HudOverlayDashedBorder : IHudOverlayDashedBorder
                     (BlendingFactorSrc)sourceAlpha, (BlendingFactorDest)targetAlpha);
                 GL.BlendEquationSeparate(0, (BlendEquationMode)rgbEquation, (BlendEquationMode)alphaEquation);
                 if (blend) GL.Enable(IndexedEnableCap.Blend, 0); else GL.Disable(IndexedEnableCap.Blend, 0);
-                if (depth) renderer.GLEnableDepthTest(); else renderer.GLDisableDepthTest();
                 if (cull) GL.Enable(EnableCap.CullFace); else GL.Disable(EnableCap.CullFace);
+                renderer.GLDepthMask(depthWrite);
             }
         }
     }

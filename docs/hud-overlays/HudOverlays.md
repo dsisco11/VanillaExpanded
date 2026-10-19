@@ -70,6 +70,8 @@ The toggle composer owns its switches directly because native list multi-select 
 
 The controller holds its target independently of hover. The host synchronizes conditions before rendering or input: unavailable editing/targets, session replacement, changed viewport/scale/locale, changed settings, or lost native focus close the popup rather than recreating graphics every frame. Selection, outside presses, Escape, explicit closure, and disposal retire owned graphics. Selection callbacks defer disposal until native input dispatch unwinds, so configuration reloads cannot destroy controls still executing. Session teardown disposes the controller with its host.
 
+Artwork and menu rendering use separate native dialog slots. The host owns a passive `HudOverlayArtworkDialog` with no input or focus behavior; its callback renders indicators, source ghosts, group captions, and edit cues with the native HUD transform. Focusing the menu does not reorder that artwork behind or ahead of ordinary windows. The input host renders only its popup at the ordinary dialog tier, without the HUD background transform, so the focused menu appears above the indicators and ordinary windows. Backdrops and dashed borders retain the enclosing depth test and temporarily disable depth writes; transparent quad regions cannot occlude other GUI artwork. Both native registrations close with the host. GPU layering still requires in-game verification.
+
 The session owns the runtime bindings; the registry retains feature ownership across sessions. Solid arrows show ownership or contained data. Dashed arrows show borrowed dependencies and calls.
 
 ```mermaid
@@ -84,6 +86,7 @@ flowchart TB
         Session --> Layouts["HudOverlayGroupLayout<br/>one per effective container"]
         Session --> EditPreviews["HudOverlayEditPreviews<br/>hidden-item placement proxies"]
         Session --> Host["HudOverlayHost<br/>native rendering and input routing"]
+        Host --> ArtworkDialog["HudOverlayArtworkDialog<br/>passive HUD render slot"]
         Containers --> Movement["HudOverlayGroupMovement<br/>one per group or individual target"]
         Layouts --> Bounds["ElementBounds<br/>container root and indicator bounds"]
         Layouts -. "resolves mixed arrangements" .-> Geometry["HudLayoutGeometry"]

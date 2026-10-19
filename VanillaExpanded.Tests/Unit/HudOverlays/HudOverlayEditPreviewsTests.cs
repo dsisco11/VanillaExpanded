@@ -79,10 +79,10 @@ public sealed class HudOverlayEditPreviewsTests
         using var host = new HudOverlayHost(fixture.Api.Object, fixture.Registry,
             registration => fixture.Live || fixture.Previews.IsDrawable(registration), (_, failure) => throw failure, backdropBatch: batch.Object, editPreviews: fixture.Previews);
         host.Synchronize(new Dictionary<string, HudOverlayGroupLayout> { [fixture.Group.Id] = layout });
-        host.TryOpen(false); host.OnRenderGUI(.1f);
+        host.TryOpen(false); HudOverlayNativeRenderPass.Render(host, .1f);
         Assert.Contains(fixture.Render.Invocations, call => call.Method.Name == nameof(IRenderAPI.Render2DTexturePremultipliedAlpha));
         fixture.VerifyNoFeatureCalls();
-        fixture.Live = true; fixture.Render.Invocations.Clear(); host.OnRenderGUI(.1f);
+        fixture.Live = true; fixture.Render.Invocations.Clear(); HudOverlayNativeRenderPass.Render(host, .1f);
         fixture.Overlay.Verify(value => value.Draw(fixture.Render.Object, It.IsAny<ElementBounds>(), It.IsAny<RectangleF>(), .1f), Times.Once);
         fixture.Backdrop.Verify(value => value.CollectBackdrops(fixture.Render.Object, It.IsAny<ElementBounds>()), Times.Once);
     }

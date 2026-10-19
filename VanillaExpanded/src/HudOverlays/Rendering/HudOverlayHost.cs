@@ -25,6 +25,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     private readonly HudSnapHighlight snapHighlight;
     private readonly HudOverlayEditPreviews? editPreviews;
     private readonly HudOverlayMenuInput? menuInput;
+    private readonly HudOverlayArtworkDialog artworkDialog;
     private readonly HudOverlayDragPreview dragPreview = new();
     private bool updatingSnap;
     private HudOverlayGroupControls? ActiveControls => groupControls.Values.FirstOrDefault(control => control.Active);
@@ -36,7 +37,8 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     public Action? BeforeRender { get; set; }
     public override bool Focusable => menuInput?.Capturing == true;
     public override bool UnregisterOnClose => true;
-    public override double DrawOrder => .1;
+    /// <summary>Shares the native inventory/dialog tier so focused menus render above ordinary windows.</summary>
+    public override double DrawOrder => .2;
     #region Public API
     #region Composition
     /// <summary>Borrows registry and prepared-state decisions; owns only composers allocated for this session.</summary>
@@ -57,12 +59,14 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         snapping = containers == null ? null : new HudOverlaySnapping(containers);
         nativeBoundaries = new HudOverlayNativeBoundaries(api);
         snapHighlight = new HudSnapHighlight(api);
+        artworkDialog = new HudOverlayArtworkDialog(api, DrawArtwork);
 
     }
     /// <summary>Registers a live session host through the native GUI lifecycle without taking focus.</summary>
     public override bool TryOpen(bool withFocus)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
+        artworkDialog.TryOpen(false);
         return base.TryOpen(false);
     }
     /// <summary>Reuses existing native compositions; allocates a composer only for a newly drawable group.</summary>
@@ -230,61 +234,18 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     {
         menuInput?.Close();
         foreach (var control in groupControls.Values.ToArray()) control.Cancel();
+        artworkDialog.TryClose();
         return base.TryClose();
     }
     #endregion
     #region Rendering and lifecycle
-    /// <summary>Uses the native HUD depth transform with exception-safe restoration and stable registry membership.</summary>
+    /// <summary>Draws the focused popup in its native dialog slot, independently of passive HUD artwork.</summary>
     public override void OnRenderGUI(float deltaTime)
     {
-        if (disposed) return;
-        BeforeRender?.Invoke();
-        // Lifecycle invalidation also runs when hidden GUI suppresses normal drawing.
-        _ = menuInput?.IsOpened;
-        RefreshSnap();
-        dragPreview.Refresh();
-        if (!IsOpened() || capi.HideGuis) return;
-        // Keep consumers alive until all composer callbacks finish, including removals requested by drawing.
-        rendering = true;
-        try { registry.RunSnapshotPass(snapshot =>
-        {
-            active.UnionWith(snapshot);
-            capi.Render.GlPushMatrix();
-            try
-            {
-                capi.Render.GlTranslate(0, 0, -150);
-                CollectBackdrops();
-                try { backdropBatch?.Flush(capi.Render); }
-                catch (Exception error) { boundaryFailure?.Invoke(error); }
-                foreach (var control in groupControls.Values.ToArray()) control.DrawBackground();
-                foreach (var pair in Composers) if (visibleGroups.Contains(pair.Key) && groups[pair.Key].Available) pair.Value.Render(deltaTime);
-                if (dragPreview.Originals.Count > 0)
-                {
-                    CollectBackdrops(true);
-                    try { backdropBatch?.Flush(capi.Render); }
-                    catch (Exception error) { boundaryFailure?.Invoke(error); }
-                }
-                // Keep the source trace visible even when the detached remainder reflows over its old slot.
-                DrawGroup(dragPreview.Originals, 0);
-                hoverLabels.Draw(groups.Where(pair => visibleGroups.Contains(pair.Key)).Select(pair => pair.Value),
-                    registration => active.Contains(registration) && isDrawable(registration), deltaTime,
-                    registration => editPreviews?.IsDrawable(registration) == true ? editPreviews.Label(registration)
-                        : Vintagestory.API.Config.Lang.Get(registration.HoverLabelKey!));
-                foreach (var control in groupControls.Values.ToArray()) control.Draw(deltaTime);
-                if (ActiveControls?.Movement.Dragging == true && snapping?.Selected is { } selected)
-                {
-                    if (selected.Grouping)
-                    {
-                        snapHighlight.DrawConnection(snapping.ConnectionTarget, snapping.Insertion, selected.Side);
-                    }
-                    else snapHighlight.DrawGuide(selected.Guide);
-                }
-                menuInput?.Draw(deltaTime);
-            }
-            finally { backdropBatch?.Clear(); capi.Render.GlPopMatrix(); active.Clear(); }
-        }, boundaryFailure); }
-        finally { rendering = false; }
+        if (disposed || !IsOpened()) return;
+        menuInput?.Draw(deltaTime);
     }
+
     /// <summary>No post-render work is needed by these dynamic-only presentations.</summary>
     public override void OnFinalizeFrame(float dt) { }
     /// <summary>Closes through native registration before disposing owned composers exactly once.</summary>
@@ -298,6 +259,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         foreach (var control in groupControls.Values) TryRelease(control.Dispose, failures);
         groupControls.Clear();
         if (menuInput != null) TryRelease(menuInput.Dispose, failures);
+        TryRelease(artworkDialog.Dispose, failures);
         TryRelease(hoverLabels.Dispose, failures);
         TryRelease(snapHighlight.Dispose, failures);
         TryRelease(() => TryClose(), failures);
@@ -361,6 +323,61 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     }
     #endregion
     #region Prepared drawing
+    /// <summary>Draws passive content in a stable HUD slot even while its separate menu owner is focused.</summary>
+    private void DrawArtwork(float deltaTime)
+    {
+        if (disposed) return;
+        BeforeRender?.Invoke();
+        // Lifecycle invalidation also runs when hidden GUI suppresses normal drawing.
+        _ = menuInput?.IsOpened;
+        RefreshSnap();
+        dragPreview.Refresh();
+        if (!IsOpened() || capi.HideGuis) return;
+        // Keep consumers alive until all composer callbacks finish, including removals requested by drawing.
+        rendering = true;
+        try { registry.RunSnapshotPass(snapshot =>
+        {
+            active.UnionWith(snapshot);
+            capi.Render.GlPushMatrix();
+            try
+            {
+                capi.Render.GlTranslate(0, 0, -150);
+                CollectBackdrops();
+                try { backdropBatch?.Flush(capi.Render); }
+                catch (Exception error) { boundaryFailure?.Invoke(error); }
+                foreach (var control in groupControls.Values.ToArray()) control.DrawBackground();
+                foreach (var pair in Composers) if (visibleGroups.Contains(pair.Key) && groups[pair.Key].Available) pair.Value.Render(deltaTime);
+                if (dragPreview.Originals.Count > 0)
+                {
+                    CollectBackdrops(true);
+                    try { backdropBatch?.Flush(capi.Render); }
+                    catch (Exception error) { boundaryFailure?.Invoke(error); }
+                }
+                // Keep the source trace visible even when the detached remainder reflows over its old slot.
+                DrawGroup(dragPreview.Originals, 0);
+                hoverLabels.Draw(groups.Where(pair => visibleGroups.Contains(pair.Key)).Select(pair => pair.Value),
+                    registration => active.Contains(registration) && isDrawable(registration), deltaTime,
+                    registration => editPreviews?.IsDrawable(registration) == true ? editPreviews.Label(registration)
+                        : Vintagestory.API.Config.Lang.Get(registration.HoverLabelKey!));
+                // Foreground editing cues occupy a later sublayer of this HUD slot. Their shaders
+                // retain depth testing, so foreground native dialogs still occlude every cue uniformly.
+                capi.Render.GlPushMatrix();
+                try
+                {
+                    capi.Render.GlTranslate(0, 0, 100);
+                    foreach (var control in groupControls.Values.ToArray()) control.Draw(deltaTime);
+                    if (ActiveControls?.Movement.Dragging == true && snapping?.Selected is { } selected)
+                    {
+                        if (selected.Grouping) snapHighlight.DrawConnection(snapping.ConnectionTarget, snapping.Insertion, selected.Side);
+                        else snapHighlight.DrawGuide(selected.Guide);
+                    }
+                }
+                finally { capi.Render.GlPopMatrix(); }
+            }
+            finally { backdropBatch?.Clear(); capi.Render.GlPopMatrix(); active.Clear(); }
+        }, boundaryFailure); }
+        finally { rendering = false; }
+    }
     /// <summary>Collects only visible prepared providers, applying the same membership and clipping gates as foreground drawing.</summary>
     private void CollectBackdrops(bool original = false)
     {

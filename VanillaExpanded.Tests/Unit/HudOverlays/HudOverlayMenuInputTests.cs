@@ -52,6 +52,31 @@ public sealed class HudOverlayMenuInputTests : IDisposable
         Assert.Equal(1, f.Popup.Disposals);
     }
 
+    /// <summary>Focused popup rendering stays outside the passive artwork transform and cannot raise its artwork slot.</summary>
+    [Fact]
+    public void FocusedPopupUsesSeparateNativeDialogPass()
+    {
+        using var f = new Fixture();
+        var render = new Mock<IRenderAPI>();
+        f.Layout.Api.SetupGet(value => value.Render).Returns(render.Object);
+        var artwork = (GuiDialog)typeof(HudOverlayHost).GetField("artworkDialog", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(f.Host)!;
+        double passiveOrder = artwork.DrawOrder;
+        f.Host.OnMouseDown(f.Press());
+        Assert.True(f.Host.Focusable);
+        Assert.False(artwork.Focusable);
+        Assert.True(artwork.DrawOrder < f.Host.DrawOrder);
+        Assert.Equal(passiveOrder, artwork.DrawOrder);
+        int draws = 0;
+        f.Popup.Render = () =>
+        {
+            draws++;
+            render.Verify(value => value.GlTranslate(It.IsAny<float>(), It.IsAny<float>(), It.IsAny<float>()), Times.Never);
+            render.Verify(value => value.GlTranslate(It.IsAny<double>(), It.IsAny<double>(), It.IsAny<double>()), Times.Never);
+        };
+        f.Host.OnRenderGUI(.1f);
+        Assert.Equal(1, draws);
+        f.Feature.Verify(value => value.Draw(It.IsAny<IRenderAPI>(), It.IsAny<ElementBounds>(), It.IsAny<RectangleF>(), It.IsAny<float>()), Times.Never);
+    }
     /// <summary>Reset targets only the selected indicator and retires stale menu ownership after dispatch.</summary>
     [Fact]
     public void IndividualResetPreservesSiblingAndFeatureSettings()
@@ -320,11 +345,11 @@ public sealed class HudOverlayMenuInputTests : IDisposable
     /// <summary>Records native popup delegation and synchronous callbacks.</summary>
     private sealed class Popup : IHudMenuPopup
     {
-        public int Presses, Disposals; public Action? Press;
+        public int Presses, Disposals; public Action? Press; public Action? Render;
         public bool IsOpened => true;
         public RectangleF VisibleBounds => new(0, 0, 500, 400);
         /// <inheritdoc />
-        public void Draw(float dt) { }
+        public void Draw(float dt) => Render?.Invoke();
         /// <inheritdoc />
         public void MouseDown(MouseEvent args) { Presses++; Press?.Invoke(); }
         /// <inheritdoc />

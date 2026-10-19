@@ -85,8 +85,8 @@ internal sealed class HudOverlayIconBackdrop : IHudOverlayIconBackdrop, IHudOver
     {
         if (shader == null || quad == null) return;
         var previous = renderer.CurrentActiveShader;
-        bool depth = GL.IsEnabled(EnableCap.DepthTest);
         bool cull = GL.IsEnabled(EnableCap.CullFace);
+        bool depthWrite = GL.GetBoolean(GetPName.DepthWritemask);
         bool blend = GL.IsEnabled(IndexedEnableCap.Blend, 0);
         int sourceRgb = GL.GetInteger(GetPName.BlendSrcRgb), targetRgb = GL.GetInteger(GetPName.BlendDstRgb);
         int sourceAlpha = GL.GetInteger(GetPName.BlendSrcAlpha), targetAlpha = GL.GetInteger(GetPName.BlendDstAlpha);
@@ -94,7 +94,8 @@ internal sealed class HudOverlayIconBackdrop : IHudOverlayIconBackdrop, IHudOver
         previous?.Stop();
         try
         {
-            renderer.GLDisableDepthTest();
+            // Soft circles obey native GUI depth without writing invisible square occluders.
+            renderer.GLDepthMask(false);
             GL.Disable(EnableCap.CullFace);
             GL.Enable(IndexedEnableCap.Blend, 0);
             GL.BlendEquationSeparate(0, BlendEquationMode.FuncAdd, BlendEquationMode.FuncAdd);
@@ -126,8 +127,8 @@ internal sealed class HudOverlayIconBackdrop : IHudOverlayIconBackdrop, IHudOver
                     (BlendingFactorSrc)sourceAlpha, (BlendingFactorDest)targetAlpha);
                 GL.BlendEquationSeparate(0, (BlendEquationMode)rgbEquation, (BlendEquationMode)alphaEquation);
                 if (blend) GL.Enable(IndexedEnableCap.Blend, 0); else GL.Disable(IndexedEnableCap.Blend, 0);
-                if (depth) renderer.GLEnableDepthTest(); else renderer.GLDisableDepthTest();
                 if (cull) GL.Enable(EnableCap.CullFace); else GL.Disable(EnableCap.CullFace);
+                renderer.GLDepthMask(depthWrite);
             }
         }
     }
