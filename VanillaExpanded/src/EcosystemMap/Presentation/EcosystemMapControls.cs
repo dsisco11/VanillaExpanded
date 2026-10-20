@@ -33,9 +33,8 @@ internal sealed class EcosystemMapControls : IDisposable
         try
         {
             var builder = composer.AddShadedDialogBG(background, false).BeginChildElements(background);
-            if (selection.Codes.Length != 0)
-                builder.AddDropDown(selection.Codes, selection.Names, selection.SelectedIndex, selection.Select,
-                    ElementBounds.Fixed(0, 0, 220, 35));
+            builder.AddDropDown(selection.Codes, selection.Names, selection.SelectedIndex, selection.Select,
+                ElementBounds.Fixed(0, 0, 220, 35));
             builder.EndChildElements().Compose();
             target.Composers[key] = composer;
             composer.Enabled = false;

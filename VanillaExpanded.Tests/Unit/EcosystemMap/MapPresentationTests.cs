@@ -42,15 +42,44 @@ public sealed class MapPresentationTests
         Assert.Empty(ExploredMapCoverage.Capture(layers, view));
     }
 
+    /// <summary>None initializes even an empty catalogue, survives rebuilding and explicitly clears an active species.</summary>
+    [Fact]
+    public void NoneIsTheInitialSelectionAndCanBeRestored()
+    {
+        var selection = new EcosystemMapSelection(item => item.Code, () => "None");
+        Assert.Equal(new[] { EcosystemMapSelection.NoneCode }, selection.Codes);
+        Assert.Equal(new[] { "None" }, selection.Names);
+        Assert.Equal(0, selection.SelectedIndex);
+        Assert.Null(selection.SelectedCode);
+        var animal = Species("game:a", "game:a-name");
+        selection.SetSpecies(new[] { animal });
+        Assert.Equal(new[] { EcosystemMapSelection.NoneCode, animal.Code }, selection.Codes);
+        Assert.Equal(0, selection.SelectedIndex);
+        Assert.Null(selection.ActiveRanges(_ => throw new InvalidOperationException()));
+        selection.Select(animal.Code, true);
+        Assert.Equal(1, selection.SelectedIndex);
+        selection.Select(EcosystemMapSelection.NoneCode, false);
+        Assert.Equal(animal.Code, selection.SelectedCode);
+        selection.Select(EcosystemMapSelection.NoneCode, true);
+        selection.SetSpecies(new[] { animal });
+        Assert.Null(selection.SelectedCode);
+        Assert.Equal(0, selection.SelectedIndex);
+        Assert.Null(selection.ActiveRanges(_ => throw new InvalidOperationException()));
+        selection.Select(animal.Code, true);
+        selection.SetSpecies(Array.Empty<EcosystemSpecies>());
+        Assert.Equal(new[] { EcosystemMapSelection.NoneCode }, selection.Codes);
+        Assert.Null(selection.SelectedCode);
+    }
+
     /// <summary>Localized ordering, stable identity and explicit criteria resolution survive dropdown reconstruction.</summary>
     [Fact]
     public void SelectionSurvivesRecompositionWithoutMergingRules()
     {
         var a = Species("game:a", "game:z-name");
         var b = Species("game:b", "game:a-name");
-        var selection = new EcosystemMapSelection(item => item.Code == a.Code ? "Zebra" : "Antelope");
+        var selection = new EcosystemMapSelection(item => item.Code == a.Code ? "Zebra" : "Antelope", () => "None");
         selection.SetSpecies(new[] { a, b });
-        Assert.Equal(selection.Names.Order(StringComparer.CurrentCulture), selection.Names);
+        Assert.Equal(selection.Names.Skip(1).Order(StringComparer.CurrentCulture), selection.Names.Skip(1));
         selection.Select(a.Code, true);
         selection.SetSpecies(new[] { b, a });
         Assert.Equal(a.Code, selection.SelectedCode);

@@ -41,7 +41,7 @@ Changing the selection uses cached environmental data locally. Panning or zoomin
 
 Proposed presentation behavior:
 
-- Sort species by their localized display names and retain the current selection while the map is recomposed or reopened within the session.
+- Place a localized **None** option first and select it initially. None leaves the map unhighlighted while keeping the dropdown available. Sort the species beneath it by their localized display names, and retain the current selection while the map is recomposed or reopened within the session.
 - Render highlights only over explored map coverage, even when environmental records cover a larger region.
 - Render a red crosshatched pattern overlay over explored areas whose required environmental data is unavailable. Areas with complete data that fail the habitat predicate receive neither the habitat highlight nor the unavailable-data pattern. Clip both overlays to explored coverage and show them only on the full map while the Ecosystem tab is active. Replace the pattern with the evaluated result when the required data becomes available.
 - Keep the dropdown attached to the full world map, following the existing extra-panel mechanism. Render the habitat highlight only in the full map, even when the Ecosystem layer is active while the minimap is visible.

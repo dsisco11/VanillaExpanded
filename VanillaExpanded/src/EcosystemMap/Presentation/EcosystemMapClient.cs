@@ -56,7 +56,7 @@ internal sealed class EcosystemMapClient : IDisposable
             profiler = api.World.FrameProfiler;
             profiler?.Enter("ecosystem-map");
             var ranges = selection.ActiveRanges(resolve);
-            if (ranges == null) return;
+            if (ranges == null) { SuspendPresentation(); return; }
             presentation ??= new(session.Preparation, new HabitatMapGraphics(api), Report);
             suspended = false;
             profiler?.Mark("selection-and-startup");
@@ -80,8 +80,7 @@ internal sealed class EcosystemMapClient : IDisposable
     internal void Close()
     {
         controls.Refresh(false);
-        if (suspended) return;
-        presentation?.Suspend(); suspended = true;
+        SuspendPresentation();
     }
     /// <summary>Detaches event ownership before releasing the graphics and composer resources.</summary>
     public void Dispose()
@@ -94,6 +93,14 @@ internal sealed class EcosystemMapClient : IDisposable
     #endregion
 
     #region Private
+    /// <summary>Stops disposable overlay work for None or map closure without hiding the species controls or stopping acquisition.</summary>
+    private void SuspendPresentation()
+    {
+        if (suspended) return;
+        presentation?.Suspend(); suspended = true;
+    }
+
+
     /// <summary>Defers graphics invalidation until the render thread observes a successful purge.</summary>
     private void OnPurge() => Interlocked.Exchange(ref purged, 1);
     /// <summary>Reloads an existing shader owner on the normal shader event; absent graphics need no reload.</summary>
