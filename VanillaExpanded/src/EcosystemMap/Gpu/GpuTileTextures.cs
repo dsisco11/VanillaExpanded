@@ -11,10 +11,10 @@ internal sealed class GpuTileTextures : IDisposable
     private readonly GpuHabitatTexture? texture;
 
     #region Public API
-    /// <summary>Uploads full unsigned heights and availability/category flags without computing habitat or exploration pixels.</summary>
-    internal GpuTileTextures(TileEnvironment? terrain, int size)
+    /// <summary>Uploads background-prepared height/flag words without packing channels or computing habitat pixels.</summary>
+    internal GpuTileTextures(ushort[] packed, int size)
     {
-        texture = new GpuHabitatTexture(PackedTerrainData.Pack(terrain, size), size,
+        texture = new GpuHabitatTexture(packed, size,
             PixelInternalFormat.Rg16ui, PixelFormat.RgInteger, PixelType.UnsignedShort);
     }
 

@@ -12,6 +12,7 @@ internal sealed class EcosystemDatabase : SQLiteDBConnection
     internal const int RegionalRecordVersion = 2;
     internal const int TileRecordVersion = 3;
     private readonly EcosystemStorageIdentity identity;
+    private PackedTextureStore uploads = null!;
     internal string FilePath { get; }
     public override string DBTypeCode => "ecosystem cache";
 
@@ -34,6 +35,7 @@ internal sealed class EcosystemDatabase : SQLiteDBConnection
             if (!OpenOrCreate(FilePath, ref error, true, true, false))
                 throw new IOException("Cannot open the ecosystem database: " + error);
             VerifyIdentity();
+            uploads = new PackedTextureStore(sqliteConn);
         }
         catch { Close(); throw; }
     }
@@ -60,6 +62,12 @@ internal sealed class EcosystemDatabase : SQLiteDBConnection
                 dimension INTEGER NOT NULL, x INTEGER NOT NULL, z INTEGER NOT NULL,
                 region_x INTEGER NOT NULL, region_z INTEGER NOT NULL, version INTEGER NOT NULL,
                 elevation BLOB NOT NULL, completeness INTEGER NOT NULL, PRIMARY KEY(dimension,x,z));
+            CREATE TABLE IF NOT EXISTS ecosystem_region_upload (
+                dimension INTEGER NOT NULL, x INTEGER NOT NULL, z INTEGER NOT NULL, version INTEGER NOT NULL,
+                payload BLOB NOT NULL, PRIMARY KEY(dimension,x,z));
+            CREATE TABLE IF NOT EXISTS ecosystem_tile_upload (
+                dimension INTEGER NOT NULL, x INTEGER NOT NULL, z INTEGER NOT NULL, version INTEGER NOT NULL,
+                payload BLOB NOT NULL, PRIMARY KEY(dimension,x,z));
             PRAGMA user_version=1;
             """;
         command.ExecuteNonQuery();
@@ -68,12 +76,14 @@ internal sealed class EcosystemDatabase : SQLiteDBConnection
     #endregion
 
     #region Record access
+    #region Original records
     /// <summary>Atomically merges independently arriving regional components; a null component leaves a previously captured input intact.</summary>
     internal void WriteRegion(RegionalEnvironment record)
     {
         var previous = ReadRegion(record.Key);
         var merged = new RegionalEnvironment(record.Key, record.Climate ?? previous?.Climate,
             record.Forest ?? previous?.Forest, record.Shrubs ?? previous?.Shrubs);
+        var packed = new PackedRegionalData(merged, message => logger.Warning(message));
         using var transaction = sqliteConn.BeginTransaction();
         using var command = sqliteConn.CreateCommand();
         command.Transaction = transaction;
@@ -90,6 +100,7 @@ internal sealed class EcosystemDatabase : SQLiteDBConnection
         command.Parameters.AddWithValue("$s", Encode(merged.Shrubs));
         command.Parameters.AddWithValue("$complete", (int)merged.Completeness);
         command.ExecuteNonQuery();
+        uploads.WriteRegion(record.Key, packed, transaction);
         transaction.Commit();
     }
 
@@ -112,6 +123,7 @@ internal sealed class EcosystemDatabase : SQLiteDBConnection
         var previous = ReadTile(tile.Key);
         tile = new TileEnvironment(tile.Key, tile.Size, tile.HasElevation ? tile.Elevation : previous?.Elevation, tile.Ocean ?? previous?.Ocean);
         var region = identity.RegionFor(tile.Key);
+        var packed = PackedTerrainData.Pack(tile, identity.ChunkSize);
         using var transaction = sqliteConn.BeginTransaction();
         using var command = sqliteConn.CreateCommand();
         command.Transaction = transaction;
@@ -128,6 +140,7 @@ internal sealed class EcosystemDatabase : SQLiteDBConnection
         command.Parameters.AddWithValue("$e", EnvironmentalCompression.Encode(EnvironmentalRecordCodec.EncodeTile(tile)));
         command.Parameters.AddWithValue("$complete", (int)tile.Completeness);
         command.ExecuteNonQuery();
+        uploads.WriteTile(tile.Key, tile.Size, packed, transaction);
         transaction.Commit();
     }
 
@@ -147,16 +160,44 @@ internal sealed class EcosystemDatabase : SQLiteDBConnection
         return EnvironmentalRecordCodec.DecodeTile(key, EnvironmentalCompression.Decode((byte[])reader.GetValue(3), maximum), identity.ChunkSize);
     }
 
-    /// <summary>Intentionally removes only captured ecosystem rows; identity/schema remain scoped to the current world.</summary>
+    #endregion
+    #region Upload cache
+    /// <summary>Loads saved RGBA bytes directly; only missing derived buffers require decoding current local originals.</summary>
+    internal PackedRegionalData? ReadRegionForUpload(EcosystemRegionKey key)
+    {
+        var packed = uploads.ReadRegion(key);
+        if (packed != null) return packed;
+        var original = ReadRegion(key);
+        if (original == null) return null;
+        packed = new PackedRegionalData(original, message => logger.Warning(message));
+        uploads.WriteRegion(key, packed);
+        return packed;
+    }
+
+    /// <summary>Loads saved RG16UI words directly, rebuilding only missing/invalid derived data on this worker.</summary>
+    internal PackedTerrainData? ReadTileForUpload(EcosystemTileKey key)
+    {
+        var packed = uploads.ReadTile(key, identity.ChunkSize, identity.RegionFor(key));
+        if (packed != null) return packed;
+        var original = ReadTile(key);
+        if (original == null) return null;
+        packed = new PackedTerrainData(identity.ChunkSize, PackedTerrainData.Pack(original, identity.ChunkSize));
+        uploads.WriteTile(key, identity.ChunkSize, packed.Values);
+        return packed;
+    }
+    #endregion
+    #region Cache clearing
+    /// <summary>Intentionally clears original and derived ecosystem rows; identity/schema remain scoped to the current world.</summary>
     internal void Purge()
     {
         using var transaction = sqliteConn.BeginTransaction();
         using var command = sqliteConn.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = "DELETE FROM ecosystem_map_piece; DELETE FROM ecosystem_region;";
+        command.CommandText = "DELETE FROM ecosystem_tile_upload; DELETE FROM ecosystem_region_upload; DELETE FROM ecosystem_map_piece; DELETE FROM ecosystem_region;";
         command.ExecuteNonQuery();
         transaction.Commit();
     }
+    #endregion
     #endregion
     #endregion
 

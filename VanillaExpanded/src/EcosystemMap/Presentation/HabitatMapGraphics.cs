@@ -11,15 +11,13 @@ namespace VanillaExpanded.EcosystemMap.Presentation;
 internal sealed class HabitatMapGraphics : IHabitatMapGraphics
 {
     private readonly GpuHabitatOverlay overlay;
-    private readonly Vintagestory.API.Common.ILogger logger;
-    private readonly BoundedLru<(EcosystemRegionKey Key, EnvironmentalInput<RegionalEnvironment> Source), GpuRegionalTextures> regions = new(8);
-    private readonly BoundedLru<(EcosystemTileKey Key, EnvironmentalInput<TileEnvironment> Source), GpuTileTextures> tiles = new(128);
+    private readonly BoundedLru<(EcosystemRegionKey Key, EnvironmentalInput<PackedRegionalData> Source), GpuRegionalTextures> regions = new(8);
+    private readonly BoundedLru<(EcosystemTileKey Key, EnvironmentalInput<PackedTerrainData> Source), GpuTileTextures> tiles = new(128);
 
     #region Public API
     /// <summary>Creates the graphics owner and loads the shader through the normal game API.</summary>
     internal HabitatMapGraphics(ICoreClientAPI api)
     {
-        logger = api.Logger;
         overlay = new(api);
         try { if (!overlay.Reload()) throw new InvalidOperationException("Ecosystem shader compilation failed."); }
         catch { overlay.Dispose(); throw; }
@@ -42,13 +40,13 @@ internal sealed class HabitatMapGraphics : IHabitatMapGraphics
         var bundle = receipt.Bundle;
         if (!regions.TryGet((bundle.World.RegionFor(bundle.Key), bundle.Region), out var region))
         {
-            region = new(bundle.Region.Value, logger);
+            region = new(bundle.RegionalTexture ?? throw new InvalidOperationException("Regional upload data was not prepared on the worker."));
             regions.Put((bundle.World.RegionFor(bundle.Key), bundle.Region), region)?.Dispose();
         }
         if (!tiles.TryGet((bundle.Key, bundle.Elevation), out var heights))
         {
             // Coverage is a whole explored chunk here. Unknown chunks never enter this draw path.
-            heights = new(bundle.Elevation.Value, bundle.World.ChunkSize);
+            heights = new(bundle.TerrainTexture ?? throw new InvalidOperationException("Terrain upload data was not prepared on the worker."), bundle.World.ChunkSize);
             tiles.Put((bundle.Key, bundle.Elevation), heights)?.Dispose();
         }
     }

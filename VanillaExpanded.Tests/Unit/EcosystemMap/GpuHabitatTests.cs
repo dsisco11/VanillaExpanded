@@ -21,9 +21,9 @@ public sealed class GpuHabitatTests
         await storage.WriteTileAsync(StorageFixture.Tile(default), storage.CurrentEpoch);
         using var preparation = new GpuHabitatPreparation(storage, new(2, 4, 4, 2));
         var first = (await Prepare(preparation, default))!;
-        Assert.Equal(original.Values, first.Bundle.Region.Value!.Climate!.Values);
-        Assert.Equal(original.TopLeftPadding, first.Bundle.Region.Value.Climate.TopLeftPadding);
-        Assert.Equal(ushort.MaxValue, first.Bundle.Elevation.Value!.Elevation[0]);
+        Assert.Equal(new PackedRegionalData(new(default, original, original, original)).Values, first.Bundle.Region.Value!.Values);
+        Assert.Equal(original.TopLeftPadding, first.Bundle.Region.Value.Layouts[0]!.TopLeftPadding);
+        Assert.Equal(ushort.MaxValue, first.Bundle.Elevation.Value!.Values[0]);
         var work = preparation.Work;
         preparation.CancelPresentation();
         Assert.False(preparation.IsCurrent(first));
@@ -34,7 +34,8 @@ public sealed class GpuHabitatTests
         Assert.True(preparation.IsCurrent(next));
         await storage.WriteRegionAsync(new(default, Shrubs: StorageFixture.Map(1)), storage.CurrentEpoch);
         Assert.False(preparation.IsCurrent(next));
-        Assert.Equal(StorageFixture.Map(1).Values, (await Prepare(preparation, default))!.Bundle.Region.Value!.Shrubs!.Values);
+        Assert.Null((await Prepare(preparation, default))!.Bundle.Region.Value!.Layouts[2]);
+        Assert.Equal(StorageFixture.Map(1).Values, (await storage.ReadRegionAsync(default)).Value!.Shrubs!.Values);
     }
 
     /// <summary>Missing inputs remain explicit, while purge/close revoke late upload receipts without closing durable storage.</summary>

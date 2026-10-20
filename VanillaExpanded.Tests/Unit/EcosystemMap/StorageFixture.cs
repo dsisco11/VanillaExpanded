@@ -15,8 +15,8 @@ internal sealed class StorageFixture : IDisposable
     /// <summary>Initializes the installed provider and creates only this fixture's unique directory.</summary>
     internal StorageFixture() { SQLitePCL.Batteries_V2.Init(); Directory.CreateDirectory(Root); }
     /// <summary>Creates a bounded owner for this test world; callers await/dispose it before fixture cleanup.</summary>
-    internal EnvironmentalStorage Open(EcosystemStorageIdentity? identity = null, int capacity = 2) =>
-        new(Root, identity ?? Identity, Mock.Of<ILogger>(), capacity);
+    internal EnvironmentalStorage Open(EcosystemStorageIdentity? identity = null, int capacity = 2, ILogger? logger = null) =>
+        new(Root, identity ?? Identity, logger ?? Mock.Of<ILogger>(), capacity);
     /// <summary>Creates a small layout containing negative and high-bit integer values to detect lossy encoding.</summary>
     internal static EnvironmentalMap Map(int offset = 0) => new(3, 1, 0,
         new[] { int.MinValue + offset, -123, 0, 1, 127, 255, 256, 0x12345678, int.MaxValue - offset });

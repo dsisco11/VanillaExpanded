@@ -2,7 +2,6 @@ using System;
 using OpenTK.Graphics.OpenGL4;
 using VanillaExpanded.EcosystemMap.Storage;
 using Vintagestory.API.Client;
-using Vintagestory.API.Common;
 
 namespace VanillaExpanded.EcosystemMap.Gpu;
 
@@ -10,16 +9,15 @@ namespace VanillaExpanded.EcosystemMap.Gpu;
 internal sealed class GpuRegionalTextures : IDisposable
 {
     private readonly GpuHabitatTexture? texture;
-    private readonly EnvironmentalMap?[] sources;
+    private readonly PackedMapLayout?[] layouts;
     private readonly int[] offsets;
     private static readonly string[] names = { "climate", "forest", "shrub" };
 
     #region Public API
-    /// <summary>Uploads independent native grids in RGBA channels; unavailable components retain explicit zero-size layouts.</summary>
-    internal GpuRegionalTextures(RegionalEnvironment? region, ILogger logger)
+    /// <summary>Uploads background-prepared RGBA bytes without channel packing; unavailable components retain explicit zero-size layouts.</summary>
+    internal GpuRegionalTextures(PackedRegionalData packed)
     {
-        var packed = new PackedRegionalData(region, message => logger.Warning(message));
-        sources = packed.Sources;
+        layouts = packed.Layouts;
         offsets = packed.Offsets;
         texture = new GpuHabitatTexture(packed.Values, packed.Size,
             PixelInternalFormat.Rgba8, PixelFormat.Rgba, PixelType.UnsignedByte);
@@ -29,9 +27,9 @@ internal sealed class GpuRegionalTextures : IDisposable
     internal void Bind(IShaderProgram shader)
     {
         shader.BindTexture2D("regionalMap", texture!.Id, 0);
-        for (int i = 0; i < sources.Length; i++)
+        for (int i = 0; i < layouts.Length; i++)
         {
-            var source = sources[i];
+            var source = layouts[i];
             shader.Uniform(names[i] + "Layout", source?.Size ?? 0, source?.TopLeftPadding ?? 0, source?.BottomRightPadding ?? 0, offsets[i]);
         }
     }

@@ -1,6 +1,6 @@
 # GPU habitat evaluation
 
-The CPU captures and persists original environmental arrays, reads immutable local snapshots and uploads packed textures. It does not sample terrain columns into suitability grids or generate overlay pixels. `GpuHabitatPreparation` owns bounded local reads and reusable upload bundles; `GpuHabitatOverlay` runs the comparison shader on the graphics thread.
+The CPU captures and persists original environmental arrays, packs channel buffers on the background storage worker, persists them and uploads those buffers as textures. It does not sample terrain columns into suitability grids or generate overlay pixels. `GpuHabitatPreparation` owns bounded reads of persisted channel buffers and reusable upload bundles; `GpuHabitatOverlay` runs the comparison shader on the graphics thread.
 
 ## One selected criteria set
 
@@ -9,7 +9,8 @@ The CPU captures and persists original environmental arrays, reads immutable loc
 ```mermaid
 flowchart LR
     Capture[Original climate forest shrubs heights] --> Storage[Dedicated local database]
-    Storage --> Bundles[Bounded original input bundles]
+    Storage --> Packed[Persisted packed channel buffers]
+    Packed --> Bundles[Bounded upload bundles]
     Bundles --> Upload[Graphics-thread packed textures]
     Selection[One selected range set] --> Uniforms[Comparison uniforms]
     Upload --> Shader[GPU sampling and comparisons]
@@ -21,7 +22,7 @@ flowchart LR
 
 ## GPU sampling and output
 
-Each draw samples one normalized regional texture and one unsigned integer terrain texture. The regional RGBA8 UNORM texture stores raw temperature in R, rainfall in G, forest density in B and shrub density in A. Each source grid is copied into its channel without resampling. Grids with equal inner dimensions align their unpadded origins using per-channel upload offsets, allowing matching neighborhoods to share one RGBA lookup. The physical square fits the union of the shifted grids; original logical sizes and padding still bound every shader read. Climate's unused low byte is omitted only from the GPU representation. Forest and shrubs retain their full 0–255 densities. An unexpected out-of-range density makes only that component unavailable with a warning during upload; it is never silently truncated or saturated. Original persisted arrays remain unchanged.
+Each draw samples one normalized regional texture and one unsigned integer terrain texture. The regional RGBA8 UNORM texture stores raw temperature in R, rainfall in G, forest density in B and shrub density in A. Each source grid is copied into its channel without resampling. Grids with equal inner dimensions align their unpadded origins using per-channel upload offsets, allowing matching neighborhoods to share one RGBA lookup. The physical square fits the union of the shifted grids; original logical sizes and padding still bound every shader read. Climate's unused low byte is omitted only from the GPU representation. Forest and shrubs retain their full 0–255 densities. An unexpected out-of-range density makes only that component unavailable with a warning during background storage packing; it is never silently truncated or saturated. Original persisted arrays remain unchanged.
 
 One terrain RG16UI texture stores full unsigned 16-bit height in R and flags in G: bit 0 means height available, bit 1 known non-ocean, and bit 2 confirmed ocean. Zero ocean bits mean classification unavailable. Height zero remains valid when its availability bit is set. Exploration is not stored in this texture: the live explored-chunk draw list gates every submission, including cached resources after coverage removal. Packing values/categories does not evaluate habitat. Regional inputs are shared across terrain tiles. Adjacent sample neighborhoods use hardware linear filtering at explicit LOD zero. Matching neighborhoods reuse the returned RGBA value across channels; native ongoing-spawn climate/forest share one lookup and shrubs use another. Worldgen chunk corners can skip intermediate shrub texels, so non-adjacent neighborhoods use four explicit corner reads with shader interpolation. Climate channels and ongoing vegetation are truncated back to whole-byte values after filtering; worldgen vegetation retains fractional density. UNORM/filter arithmetic can differ at exact thresholds because of hardware precision; source/unit checks do not establish bit-identical GPU interpolation. All habitat comparisons remain in the shader.
 
@@ -60,8 +61,14 @@ Every source, bundle, receipt and texture cache installs the new visible working
 
 The queue still admits four waiting jobs and one executing job. Jobs check the presentation lifetime and current membership before starting, between regional and tile reads and before publication. Queued departed work completes without further reads; a tile that re-enters before those checks can use the original job. Presentation retains incomplete tasks across view transitions, observes completed off-view results without publishing them, and retries bounded admission on subsequent frames. A regional read already in progress may finish after departure, but cannot revoke protected inputs or publish an inapplicable result. Source updates, ocean updates, purge and world shutdown retain their independent validity checks.
 
-Coverage removal is enforced by the current explored chunk set even when a source remains cached. Coverage re-entry with unchanged source provenance reuses the existing packed height/category textures; per-frame GPU comparisons and the shared graphics pass continue normally. Close clears disposable receipt/graphics ownership and revokes its lifetime, while local source retention returns to the configured floors. Reopen may reuse those original sources but acquires fresh presentation resources. Shader reload does not invalidate environmental source identities.
+Coverage removal is enforced by the current explored chunk set even when a source remains cached. Coverage re-entry with unchanged source provenance reuses the existing packed height/category textures; per-frame GPU comparisons and the shared graphics pass continue normally. Close clears disposable receipt/graphics ownership and revokes its lifetime, while local source retention returns to the configured floors. Reopen may reuse those packed source buffers but acquires fresh presentation resources. Shader reload does not invalidate environmental source identities.
 
 ## Packed input storage
 
 Packing reduces each region from three texture objects to one and each tile from two to one. With native 20×20 climate, 17×17 forest and 33×33 shrub grids, padding alignment keeps the regional payload at 33×33×4 = 4,356 bytes. A 32×32 RG16UI terrain tile is 4,096 bytes; its 16-bit flags channel increases payload relative to separate R16UI height and R8UI coverage (3,072 bytes). These are format-derived payload sizes, excluding driver overhead, not measured frame-time or allocation savings. The current implementation still changes tile texture bindings for each draw; atlas consolidation is not implemented.
+
+## Background channel packing
+
+Storage/Packing owns CPU channel layout and versioned upload serialization. Source writes produce the packed region/tile buffers on EnvironmentalStorage's single background worker and save them atomically with merged originals. Upload reads normally decompress these buffers directly, without rebuilding channels or decoding original environmental arrays. A missing derived cache can be rebuilt only from supported local originals, also on that worker. GpuHabitatPreparation creates missing-source placeholders on its background job worker, outside its cache gate. Source leases, current explored membership and purge/session epochs still gate publication.
+
+GpuRegionalTextures and GpuTileTextures accept ready-to-upload buffers; they perform no channel packing. The graphics thread retains GL allocation/upload/binding/disposal ownership. Removing packing from rendering does not establish that all loading or upload costs are resolved. Original arrays remain separately available for acquisition merges and exact persistence reads; GPU source caches retain packed layouts/bytes rather than a duplicate set of original arrays.

@@ -53,7 +53,7 @@ public sealed class HabitatTileBindingTests
     {
         var region = (GpuRegionalTextures)RuntimeHelpers.GetUninitializedObject(typeof(GpuRegionalTextures));
         Set(region, "texture", RuntimeHelpers.GetUninitializedObject(typeof(GpuHabitatTexture)));
-        Set(region, "sources", new EnvironmentalMap?[3]);
+        Set(region, "layouts", new PackedMapLayout?[3]);
         Set(region, "offsets", new int[3]);
         return region;
     }

@@ -1,16 +1,26 @@
 using System;
-using VanillaExpanded.EcosystemMap.Storage;
 
-namespace VanillaExpanded.EcosystemMap.Gpu;
+namespace VanillaExpanded.EcosystemMap.Storage;
 
 /// <summary>Packs exact generated heights and independent availability/category flags for an RG16UI upload.</summary>
-internal static class PackedTerrainData
+internal sealed class PackedTerrainData
 {
     internal const ushort HeightKnown = 1;
     internal const ushort KnownLand = 2;
     internal const ushort Ocean = 4;
 
+    internal int Size { get; }
+    internal ushort[] Values { get; }
+    internal bool HasElevation => (Values[1] & HeightKnown) != 0;
+
     #region Public API
+    /// <summary>Owns worker-decoded interleaved words without copying or repacking them during publication.</summary>
+    internal PackedTerrainData(int size, ushort[] values)
+    {
+        if (size <= 0 || (long)size * size * 2 != values.Length) throw new ArgumentException("Invalid packed terrain size.");
+        Size = size; Values = values;
+    }
+
     /// <summary>Writes interleaved height/flags; explored coverage belongs to the current chunk draw list, not cached texels.</summary>
     internal static ushort[] Pack(TileEnvironment? terrain, int size)
     {

@@ -19,9 +19,9 @@ public sealed class PackedHabitatDataTests
         Assert.Equal(33, packed.Size);
         Assert.Equal(33 * 33 * 4, packed.Values.Length);
         Assert.Equal(new[] { 0, 2, 0 }, packed.Offsets);
-        Assert.Same(climate, packed.Sources[0]);
-        Assert.Same(forest, packed.Sources[1]);
-        Assert.Same(shrubs, packed.Sources[2]);
+        Assert.Equal(new PackedMapLayout(climate.Size, climate.TopLeftPadding, climate.BottomRightPadding), packed.Layouts[0]);
+        Assert.Equal(new PackedMapLayout(forest.Size, forest.TopLeftPadding, forest.BottomRightPadding), packed.Layouts[1]);
+        Assert.Equal(new PackedMapLayout(shrubs.Size, shrubs.TopLeftPadding, shrubs.BottomRightPadding), packed.Layouts[2]);
         for (int z = 0; z < packed.Size; z++)
         for (int x = 0; x < packed.Size; x++)
         {
@@ -43,7 +43,7 @@ public sealed class PackedHabitatDataTests
         var packed = new PackedRegionalData(new(default, climate, forest, shrubs));
         for (int component = 0; component < 3; component++)
         {
-            var source = packed.Sources[component]!;
+            var source = new[] { climate, forest, shrubs }[component];
             int[] restored = Enumerable.Range(0, source.Values.Count).Select(i =>
             {
                 int shift = packed.Offsets[component];
@@ -85,7 +85,7 @@ public sealed class PackedHabitatDataTests
         var missingClimate = new PackedRegionalData(new(default, Forest: forest));
         Assert.Equal(0, missingClimate.Offsets[1]);
         Assert.Equal(8, missingClimate.Size);
-        Assert.Null(missingClimate.Sources[0]);
+        Assert.Null(missingClimate.Layouts[0]);
     }
 
     /// <summary>Unexpected out-of-range density affects only that component and reports the unsupported input without truncation.</summary>
@@ -99,15 +99,15 @@ public sealed class PackedHabitatDataTests
             var warnings = new List<string>();
             var bad = new EnvironmentalMap(2, 0, 1, new[] { 0, 1, invalid, 255 });
             var packed = new PackedRegionalData(new(default, climate, bad, valid), warnings.Add);
-            Assert.Same(climate, packed.Sources[0]);
-            Assert.Null(packed.Sources[1]);
-            Assert.Same(valid, packed.Sources[2]);
+            Assert.Equal(new PackedMapLayout(climate.Size, climate.TopLeftPadding, climate.BottomRightPadding), packed.Layouts[0]);
+            Assert.Null(packed.Layouts[1]);
+            Assert.Equal(new PackedMapLayout(valid.Size, valid.TopLeftPadding, valid.BottomRightPadding), packed.Layouts[2]);
             Assert.Single(warnings);
             Assert.Equal(invalid, bad.Values[2]);
         }
         var missing = new PackedRegionalData(null);
         Assert.Equal(1, missing.Size);
-        Assert.All(missing.Sources, Assert.Null);
+        Assert.All(missing.Layouts, Assert.Null);
         Assert.Equal(new byte[4], missing.Values);
     }
 

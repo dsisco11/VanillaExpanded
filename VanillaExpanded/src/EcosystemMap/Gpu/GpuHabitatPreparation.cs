@@ -13,8 +13,8 @@ internal sealed class GpuHabitatPreparation : IDisposable
     private readonly object gate = new();
     private readonly EnvironmentalStorage storage;
     private readonly GpuHabitatLimits limits;
-    private readonly BoundedLru<EcosystemRegionKey, EnvironmentalInput<RegionalEnvironment>> regions;
-    private readonly BoundedLru<EcosystemTileKey, EnvironmentalInput<TileEnvironment>> tiles;
+    private readonly BoundedLru<EcosystemRegionKey, EnvironmentalInput<PackedRegionalData>> regions;
+    private readonly BoundedLru<EcosystemTileKey, EnvironmentalInput<PackedTerrainData>> tiles;
     private readonly BoundedLru<EcosystemTileKey, GpuHabitatBundle> bundles;
     private readonly Channel<GpuHabitatJob> jobs;
     private readonly HashSet<EcosystemTileKey> pending = new();
@@ -148,26 +148,34 @@ internal sealed class GpuHabitatPreparation : IDisposable
         }
     }
 
-    /// <summary>Reads only original local snapshots; species criteria and per-column comparisons stay on the GPU.</summary>
+    /// <summary>Reads saved upload buffers; species criteria and per-column comparisons stay on the GPU.</summary>
     private async Task<GpuHabitatReceipt?> PrepareAsync(GpuHabitatJob job)
     {
         if (!JobCurrent(job)) return null;
         var region = await RegionAsync(storage.Identity.RegionFor(job.Key)).ConfigureAwait(false);
         if (!JobCurrent(job)) return null;
         var tile = await TileAsync(job.Key).ConfigureAwait(false);
+        if (!JobCurrent(job)) return null;
+        // Allocate missing-source placeholders outside the cache gate, so rendering never waits on buffer construction.
+        var regionalTexture = region.Value ?? new PackedRegionalData(null);
+        var terrainTexture = tile.Value?.Values ?? new ushort[checked(storage.Identity.ChunkSize * storage.Identity.ChunkSize * 2)];
         lock (gate)
         {
             if (!JobCurrent(job) || !InputCurrent(region) || !InputCurrent(tile)) return null;
-            var bundle = new GpuHabitatBundle(job.Key, storage.Identity, region, tile);
+            var bundle = new GpuHabitatBundle(job.Key, storage.Identity, region, tile)
+            {
+                RegionalTexture = regionalTexture,
+                TerrainTexture = terrainTexture
+            };
             bundles.Put(job.Key, bundle);
             preparedBundles++;
             return new(bundle, scope);
         }
     }
-    /// <summary>Loads a shared regional snapshot while retaining a pending lease so receipt updates can invalidate an in-flight read.</summary>
-    private async Task<EnvironmentalInput<RegionalEnvironment>> RegionAsync(EcosystemRegionKey key)
+    /// <summary>Loads a shared packed regional snapshot while retaining a pending lease so receipt updates can invalidate an in-flight read.</summary>
+    private async Task<EnvironmentalInput<PackedRegionalData>> RegionAsync(EcosystemRegionKey key)
     {
-        EnvironmentalInput<RegionalEnvironment> input;
+        EnvironmentalInput<PackedRegionalData> input;
         lock (gate)
         {
             if (regions.TryGet(key, out var cached) && InputCurrent(cached!) && cached!.Loaded) return cached;
@@ -176,7 +184,7 @@ internal sealed class GpuHabitatPreparation : IDisposable
             var evicted = regions.Put(key, input);
             if (evicted != null) evicted.Valid = false;
         }
-        var read = await storage.ReadRegionAsync(key).ConfigureAwait(false);
+        var read = await storage.ReadRegionForUploadAsync(key).ConfigureAwait(false);
         lock (gate)
         {
             if (!ReferenceEquals(read.Epoch, input.Epoch)) input.Valid = false;
@@ -185,10 +193,10 @@ internal sealed class GpuHabitatPreparation : IDisposable
         return input;
     }
 
-    /// <summary>Loads a separate generated-height snapshot with the same targeted update and purge provenance guarantees.</summary>
-    private async Task<EnvironmentalInput<TileEnvironment>> TileAsync(EcosystemTileKey key)
+    /// <summary>Loads packed height/flag words with the same targeted update and purge provenance guarantees.</summary>
+    private async Task<EnvironmentalInput<PackedTerrainData>> TileAsync(EcosystemTileKey key)
     {
-        EnvironmentalInput<TileEnvironment> input;
+        EnvironmentalInput<PackedTerrainData> input;
         lock (gate)
         {
             if (tiles.TryGet(key, out var cached) && InputCurrent(cached!) && cached!.Loaded) return cached;
@@ -197,7 +205,7 @@ internal sealed class GpuHabitatPreparation : IDisposable
             var evicted = tiles.Put(key, input);
             if (evicted != null) evicted.Valid = false;
         }
-        var read = await storage.ReadTileAsync(key).ConfigureAwait(false);
+        var read = await storage.ReadTileForUploadAsync(key).ConfigureAwait(false);
         lock (gate)
         {
             if (!ReferenceEquals(read.Epoch, input.Epoch)) input.Valid = false;

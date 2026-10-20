@@ -14,6 +14,16 @@ Each regional component and tile blob is compressed independently by the built-i
 
 The envelope has a 20-byte little-endian header: magic VED1 (identifying this Deflate format), decoded byte length, compressed byte length and a 64-bit FNV-1a checksum over decoded bytes. Reads require matching lengths, exact bounded decompression with no extra output and a matching checksum before constructing records. The checksum detects accidental damage; it does not authenticate data. Decoded payloads are limited to 64 MiB per blob on both writes and reads; tile reads additionally enforce their world's maximum serialized chunk size. These are format safety limits, not measured gameplay cache budgets. Missing, incompatible or malformed components remain unavailable. A damaged optional ocean component in an otherwise valid raw tile layout remains unavailable independently of elevations.
 
+## Persisted upload buffers
+
+Storage also owns two rebuildable derived tables in the same dedicated file: ecosystem_region_upload and ecosystem_tile_upload. They store Deflate-compressed upload buffers with independent format versions, lengths and integrity checks. Regional blobs contain aligned RGBA8 bytes plus original per-channel size/padding/offset metadata; terrain blobs contain exact interleaved RG16UI height/flag words. The original environmental tables and record formats remain unchanged. Optional derived tables are created when opening this feature database; no vanilla database or legacy source decoder is involved.
+
+The serialized storage worker merges each original partial update, packs its channels and commits the original record and corresponding upload buffer in the same transaction. Source-change notifications happen after that commit, retaining targeted lease invalidation. Packing, serialization and compression never run in a rendering callback. PackedTextureStore borrows the owning connection and transaction; it does not open another connection or own another worker.
+
+Upload reads use the packed buffers directly without decoding the original arrays first. They validate the derived version/layout and supported original-row identity/version; terrain association also checks the expected region. Missing or incompatible derived entries can be rebuilt on the storage worker from supported originals already in this database, then saved for subsequent reads. Missing/unsupported originals cannot trigger a rebuild. This is local derived-cache construction, not historical backfill, source-format migration or a world-data request. Dropping a derived entry does not discard captured environmental knowledge.
+
+Original snapshots remain authoritative capture/merge data. Packed records are persisted but disposable caches; GPU preparation bundles, outstanding jobs and GL resources remain disposable memory. Purge removes both original and derived tables under the same epoch/barrier. Normal shutdown drains accepted source writes together with their packed buffers. No measured map-loading speedup or acquisition-throughput improvement is implied by this ownership change.
+
 ## Ordering and lifetime
 
 ```mermaid
@@ -26,9 +36,9 @@ flowchart LR
     E --> F[Disposable evaluation and presentation]
 ```
 
-The caller chooses queue capacity for its acquisition workload and awaits submissions for backpressure. One worker serializes reads and updates. Each write transaction contains one regional or tile record; purge uses one transaction to clear both environmental tables. Disk work never executes on a render callback. No measured throughput or final acquisition queue budget is implied by this component.
+The caller chooses queue capacity for its acquisition workload and awaits submissions for backpressure. One worker serializes reads and updates. Each source-write transaction contains one regional or tile record and its corresponding packed upload buffer; purge uses one transaction to clear original and derived tables. Disk work never executes on a render callback. No measured throughput or final acquisition queue budget is implied by this component.
 
-Every producer and read result carries a `StorageEpoch`. Consumers check `IsCurrent` before publishing derived results and observe the epoch's disposable-work cancellation token. [GpuHabitatPreparation](HabitatEvaluation.md) owns disposable original-input bundles for GPU upload; rendering resources belong to presentation. None are persisted by storage. Successful commits notify GPU input preparation for targeted source/bundle invalidation.
+Every producer and read result carries a `StorageEpoch`. Consumers check `IsCurrent` before publishing derived results and observe the epoch's disposable-work cancellation token. [GpuHabitatPreparation](HabitatEvaluation.md) owns disposable bundles of prepacked local inputs for GPU upload; rendering resources belong to presentation. Those bundles are not persisted; their reusable channel buffers are cached separately in the upload tables. Successful commits notify GPU input preparation for targeted source/bundle invalidation.
 
 Normal shutdown closes admission, cancels disposable work, drains accepted persistent operations and closes the connection. It preserves the persistent generation so accepted writes remain durable. Later producers are rejected. Synchronous and asynchronous disposal join the same shutdown task.
 

@@ -26,6 +26,7 @@ internal sealed class EnvironmentalStorage : IDisposable, IAsyncDisposable
 
     #region Public API
     #region Opening and records
+    #region Initialization
     /// <summary>Starts a bounded serialized worker; the caller supplies queue capacity for its acquisition workload.</summary>
     internal EnvironmentalStorage(string dataPath, EcosystemStorageIdentity identity, ILogger logger, int queueCapacity)
     {
@@ -43,6 +44,8 @@ internal sealed class EnvironmentalStorage : IDisposable, IAsyncDisposable
     /// <summary>Checks source and derived result validity, including normal shutdown.</summary>
     internal bool IsCurrent(StorageEpoch candidate) => Volatile.Read(ref accepting) && ReferenceEquals(CurrentEpoch, candidate);
 
+    #endregion
+    #region Original records
     /// <summary>Queues an immutable partial regional update, returning false if its producer belongs to a purged/closed session.</summary>
     internal Task<bool> WriteRegionAsync(RegionalEnvironment record, StorageEpoch producer) =>
         SubmitAsync(producer, db => { db.WriteRegion(record); Notify(new(Region: record.Key)); return true; }, false);
@@ -66,6 +69,24 @@ internal sealed class EnvironmentalStorage : IDisposable, IAsyncDisposable
         var value = await SubmitAsync(ticket, db => db.ReadTile(key), null).ConfigureAwait(false);
         return new StorageRead<TileEnvironment>(ticket, value);
     }
+    #endregion
+    #region Upload-ready records
+    /// <summary>Queues upload-ready regional reads and any local cache rebuild on the serialized storage worker.</summary>
+    internal async Task<StorageRead<PackedRegionalData>> ReadRegionForUploadAsync(EcosystemRegionKey key)
+    {
+        StorageEpoch ticket = CurrentEpoch;
+        var value = await SubmitAsync(ticket, db => db.ReadRegionForUpload(key), null).ConfigureAwait(false);
+        return new StorageRead<PackedRegionalData>(ticket, value);
+    }
+
+    /// <summary>Queues persisted height/flag reads and any required channel packing away from rendering callbacks.</summary>
+    internal async Task<StorageRead<PackedTerrainData>> ReadTileForUploadAsync(EcosystemTileKey key)
+    {
+        StorageEpoch ticket = CurrentEpoch;
+        var value = await SubmitAsync(ticket, db => db.ReadTileForUpload(key), null).ConfigureAwait(false);
+        return new StorageRead<PackedTerrainData>(ticket, value);
+    }
+    #endregion
     #endregion
 
     #region Purge and shutdown

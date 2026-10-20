@@ -110,7 +110,7 @@ public sealed class OceanClassificationTests
             prep.TryPrepare(key, out var pending);
             var first = (await pending)!;
             Assert.False(first.Bundle.Elevation.Value!.HasElevation);
-            Assert.NotNull(first.Bundle.Elevation.Value.Ocean);
+            Assert.Equal((ushort)4, first.Bundle.Elevation.Value.Values[1]);
             await storage.WriteTileAsync(StorageFixture.Tile(key), storage.CurrentEpoch);
             Assert.False(prep.IsCurrent(first));
             var merged = (await storage.ReadTileAsync(key)).Value!;

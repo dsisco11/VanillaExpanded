@@ -140,8 +140,8 @@ public sealed class HabitatViewRetentionTests
         }
         // Use empty texture owners instead of a GL context. A mistaken cache miss in real Prepare would attempt GL and fail.
         var graphics = (HabitatMapGraphics)RuntimeHelpers.GetUninitializedObject(typeof(HabitatMapGraphics));
-        var regions = new BoundedLru<(EcosystemRegionKey Key, EnvironmentalInput<RegionalEnvironment> Source), GpuRegionalTextures>(3);
-        var tiles = new BoundedLru<(EcosystemTileKey Key, EnvironmentalInput<TileEnvironment> Source), GpuTileTextures>(3);
+        var regions = new BoundedLru<(EcosystemRegionKey Key, EnvironmentalInput<PackedRegionalData> Source), GpuRegionalTextures>(3);
+        var tiles = new BoundedLru<(EcosystemTileKey Key, EnvironmentalInput<PackedTerrainData> Source), GpuTileTextures>(3);
         SetField(graphics, "regions", regions); SetField(graphics, "tiles", tiles);
         foreach (var receipt in receipts)
         {
