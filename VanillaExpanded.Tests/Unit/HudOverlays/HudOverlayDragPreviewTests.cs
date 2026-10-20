@@ -21,6 +21,54 @@ public sealed class HudOverlayDragPreviewTests : IDisposable
     public HudOverlayDragPreviewTests() => RuntimeEnv.GUIScale = 1;
     /// <summary>Restores the borrowed engine geometry setting.</summary>
     public void Dispose() => RuntimeEnv.GUIScale = initialScale;
+
+    /// <summary>A destination preview hides the source ghost without losing identity, and withdrawing it restores the immutable capture.</summary>
+    [Fact]
+    public void GroupingPreviewSuppressionIsReversibleAndCancellationRestoresOwnership()
+    {
+        using var storage = new HudLayoutFixture();
+        var source = storage.Add("test:source", "source"); var target = storage.Add("test:target", "target");
+        var containers = new HudOverlayContainers(storage.Api.Object, storage.Registry);
+        var origin = new PointF(30, 40);
+        containers.SetMovable("source", true, origin);
+        var authoritative = containers.Resolved.ToArray();
+        int writes = storage.Writes;
+        using var layout = new HudOverlayGroupLayout();
+        var anchors = new HudOverlayAnchorContext(ElementBounds.Fixed(0, 0, 800, 600).WithEmptyParent(), () => 1, () => null);
+        anchors.BeginFrame();
+        layout.Apply(anchors, containers.Definition(containers.Owner(source.Id)!),
+            new[] { new KeyValuePair<HudOverlayRegistration, SizeF>(source, new(40, 20)) });
+        var captured = HudOverlayDragPreview.Capture(new[] { layout });
+        var startingBounds = (captured[0].Bounds.renderX, captured[0].Bounds.renderY);
+        var movement = containers.Get("source"); movement.Begin(origin, origin, 1);
+        Assert.True(movement.Dragging);
+        var preview = new HudOverlayDragPreview(); preview.Begin(movement, captured);
+        var candidate = new HudSnapCandidate("join", new HudSnapTarget("target", target.Id, new RectangleF(200, 150, 80, 60), 5),
+            HudSnapSide.Right, HudOverlayCrossAlignment.Center, new PointF(280, 150), 0, new RectangleF(200, 150, 120, 60));
+        Assert.True(containers.PreviewJoin(candidate, new PointF(200, 150)));
+        preview.Refresh(groupingPreview: true);
+        Assert.Empty(preview.Originals);
+        Assert.True(preview.Contains(source)); Assert.False(preview.Contains(target));
+        containers.ClearSnap(origin);
+        preview.Refresh();
+        Assert.Same(captured[0], Assert.Single(preview.Originals));
+        Assert.Equal(startingBounds, (preview.Originals[0].Bounds.renderX, preview.Originals[0].Bounds.renderY));
+        Assert.True(preview.Contains(source));
+        Assert.True(containers.PreviewJoin(candidate, new PointF(200, 150)));
+        preview.Refresh(groupingPreview: true);
+        containers.Cancel(); preview.Refresh();
+        Assert.Equal(authoritative, containers.Resolved);
+        layout.Apply(anchors, containers.Definition(containers.Owner(source.Id)!),
+            new[] { new KeyValuePair<HudOverlayRegistration, SizeF>(source, new(40, 20)) });
+        Assert.Equal(startingBounds, (layout.Members[0].Bounds.renderX, layout.Members[0].Bounds.renderY));
+        Assert.Empty(preview.Originals); Assert.False(preview.Contains(source));
+        Assert.Equal(writes, storage.Writes);
+        movement.Begin(origin, origin, 1);
+        preview.Refresh(groupingPreview: true);
+        Assert.False(preview.Contains(source)); Assert.Empty(preview.Originals);
+        movement.Cancel();
+    }
+
     /// <summary>Individual capture copies only its member while container capture retains all starting members.</summary>
     [Theory]
     [InlineData(true, 70, 30, 120, 80)]

@@ -333,7 +333,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         // Lifecycle invalidation also runs when hidden GUI suppresses normal drawing.
         _ = menuInput?.IsOpened;
         RefreshSnap();
-        dragPreview.Refresh();
+        dragPreview.Refresh(snapping?.Selected?.Grouping == true);
         if (!IsOpened() || capi.HideGuis) return;
         // Keep consumers alive until all composer callbacks finish, including removals requested by drawing.
         rendering = true;
@@ -355,7 +355,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
                     try { backdropBatch?.Flush(capi.Render); }
                     catch (Exception error) { boundaryFailure?.Invoke(error); }
                 }
-                // Keep the source trace visible even when the detached remainder reflows over its old slot.
+                // Source traces remain available during free dragging; a group preview displays only the destination.
                 DrawGroup(dragPreview.Originals, 0);
                 hoverLabels.Draw(groups.Where(pair => visibleGroups.Contains(pair.Key)).Select(pair => pair.Value),
                     registration => active.Contains(registration) && isDrawable(registration), deltaTime,
