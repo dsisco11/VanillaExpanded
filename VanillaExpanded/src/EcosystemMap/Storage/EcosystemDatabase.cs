@@ -9,6 +9,8 @@ namespace VanillaExpanded.EcosystemMap.Storage;
 internal sealed class EcosystemDatabase : SQLiteDBConnection
 {
     internal const int SchemaVersion = 1;
+    internal const int RegionalRecordVersion = 2;
+    internal const int TileRecordVersion = 3;
     private readonly EcosystemStorageIdentity identity;
     internal string FilePath { get; }
     public override string DBTypeCode => "ecosystem cache";
@@ -82,7 +84,7 @@ internal sealed class EcosystemDatabase : SQLiteDBConnection
                 forest=excluded.forest, shrubs=excluded.shrubs, completeness=excluded.completeness;
             """;
         AddKey(command, record.Key.X, record.Key.Z, record.Key.Dimension);
-        command.Parameters.AddWithValue("$v", RegionalEnvironment.Version);
+        command.Parameters.AddWithValue("$v", RegionalRecordVersion);
         command.Parameters.AddWithValue("$c", Encode(merged.Climate));
         command.Parameters.AddWithValue("$f", Encode(merged.Forest));
         command.Parameters.AddWithValue("$s", Encode(merged.Shrubs));
@@ -98,7 +100,7 @@ internal sealed class EcosystemDatabase : SQLiteDBConnection
         command.CommandText = "SELECT version,climate,forest,shrubs FROM ecosystem_region WHERE dimension=$d AND x=$x AND z=$z";
         AddKey(command, key.X, key.Z, key.Dimension);
         using var reader = command.ExecuteReader();
-        if (!reader.Read() || reader.GetInt32(0) != RegionalEnvironment.Version) return null;
+        if (!reader.Read() || reader.GetInt32(0) != RegionalRecordVersion) return null;
         return new RegionalEnvironment(key, ReadMap(reader, 1), ReadMap(reader, 2), ReadMap(reader, 3));
     }
 
@@ -122,8 +124,8 @@ internal sealed class EcosystemDatabase : SQLiteDBConnection
         AddKey(command, tile.Key.X, tile.Key.Z, tile.Key.Dimension);
         command.Parameters.AddWithValue("$rx", region.X);
         command.Parameters.AddWithValue("$rz", region.Z);
-        command.Parameters.AddWithValue("$v", TileEnvironment.Version);
-        command.Parameters.AddWithValue("$e", EnvironmentalRecordCodec.EncodeTile(tile));
+        command.Parameters.AddWithValue("$v", TileRecordVersion);
+        command.Parameters.AddWithValue("$e", EnvironmentalCompression.Encode(EnvironmentalRecordCodec.EncodeTile(tile)));
         command.Parameters.AddWithValue("$complete", (int)tile.Completeness);
         command.ExecuteNonQuery();
         transaction.Commit();
@@ -137,9 +139,12 @@ internal sealed class EcosystemDatabase : SQLiteDBConnection
         AddKey(command, key.X, key.Z, key.Dimension);
         using var reader = command.ExecuteReader();
         var region = identity.RegionFor(key);
-        if (!reader.Read() || (reader.GetInt32(0) != 1 && reader.GetInt32(0) != TileEnvironment.Version)
+        if (!reader.Read() || reader.GetInt32(0) != TileRecordVersion
             || reader.GetInt32(1) != region.X || reader.GetInt32(2) != region.Z) return null;
-        return EnvironmentalRecordCodec.DecodeTile(key, (byte[])reader.GetValue(3), identity.ChunkSize);
+        // Geometry bounds tile decompression more tightly than the general regional safety ceiling.
+        long cells = (long)identity.ChunkSize * identity.ChunkSize;
+        int maximum = (int)Math.Min(EnvironmentalCompression.MaximumDecodedLength, 16L + cells * 2 + (cells + 3) / 4);
+        return EnvironmentalRecordCodec.DecodeTile(key, EnvironmentalCompression.Decode((byte[])reader.GetValue(3), maximum), identity.ChunkSize);
     }
 
     /// <summary>Intentionally removes only captured ecosystem rows; identity/schema remain scoped to the current world.</summary>
@@ -191,9 +196,9 @@ internal sealed class EcosystemDatabase : SQLiteDBConnection
     }
 
     /// <summary>Encodes an available component or stores an explicit SQL null for missing data.</summary>
-    private static object Encode(EnvironmentalMap? map) => map == null ? DBNull.Value : EnvironmentalRecordCodec.EncodeMap(map);
+    private static object Encode(EnvironmentalMap? map) => map == null ? DBNull.Value : EnvironmentalCompression.Encode(EnvironmentalRecordCodec.EncodeMap(map));
     /// <summary>Validates a component independently so one unavailable input cannot make other components look absent.</summary>
     private static EnvironmentalMap? ReadMap(SqliteDataReader reader, int index) =>
-        reader.IsDBNull(index) ? null : EnvironmentalRecordCodec.DecodeMap((byte[])reader.GetValue(index));
+        reader.IsDBNull(index) ? null : EnvironmentalRecordCodec.DecodeMap(EnvironmentalCompression.Decode((byte[])reader.GetValue(index)));
     #endregion
 }

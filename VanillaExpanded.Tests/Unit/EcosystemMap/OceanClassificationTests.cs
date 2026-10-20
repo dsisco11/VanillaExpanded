@@ -52,9 +52,9 @@ public sealed class OceanClassificationTests
         Assert.Throws<NotSupportedException>(() => new NativeOceanClassifier(fixture.Terrain, fixture.Blocks.Object, fixture.Palette, 16));
     }
 
-    /// <summary>Old height records retain elevations with unknown classification; the new two-bit component roundtrips without heights.</summary>
+    /// <summary>Unsupported old layouts remain unavailable; current two-bit classification roundtrips without heights.</summary>
     [Fact]
-    public void CodecKeepsExistingHeightsAndIndependentOcean()
+    public void CodecRejectsOldLayoutsAndKeepsIndependentOcean()
     {
         var key = new EcosystemTileKey(0, 0);
         var original = StorageFixture.Tile(key);
@@ -63,13 +63,11 @@ public sealed class OceanClassificationTests
         BinaryPrimitives.WriteInt32LittleEndian(old.AsSpan(4), 32);
         BinaryPrimitives.WriteInt32LittleEndian(old.AsSpan(8), 1024);
         for (int i = 0; i < 1024; i++) BinaryPrimitives.WriteUInt16LittleEndian(old.AsSpan(12 + i * 2), original.Elevation[i]);
-        var decoded = EnvironmentalRecordCodec.DecodeTile(key, old, 32)!;
-        Assert.Equal(original.Elevation, decoded.Elevation);
-        Assert.Null(decoded.Ocean);
+        Assert.Null(EnvironmentalRecordCodec.DecodeTile(key, old, 32));
         var mask = new OceanMask(32, Enumerable.Range(0, 1024).Select(i => (byte)(i % 3)));
         byte[] encoded = EnvironmentalRecordCodec.EncodeTile(new(key, 32, ocean: mask));
         Assert.Equal(16 + 256, encoded.Length);
-        decoded = EnvironmentalRecordCodec.DecodeTile(key, encoded, 32)!;
+        var decoded = EnvironmentalRecordCodec.DecodeTile(key, encoded, 32)!;
         Assert.False(decoded.HasElevation);
         Assert.Equal(mask.Columns, decoded.Ocean!.Columns);
         encoded[16] = 3;

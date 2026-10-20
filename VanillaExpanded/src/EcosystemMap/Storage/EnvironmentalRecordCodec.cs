@@ -55,38 +55,35 @@ internal static class EnvironmentalRecordCodec
         return bytes;
     }
 
-    /// <summary>Retains valid height-only records and independently decodes compact semantic classification when present.</summary>
+    /// <summary>Decodes only the current raw tile layout, with independently available height and semantic classification.</summary>
     internal static TileEnvironment? DecodeTile(EcosystemTileKey key, byte[]? bytes, int expectedSize)
     {
         if (bytes == null || bytes.Length < 12 || ReadInt(bytes, 4) != expectedSize || expectedSize <= 0) return null;
         int version = ReadInt(bytes, 0), count = ReadInt(bytes, 8);
         long cells = (long)expectedSize * expectedSize;
-        if (version != 1 && version != TileEnvironment.Version) return null;
-        if (count < 0 || (count != cells && (version == 1 || count != 0))) return null;
+        if (version != TileEnvironment.Version) return null;
+        if (count < 0 || (count != cells && count != 0)) return null;
         long offset = 12L + count * 2L;
-        if (offset > bytes.Length || (version == 1 && offset != bytes.Length)) return null;
+        if (offset > bytes.Length) return null;
         ushort[] values = new ushort[count];
         for (int i = 0; i < count; i++) values[i] = BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(12 + i * 2, 2));
         OceanMask? ocean = null;
-        if (version == TileEnvironment.Version)
+        if (offset + 4 > bytes.Length) return null;
+        int length = ReadInt(bytes, (int)offset);
+        if (length < 0 || offset + 4 + length != bytes.Length) return null;
+        if (length != 0)
         {
-            if (offset + 4 > bytes.Length) return null;
-            int length = ReadInt(bytes, (int)offset);
-            if (length < 0 || offset + 4 + length != bytes.Length) return null;
-            if (length != 0)
+            // A damaged optional component must not erase otherwise valid terrain heights.
+            if (length == (cells + 3) / 4)
             {
-                // A damaged optional component must not erase otherwise valid terrain heights.
-                if (length == (cells + 3) / 4)
+                byte[] columns = new byte[(int)cells];
+                bool valid = true;
+                for (int i = 0; i < columns.Length; i++)
                 {
-                    byte[] columns = new byte[(int)cells];
-                    bool valid = true;
-                    for (int i = 0; i < columns.Length; i++)
-                    {
-                        columns[i] = (byte)((bytes[(int)offset + 4 + i / 4] >> ((i % 4) * 2)) & 3);
-                        valid &= columns[i] <= 2;
-                    }
-                    if (valid) ocean = new OceanMask(expectedSize, columns);
+                    columns[i] = (byte)((bytes[(int)offset + 4 + i / 4] >> ((i % 4) * 2)) & 3);
+                    valid &= columns[i] <= 2;
                 }
+                if (valid) ocean = new OceanMask(expectedSize, columns);
             }
         }
         return new TileEnvironment(key, expectedSize, values, ocean);
