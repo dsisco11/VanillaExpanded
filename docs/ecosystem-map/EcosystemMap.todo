@@ -389,7 +389,7 @@ Outcome: regional and terrain inputs occupy stable rectangles in two bounded atl
 - [ ] Implement separate regional and terrain atlas ownership using the packed formats from 9.2. Allocate each regional source once for all dependent tiles and retain independent channel-layout metadata alongside atlas addresses. Retain exact integer terrain addressing and the regional UNORM filtering/corner-selection rules; prevent neighboring-slot or mip contamination and preserve texel-center coordinates within each allocation.
 - [ ] Bound atlas capacity and metadata using hardware limits and measured workloads. Protect the visible explored working set, evict off-view allocations first, and define explicit page/capacity behavior when two physical textures cannot accommodate that working set. Bind the two atlases once per pass when it fits; document any page-driven rebinding rather than promising unlimited single-atlas capacity.
 - [ ] Upload only new or changed rectangles. Preserve retained allocations across pan, zoom and species changes; do not rebuild the atlas or reread unchanged sources on view changes. Coordinate growth, relocation and recycled slots with source leases and draw receipts so stale work cannot sample another source's allocation.
-- [ ] Integrate atlas addresses and binding ownership with the shared graphics pass, targeted invalidation, coverage gates, shader reload, map close/reopen, purge and world shutdown. Cached rectangles must not expose unexplored areas or bypass ocean/missing-data behavior. Keep draw batching or instancing outside this atlas refactor unless separately approved.
+- [ ] Integrate atlas addresses and binding ownership with the shared graphics pass, targeted invalidation, coverage gates, shader reload, map close/reopen, purge and world shutdown. Cached rectangles must not expose unexplored areas or bypass ocean/missing-data behavior. Keep draw batching or instancing in Phase 9.9, separate from atlas allocation and addressing.
 - [ ] Add focused regressions for allocation reuse, partial updates, growth/relocation, recycled-slot rejection, capacity handling, overlapping views and resource disposal. Use subagents for build/test tools and canonical packaging, then obtain normal user-run map verification and capture evidence for binding reduction and stable rendering.
 - [ ] Measure texture objects, binding/upload counts, atlas occupancy, GPU payload and CPU metadata costs on representative zoomed-out views. Keep binding improvements distinct from residual per-tile draw costs and original live frame-time evidence; reconcile implemented architecture and proposal documentation.
 
@@ -397,9 +397,100 @@ Completion criteria:
 
 - [ ] The native-atlas reuse decision is supported by source inspection, packed atlas sampling is correct, retained tiles remain stable and resource bounds/lifetimes are verified. Captures demonstrate expected binding behavior, user-run rendering passes, and measured costs and remaining performance limits are recorded.
 
+## Phase 9.4: Batch texture-upload state handling
+
+Depends on the prepacked upload-buffer path; coordinate ownership with Phase 9.3's atlas implementation.
+
+Outcome: graphics state needed for uploading is captured, configured and restored once per upload batch rather than once per texture.
+
+- [ ] Measure current upload-state queries and changes separately from texture allocation and transfer costs. Cache immutable hardware limits at graphics-owner initialization.
+- [ ] Introduce one scoped upload batch around newly ready resources. Preserve unpack alignment, row length, row/pixel skips, pixel-unpack-buffer and texture bindings; restore once on success or exception. Keep allocation/upload on the graphics thread and all packing/decompression on workers.
+- [ ] Integrate both current texture ownership and atlas rectangle uploads without allocations or uploads inside the shared draw pass. Retain source validity checks and safe partial-failure cleanup.
+- [ ] Verify state restoration and lifecycle behavior with focused checks, subagent-run build/tests and canonical packaging. Compare upload-state call counts and live acquisition cost on an equivalent workload.
+
+Completion criteria:
+
+- [ ] Upload batches preserve caller state and resource validity, repeated per-resource state setup is removed, and measured results distinguish state overhead from transfer and allocation costs.
+
+## Phase 9.5: Bound graphics-thread uploads per frame
+
+Depends on Phase 9.4; preserve the atlas and view-retention contracts when integrating Phase 9.3.
+
+Outcome: entering a large explored view cannot submit an unlimited burst of new texture uploads in one frame.
+
+- [ ] Measure upload bytes/counts and graphics-thread elapsed time on representative map opening and zoom changes. Choose a documented per-frame admission budget using that evidence, including progress for a resource larger than the normal byte budget.
+- [ ] Defer excess upload-ready receipts while continuing to draw valid resident resources. Prioritize current visible work, retain bounded pending ownership and recheck source leases, coverage and session lifetime before publication.
+- [ ] Treat regional and terrain readiness coherently so partially admitted resources cannot produce invalid draws. Purge, close and shutdown must discard deferred disposable work safely without blocking rendering or durable storage writes.
+- [ ] Verify bounded admission, eventual progress, view changes and cancellation; use subagents for build/tests and packaging. Obtain user-run checks and measure frame hitches separately from total time until the view is populated.
+
+Completion criteria:
+
+- [ ] Admission obeys the selected budget with documented oversized-resource behavior, resident tiles stay drawable, and live evidence records both frame smoothness and loading latency.
+
+## Phase 9.6: Batch local database reads
+
+Depends on the persisted packed-buffer path. Preserve single-worker ownership of the dedicated ecosystem database.
+
+Outcome: bounded groups of needed packed records share queue/SQL work instead of requiring an independent command submission for every tile.
+
+- [ ] Measure command/queue overhead separately from disk reads and Deflate decoding. Select bounded batch sizes from representative workloads; do not create speculative remote retrieval or another database connection.
+- [ ] Add bounded multi-tile packed reads with deduplicated regional dependencies, parameterized queries and reusable commands where supported. Return per-record missing-data results and preserve each tile's region association and format validation.
+- [ ] Integrate preparation admission, source leases, targeted invalidation and purge epochs. Allow accepted source writes and shutdown/purge barriers to progress between bounded read batches; never wait for database results on the graphics thread.
+- [ ] Verify partial batches, shared regions, malformed/missing records, updates during reads and purge/shutdown behavior. Run build/tests and packaging through subagents; compare command counts, allocations and time until visible data becomes ready.
+
+Completion criteria:
+
+- [ ] Batch reads reduce measured submission/SQL overhead without unbounded work, stale publication, write starvation or any access to vanilla's database.
+
+## Phase 9.7: Reduce recurring view and receipt processing
+
+Depends on the existing incremental retention and source-validity contracts; reconcile with Phase 9.5's deferred uploads.
+
+Outcome: stable and changing views avoid unnecessary collection allocation and repeated per-tile CPU work.
+
+- [ ] Profile view-set construction, coverage/placement collection creation, receipt/cache lookup and validity checks separately on stable and changing views. Identify duplicated work before changing ownership.
+- [ ] Reuse owned temporary collections and avoid rebuilding unchanged membership where verified inputs permit it. Continue updating screen positions with pan/zoom; do not confuse unchanged chunk membership with unchanged placement.
+- [ ] Consolidate redundant cache/currentness checks only where invalidation cannot intervene. Retain checks at asynchronous completion, graphics publication and draw boundaries that protect against changed source leases, coverage and purge/session epochs.
+- [ ] Verify overlapping views, coverage removal, source updates, species changes and lifecycle transitions. Use subagents for build/tests and packaging; compare per-frame allocations and CPU ranges on equivalent zoomed-out workloads.
+
+Completion criteria:
+
+- [ ] Measured recurring allocations/CPU work decrease while current coverage, source freshness and stable overlapping-tile behavior remain intact.
+
+## Phase 9.8: Make packed persistence authoritative
+
+Depends on the prepacked worker/storage path. Coordinate database readers with Phase 9.6 and preserve independent component arrivals.
+
+Outcome: the feature database persists the packed environmental representation without also storing duplicate original regional channel payloads.
+
+- [ ] Trace all original-record consumers and define the authoritative packed record contract before replacing them. Preserve per-channel size, padding, offsets, availability and independently arriving climate/forest/shrub data. Document intentional removal of climate's unused low byte; do not narrow heights or vegetation densities further.
+- [ ] Merge incoming regional channels into the authoritative packed representation on the storage worker, realigning preserved channels when layouts change without resampling or evaluating habitat. Evaluate the same duplicate-storage removal for terrain height/flag records and retain exact values and coordinate association.
+- [ ] Keep Deflate compression, dedicated database identity, atomic updates, targeted notifications and purge/shutdown durability. Define an explicit incompatible-cache version/reset policy; do not add legacy decoders, backfill or world-data retrieval. Missing knowledge must remain unavailable.
+- [ ] Remove superseded original/derived dual-write and reconstruction paths once all consumers use the authoritative records. Update permanent architecture documentation to reflect the resulting format and ownership.
+- [ ] Verify arrival order, partial updates, layout changes, missing/invalid records, reopen, purge and accepted-write shutdown. Use subagents for build/tests and canonical packaging; measure database size and write/merge work separately from normal packed-read latency.
+
+Completion criteria:
+
+- [ ] Duplicate environmental persistence is removed with preserved habitat inputs and lifecycle guarantees; measured storage/write effects and the cache compatibility policy are recorded without claiming an unmeasured loading-speed gain.
+
+## Phase 9.9: Batch atlas draw submissions
+
+Depends on Phase 9.3. Coordinate with upload budgeting and preserve the shared graphics pass.
+
+Outcome: compatible tiles share draw submissions where atlas addressing and the native map rendering API permit it.
+
+- [ ] Inspect installed engine mesh/instancing APIs and measure residual per-tile submission overhead after atlas integration. Choose bounded combined geometry or instancing from source-backed feasibility and representative measurements.
+- [ ] Carry tile placement, world origin, regional/terrain atlas addresses and independent regional layouts through the chosen geometry/instance representation. Keep the selected criteria uniforms shared and all habitat comparisons on the GPU.
+- [ ] Group only compatible atlas pages and state. Preserve native GUI depth/scissor/order, transparent discards, ocean suppression, unavailable crosshatching and current explored coverage. Reuse geometry where valid and reject stale or recycled allocations before submission.
+- [ ] Verify view/zoom changes, page changes, updates and resource lifetimes through focused checks and subagent-run build/tests/package. Obtain user-run visual checks and captures comparing draw counts, CPU submission time and GPU cost; do not equate fewer draws with proven frame-time improvement.
+
+Completion criteria:
+
+- [ ] Compatible tile draws are batched with preserved rendering and validity behavior, and captures and measured costs support the chosen submission design.
+
 ## Phase 10: Validate the integrated feature and reconcile documentation
 
-Depends on Phases 1–9, including subphases 9.1–9.3.
+Depends on Phases 1–9, including subphases 9.1–9.9.
 
 Outcome: completion is supported by separate automated, packaged, performance, and live visual evidence.
 
