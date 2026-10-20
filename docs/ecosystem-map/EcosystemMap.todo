@@ -306,19 +306,21 @@ Completion criteria:
 
 - [x] Source review, focused reuse/invalidation evidence and normal-map verification show that overlapping valid tiles remain available during view changes; newly visible tiles acquire normally, obsolete results cannot leak into current coverage, and bounded cache transitions avoid unnecessary rereads/reuploads. Linked documentation and build/package receipts are current; measured performance claims remain separate.
 
-## Phase 9.1: Compress tile-map data using BCnEncoder.Net
+## Phase 9.1: Select and implement built-in lossless database compression
 
-Outcome: all ecosystem tile-map chunks are stored in the database using DDS encoding.
+Outcome: ecosystem environmental array payloads in the dedicated database use a measured choice of built-in .NET Deflate or Brotli compression, preserving every original value without adding a compression-library dependency.
 
-- [ ] Add BCnEncoder.Net library as project dependency.
-- [ ] Refactor tile-data writer to use an efficient BCn format via the BCn encoder class.
-- [ ] Refactor tile-data reader to use the BCn decoder class.
-- [ ] DO NOT implement any data migration or legacy handling, as this system has not been deployed and there are no downstream users with legacy data.
+- [ ] Compare DeflateStream and BrotliStream on representative regional climate/forest/shrub arrays and chunk height/ocean data, including small, uniform and varied payloads. Use identical serialized inputs and record compressed size, encode/decode time and allocation costs at suitable compression levels. Use subagents for benchmark/test tools; keep these CPU/storage measurements separate from live rendering performance.
+- [ ] Select and document the codec and compression level based on the measured storage/read/write tradeoffs before implementing the production path. Keep this decision independent of the GPU packing and atlas work in 9.2–9.3.
+- [ ] Refactor the database writer to compress serialized array payloads using the selected built-in codec. Retain coordinates, dimensions, padding, component availability and source identity; compression must not quantize or otherwise change the original values. Preserve existing queued-write ordering and shutdown durability.
+- [ ] Refactor the database reader to decompress and validate payloads before constructing environmental records. Define the current format/version and enforce expected decoded lengths and bounded output; handle malformed or truncated records through the existing unavailable-data behavior rather than accepting partial arrays or fabricated values.
+- [ ] DO NOT implement data migration, legacy readers or backfill. Existing incompatible feature-cache records remain unavailable under the version policy until ordinary acquisition replaces them; do not access vanilla's database or request old regions.
+- [ ] Verify exact round trips for all supported component layouts, integer extrema, flags and independently missing components, plus malformed input, database reopen and pending-write shutdown. Use subagents for required tests and canonical build/package checks. Reconcile permanent storage documentation with the implemented format and record measured results and limitations.
 
 Completion criteria:
 
-- [ ] All ecosystem tile-map chunks are successfully encoded and stored using the BCn format.
-- [ ] Tile-data reader correctly decodes BCn-encoded chunks without errors.
+- [ ] A built-in codec and compression level are selected with recorded comparative measurements; the production writer/reader use that choice without an external compression dependency.
+- [ ] Supported environmental payloads round-trip exactly, validation rejects corrupt data safely, and persistence/lifecycle checks and canonical packaging pass. No migration or legacy handling is introduced.
 
 Implementation traceability: tasks 1–4 map to [HabitatEvaluation.md](HabitatEvaluation.md#incremental-view-retention), the proposal's performance/lifecycle expectations and Integration contract 8. Presentation now changes membership incrementally without cancelling overlapping receipts or dropping useful pending tasks. Preparation checks membership separately from its presentation lifetime and storage/source provenance, and skips departed jobs before reads, between reads and before publication. Regional/tile/bundle/receipt/texture caches install visible-key protection before shrink/admission, selecting off-view victims regardless of recency. Texture keys retain coordinate and exact source lease identity; screen placement/zoom remain frame inputs. New regressions check the first changed-view frame, both pan directions, shrink above cache floors, placement-only changes, coverage removal/re-entry, ocean-only invalidation, blocked queued work and the real graphics owner's cache-hit path without a GL context.
 
@@ -328,9 +330,45 @@ Tasks 6–7 and completion inherit the user-run stable-scrolling gate as well as
 
 User-run verification (2026-10-20): in response to the normal **Install development mod** check covering both pan directions, zoom in/out, retained overlapping overlays and normal acquisition of entering tiles, the user reports, "Yes it works, but zooming out makes the game lag quite badly." This confirms the tile-retention behavior while explicitly reporting an unresolved performance problem. The independent completion audit rechecked the confirmation against the retention contract and finds Phase 9 satisfied; the lag report does not establish a specific receipt/source-reuse violation. Phase 9 is complete on the recorded source, regression, package and user-run evidence. No fresh capture, standalone harness or permanent diagnostic readback is required or claimed. No acceptable frame-time/resource performance or lag cause is claimed; the severe zoom-out lag remains an open Phase 10 investigation.
 
+## Phase 9.2: Pack GPU inputs into two textures
+
+Depends on the implemented rendering, ocean suppression and retention contracts in Phases 7–9. Coordinate with Phase 9.1 where source readers change; this subphase concerns GPU storage, not the database encoding.
+
+Outcome: each habitat draw samples one regional RGBA8UI texture and one terrain RG16UI texture, preserving the original environmental values and existing GPU evaluation semantics.
+
+- [ ] Pack regional temperature, rainfall, forest density and shrub density into the R/G/B/A channels of an RGBA8UI texture. Preserve full byte-valued densities rather than converting forest or shrubs into booleans. Validate source ranges and explicitly resolve any non-byte modded inputs without silent truncation or saturation.
+- [ ] Preserve each source map's native dimensions, padding and sampling coordinates. Copy independent channel grids into a shared physical regional rectangle with separate logical layout metadata; do not resample the maps onto world columns or assume identical climate/forest/shrub geometry. Keep unused physical cells outside each channel's logical sampling bounds.
+- [ ] Pack full unsigned 16-bit terrain heights into R and ocean/knownness/required availability flags into G of an RG16UI texture. Preserve unknown ocean state separately from known non-ocean. Remove redundant exploration storage only while retaining the authoritative explored-tile draw gate and preventing disclosure outside current coverage.
+- [ ] Refactor texture ownership, integer uploads, sampler registration, shader decoding and graphics-state restoration for the two input textures. Keep regional data shared between tiles; this work reduces inputs per draw without claiming two bindings for the entire pass before atlas integration.
+- [ ] Preserve GPU climate conversion and inclusive habitat comparisons, the single selected criteria set, ocean suppression before missing-data crosshatching, source provenance, targeted invalidation, species-independent texture reuse, shared-pass state and current full-map/lifecycle behavior. Keep original acquisition and dedicated persistence contracts intact; database compression remains owned by 9.1.
+- [ ] Add focused regressions for channel layout, independent source geometry, byte endpoints, full height range, density thresholds, mixed availability, ocean knownness, coverage and stale-source rejection. Use subagents for build/test tools and the canonical build/package workflow; verify normal map behavior and captured integer formats/bindings through the user's standard development installation, without a standalone graphics harness or permanent readback diagnostics.
+- [ ] Reconcile the proposal and permanent architecture documentation with the implemented representation, recording validation limitations separately from measured performance claims.
+
+Completion criteria:
+
+- [ ] Two packed input textures preserve supported source values and shader results, including missing-data and ocean behavior; focused validation, canonical packaging and user-run rendering evidence are satisfactory. No database format change or atlas implementation is claimed by this subphase.
+
+## Phase 9.3: Atlas packed GPU inputs
+
+Depends on Phase 9.2 and the existing incremental view-retention contracts.
+
+Outcome: regional and terrain inputs occupy stable rectangles in two bounded atlas resources, reducing texture-object switches while preserving source reuse and rendering behavior.
+
+- [ ] Evaluate the base game's provided texture atlas type and allocation APIs against the installed implementation before selecting an owner. Check feature-owned lifetime, RGBA8UI/RG16UI support, rectangular allocation/release, partial uploads, growth or relocation, coordinate updates, padding/filtering, graphics-thread requirements and hardware limits. Record source-backed suitability; assess reuse of native allocation facilities separately if its texture upload path requires color formats. Use a narrow feature-owned alternative only where the native facilities cannot satisfy the contract, without modifying unrelated game atlases.
+- [ ] Implement separate regional and terrain atlas ownership using the packed formats from 9.2. Allocate each regional source once for all dependent tiles and retain independent channel-layout metadata alongside atlas addresses. Use integer texel addressing without interpolation, mip or neighboring-slot contamination.
+- [ ] Bound atlas capacity and metadata using hardware limits and measured workloads. Protect the visible explored working set, evict off-view allocations first, and define explicit page/capacity behavior when two physical textures cannot accommodate that working set. Bind the two atlases once per pass when it fits; document any page-driven rebinding rather than promising unlimited single-atlas capacity.
+- [ ] Upload only new or changed rectangles. Preserve retained allocations across pan, zoom and species changes; do not rebuild the atlas or reread unchanged sources on view changes. Coordinate growth, relocation and recycled slots with source leases and draw receipts so stale work cannot sample another source's allocation.
+- [ ] Integrate atlas addresses and binding ownership with the shared graphics pass, targeted invalidation, coverage gates, shader reload, map close/reopen, purge and world shutdown. Cached rectangles must not expose unexplored areas or bypass ocean/missing-data behavior. Keep draw batching or instancing outside this atlas refactor unless separately approved.
+- [ ] Add focused regressions for allocation reuse, partial updates, growth/relocation, recycled-slot rejection, capacity handling, overlapping views and resource disposal. Use subagents for build/test tools and canonical packaging, then obtain normal user-run map verification and capture evidence for binding reduction and stable rendering.
+- [ ] Measure texture objects, binding/upload counts, atlas occupancy, GPU payload and CPU metadata costs on representative zoomed-out views. Keep binding improvements distinct from residual per-tile draw costs and original live frame-time evidence; reconcile implemented architecture and proposal documentation.
+
+Completion criteria:
+
+- [ ] The native-atlas reuse decision is supported by source inspection, packed atlas sampling is correct, retained tiles remain stable and resource bounds/lifetimes are verified. Captures demonstrate expected binding behavior, user-run rendering passes, and measured costs and remaining performance limits are recorded.
+
 ## Phase 10: Validate the integrated feature and reconcile documentation
 
-Depends on Phases 1–9.
+Depends on Phases 1–9, including subphases 9.1–9.3.
 
 Outcome: completion is supported by separate automated, packaged, performance, and live visual evidence.
 
