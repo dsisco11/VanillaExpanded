@@ -306,6 +306,20 @@ Completion criteria:
 
 - [x] Source review, focused reuse/invalidation evidence and normal-map verification show that overlapping valid tiles remain available during view changes; newly visible tiles acquire normally, obsolete results cannot leak into current coverage, and bounded cache transitions avoid unnecessary rereads/reuploads. Linked documentation and build/package receipts are current; measured performance claims remain separate.
 
+## Phase 9.1: Compress tile-map data using BCnEncoder.Net
+
+Outcome: all ecosystem tile-map chunks are stored in the database using DDS encoding.
+
+- [ ] Add BCnEncoder.Net library as project dependency.
+- [ ] Refactor tile-data writer to use an efficient BCn format via the BCn encoder class.
+- [ ] Refactor tile-data reader to use the BCn decoder class.
+- [ ] DO NOT implement any data migration or legacy handling, as this system has not been deployed and there are no downstream users with legacy data.
+
+Completion criteria:
+
+- [ ] All ecosystem tile-map chunks are successfully encoded and stored using the BCn format.
+- [ ] Tile-data reader correctly decodes BCn-encoded chunks without errors.
+
 Implementation traceability: tasks 1–4 map to [HabitatEvaluation.md](HabitatEvaluation.md#incremental-view-retention), the proposal's performance/lifecycle expectations and Integration contract 8. Presentation now changes membership incrementally without cancelling overlapping receipts or dropping useful pending tasks. Preparation checks membership separately from its presentation lifetime and storage/source provenance, and skips departed jobs before reads, between reads and before publication. Regional/tile/bundle/receipt/texture caches install visible-key protection before shrink/admission, selecting off-view victims regardless of recency. Texture keys retain coordinate and exact source lease identity; screen placement/zoom remain frame inputs. New regressions check the first changed-view frame, both pan directions, shrink above cache floors, placement-only changes, coverage removal/re-entry, ocean-only invalidation, blocked queued work and the real graphics owner's cache-hit path without a GL context.
 
 Task 5 maps to Integration contracts 7–8, [EnvironmentalStorage.md](EnvironmentalStorage.md#ordering-and-lifetime) and the proposal's persistence/lifecycle requirements. Explicit close still revokes the presentation lifetime, clears graphics/receipts and returns source retention to floors without stopping durable acquisition. Reopen can reuse current original sources; shader reload leaves them intact. Purge/source commits/world shutdown retain their separate lease/epoch checks. Existing persistence, full-map applicability, shared-pass and lifecycle regressions remain applicable.
