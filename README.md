@@ -46,7 +46,14 @@ Hold the Quick Tools hotkey (assign it in Controls) to open a radial menu of ava
 
 ### Movable HUD Indicators
 
-Free the mouse (for example, by opening your inventory) and right-click an indicator for **Enabled**, a supported **Style** dropdown, **Lock**, and **Reset layout**. Uncheck Lock to move an indicator. Drag its body to move only that item, detaching it from its group, or hover a multi-member group and drag its titlebar to move the whole group. Standalone indicators have no titlebar. Lock applies to the entire group and its members without changing placement or membership.
+Customize your HUD arrangement and each indicator's options directly in-game:
+
+1. **Free the mouse cursor**, for example by opening your inventory.
+2. **Right-click a HUD indicator** to customize its **Enabled** toggle, supported **Style** options, **Lock**, or **Reset layout**.
+3. **Uncheck Lock**, then **left-click and drag the indicator's body** to place it where you want. Dragging an individual indicator detaches it from its group.
+4. To move a whole group, **hover over the group and drag its titlebar**. Right-click an indicator and enable **Lock** again when you are happy with the arrangement.
+
+Standalone indicators have no titlebar. Lock applies to the entire group and its members without changing placement or membership.
 
 While the mouse is unlocked, registered indicators without drawable live content—including disabled or currently inapplicable indicators—appear as compact outlined placeholders. Their initials identify them; hover for the full name. Drag and snap them like visible indicators. They do not show fabricated readings or enable the feature. Locking the mouse restores normal visibility and collapse. A missing native anchor uses temporary screen placement for editing; only explicit layout actions save a new placement.
 
