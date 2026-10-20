@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using VanillaExpanded.EcosystemMap.Gpu;
 using VanillaExpanded.EcosystemMap.Storage;
+using FrameProfilerUtil = Vintagestory.API.Common.FrameProfilerUtil;
 
 namespace VanillaExpanded.EcosystemMap.Presentation;
 
@@ -26,7 +27,7 @@ internal sealed class HabitatMapPresentation : IDisposable
     { this.preparation = preparation; this.graphics = graphics; this.report = report; }
 
     /// <summary>Polls only completed reads and draws current explored tiles; it never blocks the render thread on storage.</summary>
-    internal void Render(IReadOnlyList<HabitatMapTile> tiles, HabitatRanges ranges, float[] projection)
+    internal void Render(IReadOnlyList<HabitatMapTile> tiles, HabitatRanges ranges, float[] projection, FrameProfilerUtil? profiler = null)
     {
         if (disposed) return;
         // Native projection/model-view getters share scratch storage; retain an owned projection before any tile draw.
@@ -40,6 +41,7 @@ internal sealed class HabitatMapPresentation : IDisposable
             graphics.SetView(current, preparation.World, retained);
             visible = current; suspended = false;
         }
+        profiler?.Mark("view-membership");
         // Keep incomplete jobs bounded by preparation admission; observe and forget completed off-view results.
         foreach (var key in pending.Keys.Where(key => !current.Contains(key) && pending[key].IsCompleted).ToArray())
         {
@@ -64,13 +66,13 @@ internal sealed class HabitatMapPresentation : IDisposable
                 if (receipt == null && !pending.ContainsKey(tile.Key) && preparation.TryPrepare(tile.Key, out var next))
                     pending[tile.Key] = next;
             }
-            // Recheck immediately before upload; committed inputs, purge or shutdown can revoke leases.
-            if (receipt != null && preparation.IsCurrent(receipt))
-            {
-                graphics.Prepare(receipt);
-                ready.Add((receipt, tile));
-            }
+            if (receipt != null && preparation.IsCurrent(receipt)) ready.Add((receipt, tile));
         }
+        profiler?.Mark("input-preparation");
+        // Keep receipt polling separate from texture acquisition so the native profiler can distinguish CPU stages.
+        foreach (var item in ready)
+            if (preparation.IsCurrent(item.Receipt)) graphics.Prepare(item.Receipt);
+        profiler?.Mark("texture-acquisition");
         // Source acquisition finishes before any draw binding is tracked; late invalidation cannot publish stale inputs.
         ready.RemoveAll(item => !preparation.IsCurrent(item.Receipt));
         if (ready.Count == 0) return;
@@ -80,7 +82,7 @@ internal sealed class HabitatMapPresentation : IDisposable
             foreach (var item in ready)
                 if (preparation.IsCurrent(item.Receipt)) graphics.Draw(item.Receipt, item.Tile);
         }
-        finally { ready.Clear(); }
+        finally { ready.Clear(); profiler?.Mark("draw-and-restore"); }
     }
     /// <summary>Cancels disposable reads and releases textures while leaving durable acquisition/storage running.</summary>
     internal void Suspend()

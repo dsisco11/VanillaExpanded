@@ -4,6 +4,7 @@ using System.Threading;
 using VanillaExpanded.EcosystemMap.Acquisition;
 using VanillaExpanded.EcosystemMap.Catalogue;
 using Vintagestory.API.Client;
+using FrameProfilerUtil = Vintagestory.API.Common.FrameProfilerUtil;
 using Vintagestory.API.MathTools;
 using Vintagestory.GameContent;
 
@@ -47,14 +48,20 @@ internal sealed class EcosystemMapClient : IDisposable
         if (disposed || failed) return;
         if (!controls.Refresh(active)) { Close(); return; }
         if (!controls.IsSurface(map)) return;
+        FrameProfilerUtil? profiler = null;
         try
         {
             if (Interlocked.Exchange(ref purged, 0) != 0) Close();
+            // Join the native opt-in frame profile; these marks do not enable logging or read GPU results.
+            profiler = api.World.FrameProfiler;
+            profiler?.Enter("ecosystem-map");
             var ranges = selection.ActiveRanges(resolve);
             if (ranges == null) return;
             presentation ??= new(session.Preparation, new HabitatMapGraphics(api), Report);
             suspended = false;
+            profiler?.Mark("selection-and-startup");
             var coverage = ExploredMapCoverage.Capture(map.mapLayers, map.CurrentBlockViewBounds);
+            profiler?.Mark("explored-coverage");
             // Convert current explored chunk placement only; habitat values remain original GPU inputs.
             var tiles = coverage.OrderBy(key => key.Z).ThenBy(key => key.X).Select(key =>
             {
@@ -63,9 +70,11 @@ internal sealed class EcosystemMapClient : IDisposable
                 return new HabitatMapTile(key, (float)map.Bounds.renderX + point.X,
                     (float)map.Bounds.renderY + point.Y, 32 * map.ZoomLevel, 32 * map.ZoomLevel);
             }).ToArray();
-            presentation.Render(tiles, ranges, api.Render.CurrentProjectionMatrix);
+            profiler?.Mark("tile-placement");
+            presentation.Render(tiles, ranges, api.Render.CurrentProjectionMatrix, profiler);
         }
         catch (Exception error) { failed = true; Close(); Report(error); }
+        finally { profiler?.Leave(); }
     }
     /// <summary>Closes disposable presentation without stopping acquisition or dropping pending persistent writes.</summary>
     internal void Close()
