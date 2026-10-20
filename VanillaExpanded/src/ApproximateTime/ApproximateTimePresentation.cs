@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Globalization;
 using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering;
@@ -20,6 +21,7 @@ internal sealed class ApproximateTimePresentation : HudIndicatorPresentation<Env
     private bool faceDirty = true;
     private ApproximateTimePeriod? period;
     private float rotation;
+    private string clockText = string.Empty;
     private readonly HudOverlayIconReading compact;
 
     #region Public API
@@ -41,16 +43,27 @@ internal sealed class ApproximateTimePresentation : HudIndicatorPresentation<Env
     }
 
 
-    /// <summary>Updates the drifting pointer independently of the true daily solar distribution.</summary>
-    public void SetContent(ApproximateTimePeriod value, double estimatedDay, ApproximateTimeDayPhases? distribution = null)
+    /// <summary>Updates the drifting pointer, actual calendar-hour text, and independent daily solar distribution.</summary>
+    /// <returns>Whether changed text requires the host to remeasure the reading.</returns>
+    public bool SetContent(ApproximateTimePeriod value, double estimatedDay, ApproximateTimeDayPhases? distribution = null,
+        double? actualHour = null)
     {
+        string previousText = clockText;
         period = value;
         rotation = (float)((estimatedDay - Math.Floor(estimatedDay) - .5) * 2 * Math.PI);
+        // Text uses the actual calendar reading; direct callers may fall back to the supplied dial time.
+        double hour = actualHour ?? (estimatedDay - Math.Floor(estimatedDay)) * 24;
+        if (double.IsFinite(hour))
+        {
+            int minutes = (int)Math.Floor((hour - Math.Floor(hour / 24) * 24) * 60);
+            clockText = string.Create(CultureInfo.InvariantCulture, $"{minutes / 60:00}:{minutes % 60:00}");
+        }
         if (distribution != null && !phases.Equals(distribution))
         {
             phases = distribution;
             faceDirty = true;
         }
+        return IsTextStyle && previousText != clockText;
     }
 
     /// <summary>Prepares only changed face pixels and reserves the complete registered canvas.</summary>
@@ -59,7 +72,7 @@ internal sealed class ApproximateTimePresentation : HudIndicatorPresentation<Env
         if (!period.HasValue) return;
         if (IsTextStyle)
         {
-            TryPrepareText(preparation, "time", period.Value.ToString().ToUpperInvariant());
+            TryPrepareText(preparation, "time", clockText);
             return;
         }
         if (Style == EnvironmentalGaugeStyle.Icon)
@@ -121,7 +134,7 @@ internal sealed class ApproximateTimePresentation : HudIndicatorPresentation<Env
     /// <summary>Clears feature contents after a completed exit or world change.</summary>
     protected override void ClearContent()
     {
-        period = null; phases = ApproximateTimeDayPhases.Neutral;
+        period = null; phases = ApproximateTimeDayPhases.Neutral; clockText = string.Empty;
     }
     #endregion
 }

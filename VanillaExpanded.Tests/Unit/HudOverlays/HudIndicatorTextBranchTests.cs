@@ -46,7 +46,7 @@ public sealed class HudIndicatorTextBranchTests : IDisposable
 
     /// <summary>All eight presentation classes emit a short label and sampled reading while artwork loaders remain unused.</summary>
     [Theory]
-    [InlineData("time", "DUSK")]
+    [InlineData("time", "18:00")]
     [InlineData("date", "OCT 14")]
     [InlineData("environmental-temperature", "-43°C")]
     [InlineData("body-temperature", "37°C COLD +2")]

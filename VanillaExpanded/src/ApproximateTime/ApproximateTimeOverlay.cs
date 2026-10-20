@@ -121,8 +121,8 @@ internal sealed class ApproximateTimeOverlay : IHudOverlay, IHudOverlayVisibilit
             if (sampled != null) { phases = sampled; phaseKey = nextKey; }
         }
         period = next;
-        presentation.SetContent(next, estimatedDay, phases);
-        return HudOverlayChange.Presentation | (periodChanged ? HudOverlayChange.Measurement : HudOverlayChange.None);
+        bool readingChanged = presentation.SetContent(next, estimatedDay, phases, calendar.HourOfDay);
+        return HudOverlayChange.Presentation | (periodChanged || readingChanged ? HudOverlayChange.Measurement : HudOverlayChange.None);
     }
     /// <summary>Prepares cached artwork for the estimated part of the day.</summary>
     public void Prepare(HudOverlayPreparationContext context)
