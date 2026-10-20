@@ -25,7 +25,7 @@ public sealed class GpuHabitatTests
         Assert.Equal(original.TopLeftPadding, first.Bundle.Region.Value.Climate.TopLeftPadding);
         Assert.Equal(ushort.MaxValue, first.Bundle.Elevation.Value!.Elevation[0]);
         var work = preparation.Work;
-        preparation.ChangeView();
+        preparation.CancelPresentation();
         Assert.False(preparation.IsCurrent(first));
         var next = (await Prepare(preparation, default))!;
         Assert.Same(first.Bundle, next.Bundle);
@@ -51,7 +51,7 @@ public sealed class GpuHabitatTests
         Assert.False(preparation.IsCurrent(missing));
         preparation.Reset();
         Assert.Equal((0, 0, 0), (preparation.Counts.Regions, preparation.Counts.SourceTiles, preparation.Counts.Bundles));
-        preparation.ChangeView(true);
+        preparation.CancelPresentation(true);
         Assert.False(preparation.TryPrepare(default, out _));
         Assert.True(await storage.WriteRegionAsync(new(default, Climate: StorageFixture.Map()), storage.CurrentEpoch));
     }

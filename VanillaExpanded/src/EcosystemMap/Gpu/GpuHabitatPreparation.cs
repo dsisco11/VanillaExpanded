@@ -23,7 +23,9 @@ internal sealed class GpuHabitatPreparation : IDisposable
     private long regionReads, tileReads, preparedBundles;
     internal (long Regions, long Tiles, long Bundles) Work
     { get { lock (gate) return (regionReads, tileReads, preparedBundles); } }
+    private HashSet<EcosystemTileKey>? visible;
     private bool suspended;
+    internal EcosystemStorageIdentity World => storage.Identity;
     private bool disposed;
     internal (int Regions, int SourceTiles, int Bundles, int Pending) Counts
     { get { lock (gate) return (regions.Count, tiles.Count, bundles.Count, pending.Count); } }
@@ -50,15 +52,17 @@ internal sealed class GpuHabitatPreparation : IDisposable
             Math.Max(limits.SourceTiles, visible.Count), Math.Max(limits.Bundles, visible.Count), limits.PendingJobs);
         lock (gate)
         {
-            // Shrinking may revoke off-view snapshots. A stable view always fits, so ordinary admission cannot evict its inputs.
-            foreach (var input in regions.Resize(retained.Regions)) input.Valid = false;
-            foreach (var input in tiles.Resize(retained.SourceTiles)) input.Valid = false;
-            bundles.Resize(retained.Bundles);
+            // Install protection before shrinking; LRU recency must not evict an unchanged visible source.
+            this.visible = new(visible); suspended = false;
+            var tileKeys = this.visible;
+            foreach (var input in regions.Resize(retained.Regions, regionKeys.Contains)) input.Valid = false;
+            foreach (var input in tiles.Resize(retained.SourceTiles, tileKeys.Contains)) input.Valid = false;
+            bundles.Resize(retained.Bundles, tileKeys.Contains);
         }
         return retained;
     }
-    /// <summary>Revokes old view/coverage receipts, optionally suspending admission on map close; cached source data remains reusable.</summary>
-    internal void ChangeView(bool suspend = false)
+    /// <summary>Revokes the presentation lifetime on explicit cancellation, optionally suspending admission; cached source data remains reusable.</summary>
+    internal void CancelPresentation(bool suspend = false)
     {
         CancellationTokenSource old;
         lock (gate)
@@ -91,7 +95,7 @@ internal sealed class GpuHabitatPreparation : IDisposable
         lock (gate)
         {
             result = Task.FromResult<GpuHabitatReceipt?>(null);
-            if (disposed || suspended) return false;
+            if (disposed || suspended || (visible != null && !visible.Contains(key))) return false;
             if (bundles.TryGet(key, out var entry) && InputsCurrent(entry!))
             {
                 result = Task.FromResult<GpuHabitatReceipt?>(new(entry!, scope));
@@ -105,10 +109,11 @@ internal sealed class GpuHabitatPreparation : IDisposable
         }
     }
 
-    /// <summary>Checks view, world/purge and input leases immediately before a caller publishes an input bundle.</summary>
+    /// <summary>Checks current membership, presentation lifetime, world/purge and input leases immediately before a caller publishes an input bundle.</summary>
     internal bool IsCurrent(GpuHabitatReceipt result)
     {
-        lock (gate) return !disposed && !suspended && ReferenceEquals(result.Scope, scope) && InputsCurrent(result.Bundle);
+        lock (gate) return !disposed && !suspended && ReferenceEquals(result.Scope, scope) &&
+            (visible == null || visible.Contains(result.Bundle.Key)) && InputsCurrent(result.Bundle);
     }
 
     /// <summary>Cancels and joins only disposable jobs; persistent capture/storage lifetimes remain owned by the session.</summary>
@@ -148,6 +153,7 @@ internal sealed class GpuHabitatPreparation : IDisposable
     {
         if (!JobCurrent(job)) return null;
         var region = await RegionAsync(storage.Identity.RegionFor(job.Key)).ConfigureAwait(false);
+        if (!JobCurrent(job)) return null;
         var tile = await TileAsync(job.Key).ConfigureAwait(false);
         lock (gate)
         {
@@ -230,10 +236,11 @@ internal sealed class GpuHabitatPreparation : IDisposable
     private bool InputCurrent<T>(EnvironmentalInput<T> input) where T : class =>
         input.Valid && storage.IsCurrent(input.Epoch);
 
-    /// <summary>Serializes scope checks with view changes; no game-owned locks are involved.</summary>
+    /// <summary>Serializes scope and membership checks with view changes; no game-owned locks are involved.</summary>
     private bool JobCurrent(GpuHabitatJob job)
     {
-        lock (gate) return !disposed && !suspended && ReferenceEquals(job.Scope, scope);
+        lock (gate) return !disposed && !suspended && ReferenceEquals(job.Scope, scope) &&
+            (visible == null || visible.Contains(job.Key));
     }
 
     /// <summary>Replaces scope identity before callbacks execute, leaving outstanding receipts visibly stale.</summary>

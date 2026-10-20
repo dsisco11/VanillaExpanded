@@ -245,7 +245,7 @@ public sealed class MapPresentationTests
         /// <summary>Records normal shader-event forwarding.</summary>
         public bool Reload() => true;
         /// <summary>Accepts finite view resource retention without allocating graphics in the fixture.</summary>
-        public void SetView(int regions, int tiles) { }
+        public void SetView(IReadOnlyCollection<EcosystemTileKey> visible, EcosystemStorageIdentity world, GpuHabitatLimits limits) { }
         /// <summary>Accepts source acquisition without allocating graphics in this fixture.</summary>
         public void Prepare(GpuHabitatReceipt receipt) { }
         /// <summary>Records shared criteria once at the normal pass boundary.</summary>

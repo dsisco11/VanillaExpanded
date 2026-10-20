@@ -34,11 +34,18 @@ internal sealed class HabitatMapPresentation : IDisposable
         var current = tiles.Select(tile => tile.Key).ToHashSet();
         if (suspended || !visible.SetEquals(current))
         {
-            // View identity changes revoke outstanding receipts before any graphics publication.
-            preparation.ChangeView();
+            // Membership changes do not revoke source provenance or useful work for overlapping tiles.
             var retained = preparation.SetView(current);
-            receipts.Resize(retained.Bundles); graphics.SetView(retained.Regions, retained.SourceTiles);
-            DropPending(); receipts.Clear(); visible = current; suspended = false;
+            receipts.Resize(retained.Bundles, current.Contains);
+            graphics.SetView(current, preparation.World, retained);
+            visible = current; suspended = false;
+        }
+        // Keep incomplete jobs bounded by preparation admission; observe and forget completed off-view results.
+        foreach (var key in pending.Keys.Where(key => !current.Contains(key) && pending[key].IsCompleted).ToArray())
+        {
+            try { pending[key].GetAwaiter().GetResult(); }
+            catch (Exception error) { report(error); }
+            pending.Remove(key);
         }
         ready.Clear();
         foreach (var tile in tiles)
@@ -79,7 +86,7 @@ internal sealed class HabitatMapPresentation : IDisposable
     internal void Suspend()
     {
         if (disposed) return;
-        preparation.ChangeView(true); preparation.SetView(Array.Empty<EcosystemTileKey>()); DropPending(); receipts.Clear(); ready.Clear(); visible.Clear(); suspended = true;
+        preparation.SetView(Array.Empty<EcosystemTileKey>()); preparation.CancelPresentation(true); DropPending(); receipts.Clear(); ready.Clear(); visible.Clear(); suspended = true;
         graphics.Clear();
     }
     /// <summary>Reloads through the game's normal shader event on the graphics thread.</summary>
