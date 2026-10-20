@@ -40,13 +40,13 @@ public sealed class OceanClassificationTests
         Assert.Null(fixture.Classifier.Capture(new(0, 0), fixture.Map.Object));
     }
 
-    /// <summary>Raw classification and exploration bits remain independent; no height or climate is required to encode known ocean.</summary>
+    /// <summary>Raw category and height availability remain independent; no height or climate is required to encode known ocean.</summary>
     [Fact]
-    public void PacksUnknownLandOceanAndExplorationIndependently()
+    public void PacksUnknownLandOceanAndHeightAvailabilityIndependently()
     {
         var mask = new OceanMask(2, new byte[] { 0, 1, 2, 2 });
-        Assert.Equal(new byte[] { 1, 3, 5, 4 }, HabitatCoverageFlags.Pack(new byte[] { 1, 1, 1, 0 }, mask, 2));
-        Assert.Equal(new byte[] { 1, 1, 1, 1 }, HabitatCoverageFlags.Pack(new byte[] { 1, 1, 1, 1 }, null, 2));
+        Assert.Equal(new ushort[] { 0, 0, 0, 2, 0, 4, 0, 4 }, PackedTerrainData.Pack(new(default, 2, ocean: mask), 2));
+        Assert.Equal(new ushort[] { 0, 0, 0, 0, 0, 0, 0, 0 }, PackedTerrainData.Pack(null, 2));
         Assert.Throws<ArgumentException>(() => new OceanMask(2, new byte[] { 0, 1, 2, 3 }));
         var fixture = new OceanClassificationFixture();
         Assert.Throws<NotSupportedException>(() => new NativeOceanClassifier(fixture.Terrain, fixture.Blocks.Object, fixture.Palette, 16));

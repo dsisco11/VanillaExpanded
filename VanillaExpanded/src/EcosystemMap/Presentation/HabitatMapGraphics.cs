@@ -11,6 +11,7 @@ namespace VanillaExpanded.EcosystemMap.Presentation;
 internal sealed class HabitatMapGraphics : IHabitatMapGraphics
 {
     private readonly GpuHabitatOverlay overlay;
+    private readonly Vintagestory.API.Common.ILogger logger;
     private readonly BoundedLru<(EcosystemRegionKey Key, EnvironmentalInput<RegionalEnvironment> Source), GpuRegionalTextures> regions = new(8);
     private readonly BoundedLru<(EcosystemTileKey Key, EnvironmentalInput<TileEnvironment> Source), GpuTileTextures> tiles = new(128);
 
@@ -18,6 +19,7 @@ internal sealed class HabitatMapGraphics : IHabitatMapGraphics
     /// <summary>Creates the graphics owner and loads the shader through the normal game API.</summary>
     internal HabitatMapGraphics(ICoreClientAPI api)
     {
+        logger = api.Logger;
         overlay = new(api);
         try { if (!overlay.Reload()) throw new InvalidOperationException("Ecosystem shader compilation failed."); }
         catch { overlay.Dispose(); throw; }
@@ -40,15 +42,13 @@ internal sealed class HabitatMapGraphics : IHabitatMapGraphics
         var bundle = receipt.Bundle;
         if (!regions.TryGet((bundle.World.RegionFor(bundle.Key), bundle.Region), out var region))
         {
-            region = new(bundle.Region.Value);
+            region = new(bundle.Region.Value, logger);
             regions.Put((bundle.World.RegionFor(bundle.Key), bundle.Region), region)?.Dispose();
         }
         if (!tiles.TryGet((bundle.Key, bundle.Elevation), out var heights))
         {
             // Coverage is a whole explored chunk here. Unknown chunks never enter this draw path.
-            var explored = new byte[checked(bundle.World.ChunkSize * bundle.World.ChunkSize)];
-            Array.Fill(explored, (byte)1);
-            heights = new(bundle.Elevation.Value, bundle.World.ChunkSize, explored);
+            heights = new(bundle.Elevation.Value, bundle.World.ChunkSize);
             tiles.Put((bundle.Key, bundle.Elevation), heights)?.Dispose();
         }
     }

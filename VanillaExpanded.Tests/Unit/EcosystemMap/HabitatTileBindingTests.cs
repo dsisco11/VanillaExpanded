@@ -22,8 +22,7 @@ public sealed class HabitatTileBindingTests
         var first = Region();
         var second = Region();
         var tile = (GpuTileTextures)RuntimeHelpers.GetUninitializedObject(typeof(GpuTileTextures));
-        Set(tile, "elevation", RuntimeHelpers.GetUninitializedObject(typeof(GpuIntegerTexture)));
-        Set(tile, "coverage", RuntimeHelpers.GetUninitializedObject(typeof(GpuIntegerTexture)));
+        Set(tile, "texture", RuntimeHelpers.GetUninitializedObject(typeof(GpuHabitatTexture)));
         var world = new EcosystemStorageIdentity("binding-fixture", 512, 256, 512, 110, 512, 32);
         var epoch = new StorageEpoch(Guid.NewGuid(), 0);
         var bundle = new GpuHabitatBundle(new(0, 0), world, new(epoch), new(epoch));
@@ -33,19 +32,16 @@ public sealed class HabitatTileBindingTests
         overlay.Draw(bundle, first, tile, 96, 0, 32, 32);
         var binds = shader.Invocations.Where(call => call.Method.Name == nameof(IShaderProgram.BindTexture2D))
             .Select(call => (string)call.Arguments[0]).ToArray();
-        Assert.Equal(3, binds.Count(name => name == "climateMap"));
-        Assert.Equal(3, binds.Count(name => name == "forestMap"));
-        Assert.Equal(3, binds.Count(name => name == "shrubMap"));
+        Assert.Equal(3, binds.Count(name => name == "regionalMap"));
         Assert.Equal(4, binds.Count(name => name == "terrainMap"));
-        Assert.Equal(4, binds.Count(name => name == "exploredMap"));
+        Assert.Equal(7, binds.Length);
         var uniforms = shader.Invocations.Where(call => call.Method.Name == nameof(IShaderProgram.Uniform))
             .Select(call => (string)call.Arguments[0]).ToArray();
         Assert.Equal(3, uniforms.Count(name => name == "climateLayout"));
-        Assert.Equal(4, uniforms.Count(name => name == "terrainAvailable"));
         Assert.Equal(4, uniforms.Count(name => name == "screenBounds"));
         Assert.Equal(4, uniforms.Count(name => name == "tileOrigin"));
         Assert.All(uniforms, name => Assert.Contains(name, new[]
-            { "climateLayout", "forestLayout", "shrubLayout", "terrainAvailable", "screenBounds", "tileOrigin" }));
+            { "climateLayout", "forestLayout", "shrubLayout", "screenBounds", "tileOrigin" }));
         epoch.CancelDisposableWork();
         // Unallocated fixture resources deliberately never enter GL disposal or setup.
     }
@@ -56,9 +52,9 @@ public sealed class HabitatTileBindingTests
     private static GpuRegionalTextures Region()
     {
         var region = (GpuRegionalTextures)RuntimeHelpers.GetUninitializedObject(typeof(GpuRegionalTextures));
-        Set(region, "maps", Enumerable.Range(0, 3).Select(_ =>
-            (GpuIntegerTexture)RuntimeHelpers.GetUninitializedObject(typeof(GpuIntegerTexture))).ToArray());
+        Set(region, "texture", RuntimeHelpers.GetUninitializedObject(typeof(GpuHabitatTexture)));
         Set(region, "sources", new EnvironmentalMap?[3]);
+        Set(region, "offsets", new int[3]);
         return region;
     }
 

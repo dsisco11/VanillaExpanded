@@ -11,7 +11,7 @@ internal sealed class GpuHabitatPassState : IDisposable
     private readonly IShaderProgram? previous;
     private readonly int program, vertexArray, arrayBuffer, srcRgb, dstRgb, srcAlpha, dstAlpha, rgbEquation, alphaEquation, activeUnit;
     private readonly bool depth, cull, blend, writeDepth;
-    private readonly int[] bindings = new int[5], samplers = new int[5];
+    private readonly int[] bindings = new int[GpuHabitatSamplers.Count], samplers = new int[GpuHabitatSamplers.Count];
     private bool disposed;
 
     #region Public API
@@ -32,7 +32,7 @@ internal sealed class GpuHabitatPassState : IDisposable
         activeUnit = GL.GetInteger(GetPName.ActiveTexture);
         try
         {
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < GpuHabitatSamplers.Count; i++)
             {
                 GL.ActiveTexture(TextureUnit.Texture0 + i);
                 bindings[i] = GL.GetInteger(GetPName.TextureBinding2D);
@@ -50,7 +50,7 @@ internal sealed class GpuHabitatPassState : IDisposable
         shader.Stop();
         GL.BindVertexArray(vertexArray);
         GL.BindBuffer(BufferTarget.ArrayBuffer, arrayBuffer);
-        for (int i = 0; i < 5; i++) { GL.ActiveTexture(TextureUnit.Texture0 + i); GL.BindTexture(TextureTarget.Texture2D, bindings[i]); GL.BindSampler(i, samplers[i]); }
+        for (int i = 0; i < GpuHabitatSamplers.Count; i++) { GL.ActiveTexture(TextureUnit.Texture0 + i); GL.BindTexture(TextureTarget.Texture2D, bindings[i]); GL.BindSampler(i, samplers[i]); }
         GL.ActiveTexture((TextureUnit)activeUnit);
         GL.BlendFuncSeparate(0, (BlendingFactorSrc)srcRgb, (BlendingFactorDest)dstRgb, (BlendingFactorSrc)srcAlpha, (BlendingFactorDest)dstAlpha);
         GL.BlendEquationSeparate(0, (BlendEquationMode)rgbEquation, (BlendEquationMode)alphaEquation);

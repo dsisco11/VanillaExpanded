@@ -9,13 +9,13 @@ namespace VanillaExpanded.Tests.Unit.EcosystemMap;
 public sealed class HabitatSamplerBindingTests
 {
     #region Public API
-    /// <summary>Restores all signed/unsigned sampler names missing from native parsed metadata and leaves unrelated uniforms intact.</summary>
+    /// <summary>Registers both linked sampler names, including integer metadata omitted by the native parser and leaves unrelated uniforms intact.</summary>
     [Fact]
     public void LinkedIntegerSamplersCompleteEngineMetadata()
     {
         var program = new ShaderProgram();
         program.uniformLocations["existing"] = 42;
-        string[] names = { "climateMap", "forestMap", "shrubMap", "terrainMap", "exploredMap" };
+        string[] names = { "regionalMap", "terrainMap" };
         var resolved = new List<string>();
         GpuHabitatSamplers.Register(program, name => { resolved.Add(name); return Array.IndexOf(names, name); });
         Assert.Equal(names, resolved);

@@ -146,7 +146,6 @@ public sealed class HabitatViewRetentionTests
         foreach (var receipt in receipts)
         {
             var region = (GpuRegionalTextures)RuntimeHelpers.GetUninitializedObject(typeof(GpuRegionalTextures));
-            SetField(region, "maps", new GpuIntegerTexture?[3]);
             regions.Put((fixture.Identity.RegionFor(receipt.Bundle.Key), receipt.Bundle.Region), region);
             tiles.Put((receipt.Bundle.Key, receipt.Bundle.Elevation), (GpuTileTextures)RuntimeHelpers.GetUninitializedObject(typeof(GpuTileTextures)));
         }

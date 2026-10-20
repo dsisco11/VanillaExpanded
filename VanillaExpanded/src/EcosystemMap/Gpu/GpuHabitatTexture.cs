@@ -4,17 +4,26 @@ using OpenTK.Graphics.OpenGL4;
 
 namespace VanillaExpanded.EcosystemMap.Gpu;
 
-/// <summary>Owns one nearest-sampled original integer texture, allocated and disposed only on its creating graphics thread.</summary>
-internal sealed class GpuIntegerTexture : IDisposable
+/// <summary>Owns one normalized regional or integer terrain texture on its creating graphics thread.</summary>
+internal sealed class GpuHabitatTexture : IDisposable
 {
     private readonly int thread = Environment.CurrentManagedThreadId;
     internal int Id { get; private set; }
 
     #region Public API
-    /// <summary>Uploads original values without normalization, comparison or CPU pixel generation, restoring unpack/texture state.</summary>
-    internal GpuIntegerTexture(Array values, int size, PixelInternalFormat format, PixelType type)
+    /// <summary>Uploads original bytes or ushort values with the matching format/filtering contract, restoring unpack and texture state.</summary>
+    internal GpuHabitatTexture(Array values, int size, PixelInternalFormat format, PixelFormat channels, PixelType type)
     {
-        if (size <= 0 || values.Length != checked(size * size)) throw new ArgumentException("Invalid original texture layout.");
+        int components = channels switch
+        {
+            PixelFormat.Rgba => 4,
+            PixelFormat.RgInteger => 2,
+            _ => throw new ArgumentException("Unsupported packed habitat channels.", nameof(channels))
+        };
+        bool normalized = format == PixelInternalFormat.Rgba8 && channels == PixelFormat.Rgba && type == PixelType.UnsignedByte && values is byte[];
+        bool integer = format == PixelInternalFormat.Rg16ui && channels == PixelFormat.RgInteger && type == PixelType.UnsignedShort && values is ushort[];
+        if (!normalized && !integer) throw new ArgumentException("Unsupported habitat texture format or value type.", nameof(format));
+        if (size <= 0 || values.Length != checked(size * size * components)) throw new ArgumentException("Invalid original texture layout.");
         if (size > GL.GetInteger(GetPName.MaxTextureSize)) throw new NotSupportedException("Environmental map exceeds GPU texture limits.");
         int previous = GL.GetInteger(GetPName.TextureBinding2D);
         int alignment = GL.GetInteger(GetPName.UnpackAlignment);
@@ -31,9 +40,9 @@ internal sealed class GpuIntegerTexture : IDisposable
             GL.PixelStore(PixelStoreParameter.UnpackRowLength, 0);
             GL.PixelStore(PixelStoreParameter.UnpackSkipRows, 0);
             GL.PixelStore(PixelStoreParameter.UnpackSkipPixels, 0);
-            GL.TexImage2D(TextureTarget.Texture2D, 0, format, size, size, 0, PixelFormat.RedInteger, type, pinned.AddrOfPinnedObject());
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
+            GL.TexImage2D(TextureTarget.Texture2D, 0, format, size, size, 0, channels, type, pinned.AddrOfPinnedObject());
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)(normalized ? TextureMinFilter.Linear : TextureMinFilter.Nearest));
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)(normalized ? TextureMagFilter.Linear : TextureMagFilter.Nearest));
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
         }

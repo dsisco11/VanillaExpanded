@@ -6,10 +6,11 @@ using Vintagestory.Client.NoObf;
 
 namespace VanillaExpanded.EcosystemMap.Gpu;
 
-/// <summary>Completes integer-sampler metadata omitted by the engine's shader source parser.</summary>
+/// <summary>Completes linked sampler metadata, including integer declarations omitted by the native parser.</summary>
 internal static class GpuHabitatSamplers
 {
-    private static readonly string[] names = { "climateMap", "forestMap", "shrubMap", "terrainMap", "exploredMap" };
+    internal const int Count = 2;
+    private static readonly string[] names = { "regionalMap", "terrainMap" };
 
     #region Public API
     /// <summary>Registers actual linked sampler locations once after compilation, retaining normal engine texture binding.</summary>

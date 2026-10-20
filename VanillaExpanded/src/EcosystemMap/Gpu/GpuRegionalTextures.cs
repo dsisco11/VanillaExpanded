@@ -1,44 +1,42 @@
 using System;
-using System.Linq;
 using OpenTK.Graphics.OpenGL4;
 using VanillaExpanded.EcosystemMap.Storage;
 using Vintagestory.API.Client;
+using Vintagestory.API.Common;
 
 namespace VanillaExpanded.EcosystemMap.Gpu;
 
-/// <summary>Owns original regional textures shared by visible terrain tiles and all active species comparisons.</summary>
+/// <summary>Owns one packed regional texture shared by explored terrain tiles and all species comparisons.</summary>
 internal sealed class GpuRegionalTextures : IDisposable
 {
-    private readonly GpuIntegerTexture?[] maps = new GpuIntegerTexture?[3];
+    private readonly GpuHabitatTexture? texture;
     private readonly EnvironmentalMap?[] sources;
+    private readonly int[] offsets;
     private static readonly string[] names = { "climate", "forest", "shrub" };
 
     #region Public API
-    /// <summary>Uploads the three original maps once; absent maps use a harmless texture with an explicit unavailable layout.</summary>
-    internal GpuRegionalTextures(RegionalEnvironment? region)
+    /// <summary>Uploads independent native grids in RGBA channels; unavailable components retain explicit zero-size layouts.</summary>
+    internal GpuRegionalTextures(RegionalEnvironment? region, ILogger logger)
     {
-        sources = new[] { region?.Climate, region?.Forest, region?.Shrubs };
-        try
-        {
-            for (int i = 0; i < maps.Length; i++)
-                maps[i] = new GpuIntegerTexture(sources[i]?.Values.ToArray() ?? new int[1], sources[i]?.Size ?? 1,
-                    PixelInternalFormat.R32i, PixelType.Int);
-        }
-        catch { Dispose(); throw; }
+        var packed = new PackedRegionalData(region, message => logger.Warning(message));
+        sources = packed.Sources;
+        offsets = packed.Offsets;
+        texture = new GpuHabitatTexture(packed.Values, packed.Size,
+            PixelInternalFormat.Rgba8, PixelFormat.Rgba, PixelType.UnsignedByte);
     }
 
-    /// <summary>Binds shared regional values and independent layouts without resampling or selecting species.</summary>
+    /// <summary>Binds the regional input once and supplies each channel grid's original dimensions and padding.</summary>
     internal void Bind(IShaderProgram shader)
     {
-        for (int i = 0; i < maps.Length; i++)
+        shader.BindTexture2D("regionalMap", texture!.Id, 0);
+        for (int i = 0; i < sources.Length; i++)
         {
             var source = sources[i];
-            shader.BindTexture2D(names[i] + "Map", maps[i]!.Id, i);
-            shader.Uniform(names[i] + "Layout", source?.Size ?? 0, source?.TopLeftPadding ?? 0, source?.BottomRightPadding ?? 0);
+            shader.Uniform(names[i] + "Layout", source?.Size ?? 0, source?.TopLeftPadding ?? 0, source?.BottomRightPadding ?? 0, offsets[i]);
         }
     }
 
-    /// <summary>Releases only this region's owned textures on the graphics thread.</summary>
-    public void Dispose() { foreach (var map in maps) map?.Dispose(); }
+    /// <summary>Releases only this region's packed texture on its creating graphics thread.</summary>
+    public void Dispose() => texture?.Dispose();
     #endregion
 }

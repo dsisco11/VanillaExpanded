@@ -57,8 +57,8 @@ internal sealed class GpuHabitatOverlay : IDisposable
             GL.BlendEquationSeparate(0, BlendEquationMode.FuncAdd, BlendEquationMode.FuncAdd);
             GL.BlendFuncSeparate(0, BlendingFactorSrc.SrcAlpha, BlendingFactorDest.OneMinusSrcAlpha, BlendingFactorSrc.One, BlendingFactorDest.OneMinusSrcAlpha);
             shader.Use();
-            // Integer textures require nearest sampling; inherited sampler objects can override the texture parameters.
-            for (int i = 0; i < 5; i++) GL.BindSampler(i, 0);
+            // Use owned linear regional and nearest terrain filtering; inherited samplers must not override those settings.
+            for (int i = 0; i < GpuHabitatSamplers.Count; i++) GL.BindSampler(i, 0);
             boundRegion = null;
             ranges.Apply(shader);
             var criteria = (ranges.MinElevation, ranges.MaxElevation, world.SeaLevel, world.WorldHeight);
