@@ -15,11 +15,12 @@ internal sealed class HudOverlayDragPreview
     public const float Opacity = .55f;
     private HudOverlayGroupMovement? movement;
     private long revision;
+    private bool groupingPreview;
     private HudOverlayMemberLayout[] originals = Array.Empty<HudOverlayMemberLayout>();
 
     #region Public API
-    /// <summary>Gets source copies only while their captured transaction remains active.</summary>
-    public IReadOnlyList<HudOverlayMemberLayout> Originals => Active ? originals : Array.Empty<HudOverlayMemberLayout>();
+    /// <summary>Gets source copies during free dragging, suppressing them while a destination group is previewed.</summary>
+    public IReadOnlyList<HudOverlayMemberLayout> Originals => Active && !groupingPreview ? originals : Array.Empty<HudOverlayMemberLayout>();
 
     /// <summary>Copies current bounds before input can detach, reflow, or merge the native layouts.</summary>
     public static HudOverlayMemberLayout[] Capture(IEnumerable<HudOverlayGroupLayout> groups) => groups
@@ -31,6 +32,7 @@ internal sealed class HudOverlayDragPreview
     {
         movement = capture;
         revision = capture.DragRevision;
+        groupingPreview = false;
         originals = snapshot.Where(member => capture.IndicatorId is { } id ? member.Registration.Id == id
             : capture.StartingMembers.Contains(member.Registration.Id)).ToArray();
     }
@@ -42,11 +44,16 @@ internal sealed class HudOverlayDragPreview
     public void Clear()
     {
         movement = null;
+        groupingPreview = false;
         originals = Array.Empty<HudOverlayMemberLayout>();
     }
 
-    /// <summary>Retires stale captures without sampling or advancing feature presentations.</summary>
-    public void Refresh() { if (!Active) Clear(); }
+    /// <summary>Retains the source snapshot while suppressing its drawing during a reversible grouping preview.</summary>
+    public void Refresh(bool groupingPreview = false)
+    {
+        if (!Active) { Clear(); return; }
+        this.groupingPreview = groupingPreview;
+    }
     #endregion
 
     #region Private
