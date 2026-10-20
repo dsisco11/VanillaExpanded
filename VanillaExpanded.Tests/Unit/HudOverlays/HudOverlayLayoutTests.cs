@@ -10,7 +10,7 @@ namespace VanillaExpanded.Tests.Unit.HudOverlays;
 
 /// <summary>Serializes native GUI globals used by headless bounds integration.</summary>
 [CollectionDefinition("HudOverlayGeometry", DisableParallelization = true)]
-public sealed class HudOverlayGeometryCollection { }
+public sealed class HudOverlayGeometryCollection : ICollectionFixture<HudOverlayGeometryLanguage> { }
 
 /// <summary>Exercises installed native bounds rather than a parallel layout model.</summary>
 [Collection("HudOverlayGeometry")]

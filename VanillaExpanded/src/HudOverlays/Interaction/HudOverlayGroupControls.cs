@@ -209,12 +209,12 @@ internal sealed class HudOverlayGroupControls : IDisposable
         var input = api.Input;
         var pointer = new PointF(input.MouseX, input.MouseY);
         double currentScale = RuntimeEnv.GUIScale;
-        bool available = !api.HideGuis && !input.MouseGrabbed && group is { Available: true }
+        bool available = HudOverlayEditing.IsActive(api) && group is { Available: true }
             && group.Members.Any(member => (movement.IndicatorId == null || member.Registration.Id == movement.IndicatorId) && drawable(member.Registration) && member.Clip.Width > 0 && member.Clip.Height > 0);
         // The outline is a global movement cue, independent of pointer hover over an unrelated window.
         // Modal input capture still disables movement; ordinary foreground windows only suppress hover controls.
         showOutline = available && !(api.Gui.OpenedGuis?.Any(dialog =>
-            !ReferenceEquals(dialog, host) && dialog.IsOpened() && dialog.CaptureAllInputs()) ?? false);
+            !ReferenceEquals(dialog, host) && dialog.IsOpened() && HudOverlayEditing.BlocksAllInput(dialog)) ?? false);
         if (available)
         {
             var bounds = group!.Root;
@@ -323,7 +323,7 @@ internal sealed class HudOverlayGroupControls : IDisposable
         foreach (var dialog in api.Gui.OpenedGuis ?? Enumerable.Empty<GuiDialog>())
         {
             if (ReferenceEquals(dialog, host) || !dialog.IsOpened()) continue;
-            if (dialog.CaptureAllInputs()) return true;
+            if (HudOverlayEditing.BlocksAllInput(dialog)) return true;
             if (dialog.DialogType == EnumDialogType.HUD) continue;
             if (dialog.Composers.Values.Any(composition => composition.Enabled
                 && composition.Bounds.PointInside(pointer.X, pointer.Y))) return true;

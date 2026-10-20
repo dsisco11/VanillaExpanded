@@ -22,6 +22,7 @@ public sealed class SeparateGaugeRegistrationTests
         bool global = config.EnableHudOverlays, time = config.EnableApproximateTimeOverlay,
             temperature = config.EnableEnvironmentalTemperatureOverlay, date = config.EnableCalendarDateOverlay;
         var api = new Mock<ICoreClientAPI>(); var events = new Mock<IClientEventAPI>(); var loader = new Mock<IModLoader>();
+        api.SetupGet(value => value.Input).Returns(Mock.Of<IInputAPI>());
         api.SetupGet(value => value.Event).Returns(events.Object); api.SetupGet(value => value.ModLoader).Returns(loader.Object);
         var hud = new HudOverlaySystem();
         var clock = new ApproximateTimeSystem();

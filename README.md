@@ -48,14 +48,14 @@ Hold the Quick Tools hotkey (assign it in Controls) to open a radial menu of ava
 
 Customize your HUD arrangement and each indicator's options directly in-game:
 
-1. **Free the mouse cursor**, for example by opening your inventory.
+1. **Open the pause menu or press F9** to enter HUD edit mode. F9 toggles editing and frees the mouse cursor; rebind **[VE] Toggle HUD editing** in Controls if you prefer another key. Opening your inventory or otherwise freeing the cursor does not enable editing by itself.
 2. **Right-click a HUD indicator** to customize its **Enabled** toggle, supported **Style** options, **Lock**, or **Reset layout**.
 3. **Uncheck Lock**, then **left-click and drag the indicator's body** to place it where you want. Dragging an individual indicator detaches it from its group.
-4. To move a whole group, **hover over the group and drag its titlebar**. Right-click an indicator and enable **Lock** again when you are happy with the arrangement.
+4. To move a whole group, **hover over the group and drag its titlebar**. Right-click an indicator and enable **Lock** again when you are happy with the arrangement. Close the pause menu to leave pause-menu editing, or press F9 again (or Escape) to close editing enabled by the keybind.
 
 Standalone indicators have no titlebar. Lock applies to the entire group and its members without changing placement or membership.
 
-While the mouse is unlocked, registered indicators without drawable live content—including disabled or currently inapplicable indicators—appear as compact outlined placeholders. Their initials identify them; hover for the full name. Drag and snap them like visible indicators. They do not show fabricated readings or enable the feature. Locking the mouse restores normal visibility and collapse. A missing native anchor uses temporary screen placement for editing; only explicit layout actions save a new placement.
+While HUD edit mode is active, registered indicators without drawable live content—including disabled or currently inapplicable indicators—appear as compact outlined placeholders. Their initials identify them; hover for the full name. Drag and snap them like visible indicators. They do not show fabricated readings or enable the feature. Leaving edit mode restores normal visibility and collapse. A missing native anchor uses temporary screen placement for editing; only explicit layout actions save a new placement.
 
 Snap an indicator beside another to create or join a group, or drag a whole group beside another to merge their arrangements. The preview shows the destination and insertion before release. All four sides support alignment selected by pointer position; snaps that would overlap visible indicators are rejected. Overlapping free drops are cancelled and restore the starting arrangement without saving. Hold Shift to permit intentional overlap. Screen, edge, and center guides align items without grouping them. The native hotbar, health/hunger meters, and enabled temporal gear also provide alignment boundaries; they remain separate from VE groups. Overlays can snap beside these surfaces, and overlapping them requires Shift. Screen/native snaps retain an attachment for both individual indicators and groups, so hidden items collapse toward the attached edge. Free dragging clears that attachment; cancelling restores it. Hold **Shift** to bypass snapping and grouping, or press **Escape** or **right-click** to cancel the drag without opening a menu.
 

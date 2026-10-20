@@ -13,7 +13,7 @@ using Vintagestory.API.Config;
 namespace VanillaExpanded.HudOverlays.Lifecycle;
 
 /// <summary>Owns ready-world heartbeat registration and fresh native host/scheduler bindings for each player session.</summary>
-internal sealed class HudOverlaySession : IDisposable
+internal sealed class HudOverlaySession : IDisposable, IRenderer
 {
     private readonly ICoreClientAPI api;
     private readonly HudOverlayRegistry registry;
@@ -23,6 +23,7 @@ internal sealed class HudOverlaySession : IDisposable
     private readonly Func<WorkshopGaugeText>? createEditText;
     private readonly Dictionary<string, HudOverlayGroupLayout> layouts = new(StringComparer.Ordinal);
     private long? tickId;
+    private bool rendererRegistered;
     private IClientWorldAccessor? world;
     private IClientPlayer? player;
     private object? playerEntity;
@@ -30,10 +31,12 @@ internal sealed class HudOverlaySession : IDisposable
     private HudOverlayAnchorContext? anchors;
     private HudOverlayContainers? positions;
     private HudOverlayEditPreviews? editPreviews;
+    private bool editingActive;
     private bool disposed;
     public HudOverlayScheduler? Scheduler { get; private set; }
 
     #region Public API
+    #region Session lifecycle
     /// <summary>Stores borrowed services and a native-host creation boundary without allocating world resources.</summary>
     public HudOverlaySession(ICoreClientAPI api, HudOverlayRegistry registry,
         Func<HudOverlayScheduler, HudOverlayAnchorContext, IHudOverlayHost>? createHost = null,
@@ -57,6 +60,8 @@ internal sealed class HudOverlaySession : IDisposable
         ObjectDisposedException.ThrowIf(disposed, this);
         LeaveWorld();
         tickId = api.Event.RegisterGameTickListener(OnTick, HudOverlayScheduler.HeartbeatMs);
+        api.Event.RegisterRenderer(this, EnumRenderStage.Before, "hud-edit-mode");
+        rendererRegistered = true;
         OnTick(0);
     }
 
@@ -71,7 +76,18 @@ internal sealed class HudOverlaySession : IDisposable
                 api.Event.UnregisterGameTickListener(listener);
             }
         }
-        finally { EndBindings(); }
+        finally
+        {
+            try
+            {
+                if (rendererRegistered)
+                {
+                    rendererRegistered = false;
+                    api.Event.UnregisterRenderer(this, EnumRenderStage.Before);
+                }
+            }
+            finally { EndBindings(); }
+        }
     }
 
     /// <summary>Observes live selectors immediately while leaving expensive refreshes on the heartbeat.</summary>
@@ -92,6 +108,19 @@ internal sealed class HudOverlaySession : IDisposable
         disposed = true;
         LeaveWorld();
     }
+
+    #endregion
+    #region Editing transition observation
+    /// <summary>Observes editing before GUI rendering, including while gameplay ticks are paused.</summary>
+    public double RenderOrder => 0;
+    /// <summary>Keeps this world-independent transition observer eligible at every camera location.</summary>
+    public int RenderRange => int.MaxValue;
+    /// <summary>Reconciles only edit-mode transitions so an all-hidden HUD can open without gameplay ticks.</summary>
+    public void OnRenderFrame(float deltaTime, EnumRenderStage stage)
+    {
+        if (!disposed && tickId != null && editPreviews != null && editingActive != editPreviews.Active) BeforeRender();
+    }
+    #endregion
     #endregion
 
     #region Private
@@ -138,6 +167,7 @@ internal sealed class HudOverlaySession : IDisposable
             Lang.CurrentLocale ?? "en", FontRevision());
         Scheduler!.Update(anchors, preparation, visible, enabled());
         editPreviews!.Update(preparation);
+        editingActive = editPreviews.Active;
         SynchronizeLayouts();
     }
 
@@ -164,6 +194,7 @@ internal sealed class HudOverlaySession : IDisposable
         positions = null;
         if (editPreviews != null) TryCleanup(editPreviews.Dispose, ref failures);
         editPreviews = null;
+        editingActive = false;
         foreach (var layout in layouts.Values) TryCleanup(layout.Dispose, ref failures);
         layouts.Clear();
         TryCleanup(registry.EndSession, ref failures);
@@ -180,6 +211,14 @@ internal sealed class HudOverlaySession : IDisposable
         positions?.Synchronize();
         anchors.BeginFrame(visible);
         Scheduler.ObserveVisibility(anchors, visible, enabled());
+        if (editPreviews != null && editingActive != editPreviews.Active)
+        {
+            // Pause-menu entry cannot depend on gameplay ticks. Prepare only host-owned edit proxies
+            // on this transition; feature sampling remains on the normal scheduler heartbeat.
+            editPreviews.Update(new HudOverlayPreparationContext(api, anchors.GuiScale,
+                Lang.CurrentLocale ?? "en", FontRevision()));
+            editingActive = editPreviews.Active;
+        }
         SynchronizeLayouts();
     }
 

@@ -140,6 +140,7 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
         typeof(Lang).GetProperty(nameof(Lang.CurrentLocale))!.SetValue(null, "en");
         api.SetupGet(value => value.Gui).Returns(gui.Object);
         api.SetupGet(value => value.Input).Returns(input.Object);
+        api.SetupGet(value => value.World).Returns(new Mock<IClientWorldAccessor>().Object);
         api.SetupGet(value => value.HideGuis).Returns(() => hidden);
         api.SetupGet(value => value.Render.FrameWidth).Returns(800);
         api.SetupGet(value => value.Render.FrameHeight).Returns(600);
@@ -153,6 +154,7 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
         var window = new Window();
         gui.SetupGet(value => value.WindowBounds).Returns(window);
         gui.SetupGet(value => value.OpenedGuis).Returns(opened);
+        HudOverlayEditFixture.Open(api, gui, opened);
         gui.Setup(value => value.CreateCompo(It.IsAny<string>(), It.IsAny<ElementBounds>()))
             .Returns((string name, ElementBounds bounds) => (GuiComposer)Activator.CreateInstance(typeof(GuiComposer),
                 BindingFlags.Instance | BindingFlags.NonPublic, null, new object[] { api.Object, bounds, name }, null)!);
@@ -611,6 +613,7 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
     [InlineData("scale")]
     [InlineData("foreground")]
     [InlineData("escape")]
+    [InlineData("editexit")]
     public void CancellationRestoresStartingPreferenceWithoutWriting(string cause)
     {
         StartDrag();
@@ -630,6 +633,7 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
                 dialog.Setup(value => value.CaptureAllInputs()).Returns(true);
                 opened.Add(dialog.Object); break;
             case "escape": Assert.True(controls.Cancel()); break;
+            case "editexit": opened.RemoveAll(dialog => dialog is HudOverlayEditDialog); break;
         }
         controls.Synchronize(layouts);
         controls.Draw(0);

@@ -8,14 +8,31 @@ using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.ModSystems;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 
 namespace VanillaExpanded.Tests.Unit.HudOverlays;
 
 /// <summary>Checks optional feature-owned menu bindings against authoritative configuration and layout state.</summary>
 [Collection("HudOverlayGeometry")]
-public sealed class HudOverlayMenuSettingsTests
+public sealed class HudOverlayMenuSettingsTests : IDisposable
 {
+    private readonly string? oldLocale = Lang.CurrentLocale;
+    private readonly ITranslationService? english = Lang.AvailableLanguages.GetValueOrDefault("en");
     #region Public API
+    /// <summary>Provides native localization for system hotkey registration.</summary>
+    public HudOverlayMenuSettingsTests()
+    {
+        var language = new Mock<ITranslationService>();
+        language.Setup(value => value.Get(It.IsAny<string>(), It.IsAny<object[]>())).Returns((string key, object[] _) => key);
+        Lang.AvailableLanguages["en"] = language.Object;
+        typeof(Lang).GetProperty(nameof(Lang.CurrentLocale))!.SetValue(null, "en");
+    }
+    /// <summary>Restores engine localization after the system integration checks.</summary>
+    public void Dispose()
+    {
+        typeof(Lang).GetProperty(nameof(Lang.CurrentLocale))!.SetValue(null, oldLocale);
+        if (english == null) Lang.AvailableLanguages.Remove("en"); else Lang.AvailableLanguages["en"] = english;
+    }
     /// <summary>Every actual feature exposes its own enable flag and enum choices and saves before live notification.</summary>
     [Theory]
     [InlineData("ApproximateTime", "EnableApproximateTimeOverlay", "ApproximateTimeGaugeStyle")]
@@ -34,7 +51,7 @@ public sealed class HudOverlayMenuSettingsTests
         var style = config.GetType().GetProperty(styleName)!;
         var previousEnabled = enabled.GetValue(config); var previousStyle = style.GetValue(config);
         bool previousGlobal = config.EnableHudOverlays; VanillaExpandedConfig? persisted = null;
-        var api = new Mock<ICoreClientAPI>(); var loader = new Mock<IModLoader>();
+        var api = new Mock<ICoreClientAPI> { DefaultValue = DefaultValue.Mock }; var loader = new Mock<IModLoader>();
         api.SetupGet(value => value.Event).Returns(Mock.Of<IClientEventAPI>());
         api.SetupGet(value => value.ModLoader).Returns(loader.Object);
         var hud = new HudOverlaySystem();
@@ -88,7 +105,7 @@ public sealed class HudOverlayMenuSettingsTests
     [Fact]
     public void FailedSaveRollsBackWithoutReload()
     {
-        var api = new Mock<ICoreClientAPI>(); var loader = new Mock<IModLoader>();
+        var api = new Mock<ICoreClientAPI> { DefaultValue = DefaultValue.Mock }; var loader = new Mock<IModLoader>();
         var observer = new ReloadObserver(() => Assert.Fail("Failed persistence must not reload."));
         api.SetupGet(value => value.ModLoader).Returns(loader.Object);
         loader.SetupGet(value => value.Systems).Returns(new ModSystem[] { observer });
