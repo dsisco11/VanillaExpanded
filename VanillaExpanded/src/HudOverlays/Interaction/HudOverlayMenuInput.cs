@@ -192,9 +192,9 @@ internal sealed class HudOverlayMenuInput : IDisposable
     private HudMenuEnvironment Environment()
     {
         var window = api.Gui.WindowBounds;
-        bool modal = api.Gui.OpenedGuis?.Any(dialog => !ReferenceEquals(dialog, host) && dialog.IsOpened() && dialog.CaptureAllInputs()) == true;
+        bool modal = api.Gui.OpenedGuis?.Any(dialog => !ReferenceEquals(dialog, host) && dialog.IsOpened() && HudOverlayEditing.BlocksAllInput(dialog)) == true;
         return new(host, new((float)window.renderX, (float)window.renderY, (float)window.OuterWidth, (float)window.OuterHeight),
-            RuntimeEnv.GUIScale, Lang.CurrentLocale ?? "en", !disposed && host.IsOpened() && enabled() && !api.HideGuis && !api.Input.MouseGrabbed && !modal);
+            RuntimeEnv.GUIScale, Lang.CurrentLocale ?? "en", !disposed && host.IsOpened() && enabled() && HudOverlayEditing.IsActive(api) && !modal);
     }
     /// <summary>Closes stale popups before each input or drawing boundary.</summary>
     private void SynchronizeEnvironment()
@@ -220,7 +220,7 @@ internal sealed class HudOverlayMenuInput : IDisposable
     private bool Blocked(PointF pointer)
     {
         return (api.Gui.OpenedGuis ?? Enumerable.Empty<GuiDialog>()).Any(dialog => !ReferenceEquals(dialog, host) && dialog.IsOpened()
-            && (dialog.CaptureAllInputs() || dialog.DialogType != EnumDialogType.HUD && dialog.Composers.Values.Any(composer =>
+            && (HudOverlayEditing.BlocksAllInput(dialog) || dialog.DialogType != EnumDialogType.HUD && dialog.Composers.Values.Any(composer =>
                 composer.Enabled && composer.Bounds.PointInside(pointer.X, pointer.Y))));
     }
     #endregion

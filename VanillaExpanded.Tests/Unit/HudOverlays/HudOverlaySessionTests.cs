@@ -49,6 +49,29 @@ public sealed class HudOverlaySessionTests
 
     #endregion
     #region Live visibility and placement
+    /// <summary>The independent renderer opens and removes hidden edit proxies while gameplay ticks remain paused.</summary>
+    [Fact]
+    public void RenderObserverReconcilesClosedHostWithoutGameplayTick()
+    {
+        using var fixture = new Fixture();
+        fixture.FeatureEnabled = false; fixture.Grabbed = false;
+        fixture.Gui.Object.OpenedGuis.Clear();
+        fixture.Session.EnterWorld();
+        var host = fixture.Hosts.Single();
+        Assert.False(host.IsOpen); Assert.Empty(host.Layouts!["group"].Members);
+        int refreshes = fixture.Probe.Refreshes;
+        HudOverlayEditFixture.Open(fixture.Api, fixture.Gui);
+        fixture.Session.OnRenderFrame(0, EnumRenderStage.Before);
+        Assert.True(host.IsOpen); Assert.Single(host.Layouts["group"].Members);
+        fixture.Gui.Object.OpenedGuis.Clear();
+        fixture.Session.OnRenderFrame(0, EnumRenderStage.Before);
+        Assert.False(host.IsOpen); Assert.Empty(host.Layouts["group"].Members);
+        Assert.Equal(refreshes, fixture.Probe.Refreshes);
+        fixture.Session.LeaveWorld(); fixture.Session.LeaveWorld();
+        fixture.Events.Verify(value => value.RegisterRenderer(fixture.Session, EnumRenderStage.Before, "hud-edit-mode"), Times.Once);
+        fixture.Events.Verify(value => value.UnregisterRenderer(fixture.Session, EnumRenderStage.Before), Times.Once);
+    }
+
     /// <summary>Editing exposes an item whose configured native anchor is unavailable without saving a replacement position.</summary>
     [Fact]
     public void UnlockedMissingAnchorUsesTransientEditableFallback()
@@ -268,6 +291,7 @@ public sealed class HudOverlaySessionTests
             Gui.SetupGet(value => value.WindowBounds).Returns(new Window());
             Gui.SetupGet(value => value.LoadedGuis).Returns(new List<GuiDialog>());
             Api.SetupGet(value => value.Gui).Returns(Gui.Object);
+            HudOverlayEditFixture.Open(Api, Gui);
             Events.Setup(value => value.RegisterGameTickListener(It.IsAny<Action<float>>(), 100, 0))
                 .Callback<Action<float>, int, int>((callback, _, _) => tick = callback).Returns(0);
             Registry.RegisterGroup(new HudOverlayGroup("group", new HudOverlayPlacement("screen", HudOverlayPoint.LeftTop, HudOverlayPoint.LeftTop)));

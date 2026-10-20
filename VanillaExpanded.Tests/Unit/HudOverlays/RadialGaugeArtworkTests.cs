@@ -47,7 +47,7 @@ public sealed class RadialGaugeArtworkTests : IDisposable
         var paths = renderer.Invocations.Where(call => call.Method.Name == "GetOrLoadTexture")
             .Select(call => ((AssetLocation)call.Arguments[0]).Path).ToArray();
         const string root = "textures/hud/workshop-gauges/";
-        Assert.Equal(2, paths.Count(path => path == root + "radial/layer-0.png"));
+        Assert.Equal(1, paths.Count(path => path == root + "radial/layer-0.png"));
         Assert.Equal(2, paths.Count(path => path == root + "radial/layer-2.png"));
         Assert.Contains(root + "clock/layer-1.png", paths);
         Assert.Contains(root + "thermometer/empty-glass.png", paths);

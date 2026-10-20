@@ -5,6 +5,7 @@ using VanillaExpanded.HudOverlays.Lifecycle;
 using VanillaExpanded.HudOverlays.Layout;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering;
+using VanillaExpanded.HudOverlays.Interaction;
 using VanillaExpanded.ModSystems;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -16,6 +17,7 @@ public sealed class HudOverlaySystem : ModSystem, ILiveConfigurable
 {
     private ICoreClientAPI? api;
     private HudOverlaySession? session;
+    private HudOverlayEditInput? editInput;
     private bool disposed;
     /// <summary>Gets the shared registry for client overlay and group registration.</summary>
     public HudOverlayRegistry Registry { get; } = new();
@@ -36,6 +38,7 @@ public sealed class HudOverlaySystem : ModSystem, ILiveConfigurable
     public void ConfigurationChanged()
     {
         ObjectDisposedException.ThrowIf(disposed, this);
+        editInput?.Synchronize();
         session?.ConfigurationChanged();
     }
     #endregion
@@ -49,6 +52,7 @@ public sealed class HudOverlaySystem : ModSystem, ILiveConfigurable
         ArgumentNullException.ThrowIfNull(api);
         ObjectDisposedException.ThrowIf(disposed, this);
         this.api = api;
+        editInput = new HudOverlayEditInput(api);
         Backdrop = new HudOverlayIconBackdrop(api);
         Registry.RegisterGroup(new HudOverlayGroup("held-item-status",
             HudOverlayConfiguration.ResolveHeldItemStatusPlacement(VanillaExpandedModSystem.Config)));
@@ -76,6 +80,7 @@ public sealed class HudOverlaySystem : ModSystem, ILiveConfigurable
                 HudOverlayConfiguration.ResolveHeldItemStatusPlacement(VanillaExpandedModSystem.Config), group.Packing));
             break;
         }
+        editInput?.Synchronize();
         session?.ConfigurationChanged();
     }
 
@@ -89,10 +94,15 @@ public sealed class HudOverlaySystem : ModSystem, ILiveConfigurable
             api.Event.LevelFinalize -= session.EnterWorld;
             api.Event.LeaveWorld -= session.LeaveWorld;
         }
-        try { session?.Dispose(); }
+        try
+        {
+            try { editInput?.Dispose(); }
+            finally { session?.Dispose(); }
+        }
         finally
         {
             session = null;
+            editInput = null;
             api = null;
             try { Backdrop?.Dispose(); }
             finally

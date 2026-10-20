@@ -18,6 +18,7 @@ public sealed class PlayerWetnessSystemTests
     public void ClientRegistrationUsesSharedGroupAndBoundedInterval()
     {
         var api = new Mock<ICoreClientAPI>(); var events = new Mock<IClientEventAPI>(); var loader = new Mock<IModLoader>();
+        api.SetupGet(value => value.Input).Returns(Mock.Of<IInputAPI>());
         api.SetupGet(value => value.Event).Returns(events.Object); api.SetupGet(value => value.ModLoader).Returns(loader.Object);
         var hud = new HudOverlaySystem(); var feature = new PlayerWetnessSystem();
         loader.Setup(value => value.GetModSystem<HudOverlaySystem>(true)).Returns(hud);

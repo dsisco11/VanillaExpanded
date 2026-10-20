@@ -15,6 +15,22 @@ namespace VanillaExpanded.Tests.Unit.HudOverlays;
 public sealed class HudOverlayEditPreviewsTests
 {
     #region Public API
+    /// <summary>Closing explicit editing removes hidden proxies even while the pointer stays free.</summary>
+    [Fact]
+    public void EditModeExitRetiresHiddenProxiesWithFreePointer()
+    {
+        using var fixture = new Fixture();
+        fixture.Previews.Update(fixture.Context);
+        Assert.Single(fixture.Previews.GetMembers());
+        fixture.Gui.Object.OpenedGuis.Clear();
+        Assert.False(fixture.Grabbed);
+        fixture.Previews.Update(fixture.Context);
+        Assert.Empty(fixture.Previews.GetMembers());
+        Assert.False(fixture.Previews.IsDrawable(fixture.Registration));
+        Assert.All(fixture.Textures, texture => Assert.True(texture.Disposed));
+        fixture.VerifyNoFeatureCalls();
+    }
+
     /// <summary>One failed stand-in does not hide healthy registrations and can recover on a later heartbeat.</summary>
     [Fact]
     public void FailedPlaceholderPreparationIsIsolatedAndRetryable()
@@ -120,6 +136,7 @@ public sealed class HudOverlayEditPreviewsTests
             Render.SetupGet(value => value.FrameWidth).Returns(800); Render.SetupGet(value => value.FrameHeight).Returns(600);
             Gui.SetupGet(value => value.WindowBounds).Returns(new Window());
             Api.SetupGet(value => value.Input).Returns(Input.Object); Input.SetupGet(value => value.MouseGrabbed).Returns(() => Grabbed);
+            HudOverlayEditFixture.Open(Api, Gui);
             Backdrop = Overlay.As<IHudOverlayBackdropProvider>();
             Registry.RegisterGroup(Group); Registration = new HudOverlayRegistration("mod:hidden", Overlay.Object, () => false, Group.Id, reservedSize: new SizeF(74, 31));
             Handle = Registry.Register(Registration); Registry.BeginSession(Api.Object);

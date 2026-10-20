@@ -37,8 +37,10 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     public Action? BeforeRender { get; set; }
     public override bool Focusable => menuInput?.Capturing == true;
     public override bool UnregisterOnClose => true;
-    /// <summary>Shares the native inventory/dialog tier so focused menus render above ordinary windows.</summary>
-    public override double DrawOrder => .2;
+    /// <summary>Places targeted HUD popups above the pause menu while artwork stays in its passive slot.</summary>
+    public override double DrawOrder => .9;
+    /// <summary>Routes targeted edits before the escape menu consumes pointer input.</summary>
+    public override double InputOrder => -.1;
     #region Public API
     #region Composition
     /// <summary>Borrows registry and prepared-state decisions; owns only composers allocated for this session.</summary>
@@ -140,9 +142,9 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     /// <summary>Receives keyboard events during captured movement or context-menu interaction.</summary>
     public override bool ShouldReceiveKeyboardEvents() => menuInput?.Capturing == true || ActiveControls?.Active == true;
     /// <summary>Allows selective handle routing while retaining passive behavior for hosts without controls.</summary>
-    public override bool ShouldReceiveMouseEvents() => groupControls.Count > 0 && IsOpened();
-    /// <summary>Captures general input only while a context menu owns native focus.</summary>
-    public override bool CaptureAllInputs() => menuInput?.Capturing == true;
+    public override bool ShouldReceiveMouseEvents() => groupControls.Count > 0 && IsOpened() && HudOverlayEditing.IsActive(capi);
+    /// <summary>Prioritizes menu navigation and drag cancellation over the pause menu's keyboard capture.</summary>
+    public override bool CaptureAllInputs() => menuInput?.Capturing == true || ActiveControls?.Active == true;
     /// <summary>Leaves raw mouse ownership with the engine.</summary>
     public override bool CaptureRawMouse() => false;
     /// <summary>Cancels active dragging instead of closing the HUD or saving its preview.</summary>
@@ -183,7 +185,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         if (menuInput?.Capturing == true) { menuInput.MouseDown(args); return; }
         if (activeControl == null && menuInput?.TryOpen(args) == true) return;
         var starting = activeControl == null && args.Button == Vintagestory.API.Common.EnumMouseButton.Left && !args.Handled
-            && groupControls.Count > 0 && !capi.Input.MouseGrabbed && !capi.HideGuis ? HudOverlayDragPreview.Capture(groups.Where(pair => visibleGroups.Contains(pair.Key)).Select(pair => pair.Value)) : null;
+            && groupControls.Count > 0 && HudOverlayEditing.IsActive(capi) ? HudOverlayDragPreview.Capture(groups.Where(pair => visibleGroups.Contains(pair.Key)).Select(pair => pair.Value)) : null;
         try
         {
             if (activeControl != null) activeControl.OnMouseDown(capi, args);

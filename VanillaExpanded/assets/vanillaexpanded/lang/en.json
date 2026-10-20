@@ -3,6 +3,7 @@
   "mappingkey-icon": "Icon",
   "mappingkey-text": "Text",
   "hud-edit-hidden": "{0} (hidden)",
+  "hotkey-edit-hud": "[VE] Toggle HUD editing",
   "hud-custom-group": "HUD group",
   "hud-group-world-status": "World status",
   "hud-group-player-status": "Player status",

@@ -271,6 +271,42 @@ public sealed class HudOverlayMenuInputTests : IDisposable
         Assert.Equal(opens, f.Menu.IsOpened); Assert.Equal(opens, press.Handled);
     }
 
+    /// <summary>Closing explicit editing releases an active context menu even when the cursor remains free.</summary>
+    [Fact]
+    public void EditModeExitClosesMenuWithFreePointer()
+    {
+        using var f = new Fixture();
+        f.Host.OnMouseDown(f.Press());
+        Assert.True(f.Menu.IsOpened);
+        f.Opened.RemoveAll(dialog => dialog is HudOverlayEditDialog);
+        Assert.False(f.Host.CaptureAllInputs());
+        Assert.False(f.Menu.IsOpened);
+        Assert.Equal(1, f.Popup.Disposals);
+    }
+
+    /// <summary>The pause menu permits targeted editing outside its composer but retains ownership inside its bounds.</summary>
+    [Theory]
+    [InlineData(true)] [InlineData(false)]
+    public void NativePauseMenuBlocksOnlyItsComposerBounds(bool overlaps)
+    {
+        using var f = new Fixture();
+        f.Opened.RemoveAll(dialog => dialog is HudOverlayEditDialog);
+        var type = typeof(Vintagestory.Client.NoObf.ShaderProgram).Assembly
+            .GetType("Vintagestory.Client.NoObf.GuiDialogEscapeMenu", true)!;
+        var pause = (GuiDialog)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(type);
+        typeof(GuiDialog).GetField("opened", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(pause, true);
+        pause.Composers = new GuiDialog.DlgComposers(pause);
+        var press = f.Press();
+        var bounds = ElementBounds.Fixed(overlaps ? press.X - 5 : press.X + 100,
+            overlaps ? press.Y - 5 : press.Y + 100, 30, 30).WithParent(f.Layout.Gui.Object.WindowBounds);
+        bounds.CalcWorldBounds();
+        pause.Composers["pause"] = f.Layout.Gui.Object.CreateCompo("pause", bounds);
+        f.Opened.Add(pause);
+        f.Host.OnMouseDown(press);
+        Assert.Equal(!overlaps, f.Menu.IsOpened);
+        Assert.Equal(!overlaps, press.Handled);
+    }
+
     /// <summary>Mouse locking and host close release owned popup resources without another pointer event.</summary>
     [Theory]
     [InlineData(true)]
@@ -349,6 +385,7 @@ public sealed class HudOverlayMenuInputTests : IDisposable
             Layout.Gui.SetupGet(x => x.WindowBounds).Returns(new Window());
             Layout.Gui.SetupGet(x => x.OpenedGuis).Returns(Opened);
             Layout.Gui.SetupGet(x => x.LoadedGuis).Returns(new List<GuiDialog>());
+            HudOverlayEditFixture.Open(Layout.Api, Layout.Gui, Opened);
             Layout.Gui.Setup(x => x.CreateCompo(It.IsAny<string>(), It.IsAny<ElementBounds>()))
                 .Returns((string name, ElementBounds bounds) => (GuiComposer)Activator.CreateInstance(typeof(GuiComposer),
                     BindingFlags.Instance | BindingFlags.NonPublic, null, new object[] { Layout.Api.Object, bounds, name }, null)!);

@@ -118,7 +118,8 @@ public sealed class HudOverlayHostTests : IDisposable
         host.TryOpen(false); HudOverlayNativeRenderPass.Render(host, .1f);
         time.Verify(value => value.Draw(renderer.Object, member.Bounds, member.Clip, .1f), Times.Once);
         weather.Verify(value => value.Draw(It.IsAny<IRenderAPI>(), It.IsAny<ElementBounds>(), It.IsAny<RectangleF>(), It.IsAny<float>()), Times.Never);
-        renderer.Verify(value => value.RenderTexture(1, It.IsAny<double>(), It.IsAny<double>(), HudOverlaySizes.Clock, HudOverlaySizes.Clock, 50, null), Times.Once);
+        renderer.Verify(value => value.Render2DTexturePremultipliedAlpha(20, It.IsAny<float>(), It.IsAny<float>(),
+            It.IsAny<float>(), It.IsAny<float>(), 51, null), Times.Once);
         // Resize the already composed group through rain and fair weather without replacing its native composer.
         var composer = host.Composers[group.Id];
         foreach (SizeF nextSize in new[] { new SizeF(36, 36), SizeF.Empty })
@@ -131,7 +132,8 @@ public sealed class HudOverlayHostTests : IDisposable
             Assert.True(layout.Members.Single(value => value.Registration.Id == "mod:time").Clip.Width > 0);
             HudOverlayNativeRenderPass.Render(host, .1f);
         }
-        renderer.Verify(value => value.RenderTexture(1, It.IsAny<double>(), It.IsAny<double>(), HudOverlaySizes.Clock, HudOverlaySizes.Clock, 50, null), Times.Exactly(3));
+        renderer.Verify(value => value.Render2DTexturePremultipliedAlpha(20, It.IsAny<float>(), It.IsAny<float>(),
+            It.IsAny<float>(), It.IsAny<float>(), 51, null), Times.Exactly(3));
     }
     /// <summary>Native open/close registration remains focus-free and final cleanup is idempotent.</summary>
     [Fact]

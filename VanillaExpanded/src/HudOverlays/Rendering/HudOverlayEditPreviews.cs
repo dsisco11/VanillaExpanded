@@ -38,7 +38,7 @@ internal sealed class HudOverlayEditPreviews : IDisposable
     }
 
     /// <summary>Gates edit-only drawing immediately when pointer capture, global HUD visibility, or session availability changes.</summary>
-    public bool Active => !disposed && enabled() && !api.HideGuis && api.Input?.MouseGrabbed == false;
+    public bool Active => !disposed && enabled() && HudOverlayEditing.IsActive(api);
 
     /// <summary>Prepares missing live members on the heartbeat, including disabled or currently inapplicable registrations.</summary>
     public void Update(HudOverlayPreparationContext context)

@@ -14,9 +14,25 @@ namespace VanillaExpanded.Tests.Unit.HudOverlays;
 
 /// <summary>Verifies that registered defaults remain attached when permission changes materialize them.</summary>
 [Collection("HudOverlayGeometry")]
-public sealed class HudDefaultAttachmentTests
+public sealed class HudDefaultAttachmentTests : IDisposable
 {
+    private readonly string? oldLocale = Lang.CurrentLocale;
+    private readonly ITranslationService? english = Lang.AvailableLanguages.GetValueOrDefault("en");
     #region Public API
+    /// <summary>Provides native localization for system hotkey registration.</summary>
+    public HudDefaultAttachmentTests()
+    {
+        var language = new Mock<ITranslationService>();
+        language.Setup(value => value.Get(It.IsAny<string>(), It.IsAny<object[]>())).Returns((string key, object[] _) => key);
+        Lang.AvailableLanguages["en"] = language.Object;
+        typeof(Lang).GetProperty(nameof(Lang.CurrentLocale))!.SetValue(null, "en");
+    }
+    /// <summary>Restores engine localization after the system integration checks.</summary>
+    public void Dispose()
+    {
+        typeof(Lang).GetProperty(nameof(Lang.CurrentLocale))!.SetValue(null, oldLocale);
+        if (english == null) Lang.AvailableLanguages.Remove("en"); else Lang.AvailableLanguages["en"] = english;
+    }
     /// <summary>Actual built-in registrations preserve their attachment, pivot and inset through collapse, toggles and reload.</summary>
     [Theory]
     [InlineData("player-status", "hotbar", 1, 1200, 900, 400, 700, 400, 70, 35, 20)]
@@ -34,6 +50,7 @@ public sealed class HudDefaultAttachmentTests
             RuntimeEnv.GUIScale = scale; GuiStyle.LeftDialogMargin = GuiStyle.RightDialogMargin = 0;
             using var fixture = new HudLayoutFixture();
             fixture.Api.SetupGet(api => api.Event).Returns(Mock.Of<IClientEventAPI>());
+            fixture.Api.SetupGet(api => api.Input).Returns(Mock.Of<IInputAPI>());
             system.StartClientSide(fixture.Api.Object);
             var group = system.Registry.GetGroups().Single(value => value.Id == groupId);
             Assert.Equal(targetId, group.Placement.TargetId);
