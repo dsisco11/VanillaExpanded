@@ -46,7 +46,11 @@ public sealed class EcosystemMapLayer : MapLayer
     /// <summary>Composes the species panel using the native full-map extra-composer callback.</summary>
     public override void ComposeDialogExtras(GuiDialogWorldMap dialog, GuiComposer composer)
     {
-        try { client?.Compose(dialog, composer); }
+        try
+        {
+            EcosystemTabState.Synchronize(dialog, LayerGroupCode, Active);
+            client?.Compose(dialog, composer);
+        }
         catch (Exception error) { api.Logger.Error("Ecosystem map controls unavailable: {0}", error); }
     }
     /// <summary>Routes map drawing through exact full-map eligibility and explored-coverage checks.</summary>
