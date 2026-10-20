@@ -16,6 +16,7 @@ internal sealed class GpuHabitatOverlay : IDisposable
     private (float Minimum, float Maximum, int SeaLevel, int WorldHeight)? heightCriteria;
     private HabitatHeightRange heightRange;
     private GpuRegionalTextures? boundRegion;
+    private int boundRegionalTexture = -1, boundTerrainTexture = -1;
     private readonly float[] modelViewSnapshot = new float[16];
 
     #region Public API
@@ -60,6 +61,7 @@ internal sealed class GpuHabitatOverlay : IDisposable
             // Use owned linear regional and nearest terrain filtering; inherited samplers must not override those settings.
             for (int i = 0; i < GpuHabitatSamplers.Count; i++) GL.BindSampler(i, 0);
             boundRegion = null;
+            boundRegionalTexture = boundTerrainTexture = -1;
             ranges.Apply(shader);
             var criteria = (ranges.MinElevation, ranges.MaxElevation, world.SeaLevel, world.WorldHeight);
             if (heightCriteria != criteria)
@@ -93,10 +95,12 @@ internal sealed class GpuHabitatOverlay : IDisposable
         CheckThread();
         if (!ReferenceEquals(boundRegion, region))
         {
-            region.Bind(shader!);
+            region.Bind(shader!, region.TextureId != boundRegionalTexture);
+            boundRegionalTexture = region.TextureId;
             boundRegion = region;
         }
-        tile.Bind(shader!);
+        tile.Bind(shader!, tile.TextureId != boundTerrainTexture);
+        boundTerrainTexture = tile.TextureId;
         shader!.Uniform("screenBounds", x, y, width, height);
         shader.Uniform("tileOrigin", (float)((long)bundle.Key.X * bundle.World.ChunkSize), (float)((long)bundle.Key.Z * bundle.World.ChunkSize));
         api.Render.RenderMesh(quad!);

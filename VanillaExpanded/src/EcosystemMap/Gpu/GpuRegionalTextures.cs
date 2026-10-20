@@ -1,40 +1,40 @@
 using System;
-using OpenTK.Graphics.OpenGL4;
 using VanillaExpanded.EcosystemMap.Storage;
 using Vintagestory.API.Client;
 
 namespace VanillaExpanded.EcosystemMap.Gpu;
 
-/// <summary>Owns one packed regional texture shared by explored terrain tiles and all species comparisons.</summary>
+/// <summary>Retains one shared regional atlas slot and independent native channel layouts.</summary>
 internal sealed class GpuRegionalTextures : IDisposable
 {
-    private readonly GpuHabitatTexture? texture;
+    private readonly HabitatAtlasSlot slot;
     private readonly PackedMapLayout?[] layouts;
     private readonly int[] offsets;
+    private readonly int size;
     private static readonly string[] names = { "climate", "forest", "shrub" };
+    internal int TextureId => slot.TextureId;
 
     #region Public API
-    /// <summary>Uploads background-prepared RGBA bytes without channel packing; unavailable components retain explicit zero-size layouts.</summary>
-    internal GpuRegionalTextures(PackedRegionalData packed)
+    /// <summary>Uploads one background-packed region without resampling its independent channel grids.</summary>
+    internal GpuRegionalTextures(PackedRegionalData packed, HabitatAtlas atlas)
     {
-        layouts = packed.Layouts;
-        offsets = packed.Offsets;
-        texture = new GpuHabitatTexture(packed.Values, packed.Size,
-            PixelInternalFormat.Rgba8, PixelFormat.Rgba, PixelType.UnsignedByte);
+        layouts = packed.Layouts; offsets = packed.Offsets; size = packed.Size;
+        slot = atlas.Upload(packed.Values, packed.Size);
     }
-
-    /// <summary>Binds the regional input once and supplies each channel grid's original dimensions and padding.</summary>
-    internal void Bind(IShaderProgram shader)
+    /// <summary>Updates layouts and pixel origin for a changed region, binding only when its atlas page changes.</summary>
+    internal void Bind(IShaderProgram shader, bool bindTexture)
     {
-        shader.BindTexture2D("regionalMap", texture!.Id, 0);
+        int texture = slot.TextureId;
+        if (bindTexture) shader.BindTexture2D("regionalMap", texture, 0);
+        shader.Uniform("regionalAtlasOrigin", (float)slot.Address.X, slot.Address.Y);
+        shader.Uniform("regionalAtlasSize", (float)size);
         for (int i = 0; i < layouts.Length; i++)
         {
             var source = layouts[i];
             shader.Uniform(names[i] + "Layout", source?.Size ?? 0, source?.TopLeftPadding ?? 0, source?.BottomRightPadding ?? 0, offsets[i]);
         }
     }
-
-    /// <summary>Releases only this region's packed texture on its creating graphics thread.</summary>
-    public void Dispose() => texture?.Dispose();
+    /// <summary>Releases the regional rectangle without disposing its shared page.</summary>
+    public void Dispose() { slot.Dispose(); }
     #endregion
 }

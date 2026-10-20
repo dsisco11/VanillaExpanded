@@ -138,27 +138,35 @@ public sealed class HabitatViewRetentionTests
             await Until(() => preparation.TryPrepare(key, out task));
             receipts.Add((await task)!);
         }
-        // Use empty texture owners instead of a GL context. A mistaken cache miss in real Prepare would attempt GL and fail.
+        // Use real atlas leases with recording pages so cache reuse and disposal need no GL context.
         var graphics = (HabitatMapGraphics)RuntimeHelpers.GetUninitializedObject(typeof(HabitatMapGraphics));
         var regions = new BoundedLru<(EcosystemRegionKey Key, EnvironmentalInput<PackedRegionalData> Source), GpuRegionalTextures>(3);
         var tiles = new BoundedLru<(EcosystemTileKey Key, EnvironmentalInput<PackedTerrainData> Source), GpuTileTextures>(3);
         SetField(graphics, "regions", regions); SetField(graphics, "tiles", tiles);
+        var pageUploads = new List<AtlasTextureFixture>();
+        /// <summary>Records transfers while exercising the real graphics resource owner.</summary>
+        IHabitatAtlasTexture Page(int w, int h, bool normalized) { var page = new AtlasTextureFixture(); pageUploads.Add(page); return page; }
+        using var regionalAtlas = new HabitatAtlas(true, 4096, 4, Page);
+        using var terrainAtlas = new HabitatAtlas(false, 4096, 4, Page);
+        SetField(graphics, "regionalAtlas", regionalAtlas); SetField(graphics, "terrainAtlas", terrainAtlas);
         foreach (var receipt in receipts)
         {
-            var region = (GpuRegionalTextures)RuntimeHelpers.GetUninitializedObject(typeof(GpuRegionalTextures));
+            var region = new GpuRegionalTextures(receipt.Bundle.RegionalTexture!, regionalAtlas);
             regions.Put((fixture.Identity.RegionFor(receipt.Bundle.Key), receipt.Bundle.Region), region);
-            tiles.Put((receipt.Bundle.Key, receipt.Bundle.Elevation), (GpuTileTextures)RuntimeHelpers.GetUninitializedObject(typeof(GpuTileTextures)));
+            tiles.Put((receipt.Bundle.Key, receipt.Bundle.Elevation), new GpuTileTextures(receipt.Bundle.TerrainTexture!, 32, terrainAtlas));
         }
         var keep = receipts[0]; // Oldest entry is the survivor, deliberately colder than the departing entries.
         Assert.True(tiles.TryGet((keep.Bundle.Key, keep.Bundle.Elevation), out var original));
         foreach (var receipt in receipts.Skip(1)) tiles.TryGet((receipt.Bundle.Key, receipt.Bundle.Elevation), out _);
         graphics.SetView(new[] { keys[0] }, fixture.Identity, new(1, 1, 1, 2));
+        int uploads = pageUploads.Sum(page => page.Uploads.Count);
         graphics.Prepare(keep);
+        Assert.Equal(uploads, pageUploads.Sum(page => page.Uploads.Count));
         Assert.True(tiles.TryGet((keep.Bundle.Key, keep.Bundle.Elevation), out var retained));
         Assert.Same(original, retained);
         Assert.Equal(1, regions.Count); Assert.Equal(1, tiles.Count);
         // A stale off-view admission cannot evict the protected source, even when it is newest in LRU order.
-        var obsolete = (GpuTileTextures)RuntimeHelpers.GetUninitializedObject(typeof(GpuTileTextures));
+        using var obsolete = new GpuTileTextures(receipts[1].Bundle.TerrainTexture!, 32, terrainAtlas);
         Assert.Same(obsolete, tiles.Put((keys[1], receipts[1].Bundle.Elevation), obsolete));
         graphics.Prepare(keep);
         graphics.Clear();

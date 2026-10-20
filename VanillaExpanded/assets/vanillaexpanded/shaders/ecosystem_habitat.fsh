@@ -3,6 +3,9 @@ in vec2 habitatUv;
 out vec4 fragColor;
 uniform sampler2D regionalMap;
 uniform usampler2D terrainMap;
+uniform vec2 regionalAtlasOrigin;
+uniform float regionalAtlasSize;
+uniform vec2 terrainAtlasOrigin;
 uniform vec4 climateLayout;
 uniform vec4 forestLayout;
 uniform vec4 shrubLayout;
@@ -52,8 +55,8 @@ MapCoordinates mapCoordinates(vec4 mapLayout, ivec2 column) {
     }
     ivec2 a = ivec2(pos + mapLayout.y), b = ivec2(end + mapLayout.y);
     if (any(lessThan(a,ivec2(0))) || any(greaterThanEqual(b,ivec2(mapLayout.x)))) return result;
-    result.a = a + ivec2(mapLayout.w);
-    result.b = b + ivec2(mapLayout.w);
+    result.a = a + ivec2(mapLayout.w) + ivec2(regionalAtlasOrigin);
+    result.b = b + ivec2(mapLayout.w) + ivec2(regionalAtlasOrigin);
     result.available = true;
     return result;
 }
@@ -61,16 +64,19 @@ MapCoordinates mapCoordinates(vec4 mapLayout, ivec2 column) {
 bool sameCoordinates(MapCoordinates a, MapCoordinates b) {
     return a.available && b.available && all(equal(a.a,b.a)) && all(equal(a.b,b.b)) && all(equal(a.fraction,b.fraction));
 }
-/** Filters adjacent corners in hardware; worldgen's non-adjacent corners retain explicit selection. */
+/** Filters interior adjacent corners; exact edge reads isolate slots despite normalized-coordinate rounding. */
 vec4 sampleMap(MapCoordinates coordinates) {
     if (!coordinates.available) return vec4(0.0);
     ivec2 a = coordinates.a, b = coordinates.b;
     vec2 f = coordinates.fraction;
-    if (all(lessThanEqual(b-a,ivec2(1)))) {
+    // An interior one-texel margin absorbs filtering-coordinate precision without touching another allocation.
+    ivec2 first = ivec2(regionalAtlasOrigin), last = first + ivec2(regionalAtlasSize-1.0);
+    bool interior = all(greaterThan(a,first)) && all(lessThan(b,last));
+    if (interior && all(lessThanEqual(b-a,ivec2(1)))) {
         vec2 position = mix(vec2(a),vec2(b),f) + 0.5;
         return textureLod(regionalMap,position/vec2(textureSize(regionalMap,0)),0.0);
     }
-    // A worldgen chunk may span two shrub intervals. Filtering across intermediate samples would change its corners.
+    // Allocation edges cannot use page-level clamping. Non-adjacent worldgen corners also require exact reads.
     vec4 top = texelFetch(regionalMap,a,0);
     vec4 right = texelFetch(regionalMap,ivec2(b.x,a.y),0);
     vec4 bottom = texelFetch(regionalMap,ivec2(a.x,b.y),0);
@@ -86,7 +92,7 @@ bool inside(float value, vec2 range) { return value >= range.x && value <= range
 /** Evaluates one active range set and emits highlight or unavailable crosshatching on explored columns. */
 void main() {
     ivec2 column = clamp(ivec2(floor(habitatUv * chunkSize)), ivec2(0), ivec2(chunkSize-1.0));
-    uvec2 terrain = texelFetch(terrainMap,column,0).rg;
+    uvec2 terrain = texelFetch(terrainMap,column+ivec2(terrainAtlasOrigin),0).rg;
     uint flags = terrain.g;
     bool terrainAvailable = (flags & 1u) != 0u;
     // Current explored-chunk membership gates every draw; no redundant exploration texture is stored.

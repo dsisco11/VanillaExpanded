@@ -1,27 +1,25 @@
 using System;
-using OpenTK.Graphics.OpenGL4;
-using VanillaExpanded.EcosystemMap.Storage;
 using Vintagestory.API.Client;
 
 namespace VanillaExpanded.EcosystemMap.Gpu;
 
-/// <summary>Owns one packed height/flags texture independently of regional sources and species selection.</summary>
+/// <summary>Retains one exact height/flags rectangle independently of species and regional allocations.</summary>
 internal sealed class GpuTileTextures : IDisposable
 {
-    private readonly GpuHabitatTexture? texture;
+    private readonly HabitatAtlasSlot slot;
+    internal int TextureId => slot.TextureId;
 
     #region Public API
-    /// <summary>Uploads background-prepared height/flag words without packing channels or computing habitat pixels.</summary>
-    internal GpuTileTextures(ushort[] packed, int size)
+    /// <summary>Uploads background-prepared RG16UI words into one immutable atlas cell.</summary>
+    internal GpuTileTextures(ushort[] packed, int size, HabitatAtlas atlas) { slot = atlas.Upload(packed, size); }
+    /// <summary>Updates the exact terrain texel origin and binds the page only when it changes.</summary>
+    internal void Bind(IShaderProgram shader, bool bindTexture)
     {
-        texture = new GpuHabitatTexture(packed, size,
-            PixelInternalFormat.Rg16ui, PixelFormat.RgInteger, PixelType.UnsignedShort);
+        int texture = slot.TextureId;
+        if (bindTexture) shader.BindTexture2D("terrainMap", texture, 1);
+        shader.Uniform("terrainAtlasOrigin", (float)slot.Address.X, slot.Address.Y);
     }
-
-    /// <summary>Binds the packed tile input; its flags keep missing height distinct from valid zero height.</summary>
-    internal void Bind(IShaderProgram shader) => shader.BindTexture2D("terrainMap", texture!.Id, 1);
-
-    /// <summary>Releases this tile's single texture without affecting shared regional resources.</summary>
-    public void Dispose() => texture?.Dispose();
+    /// <summary>Releases this cell without changing any other tile's page or address.</summary>
+    public void Dispose() { slot.Dispose(); }
     #endregion
 }
