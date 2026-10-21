@@ -14,7 +14,7 @@ Eligible candidates are ranked by:
 
 Exact ties retain the earlier candidate. Queued fuel is considered before external supplies.
 
-Untagged burnables remain eligible as a fallback when no tagged candidate can complete the melt. The tag is a preference, not an eligibility requirement, and never bypasses temperature, duration, quantity, or inventory-access checks. This selection policy does not implement a separate preheating stage or a mixed-fuel schedule.
+Untagged burnables remain eligible as a fallback when no tagged candidate can complete the melt. The tag is a preference, not an eligibility requirement, and never bypasses temperature, duration, quantity, or inventory-access checks. Deposit does not schedule multiple fuel types; the preview can separately estimate prewarming before a manual fuel switch.
 
 ## Fuel-info preview
 
@@ -25,6 +25,20 @@ The selected batch is estimated from 20-degree ingredients and zero cooking prog
 The indicator refreshes on calculator changes and deposit attempts, and every half-second while rendering to reflect inventory changes, opened storage, and firepit heat. Text is only recomposed when its value changes. No tick listeners or inventory subscriptions are retained.
 
 Fuel has a separate panel section with a horizontal divider and localized title. The preferred fuel is shown in a centered `SlideshowItemstackTextComponent`, matching the ingredient previews' background, item tooltip, and quantity overlay. Unavailable or invalid batches clear the item preview and show a status message instead. The preview is only recomposed when the fuel stack or estimated quantity changes.
+
+### Prewarming
+
+When queued fuel has a positive effective burn duration and temperature below the selected batch's melting point, or an active burn has a positive maximum temperature below that point, the indicator displays a prewarming status. Temperature checks include the firepit's heat modifier.
+
+The simulation consumes the remaining active burn first, then the entire queued low-temperature fuel stack, then switches to a suitable available smelting fuel. The item preview shows the estimated **smelting-fuel count after prewarming**, excluding the prewarming items. Candidate ranking still prefers tagged sources, then cooler sufficient fuels and lower quantities at equal heat. Availability is tested against the reduced requirement.
+
+Savings compare that same selected smelting fuel against an immediate switch from the same current furnace heat and cold selected ingredients, omitting future low-temperature queued and active burns. An active smelting-capable burn is retained in both simulations. Already accumulated heat is credited in both; the indicator does not estimate historical fuel savings.
+
+The display reports whole-item savings, including zero when prewarming does not eliminate a whole fuel item. If prewarming increases the requirement, it reports extra items rather than claiming negative savings. If no available smelting fuel can finish the operation, prewarming status remains visible but no savings number or fuel stack is invented.
+
+The status row uses rich-text item previews: `Prewarming: [queued prewarming fuel stack] saves [saved smelting-fuel stack]`. Each slot includes its quantity overlay and item tooltip. For an active-only prewarming burn, the engine exposes remaining burn time and temperature but not the consumed item's identity; the row uses "burning fuel" instead of inventing an item icon. The separate fuel preview above continues to show the smelting fuel still required.
+
+This is a read-only preview. It does not light the firepit, consume fuel, or schedule a switch. **Deposit still replaces unsuitable queued fuel immediately**; to realize the previewed savings, let the prewarming fuel burn before switching or depositing fuel.
 
 ## Vanilla fuel tags
 

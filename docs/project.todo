@@ -2,7 +2,6 @@
     ## Issues:
         ☐ some consumable items dont show the "remaining portion" indicator in their item-slot (e.g. pie slices).
         ☐ allow auto-stashing to querns.
-        ☐ alloy-calculators fuel-info indicator should show a prewarming status when using a fuel item that cant actually achieve the smelting temperature required for the current operation. It should also inform the player of how many of the proper smelting capable fuel-items will be saved by prewarming.
 
     ## New Features:
         ☐ Add HUD indicator to show current arrow type and quantity when player is holding a bow.

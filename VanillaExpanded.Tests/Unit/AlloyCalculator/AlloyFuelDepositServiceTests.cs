@@ -17,6 +17,126 @@ namespace VanillaExpanded.Tests.Unit.AlloyCalculator;
 public class AlloyFuelDepositServiceTests
 {
     [Theory]
+    [InlineData(0, 0)]
+    [InlineData(32, 0)]
+    [InlineData(0, 60)]
+    [InlineData(32, 60)]
+    public void CreatePreview_PrewarmingShowsExactSavingsForSameSmeltingFuel(int queuedAmount, float activeBurnTime)
+    {
+        TestContext context = CreateContext(backpackFuelAmount: 64);
+        Dictionary<int, ItemStack> batch = CreatePreviewBatch(context, 20);
+        MockItem warmingFuel = CreateFuel(context.Fixture, 2, "firewood");
+        warmingFuel.CombustibleProps.BurnTemperature = 700;
+        warmingFuel.CombustibleProps.BurnDuration = 24;
+        if (queuedAmount > 0) context.Firepit.fuelSlot.Itemstack = new ItemStack(warmingFuel, queuedAmount);
+        context.Firepit.fuelBurnTime = activeBurnTime;
+        context.Firepit.maxTemperature = activeBurnTime > 0 ? 700 : 0;
+
+        Assert.Equal(AlloyDepositResultCode.Success, AlloyFuelDepositService.CreatePreview(
+            context.Fixture.ClientApi, context.Firepit, batch, context.Fixture.Player,
+            out AlloyFuelDepositPlan? plan, out bool isPrewarming));
+
+        Assert.Equal(queuedAmount > 0 || activeBurnTime > 0, isPrewarming);
+        Assert.Equal(isPrewarming, plan!.IsPrewarming);
+        if (queuedAmount > 0)
+        {
+            Assert.NotNull(plan.PrewarmingStack);
+            Assert.Equal(warmingFuel.Code, plan.PrewarmingStack.Collectible.Code);
+            Assert.Equal(queuedAmount, plan.PrewarmingStack.StackSize);
+            Assert.NotSame(context.Firepit.fuelSlot.Itemstack, plan.PrewarmingStack);
+        }
+        else
+        {
+            Assert.Null(plan.PrewarmingStack);
+        }
+        Assert.Equal(context.Fuel.Code, plan.DesiredStack.Collectible.Code);
+        int baseline = AlloyCalculatorLogic.CalculateFuelRequired(
+            1, 1000, 600, context.Firepit.furnaceTemperature, 20, 0, 0, 0, 40, 1300);
+        int prewarmed = AlloyCalculatorLogic.CalculateFuelRequired(
+            1, 1000, 600, context.Firepit.furnaceTemperature, 20, 0,
+            activeBurnTime, context.Firepit.maxTemperature, 40, 1300, queuedAmount, 24, 700);
+        Assert.Equal(prewarmed, plan.DesiredAmount);
+        Assert.Equal(baseline, plan.FuelWithoutPrewarming);
+        Assert.Equal(baseline - prewarmed, plan.SavedFuelAmount);
+        if (queuedAmount == 32) Assert.True(plan.SavedFuelAmount > 0);
+        Assert.Equal(queuedAmount, context.Firepit.fuelSlot.StackSize);
+        Assert.Equal(activeBurnTime, context.Firepit.fuelBurnTime);
+        Assert.Equal(64, context.Fixture.BackpackInventory[0].StackSize);
+        context.Fixture.ClientNetworkMock!.Verify(network => network.SendPacketClient(It.IsAny<object>()), Times.Never);
+    }
+
+    [Fact]
+    public void CreatePreview_PrewarmingWithoutAvailableSmeltingFuel_StillReportsPrewarming()
+    {
+        TestContext context = CreateContext(currentFuelAmount: 32);
+        Dictionary<int, ItemStack> batch = CreatePreviewBatch(context, 20);
+        context.Fuel.CombustibleProps.BurnTemperature = 700;
+
+        Assert.Equal(AlloyDepositResultCode.InsufficientItems, AlloyFuelDepositService.CreatePreview(
+            context.Fixture.ClientApi, context.Firepit, batch, context.Fixture.Player,
+            out AlloyFuelDepositPlan? plan, out bool isPrewarming));
+        Assert.True(isPrewarming);
+        Assert.Null(plan);
+        Assert.Equal(32, context.Firepit.fuelSlot.StackSize);
+    }
+
+    [Fact]
+    public void CreatePreview_NegligiblePrewarming_ReportsZeroSavedItems()
+    {
+        TestContext context = CreateContext(backpackFuelAmount: 64);
+        Dictionary<int, ItemStack> batch = CreatePreviewBatch(context, 20);
+        MockItem queued = CreateFuel(context.Fixture, 2, "short-burn");
+        queued.CombustibleProps.BurnTemperature = 20;
+        queued.CombustibleProps.BurnDuration = 0.1f;
+        context.Firepit.fuelSlot.Itemstack = new ItemStack(queued, 1);
+
+        Assert.Equal(AlloyDepositResultCode.Success, AlloyFuelDepositService.CreatePreview(
+            context.Fixture.ClientApi, context.Firepit, batch, context.Fixture.Player,
+            out AlloyFuelDepositPlan? plan, out bool isPrewarming));
+        Assert.True(isPrewarming);
+        Assert.Equal(0, plan!.SavedFuelAmount);
+    }
+
+    [Theory]
+    [InlineData(700, 1, true)]
+    [InlineData(700, 1.5f, false)]
+    [InlineData(1000, 1, false)]
+    [InlineData(1300, 1, false)]
+    public void CreatePreview_PrewarmingUsesEffectiveTemperature(int temperature, float heatModifier, bool expected)
+    {
+        TestContext context = CreateContext(backpackFuelAmount: 64);
+        Dictionary<int, ItemStack> batch = CreatePreviewBatch(context, 20);
+        MockItem queued = CreateFuel(context.Fixture, 2, "queued");
+        queued.CombustibleProps.BurnTemperature = temperature;
+        context.Firepit.fuelSlot.Itemstack = new ItemStack(queued, 10);
+        Assert.IsType<TestFirepit>(context.Firepit).TestHeatModifier = heatModifier;
+
+        Assert.Equal(AlloyDepositResultCode.Success, AlloyFuelDepositService.CreatePreview(
+            context.Fixture.ClientApi, context.Firepit, batch, context.Fixture.Player,
+            out AlloyFuelDepositPlan? plan, out bool isPrewarming));
+        Assert.Equal(expected, isPrewarming);
+        Assert.Equal(expected, plan!.IsPrewarming);
+    }
+
+    [Fact]
+    public void CreatePlan_QueuedPrewarmingDoesNotChangeDepositBehavior()
+    {
+        TestContext context = CreateContext(backpackFuelAmount: 64);
+        Dictionary<int, ItemStack> batch = CreatePreviewBatch(context, 20);
+        Assert.IsType<InventorySmelting>(context.Firepit.Inventory).CookingSlots[0].Itemstack = batch[0];
+        MockItem queued = CreateFuel(context.Fixture, 2, "firewood");
+        queued.CombustibleProps.BurnTemperature = 700;
+        context.Firepit.fuelSlot.Itemstack = new ItemStack(queued, 32);
+
+        Assert.Equal(AlloyDepositResultCode.Success, AlloyFuelDepositService.CreatePlan(
+            context.Fixture.ClientApi, context.Firepit, context.Fixture.Player, out AlloyFuelDepositPlan? plan));
+        Assert.False(plan!.IsPrewarming);
+        Assert.Equal(AlloyCalculatorLogic.CalculateFuelRequired(1, 1000, 600,
+            context.Firepit.furnaceTemperature, context.Firepit.InputStackTemp, 0, 0, 0, 40, 1300),
+            plan.DesiredAmount);
+    }
+
+    [Theory]
     [InlineData(2)]
     [InlineData(20)]
     public void CreatePreview_UsesSelectedBatchWithEmptyFuelSlot_WithoutMovingItems(int amount)

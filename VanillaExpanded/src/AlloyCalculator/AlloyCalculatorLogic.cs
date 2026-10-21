@@ -261,7 +261,10 @@ internal static class AlloyCalculatorLogic
         float activeFuelBurnTime,
         int activeFuelTemperature,
         float fuelBurnDuration,
-        int fuelTemperature)
+        int fuelTemperature,
+        int prewarmingFuelAmount = 0,
+        float prewarmingFuelBurnDuration = 0,
+        int prewarmingFuelTemperature = 0)
     {
         if (stackSize <= 0
             || meltingPoint <= 0
@@ -270,6 +273,12 @@ internal static class AlloyCalculatorLogic
             || fuelTemperature < meltingPoint)
         {
             return 0;
+        }
+        if (prewarmingFuelAmount < 0 || (prewarmingFuelAmount > 0
+            && (prewarmingFuelBurnDuration <= 0 || prewarmingFuelTemperature <= 0
+                || prewarmingFuelTemperature >= meltingPoint)))
+        {
+            throw new ArgumentOutOfRangeException(nameof(prewarmingFuelAmount), "Prewarming fuel must burn below the melting point.");
         }
 
         const float tickDuration = 0.1f;
@@ -323,9 +332,18 @@ internal static class AlloyCalculatorLogic
 
             if (burnTime <= 0)
             {
-                burnTime = fuelBurnDuration;
-                maximumTemperature = fuelTemperature;
-                fuelConsumed++;
+                if (prewarmingFuelAmount > 0)
+                {
+                    burnTime = prewarmingFuelBurnDuration;
+                    maximumTemperature = prewarmingFuelTemperature;
+                    prewarmingFuelAmount--;
+                }
+                else
+                {
+                    burnTime = fuelBurnDuration;
+                    maximumTemperature = fuelTemperature;
+                    fuelConsumed++;
+                }
             }
         }
 

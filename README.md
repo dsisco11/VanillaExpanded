@@ -59,6 +59,7 @@ When opening a firepit with a crucible, an Alloy Calculator dialog automatically
 - **Fine-tune ingredient ratios** using the sliders which automatically stay within valid alloy ranges
 - **See required amounts** as item stacks for easy reference
 - **Preview fuel needs** with an indicator showing the preferred available fuel and estimated count for the selected batch, even before depositing ingredients or filling the fuel slot
+- **See prewarming savings** when queued or burning fuel cannot reach the batch's melting temperature: the indicator estimates how many smelting-fuel items you can save by letting it burn before switching fuel
 - **Deposit button** automatically transfers the required ingredients from your backpack, hotbar, and opened storage containers into the crucible. It first reserves space for each selected ingredient form (such as nuggets and metal bits), then spreads the ingredients evenly across spare slots without mixing incompatible stacks.
 
 The calculator remembers your settings per crucible, so your preferred alloy and ratios are restored when you reopen the dialog (currently not remembered across restarts).
