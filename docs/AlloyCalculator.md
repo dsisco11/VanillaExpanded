@@ -38,7 +38,7 @@ Savings compare that same selected smelting fuel against an immediate switch fro
 
 The display reports whole-item savings, including zero when prewarming does not eliminate a whole fuel item. If prewarming increases the requirement, it reports extra items rather than claiming negative savings. If no available smelting fuel can finish the operation, prewarming status remains visible but no savings number or fuel stack is invented.
 
-The status row uses rich-text item previews: `Prewarming: [queued prewarming fuel stack] saves [saved smelting-fuel stack]`. Each slot includes its quantity overlay and item tooltip. For an active-only prewarming burn, the engine exposes remaining burn time and temperature but not the consumed item's identity; the row uses "burning fuel" instead of inventing an item icon. The separate fuel preview above continues to show the smelting fuel still required.
+The status row uses rich-text item previews: `Prewarming: [queued prewarming fuel stack] saves [saved smelting-fuel stack]`. Text is vertically centered alongside the item previews. Each slot includes its quantity overlay and item tooltip. For an active-only prewarming burn, the engine exposes remaining burn time and temperature but not the consumed item's identity; the row uses "burning fuel" instead of inventing an item icon. The separate fuel preview above continues to show the smelting fuel still required.
 
 This is a read-only preview. It does not light the firepit, consume fuel, or schedule a switch. **Deposit still replaces unsuitable queued fuel immediately**; to realize the previewed savings, let the prewarming fuel burn before switching or depositing fuel.
 

@@ -678,13 +678,22 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         var components = new List<RichTextComponentBase>
         {
             new RichTextComponent(capi, Lang.Get($"{Constants.ModId}:gui-alloycalculator-fuel-prewarming-label"), font)
+            {
+                VerticalAlign = EnumVerticalAlign.Middle
+            }
         };
         if (prewarmingStack is not null)
             components.Add(CreateFuelInfoSlot(prewarmingStack));
         else
             components.Add(new RichTextComponent(capi,
-                Lang.Get($"{Constants.ModId}:gui-alloycalculator-fuel-prewarming-active"), font));
-        components.Add(new RichTextComponent(capi, text, font));
+                Lang.Get($"{Constants.ModId}:gui-alloycalculator-fuel-prewarming-active"), font)
+            {
+                VerticalAlign = EnumVerticalAlign.Middle
+            });
+        components.Add(new RichTextComponent(capi, text, font)
+        {
+            VerticalAlign = EnumVerticalAlign.Middle
+        });
         components.Add(CreateFuelInfoSlot(savedStack));
         element.SetNewText(components.ToArray());
         UpdateOptionalSectionLayout();
