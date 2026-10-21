@@ -35,7 +35,7 @@ internal static class AlloyFuelDepositService
         return CreatePlan(api, firepit, api.World.Player.InventoryManager, out plan);
     }
 
-    /// <summary>Plans the coolest sufficient fuel, minimizing its amount, against the supplied inventory manager.</summary>
+    /// <summary>Prefers tagged fuel sources, then the coolest sufficient fuel and its smallest required amount.</summary>
     internal static AlloyDepositResultCode CreatePlan(
         ICoreClientAPI api,
         BlockEntityFirepit firepit,
@@ -81,6 +81,7 @@ internal static class AlloyFuelDepositService
         ItemStack? bestStack = null;
         int bestAmount = 0;
         int bestTemperature = int.MaxValue;
+        bool bestIsFuelSource = false;
         foreach (ItemStack stack in candidates)
         {
             if (!IsSuitableFuel(world, stack, meltingPoint, firepit.HeatModifier)) continue;
@@ -108,14 +109,19 @@ internal static class AlloyFuelDepositService
             }
             if (required > available || required > stack.Collectible.MaxStackSize) continue;
 
-            // Preserve hotter fuels when a cooler candidate can complete the melt; minimize count only at equal heat.
+            bool isFuelSource = api.CollectibleTagRegistry?
+                .SlowEnumerateTagNames(stack.Collectible.GetTags(stack)).Contains("is-fuel-source") == true;
+            // Prefer dedicated fuels; preserve the cooler-then-count ordering within each priority group.
             if (bestStack is null
-                || properties.BurnTemperature < bestTemperature
-                || (properties.BurnTemperature == bestTemperature && required < bestAmount))
+                || (isFuelSource && !bestIsFuelSource)
+                || (isFuelSource == bestIsFuelSource
+                    && (properties.BurnTemperature < bestTemperature
+                        || (properties.BurnTemperature == bestTemperature && required < bestAmount))))
             {
                 bestStack = stack;
                 bestAmount = required;
                 bestTemperature = properties.BurnTemperature;
+                bestIsFuelSource = isFuelSource;
             }
         }
 

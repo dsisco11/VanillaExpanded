@@ -1,10 +1,12 @@
 using Moq;
+using System.Text.Json;
 
 using VanillaExpanded.AlloyCalculator;
 using VanillaExpanded.Network;
 using VanillaExpanded.Tests.Mocks;
 
 using Vintagestory.API.Common;
+using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.GameContent;
 
@@ -14,6 +16,95 @@ namespace VanillaExpanded.Tests.Unit.AlloyCalculator;
 [Trait("Category", "Unit")]
 public class AlloyFuelDepositServiceTests
 {
+    [Fact]
+    public void FuelSourcePatch_TagsDedicatedFuelsAndOnlyCoalOreVariants()
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "VanillaExpanded.sln")))
+            root = root.Parent;
+        Assert.NotNull(root);
+        using JsonDocument document = JsonDocument.Parse(File.ReadAllText(Path.Combine(root.FullName,
+            "VanillaExpanded", "assets", "vanillaexpanded", "patches", "fuelsources.json")));
+        var patches = document.RootElement.EnumerateArray()
+            .ToDictionary(patch => patch.GetProperty("file").GetString()!);
+        string[] fuelAssets =
+        [
+            "game:itemtypes/resource/firewood.json",
+            "game:itemtypes/resource/firewood-aged.json",
+            "game:blocktypes/soil/peatbrick.json",
+            "game:itemtypes/resource/charcoal.json",
+            "game:itemtypes/resource/coke.json",
+            "game:itemtypes/resource/coal-contaminated.json"
+        ];
+        Assert.Equal(fuelAssets.Length + 1, patches.Count);
+        foreach (string asset in fuelAssets)
+        {
+            JsonElement patch = patches[asset];
+            Assert.Equal("add", patch.GetProperty("op").GetString());
+            Assert.Equal("/tags", patch.GetProperty("path").GetString());
+            Assert.Equal(["is-fuel-source"], patch.GetProperty("value").EnumerateArray().Select(tag => tag.GetString()));
+        }
+        JsonElement orePatch = patches["game:itemtypes/resource/ore-ungraded.json"];
+        Assert.Equal("add", orePatch.GetProperty("op").GetString());
+        Assert.Equal("/tagsByType", orePatch.GetProperty("path").GetString());
+        JsonProperty[] variants = orePatch.GetProperty("value").EnumerateObject().ToArray();
+        Assert.Equal(["ore-anthracite", "ore-bituminouscoal", "ore-lignite"],
+            variants.Select(variant => variant.Name).Order());
+        Assert.All(variants, variant => Assert.Equal(["is-fuel-source"],
+            variant.Value.EnumerateArray().Select(tag => tag.GetString())));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void CreatePlan_TaggedFuel_OutranksCoolerBurnableRegardlessOfLocation(bool taggedInFirepit)
+    {
+        TestContext context = CreateContext(currentFuelAmount: 64);
+        MockItem external = CreateFuel(context.Fixture, 2, "external");
+        context.Fixture.BackpackInventory[0].Itemstack = new ItemStack(external, 64);
+        MockItem tagged = taggedInFirepit ? context.Fuel : external;
+        MockItem untagged = taggedInFirepit ? external : context.Fuel;
+        MarkFuelSource(context.Fixture, tagged);
+        untagged.CombustibleProps.BurnTemperature = 1100;
+
+        Assert.Equal(AlloyDepositResultCode.Success, AlloyFuelDepositService.CreatePlan(
+            context.Fixture.ClientApi, context.Firepit, context.Fixture.Player, out AlloyFuelDepositPlan? plan));
+        Assert.Equal(tagged.Code, plan!.DesiredStack.Collectible.Code);
+    }
+
+    [Theory]
+    [InlineData(900, 40, 64)]
+    [InlineData(1300, 0, 64)]
+    [InlineData(1300, 1, 1)]
+    public void CreatePlan_TaggedFuelUnsuitableOrInsufficient_FallsBackToUntaggedBurnable(
+        int temperature, float duration, int amount)
+    {
+        TestContext context = CreateContext(currentFuelAmount: 64);
+        MockItem tagged = CreateFuel(context.Fixture, 2, "tagged");
+        MarkFuelSource(context.Fixture, tagged);
+        tagged.CombustibleProps.BurnTemperature = temperature;
+        tagged.CombustibleProps.BurnDuration = duration;
+        context.Fixture.BackpackInventory[0].Itemstack = new ItemStack(tagged, amount);
+
+        Assert.Equal(AlloyDepositResultCode.Success, AlloyFuelDepositService.CreatePlan(
+            context.Fixture.ClientApi, context.Firepit, context.Fixture.Player, out AlloyFuelDepositPlan? plan));
+        Assert.Equal(context.Fuel.Code, plan!.DesiredStack.Collectible.Code);
+    }
+
+    [Fact]
+    public void CreatePlan_TaggedFuels_StillPrefersCoolestSufficientFuel()
+    {
+        TestContext context = CreateContext(currentFuelAmount: 64);
+        MockItem cooler = CreateFuel(context.Fixture, 2, "cooler");
+        cooler.CombustibleProps.BurnTemperature = 1100;
+        MarkFuelSource(context.Fixture, context.Fuel, cooler);
+        context.Fixture.BackpackInventory[0].Itemstack = new ItemStack(cooler, 64);
+
+        Assert.Equal(AlloyDepositResultCode.Success, AlloyFuelDepositService.CreatePlan(
+            context.Fixture.ClientApi, context.Firepit, context.Fixture.Player, out AlloyFuelDepositPlan? plan));
+        Assert.Equal(cooler.Code, plan!.DesiredStack.Collectible.Code);
+    }
+
     /// <summary>Verifies cooler fuel wins despite needing more items, with fallback when it cannot supply the melt.</summary>
     [Theory]
     [InlineData(1100, 64, true)]
@@ -272,6 +363,17 @@ public class AlloyFuelDepositServiceTests
             BurnTemperature = 1_300
         };
         return fuel;
+    }
+
+    private static void MarkFuelSource(VsTestFixture fixture, params MockItem[] fuels)
+    {
+        using var reader = new BinaryReader(new MemoryStream([1, 0, 1, 0]));
+        TagSet fuelTag = TagSet.FromBytes(reader);
+        foreach (MockItem fuel in fuels) fuel.Tags = fuelTag;
+        var registry = new Mock<ITagRegistry<TagSet>>();
+        registry.Setup(r => r.SlowEnumerateTagNames(It.IsAny<TagSet>()))
+            .Returns((TagSet tags) => tags == fuelTag ? new[] { "is-fuel-source" } : []);
+        fixture.ClientApiMock!.SetupGet(api => api.CollectibleTagRegistry).Returns(registry.Object);
     }
 
     private sealed record TestContext(

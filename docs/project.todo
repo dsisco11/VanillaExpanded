@@ -1,6 +1,5 @@
 # Vanilla: Expanded TODO List:
     ## Issues:
-        ☐ alloy-calculator using non-fuel items for smelting (e.g. wooden ladders, etc.). basically it should only consider things that we would actually use as fuel, not just anything with a burn-time or burn-temperature value.
         ☐ some consumable items dont show the "remaining portion" indicator in their item-slot (e.g. pie slices).
         ☐ allow auto-stashing to querns.
         ☐ alloy-calculator should show a fuel-info indicator when a fuel item is in the fuel slot. The info indicator should inform the player about how many of the fuel items are required for the current smelting operation.

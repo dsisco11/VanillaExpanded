@@ -1,0 +1,48 @@
+[
+  {
+    "op": "add",
+    "path": "/tags",
+    "value": ["is-fuel-source"],
+    "file": "game:itemtypes/resource/firewood.json"
+  },
+  {
+    "op": "add",
+    "path": "/tags",
+    "value": ["is-fuel-source"],
+    "file": "game:itemtypes/resource/firewood-aged.json"
+  },
+  {
+    "op": "add",
+    "path": "/tags",
+    "value": ["is-fuel-source"],
+    "file": "game:blocktypes/soil/peatbrick.json"
+  },
+  {
+    "op": "add",
+    "path": "/tags",
+    "value": ["is-fuel-source"],
+    "file": "game:itemtypes/resource/charcoal.json"
+  },
+  {
+    "op": "add",
+    "path": "/tags",
+    "value": ["is-fuel-source"],
+    "file": "game:itemtypes/resource/coke.json"
+  },
+  {
+    "op": "add",
+    "path": "/tags",
+    "value": ["is-fuel-source"],
+    "file": "game:itemtypes/resource/coal-contaminated.json"
+  },
+  {
+    "op": "add",
+    "path": "/tagsByType",
+    "value": {
+      "ore-lignite": ["is-fuel-source"],
+      "ore-bituminouscoal": ["is-fuel-source"],
+      "ore-anthracite": ["is-fuel-source"]
+    },
+    "file": "game:itemtypes/resource/ore-ungraded.json"
+  }
+]
