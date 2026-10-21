@@ -275,6 +275,8 @@ public sealed class MapPresentationTests
         public bool Reload() => true;
         /// <summary>Accepts finite view resource retention without allocating graphics in the fixture.</summary>
         public void SetView(IReadOnlyCollection<EcosystemTileKey> visible, EcosystemStorageIdentity world, GpuHabitatLimits limits) { }
+        /// <summary>Provides an empty acquisition scope without GL state in this fixture.</summary>
+        public IDisposable BeginUploads() => Mock.Of<IDisposable>();
         /// <summary>Accepts source acquisition without allocating graphics in this fixture.</summary>
         public void Prepare(GpuHabitatReceipt receipt) { }
         /// <summary>Records shared criteria once at the normal pass boundary.</summary>

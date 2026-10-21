@@ -12,6 +12,8 @@ internal interface IHabitatMapGraphics : IDisposable
     bool Reload();
     /// <summary>Retains enough atlas rectangles for the current finite explored view.</summary>
     void SetView(IReadOnlyCollection<EcosystemTileKey> visible, EcosystemStorageIdentity world, GpuHabitatLimits limits);
+    /// <summary>Scopes upload state around resource acquisition, lazily starting only when a texture operation is needed.</summary>
+    IDisposable BeginUploads();
     /// <summary>Acquires missing atlas rectangles before shared draw bindings are established.</summary>
     void Prepare(GpuHabitatReceipt receipt);
     /// <summary>Establishes one exception-safe graphics pass for all ready explored tiles.</summary>

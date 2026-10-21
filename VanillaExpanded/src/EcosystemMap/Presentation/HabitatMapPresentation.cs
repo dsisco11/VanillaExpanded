@@ -70,8 +70,11 @@ internal sealed class HabitatMapPresentation : IDisposable
         }
         profiler?.Mark("input-preparation");
         // Keep receipt polling separate from texture acquisition so the native profiler can distinguish CPU stages.
-        foreach (var item in ready)
-            if (preparation.IsCurrent(item.Receipt)) graphics.Prepare(item.Receipt);
+        using (graphics.BeginUploads())
+        {
+            foreach (var item in ready)
+                if (preparation.IsCurrent(item.Receipt)) graphics.Prepare(item.Receipt);
+        }
         profiler?.Mark("texture-acquisition");
         // Source acquisition finishes before any draw binding is tracked; late invalidation cannot publish stale inputs.
         ready.RemoveAll(item => !preparation.IsCurrent(item.Receipt));

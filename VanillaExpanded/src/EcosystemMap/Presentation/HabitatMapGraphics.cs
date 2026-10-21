@@ -13,6 +13,7 @@ internal sealed class HabitatMapGraphics : IHabitatMapGraphics
 {
     private readonly GpuHabitatOverlay overlay;
     private readonly HabitatAtlas regionalAtlas, terrainAtlas;
+    private readonly GpuHabitatUploads uploads = new(new NativeHabitatUploadApi());
     private readonly BoundedLru<(EcosystemRegionKey Key, EnvironmentalInput<PackedRegionalData> Source), GpuRegionalTextures> regions = new(8);
     private readonly BoundedLru<(EcosystemTileKey Key, EnvironmentalInput<PackedTerrainData> Source), GpuTileTextures> tiles = new(128);
 
@@ -21,8 +22,8 @@ internal sealed class HabitatMapGraphics : IHabitatMapGraphics
     internal HabitatMapGraphics(ICoreClientAPI api)
     {
         int maximum = GL.GetInteger(GetPName.MaxTextureSize);
-        regionalAtlas = new(true, maximum, 9, (w, h, normalized) => new GpuHabitatTexture(w, h, normalized));
-        terrainAtlas = new(false, maximum, 129, (w, h, normalized) => new GpuHabitatTexture(w, h, normalized));
+        regionalAtlas = new(true, maximum, 9, (w, h, normalized) => new GpuHabitatTexture(w, h, normalized, uploads));
+        terrainAtlas = new(false, maximum, 129, (w, h, normalized) => new GpuHabitatTexture(w, h, normalized, uploads));
         overlay = new(api);
         try { if (!overlay.Reload()) throw new InvalidOperationException("Ecosystem shader compilation failed."); }
         catch { overlay.Dispose(); throw; }
@@ -42,6 +43,9 @@ internal sealed class HabitatMapGraphics : IHabitatMapGraphics
         regionalAtlas.SetCapacity(checked(limits.Regions + 1));
         terrainAtlas.SetCapacity(checked(limits.SourceTiles + 1));
     }
+    /// <summary>Scopes lazy shared upload state around acquisition, restoring it before the drawing pass.</summary>
+    public IDisposable BeginUploads() => uploads.Begin();
+
     /// <summary>Reuses atlas rectangles independently of species and uploads only newly encountered source leases.</summary>
     public void Prepare(GpuHabitatReceipt receipt)
     {
