@@ -17,6 +17,49 @@ public class AlloyOpenedContainerDepositTests
 
     #region Supply And Planning
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TinBronze_WithAdditionalTinFormInOpenedChest_DepositsExactAmounts(bool chestOpen)
+    {
+        Context context = CreateContext(18, 0);
+        MockItem tinIngot = CreateItem(context.Fixture, 20, "ingot-tin");
+        MockItem tinNugget = CreateItem(context.Fixture, 21, "nugget-tin");
+        MockItem tinBit = CreateItem(context.Fixture, 22, "metalbit-tin");
+        tinNugget.CombustibleProps = new CombustibleProperties
+        {
+            SmeltedRatio = 1,
+            SmeltedStack = new JsonItemStack
+            {
+                Code = tinIngot.Code,
+                ResolvedItemstack = new ItemStack(tinIngot)
+            }
+        };
+        tinBit.CombustibleProps = tinNugget.CombustibleProps;
+        context.Fixture.BackpackInventory[1].Itemstack = new ItemStack(tinNugget, 2);
+        context.Chest[0].Itemstack = new ItemStack(tinBit, 1);
+        if (!chestOpen) context.Opened.Remove(context.Chest);
+        var tinIngredient = new MetalDepositIngredient(tinIngot.Code, new ItemStack(tinIngot), 0.1f, 0.1f);
+
+        Assert.Equal(AlloyDepositResultCode.Success, AlloyDepositService.CreatePlan(
+            context.Fixture.ClientApi, context.Firepit, [context.Ingredient, tinIngredient],
+            new Dictionary<int, ItemStack>
+            {
+                [0] = new(context.Ingot, 18),
+                [1] = new(tinIngot, 2)
+            },
+            context.Fixture.Player, out AlloyDepositPlan? plan));
+        Assert.Equal(AlloyDepositResultCode.Success, Execute(context, plan!));
+        Assert.Equal(18, context.Target.CookingSlots
+            .Where(slot => slot.Itemstack?.Collectible.Code == context.Metal.Code).Sum(slot => slot.StackSize));
+        Assert.Equal(2, context.Target.CookingSlots
+            .Where(slot => slot.Itemstack?.Collectible.Code == tinNugget.Code
+                || slot.Itemstack?.Collectible.Code == tinBit.Code).Sum(slot => slot.StackSize));
+        Assert.Equal(1, context.Chest.Concat(context.Fixture.BackpackInventory)
+            .Concat(context.Fixture.HotbarInventory).Sum(slot => slot.StackSize));
+        if (chestOpen) Assert.True(context.Chest[0].Empty);
+    }
+
     /// <summary>Verifies container-only and combined supplies conserve items and use vanilla packets.</summary>
     [Theory]
     [InlineData(0, 5)]
