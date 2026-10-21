@@ -334,18 +334,18 @@ internal static class AlloyCalculatorLogic
         return 0;
     }
 
-    internal static int? FindMinimumPrewarmingFuel(
-        int stackSize, float meltingPoint, float meltingDuration, float furnaceTemperature,
-        float activeBurnTime, int activeTemperature, float fuelDuration, int fuelTemperature,
-        float warmingDuration, int warmingTemperature, int baseline, out int required)
+    internal static int CalculatePrewarmingFuelRequired(
+        int stackSize, float meltingPoint, float furnaceTemperature,
+        float activeBurnTime, int activeTemperature, float warmingDuration, int warmingTemperature)
     {
-        required = baseline;
-        if (baseline <= 0) return null;
-        float initialFurnaceTemperature = furnaceTemperature;
+        if (stackSize <= 0 || !float.IsFinite(warmingDuration) || warmingDuration <= 0
+            || warmingTemperature <= 0 || warmingTemperature >= meltingPoint)
+            throw new ArgumentOutOfRangeException(nameof(warmingDuration), "Prewarming requires valid fuel below the melting point.");
         float inputTemperature = 20;
         int amount = 0;
         float burnTime = Math.Max(0, activeBurnTime);
         int maximumTemperature = activeTemperature;
+        if (burnTime <= 0) HeatInput(stackSize, meltingPoint, furnaceTemperature, ref inputTemperature);
         while (true)
         {
             float previousFurnace = furnaceTemperature;
@@ -356,12 +356,11 @@ internal static class AlloyCalculatorLogic
                 furnaceTemperature = ChangeTemperature(furnaceTemperature, maximumTemperature, 0.1f);
                 HeatInput(stackSize, meltingPoint, furnaceTemperature, ref inputTemperature);
             }
-            required = CalculateFuelRequired(stackSize, meltingPoint, meltingDuration,
-                initialFurnaceTemperature, 20, 0, activeBurnTime, activeTemperature,
-                fuelDuration, fuelTemperature, amount, warmingDuration, warmingTemperature);
-            if (required < baseline) return amount;
+            // The game's temperature step snaps within one degree; stacked inputs approach their ceiling asymptotically.
+            if (furnaceTemperature >= warmingTemperature && inputTemperature >= warmingTemperature - 1)
+                return amount;
             if (amount > 0 && furnaceTemperature == previousFurnace && inputTemperature == previousInput)
-                return null;
+                throw new InvalidOperationException("Prewarming temperatures stopped changing before reaching the fuel's temperature ceiling.");
             amount = checked(amount + 1);
             burnTime = warmingDuration;
             maximumTemperature = warmingTemperature;

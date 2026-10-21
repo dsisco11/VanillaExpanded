@@ -74,7 +74,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private float fuelInfoRefreshElapsed;
     private string? fuelInfoText;
     private ItemStack? fuelPreviewStack;
-    private ItemStack? prewarmingPreviewStack;
+    private ItemStack[] prewarmingPreviewStacks = [];
     private ItemStack? savedFuelPreviewStack;
     private Action<bool, bool>? updateOptionalSectionLayout;
     
@@ -422,7 +422,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         SingleComposer = composer.EndChildElements().Compose();
         fuelInfoText = null;
         fuelPreviewStack = null;
-        prewarmingPreviewStack = null;
+        prewarmingPreviewStacks = [];
         savedFuelPreviewStack = null;
 
         // Set target units value
@@ -622,20 +622,16 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         BlockEntityFirepit? firepit = capi.World.BlockAccessor
             .GetBlockEntity<BlockEntityFirepit>(BlockEntityPosition);
         AlloyFuelDepositPlan? plan = null;
-        bool isPrewarming = false;
         AlloyDepositResultCode result = firepit is null
             || calculatedStacks.Count != selectedIngredients.Length
             ? AlloyDepositResultCode.InvalidRequest
             : AlloyFuelDepositService.CreatePreview(capi, firepit, calculatedStacks,
-                capi.World.Player.InventoryManager, out plan, out isPrewarming);
+                capi.World.Player.InventoryManager, out plan);
         string text = result switch
         {
-            AlloyDepositResultCode.Success when plan!.CannotSaveFuel => string.Empty,
-            AlloyDepositResultCode.Success when plan!.IsPrewarming => Lang.Get(
-                $"{Constants.ModId}:gui-alloycalculator-fuel-prewarming{(plan.SavedFuelAmount < 0 ? "-extra" : string.Empty)}"),
+            AlloyDepositResultCode.Success when plan!.PrewarmingStacks.Length > 0 => Lang.Get(
+                $"{Constants.ModId}:gui-alloycalculator-fuel-prewarming"),
             AlloyDepositResultCode.Success => string.Empty,
-            AlloyDepositResultCode.InsufficientItems when isPrewarming =>
-                Lang.Get($"{Constants.ModId}:gui-alloycalculator-fuel-prewarming-unavailable"),
             AlloyDepositResultCode.InsufficientItems => Lang.Get($"{Constants.ModId}:gui-alloycalculator-fuel-info-unavailable"),
             AlloyDepositResultCode.InventoryClosed => Lang.Get($"{Constants.ModId}:gui-alloycalculator-deposit-fuel-inventory-closed"),
             _ => Lang.Get($"{Constants.ModId}:gui-alloycalculator-fuel-info-no-batch")
@@ -659,17 +655,18 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                     Background = true
                 }]);
         }
-        ItemStack? prewarmingStack = plan?.IsPrewarming == true ? plan.PrewarmingStack : null;
-        ItemStack? savedStack = plan?.IsPrewarming == true && !plan.CannotSaveFuel ? plan.DesiredStack.Clone() : null;
-        if (savedStack is not null) savedStack.StackSize = Math.Abs(plan!.SavedFuelAmount);
-        if (text == fuelInfoText && SameFuelPreview(prewarmingStack, prewarmingPreviewStack)
+        ItemStack[] prewarmingStacks = plan?.PrewarmingStacks ?? [];
+        ItemStack? savedStack = prewarmingStacks.Length > 0 ? plan!.DesiredStack.Clone() : null;
+        if (savedStack is not null) savedStack.StackSize = 1;
+        if (text == fuelInfoText && prewarmingStacks.Length == prewarmingPreviewStacks.Length
+            && prewarmingStacks.Zip(prewarmingPreviewStacks).All(pair => SameFuelPreview(pair.First, pair.Second))
             && SameFuelPreview(savedStack, savedFuelPreviewStack))
         {
             UpdateOptionalSectionLayout();
             return;
         }
         fuelInfoText = text;
-        prewarmingPreviewStack = prewarmingStack?.Clone();
+        prewarmingPreviewStacks = prewarmingStacks.Select(stack => stack.Clone()).ToArray();
         savedFuelPreviewStack = savedStack;
         foreach (RichTextComponentBase component in element.Components) component.Dispose();
         var font = CairoFont.WhiteDetailText().WithFontSize(12);
@@ -688,19 +685,12 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                 VerticalAlign = EnumVerticalAlign.Middle
             }
         };
-        if (prewarmingStack is not null)
-            components.Add(CreateFuelInfoSlot(prewarmingStack));
-        else
-            components.Add(new RichTextComponent(capi,
-                Lang.Get($"{Constants.ModId}:gui-alloycalculator-fuel-prewarming-active"), font)
-            {
-                VerticalAlign = EnumVerticalAlign.Middle
-            });
+        components.Add(CreateFuelInfoSlot(prewarmingStacks));
         components.Add(new RichTextComponent(capi, text, font)
         {
             VerticalAlign = EnumVerticalAlign.Middle
         });
-        components.Add(CreateFuelInfoSlot(savedStack));
+        components.Add(CreateFuelInfoSlot([savedStack]));
         element.SetNewText(components.ToArray());
         UpdateOptionalSectionLayout();
     }
@@ -716,8 +706,8 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         => left is null ? right is null : right is not null && left.StackSize == right.StackSize
             && left.Equals(capi.World, right, GlobalConstants.IgnoredStackAttributes);
 
-    private SlideshowItemstackTextComponent CreateFuelInfoSlot(ItemStack stack)
-        => new(capi, [stack], SlotSize, EnumFloat.Inline)
+    private SlideshowItemstackTextComponent CreateFuelInfoSlot(ItemStack[] stacks)
+        => new(capi, stacks, SlotSize, EnumFloat.Inline)
         {
             ShowStackSize = true,
             Background = true,

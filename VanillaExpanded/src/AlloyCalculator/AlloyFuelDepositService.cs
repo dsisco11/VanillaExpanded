@@ -128,14 +128,6 @@ internal static class AlloyFuelDepositService
             return AlloyDepositResultCode.InvalidRequest;
         }
         ItemStack? queuedFuel = firepit.fuelStack;
-        CombustibleProperties? queuedProperties = queuedFuel?.Collectible.GetCombustibleProperties(world, queuedFuel, null);
-        int queuedTemperature = (int)((queuedProperties?.BurnTemperature ?? 0) * firepit.HeatModifier);
-        float queuedDuration = (queuedProperties?.BurnDuration ?? 0) * firepit.BurnDurationModifier;
-        int prewarmingAmount = previewInventory is not null && queuedDuration > 0
-            && queuedTemperature > 0 && queuedTemperature < meltingPoint ? queuedFuel!.StackSize : 0;
-        bool activePrewarming = previewInventory is not null && firepit.fuelBurnTime > 0
-            && firepit.maxTemperature > 0 && firepit.maxTemperature < meltingPoint;
-        isPrewarming = prewarmingAmount > 0 || activePrewarming;
 
         // Queued fuel remains separate from external sources; source restrictions govern candidate availability.
         List<ItemSlot> suitableExternalSlots = externalSlots
@@ -154,8 +146,6 @@ internal static class AlloyFuelDepositService
         int bestAmount = 0;
         int bestTemperature = int.MaxValue;
         bool bestIsFuelSource = false;
-        int bestWithoutPrewarming = 0;
-        int? bestPrewarmingAmount = null;
         foreach (ItemStack stack in candidates)
         {
             if (!IsSuitableFuel(world, stack, meltingPoint, firepit.HeatModifier)) continue;
@@ -172,33 +162,7 @@ internal static class AlloyFuelDepositService
                 firepit.fuelBurnTime,
                 firepit.maxTemperature,
                 properties.BurnDuration * firepit.BurnDurationModifier,
-                (int)(properties.BurnTemperature * firepit.HeatModifier),
-                prewarmingAmount,
-                queuedDuration,
-                queuedTemperature);
-            int withoutPrewarming = isPrewarming
-                ? AlloyCalculatorLogic.CalculateFuelRequired(
-                    inputStack.StackSize, meltingPoint, meltingDuration, firepit.furnaceTemperature,
-                    20, 0, activePrewarming ? 0 : firepit.fuelBurnTime, firepit.maxTemperature,
-                    properties.BurnDuration * firepit.BurnDurationModifier,
-                    (int)(properties.BurnTemperature * firepit.HeatModifier))
-                : required;
-            int? minimumPrewarming = null;
-            if (prewarmingAmount > 0)
-            {
-                minimumPrewarming = AlloyCalculatorLogic.FindMinimumPrewarmingFuel(
-                    inputStack.StackSize, meltingPoint, meltingDuration, firepit.furnaceTemperature,
-                    firepit.fuelBurnTime, firepit.maxTemperature,
-                    properties.BurnDuration * firepit.BurnDurationModifier,
-                    (int)(properties.BurnTemperature * firepit.HeatModifier),
-                    queuedDuration, queuedTemperature, withoutPrewarming, out required);
-                if (minimumPrewarming is null)
-                    required = AlloyCalculatorLogic.CalculateFuelRequired(
-                        inputStack.StackSize, meltingPoint, meltingDuration, firepit.furnaceTemperature,
-                        20, 0, firepit.fuelBurnTime, firepit.maxTemperature,
-                        properties.BurnDuration * firepit.BurnDurationModifier,
-                        (int)(properties.BurnTemperature * firepit.HeatModifier));
-            }
+                (int)(properties.BurnTemperature * firepit.HeatModifier));
 
             int available = suitableExternalSlots
                 .Where(slot => SameStack(world, slot.Itemstack!, stack))
@@ -209,8 +173,7 @@ internal static class AlloyFuelDepositService
             }
             if (required > available || required > stack.Collectible.MaxStackSize) continue;
 
-            bool isFuelSource = api.CollectibleTagRegistry?
-                .SlowEnumerateTagNames(stack.Collectible.GetTags(stack)).Contains("is-fuel-source") == true;
+            bool isFuelSource = IsFuelSource(api, stack);
             // Prefer dedicated fuels; preserve the cooler-then-count ordering within each priority group.
             if (bestStack is null
                 || (isFuelSource && !bestIsFuelSource)
@@ -222,8 +185,6 @@ internal static class AlloyFuelDepositService
                 bestAmount = required;
                 bestTemperature = properties.BurnTemperature;
                 bestIsFuelSource = isFuelSource;
-                bestWithoutPrewarming = withoutPrewarming;
-                bestPrewarmingAmount = minimumPrewarming;
             }
         }
 
@@ -232,18 +193,49 @@ internal static class AlloyFuelDepositService
             return AlloyDepositResultCode.InsufficientItems;
         }
 
-        ItemStack? prewarmingStack = prewarmingAmount > 0 ? queuedFuel!.Clone() : null;
-        if (prewarmingStack is not null) prewarmingStack.StackSize = bestPrewarmingAmount ?? 0;
+        var prewarmingStacks = new List<ItemStack>();
+        if (previewInventory is not null && bestAmount > 0)
+        {
+            var warmingCandidates = externalSlots.Where(AlloyTransferInventoryPolicy.CanWithdraw)
+                .Select(static slot => slot.Itemstack!).ToList();
+            if (queuedFuel is not null) warmingCandidates.Insert(0, queuedFuel);
+            var seen = new List<ItemStack>();
+            CombustibleProperties smeltingProperties = bestStack.Collectible.GetCombustibleProperties(world, bestStack, null)!;
+            foreach (ItemStack stack in warmingCandidates)
+            {
+                if (seen.Any(previous => SameStack(world, previous, stack))) continue;
+                seen.Add(stack);
+                CombustibleProperties? properties = stack.Collectible.GetCombustibleProperties(world, stack, null);
+                if (properties is null) continue;
+                float duration = properties.BurnDuration * firepit.BurnDurationModifier;
+                int temperature = (int)(properties.BurnTemperature * firepit.HeatModifier);
+                if (!float.IsFinite(duration) || duration <= 0 || temperature <= 0 || temperature >= meltingPoint) continue;
+                int amount = AlloyCalculatorLogic.CalculatePrewarmingFuelRequired(
+                    inputStack.StackSize, meltingPoint, firepit.furnaceTemperature,
+                    firepit.fuelBurnTime, firepit.maxTemperature, duration, temperature);
+                if (amount == 0) continue;
+                int smeltingRequired = AlloyCalculatorLogic.CalculateFuelRequired(
+                    inputStack.StackSize, meltingPoint, meltingDuration, firepit.furnaceTemperature,
+                    20, 0, firepit.fuelBurnTime, firepit.maxTemperature,
+                    smeltingProperties.BurnDuration * firepit.BurnDurationModifier,
+                    (int)(smeltingProperties.BurnTemperature * firepit.HeatModifier),
+                    amount, duration, temperature);
+                if (smeltingRequired >= bestAmount) continue;
+                ItemStack option = stack.Clone();
+                option.StackSize = amount;
+                prewarmingStacks.Add(option);
+            }
+            if (prewarmingStacks.Any(stack => IsFuelSource(api, stack)))
+                prewarmingStacks.RemoveAll(stack => !IsFuelSource(api, stack));
+        }
+        isPrewarming = prewarmingStacks.Count > 0;
         plan = new AlloyFuelDepositPlan(
             bestStack.Clone(),
             bestAmount,
             queuedFuel?.Clone(),
             firepit.fuelSlot.StackSize)
         {
-            IsPrewarming = isPrewarming,
-            PrewarmingStack = prewarmingStack,
-            CannotSaveFuel = prewarmingAmount > 0 && bestPrewarmingAmount is null,
-            FuelWithoutPrewarming = bestWithoutPrewarming
+            PrewarmingStacks = prewarmingStacks.ToArray()
         };
         return AlloyDepositResultCode.Success;
     }
@@ -317,6 +309,10 @@ internal static class AlloyFuelDepositService
     #endregion
 
     #region Private
+
+    private static bool IsFuelSource(ICoreClientAPI api, ItemStack stack)
+        => api.CollectibleTagRegistry?
+            .SlowEnumerateTagNames(stack.Collectible.GetTags(stack)).Contains("is-fuel-source") == true;
 
     /// <summary>Requires burning fuel that reaches the metals' melting point under the firepit's heat modifier.</summary>
     private static bool IsSuitableFuel(IWorldAccessor world, ItemStack stack, float meltingPoint, float heatModifier)

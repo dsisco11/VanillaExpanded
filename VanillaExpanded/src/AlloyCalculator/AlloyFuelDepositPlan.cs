@@ -9,9 +9,5 @@ internal sealed record AlloyFuelDepositPlan(
     ItemStack? ExpectedCurrentStack,
     int ExpectedCurrentAmount)
 {
-    internal bool IsPrewarming { get; init; }
-    internal bool CannotSaveFuel { get; init; }
-    internal ItemStack? PrewarmingStack { get; init; }
-    internal int FuelWithoutPrewarming { get; init; }
-    internal int SavedFuelAmount => IsPrewarming ? FuelWithoutPrewarming - DesiredAmount : 0;
+    internal ItemStack[] PrewarmingStacks { get; init; } = [];
 }
