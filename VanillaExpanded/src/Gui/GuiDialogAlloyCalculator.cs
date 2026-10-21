@@ -76,6 +76,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private ItemStack? fuelPreviewStack;
     private ItemStack? prewarmingPreviewStack;
     private ItemStack? savedFuelPreviewStack;
+    private Action<bool, bool>? updateOptionalSectionLayout;
     
     // Cached handbook data for filtering
     private ItemStack[]? handbookStacks;
@@ -174,6 +175,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     #region Dialog Composition
     private void ComposeDialog()
     {
+        updateOptionalSectionLayout = null;
         // Calculate number of ingredient rows
         var ingredientCount = selectedIngredients.Length;
         bool showRatioControls = selectedOption is not null
@@ -353,12 +355,15 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                 "wasteWarning");
 
             yOffset += WasteWarningHeight + WasteWarningGap;
-            composer.AddInset(ElementBounds.Fixed(0, yOffset + 5, contentWidth, 1), 1, 0.5f);
+            var fuelDividerBounds = ElementBounds.Fixed(0, yOffset + 5, contentWidth, 1);
+            composer.AddInset(fuelDividerBounds, 1, 0.5f);
             yOffset += 15;
+            var fuelTitleBounds = ElementBounds.Fixed(0, yOffset, contentWidth, FuelSectionTitleHeight)
+                .WithParent(contentBounds);
             composer.AddStaticText(
                 Lang.Get($"{Constants.ModId}:gui-alloycalculator-fuel-title"),
                 CairoFont.WhiteSmallText().WithOrientation(EnumTextOrientation.Center),
-                ElementBounds.Fixed(0, yOffset, contentWidth, FuelSectionTitleHeight).WithParent(contentBounds));
+                fuelTitleBounds);
             yOffset += FuelSectionTitleHeight;
             var fuelSlotBounds = ElementBounds
                 .Fixed(0, yOffset, SlotSize, SlotSize + 8)
@@ -375,9 +380,37 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                 .Fixed(0, yOffset, 100, ButtonHeight)
                 .WithParent(contentBounds)
                 .WithAlignment(EnumDialogArea.CenterFixed);
+            var buttonTooltipBounds = buttonBounds.FlatCopy();
             composer
                 .AddSmallButton(Lang.Get($"{Constants.ModId}:gui-alloycalculator-deposit"), OnDepositButtonClicked, buttonBounds, EnumButtonStyle.Normal, "depositButton")
-                .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-deposit-tooltip"), CairoFont.WhiteDetailText(), 250, buttonBounds.FlatCopy(), "depositTooltip");
+                .AddHoverText(Lang.Get($"{Constants.ModId}:gui-alloycalculator-deposit-tooltip"), CairoFont.WhiteDetailText(), 250, buttonTooltipBounds, "depositTooltip");
+
+            (ElementBounds Bounds, double Y)[] fuelSectionBounds =
+            [
+                (fuelDividerBounds, fuelDividerBounds.fixedY),
+                (fuelTitleBounds, fuelTitleBounds.fixedY),
+                (fuelSlotBounds, fuelSlotBounds.fixedY),
+                (fuelInfoBounds, fuelInfoBounds.fixedY)
+            ];
+            double expandedButtonY = buttonBounds.fixedY;
+            bool warningExpanded = true;
+            bool fuelStatusExpanded = true;
+            updateOptionalSectionLayout = (showWarning, showFuelStatus) =>
+            {
+                if (showWarning == warningExpanded && showFuelStatus == fuelStatusExpanded) return;
+                warningExpanded = showWarning;
+                fuelStatusExpanded = showFuelStatus;
+                double warningReduction = showWarning ? 0 : WasteWarningHeight + WasteWarningGap;
+                double statusReduction = showFuelStatus ? 0 : FuelStatusHeight;
+                foreach (var (bounds, originalY) in fuelSectionBounds)
+                    bounds.fixedY = originalY - warningReduction;
+                fuelInfoBounds.fixedHeight = showFuelStatus ? FuelStatusHeight : 0;
+                buttonBounds.fixedY = expandedButtonY - warningReduction - statusReduction;
+                buttonTooltipBounds.fixedY = buttonBounds.fixedY;
+                contentBounds.fixedHeight = contentHeight - warningReduction - statusReduction;
+                SingleComposer.Bounds.MarkDirtyRecursive();
+                SingleComposer.ReCompose();
+            };
         }
 
         SingleComposer = composer.EndChildElements().Compose();
@@ -624,7 +657,11 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         ItemStack? savedStack = plan?.IsPrewarming == true ? plan.DesiredStack.Clone() : null;
         if (savedStack is not null) savedStack.StackSize = Math.Abs(plan!.SavedFuelAmount);
         if (text == fuelInfoText && SameFuelPreview(prewarmingStack, prewarmingPreviewStack)
-            && SameFuelPreview(savedStack, savedFuelPreviewStack)) return;
+            && SameFuelPreview(savedStack, savedFuelPreviewStack))
+        {
+            UpdateOptionalSectionLayout();
+            return;
+        }
         fuelInfoText = text;
         prewarmingPreviewStack = prewarmingStack?.Clone();
         savedFuelPreviewStack = savedStack;
@@ -635,6 +672,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             element.SetNewText(string.IsNullOrEmpty(text)
                 ? Array.Empty<RichTextComponentBase>()
                 : [new RichTextComponent(capi, text, font)]);
+            UpdateOptionalSectionLayout();
             return;
         }
         var components = new List<RichTextComponentBase>
@@ -649,6 +687,14 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         components.Add(new RichTextComponent(capi, text, font));
         components.Add(CreateFuelInfoSlot(savedStack));
         element.SetNewText(components.ToArray());
+        UpdateOptionalSectionLayout();
+    }
+
+    private void UpdateOptionalSectionLayout()
+    {
+        bool showWarning = AlloyCalculatorLogic.CalculateWastedMetalUnits(
+            targetUnits, sliderValues, selectedIngredients) > 0;
+        updateOptionalSectionLayout?.Invoke(showWarning, !string.IsNullOrEmpty(fuelInfoText));
     }
 
     private bool SameFuelPreview(ItemStack? left, ItemStack? right)

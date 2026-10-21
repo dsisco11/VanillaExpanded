@@ -26,6 +26,8 @@ The indicator refreshes on calculator changes and deposit attempts, and every ha
 
 Fuel has a separate panel section with a horizontal divider and localized title. The preferred fuel is shown in a centered `SlideshowItemstackTextComponent`, matching the ingredient previews' background, item tooltip, and quantity overlay. Unavailable or invalid batches clear the item preview and show a status message instead. The preview is only recomposed when the fuel stack or estimated quantity changes.
 
+The excess-metal warning's reserved space and gap collapse when there is no warning. The fuel-status row also collapses when it has no prewarming or availability message. Visibility changes reposition the fuel section and Deposit button and resize the existing composer without resetting alloy selection, ratios, or target units; the button tooltip moves with the button.
+
 ### Prewarming
 
 When queued fuel has a positive effective burn duration and temperature below the selected batch's melting point, or an active burn has a positive maximum temperature below that point, the indicator displays a prewarming status. Temperature checks include the firepit's heat modifier.
