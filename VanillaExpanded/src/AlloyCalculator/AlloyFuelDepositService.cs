@@ -155,6 +155,7 @@ internal static class AlloyFuelDepositService
         int bestTemperature = int.MaxValue;
         bool bestIsFuelSource = false;
         int bestWithoutPrewarming = 0;
+        int? bestPrewarmingAmount = null;
         foreach (ItemStack stack in candidates)
         {
             if (!IsSuitableFuel(world, stack, meltingPoint, firepit.HeatModifier)) continue;
@@ -175,6 +176,29 @@ internal static class AlloyFuelDepositService
                 prewarmingAmount,
                 queuedDuration,
                 queuedTemperature);
+            int withoutPrewarming = isPrewarming
+                ? AlloyCalculatorLogic.CalculateFuelRequired(
+                    inputStack.StackSize, meltingPoint, meltingDuration, firepit.furnaceTemperature,
+                    20, 0, activePrewarming ? 0 : firepit.fuelBurnTime, firepit.maxTemperature,
+                    properties.BurnDuration * firepit.BurnDurationModifier,
+                    (int)(properties.BurnTemperature * firepit.HeatModifier))
+                : required;
+            int? minimumPrewarming = null;
+            if (prewarmingAmount > 0)
+            {
+                minimumPrewarming = AlloyCalculatorLogic.FindMinimumPrewarmingFuel(
+                    inputStack.StackSize, meltingPoint, meltingDuration, firepit.furnaceTemperature,
+                    firepit.fuelBurnTime, firepit.maxTemperature,
+                    properties.BurnDuration * firepit.BurnDurationModifier,
+                    (int)(properties.BurnTemperature * firepit.HeatModifier),
+                    queuedDuration, queuedTemperature, withoutPrewarming, out required);
+                if (minimumPrewarming is null)
+                    required = AlloyCalculatorLogic.CalculateFuelRequired(
+                        inputStack.StackSize, meltingPoint, meltingDuration, firepit.furnaceTemperature,
+                        20, 0, firepit.fuelBurnTime, firepit.maxTemperature,
+                        properties.BurnDuration * firepit.BurnDurationModifier,
+                        (int)(properties.BurnTemperature * firepit.HeatModifier));
+            }
 
             int available = suitableExternalSlots
                 .Where(slot => SameStack(world, slot.Itemstack!, stack))
@@ -198,14 +222,8 @@ internal static class AlloyFuelDepositService
                 bestAmount = required;
                 bestTemperature = properties.BurnTemperature;
                 bestIsFuelSource = isFuelSource;
-                // Compare the same smelting fuel from the same starting heat, without future low-temperature burns.
-                bestWithoutPrewarming = isPrewarming
-                    ? AlloyCalculatorLogic.CalculateFuelRequired(
-                        inputStack.StackSize, meltingPoint, meltingDuration, firepit.furnaceTemperature,
-                        20, 0, activePrewarming ? 0 : firepit.fuelBurnTime, firepit.maxTemperature,
-                        properties.BurnDuration * firepit.BurnDurationModifier,
-                        (int)(properties.BurnTemperature * firepit.HeatModifier))
-                    : required;
+                bestWithoutPrewarming = withoutPrewarming;
+                bestPrewarmingAmount = minimumPrewarming;
             }
         }
 
@@ -214,6 +232,8 @@ internal static class AlloyFuelDepositService
             return AlloyDepositResultCode.InsufficientItems;
         }
 
+        ItemStack? prewarmingStack = prewarmingAmount > 0 ? queuedFuel!.Clone() : null;
+        if (prewarmingStack is not null) prewarmingStack.StackSize = bestPrewarmingAmount ?? 0;
         plan = new AlloyFuelDepositPlan(
             bestStack.Clone(),
             bestAmount,
@@ -221,7 +241,8 @@ internal static class AlloyFuelDepositService
             firepit.fuelSlot.StackSize)
         {
             IsPrewarming = isPrewarming,
-            PrewarmingStack = prewarmingAmount > 0 ? queuedFuel!.Clone() : null,
+            PrewarmingStack = prewarmingStack,
+            CannotSaveFuel = prewarmingAmount > 0 && bestPrewarmingAmount is null,
             FuelWithoutPrewarming = bestWithoutPrewarming
         };
         return AlloyDepositResultCode.Success;

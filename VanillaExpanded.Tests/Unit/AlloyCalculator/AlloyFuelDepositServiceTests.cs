@@ -21,13 +21,16 @@ public class AlloyFuelDepositServiceTests
     [InlineData(32, 0)]
     [InlineData(0, 60)]
     [InlineData(32, 60)]
+    [InlineData(1, 0)]
+    [InlineData(128, 0)]
     public void CreatePreview_PrewarmingShowsExactSavingsForSameSmeltingFuel(int queuedAmount, float activeBurnTime)
     {
         TestContext context = CreateContext(backpackFuelAmount: 64);
         Dictionary<int, ItemStack> batch = CreatePreviewBatch(context, 20);
         MockItem warmingFuel = CreateFuel(context.Fixture, 2, "firewood");
         warmingFuel.CombustibleProps.BurnTemperature = 700;
-        warmingFuel.CombustibleProps.BurnDuration = 24;
+        float warmingDuration = queuedAmount == 1 ? 0.1f : 24;
+        warmingFuel.CombustibleProps.BurnDuration = warmingDuration;
         if (queuedAmount > 0) context.Firepit.fuelSlot.Itemstack = new ItemStack(warmingFuel, queuedAmount);
         context.Firepit.fuelBurnTime = activeBurnTime;
         context.Firepit.maxTemperature = activeBurnTime > 0 ? 700 : 0;
@@ -42,7 +45,6 @@ public class AlloyFuelDepositServiceTests
         {
             Assert.NotNull(plan.PrewarmingStack);
             Assert.Equal(warmingFuel.Code, plan.PrewarmingStack.Collectible.Code);
-            Assert.Equal(queuedAmount, plan.PrewarmingStack.StackSize);
             Assert.NotSame(context.Firepit.fuelSlot.Itemstack, plan.PrewarmingStack);
         }
         else
@@ -54,11 +56,21 @@ public class AlloyFuelDepositServiceTests
             1, 1000, 600, context.Firepit.furnaceTemperature, 20, 0, 0, 0, 40, 1300);
         int prewarmed = AlloyCalculatorLogic.CalculateFuelRequired(
             1, 1000, 600, context.Firepit.furnaceTemperature, 20, 0,
-            activeBurnTime, context.Firepit.maxTemperature, 40, 1300, queuedAmount, 24, 700);
+            activeBurnTime, context.Firepit.maxTemperature, 40, 1300,
+            plan.PrewarmingStack?.StackSize ?? 0, warmingDuration, 700);
         Assert.Equal(prewarmed, plan.DesiredAmount);
         Assert.Equal(baseline, plan.FuelWithoutPrewarming);
         Assert.Equal(baseline - prewarmed, plan.SavedFuelAmount);
-        if (queuedAmount == 32) Assert.True(plan.SavedFuelAmount > 0);
+        if (queuedAmount > 0)
+        {
+            Assert.False(plan.CannotSaveFuel);
+            Assert.True(plan.SavedFuelAmount >= 1);
+            for (int amount = 0; amount < plan.PrewarmingStack!.StackSize; amount++)
+                Assert.True(AlloyCalculatorLogic.CalculateFuelRequired(
+                    1, 1000, 600, context.Firepit.furnaceTemperature, 20, 0,
+                    activeBurnTime, context.Firepit.maxTemperature, 40, 1300, amount, warmingDuration, 700) >= baseline);
+            if (queuedAmount == 1) Assert.True(plan.PrewarmingStack.StackSize > queuedAmount);
+        }
         Assert.Equal(queuedAmount, context.Firepit.fuelSlot.StackSize);
         Assert.Equal(activeBurnTime, context.Firepit.fuelBurnTime);
         Assert.Equal(64, context.Fixture.BackpackInventory[0].StackSize);
@@ -95,6 +107,29 @@ public class AlloyFuelDepositServiceTests
             out AlloyFuelDepositPlan? plan, out bool isPrewarming));
         Assert.True(isPrewarming);
         Assert.Equal(0, plan!.SavedFuelAmount);
+        Assert.True(plan.CannotSaveFuel);
+    }
+
+    [Fact]
+    public void MinimumPrewarming_SearchesBeyondOneStackAndStopsAtFirstSaving()
+    {
+        int baseline = AlloyCalculatorLogic.CalculateFuelRequired(1, 1000, 600, 20, 20, 0, 0, 0, 40, 1300);
+        int? amount = AlloyCalculatorLogic.FindMinimumPrewarmingFuel(
+            1, 1000, 600, 20, 0, 0, 40, 1300, 0.1f, 700, baseline, out int required);
+        Assert.NotNull(amount);
+        Assert.True(amount > 64);
+        Assert.True(required < baseline);
+        for (int count = 0; count < amount.Value; count++)
+            Assert.True(AlloyCalculatorLogic.CalculateFuelRequired(
+                1, 1000, 600, 20, 20, 0, 0, 0, 40, 1300, count, 0.1f, 700) >= baseline);
+    }
+
+    [Fact]
+    public void MinimumPrewarming_ReachesHeatingLimitWithoutSavings()
+    {
+        int baseline = AlloyCalculatorLogic.CalculateFuelRequired(1, 1000, 600, 20, 20, 0, 0, 0, 40, 1300);
+        Assert.Null(AlloyCalculatorLogic.FindMinimumPrewarmingFuel(
+            1, 1000, 600, 20, 0, 0, 40, 1300, 24, 21, baseline, out _));
     }
 
     [Theory]

@@ -630,6 +630,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                 capi.World.Player.InventoryManager, out plan, out isPrewarming);
         string text = result switch
         {
+            AlloyDepositResultCode.Success when plan!.CannotSaveFuel => string.Empty,
             AlloyDepositResultCode.Success when plan!.IsPrewarming => Lang.Get(
                 $"{Constants.ModId}:gui-alloycalculator-fuel-prewarming{(plan.SavedFuelAmount < 0 ? "-extra" : string.Empty)}"),
             AlloyDepositResultCode.Success => string.Empty,
@@ -659,7 +660,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                 }]);
         }
         ItemStack? prewarmingStack = plan?.IsPrewarming == true ? plan.PrewarmingStack : null;
-        ItemStack? savedStack = plan?.IsPrewarming == true ? plan.DesiredStack.Clone() : null;
+        ItemStack? savedStack = plan?.IsPrewarming == true && !plan.CannotSaveFuel ? plan.DesiredStack.Clone() : null;
         if (savedStack is not null) savedStack.StackSize = Math.Abs(plan!.SavedFuelAmount);
         if (text == fuelInfoText && SameFuelPreview(prewarmingStack, prewarmingPreviewStack)
             && SameFuelPreview(savedStack, savedFuelPreviewStack))

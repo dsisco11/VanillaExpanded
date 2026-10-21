@@ -298,23 +298,7 @@ internal static class AlloyCalculatorLogic
                     tickDuration);
             }
 
-            if (inputTemperature < furnaceTemperature)
-            {
-                float heatingRate = (1 + Math.Clamp(
-                    (furnaceTemperature - inputTemperature) / 30,
-                    0,
-                    1.6f)) * tickDuration;
-                if (inputTemperature >= meltingPoint)
-                {
-                    heatingRate /= 11;
-                }
-
-                float heatedTemperature = ChangeTemperature(
-                    inputTemperature,
-                    furnaceTemperature,
-                    heatingRate);
-                inputTemperature = (heatedTemperature + (stackSize - 1) * inputTemperature) / stackSize;
-            }
+            HeatInput(stackSize, meltingPoint, furnaceTemperature, ref inputTemperature);
 
             if (inputTemperature >= meltingPoint)
             {
@@ -348,6 +332,50 @@ internal static class AlloyCalculatorLogic
         }
 
         return 0;
+    }
+
+    internal static int? FindMinimumPrewarmingFuel(
+        int stackSize, float meltingPoint, float meltingDuration, float furnaceTemperature,
+        float activeBurnTime, int activeTemperature, float fuelDuration, int fuelTemperature,
+        float warmingDuration, int warmingTemperature, int baseline, out int required)
+    {
+        required = baseline;
+        if (baseline <= 0) return null;
+        float initialFurnaceTemperature = furnaceTemperature;
+        float inputTemperature = 20;
+        int amount = 0;
+        float burnTime = Math.Max(0, activeBurnTime);
+        int maximumTemperature = activeTemperature;
+        while (true)
+        {
+            float previousFurnace = furnaceTemperature;
+            float previousInput = inputTemperature;
+            while (burnTime > 0)
+            {
+                burnTime = Math.Max(0, burnTime - 0.1f);
+                furnaceTemperature = ChangeTemperature(furnaceTemperature, maximumTemperature, 0.1f);
+                HeatInput(stackSize, meltingPoint, furnaceTemperature, ref inputTemperature);
+            }
+            required = CalculateFuelRequired(stackSize, meltingPoint, meltingDuration,
+                initialFurnaceTemperature, 20, 0, activeBurnTime, activeTemperature,
+                fuelDuration, fuelTemperature, amount, warmingDuration, warmingTemperature);
+            if (required < baseline) return amount;
+            if (amount > 0 && furnaceTemperature == previousFurnace && inputTemperature == previousInput)
+                return null;
+            amount = checked(amount + 1);
+            burnTime = warmingDuration;
+            maximumTemperature = warmingTemperature;
+        }
+    }
+
+    private static void HeatInput(int stackSize, float meltingPoint, float furnaceTemperature, ref float inputTemperature)
+    {
+        if (inputTemperature >= furnaceTemperature) return;
+        float heatingRate = (1 + Math.Clamp(
+            (furnaceTemperature - inputTemperature) / 30, 0, 1.6f)) * 0.1f;
+        if (inputTemperature >= meltingPoint) heatingRate /= 11;
+        float heatedTemperature = ChangeTemperature(inputTemperature, furnaceTemperature, heatingRate);
+        inputTemperature = (heatedTemperature + (stackSize - 1) * inputTemperature) / stackSize;
     }
 
     private static float ChangeTemperature(float fromTemperature, float toTemperature, float deltaTime)
