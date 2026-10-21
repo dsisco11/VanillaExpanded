@@ -1,6 +1,5 @@
 # Vanilla: Expanded TODO List:
     ## Issues:
-        ☐ some consumable items dont show the "remaining portion" indicator in their item-slot (e.g. pie slices).
         ☐ allow auto-stashing to querns.
 
     ## New Features:
@@ -32,5 +31,3 @@
         ☐ Monsters cant spawn under roofs.
         ☐ Increase gear drop rates from monsters (and trading costs for gears) by 500%. this will make fighting monsters feel more rewarding.
         ☐ Add other items to monster drops (bones, scrapmetal, metal parts (uncommon), gems (rare), etc) to make them more rewarding to fight.
-
-

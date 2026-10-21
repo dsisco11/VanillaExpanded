@@ -13,6 +13,21 @@ namespace VanillaExpanded.Tests.Unit.FoodContainerIndicators;
 public sealed class FoodContainerParticlePaletteTests
 {
     #region Public API
+    [Fact]
+    public void PortionedFoodWithoutMealInterface_UsesItsOwnColors()
+    {
+        var api = Mock.Of<ICoreClientAPI>();
+        var food = new Mock<MockItem>(1, (byte)0, api);
+        var stack = new ItemStack(food.Object);
+        food.Setup(value => value.GetRandomColor(api, stack)).Returns(unchecked((int)0xFF123456));
+        var resolver = new FoodContainerParticlePalette();
+
+        var palette = resolver.Resolve(api, stack, null);
+
+        Assert.Same(palette, resolver.Resolve(api, stack, null));
+        food.Verify(value => value.GetRandomColor(api, stack), Times.Exactly(16));
+    }
+
     /// <summary>Ingredients supply colors instead of vessel texture, and replacement refreshes the palette.</summary>
     [Fact]
     public void Ingredients_SupplyStablePaletteUntilTheirIdentityChanges()

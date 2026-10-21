@@ -14,9 +14,9 @@ internal sealed class FoodContainerParticlePalette
 
     #region Public API
     /// <summary>Samples meal colors only when the client or ingredient collectibles change.</summary>
-    internal ItemSlotIndicatorParticlePalette Resolve(ICoreClientAPI api, ItemStack stack, IBlockMealContainer container)
+    internal ItemSlotIndicatorParticlePalette Resolve(ICoreClientAPI api, ItemStack stack, IBlockMealContainer? container)
     {
-        ItemStack[] contents = container.GetNonEmptyContents(api.World, stack) ?? [];
+        ItemStack[] contents = container?.GetNonEmptyContents(api.World, stack) ?? [];
         if (samples.TryGetValue(stack, out var cached) && Matches(cached, api, contents)) return cached.Palette;
         var identities = new CollectibleObject[contents.Length];
         for (int i = 0; i < contents.Length; i++) identities[i] = contents[i].Collectible;
