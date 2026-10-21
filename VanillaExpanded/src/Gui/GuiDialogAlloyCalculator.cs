@@ -39,9 +39,9 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private const double TitlebarHeight = 20;
     private const double SlotSize = 40;
     private const double ButtonHeight = 25;
-    private const double FuelSectionTitleHeight = 20;
+    private const double SectionTitleHeight = 20;
     private const double FuelStatusHeight = 64;
-    private const double FuelInfoHeight = 15 + FuelSectionTitleHeight + SlotSize + 8 + FuelStatusHeight + 6;
+    private const double FuelInfoHeight = 15 + SectionTitleHeight + SlotSize + 8 + FuelStatusHeight + 6;
     private const float FuelInfoRefreshInterval = 0.5f;
     #endregion
 
@@ -197,7 +197,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             {
                 contentHeight += ingredientCount * RowHeight;
             }
-            contentHeight += 15 + SlotSize; // gap + slot row
+            contentHeight += 15 + SectionTitleHeight + SlotSize;
             contentHeight += 18 + WasteWarningHeight + WasteWarningGap + FuelInfoHeight + ButtonHeight;
         }
         var contentBounds = ElementBounds.Fixed(0, 0, contentWidth, contentHeight);
@@ -309,6 +309,12 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             composer.AddInset(divider2Bounds, 1, 0.5f);
             yOffset += 10;
 
+            composer.AddStaticText(
+                Lang.Get($"{Constants.ModId}:gui-alloycalculator-metals-title"),
+                CairoFont.WhiteSmallText().WithOrientation(EnumTextOrientation.Center),
+                ElementBounds.Fixed(0, yOffset, contentWidth, SectionTitleHeight).WithParent(contentBounds));
+            yOffset += SectionTitleHeight;
+
             // Create slideshow components for each ingredient
             slideshowComponents.Clear();
             var richTextComponents = new List<RichTextComponentBase>();
@@ -358,13 +364,13 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             var fuelDividerBounds = ElementBounds.Fixed(0, yOffset + 5, contentWidth, 1);
             composer.AddInset(fuelDividerBounds, 1, 0.5f);
             yOffset += 15;
-            var fuelTitleBounds = ElementBounds.Fixed(0, yOffset, contentWidth, FuelSectionTitleHeight)
+            var fuelTitleBounds = ElementBounds.Fixed(0, yOffset, contentWidth, SectionTitleHeight)
                 .WithParent(contentBounds);
             composer.AddStaticText(
                 Lang.Get($"{Constants.ModId}:gui-alloycalculator-fuel-title"),
                 CairoFont.WhiteSmallText().WithOrientation(EnumTextOrientation.Center),
                 fuelTitleBounds);
-            yOffset += FuelSectionTitleHeight;
+            yOffset += SectionTitleHeight;
             var fuelSlotBounds = ElementBounds
                 .Fixed(0, yOffset, SlotSize, SlotSize + 8)
                 .WithParent(contentBounds)
