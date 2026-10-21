@@ -16,6 +16,16 @@ Exact ties retain the earlier candidate. Queued fuel is considered before extern
 
 Untagged burnables remain eligible as a fallback when no tagged candidate can complete the melt. The tag is a preference, not an eligibility requirement, and never bypasses temperature, duration, quantity, or inventory-access checks. This selection policy does not implement a separate preheating stage or a mixed-fuel schedule.
 
+## Fuel-info preview
+
+The dialog calls `AlloyFuelDepositService.CreatePreview` for the selected ingredient stacks, using a detached smelting inventory to obtain the crucible's melting point and duration without altering live inventory. The preview shares fuel selection and simulation with Deposit, including native tag preference and available supply restrictions.
+
+The selected batch is estimated from 20-degree ingredients and zero cooking progress, retaining current furnace heat and the remaining active fuel burn. The count is the total queued fuel needed for that simulated batch, not an additional-to-deposit count; fuel already burning is excluded. The preview does not require possession of the selected ingredients or fuel already in the fuel slot. If no available fuel can complete the batch, it reports insufficient suitable fuel rather than inventing a fuel choice.
+
+The indicator refreshes on calculator changes and deposit attempts, and every half-second while rendering to reflect inventory changes, opened storage, and firepit heat. Text is only recomposed when its value changes. No tick listeners or inventory subscriptions are retained.
+
+Fuel has a separate panel section with a horizontal divider and localized title. The preferred fuel is shown in a centered `SlideshowItemstackTextComponent`, matching the ingredient previews' background, item tooltip, and quantity overlay. Unavailable or invalid batches clear the item preview and show a status message instead. The preview is only recomposed when the fuel stack or estimated quantity changes.
+
 ## Vanilla fuel tags
 
 [fuelsources.json](../VanillaExpanded/assets/vanillaexpanded/patches/fuelsources.json) adds `is-fuel-source` to:

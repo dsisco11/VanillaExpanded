@@ -42,6 +42,47 @@ internal static class AlloyFuelDepositService
         IPlayerInventoryManager playerInventory,
         out AlloyFuelDepositPlan? plan)
     {
+        return CreatePlan(api, firepit, playerInventory, out plan, previewInventory: null);
+    }
+
+    /// <summary>Estimates fuel for a cold selected batch without changing the firepit or moving inventory items.</summary>
+    internal static AlloyDepositResultCode CreatePreview(
+        ICoreClientAPI api,
+        BlockEntityFirepit firepit,
+        IReadOnlyDictionary<int, ItemStack> calculatedStacks,
+        IPlayerInventoryManager playerInventory,
+        out AlloyFuelDepositPlan? plan)
+    {
+        plan = null;
+        if (firepit.Inventory is not InventorySmelting inventory
+            || !playerInventory.OpenedInventories.Contains(inventory))
+        {
+            return AlloyDepositResultCode.InventoryClosed;
+        }
+        if (firepit.inputStack?.Collectible is not BlockSmeltingContainer
+            || calculatedStacks.Count == 0
+            || calculatedStacks.Count > inventory.CookingSlots.Length
+            || calculatedStacks.Any(pair => pair.Value.StackSize <= 0))
+        {
+            return AlloyDepositResultCode.InvalidRequest;
+        }
+
+        var preview = new InventorySmelting("alloyfuelpreview", "preview", null!) { Api = api };
+        preview[1].Itemstack = firepit.inputStack.Clone();
+        int index = 0;
+        foreach (ItemStack stack in calculatedStacks.OrderBy(static pair => pair.Key).Select(static pair => pair.Value))
+            preview.CookingSlots[index++].Itemstack = stack.Clone();
+
+        return CreatePlan(api, firepit, playerInventory, out plan, preview);
+    }
+
+    private static AlloyDepositResultCode CreatePlan(
+        ICoreClientAPI api,
+        BlockEntityFirepit firepit,
+        IPlayerInventoryManager playerInventory,
+        out AlloyFuelDepositPlan? plan,
+        InventorySmelting? previewInventory)
+    {
         plan = null;
         IWorldAccessor world = api.World;
         if (firepit.Inventory is not InventorySmelting inventory
@@ -60,9 +101,18 @@ internal static class AlloyFuelDepositService
             return AlloyDepositResultCode.InvalidRequest;
         }
 
-        ItemStack inputStack = firepit.inputStack;
-        float meltingPoint = inputStack.Collectible.GetMeltingPoint(world, inventory, firepit.inputSlot);
-        float meltingDuration = inputStack.Collectible.GetMeltingDuration(world, inventory, firepit.inputSlot);
+        InventorySmelting operationInventory = previewInventory ?? inventory;
+        ItemSlot inputSlot = operationInventory[1];
+        if (inputSlot.Itemstack is not ItemStack inputStack)
+        {
+            return AlloyDepositResultCode.InvalidRequest;
+        }
+        float meltingPoint = inputStack.Collectible.GetMeltingPoint(world, operationInventory, inputSlot);
+        float meltingDuration = inputStack.Collectible.GetMeltingDuration(world, operationInventory, inputSlot);
+        if (previewInventory is not null && (meltingPoint <= 0 || meltingDuration <= 0))
+        {
+            return AlloyDepositResultCode.InvalidRequest;
+        }
         ItemStack? queuedFuel = firepit.fuelStack;
 
         // Queued fuel remains separate from external sources; source restrictions govern candidate availability.
@@ -93,8 +143,8 @@ internal static class AlloyFuelDepositService
                 meltingPoint,
                 meltingDuration,
                 firepit.furnaceTemperature,
-                firepit.InputStackTemp,
-                firepit.inputStackCookingTime,
+                previewInventory is null ? firepit.InputStackTemp : 20,
+                previewInventory is null ? firepit.inputStackCookingTime : 0,
                 firepit.fuelBurnTime,
                 firepit.maxTemperature,
                 properties.BurnDuration * firepit.BurnDurationModifier,

@@ -16,6 +16,147 @@ namespace VanillaExpanded.Tests.Unit.AlloyCalculator;
 [Trait("Category", "Unit")]
 public class AlloyFuelDepositServiceTests
 {
+    [Theory]
+    [InlineData(2)]
+    [InlineData(20)]
+    public void CreatePreview_UsesSelectedBatchWithEmptyFuelSlot_WithoutMovingItems(int amount)
+    {
+        TestContext context = CreateContext(backpackFuelAmount: 64);
+        Dictionary<int, ItemStack> batch = CreatePreviewBatch(context, amount);
+        var inventory = Assert.IsType<InventorySmelting>(context.Firepit.Inventory);
+        ItemStack crucible = context.Firepit.inputStack;
+        inventory.CookingSlots[0].Itemstack = new ItemStack(batch[0].Collectible, 7);
+        context.Firepit.inputStackCookingTime = 50;
+
+        AlloyDepositResultCode result = AlloyFuelDepositService.CreatePreview(context.Fixture.ClientApi,
+            context.Firepit, batch, context.Fixture.Player, out AlloyFuelDepositPlan? plan);
+
+        Assert.Equal(AlloyDepositResultCode.Success, result);
+        Assert.Equal(context.Fuel.Code, plan!.DesiredStack.Collectible.Code);
+        Assert.Equal(AlloyCalculatorLogic.CalculateFuelRequired(1, 1000, 30 * amount,
+            context.Firepit.furnaceTemperature, 20, 0, context.Firepit.fuelBurnTime,
+            context.Firepit.maxTemperature, 40, 1300), plan.DesiredAmount);
+        Assert.True(context.Firepit.fuelSlot.Empty);
+        Assert.Equal(64, context.Fixture.BackpackInventory[0].StackSize);
+        Assert.Equal(7, inventory.CookingSlots[0].StackSize);
+        Assert.Same(crucible, context.Firepit.inputStack);
+        Assert.Equal(50, context.Firepit.inputStackCookingTime);
+        Assert.Equal(amount, batch[0].StackSize);
+        context.Fixture.InventoryManagerMock.Verify(manager => manager.TryTransferTo(
+            It.IsAny<ItemSlot>(), It.IsAny<ItemSlot>(), ref It.Ref<ItemStackMoveOperation>.IsAny), Times.Never);
+        context.Fixture.ClientNetworkMock!.Verify(network => network.SendPacketClient(It.IsAny<object>()), Times.Never);
+    }
+
+    [Fact]
+    public void CreatePreview_RecalculatesForTargetChanges_AndAgreesWithColdDepositPlan()
+    {
+        TestContext context = CreateContext(backpackFuelAmount: 64);
+        Dictionary<int, ItemStack> batch = CreatePreviewBatch(context, 2);
+        Assert.Equal(AlloyDepositResultCode.Success, AlloyFuelDepositService.CreatePreview(context.Fixture.ClientApi,
+            context.Firepit, batch, context.Fixture.Player, out AlloyFuelDepositPlan? small));
+        batch[0].StackSize = 20;
+        Assert.Equal(AlloyDepositResultCode.Success, AlloyFuelDepositService.CreatePreview(context.Fixture.ClientApi,
+            context.Firepit, batch, context.Fixture.Player, out AlloyFuelDepositPlan? large));
+        Assert.True(large!.DesiredAmount > small!.DesiredAmount);
+
+        var inventory = Assert.IsType<InventorySmelting>(context.Firepit.Inventory);
+        inventory.CookingSlots[0].Itemstack = batch[0].Clone();
+        Assert.Equal(AlloyDepositResultCode.Success, AlloyFuelDepositService.CreatePlan(context.Fixture.ClientApi,
+            context.Firepit, context.Fixture.Player, out AlloyFuelDepositPlan? deposit));
+        Assert.Equal(large.DesiredAmount, deposit!.DesiredAmount);
+        Assert.Equal(large.DesiredStack.Collectible.Code, deposit.DesiredStack.Collectible.Code);
+    }
+
+    [Fact]
+    public void CreatePreview_NoSufficientFuel_ReportsUnavailable()
+    {
+        TestContext context = CreateContext();
+        Dictionary<int, ItemStack> batch = CreatePreviewBatch(context, 20);
+        Assert.Equal(AlloyDepositResultCode.InsufficientItems, AlloyFuelDepositService.CreatePreview(
+            context.Fixture.ClientApi, context.Firepit, batch, context.Fixture.Player, out AlloyFuelDepositPlan? plan));
+        Assert.Null(plan);
+    }
+
+    [Fact]
+    public void CreatePreview_EmptyBatch_ReportsInvalidRequest()
+    {
+        TestContext context = CreateContext(backpackFuelAmount: 64);
+        Assert.Equal(AlloyDepositResultCode.InvalidRequest, AlloyFuelDepositService.CreatePreview(
+            context.Fixture.ClientApi, context.Firepit, new Dictionary<int, ItemStack>(),
+            context.Fixture.Player, out AlloyFuelDepositPlan? plan));
+        Assert.Null(plan);
+    }
+
+    [Fact]
+    public void CreatePreview_TagPreferenceAndLiveInventoryChanges_MatchDepositPolicy()
+    {
+        TestContext context = CreateContext(backpackFuelAmount: 64);
+        Dictionary<int, ItemStack> batch = CreatePreviewBatch(context, 2);
+        MockItem cooler = CreateFuel(context.Fixture, 2, "cooler");
+        cooler.CombustibleProps.BurnTemperature = 1100;
+        context.Fixture.BackpackInventory[1].Itemstack = new ItemStack(cooler, 64);
+        MarkFuelSource(context.Fixture, context.Fuel);
+
+        Assert.Equal(AlloyDepositResultCode.Success, AlloyFuelDepositService.CreatePreview(context.Fixture.ClientApi,
+            context.Firepit, batch, context.Fixture.Player, out AlloyFuelDepositPlan? tagged));
+        Assert.Equal(context.Fuel.Code, tagged!.DesiredStack.Collectible.Code);
+        context.Fixture.BackpackInventory[0].Itemstack = null;
+        Assert.Equal(AlloyDepositResultCode.Success, AlloyFuelDepositService.CreatePreview(context.Fixture.ClientApi,
+            context.Firepit, batch, context.Fixture.Player, out AlloyFuelDepositPlan? fallback));
+        Assert.Equal(cooler.Code, fallback!.DesiredStack.Collectible.Code);
+    }
+
+    [Fact]
+    public void CreatePreview_MultipleMetals_UsesHighestMeltingPointAndCombinedDuration()
+    {
+        TestContext context = CreateContext(backpackFuelAmount: 64);
+        Dictionary<int, ItemStack> batch = CreatePreviewBatch(context, 4);
+        MockItem secondMetal = context.Fixture.CreateNonLightSource(11);
+        secondMetal.Code = new AssetLocation("game", "nugget-other");
+        secondMetal.CombustibleProps = new CombustibleProperties
+        {
+            MeltingPoint = 1200,
+            MeltingDuration = 60,
+            SmeltedRatio = 2
+        };
+        batch[1] = new ItemStack(secondMetal, 2);
+
+        Assert.Equal(AlloyDepositResultCode.Success, AlloyFuelDepositService.CreatePreview(context.Fixture.ClientApi,
+            context.Firepit, batch, context.Fixture.Player, out AlloyFuelDepositPlan? plan));
+        Assert.Equal(AlloyCalculatorLogic.CalculateFuelRequired(1, 1200, 180,
+            context.Firepit.furnaceTemperature, 20, 0, 0, context.Firepit.maxTemperature, 40, 1300),
+            plan!.DesiredAmount);
+        Assert.All(Assert.IsType<InventorySmelting>(context.Firepit.Inventory).CookingSlots,
+            slot => Assert.True(slot.Empty));
+    }
+
+    [Fact]
+    public void CreatePreview_ActiveFuelCanFinishBatch_RequiresNoQueuedFuel()
+    {
+        TestContext context = CreateContext(backpackFuelAmount: 64);
+        Dictionary<int, ItemStack> batch = CreatePreviewBatch(context, 2);
+        context.Firepit.furnaceTemperature = 1300;
+        context.Firepit.maxTemperature = 1300;
+        context.Firepit.fuelBurnTime = 1000;
+
+        Assert.Equal(AlloyDepositResultCode.Success, AlloyFuelDepositService.CreatePreview(context.Fixture.ClientApi,
+            context.Firepit, batch, context.Fixture.Player, out AlloyFuelDepositPlan? plan));
+        Assert.Equal(0, plan!.DesiredAmount);
+        Assert.Equal(1000, context.Firepit.fuelBurnTime);
+    }
+
+    [Fact]
+    public void CreatePreview_ClosedFirepit_ReportsInventoryClosed()
+    {
+        TestContext context = CreateContext(backpackFuelAmount: 64);
+        Dictionary<int, ItemStack> batch = CreatePreviewBatch(context, 2);
+        context.Fixture.InventoryManagerMock.SetupGet(manager => manager.OpenedInventories).Returns([]);
+
+        Assert.Equal(AlloyDepositResultCode.InventoryClosed, AlloyFuelDepositService.CreatePreview(
+            context.Fixture.ClientApi, context.Firepit, batch, context.Fixture.Player, out AlloyFuelDepositPlan? plan));
+        Assert.Null(plan);
+    }
+
     [Fact]
     public void FuelSourcePatch_TagsDedicatedFuelsAndOnlyCoalOreVariants()
     {
@@ -363,6 +504,25 @@ public class AlloyFuelDepositServiceTests
             BurnTemperature = 1_300
         };
         return fuel;
+    }
+
+    private static Dictionary<int, ItemStack> CreatePreviewBatch(TestContext context, int amount)
+    {
+        var crucible = new BlockSmeltingContainer
+        {
+            Code = new AssetLocation("game", "crucible"),
+            Attributes = JsonObject.FromJson("{\"cookingContainerSlots\":4,\"maxContainerSlotStackSize\":64}")
+        };
+        context.Firepit.inputSlot.Itemstack = new ItemStack(crucible);
+        MockItem metal = context.Fixture.CreateNonLightSource(10);
+        metal.Code = new AssetLocation("game", "metalbit-copper");
+        metal.CombustibleProps = new CombustibleProperties
+        {
+            MeltingPoint = 1000,
+            MeltingDuration = 30,
+            SmeltedRatio = 1
+        };
+        return new Dictionary<int, ItemStack> { [0] = new(metal, amount) };
     }
 
     private static void MarkFuelSource(VsTestFixture fixture, params MockItem[] fuels)
