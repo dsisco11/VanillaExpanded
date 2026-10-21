@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Moq;
 using VanillaExpanded.AutoLoot;
 using VanillaExpanded.RadialProgress;
@@ -103,7 +104,9 @@ internal sealed class AutoLootTestCase : IDisposable
         var item = Fixture.CreateNonLightSource(1);
         item.MaxStackSize = 64;
         Inventory[0].Itemstack = new ItemStack(item, 3);
-        Dialog = new TestLootDialog(Fixture.ClientApi, () => Inventory.Close(Player.Object));
+        Dialog = TestLootDialog.Create(() => Inventory.Close(Player.Object));
+        typeof(EntityBehaviorHarvestable).GetField("dlg", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(Behavior, Dialog);
         Progress.SetupAllProperties();
         ProgressProvider.Setup(provider => provider.CreateProgressBar(true)).Returns(Progress.Object);
         Fixture.ClientNetworkMock!.Setup(network => network.SendEntityPacketWithOffset(
@@ -206,19 +209,28 @@ internal sealed class AutoLootTestCase : IDisposable
         }
     }
 
-    internal sealed class TestLootDialog : GuiDialog
+    internal sealed class TestLootDialog : GuiDialogCreatureContents
     {
         public override string ToggleKeyCombinationCode => "test-autoloot";
-        private readonly Action closeInventory;
-        public TestLootDialog(ICoreClientAPI api, Action closeInventory) : base(api)
+        private Action closeInventory = null!;
+        private TestLootDialog() : base(null!, null!, null!, "")
         {
-            this.closeInventory = closeInventory;
-            opened = true;
         }
-        public override void OnGuiClosed()
+
+        public static TestLootDialog Create(Action closeInventory)
         {
-            base.OnGuiClosed();
+            var dialog = (TestLootDialog)RuntimeHelpers.GetUninitializedObject(typeof(TestLootDialog));
+            dialog.closeInventory = closeInventory;
+            dialog.opened = true;
+            return dialog;
+        }
+
+        public override bool TryClose()
+        {
+            if (!opened) return false;
+            opened = false;
             closeInventory();
+            return true;
         }
     }
 }

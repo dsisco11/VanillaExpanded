@@ -39,6 +39,8 @@ public sealed class AutoLootClientTests
         Assert.Single(test.Sent);
         Assert.DoesNotContain(test.Inventory, slot => !slot.Empty);
         Assert.Equal(3, test.Fixture.BackpackInventory[0].StackSize);
+        Assert.False(test.Dialog.IsOpened());
+        Assert.False(test.Inventory.HasOpened(test.Player.Object));
         test.Begin();
         test.Tick(delay);
         Assert.Single(test.Sent);
@@ -245,6 +247,7 @@ public sealed class AutoLootClientTests
         test.Tick(1);
         Assert.Single(test.Sent);
         test.Release();
+        test.Inventory.Open(test.Player.Object);
         test.Begin();
         test.Tick(0.5f);
         Assert.Equal(2, test.Sent.Count);
@@ -293,7 +296,7 @@ public sealed class AutoLootClientTests
         Assert.Single(test.Attempts);
         Assert.Equal(full ? 0 : 1, test.Sent.Count);
         Assert.Equal(full ? 3 : 0, test.Inventory[0].StackSize);
-        Assert.True(test.Dialog.IsOpened());
+        Assert.Equal(full, test.Dialog.IsOpened());
         test.ProgressProvider.Verify(provider => provider.RemoveProgressBar(test.Progress.Object), Times.Once);
         test.Fixture.ClientApiMock!.Verify(api => api.ShowChatMessage(It.IsAny<string>()), Times.Never);
         test.Fixture.ClientApiMock.Verify(api => api.TriggerIngameError(
@@ -301,6 +304,53 @@ public sealed class AutoLootClientTests
         Assert.DoesNotContain(test.Fixture.WorldMock.Invocations, invocation => invocation.Method.Name.StartsWith("PlaySound"));
         test.Player.Verify(player => player.TriggerFpAnimation(It.IsAny<EnumHandInteract>()), Times.Never);
         test.Fixture.InventoryManagerMock.Verify(manager => manager.CloseInventoryAndSync(It.IsAny<IInventory>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Collection_ClosesOnlyWhenEveryLootSlotIsEmpty(bool leaveOverflow)
+    {
+        using var test = new AutoLootTestCase();
+        test.Inventory[2].Itemstack = new ItemStack(test.Fixture.CreateNonLightSource(2), 2);
+        test.TransferOverride = (source, operation) => leaveOverflow && source == test.Inventory[2]
+            ? null : test.TransferToPlayer(source, operation);
+        int closes = 0;
+        test.Inventory.OnInventoryClosed += _ =>
+        {
+            closes++;
+            Assert.Equal(2, test.Sent.Count);
+            Assert.All(test.Inventory, slot => Assert.True(slot.Empty));
+        };
+
+        test.Begin();
+        test.Tick(0.5f);
+        test.Tick(1);
+
+        Assert.Equal(leaveOverflow, test.Dialog.IsOpened());
+        Assert.Equal(leaveOverflow, test.Inventory.HasOpened(test.Player.Object));
+        Assert.Equal(leaveOverflow ? 0 : 1, closes);
+        Assert.Equal(leaveOverflow ? 1 : 2, test.Sent.Count);
+        Assert.Equal(leaveOverflow ? 2 : 0, test.Inventory[2].StackSize);
+    }
+
+    [Fact]
+    public void InvalidatedCollection_DoesNotCloseEvenIfPredictionEmptiedTheCorpse()
+    {
+        using var test = new AutoLootTestCase();
+        test.TransferOverride = (source, operation) =>
+        {
+            object[]? packets = test.TransferToPlayer(source, operation);
+            test.Controller.CancelUntilRelease();
+            return packets;
+        };
+
+        test.Begin();
+        test.Tick(0.5f);
+
+        Assert.Single(test.Sent);
+        Assert.All(test.Inventory, slot => Assert.True(slot.Empty));
+        Assert.True(test.Dialog.IsOpened());
     }
 
     [Theory]

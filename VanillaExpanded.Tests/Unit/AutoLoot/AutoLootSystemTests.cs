@@ -211,8 +211,7 @@ public sealed class AutoLootSystemTests
         using var test = new AutoLootTestCase();
         test.Controller.Dispose();
         var system = new AutoLootSystem_Client(test.ProgressProvider.Object);
-        var dialog = (GuiDialogCreatureContents)RuntimeHelpers.GetUninitializedObject(typeof(GuiDialogCreatureContents));
-        typeof(GuiDialog).GetField("opened", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(dialog, true);
+        var dialog = test.Dialog;
         typeof(EntityBehaviorHarvestable).GetField("dlg", BindingFlags.Instance | BindingFlags.NonPublic)!
             .SetValue(test.Behavior, dialog);
         typeof(EntityBehaviorContainer).GetField("Api", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
@@ -228,7 +227,7 @@ public sealed class AutoLootSystemTests
             test.Fixture.InventoryManagerMock.Verify(manager => manager.OpenInventory(test.Inventory), Times.Once);
             test.Tick(0.5f);
             Assert.Single(test.Sent);
-            Assert.True(dialog.IsOpened());
+            Assert.False(dialog.IsOpened());
         }
         finally
         {

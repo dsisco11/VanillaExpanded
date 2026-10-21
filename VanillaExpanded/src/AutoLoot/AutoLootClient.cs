@@ -125,6 +125,11 @@ internal sealed class AutoLootClient : IDisposable
             if (hold.Advance(deltaTime, VanillaExpandedModSystem.Config.AutoLootDelay, rendersTopmost: true))
             {
                 AutoLootTransferCoordinator.Collect(api, player, target, () => CanContinue(target, player));
+                if (CanContinue(target, player) && !target.HasLoot)
+                {
+                    target.CloseDialog();
+                    Cancel();
+                }
             }
         }
         catch (Exception exception)

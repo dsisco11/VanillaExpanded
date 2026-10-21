@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
+using HarmonyLib;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -10,6 +11,8 @@ namespace VanillaExpanded.AutoLoot;
 
 internal sealed class AutoLootTarget
 {
+    private static readonly AccessTools.FieldRef<EntityBehaviorHarvestable, GuiDialogCreatureContents> LootDialog =
+        AccessTools.FieldRefAccess<EntityBehaviorHarvestable, GuiDialogCreatureContents>("dlg");
     // EntityBehaviorHarvestable.OnInteract uses a five-block client eye-to-hit reach.
     private const double MaximumReachSquared = 25;
     private readonly EntityBehaviorHarvestable behavior;
@@ -21,6 +24,8 @@ internal sealed class AutoLootTarget
     public long EntityId { get; }
     public InventoryBase Inventory { get; }
     public bool HasLoot => Inventory.FirstNonEmptySlot is not null;
+
+    public void CloseDialog() => LootDialog(behavior)?.TryClose();
 
     private AutoLootTarget(EntityBehaviorHarvestable behavior, EntityPlayer looter, Vec3d hitPosition)
     {

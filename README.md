@@ -26,7 +26,7 @@ Collect available corpse loot without shift-clicking each stack:
 1. Harvest the corpse normally first. AutoLoot does not skin, butcher, generate loot, or bypass access restrictions.
 2. Press and hold the right mouse button on a supported corpse. A normal click still opens the vanilla loot window; no extra hotkey or modifier is needed.
 3. Keep holding while the radial **Auto Looting** indicator completes (0.5 seconds by default). It always renders above the loot window; moving the cursor over that window does not cancel the hold.
-4. Everything that fits is transferred into your player storage. Overflow stays on the corpse, the loot window stays open, and you must release before holding again for another pass.
+4. Everything that fits is transferred into your player storage. The loot window closes automatically if the corpse is empty. If any items remain, the window stays open with the overflow, and you must release before holding again for another pass.
 
 Release, close the loot window, change world targets, move out of reach, or disable AutoLoot to cancel. Attached-container Auto-Stash takes precedence when its gesture is used.
 
