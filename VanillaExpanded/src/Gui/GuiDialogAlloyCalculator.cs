@@ -649,8 +649,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                 : [new SlideshowItemstackTextComponent(capi, [previewStack], SlotSize, EnumFloat.Inline)
                 {
                     ShowStackSize = true,
-                    Background = true,
-                    ExtraTooltipText = "\n" + Lang.Get($"{Constants.ModId}:gui-alloycalculator-fuel-info-tooltip")
+                    Background = true
                 }]);
         }
         ItemStack? prewarmingStack = plan?.IsPrewarming == true ? plan.PrewarmingStack : null;
@@ -716,8 +715,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             ShowStackSize = true,
             Background = true,
             PaddingLeft = 4,
-            PaddingRight = 4,
-            ExtraTooltipText = "\n" + Lang.Get($"{Constants.ModId}:gui-alloycalculator-fuel-info-tooltip")
+            PaddingRight = 4
         };
 
     /// <summary>

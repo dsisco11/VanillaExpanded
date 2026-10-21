@@ -70,7 +70,6 @@
   "gui-alloycalculator-fuel-prewarming-unavailable": "Prewarming: not enough smelting-capable fuel.",
   "gui-alloycalculator-fuel-info-unavailable": "Not enough suitable fuel for this batch.",
   "gui-alloycalculator-fuel-info-no-batch": "Select a smeltable batch to estimate fuel.",
-  "gui-alloycalculator-fuel-info-tooltip": "Estimated fuel for the selected alloy and target amount, assuming cold ingredients. Uses available fuel in your backpack, hotbar, opened storage, and the firepit. Accounts for current furnace heat and remaining burn time; fuel already burning is not included in the item count. Prewarming assumes the entire queued low-temperature fuel stack and remaining active burn are used before switching to the displayed smelting fuel. Savings compare the same smelting fuel from current heat without those future low-temperature burns. No items are moved; Deposit still replaces queued fuel.",
   "gui-alloycalculator-slider-tooltip": "{0}: Adjust ratio between {1}% and {2}%",
   "gui-alloycalculator-itemstack-tooltip": "Required ingredient amount",
   "gui-alloycalculator-deposit": "Deposit",
