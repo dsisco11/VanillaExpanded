@@ -101,7 +101,7 @@ internal sealed class GpuHabitatPreparation : IDisposable
                 result = Task.FromResult<GpuHabitatReceipt?>(new(entry!, scope));
                 return true;
             }
-            if (pending.Contains(key)) return false;
+            if (pending.Contains(key) || pending.Count >= limits.PendingJobs + 1) return false;
             var completion = new TaskCompletionSource<GpuHabitatReceipt?>(TaskCreationOptions.RunContinuationsAsynchronously);
             var job = new GpuHabitatJob(key, scope, completion);
             if (!jobs.Writer.TryWrite(job)) return false;
@@ -140,78 +140,95 @@ internal sealed class GpuHabitatPreparation : IDisposable
     /// <summary>Drains bounded jobs, completing cancelled/stale requests without allowing an obsolete upload bundle to replace current output.</summary>
     private async Task ProcessAsync()
     {
-        await foreach (var job in jobs.Reader.ReadAllAsync().ConfigureAwait(false))
+        await foreach (var first in jobs.Reader.ReadAllAsync().ConfigureAwait(false))
         {
-            try { job.Completion.TrySetResult(await PrepareAsync(job).ConfigureAwait(false)); }
-            catch (Exception error) { job.Completion.TrySetException(error); }
-            finally { lock (gate) pending.Remove(job.Key); }
-        }
-    }
-
-    /// <summary>Reads saved upload buffers; species criteria and per-column comparisons stay on the GPU.</summary>
-    private async Task<GpuHabitatReceipt?> PrepareAsync(GpuHabitatJob job)
-    {
-        if (!JobCurrent(job)) return null;
-        var region = await RegionAsync(storage.Identity.RegionFor(job.Key)).ConfigureAwait(false);
-        if (!JobCurrent(job)) return null;
-        var tile = await TileAsync(job.Key).ConfigureAwait(false);
-        if (!JobCurrent(job)) return null;
-        // Allocate missing-source placeholders outside the cache gate, so rendering never waits on buffer construction.
-        var regionalTexture = region.Value ?? new PackedRegionalData(null);
-        var terrainTexture = tile.Value?.Values ?? new ushort[checked(storage.Identity.ChunkSize * storage.Identity.ChunkSize * 2)];
-        lock (gate)
-        {
-            if (!JobCurrent(job) || !InputCurrent(region) || !InputCurrent(tile)) return null;
-            var bundle = new GpuHabitatBundle(job.Key, storage.Identity, region, tile)
+            var batch = new List<GpuHabitatJob> { first };
+            // Drain only already-admitted work: do not delay a small batch or enlarge the queue.
+            while (batch.Count < PackedReadBatch.MaximumRecords && jobs.Reader.TryRead(out var next)) batch.Add(next);
+            try { await PrepareBatchAsync(batch).ConfigureAwait(false); }
+            catch (Exception error)
             {
-                RegionalTexture = regionalTexture,
-                TerrainTexture = terrainTexture
-            };
-            bundles.Put(job.Key, bundle);
-            preparedBundles++;
-            return new(bundle, scope);
+                foreach (var job in batch) job.Completion.TrySetException(error);
+            }
+            finally
+            {
+                lock (gate) foreach (var job in batch) pending.Remove(job.Key);
+                foreach (var job in batch) job.Completion.TrySetResult(null);
+            }
         }
-    }
-    /// <summary>Loads a shared packed regional snapshot while retaining a pending lease so receipt updates can invalidate an in-flight read.</summary>
-    private async Task<EnvironmentalInput<PackedRegionalData>> RegionAsync(EcosystemRegionKey key)
-    {
-        EnvironmentalInput<PackedRegionalData> input;
-        lock (gate)
-        {
-            if (regions.TryGet(key, out var cached) && InputCurrent(cached!) && cached!.Loaded) return cached;
-            input = new(storage.CurrentEpoch);
-            regionReads++;
-            var evicted = regions.Put(key, input);
-            if (evicted != null) evicted.Valid = false;
-        }
-        var read = await storage.ReadRegionForUploadAsync(key).ConfigureAwait(false);
-        lock (gate)
-        {
-            if (!ReferenceEquals(read.Epoch, input.Epoch)) input.Valid = false;
-            input.Value = read.Value; input.Loaded = true;
-        }
-        return input;
     }
 
-    /// <summary>Loads packed height/flag words with the same targeted update and purge provenance guarantees.</summary>
-    private async Task<EnvironmentalInput<PackedTerrainData>> TileAsync(EcosystemTileKey key)
+    /// <summary>Installs invalidatable leases before a single bounded database submission and publishes only current sources.</summary>
+    private async Task PrepareBatchAsync(List<GpuHabitatJob> batch)
     {
-        EnvironmentalInput<PackedTerrainData> input;
+        var requestedRegions = new Dictionary<EcosystemRegionKey, EnvironmentalInput<PackedRegionalData>>();
+        var requestedTiles = new Dictionary<EcosystemTileKey, EnvironmentalInput<PackedTerrainData>>();
+        var sources = new List<(GpuHabitatJob Job, EnvironmentalInput<PackedRegionalData> Region, EnvironmentalInput<PackedTerrainData> Tile)>();
         lock (gate)
         {
-            if (tiles.TryGet(key, out var cached) && InputCurrent(cached!) && cached!.Loaded) return cached;
-            input = new(storage.CurrentEpoch);
-            tileReads++;
-            var evicted = tiles.Put(key, input);
-            if (evicted != null) evicted.Valid = false;
+            foreach (var job in batch)
+            {
+                if (!JobCurrent(job)) continue;
+                var regionKey = storage.Identity.RegionFor(job.Key);
+                if (!regions.TryGet(regionKey, out var region) || !InputCurrent(region!) || !region!.Loaded)
+                {
+                    if (!requestedRegions.TryGetValue(regionKey, out region))
+                    {
+                        region = new(storage.CurrentEpoch);
+                        requestedRegions.Add(regionKey, region);
+                        var evicted = regions.Put(regionKey, region);
+                        if (evicted != null) evicted.Valid = false;
+                        regionReads++;
+                    }
+                }
+                if (!tiles.TryGet(job.Key, out var tile) || !InputCurrent(tile!) || !tile!.Loaded)
+                {
+                    tile = new(storage.CurrentEpoch);
+                    requestedTiles.Add(job.Key, tile);
+                    var evicted = tiles.Put(job.Key, tile);
+                    if (evicted != null) evicted.Valid = false;
+                    tileReads++;
+                }
+                sources.Add((job, region!, tile!));
+            }
         }
-        var read = await storage.ReadTileForUploadAsync(key).ConfigureAwait(false);
-        lock (gate)
+        if (requestedRegions.Count != 0 || requestedTiles.Count != 0)
         {
-            if (!ReferenceEquals(read.Epoch, input.Epoch)) input.Valid = false;
-            input.Value = read.Value; input.Loaded = true;
+            var read = await storage.ReadPackedBatchAsync(requestedRegions.Keys, requestedTiles.Keys).ConfigureAwait(false);
+            lock (gate)
+            {
+                // A commit can invalidate a pending lease while SQL runs. Never revive that lease here.
+                foreach (var (key, input) in requestedRegions)
+                {
+                    if (!ReferenceEquals(read.Epoch, input.Epoch)) input.Valid = false;
+                    input.Value = read.Value?.Regions[key]; input.Loaded = true;
+                }
+                foreach (var (key, input) in requestedTiles)
+                {
+                    if (!ReferenceEquals(read.Epoch, input.Epoch)) input.Valid = false;
+                    input.Value = read.Value?.Tiles[key]; input.Loaded = true;
+                }
+            }
         }
-        return input;
+        foreach (var (job, region, tile) in sources)
+        {
+            if (!JobCurrent(job)) continue;
+            // Placeholder construction stays outside the cache gate and never evaluates habitat.
+            var regionalTexture = region.Value ?? new PackedRegionalData(null);
+            var terrainTexture = tile.Value?.Values ?? new ushort[checked(storage.Identity.ChunkSize * storage.Identity.ChunkSize * 2)];
+            lock (gate)
+            {
+                if (!JobCurrent(job) || !InputCurrent(region) || !InputCurrent(tile)) continue;
+                var bundle = new GpuHabitatBundle(job.Key, storage.Identity, region, tile)
+                {
+                    RegionalTexture = regionalTexture,
+                    TerrainTexture = terrainTexture
+                };
+                bundles.Put(job.Key, bundle);
+                preparedBundles++;
+                job.Completion.TrySetResult(new(bundle, scope));
+            }
+        }
     }
     #endregion
 

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using Microsoft.Data.Sqlite;
 using Vintagestory.API.Common;
@@ -72,6 +73,12 @@ internal sealed class EcosystemDatabase : SQLiteDBConnection
             """;
         command.ExecuteNonQuery();
         transaction.Commit();
+    }
+    /// <summary>Releases prepared upload commands before closing their owning connection.</summary>
+    public override void Close()
+    {
+        uploads?.Dispose();
+        base.Close();
     }
     #endregion
 
@@ -184,6 +191,26 @@ internal sealed class EcosystemDatabase : SQLiteDBConnection
         packed = new PackedTerrainData(identity.ChunkSize, PackedTerrainData.Pack(original, identity.ChunkSize));
         uploads.WriteTile(key, identity.ChunkSize, packed.Values);
         return packed;
+    }
+    /// <summary>Reads deduplicated packed records together, then rebuilds only unavailable derived entries from supported local originals.</summary>
+    internal PackedReadBatch ReadPackedBatch(IReadOnlyCollection<EcosystemRegionKey> regions, IReadOnlyCollection<EcosystemTileKey> tiles)
+    {
+        var result = uploads.ReadBatch(regions, tiles, identity);
+        foreach (var key in regions)
+            if (result.Regions[key] == null && ReadRegion(key) is { } original)
+            {
+                var packed = new PackedRegionalData(original, message => logger.Warning(message));
+                uploads.WriteRegion(key, packed);
+                result.Regions[key] = packed;
+            }
+        foreach (var key in tiles)
+            if (result.Tiles[key] == null && ReadTile(key) is { } original)
+            {
+                var packed = new PackedTerrainData(identity.ChunkSize, PackedTerrainData.Pack(original, identity.ChunkSize));
+                uploads.WriteTile(key, identity.ChunkSize, packed.Values);
+                result.Tiles[key] = packed;
+            }
+        return new(result.Regions, result.Tiles);
     }
     #endregion
     #region Cache clearing

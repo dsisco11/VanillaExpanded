@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -85,6 +86,18 @@ internal sealed class EnvironmentalStorage : IDisposable, IAsyncDisposable
         StorageEpoch ticket = CurrentEpoch;
         var value = await SubmitAsync(ticket, db => db.ReadTileForUpload(key), null).ConfigureAwait(false);
         return new StorageRead<PackedTerrainData>(ticket, value);
+    }
+    /// <summary>Copies bounded distinct requests before queuing one worker operation; missing records remain individually nullable.</summary>
+    internal async Task<StorageRead<PackedReadBatch>> ReadPackedBatchAsync(
+        IReadOnlyCollection<EcosystemRegionKey> regions, IReadOnlyCollection<EcosystemTileKey> tiles)
+    {
+        if (regions.Count > PackedReadBatch.MaximumRecords || tiles.Count > PackedReadBatch.MaximumRecords)
+            throw new ArgumentOutOfRangeException(nameof(tiles));
+        var regionKeys = new HashSet<EcosystemRegionKey>(regions);
+        var tileKeys = new HashSet<EcosystemTileKey>(tiles);
+        StorageEpoch ticket = CurrentEpoch;
+        var value = await SubmitAsync(ticket, db => db.ReadPackedBatch(regionKeys, tileKeys), null).ConfigureAwait(false);
+        return new StorageRead<PackedReadBatch>(ticket, value);
     }
     #endregion
     #endregion
