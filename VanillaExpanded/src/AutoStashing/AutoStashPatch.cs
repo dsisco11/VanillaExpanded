@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Reflection.Emit;
 
 using HarmonyLib;
@@ -17,6 +18,108 @@ namespace VanillaExpanded.src.AutoStashing;
 [HarmonyPatch]
 public static class AutoStashPatch
 {
+    // Server interactions are concurrent; client-only stashingState cannot identify their opening gesture.
+    private static readonly ConditionalWeakTable<IPlayer, BlockEntityQuern> serverQuernGestures = new();
+
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(BlockBehaviorContainer), nameof(BlockBehaviorContainer.OnBlockInteractStart))]
+    public static bool QuernOpenInventory(BlockBehaviorContainer __instance, IWorldAccessor world,
+        IPlayer byPlayer, BlockSelection blockSel, ref EnumHandling handling, ref bool __result)
+    {
+        if (__instance.block is not BlockQuern
+            || world.Api is not ICoreClientAPI client
+            || __instance.block.GetCollectibleBehavior<BlockBehaviorAutoStashable>(true)?.HasActiveGesture(world) != true)
+            return true;
+
+        if (world.BlockAccessor.GetBlockEntity(blockSel.Position) is not BlockEntityQuern quern)
+            return true;
+        BlockSelection selection = blockSel.Clone();
+        // Vanilla sends StartBlockUse after this callback; opening now sends the inventory packet first.
+        client.Event.EnqueueMainThreadTask(() =>
+        {
+            if (ReferenceEquals(world.BlockAccessor.GetBlockEntity(selection.Position), quern))
+                quern.OnPlayerRightClick(byPlayer, selection);
+        }, "vanillaexpanded-quern-open");
+        handling = EnumHandling.PreventSubsequent;
+        __result = true;
+        return false;
+    }
+
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(BlockQuern), nameof(BlockQuern.OnBlockInteractStart))]
+    public static void QuernStart(IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel,
+        out BlockEntityQuern? __state)
+    {
+        __state = null;
+        if (world.Side != EnumAppSide.Server) return;
+        serverQuernGestures.Remove(byPlayer);
+        if (!VanillaExpandedModSystem.Config.EnableAutoStash) return;
+        if (world.BlockAccessor.GetBlockEntity(blockSel.Position) is not BlockEntityQuern quern
+            || quern.Inventory.HasOpened(byPlayer)) return;
+        var assessment = AutoStashService.AssessBlock(byPlayer.InventoryManager, quern, true, blockSel, byPlayer);
+        if (assessment.CanStartInteraction && assessment.HasAvailableItems) __state = quern;
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(BlockQuern), nameof(BlockQuern.OnBlockInteractStart))]
+    public static void QuernStarted(IPlayer byPlayer, bool __result, BlockEntityQuern? __state)
+    {
+        if (__result && __state is not null)
+            serverQuernGestures.Add(byPlayer, __state);
+    }
+
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(BlockQuern), nameof(BlockQuern.OnBlockInteractStep))]
+    public static bool QuernStep(BlockQuern __instance, float secondsUsed, IWorldAccessor world,
+        IPlayer byPlayer, BlockSelection blockSel, ref bool __result)
+    {
+        if (world.Side == EnumAppSide.Server
+            && serverQuernGestures.TryGetValue(byPlayer, out var quern))
+        {
+            __result = VanillaExpandedModSystem.Config.EnableAutoStash
+                && blockSel.SelectionBoxIndex == 0 && quern.Pos.Equals(blockSel.Position)
+                && ReferenceEquals(world.BlockAccessor.GetBlockEntity(blockSel.Position), quern);
+            return false;
+        }
+        var behavior = __instance.GetCollectibleBehavior<BlockBehaviorAutoStashable>(true);
+        if (behavior?.HasActiveGesture(world) != true) return true;
+        EnumHandling handling = EnumHandling.PassThrough;
+        if (!VanillaExpandedModSystem.Config.EnableAutoStash)
+        {
+            behavior.OnBlockInteractCancel(secondsUsed, world, byPlayer, blockSel, ref handling);
+            __result = false;
+        }
+        else __result = behavior.OnBlockInteractStep(secondsUsed, world, byPlayer, blockSel, ref handling);
+        return false;
+    }
+
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(BlockQuern), nameof(BlockQuern.OnBlockInteractStop))]
+    public static bool QuernStop(BlockQuern __instance, float secondsUsed, IWorldAccessor world,
+        IPlayer byPlayer, BlockSelection blockSel)
+    {
+        if (world.Side == EnumAppSide.Server) serverQuernGestures.Remove(byPlayer);
+        var behavior = __instance.GetCollectibleBehavior<BlockBehaviorAutoStashable>(true);
+        if (behavior?.HasActiveGesture(world) != true) return true;
+        EnumHandling handling = EnumHandling.PassThrough;
+        behavior.OnBlockInteractStop(secondsUsed, world, byPlayer, blockSel, ref handling);
+        return false;
+    }
+
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(BlockQuern), nameof(BlockQuern.OnBlockInteractCancel))]
+    public static bool QuernCancel(BlockQuern __instance, float secondsUsed, IWorldAccessor world,
+        IPlayer byPlayer, BlockSelection blockSel, ref bool __result)
+    {
+        if (world.Side == EnumAppSide.Server) serverQuernGestures.Remove(byPlayer);
+        var behavior = __instance.GetCollectibleBehavior<BlockBehaviorAutoStashable>(true);
+        if (behavior?.HasActiveGesture(world) != true) return true;
+        EnumHandling handling = EnumHandling.PassThrough;
+        behavior.OnBlockInteractCancel(secondsUsed, world, byPlayer, blockSel, ref handling);
+        __result = true;
+        return false;
+    }
+
     /// <summary>
     /// Find all block types which use BlockBehaviorContainer and amend our BlockBehaviorAutoStashable behavior to them
     /// </summary>

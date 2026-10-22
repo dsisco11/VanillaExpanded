@@ -7,6 +7,11 @@ namespace VanillaExpanded.AutoStashing.Planning;
 internal abstract class AutoStashPolicy
 {
     public virtual PreferredSlotCompatibility? PreferredSlot => null;
+    public virtual EnumHandling StartHandling => EnumHandling.PreventDefault;
+
+    /// <summary>Gates client gestures and help only; server transfer execution never consults input or GUI state.</summary>
+    public virtual bool CanStartInteraction(IPlayerInventoryManager owner, BlockSelection? selection = null,
+        IPlayer? player = null, bool forHelp = false, AutoStashAssessment? assessment = null) => true;
 
     #region Public API
     /// <summary>Traverses backpack then hotbar, omitting absent inventories.</summary>

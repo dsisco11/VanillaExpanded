@@ -24,7 +24,8 @@ internal sealed class BlockGestureCase : IDisposable
     public Mock<IProgressSystemProvider> ProgressProvider { get; } = new();
     public BlockSelection Selection { get; } = new() { Position = new BlockPos(12, 34, 56) };
     public MockItem Item { get; }
-    private readonly InventoryGeneric targetInventory;
+    private readonly InventoryBase targetInventory;
+    public InventoryBase TargetInventory => targetInventory;
     private InventorySnapshot? beforeGesture;
     private int[] dirtyBeforeGesture = [];
     private readonly Mock<BlockEntityContainer>? containerTarget;
@@ -54,7 +55,26 @@ internal sealed class BlockGestureCase : IDisposable
 
         BlockEntity target;
         Block block;
-        if (kind == "bloomery")
+        if (kind == "quern")
+        {
+            Item = new MockItem(1, api: Fixture.Api)
+            {
+                Code = new AssetLocation("game:gesture-grain"), MaxStackSize = 64,
+                GrindingProps = new GrindingProperties()
+            };
+            var quern = new Mock<BlockEntityQuern> { CallBase = true };
+            quern.Object.Api = Fixture.Api;
+            quern.Object.Pos = Selection.Position;
+            quern.Setup(value => value.MarkDirty(It.IsAny<bool>(), It.IsAny<IPlayer>()));
+            quern.Setup(value => value.OnPlayerRightClick(It.IsAny<IPlayer>(), It.IsAny<BlockSelection>())).Returns(true);
+            targetInventory = quern.Object.Inventory;
+            targetInventory.Api = Fixture.Api;
+            targetInventory.InvNetworkUtil = Fixture.InvNetworkUtilMock.Object;
+            targetInventory[0].Itemstack = new ItemStack(Item, 1);
+            target = quern.Object;
+            block = new BlockQuern();
+        }
+        else if (kind == "bloomery")
         {
             Item = MockItem.CreateBloomeryOre(1, 2, Fixture.Api);
             Item.Code = new AssetLocation("game:gesture-ore");
@@ -96,6 +116,11 @@ internal sealed class BlockGestureCase : IDisposable
         Progress.SetupAllProperties();
         ProgressProvider.Setup(provider => provider.CreateProgressBar(It.IsAny<bool>())).Returns(Progress.Object);
         Behavior = new GestureBlockBehavior(block, ProgressProvider.Object);
+        if (kind == "quern")
+        {
+            block.BlockBehaviors = [Behavior];
+            block.CollectibleBehaviors = [Behavior];
+        }
         Behavior.OnLoaded(Fixture.Api);
         Player.Object.Entity.Controls.CtrlKey = true;
         Player.Object.Entity.Controls.ShiftKey = true;

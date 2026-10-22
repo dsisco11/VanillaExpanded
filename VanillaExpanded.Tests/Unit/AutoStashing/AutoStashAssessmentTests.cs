@@ -13,6 +13,34 @@ namespace VanillaExpanded.Tests.Unit.AutoStashing;
 [Collection("AutoStash")]
 public sealed class AutoStashAssessmentTests
 {
+    [Theory]
+    [InlineData("crate", false, false)]
+    [InlineData("crate", false, true)]
+    [InlineData("crate", true, true)]
+    [InlineData("quern", false, false)]
+    [InlineData("quern", false, true)]
+    [InlineData("quern", true, true)]
+    public void InteractionEligibility_DoesNotEraseTransferAvailability(string kind, bool full, bool allowed)
+    {
+        using var test = new BlockGestureCase(kind);
+        test.TargetInventory[0].Itemstack!.StackSize = full ? 64 : 1;
+        if (kind == "crate") test.Player.Object.Entity.Controls.CtrlKey = allowed;
+        else test.Selection.SelectionBoxIndex = allowed ? 0 : 1;
+        var entity = test.Fixture.World.BlockAccessor.GetBlockEntity(test.Selection.Position);
+
+        var assessment = AutoStashService.AssessBlock(test.Fixture.Player, entity, true,
+            test.Selection, test.Player.Object);
+
+        Assert.True(assessment.HasCandidates);
+        Assert.Equal(!full, assessment.HasAvailableItems);
+        Assert.Equal(allowed, assessment.CanStartInteraction);
+        Assert.Equal(kind == "crate" ? EnumHandling.PreventSubsequent : EnumHandling.PreventDefault,
+            assessment.StartHandling);
+        var start = test.Start();
+        Assert.Equal(!full, start.Result);
+        Assert.Equal(!full && allowed ? assessment.StartHandling : EnumHandling.PassThrough, start.Handling);
+    }
+
     #region Public API
     #region Block assessment
     /// <summary>Separates matching candidates from automatic capacity without movement, dirty effects or sessions.</summary>

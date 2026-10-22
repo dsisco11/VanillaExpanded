@@ -82,47 +82,12 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
 
         hold!.Reset();
         BlockEntity? blockEntity = world.BlockAccessor.GetBlockEntity(blockSel.Position);
-        HashSet<int> stashables = GetStashableItems(byPlayer.InventoryManager, blockEntity);
-        bool hasStashableItems = stashables.Count != 0;
-        if (!hasStashableItems)
-        {
-            return false; // no stashable items, do nothing
-        }
-
-        switch (block)
-        {
-            case BlockCrate:
-                {
-                    // if the player isnt using the ctrl+shift keys, do not start stashing
-                    if (byPlayer.Entity.Controls.CtrlKey && byPlayer.Entity.Controls.ShiftKey)
-                    {
-                        bool isActiveHotbarSlotStashable = byPlayer.InventoryManager.ActiveHotbarSlot?.Itemstack?.Collectible?.Id is not null && stashables.Contains(byPlayer.InventoryManager.ActiveHotbarSlot.Itemstack.Collectible.Id);
-                        // Check if the active hotbar item is stashable, if so then we do not auto-stash as we want to allow the crate to handle the interaction as it normally would.
-                        if (!isActiveHotbarSlotStashable)
-                        {
-                            handling = EnumHandling.PreventSubsequent;// in the case of crates, this prevents the default storing behavior from occurring.
-                            stashingState = EStashingState.PreStashGracePeriod;
-                        }
-                    }
-                    break;
-                }
-            case BlockGenericTypedContainer:
-                {
-                    handling = EnumHandling.PreventDefault;
-                    stashingState = EStashingState.PreStashGracePeriod;
-                    break;
-                }
-            case BlockBloomery:
-                {
-                    handling = EnumHandling.PreventDefault;
-                    stashingState = EStashingState.PreStashGracePeriod;
-                    break;
-                }
-            default:
-                world.Logger.Error($"[{nameof(BlockBehaviorAutoStashable)}][{nameof(OnBlockInteractStart)}] unsupported block type: {block.Class} ({block.Code})");
-                break;
-        }
-
+        var assessment = AutoStashService.AssessBlock(byPlayer.InventoryManager, blockEntity, true,
+            blockSel, byPlayer);
+        if (!assessment.HasAvailableItems) return false;
+        if (!assessment.CanStartInteraction) return true;
+        handling = assessment.StartHandling;
+        stashingState = EStashingState.PreStashGracePeriod;
         return true;
     }
 
@@ -169,20 +134,27 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
 
     public override bool OnBlockInteractCancel(float secondsUsed, IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel, ref EnumHandling handling)
     {
-        stashingState = EStashingState.None;
-        hold?.Reset();
+        ResetGesture();
         return base.OnBlockInteractCancel(secondsUsed, world, byPlayer, blockSel, ref handling);
     }
 
     public override void OnBlockInteractStop(float secondsUsed, IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel, ref EnumHandling handling)
     {
-        stashingState = EStashingState.None;
-        hold?.Reset();
+        ResetGesture();
         handling = EnumHandling.Handled;
     }
     #endregion
 
     #region Private
+    internal bool HasActiveGesture(IWorldAccessor world)
+        => world.Side == EnumAppSide.Client && stashingState != EStashingState.None;
+
+    private void ResetGesture()
+    {
+        stashingState = EStashingState.None;
+        hold?.Reset();
+    }
+
     /// <summary>
     /// Attempts to stash items from the player's inventory into the specified container at the given block selection.
     /// </summary>
@@ -201,6 +173,10 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         else if (be is BlockEntityBloomery bloomeryEntity)
         {
             AutoStashToBloomery(world, byPlayer.InventoryManager, bloomeryEntity, byPlayer.PlayerName);
+        }
+        else if (be is BlockEntityQuern quernEntity)
+        {
+            AutoStashService.StashQuern(world, byPlayer.InventoryManager, quernEntity, byPlayer.PlayerName);
         }
         else if (be is BlockEntityContainer containerEntity)
         {
@@ -243,6 +219,11 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
         {
             return [];
         }
+
+        var assessment = AutoStashService.AssessBlock(playerInventory,
+            world.BlockAccessor.GetBlockEntity(selection.Position), true, selection, forHelp: true);
+        if (!assessment.CanStartInteraction || !assessment.HasCandidates)
+            return [];
 
         switch (block.EntityClass)
         {
@@ -318,8 +299,9 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
             return null;
         }
 
-        AutoStashAssessment assessment = AssessTarget(playerInventory, blockEntity);
-        return assessment.DisplayStacks.Length == 0 ? null : assessment.DisplayStacks;
+        AutoStashAssessment assessment = AutoStashService.AssessBlock(playerInventory, blockEntity, true,
+            selection, forHelp: true);
+        return !assessment.CanStartInteraction || assessment.DisplayStacks.Length == 0 ? null : assessment.DisplayStacks;
     }
     #endregion
 
@@ -334,23 +316,13 @@ internal class BlockBehaviorAutoStashable : BlockBehavior
     /// <returns> A set of collectible IDs which can be stashed from the player into the block entity. </returns>
     internal static HashSet<int> GetStashableItems(IPlayerInventoryManager playerInventory, BlockEntity? blockEntity)
     {
-        return [.. AssessTarget(playerInventory, blockEntity).AvailableItemIds];
+        var assessment = AssessTarget(playerInventory, blockEntity);
+        return assessment.CanStartInteraction ? [.. assessment.AvailableItemIds] : [];
     }
 
-    /// <summary>Applies the established empty-bloomery interaction gate as an input to shared advisory assessment.</summary>
+    /// <summary>Assesses target policy without requiring a currently held interaction gesture.</summary>
     private static AutoStashAssessment AssessTarget(IPlayerInventoryManager owner, BlockEntity? blockEntity)
-    {
-        bool interactionAllowed = true;
-        if (blockEntity is BlockEntityBloomery bloomery)
-        {
-            InventoryGeneric? inventory = BloomeryAccessor.GetInventory(bloomery);
-            ItemStack? active = owner.ActiveHotbarSlot?.Itemstack;
-            // This input belongs only to interaction eligibility. Server execution never consults the active item.
-            interactionAllowed = inventory is not null && (!inventory[0].Empty || !inventory[1].Empty
-                || (active is not null && bloomery.CanAdd(active)));
-        }
-        return AutoStashService.AssessBlock(owner, blockEntity, interactionAllowed);
-    }
+        => AutoStashService.AssessBlock(owner, blockEntity, true, forHelp: true, checkInteraction: true);
 
     /// <summary>
     /// Automatically stashes items from the player's inventory into the specified generic container.

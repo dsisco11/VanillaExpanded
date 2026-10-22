@@ -34,6 +34,13 @@ public static class EngineDispatchHarness
             CheckAttachedEntry(true);
             CheckAttachedEntry(false);
             CheckAttachedHelp();
+            CheckQuernGesture(false);
+            CheckQuernGesture(true);
+            CheckQuernOpeningOrder();
+            CheckServerQuernGesture(false);
+            CheckServerQuernGesture(true);
+            foreach (string reason in new[] { "upper", "open", "disabled", "ineligible", "server" })
+                CheckQuernVanillaDispatch(reason);
         }
         finally
         {
@@ -45,6 +52,133 @@ public static class EngineDispatchHarness
     #endregion
 
     #region Private
+    private static void CheckQuernOpeningOrder()
+    {
+        using var test = new BlockGestureCase("quern");
+        var block = (BlockQuern)test.Behavior.block;
+        var container = new BlockBehaviorContainer(block);
+        block.BlockBehaviors = [test.Behavior, container];
+        block.CollectibleBehaviors = [test.Behavior, container];
+        var claims = new Mock<ILandClaimAPI>();
+        claims.Setup(value => value.TryAccess(test.Player.Object, test.Selection.Position, EnumBlockAccessFlags.Use)).Returns(true);
+        test.Fixture.WorldMock.SetupGet(value => value.Claims).Returns(claims.Object);
+        var events = new Mock<IClientEventAPI>();
+        var queued = new Queue<Action>();
+        events.Setup(value => value.EnqueueMainThreadTask(It.IsAny<Action>(), It.IsAny<string>()))
+            .Callback<Action, string>((action, _) => queued.Enqueue(action));
+        test.Fixture.ClientApiMock!.SetupGet(value => value.Event).Returns(events.Object);
+        var quern = Mock.Get((BlockEntityQuern)test.Fixture.World.BlockAccessor.GetBlockEntity(test.Selection.Position));
+        var order = new List<string>();
+        quern.Setup(value => value.OnPlayerRightClick(test.Player.Object, It.IsAny<BlockSelection>()))
+            .Callback(() =>
+            {
+                order.Add("inventory-open");
+                test.TargetInventory.Open(test.Player.Object);
+            }).Returns(true);
+
+        Assert.True(block.OnBlockInteractStart(test.Fixture.World, test.Player.Object, test.Selection));
+        Assert.Empty(order);
+        // The engine sends its normal interaction-start packet immediately after the block callback returns.
+        order.Add("interaction-start");
+        Assert.Single(queued);
+        queued.Dequeue()();
+        Assert.Equal(new[] { "interaction-start", "inventory-open" }, order);
+        Assert.True(block.OnBlockInteractStep(.5f, test.Fixture.World, test.Player.Object, test.Selection));
+        Assert.Single(test.Requests);
+        block.OnBlockInteractStop(.5f, test.Fixture.World, test.Player.Object, test.Selection);
+    }
+
+    private static void CheckServerQuernGesture(bool cancel)
+    {
+        using var test = new BlockGestureCase("quern");
+        var server = VanillaExpanded.Tests.Mocks.VsTestFixture.Server();
+        server.WorldMock.SetupGet(value => value.BlockAccessor).Returns(test.Fixture.World.BlockAccessor);
+        test.Fixture.WorldMock.SetupGet(value => value.Side).Returns(EnumAppSide.Server);
+        test.Player.SetupGet(value => value.PlayerUID).Returns("quern-server-player");
+        var block = (BlockQuern)test.Behavior.block;
+        var quern = (BlockEntityQuern)test.Fixture.World.BlockAccessor.GetBlockEntity(test.Selection.Position);
+        quern.Api = server.Api;
+        var container = new BlockBehaviorContainer(block);
+        block.BlockBehaviors = [test.Behavior, container];
+        block.CollectibleBehaviors = [test.Behavior, container];
+        var claims = new Mock<ILandClaimAPI>();
+        claims.Setup(value => value.TryAccess(test.Player.Object, test.Selection.Position, EnumBlockAccessFlags.Use)).Returns(true);
+        test.Fixture.WorldMock.SetupGet(value => value.Claims).Returns(claims.Object);
+        var grinding = typeof(BlockEntityQuern).GetField("quantityPlayersGrinding",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+
+        Assert.True(block.OnBlockInteractStart(test.Fixture.World, test.Player.Object, test.Selection));
+        test.TargetInventory.Open(test.Player.Object);
+        Assert.True(block.OnBlockInteractStep(.25f, test.Fixture.World, test.Player.Object, test.Selection));
+        Assert.Equal(0, (int)grinding.GetValue(quern)!);
+        if (cancel)
+            block.OnBlockInteractCancel(.25f, test.Fixture.World, test.Player.Object, test.Selection,
+                EnumItemUseCancelReason.ReleasedMouse);
+        else block.OnBlockInteractStop(.25f, test.Fixture.World, test.Player.Object, test.Selection);
+
+        // A fresh interaction with the window already open must still grind normally.
+        Assert.True(block.OnBlockInteractStart(test.Fixture.World, test.Player.Object, test.Selection));
+        Assert.True(block.OnBlockInteractStep(.25f, test.Fixture.World, test.Player.Object, test.Selection));
+        Assert.Equal(1, (int)grinding.GetValue(quern)!);
+        block.OnBlockInteractStop(.25f, test.Fixture.World, test.Player.Object, test.Selection);
+        Assert.Equal(0, (int)grinding.GetValue(quern)!);
+    }
+
+    private static void CheckQuernGesture(bool cancel)
+    {
+        using var test = new BlockGestureCase("quern");
+        var block = (BlockQuern)test.Behavior.block;
+        var claims = new Mock<ILandClaimAPI>();
+        claims.Setup(value => value.TryAccess(test.Player.Object, test.Selection.Position, EnumBlockAccessFlags.Use)).Returns(true);
+        test.Fixture.WorldMock.SetupGet(value => value.Claims).Returns(claims.Object);
+        var accessor = Mock.Get(test.Fixture.World.BlockAccessor);
+        accessor.Invocations.Clear();
+
+        Assert.True(block.OnBlockInteractStart(test.Fixture.World, test.Player.Object, test.Selection));
+        Assert.True(test.Behavior.HasActiveGesture(test.Fixture.World));
+        accessor.Verify(value => value.GetBlockEntity(test.Selection.Position), Times.Exactly(2));
+        test.TargetInventory.Open(test.Player.Object);
+        test.Fixture.InventoryManagerMock.SetupGet(value => value.OpenedInventories).Returns([test.TargetInventory]);
+        accessor.Invocations.Clear();
+        Assert.True(block.OnBlockInteractStep(.25f, test.Fixture.World, test.Player.Object, test.Selection));
+        Assert.True(block.OnBlockInteractStep(.5f, test.Fixture.World, test.Player.Object, test.Selection));
+        Assert.True(block.OnBlockInteractStep(.6f, test.Fixture.World, test.Player.Object, test.Selection));
+        Assert.Single(test.Requests);
+        accessor.Verify(value => value.GetBlockEntity(It.IsAny<BlockPos>()), Times.Never);
+        if (cancel)
+            Assert.True(block.OnBlockInteractCancel(.6f, test.Fixture.World, test.Player.Object,
+                test.Selection, EnumItemUseCancelReason.ReleasedMouse));
+        else block.OnBlockInteractStop(.6f, test.Fixture.World, test.Player.Object, test.Selection);
+        Assert.False(test.Behavior.HasActiveGesture(test.Fixture.World));
+        accessor.Verify(value => value.GetBlockEntity(It.IsAny<BlockPos>()), Times.Never);
+        test.ProgressProvider.Verify(value => value.RemoveProgressBar(test.Progress.Object), Times.Once);
+    }
+
+    private static void CheckQuernVanillaDispatch(string reason)
+    {
+        using var test = new BlockGestureCase("quern");
+        var block = (BlockQuern)test.Behavior.block;
+        if (reason == "upper") test.Selection.SelectionBoxIndex = 1;
+        if (reason == "open")
+            test.Fixture.InventoryManagerMock.SetupGet(value => value.OpenedInventories).Returns([test.TargetInventory]);
+        if (reason == "disabled") VanillaExpandedModSystem.Config.EnableAutoStash = false;
+        if (reason == "ineligible") test.TargetInventory[0].Itemstack = null;
+        if (reason == "server") test.Fixture.WorldMock.SetupGet(value => value.Side).Returns(EnumAppSide.Server);
+        test.Start();
+        Assert.False(test.Behavior.HasActiveGesture(test.Fixture.World));
+        var accessor = Mock.Get(test.Fixture.World.BlockAccessor);
+        var vanilla = new InvalidOperationException("vanilla quern lifecycle reached its world lookup");
+        accessor.Setup(value => value.GetBlockEntity(test.Selection.Position)).Throws(vanilla);
+        Assert.Same(vanilla, Assert.Throws<InvalidOperationException>(() =>
+            block.OnBlockInteractStep(.5f, test.Fixture.World, test.Player.Object, test.Selection)));
+        Assert.Same(vanilla, Assert.Throws<InvalidOperationException>(() =>
+            block.OnBlockInteractStop(.5f, test.Fixture.World, test.Player.Object, test.Selection)));
+        Assert.Same(vanilla, Assert.Throws<InvalidOperationException>(() =>
+            block.OnBlockInteractCancel(.5f, test.Fixture.World, test.Player.Object, test.Selection,
+                EnumItemUseCancelReason.ReleasedMouse)));
+        Assert.Empty(test.Requests);
+    }
+
     /// <summary>Calls each real engine block override, observing suppression or a sentinel raised at its first vanilla world access.</summary>
     private static void CheckBlockEntry(string kind, bool handled)
     {
