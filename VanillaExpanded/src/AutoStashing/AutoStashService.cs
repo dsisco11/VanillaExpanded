@@ -23,26 +23,34 @@ internal static class AutoStashService
         if (!interactionAllowed) return AutoStashAssessment.Empty;
         AutoStashPolicy policy;
         IInventory inventory;
-        if (blockEntity is Vintagestory.GameContent.BlockEntityBloomery bloomery)
+        switch (blockEntity)
         {
-            var target = BloomeryAutoStashTarget.Resolve(bloomery);
-            if (target is null) return AutoStashAssessment.Empty;
-            inventory = target.Inventory;
-            policy = new BloomeryPolicy(bloomery, (InventoryGeneric)inventory);
+            case Vintagestory.GameContent.BlockEntityBloomery bloomery:
+                {
+                    var target = BloomeryAutoStashTarget.Resolve(bloomery);
+                    if (target is null) return AutoStashAssessment.Empty;
+                    inventory = target.Inventory;
+                    policy = new BloomeryPolicy(bloomery, (InventoryGeneric)inventory);
+                    break;
+                }
+
+            case Vintagestory.GameContent.BlockEntityQuern quern:
+                {
+                    inventory = quern.Inventory;
+                    policy = new QuernPolicy(quern.Api.World, inventory);
+                    break;
+                }
+            case Vintagestory.GameContent.BlockEntityContainer container:
+                {
+                    inventory = container.Inventory;
+                    // Existing crate help considers all current contents, unlike first-type crate execution.
+                    // Retain client ID matching instead of silently broadening it to execution's code matching.
+                    policy = MatchingContentsPolicy.ForAssessment(container.GetNonEmptyContentStacks());
+                    break;
+                }
+            default:
+                return AutoStashAssessment.Empty;
         }
-        else if (blockEntity is Vintagestory.GameContent.BlockEntityQuern quern)
-        {
-            inventory = quern.Inventory;
-            policy = new QuernPolicy(quern.Api.World, inventory);
-        }
-        else if (blockEntity is Vintagestory.GameContent.BlockEntityContainer container)
-        {
-            inventory = container.Inventory;
-            // Existing crate help considers all current contents, unlike first-type crate execution.
-            // Retain client ID matching instead of silently broadening it to execution's code matching.
-            policy = MatchingContentsPolicy.ForAssessment(container.GetNonEmptyContentStacks());
-        }
-        else return AutoStashAssessment.Empty;
 
         AutoStashPolicy interactionPolicy = blockEntity is Vintagestory.GameContent.BlockEntityCrate crate
             ? new CratePolicy(crate.Inventory) : policy;
