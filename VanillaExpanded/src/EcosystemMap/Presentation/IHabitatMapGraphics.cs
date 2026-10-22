@@ -14,8 +14,8 @@ internal interface IHabitatMapGraphics : IDisposable
     void SetView(IReadOnlyCollection<EcosystemTileKey> visible, EcosystemStorageIdentity world, GpuHabitatLimits limits);
     /// <summary>Scopes upload state around resource acquisition, lazily starting only when a texture operation is needed.</summary>
     IDisposable BeginUploads();
-    /// <summary>Acquires missing atlas rectangles before shared draw bindings are established.</summary>
-    void Prepare(GpuHabitatReceipt receipt);
+    /// <summary>Admits all missing rectangles together, returning false when this frame must defer the receipt.</summary>
+    bool TryPrepare(GpuHabitatReceipt receipt, HabitatUploadBudget budget);
     /// <summary>Establishes one exception-safe graphics pass for all ready explored tiles.</summary>
     IDisposable Begin(GpuHabitatReceipt first, HabitatRanges ranges, float[] projection);
     /// <summary>Draws original inputs using exactly one criteria set and the current explored tile placement.</summary>

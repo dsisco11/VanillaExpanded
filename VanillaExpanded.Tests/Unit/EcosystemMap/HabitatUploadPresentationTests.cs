@@ -24,10 +24,11 @@ public sealed class HabitatUploadPresentationTests
         var drawScope = new Mock<IDisposable>();
         drawScope.Setup(scope => scope.Dispose()).Callback(() => calls.Add("draw-end"));
         var graphics = new Mock<IHabitatMapGraphics>();
+        graphics.Setup(owner => owner.TryPrepare(It.IsAny<GpuHabitatReceipt>(), It.IsAny<HabitatUploadBudget>())).Returns(true);
         graphics.Setup(owner => owner.BeginUploads()).Returns(() =>
         { Assert.False(uploading); uploading = true; calls.Add("upload-begin"); return uploadScope.Object; });
-        graphics.Setup(owner => owner.Prepare(It.IsAny<GpuHabitatReceipt>())).Callback(() =>
-        { Assert.True(uploading); calls.Add("prepare"); if (fail) throw new InvalidOperationException("transfer failed"); });
+        graphics.Setup(owner => owner.TryPrepare(It.IsAny<GpuHabitatReceipt>(), It.IsAny<HabitatUploadBudget>())).Callback(() =>
+        { Assert.True(uploading); calls.Add("prepare"); if (fail) throw new InvalidOperationException("transfer failed"); }).Returns(true);
         graphics.Setup(owner => owner.Begin(It.IsAny<GpuHabitatReceipt>(), It.IsAny<HabitatRanges>(), It.IsAny<float[]>())).Returns(() =>
         { Assert.False(uploading); calls.Add("draw-begin"); return drawScope.Object; });
         graphics.Setup(owner => owner.Draw(It.IsAny<GpuHabitatReceipt>(), It.IsAny<HabitatMapTile>())).Callback(() =>

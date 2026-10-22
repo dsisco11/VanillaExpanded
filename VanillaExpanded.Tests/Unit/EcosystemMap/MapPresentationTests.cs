@@ -198,6 +198,7 @@ public sealed class MapPresentationTests
         var recorded = new List<float[]>();
         int draws = 0;
         var graphics = new Mock<IHabitatMapGraphics>();
+        graphics.Setup(owner => owner.TryPrepare(It.IsAny<GpuHabitatReceipt>(), It.IsAny<HabitatUploadBudget>())).Returns(true);
         graphics.Setup(item => item.Begin(It.IsAny<GpuHabitatReceipt>(), It.IsAny<HabitatRanges>(), It.IsAny<float[]>()))
             .Callback<GpuHabitatReceipt, HabitatRanges, float[]>((receipt, ranges, projection) =>
             {
@@ -278,7 +279,7 @@ public sealed class MapPresentationTests
         /// <summary>Provides an empty acquisition scope without GL state in this fixture.</summary>
         public IDisposable BeginUploads() => Mock.Of<IDisposable>();
         /// <summary>Accepts source acquisition without allocating graphics in this fixture.</summary>
-        public void Prepare(GpuHabitatReceipt receipt) { }
+        public bool TryPrepare(GpuHabitatReceipt receipt, HabitatUploadBudget budget) => true;
         /// <summary>Records shared criteria once at the normal pass boundary.</summary>
         public IDisposable Begin(GpuHabitatReceipt first, HabitatRanges ranges, float[] projection)
         { Ranges = ranges; return Mock.Of<IDisposable>(); }

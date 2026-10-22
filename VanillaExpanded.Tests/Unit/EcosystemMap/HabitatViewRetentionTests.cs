@@ -160,7 +160,7 @@ public sealed class HabitatViewRetentionTests
         foreach (var receipt in receipts.Skip(1)) tiles.TryGet((receipt.Bundle.Key, receipt.Bundle.Elevation), out _);
         graphics.SetView(new[] { keys[0] }, fixture.Identity, new(1, 1, 1, 2));
         int uploads = pageUploads.Sum(page => page.Uploads.Count);
-        graphics.Prepare(keep);
+        Assert.True(graphics.TryPrepare(keep, new HabitatUploadBudget(HabitatUploadLimits.Client)));
         Assert.Equal(uploads, pageUploads.Sum(page => page.Uploads.Count));
         Assert.True(tiles.TryGet((keep.Bundle.Key, keep.Bundle.Elevation), out var retained));
         Assert.Same(original, retained);
@@ -168,7 +168,7 @@ public sealed class HabitatViewRetentionTests
         // A stale off-view admission cannot evict the protected source, even when it is newest in LRU order.
         using var obsolete = new GpuTileTextures(receipts[1].Bundle.TerrainTexture!, 32, terrainAtlas);
         Assert.Same(obsolete, tiles.Put((keys[1], receipts[1].Bundle.Elevation), obsolete));
-        graphics.Prepare(keep);
+        Assert.True(graphics.TryPrepare(keep, new HabitatUploadBudget(HabitatUploadLimits.Client)));
         graphics.Clear();
     }
     #endregion
@@ -182,6 +182,7 @@ public sealed class HabitatViewRetentionTests
     private static Mock<IHabitatMapGraphics> Graphics(Dictionary<EcosystemTileKey, (GpuHabitatReceipt Receipt, HabitatMapTile Tile)> frame)
     {
         var graphics = new Mock<IHabitatMapGraphics>();
+        graphics.Setup(owner => owner.TryPrepare(It.IsAny<GpuHabitatReceipt>(), It.IsAny<HabitatUploadBudget>())).Returns(true);
         graphics.Setup(value => value.Begin(It.IsAny<GpuHabitatReceipt>(), It.IsAny<HabitatRanges>(), It.IsAny<float[]>())).Returns(Mock.Of<IDisposable>());
         graphics.Setup(value => value.Draw(It.IsAny<GpuHabitatReceipt>(), It.IsAny<HabitatMapTile>()))
             .Callback<GpuHabitatReceipt, HabitatMapTile>((receipt, tile) => frame[tile.Key] = (receipt, tile));

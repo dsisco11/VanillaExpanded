@@ -20,9 +20,10 @@ public sealed class SharedHabitatPassTests
         using var preparation = new GpuHabitatPreparation(storage, new(2, 4, 4, 2));
         var events = new List<string>();
         var graphics = new Mock<IHabitatMapGraphics>();
+        graphics.Setup(owner => owner.TryPrepare(It.IsAny<GpuHabitatReceipt>(), It.IsAny<HabitatUploadBudget>())).Returns(true);
         var lifetime = new Mock<IDisposable>();
         lifetime.Setup(value => value.Dispose()).Callback(() => events.Add("end"));
-        graphics.Setup(value => value.Prepare(It.IsAny<GpuHabitatReceipt>())).Callback(() => events.Add("upload"));
+        graphics.Setup(value => value.TryPrepare(It.IsAny<GpuHabitatReceipt>(), It.IsAny<HabitatUploadBudget>())).Callback(() => events.Add("upload")).Returns(true);
         graphics.Setup(value => value.Begin(It.IsAny<GpuHabitatReceipt>(), It.IsAny<HabitatRanges>(), It.IsAny<float[]>()))
             .Callback(() => events.Add("begin")).Returns(lifetime.Object);
         bool warmed = false;
@@ -61,8 +62,9 @@ public sealed class SharedHabitatPassTests
         await using var storage = fixture.Open();
         using var preparation = new GpuHabitatPreparation(storage, new(2, 4, 4, 2));
         var graphics = new Mock<IHabitatMapGraphics>();
+        graphics.Setup(owner => owner.TryPrepare(It.IsAny<GpuHabitatReceipt>(), It.IsAny<HabitatUploadBudget>())).Returns(true);
         bool acquired = false;
-        graphics.Setup(value => value.Prepare(It.IsAny<GpuHabitatReceipt>())).Callback(() => { acquired = true; preparation.Reset(); });
+        graphics.Setup(value => value.TryPrepare(It.IsAny<GpuHabitatReceipt>(), It.IsAny<HabitatUploadBudget>())).Callback(() => { acquired = true; preparation.Reset(); }).Returns(true);
         using var presentation = new HabitatMapPresentation(preparation, graphics.Object, error => throw error);
         var view = new[] { new HabitatMapTile(default, 0, 0, 32, 32) };
         var ranges = HabitatRanges.From(new HabitatRule("game:test", HabitatSpawnPath.Runtime, -20, 30, 0, 1, 0, 1, 0, 1, 0, 0, 2));

@@ -472,14 +472,26 @@ Depends on Phase 9.4; preserve the atlas and view-retention contracts when integ
 
 Outcome: entering a large explored view cannot submit an unlimited burst of new texture uploads in one frame.
 
-- [ ] Measure upload bytes/counts and graphics-thread elapsed time on representative map opening and zoom changes. Choose a documented per-frame admission budget using that evidence, including progress for a resource larger than the normal byte budget.
-- [ ] Defer excess upload-ready receipts while continuing to draw valid resident resources. Prioritize current visible work, retain bounded pending ownership and recheck source leases, coverage and session lifetime before publication.
-- [ ] Treat regional and terrain readiness coherently so partially admitted resources cannot produce invalid draws. Purge, close and shutdown must discard deferred disposable work safely without blocking rendering or durable storage writes.
-- [ ] Verify bounded admission, eventual progress, view changes and cancellation; use subagents for build/tests and packaging. Obtain user-run checks and measure frame hitches separately from total time until the view is populated.
+- [x] Measure upload bytes/counts and graphics-thread elapsed time on representative map opening and zoom changes. Choose a documented per-frame admission budget using that evidence, including progress for a resource larger than the normal byte budget.
+- [x] Defer excess upload-ready receipts while continuing to draw valid resident resources. Prioritize current visible work, retain bounded pending ownership and recheck source leases, coverage and session lifetime before publication.
+- [x] Treat regional and terrain readiness coherently so partially admitted resources cannot produce invalid draws. Purge, close and shutdown must discard deferred disposable work safely without blocking rendering or durable storage writes.
+- [x] Verify bounded admission, eventual progress, view changes and cancellation; use subagents for build/tests and packaging. Obtain user-run checks and measure frame hitches separately from total time until the view is populated.
 
 Completion criteria:
 
-- [ ] Admission obeys the selected budget with documented oversized-resource behavior, resident tiles stay drawable, and live evidence records both frame smoothness and loading latency.
+- [x] Admission obeys the selected budget with documented oversized-resource behavior, resident tiles stay drawable, and live evidence records both frame smoothness and loading latency.
+
+Implementation and verification notes (2026-10-21):
+
+- Task/document traceability: budget selection and deferred rendering follow `EcosystemMapProposal.md#performance-and-lifecycle-expectations` and `HabitatEvaluation.md` (Upload admission; atlas allocation and sampling). `HabitatUploadBudget`, `HabitatAtlas.EstimateUpload`, and `HabitatMapGraphics.TryPrepare` account for coherent transfer/page-allocation costs before publication. Provisional defaults: 256 KiB, 64 native image operations, 2 ms soft elapsed stop; one first oversized admission guarantees progress. Live calibration was not performed; its completion gate is waived below.
+- Lifecycle tasks follow `EnvironmentalStorage.md` (Ordering and lifetime) and `EnvironmentalAcquisition.md` (Purge and exit): existing source leases, coverage and session epochs gate publication; deferred ownership adds only one priority coordinate. `HabitatMapPresentation` keeps resident draws and clears priority on suspension without cancelling durable writes.
+- Focused subagent validation: 141/141 ecosystem tests passed (baseline 130/130). Added budget/count/time, allocation forecasting, coherent readiness, oversized progress, view-priority/removal, suspension and purge checks. Full subagent validation: 2,207/2,207 tests passed; canonical Release JSON validation/build/package passed. ZIP SHA-256 `AC11C2EC60AAEDFF628E81A28E1A9FB2824CF8794487082803EA0F1AC0F67013`; Release/publish/packaged DLLs match. Standard Install development mod includes the candidate. Second source review and independent completion audit found no confirmed implementation defect. The user subsequently supplied live profile logs and reported improved but still laggy rendering. Remaining calibration and loading-latency statistics were explicitly waived below.
+
+Live evidence (2026-10-22): the user reports rendering remains laggy but improved. `client-main.log` through 07:59:26 local contains 626 ecosystem profile samples: median ecosystem 54.85 ms, draw-and-restore 34.56 ms (622 samples), texture-acquisition 6.78 ms (621 samples), input-preparation 6.67 ms, tile-placement 2.39 ms and view-membership 0.81 ms. The last 100 samples have median ecosystem 66.84 ms and draw-and-restore 43.74 ms. Overall profiled-frame median is 95.155 ms; logging overhead and workload changes preclude a controlled before/after speedup claim. No ecosystem/shader errors were found. Acquisition includes cache/currentness work and possible uploads, so these marks cannot isolate upload bytes/counts or driver time. Draw submission is the largest measured component; recurring processing and draw batching remain covered by 9.7/9.9. Upload calibration and total population latency remain unverified.
+
+User-directed waiver (2026-10-22): the user requested closing 9.5 without the remaining statistics. Isolated upload byte/operation counts, live graphics-thread budget calibration and total view-population latency are waived as completion gates, not recorded as measured. Retain the documented provisional limits and oversized-resource behavior; no empirically optimal budget or controlled speedup is claimed. The reported improvement and residual drawing cost are recorded above. Remaining recurring processing and draw batching stay in 9.7/9.9.
+
+Completion: the independent affected-requirement recheck accepts the explicit 2026-10-22 waiver and finds 9.5 satisfied under the revised contract. Upload bounds, coherent readiness, resident draws and lifecycle behavior are supported by source review and focused checks; full validation and canonical packaging passed. Unperformed measurements are not claimed as verified. Later phases remain unchecked.
 
 ## Phase 9.6: Batch local database reads
 

@@ -46,21 +46,31 @@ internal sealed class HabitatMapGraphics : IHabitatMapGraphics
     /// <summary>Scopes lazy shared upload state around acquisition, restoring it before the drawing pass.</summary>
     public IDisposable BeginUploads() => uploads.Begin();
 
-    /// <summary>Reuses atlas rectangles independently of species and uploads only newly encountered source leases.</summary>
-    public void Prepare(GpuHabitatReceipt receipt)
+    /// <summary>Admits missing regional/terrain work coherently; resident receipts remain available after budget exhaustion.</summary>
+    public bool TryPrepare(GpuHabitatReceipt receipt, HabitatUploadBudget budget)
     {
         var bundle = receipt.Bundle;
-        if (!regions.TryGet((bundle.World.RegionFor(bundle.Key), bundle.Region), out var region))
+        var regionKey = (bundle.World.RegionFor(bundle.Key), bundle.Region);
+        var tileKey = (bundle.Key, bundle.Elevation);
+        bool hasRegion = regions.TryGet(regionKey, out _), hasTerrain = tiles.TryGet(tileKey, out _);
+        HabitatUploadCost cost = default;
+        if (!hasRegion) cost += regionalAtlas.EstimateUpload(bundle.RegionalTexture?.Size
+            ?? throw new InvalidOperationException("Regional upload data was not prepared on the worker."));
+        if (!hasTerrain) cost += terrainAtlas.EstimateUpload(bundle.World.ChunkSize);
+        if (!budget.TryAdmit(cost)) return false;
+        // Reserve both missing inputs before publishing either resource. Exceptions retain the existing atlas rollback path.
+        if (!hasRegion)
         {
-            region = new(bundle.RegionalTexture ?? throw new InvalidOperationException("Regional upload data was not prepared on the worker."), regionalAtlas);
-            regions.Put((bundle.World.RegionFor(bundle.Key), bundle.Region), region)?.Dispose();
+            var region = new GpuRegionalTextures(bundle.RegionalTexture!, regionalAtlas);
+            regions.Put(regionKey, region)?.Dispose();
         }
-        if (!tiles.TryGet((bundle.Key, bundle.Elevation), out var heights))
+        if (!hasTerrain)
         {
-            // Coverage is a whole explored chunk here. Unknown chunks never enter this draw path.
-            heights = new(bundle.TerrainTexture ?? throw new InvalidOperationException("Terrain upload data was not prepared on the worker."), bundle.World.ChunkSize, terrainAtlas);
-            tiles.Put((bundle.Key, bundle.Elevation), heights)?.Dispose();
+            var terrain = new GpuTileTextures(bundle.TerrainTexture
+                ?? throw new InvalidOperationException("Terrain upload data was not prepared on the worker."), bundle.World.ChunkSize, terrainAtlas);
+            tiles.Put(tileKey, terrain)?.Dispose();
         }
+        return true;
     }
     /// <summary>Begins the shared state lifetime only after texture acquisition has completed.</summary>
     public IDisposable Begin(GpuHabitatReceipt first, HabitatRanges ranges, float[] projection) => overlay.Begin(first.Bundle.World, ranges, projection);

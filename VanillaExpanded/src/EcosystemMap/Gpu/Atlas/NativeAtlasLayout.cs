@@ -22,14 +22,10 @@ internal sealed class NativeAtlasLayout
     /// <summary>Sizes an immutable page to retained demand within hardware limits, avoiding native full-pixel CPU storage.</summary>
     internal NativeAtlasLayout(int size, int demand, int hardwareLimit)
     {
-        if (size <= 0 || demand <= 0 || hardwareLimit < size) throw new ArgumentOutOfRangeException(nameof(size));
-        slotSize = size;
-        // The captured 7,510-tile view fits one page below this provisional axis limit; extra pages handle growth.
-        int axis = Math.Max(size, Math.Min(4096, hardwareLimit)) / size;
-        int cells = (int)Math.Min(demand, (long)axis * axis);
-        columns = Math.Min(axis, (int)Math.Ceiling(Math.Sqrt(cells)));
-        int rows = (cells + columns - 1) / columns;
-        Width = checked(columns * size); Height = checked(rows * size);
+        var geometry = AtlasPageGeometry.For(size, demand, hardwareLimit);
+        slotSize = size; columns = geometry.Columns;
+        int rows = geometry.Rows;
+        Width = geometry.Width; Height = geometry.Height;
         generations = new long[checked(columns * rows)];
         free = new Stack<int>(generations.Length);
         rowOrigins = new int[rows];

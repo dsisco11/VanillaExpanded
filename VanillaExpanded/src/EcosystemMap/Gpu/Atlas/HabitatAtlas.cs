@@ -35,6 +35,20 @@ internal sealed class HabitatAtlas : IDisposable
         this.capacity = capacity;
         TrimEmpty();
     }
+    /// <summary>Accounts for the next square and any new page without reserving cells or touching GL.</summary>
+    internal HabitatUploadCost EstimateUpload(int size)
+    {
+        CheckThread();
+        if (size <= 0 || size > maximum) throw new ArgumentOutOfRangeException(nameof(size));
+        bool available = pages.Any(page => page.SlotSize == size && page.Layout.Used < page.Layout.Capacity);
+        long allocation = 0;
+        if (!available)
+        {
+            var geometry = AtlasPageGeometry.For(size, Math.Max(1, capacity - Used), maximum);
+            allocation = (long)geometry.Width * geometry.Height * 4;
+        }
+        return new((long)size * size * 4, allocation, 1, available ? 0 : 1);
+    }
     /// <summary>Uploads only one new or changed source square and returns its immutable rectangle lease.</summary>
     internal HabitatAtlasSlot Upload(Array values, int size)
     {
