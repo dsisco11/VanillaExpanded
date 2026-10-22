@@ -1,6 +1,5 @@
 # Vanilla: Expanded TODO List:
     ## Issues:
-        ☐ Fix respawn decal looking obnoxious (too colorful).
 
     ## New Features:
         ☐ Add HUD indicator to show current arrow type and quantity when player is holding a bow.
@@ -31,5 +30,3 @@
         ☐ Monsters cant spawn under roofs.
         ☐ Increase gear drop rates from monsters (and trading costs for gears) by 500%. this will make fighting monsters feel more rewarding.
         ☐ Add other items to monster drops (bones, scrapmetal, metal parts (uncommon), gems (rare), etc) to make them more rewarding to fight.
-
-

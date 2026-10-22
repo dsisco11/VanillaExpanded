@@ -7,4 +7,7 @@ internal sealed record AlloyFuelDepositPlan(
     ItemStack DesiredStack,
     int DesiredAmount,
     ItemStack? ExpectedCurrentStack,
-    int ExpectedCurrentAmount);
+    int ExpectedCurrentAmount)
+{
+    internal ItemStack[] PrewarmingStacks { get; init; } = [];
+}

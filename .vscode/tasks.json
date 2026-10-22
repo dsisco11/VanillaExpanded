@@ -1,6 +1,108 @@
 {
     "version": "2.0.0",
     "tasks": [
+        
+        {
+            "label": "tail-clientlog-start",
+            "command": "pwsh",
+            "type": "process",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                "$env:VGE_DATA_PATH = '${config:vsmod.debugGame.dataPath}'; if ([string]::IsNullOrWhiteSpace($env:VGE_DATA_PATH) -or -not [System.IO.Path]::IsPathFullyQualified($env:VGE_DATA_PATH)) { throw 'Set VGE_DATA_PATH to an absolute automation data directory and restart the IDE.' }; $log = Join-Path $env:VGE_DATA_PATH 'Logs/client-debug.log'; $sentinel = '== VSLOGTAIL STOP =='; New-Item -ItemType Directory -Force -Path (Split-Path $log) | Out-Null; if (-not (Test-Path -LiteralPath $log)) { New-Item -ItemType File -Path $log | Out-Null }; Write-Host '== VSLOGTAIL BEGIN =='; Write-Host $log; Write-Host '== VSLOGTAIL READY =='; Get-Content -Path $log -Tail 50 | ForEach-Object { Write-Host $_ }; $fs = [System.IO.File]::Open($log, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite); try { $fs.Seek(0, [System.IO.SeekOrigin]::End) | Out-Null; $sr = New-Object System.IO.StreamReader($fs); while($true) { $line = $sr.ReadLine(); if($null -ne $line) { if($line -eq $sentinel) { break }; Write-Host $line } else { Start-Sleep -Milliseconds 200 } } } finally { if($sr) { $sr.Dispose() }; $fs.Dispose() }; Write-Host '== VSLOGTAIL STOPPED =='"
+            ],
+            "isBackground": true,
+            "problemMatcher": {
+                "owner": "vintagestory-logtail-ready",
+                "pattern": {
+                    "regexp": "^$"
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "^== VSLOGTAIL BEGIN ==$",
+                    "endsPattern": "^== VSLOGTAIL READY ==$"
+                }
+            },
+            "presentation": {
+                "panel": "dedicated",
+                "reveal": "always",
+                "focus": false,
+                "close": true,
+                "showReuseMessage": false,
+                "clear": false
+            }
+        },
+        {
+            "label": "tail-clientlog-stop",
+            "command": "pwsh",
+            "type": "process",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                "$env:VGE_DATA_PATH = '${config:vsmod.debugGame.dataPath}'; if ([string]::IsNullOrWhiteSpace($env:VGE_DATA_PATH) -or -not [System.IO.Path]::IsPathFullyQualified($env:VGE_DATA_PATH)) { throw 'Set VGE_DATA_PATH to an absolute automation data directory and restart the IDE.' }; $log = Join-Path $env:VGE_DATA_PATH 'Logs/client-debug.log'; Add-Content -Path $log -Value '== VSLOGTAIL STOP =='; Write-Host '== VSLOGTAIL STOP SIGNALLED =='"
+            ],
+            "problemMatcher": [],
+            "presentation": {
+                "panel": "dedicated",
+                "reveal": "never",
+                "focus": false,
+                "close": true,
+                "showReuseMessage": false,
+                "clear": false
+            }
+        },
+        {
+            "label": "scan-clientlog",
+            "command": "pwsh",
+            "type": "process",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                "$env:VGE_DATA_PATH = '${config:vsmod.debugGame.dataPath}'; if ([string]::IsNullOrWhiteSpace($env:VGE_DATA_PATH) -or -not [System.IO.Path]::IsPathFullyQualified($env:VGE_DATA_PATH)) { throw 'Set VGE_DATA_PATH to an absolute automation data directory and restart the IDE.' }; $log = Join-Path $env:VGE_DATA_PATH 'Logs/client-debug.log'; if (-not (Test-Path $log)) { exit 0 }; $i = 0; Get-Content -Path $log | ForEach-Object { $i++; $l = $_; if($l -eq '== VSLOGTAIL STOP ==') { return }; if($l -match '\\[(?:Error|VGE)\\]') { Write-Host ('{0}:{1}: {2}' -f $log, $i, $l) } }"
+            ],
+            "problemMatcher": {
+                "owner": "vintagestory-logscan",
+                "fileLocation": ["absolute"],
+                "pattern": {
+                    "regexp": "^(.*):(\\d+):\\s(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "message": 3
+                }
+            },
+            "presentation": {
+                "panel": "dedicated",
+                "reveal": "never",
+                "focus": false,
+                "close": true,
+                "showReuseMessage": false,
+                "clear": false
+            }
+        },
+        {
+            "label": "stop-and-scan-clientlog",
+            "dependsOn": [
+                "tail-clientlog-stop",
+                "scan-clientlog"
+            ],
+            "dependsOrder": "sequence",
+            "problemMatcher": []
+        },
+        {
+            "label": "build-and-tail",
+            "dependsOn": [
+                "Build (dotnet)",
+                "tail-clientlog-start"
+            ],
+            "dependsOrder": "parallel",
+            "problemMatcher": []
+        },
         {
             "label": "Build (dotnet)",
             "group": "build",
@@ -10,7 +112,7 @@
                 "build",
                 "-c",
                 "Debug",
-                "${workspaceFolder}/VanillaExpanded/VanillaExpanded.csproj"
+                "${config:vsmod.projectFolder}/VanillaExpanded.csproj"
             ],
             "problemMatcher": "$msCompile"
         },

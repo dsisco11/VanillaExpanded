@@ -1,5 +1,11 @@
 {
     // Path to RenderDoc installation (used by "Launch Client (RenderDoc)" debug config)
     // Adjust this path to match your RenderDoc installation location
-    "vanillaExpanded.renderdocPath": "C:/Program Files/RenderDoc"
+    "renderdoc.path": "C:/Program Files/RenderDoc",
+    // Nsight Graphics installation root; update this when installing a different version.
+    "nsightGraphics.path": "C:\\Program Files\\NVIDIA Corporation\\Nsight Graphics 2026.3.1",
+    "vsmod.projectFolder": "${workspaceFolder}/VanillaExpanded",
+    // Development game data directory used by launch profiles and log automation.
+    "vsmod.debugGame.dataPath": "D:/CODE/VintageStory/VintagestoryAutomation/Data"
+    // "vsmod.debugGame.dataPath": "${workspaceFolder}/Debug/GameClient/Data"
 }

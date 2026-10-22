@@ -5,26 +5,73 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Launch Client (RenderDoc)",
+            "name": "Launch Client",
             "type": "coreclr",
             "request": "launch",
-            "program": "${config:vanillaExpanded.renderdocPath}/renderdoccmd.exe",
-            "preLaunchTask": "Build (Cake)",
+            "program": "${config:renderdoc.path}/renderdoccmd.exe",
+            "preLaunchTask": "build-and-tail",
+            "postDebugTask": "stop-and-scan-clientlog",
+            "env": {
+                "VGE_DATA_PATH": "${config:vsmod.debugGame.dataPath}"
+            },
             "args": [
                 "capture",
                 "--wait-for-exit",
                 "${env:VINTAGE_STORY}/Vintagestory.exe",
+                "--openWorld", "TestWorld",
                 "--tracelog",
+                "--dataPath",
+                "${config:vsmod.debugGame.dataPath}",
                 "--addModPath",
-                "${workspaceFolder}/VanillaExpanded/bin/Debug/Mods",
+                "${config:vsmod.projectFolder}/bin/Debug/Mods",
                 "--addOrigin",
-                "${workspaceFolder}/VanillaExpanded/assets"
-                // "--playStyle" , "preset-surviveandbuild",
-                // "--openWorld" , "modding test world",
+                "${config:vsmod.projectFolder}/assets"
             ],
             "cwd": "${env:VINTAGE_STORY}",
             "console": "internalConsole",
             "internalConsoleOptions": "neverOpen",
+            "stopAtEntry": false
+        },
+        {
+            "name": "Launch Client (Nsight Graphics)",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "${config:nsightGraphics.path}\\host\\windows-desktop-nomad-x64\\ngfx.exe",
+            "preLaunchTask": "build-and-tail",
+            "postDebugTask": "stop-and-scan-clientlog",
+            "env": {
+                "VGE_DATA_PATH": "${config:vsmod.debugGame.dataPath}"
+            },
+            "args": [
+                "--activity", "OpenGL Frame Debugger",
+                "--wait-hotkey",
+                "--exe", "${env:VINTAGE_STORY}\\Vintagestory.exe",
+                "--dir", "${env:VINTAGE_STORY}",
+                "--args", "--openWorld TestWorld --tracelog --dataPath \"${config:vsmod.debugGame.dataPath}\" --addModPath \"${workspaceFolder}\\VanillaExpanded\\bin\\Debug\\Mods\" --addOrigin \"${workspaceFolder}\\VanillaExpanded\\assets\""
+            ],
+            "cwd": "${env:VINTAGE_STORY}",
+            "console": "internalConsole",
+            "internalConsoleOptions": "neverOpen",
+            "stopAtEntry": false
+        },
+        {
+            "name": "Launch Client (CPU Profile)",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "C:/Program Files/PowerShell/7/pwsh.exe",
+            "preLaunchTask": "Build (dotnet)",
+            "env": {
+                "VGE_DATA_PATH": "${config:vsmod.debugGame.dataPath}"
+            },
+            "args": [
+                "-NoProfile",
+                "-File", "${workspaceFolder}/tools/Start-ClientCpuProfile.ps1",
+                "-WorkspaceRoot", "${workspaceFolder}",
+                "-GameRoot", "${env:VINTAGE_STORY}",
+                "-DataPath", "${config:vsmod.debugGame.dataPath}"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
             "stopAtEntry": false
         },
         {
@@ -38,13 +85,18 @@
             "osx": {
                 "program": "${env:VINTAGE_STORY}/VintagestoryServer"
             },
-            "preLaunchTask": "build",
+            "preLaunchTask": "Build (dotnet)",
+            "env": {
+                "VGE_DATA_PATH": "${config:vsmod.debugGame.dataPath}"
+            },
             "args": [
                 "--tracelog",
+                "--dataPath",
+                "${config:vsmod.debugGame.dataPath}",
                 "--addModPath",
-                "${workspaceFolder}/VanillaExpanded/bin/Debug/Mods",
+                "${config:vsmod.projectFolder}/bin/Debug/Mods",
                  "--addOrigin",
-                 "${workspaceFolder}/VanillaExpanded/assets"
+                 "${config:vsmod.projectFolder}/assets"
             ],
             "console": "internalConsole",
             "stopAtEntry": false

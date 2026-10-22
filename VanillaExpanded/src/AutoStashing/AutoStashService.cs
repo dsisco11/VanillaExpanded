@@ -17,29 +17,49 @@ internal static class AutoStashService
     #region Advisory assessment
     /// <summary>Resolves a read-only block view and policy while treating interaction eligibility as a separate caller input.</summary>
     internal static AutoStashAssessment AssessBlock(IPlayerInventoryManager owner, BlockEntity? blockEntity,
-        bool interactionAllowed)
+        bool interactionAllowed, BlockSelection? selection = null, IPlayer? player = null, bool forHelp = false,
+        bool checkInteraction = false)
     {
         if (!interactionAllowed) return AutoStashAssessment.Empty;
         AutoStashPolicy policy;
         IInventory inventory;
-        if (blockEntity is Vintagestory.GameContent.BlockEntityBloomery bloomery)
+        switch (blockEntity)
         {
-            var target = BloomeryAutoStashTarget.Resolve(bloomery);
-            if (target is null) return AutoStashAssessment.Empty;
-            inventory = target.Inventory;
-            policy = new BloomeryPolicy(bloomery, (InventoryGeneric)inventory);
-        }
-        else if (blockEntity is Vintagestory.GameContent.BlockEntityContainer container)
-        {
-            inventory = container.Inventory;
-            // Existing crate help considers all current contents, unlike first-type crate execution.
-            // Retain client ID matching instead of silently broadening it to execution's code matching.
-            policy = MatchingContentsPolicy.ForAssessment(container.GetNonEmptyContentStacks());
-        }
-        else return AutoStashAssessment.Empty;
+            case Vintagestory.GameContent.BlockEntityBloomery bloomery:
+                {
+                    var target = BloomeryAutoStashTarget.Resolve(bloomery);
+                    if (target is null) return AutoStashAssessment.Empty;
+                    inventory = target.Inventory;
+                    policy = new BloomeryPolicy(bloomery, (InventoryGeneric)inventory);
+                    break;
+                }
 
-        return AutoStashAssessor.Assess(policy, inventory,
+            case Vintagestory.GameContent.BlockEntityQuern quern:
+                {
+                    inventory = quern.Inventory;
+                    policy = new QuernPolicy(quern.Api.World, inventory);
+                    break;
+                }
+            case Vintagestory.GameContent.BlockEntityContainer container:
+                {
+                    inventory = container.Inventory;
+                    // Existing crate help considers all current contents, unlike first-type crate execution.
+                    // Retain client ID matching instead of silently broadening it to execution's code matching.
+                    policy = MatchingContentsPolicy.ForAssessment(container.GetNonEmptyContentStacks());
+                    break;
+                }
+            default:
+                return AutoStashAssessment.Empty;
+        }
+
+        AutoStashPolicy interactionPolicy = blockEntity is Vintagestory.GameContent.BlockEntityCrate crate
+            ? new CratePolicy(crate.Inventory) : policy;
+        var assessment = AutoStashAssessor.Assess(policy, inventory,
             owner.GetOwnInventory(GlobalConstants.backpackInvClassName), owner.GetOwnInventory(GlobalConstants.hotBarInvClassName));
+        assessment.StartHandling = interactionPolicy.StartHandling;
+        assessment.CanStartInteraction = !(checkInteraction || selection is not null || player is not null)
+            || interactionPolicy.CanStartInteraction(owner, selection, player, forHelp, assessment);
+        return assessment;
     }
 
     /// <summary>Reads persisted bag contents only; candidate detection does not claim available space or load execution slots.</summary>
@@ -56,6 +76,11 @@ internal static class AutoStashService
     #endregion
 
     #region Target operations
+    internal static AutoStashResult StashQuern(IWorldAccessor world, IPlayerInventoryManager owner,
+        Vintagestory.GameContent.BlockEntityQuern quern, string playerName)
+        => Execute(world, owner, playerName, new ContainerAutoStashTarget(quern), quern.Pos,
+            quern.InventoryClassName, new QuernPolicy(world, quern.Inventory));
+
     /// <summary>Captures container matching types before acquiring its execution session.</summary>
     internal static AutoStashResult StashContainer(IWorldAccessor world, IPlayerInventoryManager owner,
         Vintagestory.GameContent.BlockEntityContainer container, string playerName, bool crate)

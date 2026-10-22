@@ -261,7 +261,10 @@ internal static class AlloyCalculatorLogic
         float activeFuelBurnTime,
         int activeFuelTemperature,
         float fuelBurnDuration,
-        int fuelTemperature)
+        int fuelTemperature,
+        int prewarmingFuelAmount = 0,
+        float prewarmingFuelBurnDuration = 0,
+        int prewarmingFuelTemperature = 0)
     {
         if (stackSize <= 0
             || meltingPoint <= 0
@@ -270,6 +273,12 @@ internal static class AlloyCalculatorLogic
             || fuelTemperature < meltingPoint)
         {
             return 0;
+        }
+        if (prewarmingFuelAmount < 0 || (prewarmingFuelAmount > 0
+            && (prewarmingFuelBurnDuration <= 0 || prewarmingFuelTemperature <= 0
+                || prewarmingFuelTemperature >= meltingPoint)))
+        {
+            throw new ArgumentOutOfRangeException(nameof(prewarmingFuelAmount), "Prewarming fuel must burn below the melting point.");
         }
 
         const float tickDuration = 0.1f;
@@ -289,23 +298,7 @@ internal static class AlloyCalculatorLogic
                     tickDuration);
             }
 
-            if (inputTemperature < furnaceTemperature)
-            {
-                float heatingRate = (1 + Math.Clamp(
-                    (furnaceTemperature - inputTemperature) / 30,
-                    0,
-                    1.6f)) * tickDuration;
-                if (inputTemperature >= meltingPoint)
-                {
-                    heatingRate /= 11;
-                }
-
-                float heatedTemperature = ChangeTemperature(
-                    inputTemperature,
-                    furnaceTemperature,
-                    heatingRate);
-                inputTemperature = (heatedTemperature + (stackSize - 1) * inputTemperature) / stackSize;
-            }
+            HeatInput(stackSize, meltingPoint, furnaceTemperature, ref inputTemperature);
 
             if (inputTemperature >= meltingPoint)
             {
@@ -323,13 +316,65 @@ internal static class AlloyCalculatorLogic
 
             if (burnTime <= 0)
             {
-                burnTime = fuelBurnDuration;
-                maximumTemperature = fuelTemperature;
-                fuelConsumed++;
+                if (prewarmingFuelAmount > 0)
+                {
+                    burnTime = prewarmingFuelBurnDuration;
+                    maximumTemperature = prewarmingFuelTemperature;
+                    prewarmingFuelAmount--;
+                }
+                else
+                {
+                    burnTime = fuelBurnDuration;
+                    maximumTemperature = fuelTemperature;
+                    fuelConsumed++;
+                }
             }
         }
 
         return 0;
+    }
+
+    internal static int CalculatePrewarmingFuelRequired(
+        int stackSize, float meltingPoint, float furnaceTemperature,
+        float activeBurnTime, int activeTemperature, float warmingDuration, int warmingTemperature)
+    {
+        if (stackSize <= 0 || !float.IsFinite(warmingDuration) || warmingDuration <= 0
+            || warmingTemperature <= 0 || warmingTemperature >= meltingPoint)
+            throw new ArgumentOutOfRangeException(nameof(warmingDuration), "Prewarming requires valid fuel below the melting point.");
+        float inputTemperature = 20;
+        int amount = 0;
+        float burnTime = Math.Max(0, activeBurnTime);
+        int maximumTemperature = activeTemperature;
+        if (burnTime <= 0) HeatInput(stackSize, meltingPoint, furnaceTemperature, ref inputTemperature);
+        while (true)
+        {
+            float previousFurnace = furnaceTemperature;
+            float previousInput = inputTemperature;
+            while (burnTime > 0)
+            {
+                burnTime = Math.Max(0, burnTime - 0.1f);
+                furnaceTemperature = ChangeTemperature(furnaceTemperature, maximumTemperature, 0.1f);
+                HeatInput(stackSize, meltingPoint, furnaceTemperature, ref inputTemperature);
+            }
+            // The game's temperature step snaps within one degree; stacked inputs approach their ceiling asymptotically.
+            if (furnaceTemperature >= warmingTemperature && inputTemperature >= warmingTemperature - 1)
+                return amount;
+            if (amount > 0 && furnaceTemperature == previousFurnace && inputTemperature == previousInput)
+                throw new InvalidOperationException("Prewarming temperatures stopped changing before reaching the fuel's temperature ceiling.");
+            amount = checked(amount + 1);
+            burnTime = warmingDuration;
+            maximumTemperature = warmingTemperature;
+        }
+    }
+
+    private static void HeatInput(int stackSize, float meltingPoint, float furnaceTemperature, ref float inputTemperature)
+    {
+        if (inputTemperature >= furnaceTemperature) return;
+        float heatingRate = (1 + Math.Clamp(
+            (furnaceTemperature - inputTemperature) / 30, 0, 1.6f)) * 0.1f;
+        if (inputTemperature >= meltingPoint) heatingRate /= 11;
+        float heatedTemperature = ChangeTemperature(inputTemperature, furnaceTemperature, heatingRate);
+        inputTemperature = (heatedTemperature + (stackSize - 1) * inputTemperature) / stackSize;
     }
 
     private static float ChangeTemperature(float fromTemperature, float toTemperature, float deltaTime)

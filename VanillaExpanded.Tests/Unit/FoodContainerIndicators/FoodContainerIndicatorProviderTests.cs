@@ -1,4 +1,5 @@
 using Moq;
+using Newtonsoft.Json.Linq;
 using VanillaExpanded.FoodContainerIndicators;
 using VanillaExpanded.PerishableItemSlots;
 using VanillaExpanded.Tests.Mocks;
@@ -8,7 +9,7 @@ using Vintagestory.API.Datastructures;
 
 namespace VanillaExpanded.Tests.Unit.FoodContainerIndicators;
 
-/// <summary>Checks exclusive container routing and preservation of contained freshness.</summary>
+/// <summary>Checks portion data, serving capacity, and independent freshness.</summary>
 [Trait("Category", "Unit")]
 public sealed class FoodContainerIndicatorProviderTests : System.IDisposable
 {
@@ -71,35 +72,85 @@ public sealed class FoodContainerIndicatorProviderTests : System.IDisposable
         if (visible) Assert.Equal(fill, indicator.Fill);
     }
 
-    /// <summary>Actual pie inheritance does not route its direct freshness into the vessel effect.</summary>
-    [Fact]
-    public void Pie_UsesOrdinaryFreshnessDespiteMealInterface()
+    /// <summary>Pies normalize their portions by slice count without altering freshness.</summary>
+    [Theory]
+    [InlineData(1, 0.25f, 1)]
+    [InlineData(1, 0.125f, 0.5f)]
+    [InlineData(1, 0.0625f, 0.25f)]
+    [InlineData(2, 0.5f, 1)]
+    [InlineData(4, 1, 1)]
+    public void Pie_NormalizesPortionsIndependentlyOfFreshness(int slices, float servings, float fill)
     {
         var (world, _, inventory) = CreateInventory();
         var pie = new Mock<BlockPie> { CallBase = true };
         pie.Setup(value => value.UpdateAndGetTransitionState(world, inventory[0], EnumTransitionType.Perish))
             .Returns(new TransitionState { FreshHours = 100, FreshHoursLeft = 50 });
-        inventory[0].Itemstack = new ItemStack(pie.Object);
+        var stack = new ItemStack(pie.Object);
+        stack.Attributes.SetInt("pieSize", slices);
+        stack.Attributes.SetFloat("quantityServings", servings);
+        inventory[0].Itemstack = stack;
         Assert.NotNull(pie.Object.GetCollectibleInterface<IBlockMealContainer>());
-        Assert.False(new FoodContainerIndicatorProvider().TryGetIndicator(inventory[0], out _));
+        Assert.True(new FoodContainerIndicatorProvider().TryGetIndicator(inventory[0], out var portion));
+        Assert.Equal(fill, portion.Fill);
         Assert.True(new FreshnessIndicatorProvider().TryGetIndicator(inventory[0], out var indicator));
         Assert.Equal(0.5f, indicator.Fill);
         Assert.Null(indicator.DrawRange);
         Assert.Null(indicator.ParticlePalette);
     }
 
-    /// <summary>Each game's vessel metadata route accepts meal containers while rejecting metadata on ordinary food.</summary>
+    /// <summary>Portion data works without meal handling or vessel metadata.</summary>
     [Theory]
-    [InlineData("{\"mealContainer\":true}")]
-    [InlineData("{\"eatenBlock\":\"game:bowl-fired\"}")]
-    [InlineData("{\"emptiedBlockCode\":\"game:pot-fired\"}")]
-    public void VesselMetadata_RequiresMealHandling(string metadata)
+    [InlineData(0.5f, 1, true, 0.5f)]
+    [InlineData(3, 4, true, 0.75f)]
+    [InlineData(5, 4, true, 1)]
+    [InlineData(0, 1, false, 0)]
+    [InlineData(-1, 1, false, 0)]
+    [InlineData(float.NaN, 1, false, 0)]
+    [InlineData(float.PositiveInfinity, 1, false, 0)]
+    [InlineData(1, 0, false, 0)]
+    [InlineData(1, -1, false, 0)]
+    public void PortionData_DoesNotRequireMealInterface(float servings, float capacity, bool visible, float fill)
     {
-        var item = new Mock<MockItem>(1, (byte)0, Mock.Of<ICoreAPI>());
-        item.Object.Attributes = JsonObject.FromJson(metadata);
-        Assert.False(FoodContainerClassification.IsFoodContainer(item.Object));
-        item.Setup(value => value.GetCollectibleInterface<IBlockMealContainer>()).Returns(Mock.Of<IBlockMealContainer>());
-        Assert.True(FoodContainerClassification.IsFoodContainer(item.Object));
+        var (_, api, inventory) = CreateInventory();
+        var item = new MockItem(1, 0, api)
+        {
+            Attributes = new JsonObject(new JObject { ["servingCapacity"] = capacity })
+        };
+        var stack = new ItemStack(item);
+        stack.Attributes.SetFloat("quantityServings", servings);
+        inventory[0].Itemstack = stack;
+        Assert.Equal(visible, new FoodContainerIndicatorProvider().TryGetIndicator(inventory[0], out var indicator));
+        if (visible) Assert.Equal(fill, indicator.Fill);
+    }
+
+    [Fact]
+    public void OrdinaryItem_WithoutPortionDataHasNoIndicator()
+    {
+        var (_, api, inventory) = CreateInventory();
+        inventory[0].Itemstack = new ItemStack(new MockItem(1, 0, api));
+        Assert.False(new FoodContainerIndicatorProvider().TryGetIndicator(inventory[0], out _));
+    }
+
+    [Fact]
+    public void PortionData_WithoutCapacityDefaultsToOneServing()
+    {
+        var (_, api, inventory) = CreateInventory();
+        var stack = new ItemStack(new MockItem(1, 0, api));
+        stack.Attributes.SetDouble("quantityServings", 0.75);
+        inventory[0].Itemstack = stack;
+        Assert.True(new FoodContainerIndicatorProvider().TryGetIndicator(inventory[0], out var indicator));
+        Assert.Equal(0.75f, indicator.Fill);
+    }
+
+    [Fact]
+    public void MealInterface_WithoutVesselMetadataStillReportsPortions()
+    {
+        var (world, api, inventory) = CreateInventory();
+        var item = new Mock<MockItem>(1, (byte)0, api);
+        item.Setup(value => value.GetCollectibleInterface<IBlockMealContainer>()).Returns(CreateMeal(world));
+        inventory[0].Itemstack = new ItemStack(item.Object);
+        Assert.True(new FoodContainerIndicatorProvider().TryGetIndicator(inventory[0], out var indicator));
+        Assert.Equal(0.5f, indicator.Fill);
     }
 
     /// <summary>Freshness remains available on vessels alongside an independently sampled serving level.</summary>

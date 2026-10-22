@@ -35,14 +35,69 @@ internal static class AlloyFuelDepositService
         return CreatePlan(api, firepit, api.World.Player.InventoryManager, out plan);
     }
 
-    /// <summary>Plans the coolest sufficient fuel, minimizing its amount, against the supplied inventory manager.</summary>
+    /// <summary>Prefers tagged fuel sources, then the coolest sufficient fuel and its smallest required amount.</summary>
     internal static AlloyDepositResultCode CreatePlan(
         ICoreClientAPI api,
         BlockEntityFirepit firepit,
         IPlayerInventoryManager playerInventory,
         out AlloyFuelDepositPlan? plan)
     {
+        return CreatePlan(api, firepit, playerInventory, out plan, previewInventory: null, out _);
+    }
+
+    /// <summary>Estimates fuel for a cold selected batch without changing the firepit or moving inventory items.</summary>
+    internal static AlloyDepositResultCode CreatePreview(
+        ICoreClientAPI api,
+        BlockEntityFirepit firepit,
+        IReadOnlyDictionary<int, ItemStack> calculatedStacks,
+        IPlayerInventoryManager playerInventory,
+        out AlloyFuelDepositPlan? plan)
+    {
+        return CreatePreview(api, firepit, calculatedStacks, playerInventory, out plan, out _);
+    }
+
+    internal static AlloyDepositResultCode CreatePreview(
+        ICoreClientAPI api,
+        BlockEntityFirepit firepit,
+        IReadOnlyDictionary<int, ItemStack> calculatedStacks,
+        IPlayerInventoryManager playerInventory,
+        out AlloyFuelDepositPlan? plan,
+        out bool isPrewarming)
+    {
         plan = null;
+        isPrewarming = false;
+        if (firepit.Inventory is not InventorySmelting inventory
+            || !playerInventory.OpenedInventories.Contains(inventory))
+        {
+            return AlloyDepositResultCode.InventoryClosed;
+        }
+        if (firepit.inputStack?.Collectible is not BlockSmeltingContainer
+            || calculatedStacks.Count == 0
+            || calculatedStacks.Count > inventory.CookingSlots.Length
+            || calculatedStacks.Any(pair => pair.Value.StackSize <= 0))
+        {
+            return AlloyDepositResultCode.InvalidRequest;
+        }
+
+        var preview = new InventorySmelting("alloyfuelpreview", "preview", null!) { Api = api };
+        preview[1].Itemstack = firepit.inputStack.Clone();
+        int index = 0;
+        foreach (ItemStack stack in calculatedStacks.OrderBy(static pair => pair.Key).Select(static pair => pair.Value))
+            preview.CookingSlots[index++].Itemstack = stack.Clone();
+
+        return CreatePlan(api, firepit, playerInventory, out plan, preview, out isPrewarming);
+    }
+
+    private static AlloyDepositResultCode CreatePlan(
+        ICoreClientAPI api,
+        BlockEntityFirepit firepit,
+        IPlayerInventoryManager playerInventory,
+        out AlloyFuelDepositPlan? plan,
+        InventorySmelting? previewInventory,
+        out bool isPrewarming)
+    {
+        plan = null;
+        isPrewarming = false;
         IWorldAccessor world = api.World;
         if (firepit.Inventory is not InventorySmelting inventory
             || !playerInventory.OpenedInventories.Contains(inventory))
@@ -60,9 +115,18 @@ internal static class AlloyFuelDepositService
             return AlloyDepositResultCode.InvalidRequest;
         }
 
-        ItemStack inputStack = firepit.inputStack;
-        float meltingPoint = inputStack.Collectible.GetMeltingPoint(world, inventory, firepit.inputSlot);
-        float meltingDuration = inputStack.Collectible.GetMeltingDuration(world, inventory, firepit.inputSlot);
+        InventorySmelting operationInventory = previewInventory ?? inventory;
+        ItemSlot inputSlot = operationInventory[1];
+        if (inputSlot.Itemstack is not ItemStack inputStack)
+        {
+            return AlloyDepositResultCode.InvalidRequest;
+        }
+        float meltingPoint = inputStack.Collectible.GetMeltingPoint(world, operationInventory, inputSlot);
+        float meltingDuration = inputStack.Collectible.GetMeltingDuration(world, operationInventory, inputSlot);
+        if (previewInventory is not null && (meltingPoint <= 0 || meltingDuration <= 0))
+        {
+            return AlloyDepositResultCode.InvalidRequest;
+        }
         ItemStack? queuedFuel = firepit.fuelStack;
 
         // Queued fuel remains separate from external sources; source restrictions govern candidate availability.
@@ -81,6 +145,7 @@ internal static class AlloyFuelDepositService
         ItemStack? bestStack = null;
         int bestAmount = 0;
         int bestTemperature = int.MaxValue;
+        bool bestIsFuelSource = false;
         foreach (ItemStack stack in candidates)
         {
             if (!IsSuitableFuel(world, stack, meltingPoint, firepit.HeatModifier)) continue;
@@ -92,8 +157,8 @@ internal static class AlloyFuelDepositService
                 meltingPoint,
                 meltingDuration,
                 firepit.furnaceTemperature,
-                firepit.InputStackTemp,
-                firepit.inputStackCookingTime,
+                previewInventory is null ? firepit.InputStackTemp : 20,
+                previewInventory is null ? firepit.inputStackCookingTime : 0,
                 firepit.fuelBurnTime,
                 firepit.maxTemperature,
                 properties.BurnDuration * firepit.BurnDurationModifier,
@@ -108,14 +173,18 @@ internal static class AlloyFuelDepositService
             }
             if (required > available || required > stack.Collectible.MaxStackSize) continue;
 
-            // Preserve hotter fuels when a cooler candidate can complete the melt; minimize count only at equal heat.
+            bool isFuelSource = IsFuelSource(api, stack);
+            // Prefer dedicated fuels; preserve the cooler-then-count ordering within each priority group.
             if (bestStack is null
-                || properties.BurnTemperature < bestTemperature
-                || (properties.BurnTemperature == bestTemperature && required < bestAmount))
+                || (isFuelSource && !bestIsFuelSource)
+                || (isFuelSource == bestIsFuelSource
+                    && (properties.BurnTemperature < bestTemperature
+                        || (properties.BurnTemperature == bestTemperature && required < bestAmount))))
             {
                 bestStack = stack;
                 bestAmount = required;
                 bestTemperature = properties.BurnTemperature;
+                bestIsFuelSource = isFuelSource;
             }
         }
 
@@ -124,11 +193,50 @@ internal static class AlloyFuelDepositService
             return AlloyDepositResultCode.InsufficientItems;
         }
 
+        var prewarmingStacks = new List<ItemStack>();
+        if (previewInventory is not null && bestAmount > 0)
+        {
+            var warmingCandidates = externalSlots.Where(AlloyTransferInventoryPolicy.CanWithdraw)
+                .Select(static slot => slot.Itemstack!).ToList();
+            if (queuedFuel is not null) warmingCandidates.Insert(0, queuedFuel);
+            var seen = new List<ItemStack>();
+            CombustibleProperties smeltingProperties = bestStack.Collectible.GetCombustibleProperties(world, bestStack, null)!;
+            foreach (ItemStack stack in warmingCandidates)
+            {
+                if (seen.Any(previous => SameStack(world, previous, stack))) continue;
+                seen.Add(stack);
+                CombustibleProperties? properties = stack.Collectible.GetCombustibleProperties(world, stack, null);
+                if (properties is null) continue;
+                float duration = properties.BurnDuration * firepit.BurnDurationModifier;
+                int temperature = (int)(properties.BurnTemperature * firepit.HeatModifier);
+                if (!float.IsFinite(duration) || duration <= 0 || temperature <= 0 || temperature >= meltingPoint) continue;
+                int amount = AlloyCalculatorLogic.CalculatePrewarmingFuelRequired(
+                    inputStack.StackSize, meltingPoint, firepit.furnaceTemperature,
+                    firepit.fuelBurnTime, firepit.maxTemperature, duration, temperature);
+                if (amount == 0) continue;
+                int smeltingRequired = AlloyCalculatorLogic.CalculateFuelRequired(
+                    inputStack.StackSize, meltingPoint, meltingDuration, firepit.furnaceTemperature,
+                    20, 0, firepit.fuelBurnTime, firepit.maxTemperature,
+                    smeltingProperties.BurnDuration * firepit.BurnDurationModifier,
+                    (int)(smeltingProperties.BurnTemperature * firepit.HeatModifier),
+                    amount, duration, temperature);
+                if (smeltingRequired >= bestAmount) continue;
+                ItemStack option = stack.Clone();
+                option.StackSize = amount;
+                prewarmingStacks.Add(option);
+            }
+            if (prewarmingStacks.Any(stack => IsFuelSource(api, stack)))
+                prewarmingStacks.RemoveAll(stack => !IsFuelSource(api, stack));
+        }
+        isPrewarming = prewarmingStacks.Count > 0;
         plan = new AlloyFuelDepositPlan(
             bestStack.Clone(),
             bestAmount,
             queuedFuel?.Clone(),
-            firepit.fuelSlot.StackSize);
+            firepit.fuelSlot.StackSize)
+        {
+            PrewarmingStacks = prewarmingStacks.ToArray()
+        };
         return AlloyDepositResultCode.Success;
     }
 
@@ -201,6 +309,10 @@ internal static class AlloyFuelDepositService
     #endregion
 
     #region Private
+
+    private static bool IsFuelSource(ICoreClientAPI api, ItemStack stack)
+        => api.CollectibleTagRegistry?
+            .SlowEnumerateTagNames(stack.Collectible.GetTags(stack)).Contains("is-fuel-source") == true;
 
     /// <summary>Requires burning fuel that reaches the metals' melting point under the firepit's heat modifier.</summary>
     private static bool IsSuitableFuel(IWorldAccessor world, ItemStack stack, float meltingPoint, float heatModifier)

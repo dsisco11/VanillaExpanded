@@ -66,7 +66,7 @@ internal static class AlloyDepositService
             return AlloyDepositResultCode.InventoryClosed;
         }
 
-        AlloyDepositPlan? createdPlan = AlloyDepositPlan.Create(
+        AlloyDepositPlan? createdPlan = AlloyDepositPlan.CreateRequest(
             ingredients,
             calculatedStacks,
             inventory.CookingSlots.Length);
@@ -93,7 +93,8 @@ internal static class AlloyDepositService
 
         plan = AlloyDepositStackPlanner.Resolve(api.World, createdPlan, inventory.CookingSlots,
             externalSlots.Where(AlloyTransferInventoryPolicy.CanWithdraw).Concat(inventory.CookingSlots),
-            (stack, ingredient) => SmeltsInto(api.World, stack, ingredient.ResolvedStack));
+            (stack, ingredient) => SmeltsInto(api.World, stack, ingredient.ResolvedStack),
+            spreadAcrossCookingSlots: true);
         if (plan is null) return AlloyDepositResultCode.InsufficientSpace;
         return AlloyDepositResultCode.Success;
     }

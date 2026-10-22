@@ -12,6 +12,9 @@ internal sealed class AutoStashAssessment
     public bool HasCandidates => CandidateItemIds.Count > 0;
     public AutoStashCapacity Capacity { get; }
     public ItemStack[] DisplayStacks { get; }
+    public bool HasAvailableItems => AvailableItemIds.Count > 0;
+    public bool CanStartInteraction { get; internal set; } = true;
+    public EnumHandling StartHandling { get; internal set; } = EnumHandling.PreventDefault;
 
     #region Public API
     /// <summary>Captures query-local IDs and already cloned representatives; availability remains advisory.</summary>

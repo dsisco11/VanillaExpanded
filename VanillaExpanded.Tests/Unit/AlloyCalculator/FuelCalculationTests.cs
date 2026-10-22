@@ -6,6 +6,34 @@ namespace VanillaExpanded.Tests.Unit.AlloyCalculator;
 public class FuelCalculationTests
 {
     [Fact]
+    public void CalculateFuelRequired_QueuedPrewarmingReducesSmeltingFuel()
+    {
+        int baseline = Calculate(inputTemperature: 20);
+        int prewarmed = AlloyCalculatorLogic.CalculateFuelRequired(
+            20, 1000, 600, 20, 20, 0, 0, 0, 40, 1300,
+            prewarmingFuelAmount: 32, prewarmingFuelBurnDuration: 24, prewarmingFuelTemperature: 700);
+
+        Assert.InRange(prewarmed, 1, baseline - 1);
+    }
+
+    [Fact]
+    public void CalculateFuelRequired_ZeroQueuedPrewarmingPreservesExistingResult()
+    {
+        Assert.Equal(Calculate(20), AlloyCalculatorLogic.CalculateFuelRequired(
+            20, 1000, 600, 20, 20, 0, 0, 0, 40, 1300, 0, 24, 700));
+    }
+
+    [Fact]
+    public void CalculateFuelRequired_ActiveAndQueuedPrewarmingRunBeforeSmeltingFuel()
+    {
+        int queuedOnly = AlloyCalculatorLogic.CalculateFuelRequired(
+            20, 1000, 600, 20, 20, 0, 0, 0, 40, 1300, 32, 24, 700);
+        int activeAndQueued = AlloyCalculatorLogic.CalculateFuelRequired(
+            20, 1000, 600, 20, 20, 0, 24, 700, 40, 1300, 32, 24, 700);
+        Assert.InRange(activeAndQueued, 1, queuedOnly);
+    }
+
+    [Fact]
     public void CalculateFuelRequired_IncludesMetalWarmupTime()
     {
         int required = AlloyCalculatorLogic.CalculateFuelRequired(

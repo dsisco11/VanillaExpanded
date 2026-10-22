@@ -18,10 +18,12 @@ public sealed class BehaviorInstallationTests
     [InlineData("container")]
     [InlineData("crate")]
     [InlineData("bloomery")]
+    [InlineData("quern")]
     public void SupportedBlock_InstallsInOrderAndRemainsIdempotent(string kind)
     {
         var fixture = VsTestFixture.Server();
-        Block block = kind == "bloomery" ? new BlockBloomery() : kind == "crate" ? new BlockCrate() : new Block();
+        Block block = kind == "bloomery" ? new BlockBloomery() : kind == "crate" ? new BlockCrate()
+            : kind == "quern" ? new BlockQuern() : new Block();
         block.Code = new AssetLocation("game:installation-" + kind);
         block.EntityClass = kind == "crate" ? "Crate" : kind;
         var existing = new Mock<BlockBehavior>(block).Object;

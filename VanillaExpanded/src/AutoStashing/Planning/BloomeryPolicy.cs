@@ -38,6 +38,11 @@ internal sealed class BloomeryPolicy : AutoStashPolicy
     /// <summary>Recognizes valid input types even when live input capacity is exhausted.</summary>
     public override bool IsCandidate(ItemStack stack, AutoStashSourcePass pass) => Classify(stack) == pass.RequiredSlot;
 
+    public override bool CanStartInteraction(IPlayerInventoryManager owner, BlockSelection? selection = null,
+        IPlayer? player = null, bool forHelp = false, AutoStashAssessment? assessment = null)
+        => !inventory[0].Empty || !inventory[1].Empty
+            || (owner.ActiveHotbarSlot?.Itemstack is ItemStack active && bloomery.CanAdd(active));
+
     /// <summary>Limits the request to remaining capacity using contents left by preceding actual moves.</summary>
     public override int GetQuantity(ItemSlot source, AutoStashSourcePass pass)
         => Math.Min(source.StackSize, GetMaxCanAdd(inventory, source.Itemstack!, pass.RequiredSlot!.Value));
