@@ -61,7 +61,7 @@ internal static class AlloyDepositStackPlanner
         {
             // Greedy preferences are not constraints: discard the failed selection and reconsider forms.
             forms.Clear();
-            if (!TrySelectForms(ingredients, 0, 0, ingredients[0].Amount, slotIndices.Length, forms))
+            if (!TrySelectForms(ingredients, 0, 0, ingredients[0].Amount, slotIndices.Length, forms, []))
                 return null;
         }
 
@@ -123,22 +123,36 @@ internal static class AlloyDepositStackPlanner
         int formIndex,
         int remainingAmount,
         int remainingSlots,
-        List<(MetalDepositIngredient Ingredient, ItemStack Stack, int Amount, int Slots)> selected)
+        List<(MetalDepositIngredient Ingredient, ItemStack Stack, int Amount, int Slots)> selected,
+        HashSet<(int IngredientIndex, int FormIndex, int RemainingAmount, int RemainingSlots)> failedStates)
     {
         if (remainingAmount == 0)
         {
             int nextIngredient = ingredientIndex + 1;
             return nextIngredient == ingredients.Length
                 || TrySelectForms(ingredients, nextIngredient, 0,
-                    ingredients[nextIngredient].Amount, remainingSlots, selected);
+                    ingredients[nextIngredient].Amount, remainingSlots, selected, failedStates);
         }
 
+        // Ingredient supplies are disjoint; only the remaining slot budget connects earlier choices
+        // to this state. The cache belongs to this one detached supply snapshot.
+        var state = (ingredientIndex, formIndex, remainingAmount, remainingSlots);
+        if (failedStates.Contains(state)) return false;
+
         IngredientSupply ingredient = ingredients[ingredientIndex];
-        if (remainingSlots == 0 || formIndex == ingredient.Forms.Length) return false;
+        // Every later ingredient has a positive request and needs at least one slot.
+        // This is a lower bound, not a prediction of its final mixed-form allocation.
+        int currentSlotBudget = remainingSlots - (ingredients.Length - ingredientIndex - 1);
+        if (currentSlotBudget <= 0
+            || !HasEnoughRemainingCapacity(ingredient.Forms, formIndex, remainingAmount, currentSlotBudget))
+        {
+            failedStates.Add(state);
+            return false;
+        }
 
         FormSupply form = ingredient.Forms[formIndex];
         int preferredAmount = Math.Min(remainingAmount, form.Amount);
-        int maximumSlots = Math.Min(remainingSlots, 1 + (preferredAmount - 1) / form.Capacity);
+        int maximumSlots = Math.Min(currentSlotBudget, 1 + (preferredAmount - 1) / form.Capacity);
         for (int slots = maximumSlots; slots > 0; slots--)
         {
             // For a fixed slot allocation, taking fewer items cannot help: forms contribute
@@ -147,15 +161,38 @@ internal static class AlloyDepositStackPlanner
             int usedSlots = 1 + (amount - 1) / form.Capacity;
             selected.Add((ingredient.Ingredient, form.Stack, amount, usedSlots));
             if (TrySelectForms(ingredients, ingredientIndex, formIndex + 1,
-                remainingAmount - amount, remainingSlots - usedSlots, selected)) return true;
+                remainingAmount - amount, remainingSlots - usedSlots, selected, failedStates)) return true;
 
             // A later ingredient may force reconsideration of this earlier choice.
             selected.RemoveAt(selected.Count - 1);
         }
 
         // Skipping is essential when a small preferred source would consume an extra slot.
-        return TrySelectForms(ingredients, ingredientIndex, formIndex + 1,
-            remainingAmount, remainingSlots, selected);
+        if (TrySelectForms(ingredients, ingredientIndex, formIndex + 1,
+            remainingAmount, remainingSlots, selected, failedStates)) return true;
+
+        failedStates.Add(state);
+        return false;
+    }
+
+    /// <summary>Rejects only states that fail even optimistic supply and slot-capacity bounds.</summary>
+    private static bool HasEnoughRemainingCapacity(
+        ImmutableArray<FormSupply> forms,
+        int formIndex,
+        int remainingAmount,
+        int slotBudget)
+    {
+        long availableAmount = 0;
+        int maximumCapacity = 0;
+        for (int index = formIndex; index < forms.Length; index++)
+        {
+            availableAmount += forms[index].Amount;
+            maximumCapacity = Math.Max(maximumCapacity, forms[index].Capacity);
+        }
+        // Assuming every slot can use the largest remaining capacity overestimates what fits.
+        // It is safe for pruning even when that form has too little supply to fill those slots.
+        return availableAmount >= remainingAmount
+            && (long)slotBudget * maximumCapacity >= remainingAmount;
     }
 
     /// <summary>Checks the existing allocation against eligible supplies without choosing replacement forms.</summary>

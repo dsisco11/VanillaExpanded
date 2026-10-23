@@ -24,8 +24,12 @@ smaller contributions from preferred forms, then skips those forms as needed. It
 revisit an earlier ingredient's choices to leave space for later ingredients.
 The first feasible selection is passed to the existing spare-slot balancing logic.
 Execution-time resolution remains restricted to the plan's destination indices.
-Search pruning and failed-state memoization remain pending; see
-[the planner proposal](AlloyDepositPlannerProposal.md).
+Search reserves at least one slot for each later ingredient and rejects states whose
+remaining supply or optimistic capacity cannot meet the current request. Failed states
+are memoized by ingredient index, form index, remaining quantity, and remaining slots.
+The cache is local to one detached supply snapshot, assuming disjoint supplies between
+ingredients; no attempt limit truncates the search. See
+[the planner proposal](AlloyDepositPlannerProposal.md) for the broader design.
 
 ## Fuel selection
 

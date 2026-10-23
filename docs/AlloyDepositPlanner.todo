@@ -1,7 +1,7 @@
 # Alloy Deposit Planner Implementation TODO
     Proposal: AlloyDepositPlannerProposal.md
     Scope: implement slot-bounded fallback search without changing ingredient calculations or inventory-access policy.
-    Status: Phases 1 through 4 complete; search pruning and memoization remain pending.
+    Status: Phases 1 through 5 complete; integration acceptance and broader validation remain pending.
     Phase 1 validation: 10 focused planner cases run; 6 passed and 4 failed as expected.
         Expected failures: primary three-metal scenario, concrete-layout preservation,
         and both fallback-capacity scenarios (multi-slot alternative and reduced preferred contribution).
@@ -76,14 +76,17 @@
 
     ## 5. Add Pruning and Failed-State Memoization
         Depends on: 4
-        [ ] Prune when remaining supply cannot satisfy the current ingredient.
-        [ ] Prune when an optimistic capacity bound cannot satisfy the request within the slot budget.
-        [ ] Reserve a lower bound of one slot for every remaining nonzero ingredient.
-        [ ] Memoize failed states by ingredient index, form index, remaining quantity, and remaining slots.
+        Validation: all 55 focused planner/service/opened-container cases passed.
+            Includes deterministic and cross-ingredient backtracking regressions, plus a new
+            converging-branches case that becomes feasible after a supply snapshot changes.
+        [x] Prune when remaining supply cannot satisfy the current ingredient.
+        [x] Prune when an optimistic capacity bound cannot satisfy the request within the slot budget.
+        [x] Reserve a lower bound of one slot for every remaining nonzero ingredient.
+        [x] Memoize failed states by ingredient index, form index, remaining quantity, and remaining slots.
             Scope the cache to one supply snapshot.
             Document the assumption that ingredient supplies are disjoint.
-        [ ] Do not add arbitrary search-attempt limits or success-shaped fallbacks.
-        [ ] Re-run deterministic and cross-ingredient backtracking tests.
+        [x] Do not add arbitrary search-attempt limits or success-shaped fallbacks.
+        [x] Re-run deterministic and cross-ingredient backtracking tests.
 
     ## 6. Materialize and Integrate
         Depends on: 4, 5
