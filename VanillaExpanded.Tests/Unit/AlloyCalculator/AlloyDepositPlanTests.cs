@@ -64,6 +64,112 @@ public class AlloyDepositPlanTests
             Assert.Equal(amounts[index], plan.Targets
                 .Where(target => target.Ingredient == ingredients[index]).Sum(target => target.Amount));
         }
+        AssertSameLayout(plan, Assert.IsType<AlloyDepositPlan>(AlloyDepositStackPlanner.Resolve(
+            fixture.World, request, cooking.ToArray(), supplies, MatchesIngredient, spreadAcrossCookingSlots: true)));
+    }
+
+    [Fact]
+    public void Resolve_ValidConcreteLayoutWithNewSmallerForm_RetainsExactLayout()
+    {
+        VsTestFixture fixture = VsTestFixture.Client();
+        MockItem metal = CreateItem(1, "ingot-metal-a");
+        MockItem nuggets = CreateSmeltableItem(2, "nugget-metal-a", metal);
+        MockItem bits = CreateSmeltableItem(3, "metalbit-metal-a", metal);
+        var ingredient = new MetalDepositIngredient(metal.Code, new ItemStack(metal), 1, 1);
+        var supplies = new InventoryGeneric(1, "supply", "preservation", null!) { Api = fixture.Api };
+        supplies[0].Itemstack = new ItemStack(bits, 1);
+        var cooking = new InventoryGeneric(4, "cooking", "preservation", null!) { Api = fixture.Api };
+        int[] amounts = [7, 5, 4, 4];
+        for (int index = 0; index < cooking.Count; index++)
+            cooking[index].Itemstack = new ItemStack(nuggets, amounts[index]);
+        var original = new AlloyDepositPlan([.. amounts.Select((amount, index) =>
+            new AlloyDepositSlotTarget(index, ingredient, amount, new ItemStack(nuggets)))]);
+
+        AlloyDepositPlan? resolved = AlloyDepositStackPlanner.Resolve(
+            fixture.World, original, cooking.ToArray(), supplies.Concat(cooking), MatchesIngredient);
+
+        Assert.Equal(amounts, cooking.Select(slot => slot.StackSize));
+        Assert.Equal(1, supplies[0].StackSize);
+        Assert.Same(original, resolved);
+        Assert.Same(original, AlloyDepositStackPlanner.Resolve(
+            fixture.World, original, cooking.ToArray(), supplies.Concat(cooking), MatchesIngredient));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Resolve_FallbackWithCapacityLimits_FindsFourSlotPlan(bool reducePreferredForm)
+    {
+        VsTestFixture fixture = VsTestFixture.Client();
+        MockItem metalA = CreateItem(1, "ingot-metal-a");
+        MockItem metalB = CreateItem(2, "ingot-metal-b");
+        MockItem preferredA = CreateSmeltableItem(3, "chunk-metal-a", metalA);
+        MockItem alternativeA = CreateSmeltableItem(4, "nugget-metal-a", metalA);
+        MockItem bBits = CreateSmeltableItem(5, "metalbit-metal-b", metalB);
+        MockItem bNuggets = CreateSmeltableItem(6, "nugget-metal-b", metalB);
+        var a = new MetalDepositIngredient(metalA.Code, new ItemStack(metalA), 0, 1);
+        var b = new MetalDepositIngredient(metalB.Code, new ItemStack(metalB), 0, 1);
+        preferredA.MaxStackSize = reducePreferredForm ? 2 : 64;
+        alternativeA.MaxStackSize = reducePreferredForm ? 6 : 4;
+        // In the reduced-contribution case, five preferred items span three source stacks.
+        var supplies = new InventoryGeneric(6, "supply", "capacity", null!) { Api = fixture.Api };
+        if (reducePreferredForm)
+        {
+            supplies[0].Itemstack = new ItemStack(preferredA, 1);
+            supplies[1].Itemstack = new ItemStack(preferredA, 2);
+            supplies[2].Itemstack = new ItemStack(preferredA, 2);
+        }
+        else supplies[0].Itemstack = new ItemStack(preferredA, 1);
+        // Eight alternative items must also be represented by legal source stacks.
+        supplies[3].Itemstack = new ItemStack(alternativeA, reducePreferredForm ? 6 : 4);
+        supplies[4].Itemstack = new ItemStack(reducePreferredForm ? bBits : alternativeA, reducePreferredForm ? 1 : 4);
+        supplies[5].Itemstack = new ItemStack(reducePreferredForm ? bBits : bNuggets, 1);
+        if (!reducePreferredForm)
+        {
+            // B needs both nonmergeable forms, leaving two slots for A.
+            supplies[1].Itemstack = new ItemStack(bBits, 1);
+        }
+        int requestedA = reducePreferredForm ? 10 : 8;
+        int requestedB = reducePreferredForm ? 1 : 2;
+        var request = new AlloyDepositPlan(
+        [
+            new(0, a, requestedA),
+            new(1, b, requestedB)
+        ]);
+        var cooking = new InventoryGeneric(4, "cooking", "capacity", null!) { Api = fixture.Api };
+        var before = supplies.Select(slot => (slot.Itemstack?.Collectible.Code, slot.StackSize)).ToArray();
+        Assert.True(supplies.Where(slot => !slot.Empty && MatchesIngredient(slot.Itemstack, a))
+            .Sum(slot => slot.StackSize) >= requestedA);
+        Assert.True(supplies.Where(slot => !slot.Empty && MatchesIngredient(slot.Itemstack, b))
+            .Sum(slot => slot.StackSize) >= requestedB);
+
+        AlloyDepositPlan? result = AlloyDepositStackPlanner.Resolve(
+            fixture.World, request, cooking.ToArray(), supplies, MatchesIngredient, spreadAcrossCookingSlots: true);
+
+        Assert.Equal(before, supplies.Select(slot => (slot.Itemstack?.Collectible.Code, slot.StackSize)));
+        Assert.All(cooking, slot => Assert.True(slot.Empty));
+        AlloyDepositPlan plan = Assert.IsType<AlloyDepositPlan>(result);
+        Assert.Equal(4, plan.Targets.Length);
+        Assert.Equal(4, plan.Targets.Select(target => target.SlotIndex).Distinct().Count());
+        Assert.Equal(requestedA, plan.Targets.Where(target => target.Ingredient == a).Sum(target => target.Amount));
+        Assert.Equal(requestedB, plan.Targets.Where(target => target.Ingredient == b).Sum(target => target.Amount));
+        Assert.All(plan.Targets, target => Assert.InRange(target.Amount, 1,
+            Math.Min(cooking[target.SlotIndex].MaxSlotStackSize, target.DesiredStack!.Collectible.MaxStackSize)));
+        if (reducePreferredForm)
+        {
+            // Skipping the preferred form is impossible: the alternative supplies only six of ten items.
+            Assert.Equal(4, plan.Targets.Where(target => target.DesiredStack!.Collectible == preferredA)
+                .Sum(target => target.Amount));
+            Assert.Equal(6, plan.Targets.Where(target => target.DesiredStack!.Collectible == alternativeA)
+                .Sum(target => target.Amount));
+        }
+        else
+        {
+            Assert.DoesNotContain(plan.Targets, target => target.DesiredStack!.Collectible == preferredA);
+            Assert.Equal(2, plan.Targets.Count(target => target.DesiredStack!.Collectible == alternativeA));
+        }
+        AssertSameLayout(plan, Assert.IsType<AlloyDepositPlan>(AlloyDepositStackPlanner.Resolve(
+            fixture.World, request, cooking.ToArray(), supplies, MatchesIngredient, spreadAcrossCookingSlots: true)));
     }
 
     [Fact]
@@ -155,6 +261,8 @@ public class AlloyDepositPlanTests
         Assert.Equal(copperAmount + 2, supplies.Sum(slot => slot.StackSize));
         Assert.Equal(plan, AlloyDepositStackPlanner.Resolve(
             fixture.World, plan, cooking.ToArray(), supplies, MatchesIngredient));
+        AssertSameLayout(plan, Assert.IsType<AlloyDepositPlan>(AlloyDepositStackPlanner.Resolve(
+            fixture.World, request, cooking.ToArray(), supplies, MatchesIngredient, spreadAcrossCookingSlots: true)));
 
         var previousLayout = new AlloyDepositPlan(
         [
@@ -185,6 +293,13 @@ public class AlloyDepositPlanTests
             fixture.World, request, cooking.ToArray(), supplies, MatchesIngredient, spreadAcrossCookingSlots: true));
         Assert.All(cooking, slot => Assert.True(slot.Empty));
         Assert.All(supplies, slot => Assert.Equal(1, slot.StackSize));
+    }
+
+    private static void AssertSameLayout(AlloyDepositPlan expected, AlloyDepositPlan actual)
+    {
+        Assert.Equal(
+            expected.Targets.Select(target => (target.SlotIndex, target.Ingredient, target.Amount, target.DesiredStack!.Collectible.Code)),
+            actual.Targets.Select(target => (target.SlotIndex, target.Ingredient, target.Amount, target.DesiredStack!.Collectible.Code)));
     }
 
     private static bool MatchesIngredient(ItemStack stack, MetalDepositIngredient ingredient)

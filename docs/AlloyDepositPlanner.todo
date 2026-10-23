@@ -1,20 +1,25 @@
 # Alloy Deposit Planner Implementation TODO
     Proposal: AlloyDepositPlannerProposal.md
     Scope: implement slot-bounded fallback search without changing ingredient calculations or inventory-access policy.
-    Status: not started; the three-metal regression is intentionally failing.
+    Status: Phase 1 complete; production implementation has not started.
+    Phase 1 validation: 10 focused planner cases run; 6 passed and 4 failed as expected.
+        Expected failures: primary three-metal scenario, concrete-layout preservation,
+        and both fallback-capacity scenarios (multi-slot alternative and reduced preferred contribution).
+        Failures occur at missing-plan/layout assertions, not fixture or supply checks.
+        The original three-metal scenario also covers revisiting an earlier ingredient for later ingredients.
 
     ## 1. Establish Regression Coverage
-        [ ] Preserve Resolve_ThreeMetalAlloyWithOptionalForms_FindsFourSlotPlan as the primary failing regression.
+        [x] Preserve Resolve_ThreeMetalAlloyWithOptionalForms_FindsFourSlotPlan as the primary failing regression.
             Keep targetUnits=100, normalized weights, requested counts 10/7/4, and approved supply quantities.
             Do not change rounding or relax assertions to make the test pass.
-        [ ] Add a valid-concrete-layout test with newly available, smaller preferred forms.
+        [x] Add a valid-concrete-layout test with newly available, smaller preferred forms.
             Assert execution-time resolution retains the exact existing layout.
-        [ ] Add a fallback case where one form needs multiple slots because of its stack limit.
-        [ ] Add a case requiring reduced use of a preferred form rather than simply skipping it.
-        [ ] Add a case requiring backtracking to an earlier ingredient to leave room for later ingredients.
-        [ ] Retain coverage for mandatory mixed forms and genuinely impossible arrangements.
-        [ ] Add repeated-input assertions proving deterministic selection.
-        [ ] Confirm new failures expose selection/layout defects rather than insufficient supply or invalid fixtures.
+        [x] Add a fallback case where one form needs multiple slots because of its stack limit.
+        [x] Add a case requiring reduced use of a preferred form rather than simply skipping it.
+        [x] Add a case requiring backtracking to an earlier ingredient to leave room for later ingredients.
+        [x] Retain coverage for mandatory mixed forms and genuinely impossible arrangements.
+        [x] Add repeated-input assertions proving deterministic selection.
+        [x] Confirm new failures expose selection/layout defects rather than insufficient supply or invalid fixtures.
 
     ## 2. Prepare Shared Planning Data
         Depends on: 1
