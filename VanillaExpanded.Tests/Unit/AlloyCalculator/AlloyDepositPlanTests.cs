@@ -8,6 +8,103 @@ namespace VanillaExpanded.Tests.Unit.AlloyCalculator;
 [Trait("Category", "Unit")]
 public class AlloyDepositPlanTests
 {
+    [Theory]
+    [InlineData(-1, 6)]
+    [InlineData(4, 6)]
+    [InlineData(0, 0)]
+    [InlineData(0, -1)]
+    public void Resolve_InvalidTargetIndexOrQuantity_ReturnsNull(int index, int amount)
+    {
+        VsTestFixture fixture = VsTestFixture.Client();
+        MockItem metal = CreateItem(1, "ingot-metal-a");
+        MockItem bits = CreateSmeltableItem(2, "metalbit-metal-a", metal);
+        var ingredient = new MetalDepositIngredient(metal.Code, new ItemStack(metal), 1, 1);
+        var supplies = new InventoryGeneric(1, "supply", "invalid-target", null!) { Api = fixture.Api };
+        supplies[0].Itemstack = new ItemStack(bits, 12);
+        var cooking = new InventoryGeneric(4, "cooking", "invalid-target", null!) { Api = fixture.Api };
+        var plan = new AlloyDepositPlan([new(index, ingredient, amount, new ItemStack(bits))]);
+
+        Assert.Null(AlloyDepositStackPlanner.Resolve(
+            fixture.World, plan, cooking.ToArray(), supplies, MatchesIngredient));
+        Assert.Equal(12, supplies[0].StackSize);
+        Assert.All(cooking, slot => Assert.True(slot.Empty));
+    }
+
+    [Theory]
+    [InlineData("aggregate-shortage")]
+    [InlineData("unavailable-form")]
+    [InlineData("wrong-metal")]
+    [InlineData("duplicate-slot")]
+    [InlineData("missing-desired-stack")]
+    public void Resolve_InfeasibleConcreteLayout_ReselectsFromEligibleSupplies(string scenario)
+    {
+        VsTestFixture fixture = VsTestFixture.Client();
+        MockItem metal = CreateItem(1, "ingot-metal-a");
+        MockItem bits = CreateSmeltableItem(2, "metalbit-metal-a", metal);
+        MockItem nuggets = CreateSmeltableItem(3, "nugget-metal-a", metal);
+        MockItem otherMetal = CreateItem(4, "ingot-metal-b");
+        MockItem otherBits = CreateSmeltableItem(5, "metalbit-metal-b", otherMetal);
+        var ingredient = new MetalDepositIngredient(metal.Code, new ItemStack(metal), 1, 1);
+        var supplies = new InventoryGeneric(3, "supply", "reselection", null!) { Api = fixture.Api };
+        int bitsAvailable = scenario == "aggregate-shortage" ? 8 : scenario == "unavailable-form" ? 0 : 12;
+        if (bitsAvailable > 0) supplies[0].Itemstack = new ItemStack(bits, bitsAvailable);
+        supplies[1].Itemstack = new ItemStack(nuggets, 20);
+        supplies[2].Itemstack = new ItemStack(otherBits, 1);
+        var cooking = new InventoryGeneric(4, "cooking", "reselection", null!) { Api = fixture.Api };
+        MockItem desired = scenario == "wrong-metal" ? otherBits : bits;
+        var original = new AlloyDepositPlan(
+        [
+            new(0, ingredient, 6, new ItemStack(desired)),
+            new(scenario == "duplicate-slot" ? 0 : 1, ingredient, 6,
+                scenario == "missing-desired-stack" ? null : new ItemStack(desired))
+        ]);
+
+        AlloyDepositPlan result = Assert.IsType<AlloyDepositPlan>(AlloyDepositStackPlanner.Resolve(
+            fixture.World, original, cooking.ToArray(), supplies, MatchesIngredient));
+
+        Assert.NotSame(original, result);
+        Assert.Equal(12, result.Targets.Sum(target => target.Amount));
+        Assert.Equal(result.Targets.Length, result.Targets.Select(target => target.SlotIndex).Distinct().Count());
+        Assert.All(result.Targets, target =>
+        {
+            Assert.Contains(target.SlotIndex, original.Targets.Select(item => item.SlotIndex));
+            Assert.True(MatchesIngredient(target.DesiredStack!, ingredient));
+        });
+        Assert.True(result.Targets.Where(target => target.DesiredStack!.Collectible == bits)
+            .Sum(target => target.Amount) <= bitsAvailable);
+        Assert.Equal(bitsAvailable, supplies[0].StackSize);
+        Assert.Equal(20, supplies[1].StackSize);
+        Assert.Equal(1, supplies[2].StackSize);
+        Assert.All(cooking, slot => Assert.True(slot.Empty));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Resolve_ConcreteTargetsExceedCapacity_RejectsLayout(bool itemLimit)
+    {
+        VsTestFixture fixture = VsTestFixture.Client();
+        MockItem metal = CreateItem(1, "ingot-metal-a");
+        MockItem bits = CreateSmeltableItem(2, "metalbit-metal-a", metal);
+        if (itemLimit) bits.MaxStackSize = 4;
+        var ingredient = new MetalDepositIngredient(metal.Code, new ItemStack(metal), 1, 1);
+        var supplies = new InventoryGeneric(3, "supply", "capacity-validation", null!) { Api = fixture.Api };
+        foreach (ItemSlot slot in supplies) slot.Itemstack = new ItemStack(bits, 4);
+        var cooking = new InventoryGeneric(4, "cooking", "capacity-validation", null!) { Api = fixture.Api };
+        if (!itemLimit)
+            foreach (ItemSlot slot in cooking) slot.MaxSlotStackSize = 4;
+        var original = new AlloyDepositPlan(
+        [
+            new(0, ingredient, 6, new ItemStack(bits)),
+            new(1, ingredient, 6, new ItemStack(bits))
+        ]);
+
+        Assert.Null(AlloyDepositStackPlanner.Resolve(
+            fixture.World, original, cooking.ToArray(), supplies, MatchesIngredient));
+        Assert.Equal([4, 4, 4], supplies.Select(slot => slot.StackSize));
+        Assert.All(cooking, slot => Assert.True(slot.Empty));
+    }
+
     [Fact]
     public void Resolve_EqualSizeSources_GroupsCompatibleStacksAndRetainsTieOrder()
     {

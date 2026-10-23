@@ -1,7 +1,7 @@
 # Alloy Deposit Planner Implementation TODO
     Proposal: AlloyDepositPlannerProposal.md
     Scope: implement slot-bounded fallback search without changing ingredient calculations or inventory-access policy.
-    Status: Phases 1 and 2 complete; layout preservation and fallback search remain pending.
+    Status: Phases 1 through 3 complete; fallback search remains pending.
     Phase 1 validation: 10 focused planner cases run; 6 passed and 4 failed as expected.
         Expected failures: primary three-metal scenario, concrete-layout preservation,
         and both fallback-capacity scenarios (multi-slot alternative and reduced preferred contribution).
@@ -40,14 +40,19 @@
 
     ## 3. Preserve Valid Concrete Layouts
         Depends on: 2
-        [ ] Before greedy reselection, validate concrete targets when spreadAcrossCookingSlots is false.
-        [ ] Validate unique and permitted destination indices.
-        [ ] Validate positive quantities and each target's effective capacity.
-        [ ] Validate desired forms against eligible supplies and the requested ingredient identity.
-        [ ] Validate aggregate per-form supply and exact requested ingredient totals.
-        [ ] Return the existing plan unchanged when valid.
-        [ ] Fall through to selection when the layout is no longer feasible.
-        [ ] Pass the layout-preservation regression and existing execution-layout tests.
+        Validation: 54 focused planner/service/opened-container cases run; 51 passed.
+            The concrete-layout preservation regression now passes.
+            Three fallback-search cases remain intentionally failing.
+            Eleven new cases cover invalid indices/quantities, duplicate destinations,
+            missing or mismatched forms, aggregate supply shortage, and item/slot capacity.
+        [x] Before greedy reselection, validate concrete targets when spreadAcrossCookingSlots is false.
+        [x] Validate unique and permitted destination indices.
+        [x] Validate positive quantities and each target's effective capacity.
+        [x] Validate desired forms against eligible supplies and the requested ingredient identity.
+        [x] Validate aggregate per-form supply and exact requested ingredient totals.
+        [x] Return the existing plan unchanged when valid.
+        [x] Fall through to selection when the layout is no longer feasible.
+        [x] Pass the layout-preservation regression and existing execution-layout tests.
 
     ## 4. Implement Slot-Bounded Fallback Search
         Depends on: 2, 3

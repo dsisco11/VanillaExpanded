@@ -22,16 +22,26 @@ internal static class AlloyDepositStackPlanner
         System.Func<ItemStack, MetalDepositIngredient, bool> matchesIngredient,
         bool spreadAcrossCookingSlots = false)
     {
+        if (plan.Targets.Any(target => target.SlotIndex < 0 || target.SlotIndex >= cookingSlots.Count
+            || target.Amount <= 0)) return null;
+
+        // Work on detached stacks so resolving a plan cannot modify live supplies.
         ItemStack[] available = availableSlots.Where(static slot => !slot.Empty)
             .Select(static slot => slot.Itemstack!.Clone())
             .OrderBy(static stack => stack.StackSize).ToArray();
+        // Initial planning may use every cooking slot; execution stays within the planned destinations.
         int[] slotIndices = spreadAcrossCookingSlots
             ? Enumerable.Range(0, cookingSlots.Count).ToArray()
             : plan.Targets.Select(static target => target.SlotIndex).Distinct().Order().ToArray();
         if (slotIndices.Length == 0) return null;
+        // Use a conservative common limit so selected forms fit any permitted destination.
         int slotCapacity = slotIndices.Min(index => cookingSlots[index].MaxSlotStackSize);
         ImmutableArray<IngredientSupply> ingredients = CollectIngredientSupplies(
             world, plan, available, slotCapacity, matchesIngredient);
+        // Validate before greedy selection: a newly available small stack must not displace a valid layout.
+        if (!spreadAcrossCookingSlots && HasValidConcreteLayout(
+            world, plan, ingredients, matchesIngredient)) return plan;
+
         var forms = new List<(MetalDepositIngredient Ingredient, ItemStack Stack, int Amount, int Slots)>();
         foreach (IngredientSupply ingredient in ingredients)
         {
@@ -49,18 +59,9 @@ internal static class AlloyDepositStackPlanner
         }
         if (forms.Sum(static form => form.Slots) > slotIndices.Length) return null;
 
-        // Execution retains a feasible layout, including deliberately uneven quantities, rather than reshuffling it.
-        if (!spreadAcrossCookingSlots && plan.Targets.All(target => target.DesiredStack is not null
-            && forms.Any(form => form.Ingredient == target.Ingredient
-                && form.Stack.Equals(world, target.DesiredStack, GlobalConstants.IgnoredStackAttributes))
-            && target.Amount <= Math.Min(slotCapacity, target.DesiredStack.Collectible.MaxStackSize))
-            && forms.All(form => plan.Targets.Where(target => target.Ingredient == form.Ingredient
-                && form.Stack.Equals(world, target.DesiredStack, GlobalConstants.IgnoredStackAttributes))
-                .Sum(static target => target.Amount) == form.Amount))
-        {
-            return plan;
-        }
-        if (!spreadAcrossCookingSlots && forms.All(form =>
+        // With one selected form per ingredient, existing quantities and destinations can be retained
+        // even when the original concrete form is unavailable. Duplicate destinations require rebuilding.
+        if (!spreadAcrossCookingSlots && plan.Targets.Length == slotIndices.Length && forms.All(form =>
             forms.Count(other => other.Ingredient == form.Ingredient) == 1)
             && plan.Targets.All(target => target.Amount <= Math.Min(slotCapacity,
                 forms.First(form => form.Ingredient == target.Ingredient).Stack.Collectible.MaxStackSize)))
@@ -109,6 +110,43 @@ internal static class AlloyDepositStackPlanner
         int Amount,
         ImmutableArray<FormSupply> Forms);
 
+    /// <summary>Checks the existing allocation against eligible supplies without choosing replacement forms.</summary>
+    private static bool HasValidConcreteLayout(
+        IWorldAccessor world,
+        AlloyDepositPlan plan,
+        ImmutableArray<IngredientSupply> ingredients,
+        System.Func<ItemStack, MetalDepositIngredient, bool> matchesIngredient)
+    {
+        if (plan.Targets.Select(static target => target.SlotIndex).Distinct().Count() != plan.Targets.Length
+            || plan.Targets.Any(static target => target.DesiredStack is null)) return false;
+
+        foreach (IngredientSupply ingredient in ingredients)
+        {
+            AlloyDepositSlotTarget[] targets = plan.Targets
+                .Where(target => target.Ingredient == ingredient.Ingredient).ToArray();
+            if (targets.Sum(static target => (long)target.Amount) != ingredient.Amount) return false;
+
+            foreach (AlloyDepositSlotTarget target in targets)
+            {
+                ItemStack desired = target.DesiredStack!;
+                FormSupply? supply = ingredient.Forms.FirstOrDefault(form =>
+                    form.Stack.Equals(world, desired, GlobalConstants.IgnoredStackAttributes));
+                if (supply is null || target.Amount > supply.Capacity
+                    || !matchesIngredient(desired, ingredient.Ingredient)) return false;
+            }
+            // Per-target checks are insufficient: several targets may compete for the same supply.
+            foreach (FormSupply form in ingredient.Forms)
+            {
+                long required = targets.Where(target =>
+                    form.Stack.Equals(world, target.DesiredStack, GlobalConstants.IgnoredStackAttributes))
+                    .Sum(static target => (long)target.Amount);
+                if (required > form.Amount) return false;
+            }
+        }
+        return true;
+    }
+
+    /// <summary>Groups detached supplies by merge compatibility, retaining source preference and usable capacity.</summary>
     private static ImmutableArray<IngredientSupply> CollectIngredientSupplies(
         IWorldAccessor world,
         AlloyDepositPlan plan,
@@ -127,6 +165,7 @@ internal static class AlloyDepositStackPlanner
                 int capacity = Math.Min(slotCapacity, stack.Collectible.MaxStackSize);
                 if (capacity <= 0 || !matchesIngredient(stack, group.Key)) continue;
 
+                // Equal metal output establishes eligibility, not whether two source stacks can share a slot.
                 int index = forms.FindIndex(form => form.Stack.Equals(world, stack, GlobalConstants.IgnoredStackAttributes));
                 if (index < 0) forms.Add(new FormSupply(stack, stack.StackSize, capacity));
                 else forms[index] = forms[index] with { Amount = forms[index].Amount + stack.StackSize };

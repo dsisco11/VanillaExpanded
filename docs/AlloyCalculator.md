@@ -13,7 +13,12 @@ The stack planner snapshots source stacks and groups merge-compatible forms per 
 retaining stable smallest-source-stack preference. Each form records its available quantity
 and effective capacity (the lower of the common cooking-slot limit and the item's stack limit).
 Forms with nonpositive capacity are skipped without excluding usable alternatives.
-Selection is still greedy; fallback search is planned in
+During execution-time resolution, a concrete layout is validated before greedy selection.
+Valid layouts retain their exact forms, quantities, and slot assignments even if smaller
+source stacks have become available. Validation checks unique in-range destinations,
+positive quantities, capacity, ingredient identity, and aggregate supply per form.
+Infeasible layouts fall through to reselection; invalid indices or nonpositive requests
+are rejected. Selection of replacement layouts is still greedy; fallback search is planned in
 [the planner proposal](AlloyDepositPlannerProposal.md).
 
 ## Fuel selection
