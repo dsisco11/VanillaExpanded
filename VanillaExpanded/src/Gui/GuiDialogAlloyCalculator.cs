@@ -91,7 +91,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     public override double DrawOrder => 0.2;
     public override string ToggleKeyCombinationCode => string.Empty;
     protected override double FloatyDialogPosition => 0.5;
-    protected override double FloatyDialogAlign => 1.0;
+    protected override double FloatyDialogAlign => 0;
 
     /// <summary>
     /// Gets the calculated ingredient stacks for the current alloy configuration.
@@ -175,6 +175,13 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     #endregion
 
     #region Dialog Composition
+    internal static ElementBounds CreateDialogBounds(ElementBounds? firepitBounds)
+        => ElementStdBounds.AutosizedMainDialog
+            .WithAlignment(EnumDialogArea.CenterTop)
+            .WithFixedAlignmentOffset(
+                (firepitBounds?.OuterWidth ?? 0) / 2,
+                (firepitBounds?.absY ?? 0) / RuntimeEnv.GUIScale);
+
     private void ComposeDialog()
     {
         updateOptionalSectionLayout = null;
@@ -209,14 +216,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         bgBounds.BothSizing = ElementSizing.FitToChildren;
         bgBounds.WithChildren(contentBounds);
 
-        // Calculate offset to position right of firepit dialog
-        var firepitWidth = FirepitDialogWidth;
-        var dialogXOffset = (firepitWidth / 2);
-
-        // Dialog bounds - positioned to the right of the firepit
-        var dialogBounds = ElementStdBounds.AutosizedMainDialog
-            .WithAlignment(EnumDialogArea.CenterMiddle)
-            .WithFixedAlignmentOffset(dialogXOffset, 0);
+        var dialogBounds = CreateDialogBounds(firepitDialog?.SingleComposer?.Bounds);
 
         // Build the UI - start below title bar
         var yOffset = TitlebarHeight;
@@ -1017,15 +1017,28 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
     public override void OnRenderGUI(float deltaTime)
     {
-        base.OnRenderGUI(deltaTime);
         fuelInfoRefreshElapsed += deltaTime;
         if (fuelInfoRefreshElapsed >= FuelInfoRefreshInterval) UpdateFuelInfo();
-        if (capi.Settings.Bool["immersiveMouseMode"])
+        if (capi.Settings.Bool["immersiveMouseMode"]
+            && firepitDialog?.SingleComposer?.Bounds is ElementBounds firepitBounds)
         {
-            // Adjust position to account for firepit dialog width in immersive mode (positions the calculator dialog to the right of the firepit dialog)
-            SingleComposer.Bounds.absOffsetX = (SingleComposer.Bounds.OuterWidth / 2) + (FirepitDialogWidth / 2) - 5;
-            SingleComposer.Bounds.absOffsetY = 0;
+            var anchor = new Vec3d(BlockEntityPosition.X + 0.5,
+                BlockEntityPosition.Y + FloatyDialogPosition, BlockEntityPosition.Z + 0.5);
+            Vec3d projected = MatrixToolsd.Project(anchor, capi.Render.PerspectiveProjectionMat,
+                capi.Render.PerspectiveViewMat, capi.Render.FrameWidth, capi.Render.FrameHeight);
+            AlignImmersiveDialog(SingleComposer.Bounds, firepitBounds, capi.Render.FrameHeight - projected.Y);
         }
+        base.OnRenderGUI(deltaTime);
+    }
+
+    internal static void AlignImmersiveDialog(ElementBounds bounds, ElementBounds firepitBounds, double projectedAnchorY)
+    {
+        // The base renderer resets absFixedY to this projected anchor, but retains absolute offsets.
+        bounds.absFixedY = projectedAnchorY;
+        bounds.absMarginY = 0;
+        bounds.absOffsetY = 0;
+        bounds.absOffsetY = firepitBounds.renderY - bounds.renderY;
+        bounds.absOffsetX = bounds.OuterWidth / 2 + firepitBounds.OuterWidth / 2 - 5;
     }
 
     public override bool TryOpen()

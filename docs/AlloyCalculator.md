@@ -70,6 +70,8 @@ Below the required metals, a localized "Smelting temperature" row displays the s
 
 The excess-metal warning's reserved space and gap collapse when there is no warning. The fuel-status row also collapses when it has no prewarming or availability message. Visibility changes reposition the fuel section and Deposit button and resize the existing composer without resetting alloy selection, ratios, or target units; the button tooltip moves with the button.
 
+The panel is top-anchored: height changes from optional rows or alloy selection move only the bottom edge. In both normal and immersive mode, its top aligns with the firepit dialog's actual screen-space top. Immersive positioning offsets the calculator's projected block anchor before rendering so camera movement and calculator height changes do not separate the two title bars.
+
 ### Prewarming
 
 Prewarming candidates come from withdrawable backpack, hotbar, and supported opened-storage slots, plus the firepit's queued fuel. Each distinct stack type with positive effective burn duration and temperature below the selected batch's melting point is considered, including untagged burnables. Candidates need not already be in the fuel slot. Temperature and duration checks include the firepit's modifiers.
