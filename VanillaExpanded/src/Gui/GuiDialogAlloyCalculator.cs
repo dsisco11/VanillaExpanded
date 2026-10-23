@@ -40,8 +40,10 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private const double SlotSize = 40;
     private const double ButtonHeight = 25;
     private const double SectionTitleHeight = 20;
+    private const double SmeltingTemperatureHeight = 20;
+    private const double FuelSlotHeight = SlotSize + 8;
     private const double FuelStatusHeight = 64;
-    private const double FuelInfoHeight = 15 + SectionTitleHeight + SlotSize + 8 + FuelStatusHeight + 6;
+    private const double FuelInfoHeight = 15 + SectionTitleHeight + FuelSlotHeight + FuelStatusHeight + 6;
     private const float FuelInfoRefreshInterval = 0.5f;
     #endregion
 
@@ -73,10 +75,11 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private bool isAdjustingSliders;
     private float fuelInfoRefreshElapsed;
     private string? fuelInfoText;
+    private string? smeltingTemperatureText;
     private ItemStack? fuelPreviewStack;
     private ItemStack[] prewarmingPreviewStacks = [];
     private ItemStack? savedFuelPreviewStack;
-    private Action<bool, bool>? updateOptionalSectionLayout;
+    private Action<bool, bool, double>? updateOptionalSectionLayout;
     
     // Cached handbook data for filtering
     private ItemStack[]? handbookStacks;
@@ -89,7 +92,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     public override double DrawOrder => 0.2;
     public override string ToggleKeyCombinationCode => string.Empty;
     protected override double FloatyDialogPosition => 0.5;
-    protected override double FloatyDialogAlign => 1.0;
+    protected override double FloatyDialogAlign => 0;
 
     /// <summary>
     /// Gets the calculated ingredient stacks for the current alloy configuration.
@@ -173,6 +176,19 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     #endregion
 
     #region Dialog Composition
+    internal static ElementBounds CreateDialogBounds(ElementBounds? firepitBounds)
+        => ElementStdBounds.AutosizedMainDialog
+            .WithAlignment(EnumDialogArea.CenterTop)
+            .WithFixedAlignmentOffset(
+                (firepitBounds?.OuterWidth ?? 0) / 2,
+                (firepitBounds?.absY ?? 0) / RuntimeEnv.GUIScale);
+
+    internal static (double WarningReduction, double SlotReduction, double StatusReduction)
+        GetOptionalSectionReductions(bool showWarning, bool showFuelSlot, double fuelStatusHeight)
+        => (showWarning ? 0 : WasteWarningHeight + WasteWarningGap,
+            showFuelSlot ? 0 : FuelSlotHeight,
+            FuelStatusHeight - fuelStatusHeight);
+
     private void ComposeDialog()
     {
         updateOptionalSectionLayout = null;
@@ -198,7 +214,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                 contentHeight += ingredientCount * RowHeight;
             }
             contentHeight += 15 + SectionTitleHeight + SlotSize;
-            contentHeight += 18 + WasteWarningHeight + WasteWarningGap + FuelInfoHeight + ButtonHeight;
+            contentHeight += 18 + SmeltingTemperatureHeight + WasteWarningHeight + WasteWarningGap + FuelInfoHeight + ButtonHeight;
         }
         var contentBounds = ElementBounds.Fixed(0, 0, contentWidth, contentHeight);
 
@@ -207,14 +223,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         bgBounds.BothSizing = ElementSizing.FitToChildren;
         bgBounds.WithChildren(contentBounds);
 
-        // Calculate offset to position right of firepit dialog
-        var firepitWidth = FirepitDialogWidth;
-        var dialogXOffset = (firepitWidth / 2);
-
-        // Dialog bounds - positioned to the right of the firepit
-        var dialogBounds = ElementStdBounds.AutosizedMainDialog
-            .WithAlignment(EnumDialogArea.CenterMiddle)
-            .WithFixedAlignmentOffset(dialogXOffset, 0);
+        var dialogBounds = CreateDialogBounds(firepitDialog?.SingleComposer?.Bounds);
 
         // Build the UI - start below title bar
         var yOffset = TitlebarHeight;
@@ -348,6 +357,12 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             composer.AddRichtext(richTextComponents.ToArray(), slotBounds, "ingredientSlots");
 
             yOffset += (int)SlotSize + 18;
+            composer.AddDynamicText(
+                string.Empty,
+                CairoFont.WhiteDetailText().WithFontSize(12).WithOrientation(EnumTextOrientation.Center),
+                ElementBounds.Fixed(0, yOffset, contentWidth, SmeltingTemperatureHeight).WithParent(contentBounds),
+                "smeltingTemperature");
+            yOffset += SmeltingTemperatureHeight;
             var warningBounds = ElementBounds
                 .Fixed(0, yOffset, contentWidth, WasteWarningHeight)
                 .WithParent(contentBounds);
@@ -372,11 +387,11 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                 fuelTitleBounds);
             yOffset += SectionTitleHeight;
             var fuelSlotBounds = ElementBounds
-                .Fixed(0, yOffset, SlotSize, SlotSize + 8)
+                .Fixed(0, yOffset, SlotSize, FuelSlotHeight)
                 .WithParent(contentBounds)
                 .WithAlignment(EnumDialogArea.CenterFixed);
             composer.AddRichtext(Array.Empty<RichTextComponentBase>(), fuelSlotBounds, "fuelSlot");
-            yOffset += SlotSize + 8;
+            yOffset += FuelSlotHeight;
             var fuelInfoBounds = ElementBounds
                 .Fixed(0, yOffset, contentWidth, FuelStatusHeight)
                 .WithParent(contentBounds);
@@ -400,20 +415,25 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             ];
             double expandedButtonY = buttonBounds.fixedY;
             bool warningExpanded = true;
-            bool fuelStatusExpanded = true;
-            updateOptionalSectionLayout = (showWarning, showFuelStatus) =>
+            bool fuelSlotExpanded = true;
+            double currentFuelStatusHeight = FuelStatusHeight;
+            updateOptionalSectionLayout = (showWarning, showFuelSlot, fuelStatusHeight) =>
             {
-                if (showWarning == warningExpanded && showFuelStatus == fuelStatusExpanded) return;
+                if (showWarning == warningExpanded && showFuelSlot == fuelSlotExpanded
+                    && fuelStatusHeight == currentFuelStatusHeight) return;
                 warningExpanded = showWarning;
-                fuelStatusExpanded = showFuelStatus;
-                double warningReduction = showWarning ? 0 : WasteWarningHeight + WasteWarningGap;
-                double statusReduction = showFuelStatus ? 0 : FuelStatusHeight;
+                fuelSlotExpanded = showFuelSlot;
+                currentFuelStatusHeight = fuelStatusHeight;
+                var (warningReduction, slotReduction, statusReduction) = GetOptionalSectionReductions(
+                    showWarning, showFuelSlot, fuelStatusHeight);
                 foreach (var (bounds, originalY) in fuelSectionBounds)
                     bounds.fixedY = originalY - warningReduction;
-                fuelInfoBounds.fixedHeight = showFuelStatus ? FuelStatusHeight : 0;
-                buttonBounds.fixedY = expandedButtonY - warningReduction - statusReduction;
+                fuelSlotBounds.fixedHeight = showFuelSlot ? FuelSlotHeight : 0;
+                fuelInfoBounds.fixedY -= slotReduction;
+                fuelInfoBounds.fixedHeight = fuelStatusHeight;
+                buttonBounds.fixedY = expandedButtonY - warningReduction - slotReduction - statusReduction;
                 buttonTooltipBounds.fixedY = buttonBounds.fixedY;
-                contentBounds.fixedHeight = contentHeight - warningReduction - statusReduction;
+                contentBounds.fixedHeight = contentHeight - warningReduction - slotReduction - statusReduction;
                 SingleComposer.Bounds.MarkDirtyRecursive();
                 SingleComposer.ReCompose();
             };
@@ -421,6 +441,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
         SingleComposer = composer.EndChildElements().Compose();
         fuelInfoText = null;
+        smeltingTemperatureText = null;
         fuelPreviewStack = null;
         prewarmingPreviewStacks = [];
         savedFuelPreviewStack = null;
@@ -622,11 +643,20 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         BlockEntityFirepit? firepit = capi.World.BlockAccessor
             .GetBlockEntity<BlockEntityFirepit>(BlockEntityPosition);
         AlloyFuelDepositPlan? plan = null;
+        float? batchMeltingPoint = null;
         AlloyDepositResultCode result = firepit is null
             || calculatedStacks.Count != selectedIngredients.Length
             ? AlloyDepositResultCode.InvalidRequest
             : AlloyFuelDepositService.CreatePreview(capi, firepit, calculatedStacks,
-                capi.World.Player.InventoryManager, out plan);
+                capi.World.Player.InventoryManager, out plan, out _, out batchMeltingPoint);
+        string temperatureText = batchMeltingPoint is > 0
+            ? Lang.Get($"{Constants.ModId}:gui-alloycalculator-smelting-temperature", batchMeltingPoint.Value.ToString("0.#"))
+            : Lang.Get($"{Constants.ModId}:gui-alloycalculator-smelting-temperature-unavailable");
+        if (temperatureText != smeltingTemperatureText)
+        {
+            smeltingTemperatureText = temperatureText;
+            SingleComposer?.GetDynamicText("smeltingTemperature")?.SetNewText(temperatureText);
+        }
         string text = result switch
         {
             AlloyDepositResultCode.Success when plan!.PrewarmingStacks.Length > 0 => Lang.Get(
@@ -636,7 +666,8 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             AlloyDepositResultCode.InventoryClosed => Lang.Get($"{Constants.ModId}:gui-alloycalculator-deposit-fuel-inventory-closed"),
             _ => Lang.Get($"{Constants.ModId}:gui-alloycalculator-fuel-info-no-batch")
         };
-        ItemStack? previewStack = result == AlloyDepositResultCode.Success ? plan!.DesiredStack.Clone() : null;
+        ItemStack? previewStack = result == AlloyDepositResultCode.Success && plan!.DesiredAmount > 0
+            ? plan.DesiredStack.Clone() : null;
         if (previewStack is not null) previewStack.StackSize = plan!.DesiredAmount;
         bool samePreview = previewStack is null
             ? fuelPreviewStack is null
@@ -699,7 +730,10 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     {
         bool showWarning = AlloyCalculatorLogic.CalculateWastedMetalUnits(
             targetUnits, sliderValues, selectedIngredients) > 0;
-        updateOptionalSectionLayout?.Invoke(showWarning, !string.IsNullOrEmpty(fuelInfoText));
+        double statusHeight = string.IsNullOrEmpty(fuelInfoText)
+            ? 0
+            : Math.Ceiling(SingleComposer!.GetRichtext("fuelInfo").TotalHeight / RuntimeEnv.GUIScale) + 1;
+        updateOptionalSectionLayout?.Invoke(showWarning, fuelPreviewStack is not null, statusHeight);
     }
 
     private bool SameFuelPreview(ItemStack? left, ItemStack? right)
@@ -999,15 +1033,28 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
     public override void OnRenderGUI(float deltaTime)
     {
-        base.OnRenderGUI(deltaTime);
         fuelInfoRefreshElapsed += deltaTime;
         if (fuelInfoRefreshElapsed >= FuelInfoRefreshInterval) UpdateFuelInfo();
-        if (capi.Settings.Bool["immersiveMouseMode"])
+        if (capi.Settings.Bool["immersiveMouseMode"]
+            && firepitDialog?.SingleComposer?.Bounds is ElementBounds firepitBounds)
         {
-            // Adjust position to account for firepit dialog width in immersive mode (positions the calculator dialog to the right of the firepit dialog)
-            SingleComposer.Bounds.absOffsetX = (SingleComposer.Bounds.OuterWidth / 2) + (FirepitDialogWidth / 2) - 5;
-            SingleComposer.Bounds.absOffsetY = 0;
+            var anchor = new Vec3d(BlockEntityPosition.X + 0.5,
+                BlockEntityPosition.Y + FloatyDialogPosition, BlockEntityPosition.Z + 0.5);
+            Vec3d projected = MatrixToolsd.Project(anchor, capi.Render.PerspectiveProjectionMat,
+                capi.Render.PerspectiveViewMat, capi.Render.FrameWidth, capi.Render.FrameHeight);
+            AlignImmersiveDialog(SingleComposer.Bounds, firepitBounds, capi.Render.FrameHeight - projected.Y);
         }
+        base.OnRenderGUI(deltaTime);
+    }
+
+    internal static void AlignImmersiveDialog(ElementBounds bounds, ElementBounds firepitBounds, double projectedAnchorY)
+    {
+        // The base renderer resets absFixedY to this projected anchor, but retains absolute offsets.
+        bounds.absFixedY = projectedAnchorY;
+        bounds.absMarginY = 0;
+        bounds.absOffsetY = 0;
+        bounds.absOffsetY = firepitBounds.renderY - bounds.renderY;
+        bounds.absOffsetX = bounds.OuterWidth / 2 + firepitBounds.OuterWidth / 2 - 5;
     }
 
     public override bool TryOpen()

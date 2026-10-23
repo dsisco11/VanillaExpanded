@@ -1,5 +1,45 @@
 # Alloy Calculator: Technical Reference
 
+## Ingredient eligibility
+
+Ingredient availability and concrete-form planning use the crucible cooking slots' native
+`CanHold` checks, including storage flags, tags, insertion locks, and content dimensions.
+Matching a metal's smelted output alone is not sufficient: ordinary ingots are too large
+for the vanilla crucible and must not displace usable nuggets in a deposit plan.
+Execution rechecks eligibility from live supplies. Planning does not use `CanTakeFrom`
+against current cooking contents because those contents may be removed before insertion.
+
+The stack planner snapshots source stacks and groups merge-compatible forms per ingredient,
+retaining stable smallest-source-stack preference. Each form records its available quantity
+and effective capacity (the lower of the common cooking-slot limit and the item's stack limit).
+Forms with nonpositive capacity are skipped without excluding usable alternatives.
+During execution-time resolution, a concrete layout is validated before greedy selection.
+Valid layouts retain their exact forms, quantities, and slot assignments even if smaller
+source stacks have become available. Validation checks unique in-range destinations,
+positive quantities, capacity, ingredient identity, and aggregate supply per form.
+Infeasible layouts fall through to reselection; invalid indices or nonpositive requests
+are rejected. Selection prefers the existing greedy result when it fits. If greedy
+selection exceeds the available slot budget, a read-only backtracking search tries
+smaller contributions from preferred forms, then skips those forms as needed. It can
+revisit an earlier ingredient's choices to leave space for later ingredients.
+The first feasible selection is passed to the existing spare-slot balancing logic.
+Execution-time resolution remains restricted to the plan's destination indices.
+Search reserves at least one slot for each later ingredient and rejects states whose
+remaining supply or optimistic capacity cannot meet the current request. Failed states
+are memoized by ingredient index, form index, remaining quantity, and remaining slots.
+The cache is local to one detached supply snapshot, assuming disjoint supplies between
+ingredients; no attempt limit truncates the search. See
+[the planner proposal](AlloyDepositPlannerProposal.md) for the broader design.
+
+### Deposit integration coverage
+
+The three-metal fallback scenario is also tested through `AlloyDepositService` with
+player and opened-container supplies. Coverage verifies exact per-form transfers,
+unchanged fuel and unselected forms, no planning packets or stack mutations, and
+idempotent execution after completing a deposit. Closing or take-locking storage
+before execution reports insufficient items without transfers. Replacing sufficient
+supplies with too many incompatible forms reports insufficient space instead.
+
 ## Fuel selection
 
 [AlloyFuelDepositService](../VanillaExpanded/src/AlloyCalculator/AlloyFuelDepositService.cs) considers fuel in the backpack, hotbar, supported opened storage containers, and the firepit's queued fuel slot.
@@ -26,7 +66,11 @@ The indicator refreshes on calculator changes and deposit attempts, and every ha
 
 The ingredient previews have a centered, localized "Required metals" title. Fuel has a separate panel section with a horizontal divider and centered, localized "Required fuel" title. The preferred fuel is shown in a centered `SlideshowItemstackTextComponent`, matching the ingredient previews' background and quantity overlay. Fuel and prewarming slots retain the standard item tooltip without custom explanatory text. Unavailable or invalid batches clear the item preview and show a status message instead. The preview is only recomposed when the fuel stack or estimated quantity changes.
 
-The excess-metal warning's reserved space and gap collapse when there is no warning. The fuel-status row also collapses when it has no prewarming or availability message. Visibility changes reposition the fuel section and Deposit button and resize the existing composer without resetting alloy selection, ratios, or target units; the button tooltip moves with the button.
+Below the required metals, a localized "Smelting temperature" row displays the selected batch's melting point in degrees Celsius, using the same detached crucible calculation as the fuel estimate. For mixed metals this is the highest ingredient melting point, not the output alloy's remelting temperature or the fuel's burn temperature. The temperature updates with the selected batch and remains visible when suitable fuel is insufficient. Invalid or unavailable batches show "Smelting temperature unavailable." instead of a stale value.
+
+The excess-metal warning's reserved space and gap collapse when there is no warning. The fuel item-slot row, including its spacing, collapses when no fuel preview is available or no queued fuel is required. The fuel-status row uses the measured height of its text and inline prewarming slots, rather than reserving slot-sized space for text-only messages, and collapses completely when empty. Missing fuel still shows the availability message directly below the fuel title. Visibility changes reposition the fuel section and Deposit button and resize the existing composer without resetting alloy selection, ratios, or target units; the button tooltip moves with the button.
+
+The panel is top-anchored: height changes from optional rows or alloy selection move only the bottom edge. In both normal and immersive mode, its top aligns with the firepit dialog's actual screen-space top. Immersive positioning offsets the calculator's projected block anchor before rendering so camera movement and calculator height changes do not separate the two title bars.
 
 ### Prewarming
 

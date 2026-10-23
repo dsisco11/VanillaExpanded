@@ -17,12 +17,17 @@ internal static class AlloyTransferInventoryPolicy
         IWorldAccessor world,
         IPlayerInventoryManager manager,
         IInventory target,
-        out IReadOnlyList<ItemSlot> slots)
+        out IReadOnlyList<ItemSlot> slots,
+        System.Action<string>? diagnostic = null)
     {
         slots = [];
         IInventory? backpack = manager.GetOwnInventory(GlobalConstants.backpackInvClassName);
         IInventory? hotbar = manager.GetOwnInventory(GlobalConstants.hotBarInvClassName);
-        if (backpack is null || hotbar is null) return false;
+        if (backpack is null || hotbar is null)
+        {
+            diagnostic?.Invoke($"Missing player inventory: backpack={backpack is not null}, hotbar={hotbar is not null}.");
+            return false;
+        }
 
         // The opened list defines this operation's order. Never include the target or enumerate it as storage.
         var inventories = new HashSet<IInventory>(System.Collections.Generic.ReferenceEqualityComparer.Instance) { target };
@@ -32,7 +37,12 @@ internal static class AlloyTransferInventoryPolicy
         AppendSlots(hotbar, inventories, seenSlots, collected);
         foreach (IInventory inventory in manager.OpenedInventories.ToArray())
         {
-            if (!inventories.Contains(inventory) && IsOpenedStorage(world, inventory))
+            if (inventories.Contains(inventory))
+            {
+                diagnostic?.Invoke($"Opened inventory {inventory.InventoryID}: already included or target.");
+                continue;
+            }
+            if (IsOpenedStorage(world, inventory, diagnostic))
             {
                 AppendSlots(inventory, inventories, seenSlots, collected);
             }
@@ -81,15 +91,24 @@ internal static class AlloyTransferInventoryPolicy
     #region Private
 
     /// <summary>Accepts evidenced storage owner families only when the owner still holds this exact inventory.</summary>
-    private static bool IsOpenedStorage(IWorldAccessor world, IInventory inventory)
+    private static bool IsOpenedStorage(
+        IWorldAccessor world,
+        IInventory inventory,
+        System.Action<string>? diagnostic = null)
     {
-        if (inventory is not InventoryBase { Pos: not null } positioned) return false;
+        if (inventory is not InventoryBase { Pos: not null } positioned)
+        {
+            diagnostic?.Invoke($"Storage {inventory.InventoryID}, type={inventory.GetType().FullName}: rejected; missing positioned InventoryBase.");
+            return false;
+        }
 
         // Generic inventories also back machines. Resolve the actual owner instead of guessing from inventory names.
         BlockEntity? owner = world.BlockAccessor.GetBlockEntity(positioned.Pos);
-        return owner is BlockEntityContainer container
+        bool accepted = owner is BlockEntityContainer container
             && owner is BlockEntityGenericContainer or BlockEntityGenericTypedContainer or BlockEntityCrate
             && ReferenceEquals(container.Inventory, inventory);
+        diagnostic?.Invoke($"Storage {inventory.InventoryID}, type={inventory.GetType().FullName}, position={positioned.Pos}, owner={owner?.GetType().FullName ?? "none"}, ownerInventoryMatches={owner is BlockEntityContainer storage && ReferenceEquals(storage.Inventory, inventory)}, accepted={accepted}.");
+        return accepted;
     }
 
     /// <summary>Appends each inventory and slot identity once while retaining enumeration order.</summary>

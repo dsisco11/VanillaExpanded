@@ -22,15 +22,29 @@ internal static class AlloyDepositService
         IReadOnlyList<MetalDepositIngredient> ingredients,
         IReadOnlyDictionary<int, ItemStack> calculatedStacks)
     {
+        LogSupplyDiagnostics(api, firepit, ingredients, calculatedStacks);
         AlloyDepositResultCode result = CreatePlan(
             api,
             firepit,
             ingredients,
             calculatedStacks,
             out AlloyDepositPlan? plan);
-        return result == AlloyDepositResultCode.Success
-            ? ExecutePlan(api, firepit, plan!)
-            : result;
+#if DEBUG
+        api.Logger.Notification($"[VanillaExpanded] Alloy deposit diagnostics: planning result={result}.");
+#endif
+        if (result != AlloyDepositResultCode.Success) return result;
+
+#if DEBUG
+        foreach (AlloyDepositSlotTarget target in plan!.Targets)
+        {
+            api.Logger.Notification($"[VanillaExpanded] Alloy deposit diagnostics: target slot={target.SlotIndex}, ingredient={target.Ingredient.Code}, form={target.DesiredStack?.Collectible.Code}, amount={target.Amount}.");
+        }
+#endif
+        result = ExecutePlan(api, firepit, plan!);
+#if DEBUG
+        api.Logger.Notification($"[VanillaExpanded] Alloy deposit diagnostics: execution result={result}.");
+#endif
+        return result;
     }
 
     /// <summary>Creates an ingredient plan using the current player inventory manager.</summary>
@@ -80,9 +94,10 @@ internal static class AlloyDepositService
             return AlloyDepositResultCode.InvalidRequest;
         }
 
+        ItemSlot[] supplies = CollectCompatibleSupplies(externalSlots, inventory);
         // Existing cooking contents are counted separately; take locks only restrict external availability here.
         bool hasAllIngredients = ingredients.All(ingredient =>
-            externalSlots.Where(AlloyTransferInventoryPolicy.CanWithdraw).Concat(inventory.CookingSlots)
+            supplies
                 .Where(slot => !slot.Empty && SmeltsInto(api.World, slot.Itemstack, ingredient.ResolvedStack))
                 .Sum(static slot => slot.StackSize)
             >= createdPlan.Targets.Where(target => target.Ingredient == ingredient).Sum(static target => target.Amount));
@@ -92,7 +107,7 @@ internal static class AlloyDepositService
         }
 
         plan = AlloyDepositStackPlanner.Resolve(api.World, createdPlan, inventory.CookingSlots,
-            externalSlots.Where(AlloyTransferInventoryPolicy.CanWithdraw).Concat(inventory.CookingSlots),
+            supplies,
             (stack, ingredient) => SmeltsInto(api.World, stack, ingredient.ResolvedStack),
             spreadAcrossCookingSlots: true);
         if (plan is null) return AlloyDepositResultCode.InsufficientSpace;
@@ -128,10 +143,11 @@ internal static class AlloyDepositService
             return AlloyDepositResultCode.InvalidRequest;
         }
 
+        ItemSlot[] supplies = CollectCompatibleSupplies(externalSlots, inventory);
         // Recollect at execution instead of retaining a planning snapshot of opened containers.
         bool hasAllIngredients = plan.Targets
             .GroupBy(static target => target.Ingredient)
-            .All(group => externalSlots.Where(AlloyTransferInventoryPolicy.CanWithdraw).Concat(inventory.CookingSlots)
+            .All(group => supplies
                 .Where(slot => !slot.Empty && SmeltsInto(api.World, slot.Itemstack, group.Key.ResolvedStack))
                 .Sum(static slot => slot.StackSize)
                 >= group.Sum(static target => target.Amount));
@@ -142,7 +158,7 @@ internal static class AlloyDepositService
 
         // Resolve again from live supplies so every slot receives a single merge-compatible form before any movement.
         AlloyDepositPlan? resolvedPlan = AlloyDepositStackPlanner.Resolve(api.World, plan, inventory.CookingSlots,
-            externalSlots.Where(AlloyTransferInventoryPolicy.CanWithdraw).Concat(inventory.CookingSlots),
+            supplies,
             (stack, ingredient) => SmeltsInto(api.World, stack, ingredient.ResolvedStack));
         if (resolvedPlan is null) return AlloyDepositResultCode.InsufficientSpace;
         plan = resolvedPlan;
@@ -190,6 +206,50 @@ internal static class AlloyDepositService
     #endregion
 
     #region Private
+
+    private static ItemSlot[] CollectCompatibleSupplies(
+        IReadOnlyList<ItemSlot> externalSlots,
+        InventorySmelting inventory)
+    {
+        // Cooking slots share container restrictions. CanHold ignores current contents,
+        // which may be removed by the plan, unlike CanTakeFrom's merge/capacity checks.
+        return externalSlots.Where(AlloyTransferInventoryPolicy.CanWithdraw)
+            .Concat(inventory.CookingSlots)
+            .Where(source => !source.Empty && inventory.CookingSlots.All(target => target.CanHold(source)))
+            .ToArray();
+    }
+
+    [System.Diagnostics.Conditional("DEBUG")]
+    private static void LogSupplyDiagnostics(
+        ICoreClientAPI api,
+        BlockEntityFirepit firepit,
+        IReadOnlyList<MetalDepositIngredient> ingredients,
+        IReadOnlyDictionary<int, ItemStack> calculatedStacks)
+    {
+        var manager = api.World.Player.InventoryManager;
+        AlloyTransferInventoryPolicy.TryCollect(api.World, manager, firepit.Inventory, out var externalSlots,
+            message => api.Logger.Notification($"[VanillaExpanded] Alloy deposit diagnostics: {message}"));
+        var inventories = new HashSet<IInventory>(System.Collections.Generic.ReferenceEqualityComparer.Instance);
+        IInventory? backpack = manager.GetOwnInventory(GlobalConstants.backpackInvClassName);
+        IInventory? hotbar = manager.GetOwnInventory(GlobalConstants.hotBarInvClassName);
+        if (backpack is not null) inventories.Add(backpack);
+        if (hotbar is not null) inventories.Add(hotbar);
+        foreach (IInventory inventory in manager.OpenedInventories) inventories.Add(inventory);
+
+        for (int index = 0; index < ingredients.Count; index++)
+        {
+            MetalDepositIngredient ingredient = ingredients[index];
+            api.Logger.Notification($"[VanillaExpanded] Alloy deposit diagnostics: requested {ingredient.Code}={calculatedStacks.GetValueOrDefault(index)?.StackSize ?? 0}.");
+            foreach (IInventory inventory in inventories)
+            {
+                foreach (ItemSlot slot in inventory)
+                {
+                    if (slot.Empty || !SmeltsInto(api.World, slot.Itemstack, ingredient.ResolvedStack)) continue;
+                    api.Logger.Notification($"[VanillaExpanded] Alloy deposit diagnostics: supply inventory={inventory.InventoryID}, item={slot.Itemstack.Collectible.Code}, amount={slot.StackSize}, externalEligible={externalSlots.Contains(slot)}, canWithdraw={AlloyTransferInventoryPolicy.CanWithdraw(slot)}.");
+                }
+            }
+        }
+    }
 
     /// <summary>Requires both the desired metal output and the concrete stack form selected for this slot.</summary>
     private static bool MatchesTarget(IWorldAccessor world, ItemStack stack, AlloyDepositSlotTarget target)
