@@ -63,6 +63,8 @@
   "gui-alloycalculator-increment-tooltip": "Next waste-free target",
   "gui-alloycalculator-waste-warning": "Warning: {0} excess metal units",
   "gui-alloycalculator-metals-title": "Required metals",
+  "gui-alloycalculator-smelting-temperature": "Smelting temperature: {0} \u00b0C",
+  "gui-alloycalculator-smelting-temperature-unavailable": "Smelting temperature unavailable.",
   "gui-alloycalculator-fuel-title": "Required fuel",
   "gui-alloycalculator-fuel-prewarming-label": "Prewarming: ",
   "gui-alloycalculator-fuel-prewarming": " saves ",

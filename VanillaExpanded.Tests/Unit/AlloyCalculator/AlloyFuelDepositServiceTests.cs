@@ -307,9 +307,10 @@ public class AlloyFuelDepositServiceTests
         context.Firepit.inputStackCookingTime = 50;
 
         AlloyDepositResultCode result = AlloyFuelDepositService.CreatePreview(context.Fixture.ClientApi,
-            context.Firepit, batch, context.Fixture.Player, out AlloyFuelDepositPlan? plan);
+            context.Firepit, batch, context.Fixture.Player, out AlloyFuelDepositPlan? plan, out _, out float? meltingPoint);
 
         Assert.Equal(AlloyDepositResultCode.Success, result);
+        Assert.Equal(1000f, meltingPoint);
         Assert.Equal(context.Fuel.Code, plan!.DesiredStack.Collectible.Code);
         Assert.Equal(AlloyCalculatorLogic.CalculateFuelRequired(1, 1000, 30 * amount,
             context.Firepit.furnaceTemperature, 20, 0, context.Firepit.fuelBurnTime,
@@ -351,8 +352,10 @@ public class AlloyFuelDepositServiceTests
         TestContext context = CreateContext();
         Dictionary<int, ItemStack> batch = CreatePreviewBatch(context, 20);
         Assert.Equal(AlloyDepositResultCode.InsufficientItems, AlloyFuelDepositService.CreatePreview(
-            context.Fixture.ClientApi, context.Firepit, batch, context.Fixture.Player, out AlloyFuelDepositPlan? plan));
+            context.Fixture.ClientApi, context.Firepit, batch, context.Fixture.Player,
+            out AlloyFuelDepositPlan? plan, out _, out float? meltingPoint));
         Assert.Null(plan);
+        Assert.Equal(1000f, meltingPoint);
     }
 
     [Fact]
@@ -361,8 +364,9 @@ public class AlloyFuelDepositServiceTests
         TestContext context = CreateContext(backpackFuelAmount: 64);
         Assert.Equal(AlloyDepositResultCode.InvalidRequest, AlloyFuelDepositService.CreatePreview(
             context.Fixture.ClientApi, context.Firepit, new Dictionary<int, ItemStack>(),
-            context.Fixture.Player, out AlloyFuelDepositPlan? plan));
+            context.Fixture.Player, out AlloyFuelDepositPlan? plan, out _, out float? meltingPoint));
         Assert.Null(plan);
+        Assert.Null(meltingPoint);
     }
 
     [Fact]
@@ -400,12 +404,42 @@ public class AlloyFuelDepositServiceTests
         batch[1] = new ItemStack(secondMetal, 2);
 
         Assert.Equal(AlloyDepositResultCode.Success, AlloyFuelDepositService.CreatePreview(context.Fixture.ClientApi,
-            context.Firepit, batch, context.Fixture.Player, out AlloyFuelDepositPlan? plan));
+            context.Firepit, batch, context.Fixture.Player, out AlloyFuelDepositPlan? plan, out _, out float? meltingPoint));
+        Assert.Equal(1200f, meltingPoint);
         Assert.Equal(AlloyCalculatorLogic.CalculateFuelRequired(1, 1200, 180,
             context.Firepit.furnaceTemperature, 20, 0, 0, context.Firepit.maxTemperature, 40, 1300),
             plan!.DesiredAmount);
         Assert.All(Assert.IsType<InventorySmelting>(context.Firepit.Inventory).CookingSlots,
             slot => Assert.True(slot.Empty));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(64)]
+    public void CreatePreview_SelectionChanges_UpdateMeltingPointRegardlessOfFuelSupply(int fuelAmount)
+    {
+        TestContext context = CreateContext(backpackFuelAmount: fuelAmount);
+        Dictionary<int, ItemStack> batch = CreatePreviewBatch(context, 20);
+        AlloyDepositResultCode expected = fuelAmount == 0
+            ? AlloyDepositResultCode.InsufficientItems
+            : AlloyDepositResultCode.Success;
+
+        Assert.Equal(expected, AlloyFuelDepositService.CreatePreview(
+            context.Fixture.ClientApi, context.Firepit, batch, context.Fixture.Player,
+            out _, out _, out float? originalMeltingPoint));
+        Assert.Equal(1000f, originalMeltingPoint);
+
+        batch[0].Collectible.CombustibleProps.MeltingPoint = 1100;
+        Assert.Equal(expected, AlloyFuelDepositService.CreatePreview(
+            context.Fixture.ClientApi, context.Firepit, batch, context.Fixture.Player,
+            out _, out _, out float? updatedMeltingPoint));
+        Assert.Equal(1100f, updatedMeltingPoint);
+
+        batch.Clear();
+        Assert.Equal(AlloyDepositResultCode.InvalidRequest, AlloyFuelDepositService.CreatePreview(
+            context.Fixture.ClientApi, context.Firepit, batch, context.Fixture.Player,
+            out _, out _, out float? invalidMeltingPoint));
+        Assert.Null(invalidMeltingPoint);
     }
 
     [Fact]
@@ -431,8 +465,10 @@ public class AlloyFuelDepositServiceTests
         context.Fixture.InventoryManagerMock.SetupGet(manager => manager.OpenedInventories).Returns([]);
 
         Assert.Equal(AlloyDepositResultCode.InventoryClosed, AlloyFuelDepositService.CreatePreview(
-            context.Fixture.ClientApi, context.Firepit, batch, context.Fixture.Player, out AlloyFuelDepositPlan? plan));
+            context.Fixture.ClientApi, context.Firepit, batch, context.Fixture.Player,
+            out AlloyFuelDepositPlan? plan, out _, out float? meltingPoint));
         Assert.Null(plan);
+        Assert.Null(meltingPoint);
     }
 
     [Fact]

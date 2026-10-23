@@ -66,6 +66,8 @@ The indicator refreshes on calculator changes and deposit attempts, and every ha
 
 The ingredient previews have a centered, localized "Required metals" title. Fuel has a separate panel section with a horizontal divider and centered, localized "Required fuel" title. The preferred fuel is shown in a centered `SlideshowItemstackTextComponent`, matching the ingredient previews' background and quantity overlay. Fuel and prewarming slots retain the standard item tooltip without custom explanatory text. Unavailable or invalid batches clear the item preview and show a status message instead. The preview is only recomposed when the fuel stack or estimated quantity changes.
 
+Below the required metals, a localized "Smelting temperature" row displays the selected batch's melting point in degrees Celsius, using the same detached crucible calculation as the fuel estimate. For mixed metals this is the highest ingredient melting point, not the output alloy's remelting temperature or the fuel's burn temperature. The temperature updates with the selected batch and remains visible when suitable fuel is insufficient. Invalid or unavailable batches show "Smelting temperature unavailable." instead of a stale value.
+
 The excess-metal warning's reserved space and gap collapse when there is no warning. The fuel-status row also collapses when it has no prewarming or availability message. Visibility changes reposition the fuel section and Deposit button and resize the existing composer without resetting alloy selection, ratios, or target units; the button tooltip moves with the button.
 
 ### Prewarming

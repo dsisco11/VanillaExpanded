@@ -42,7 +42,7 @@ internal static class AlloyFuelDepositService
         IPlayerInventoryManager playerInventory,
         out AlloyFuelDepositPlan? plan)
     {
-        return CreatePlan(api, firepit, playerInventory, out plan, previewInventory: null, out _);
+        return CreatePlan(api, firepit, playerInventory, out plan, previewInventory: null, out _, out _);
     }
 
     /// <summary>Estimates fuel for a cold selected batch without changing the firepit or moving inventory items.</summary>
@@ -64,8 +64,21 @@ internal static class AlloyFuelDepositService
         out AlloyFuelDepositPlan? plan,
         out bool isPrewarming)
     {
+        return CreatePreview(api, firepit, calculatedStacks, playerInventory, out plan, out isPrewarming, out _);
+    }
+
+    internal static AlloyDepositResultCode CreatePreview(
+        ICoreClientAPI api,
+        BlockEntityFirepit firepit,
+        IReadOnlyDictionary<int, ItemStack> calculatedStacks,
+        IPlayerInventoryManager playerInventory,
+        out AlloyFuelDepositPlan? plan,
+        out bool isPrewarming,
+        out float? batchMeltingPoint)
+    {
         plan = null;
         isPrewarming = false;
+        batchMeltingPoint = null;
         if (firepit.Inventory is not InventorySmelting inventory
             || !playerInventory.OpenedInventories.Contains(inventory))
         {
@@ -85,7 +98,7 @@ internal static class AlloyFuelDepositService
         foreach (ItemStack stack in calculatedStacks.OrderBy(static pair => pair.Key).Select(static pair => pair.Value))
             preview.CookingSlots[index++].Itemstack = stack.Clone();
 
-        return CreatePlan(api, firepit, playerInventory, out plan, preview, out isPrewarming);
+        return CreatePlan(api, firepit, playerInventory, out plan, preview, out isPrewarming, out batchMeltingPoint);
     }
 
     private static AlloyDepositResultCode CreatePlan(
@@ -94,10 +107,12 @@ internal static class AlloyFuelDepositService
         IPlayerInventoryManager playerInventory,
         out AlloyFuelDepositPlan? plan,
         InventorySmelting? previewInventory,
-        out bool isPrewarming)
+        out bool isPrewarming,
+        out float? batchMeltingPoint)
     {
         plan = null;
         isPrewarming = false;
+        batchMeltingPoint = null;
         IWorldAccessor world = api.World;
         if (firepit.Inventory is not InventorySmelting inventory
             || !playerInventory.OpenedInventories.Contains(inventory))
@@ -127,6 +142,7 @@ internal static class AlloyFuelDepositService
         {
             return AlloyDepositResultCode.InvalidRequest;
         }
+        batchMeltingPoint = meltingPoint;
         ItemStack? queuedFuel = firepit.fuelStack;
 
         // Queued fuel remains separate from external sources; source restrictions govern candidate availability.

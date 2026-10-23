@@ -40,6 +40,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private const double SlotSize = 40;
     private const double ButtonHeight = 25;
     private const double SectionTitleHeight = 20;
+    private const double SmeltingTemperatureHeight = 20;
     private const double FuelStatusHeight = 64;
     private const double FuelInfoHeight = 15 + SectionTitleHeight + SlotSize + 8 + FuelStatusHeight + 6;
     private const float FuelInfoRefreshInterval = 0.5f;
@@ -73,6 +74,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
     private bool isAdjustingSliders;
     private float fuelInfoRefreshElapsed;
     private string? fuelInfoText;
+    private string? smeltingTemperatureText;
     private ItemStack? fuelPreviewStack;
     private ItemStack[] prewarmingPreviewStacks = [];
     private ItemStack? savedFuelPreviewStack;
@@ -198,7 +200,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
                 contentHeight += ingredientCount * RowHeight;
             }
             contentHeight += 15 + SectionTitleHeight + SlotSize;
-            contentHeight += 18 + WasteWarningHeight + WasteWarningGap + FuelInfoHeight + ButtonHeight;
+            contentHeight += 18 + SmeltingTemperatureHeight + WasteWarningHeight + WasteWarningGap + FuelInfoHeight + ButtonHeight;
         }
         var contentBounds = ElementBounds.Fixed(0, 0, contentWidth, contentHeight);
 
@@ -348,6 +350,12 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
             composer.AddRichtext(richTextComponents.ToArray(), slotBounds, "ingredientSlots");
 
             yOffset += (int)SlotSize + 18;
+            composer.AddDynamicText(
+                string.Empty,
+                CairoFont.WhiteDetailText().WithFontSize(12).WithOrientation(EnumTextOrientation.Center),
+                ElementBounds.Fixed(0, yOffset, contentWidth, SmeltingTemperatureHeight).WithParent(contentBounds),
+                "smeltingTemperature");
+            yOffset += SmeltingTemperatureHeight;
             var warningBounds = ElementBounds
                 .Fixed(0, yOffset, contentWidth, WasteWarningHeight)
                 .WithParent(contentBounds);
@@ -421,6 +429,7 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
 
         SingleComposer = composer.EndChildElements().Compose();
         fuelInfoText = null;
+        smeltingTemperatureText = null;
         fuelPreviewStack = null;
         prewarmingPreviewStacks = [];
         savedFuelPreviewStack = null;
@@ -622,11 +631,20 @@ public sealed class GuiDialogAlloyCalculator : GuiDialogBlockEntity
         BlockEntityFirepit? firepit = capi.World.BlockAccessor
             .GetBlockEntity<BlockEntityFirepit>(BlockEntityPosition);
         AlloyFuelDepositPlan? plan = null;
+        float? batchMeltingPoint = null;
         AlloyDepositResultCode result = firepit is null
             || calculatedStacks.Count != selectedIngredients.Length
             ? AlloyDepositResultCode.InvalidRequest
             : AlloyFuelDepositService.CreatePreview(capi, firepit, calculatedStacks,
-                capi.World.Player.InventoryManager, out plan);
+                capi.World.Player.InventoryManager, out plan, out _, out batchMeltingPoint);
+        string temperatureText = batchMeltingPoint is > 0
+            ? Lang.Get($"{Constants.ModId}:gui-alloycalculator-smelting-temperature", batchMeltingPoint.Value.ToString("0.#"))
+            : Lang.Get($"{Constants.ModId}:gui-alloycalculator-smelting-temperature-unavailable");
+        if (temperatureText != smeltingTemperatureText)
+        {
+            smeltingTemperatureText = temperatureText;
+            SingleComposer?.GetDynamicText("smeltingTemperature")?.SetNewText(temperatureText);
+        }
         string text = result switch
         {
             AlloyDepositResultCode.Success when plan!.PrewarmingStacks.Length > 0 => Lang.Get(
