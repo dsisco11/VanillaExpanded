@@ -9,6 +9,13 @@ for the vanilla crucible and must not displace usable nuggets in a deposit plan.
 Execution rechecks eligibility from live supplies. Planning does not use `CanTakeFrom`
 against current cooking contents because those contents may be removed before insertion.
 
+The stack planner snapshots source stacks and groups merge-compatible forms per ingredient,
+retaining stable smallest-source-stack preference. Each form records its available quantity
+and effective capacity (the lower of the common cooking-slot limit and the item's stack limit).
+Forms with nonpositive capacity are skipped without excluding usable alternatives.
+Selection is still greedy; fallback search is planned in
+[the planner proposal](AlloyDepositPlannerProposal.md).
+
 ## Fuel selection
 
 [AlloyFuelDepositService](../VanillaExpanded/src/AlloyCalculator/AlloyFuelDepositService.cs) considers fuel in the backpack, hotbar, supported opened storage containers, and the firepit's queued fuel slot.

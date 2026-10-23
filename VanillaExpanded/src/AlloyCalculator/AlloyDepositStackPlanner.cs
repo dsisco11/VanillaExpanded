@@ -23,35 +23,25 @@ internal static class AlloyDepositStackPlanner
         bool spreadAcrossCookingSlots = false)
     {
         ItemStack[] available = availableSlots.Where(static slot => !slot.Empty)
-            .Select(static slot => slot.Itemstack!)
+            .Select(static slot => slot.Itemstack!.Clone())
             .OrderBy(static stack => stack.StackSize).ToArray();
         int[] slotIndices = spreadAcrossCookingSlots
             ? Enumerable.Range(0, cookingSlots.Count).ToArray()
             : plan.Targets.Select(static target => target.SlotIndex).Distinct().Order().ToArray();
         if (slotIndices.Length == 0) return null;
         int slotCapacity = slotIndices.Min(index => cookingSlots[index].MaxSlotStackSize);
+        ImmutableArray<IngredientSupply> ingredients = CollectIngredientSupplies(
+            world, plan, available, slotCapacity, matchesIngredient);
         var forms = new List<(MetalDepositIngredient Ingredient, ItemStack Stack, int Amount, int Slots)>();
-        foreach (var group in plan.Targets.GroupBy(static target => target.Ingredient))
+        foreach (IngredientSupply ingredient in ingredients)
         {
-            var supplies = new List<(ItemStack Stack, int Amount)>();
-            // Group compatible stacks while retaining the order of their smallest source stack.
-            // Metal identity establishes eligibility, while stack equality establishes actual merge compatibility.
-            foreach (ItemStack stack in available.Where(stack => matchesIngredient(stack, group.Key)))
-            {
-                int index = supplies.FindIndex(item => item.Stack.Equals(world, stack, GlobalConstants.IgnoredStackAttributes));
-                if (index < 0) supplies.Add((stack, stack.StackSize));
-                else supplies[index] = (supplies[index].Stack, supplies[index].Amount + stack.StackSize);
-            }
-
-            int remaining = group.Sum(static target => target.Amount);
+            int remaining = ingredient.Amount;
             // Consume forms with the smallest source stacks first, reserving separate slots for each form.
-            foreach (var supply in supplies)
+            foreach (FormSupply supply in ingredient.Forms)
             {
                 int amount = Math.Min(remaining, supply.Amount);
-                int capacity = Math.Min(slotCapacity, supply.Stack.Collectible.MaxStackSize);
-                if (capacity <= 0) return null;
-                int slots = (amount + capacity - 1) / capacity;
-                forms.Add((group.Key, supply.Stack, amount, slots));
+                int slots = (amount + supply.Capacity - 1) / supply.Capacity;
+                forms.Add((ingredient.Ingredient, supply.Stack, amount, slots));
                 remaining -= amount;
                 if (remaining == 0) break;
             }
@@ -106,6 +96,45 @@ internal static class AlloyDepositStackPlanner
             }
         }
         return new AlloyDepositPlan(targets.ToImmutable());
+    }
+
+    #endregion
+
+    #region Private
+
+    private sealed record FormSupply(ItemStack Stack, int Amount, int Capacity);
+
+    private sealed record IngredientSupply(
+        MetalDepositIngredient Ingredient,
+        int Amount,
+        ImmutableArray<FormSupply> Forms);
+
+    private static ImmutableArray<IngredientSupply> CollectIngredientSupplies(
+        IWorldAccessor world,
+        AlloyDepositPlan plan,
+        IReadOnlyList<ItemStack> available,
+        int slotCapacity,
+        System.Func<ItemStack, MetalDepositIngredient, bool> matchesIngredient)
+    {
+        var ingredients = ImmutableArray.CreateBuilder<IngredientSupply>();
+        foreach (var group in plan.Targets.GroupBy(static target => target.Ingredient))
+        {
+            var forms = new List<FormSupply>();
+            // Available stacks are sorted stably by source size, so the first stack
+            // establishes each merge-compatible form's preference.
+            foreach (ItemStack stack in available)
+            {
+                int capacity = Math.Min(slotCapacity, stack.Collectible.MaxStackSize);
+                if (capacity <= 0 || !matchesIngredient(stack, group.Key)) continue;
+
+                int index = forms.FindIndex(form => form.Stack.Equals(world, stack, GlobalConstants.IgnoredStackAttributes));
+                if (index < 0) forms.Add(new FormSupply(stack, stack.StackSize, capacity));
+                else forms[index] = forms[index] with { Amount = forms[index].Amount + stack.StackSize };
+            }
+            ingredients.Add(new IngredientSupply(
+                group.Key, group.Sum(static target => target.Amount), [.. forms]));
+        }
+        return ingredients.ToImmutable();
     }
 
     #endregion

@@ -9,6 +9,72 @@ namespace VanillaExpanded.Tests.Unit.AlloyCalculator;
 public class AlloyDepositPlanTests
 {
     [Fact]
+    public void Resolve_EqualSizeSources_GroupsCompatibleStacksAndRetainsTieOrder()
+    {
+        VsTestFixture fixture = VsTestFixture.Client();
+        MockItem metal = CreateItem(1, "ingot-metal-a");
+        MockItem bits = CreateSmeltableItem(2, "metalbit-metal-a", metal);
+        MockItem nuggets = CreateSmeltableItem(3, "nugget-metal-a", metal);
+        var supplies = new InventoryGeneric(3, "supply", "stable-grouping", null!) { Api = fixture.Api };
+        supplies[0].Itemstack = new ItemStack(bits, 3);
+        supplies[1].Itemstack = new ItemStack(nuggets, 3);
+        supplies[2].Itemstack = new ItemStack(bits, 3);
+        var cooking = new InventoryGeneric(4, "cooking", "stable-grouping", null!) { Api = fixture.Api };
+        var ingredient = new MetalDepositIngredient(metal.Code, new ItemStack(metal), 1, 1);
+        var request = new AlloyDepositPlan([new(0, ingredient, 8)]);
+
+        AlloyDepositPlan plan = Assert.IsType<AlloyDepositPlan>(AlloyDepositStackPlanner.Resolve(
+            fixture.World, request, cooking.ToArray(), supplies, MatchesIngredient, spreadAcrossCookingSlots: true));
+
+        Assert.Equal(6, plan.Targets.Where(target => target.DesiredStack!.Collectible == bits)
+            .Sum(target => target.Amount));
+        Assert.Equal(2, plan.Targets.Where(target => target.DesiredStack!.Collectible == nuggets)
+            .Sum(target => target.Amount));
+        Assert.Same(bits, plan.Targets[0].DesiredStack!.Collectible);
+        AssertSameLayout(plan, Assert.IsType<AlloyDepositPlan>(AlloyDepositStackPlanner.Resolve(
+            fixture.World, request, cooking.ToArray(), supplies, MatchesIngredient, spreadAcrossCookingSlots: true)));
+        plan.Targets[0].DesiredStack!.StackSize = 99;
+        Assert.Equal([3, 3, 3], supplies.Select(slot => slot.StackSize));
+        Assert.All(cooking, slot => Assert.True(slot.Empty));
+    }
+
+    [Theory]
+    [InlineData(0, true)]
+    [InlineData(-1, true)]
+    [InlineData(0, false)]
+    [InlineData(-1, false)]
+    public void Resolve_UnusableFormCapacity_UsesAlternativeOrRejects(int capacity, bool hasAlternative)
+    {
+        VsTestFixture fixture = VsTestFixture.Client();
+        MockItem metal = CreateItem(1, "ingot-metal-a");
+        MockItem unusable = CreateSmeltableItem(2, "chunk-metal-a", metal);
+        MockItem usable = CreateSmeltableItem(3, "nugget-metal-a", metal);
+        unusable.MaxStackSize = capacity;
+        var supplies = new InventoryGeneric(2, "supply", "unusable-capacity", null!) { Api = fixture.Api };
+        supplies[0].Itemstack = new ItemStack(unusable, 1);
+        if (hasAlternative) supplies[1].Itemstack = new ItemStack(usable, 10);
+        var cooking = new InventoryGeneric(4, "cooking", "unusable-capacity", null!) { Api = fixture.Api };
+        var ingredient = new MetalDepositIngredient(metal.Code, new ItemStack(metal), 1, 1);
+        var request = new AlloyDepositPlan([new(0, ingredient, 10)]);
+
+        AlloyDepositPlan? result = AlloyDepositStackPlanner.Resolve(
+            fixture.World, request, cooking.ToArray(), supplies, MatchesIngredient, spreadAcrossCookingSlots: true);
+
+        Assert.Equal(1, supplies[0].StackSize);
+        Assert.Equal(hasAlternative ? 10 : 0, supplies[1].StackSize);
+        Assert.All(cooking, slot => Assert.True(slot.Empty));
+        if (!hasAlternative)
+        {
+            Assert.Null(result);
+            return;
+        }
+        AlloyDepositPlan plan = Assert.IsType<AlloyDepositPlan>(result);
+        Assert.Equal(10, plan.Targets.Sum(target => target.Amount));
+        Assert.All(plan.Targets, target => Assert.Same(usable, target.DesiredStack!.Collectible));
+        Assert.All(plan.Targets, target => Assert.NotSame(supplies[1].Itemstack, target.DesiredStack));
+    }
+
+    [Fact]
     public void Resolve_ThreeMetalAlloyWithOptionalForms_FindsFourSlotPlan()
     {
         const int targetUnits = 100;

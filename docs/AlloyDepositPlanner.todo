@@ -1,7 +1,7 @@
 # Alloy Deposit Planner Implementation TODO
     Proposal: AlloyDepositPlannerProposal.md
     Scope: implement slot-bounded fallback search without changing ingredient calculations or inventory-access policy.
-    Status: Phase 1 complete; production implementation has not started.
+    Status: Phases 1 and 2 complete; layout preservation and fallback search remain pending.
     Phase 1 validation: 10 focused planner cases run; 6 passed and 4 failed as expected.
         Expected failures: primary three-metal scenario, concrete-layout preservation,
         and both fallback-capacity scenarios (multi-slot alternative and reduced preferred contribution).
@@ -24,16 +24,19 @@
     ## 2. Prepare Shared Planning Data
         Depends on: 1
         Primary file: ../VanillaExpanded/src/AlloyCalculator/AlloyDepositStackPlanner.cs
-        [ ] Extract existing merge-compatible grouping into a reusable private helper.
+        Validation: 43 focused planner/service/opened-container cases run; 39 passed.
+            The same four Phase 1 regressions remain intentionally failing.
+            Five new cases cover stable grouping/ties and zero/negative form capacities.
+        [x] Extract existing merge-compatible grouping into a reusable private helper.
             Preserve smallest-source-stack order and stable ties.
             Aggregate by actual stack equality, not item code alone.
-        [ ] Represent each ingredient's request, ordered forms, available counts, and effective capacities.
+        [x] Represent each ingredient's request, ordered forms, available counts, and effective capacities.
             Reuse existing types where practical; keep any new helper types private.
-        [ ] Keep supplies and quantities detached from live inventory mutation.
-        [ ] Preserve the service's existing CanHold eligibility and inventory-access checks.
-        [ ] Handle nonpositive capacities as unusable forms without abandoning usable alternatives.
-        [ ] Preserve the existing common cooking-slot capacity model.
-        [ ] Run existing planner tests to detect accidental ordering or capacity changes.
+        [x] Keep supplies and quantities detached from live inventory mutation.
+        [x] Preserve the service's existing CanHold eligibility and inventory-access checks.
+        [x] Handle nonpositive capacities as unusable forms without abandoning usable alternatives.
+        [x] Preserve the existing common cooking-slot capacity model.
+        [x] Run existing planner tests to detect accidental ordering or capacity changes.
 
     ## 3. Preserve Valid Concrete Layouts
         Depends on: 2
