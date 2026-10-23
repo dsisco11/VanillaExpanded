@@ -18,6 +18,143 @@ public class AlloyOpenedContainerDepositTests
     #region Supply And Planning
 
     [Theory]
+    [InlineData("unchanged")]
+    [InlineData("closed")]
+    [InlineData("take-locked")]
+    [InlineData("shortage")]
+    [InlineData("too-many-forms")]
+    public void ThreeMetalFallback_PlanAndExecute_ConservesItemsAndRevalidatesSupplies(string change)
+    {
+        Context context = CreateContext(15, 0);
+        MockItem metalB = CreateItem(context.Fixture, 30, "ingot-metal-b");
+        MockItem metalC = CreateItem(context.Fixture, 31, "ingot-metal-c");
+        MockItem aNuggets = CreateForm(32, "nugget-metal-a", context.Ingot);
+        MockItem aChunks = CreateForm(33, "chunk-metal-a", context.Ingot);
+        MockItem bBits = CreateForm(34, "metalbit-metal-b", metalB);
+        MockItem bNuggets = CreateForm(35, "nugget-metal-b", metalB);
+        MockItem cBits = CreateForm(36, "metalbit-metal-c", metalC);
+        context.Metal.CombustibleProps.SmeltedRatio = 20;
+        context.Fixture.BackpackInventory[1].Itemstack = new ItemStack(aNuggets, 10);
+        context.Fixture.BackpackInventory[2].Itemstack = new ItemStack(aChunks, 5);
+        context.Fixture.BackpackInventory[3].Itemstack = new ItemStack(bBits, 3);
+        context.Chest[0].Itemstack = new ItemStack(bNuggets, 4);
+        context.Chest[1].Itemstack = new ItemStack(cBits, 10);
+        var fuel = new ItemStack(CreateItem(context.Fixture, 37, "fuel"), 4);
+        context.Target[0].Itemstack = fuel;
+        MetalDepositIngredient[] ingredients =
+        [
+            context.Ingredient,
+            new(metalB.Code, new ItemStack(metalB), 0, 1),
+            new(metalC.Code, new ItemStack(metalC), 0, 1)
+        ];
+        var requested = new Dictionary<int, ItemStack>
+        {
+            [0] = new(aNuggets, 10), [1] = new(bBits, 7), [2] = new(cBits, 4)
+        };
+        ItemSlot[] external = [.. context.Fixture.BackpackInventory,
+            .. context.Fixture.HotbarInventory, .. context.Chest];
+        var beforePlanning = external.Select(slot => (Stack: slot.Itemstack, Amount: slot.StackSize)).ToArray();
+
+        Assert.Equal(AlloyDepositResultCode.Success, AlloyDepositService.CreatePlan(
+            context.Fixture.ClientApi, context.Firepit, ingredients, requested,
+            context.Fixture.Player, out AlloyDepositPlan? created));
+        AlloyDepositPlan plan = Assert.IsType<AlloyDepositPlan>(created);
+        Assert.Equal(4, plan.Targets.Length);
+        Assert.Equal(4, plan.Targets.Select(target => target.SlotIndex).Distinct().Count());
+        for (int index = 0; index < ingredients.Length; index++)
+            Assert.Equal(requested[index].StackSize, plan.Targets
+                .Where(target => target.Ingredient == ingredients[index]).Sum(target => target.Amount));
+        Assert.All(plan.Targets, target =>
+        {
+            Assert.InRange(target.Amount, 1, Math.Min(
+                context.Target.CookingSlots[target.SlotIndex].MaxSlotStackSize,
+                target.DesiredStack!.Collectible.MaxStackSize));
+            Assert.True(target.Amount <= external
+                .Where(slot => slot.Itemstack?.Collectible == target.DesiredStack.Collectible)
+                .Sum(slot => slot.StackSize));
+        });
+        foreach (var form in plan.Targets.GroupBy(target => target.DesiredStack!.Collectible.Code))
+            Assert.True(form.Sum(target => target.Amount) <= external
+                .Where(slot => slot.Itemstack?.Collectible.Code == form.Key).Sum(slot => slot.StackSize));
+        for (int index = 0; index < external.Length; index++)
+        {
+            Assert.Same(beforePlanning[index].Stack, external[index].Itemstack);
+            Assert.Equal(beforePlanning[index].Amount, external[index].StackSize);
+        }
+        Assert.All(context.Target.CookingSlots, slot => Assert.True(slot.Empty));
+        context.Fixture.ClientNetworkMock!.Verify(n => n.SendPacketClient(It.IsAny<object>()), Times.Never);
+
+        switch (change)
+        {
+            case "closed":
+                context.Opened.Remove(context.Chest);
+                break;
+            case "take-locked":
+                context.Chest.TakeLocked = true;
+                break;
+            case "shortage":
+                context.Chest[1].Itemstack!.StackSize = 3;
+                break;
+            case "too-many-forms":
+                context.Chest[1].Itemstack!.StackSize = 1;
+                context.Fixture.BackpackInventory[4].Itemstack = new ItemStack(CreateForm(38, "nugget-metal-c", metalC), 2);
+                context.Fixture.BackpackInventory[5].Itemstack = new ItemStack(CreateForm(39, "chunk-metal-c", metalC), 1);
+                break;
+        }
+        var beforeExecution = external.Select(slot => (Stack: slot.Itemstack, Amount: slot.StackSize)).ToArray();
+        var totals = external.Where(slot => !slot.Empty).GroupBy(slot => slot.Itemstack!.Collectible.Code)
+            .ToDictionary(group => group.Key, group => group.Sum(slot => slot.StackSize));
+        AlloyDepositResultCode expected = change switch
+        {
+            "unchanged" => AlloyDepositResultCode.Success,
+            "too-many-forms" => AlloyDepositResultCode.InsufficientSpace,
+            _ => AlloyDepositResultCode.InsufficientItems
+        };
+
+        Assert.Equal(expected, Execute(context, plan));
+        Assert.Same(fuel, context.Target[0].Itemstack);
+        Assert.Equal(4, fuel.StackSize);
+        foreach (var total in totals)
+            Assert.Equal(total.Value, external.Concat(context.Target.CookingSlots)
+                .Where(slot => slot.Itemstack?.Collectible.Code == total.Key).Sum(slot => slot.StackSize));
+        if (change == "unchanged")
+        {
+            Assert.Equal([10, 3, 4, 4], context.Target.CookingSlots.Select(slot => slot.StackSize));
+            Assert.Equal([aNuggets.Code, bBits.Code, bNuggets.Code, cBits.Code],
+                context.Target.CookingSlots.Select(slot => slot.Itemstack!.Collectible.Code));
+            Assert.Equal(15, context.Fixture.BackpackInventory[0].StackSize);
+            Assert.Equal(5, context.Fixture.BackpackInventory[2].StackSize);
+            Assert.Equal(6, context.Chest[1].StackSize);
+            context.Fixture.ClientNetworkMock.Verify(n => n.SendPacketClient(It.IsAny<object>()), Times.Exactly(4));
+            Assert.Equal(AlloyDepositResultCode.Success, Execute(context, plan));
+            // A completed plan should retain its contents, not send another round of transfers.
+            context.Fixture.ClientNetworkMock.Verify(n => n.SendPacketClient(It.IsAny<object>()), Times.Exactly(4));
+            Assert.Equal([10, 3, 4, 4], context.Target.CookingSlots.Select(slot => slot.StackSize));
+        }
+        else
+        {
+            for (int index = 0; index < external.Length; index++)
+            {
+                Assert.Same(beforeExecution[index].Stack, external[index].Itemstack);
+                Assert.Equal(beforeExecution[index].Amount, external[index].StackSize);
+            }
+            Assert.All(context.Target.CookingSlots, slot => Assert.True(slot.Empty));
+            context.Fixture.ClientNetworkMock.Verify(n => n.SendPacketClient(It.IsAny<object>()), Times.Never);
+        }
+
+        MockItem CreateForm(int id, string name, MockItem ingot)
+        {
+            MockItem item = CreateItem(context.Fixture, id, name);
+            item.CombustibleProps = new CombustibleProperties
+            {
+                SmeltedRatio = 20,
+                SmeltedStack = new JsonItemStack { Code = ingot.Code, ResolvedItemstack = new ItemStack(ingot) }
+            };
+            return item;
+        }
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void Molybdochalkos_OpenedSuppliesWithLeadIngot_DepositsOnlyFittingNuggets(bool playerSupplies)

@@ -1,7 +1,7 @@
 # Alloy Deposit Planner Implementation TODO
     Proposal: AlloyDepositPlannerProposal.md
     Scope: implement slot-bounded fallback search without changing ingredient calculations or inventory-access policy.
-    Status: Phases 1 through 5 complete; integration acceptance and broader validation remain pending.
+    Status: Phases 1 through 6 complete; broader validation and in-game confirmation remain pending.
     Phase 1 validation: 10 focused planner cases run; 6 passed and 4 failed as expected.
         Expected failures: primary three-metal scenario, concrete-layout preservation,
         and both fallback-capacity scenarios (multi-slot alternative and reduced preferred contribution).
@@ -90,14 +90,22 @@
 
     ## 6. Materialize and Integrate
         Depends on: 4, 5
-        [ ] Feed the selected forms into existing spare-slot balancing and target construction.
-        [ ] Preserve one merge-compatible form per target.
-        [ ] Ensure every target respects both item and cooking-slot capacity.
-        [ ] Preserve exact ingredient totals and aggregate per-form availability.
-        [ ] Keep execution-time supply recollection and permission revalidation intact.
-        [ ] Keep ingredient shortages distinct from allocation failures.
-        [ ] Keep planning free of transfers, packets, stack mutations, and fuel consumption.
-        [ ] Keep deposit diagnostics Debug-only.
+        Validation: all 73 focused planner/service/opened-container/inventory-policy cases passed.
+            Existing production materialization and transfer paths already consume search results;
+            no duplicate path or additional production changes were needed for this phase.
+            Five new service cases cover the three-metal fallback deposit, storage closure,
+            take locking, quantity shortage, and sufficient quantity fragmented into too many forms.
+            Assertions cover plan invariants, read-only planning, per-form conservation,
+            unchanged fuel/unselected supplies, and idempotent execution without extra packets.
+            Existing Debug-only diagnostic guards are unchanged; configuration builds remain in Phase 7.
+        [x] Feed the selected forms into existing spare-slot balancing and target construction.
+        [x] Preserve one merge-compatible form per target.
+        [x] Ensure every target respects both item and cooking-slot capacity.
+        [x] Preserve exact ingredient totals and aggregate per-form availability.
+        [x] Keep execution-time supply recollection and permission revalidation intact.
+        [x] Keep ingredient shortages distinct from allocation failures.
+        [x] Keep planning free of transfers, packets, stack mutations, and fuel consumption.
+        [x] Keep deposit diagnostics Debug-only.
 
     ## 7. Verify Correctness and Runtime
         Depends on: 6

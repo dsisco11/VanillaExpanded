@@ -31,6 +31,15 @@ The cache is local to one detached supply snapshot, assuming disjoint supplies b
 ingredients; no attempt limit truncates the search. See
 [the planner proposal](AlloyDepositPlannerProposal.md) for the broader design.
 
+### Deposit integration coverage
+
+The three-metal fallback scenario is also tested through `AlloyDepositService` with
+player and opened-container supplies. Coverage verifies exact per-form transfers,
+unchanged fuel and unselected forms, no planning packets or stack mutations, and
+idempotent execution after completing a deposit. Closing or take-locking storage
+before execution reports insufficient items without transfers. Replacing sufficient
+supplies with too many incompatible forms reports insufficient space instead.
+
 ## Fuel selection
 
 [AlloyFuelDepositService](../VanillaExpanded/src/AlloyCalculator/AlloyFuelDepositService.cs) considers fuel in the backpack, hotbar, supported opened storage containers, and the firepit's queued fuel slot.
