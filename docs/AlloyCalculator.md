@@ -1,5 +1,14 @@
 # Alloy Calculator: Technical Reference
 
+## Ingredient eligibility
+
+Ingredient availability and concrete-form planning use the crucible cooking slots' native
+`CanHold` checks, including storage flags, tags, insertion locks, and content dimensions.
+Matching a metal's smelted output alone is not sufficient: ordinary ingots are too large
+for the vanilla crucible and must not displace usable nuggets in a deposit plan.
+Execution rechecks eligibility from live supplies. Planning does not use `CanTakeFrom`
+against current cooking contents because those contents may be removed before insertion.
+
 ## Fuel selection
 
 [AlloyFuelDepositService](../VanillaExpanded/src/AlloyCalculator/AlloyFuelDepositService.cs) considers fuel in the backpack, hotbar, supported opened storage containers, and the firepit's queued fuel slot.

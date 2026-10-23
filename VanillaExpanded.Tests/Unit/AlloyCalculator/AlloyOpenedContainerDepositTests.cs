@@ -20,6 +20,59 @@ public class AlloyOpenedContainerDepositTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void Molybdochalkos_OpenedSuppliesWithLeadIngot_DepositsOnlyFittingNuggets(bool playerSupplies)
+    {
+        Context context = CreateContext(0, 0);
+        context.Target[1].Itemstack!.Collectible.Attributes = JsonObject.FromJson(
+            "{\"cookingContainerSlots\":4,\"maxContainerSlotStackSize\":64,\"maxContentDimensions\":{\"width\":0.125,\"height\":0.25,\"length\":0.125}}");
+        context.Metal.Dimensions = new Size3f(0.1f, 0.1f, 0.1f);
+        MockItem lead = CreateItem(context.Fixture, 40, "ingot-lead");
+        lead.CombustibleProps = new CombustibleProperties
+        {
+            SmeltedRatio = 1,
+            SmeltedStack = new JsonItemStack { Code = lead.Code, ResolvedItemstack = new ItemStack(lead) }
+        };
+        MockItem galena = CreateItem(context.Fixture, 41, "nugget-galena");
+        galena.Dimensions = context.Metal.Dimensions;
+        galena.CombustibleProps = lead.CombustibleProps;
+        context.Chest[0].Itemstack = new ItemStack(lead);
+        var leadIngredient = new MetalDepositIngredient(lead.Code, new ItemStack(lead), 0.88f, 0.90f);
+        IInventory supply = playerSupplies ? context.Fixture.BackpackInventory! : context.Chest;
+        // The chest has two slots; use its second slot for lead and player inventory for copper.
+        supply[playerSupplies ? 0 : 1]!.Itemstack = new ItemStack(galena, 128);
+        context.Fixture.HotbarInventory![0].Itemstack = new ItemStack(context.Metal, 14);
+        var requested = new Dictionary<int, ItemStack>
+        {
+            [0] = new(context.Metal, 14),
+            [1] = new(galena, 106)
+        };
+        Assert.False(context.Target.CookingSlots[0].CanHold(context.Chest[0]));
+        Assert.Equal(AlloyDepositResultCode.Success, AlloyDepositService.CreatePlan(
+            context.Fixture.ClientApi, context.Firepit, [context.Ingredient, leadIngredient],
+            requested, context.Fixture.Player, out AlloyDepositPlan? plan));
+        Assert.DoesNotContain(plan!.Targets, target => target.DesiredStack!.Collectible.Code == lead.Code);
+        Assert.Equal(AlloyDepositResultCode.Success, Execute(context, plan));
+        Assert.Equal(14, context.Target.CookingSlots.Where(slot => slot.Itemstack?.Collectible == context.Metal)
+            .Sum(slot => slot.StackSize));
+        Assert.Equal(106, context.Target.CookingSlots.Where(slot => slot.Itemstack?.Collectible == galena)
+            .Sum(slot => slot.StackSize));
+        Assert.Equal(1, context.Chest[0].StackSize);
+        Assert.Equal(22, supply[playerSupplies ? 0 : 1]!.StackSize);
+
+        foreach (ItemSlot slot in context.Target.CookingSlots) slot.Itemstack = null;
+        context.Fixture.HotbarInventory[0].Itemstack = new ItemStack(context.Metal, 14);
+        supply[playerSupplies ? 0 : 1]!.Itemstack = new ItemStack(galena, 105);
+        Assert.Equal(AlloyDepositResultCode.InsufficientItems, AlloyDepositService.CreatePlan(
+            context.Fixture.ClientApi, context.Firepit, [context.Ingredient, leadIngredient],
+            requested, context.Fixture.Player, out _));
+        Assert.Equal(AlloyDepositResultCode.InsufficientItems, Execute(context, plan));
+        Assert.Equal(1, context.Chest[0].StackSize);
+        Assert.All(context.Target.CookingSlots, slot => Assert.True(slot.Empty));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void TinBronze_WithAdditionalTinFormInOpenedChest_DepositsExactAmounts(bool chestOpen)
     {
         Context context = CreateContext(18, 0);

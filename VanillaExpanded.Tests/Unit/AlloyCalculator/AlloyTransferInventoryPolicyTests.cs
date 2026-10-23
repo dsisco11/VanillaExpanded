@@ -39,9 +39,12 @@ public class AlloyTransferInventoryPolicyTests
         fixture.InventoryManagerMock.SetupGet(m => m.OpenedInventories)
             .Returns([target, chest, fixture.BackpackInventory, typed, chest, crate, fixture.HotbarInventory]);
 
-        Assert.True(AlloyTransferInventoryPolicy.TryCollect(fixture.World, fixture.Player, target, out var slots));
+        var diagnostics = new List<string>();
+        Assert.True(AlloyTransferInventoryPolicy.TryCollect(fixture.World, fixture.Player, target, out var slots, diagnostics.Add));
 
         Assert.Equal(fixture.BackpackInventory.Concat(fixture.HotbarInventory).Concat(chest).Concat(typed).Concat(crate), slots);
+        Assert.Equal(3, diagnostics.Count(message => message.Contains("accepted=True")));
+        Assert.Contains(diagnostics, message => message.Contains("ownerInventoryMatches=True"));
     }
 
     /// <summary>Verifies machines, owner mismatches, equipment, and unresolved owners cannot join the pool.</summary>
@@ -62,9 +65,11 @@ public class AlloyTransferInventoryPolicyTests
         fixture.InventoryManagerMock.SetupGet(m => m.OpenedInventories)
             .Returns([target, machine, mismatch, unresolved, fixture.OffhandInventory]);
 
-        Assert.True(AlloyTransferInventoryPolicy.TryCollect(fixture.World, fixture.Player, target, out var slots));
+        var diagnostics = new List<string>();
+        Assert.True(AlloyTransferInventoryPolicy.TryCollect(fixture.World, fixture.Player, target, out var slots, diagnostics.Add));
 
         Assert.Equal(fixture.BackpackInventory.Concat(fixture.HotbarInventory), slots);
+        Assert.Equal(3, diagnostics.Count(message => message.Contains("accepted=False")));
     }
 
     /// <summary>Verifies duplicate slot references and aliases of target slots cannot enter the pool.</summary>
