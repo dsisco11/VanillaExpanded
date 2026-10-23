@@ -1,7 +1,7 @@
 # Alloy Deposit Planner Implementation TODO
     Proposal: AlloyDepositPlannerProposal.md
     Scope: implement slot-bounded fallback search without changing ingredient calculations or inventory-access policy.
-    Status: Phases 1 through 6 complete; broader validation and in-game confirmation remain pending.
+    Status: Phases 1 through 7 complete; in-game confirmation remains pending.
     Phase 1 validation: 10 focused planner cases run; 6 passed and 4 failed as expected.
         Expected failures: primary three-metal scenario, concrete-layout preservation,
         and both fallback-capacity scenarios (multi-slot alternative and reduced preferred contribution).
@@ -110,18 +110,22 @@
     ## 7. Verify Correctness and Runtime
         Depends on: 6
         Primary tests: ../VanillaExpanded.Tests/Unit/AlloyCalculator/AlloyDepositPlanTests.cs
-        [ ] Run focused planner tests; confirm the previously failing three-metal regression now passes.
-        [ ] Add a small exhaustive allocation oracle in test code.
+        Validation: 33 planner cases and all 298 alloy-calculator cases passed.
+            The independent oracle checked 69,984 combinations with no feasibility mismatches.
+            Four high-form-count cases passed; measured durations are recorded in the proposal.
+            Debug and Release builds passed; Release retained six pre-existing unrelated warnings.
+        [x] Run focused planner tests; confirm the previously failing three-metal regression now passes.
+        [x] Add a small exhaustive allocation oracle in test code.
             Compare feasibility against production search for bounded synthetic supply/capacity combinations.
             Keep the oracle independent of production search logic and avoid new test packages.
-        [ ] Assert plan invariants for successful oracle cases.
+        [x] Assert plan invariants for successful oracle cases.
             Exact totals, available quantities, unique destinations, compatible forms, and capacity.
-        [ ] Assert no inventory mutations for both successful and failed planning.
-        [ ] Exercise representative high-form-count inputs and record runtime in the proposal.
+        [x] Assert no inventory mutations for both successful and failed planning.
+        [x] Exercise representative high-form-count inputs and record runtime in the proposal.
             Do not add flaky wall-clock assertions to ordinary unit tests.
-        [ ] Run the full alloy-calculator test group.
-        [ ] Build Debug and Release configurations; confirm no new warnings or errors.
-        [ ] Run git diff --check.
+        [x] Run the full alloy-calculator test group.
+        [x] Build Debug and Release configurations; confirm no new warnings or errors.
+        [x] Run git diff --check.
 
     ## 8. Document and Confirm In Game
         Depends on: 7
