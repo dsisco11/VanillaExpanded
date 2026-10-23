@@ -9,6 +9,64 @@ namespace VanillaExpanded.Tests.Unit.AlloyCalculator;
 public class AlloyDepositPlanTests
 {
     [Fact]
+    public void Resolve_ThreeMetalAlloyWithOptionalForms_FindsFourSlotPlan()
+    {
+        const int targetUnits = 100;
+        VsTestFixture fixture = VsTestFixture.Client();
+        MockItem metalA = CreateItem(1, "ingot-metal-a");
+        MockItem metalB = CreateItem(2, "ingot-metal-b");
+        MockItem metalC = CreateItem(3, "ingot-metal-c");
+        MetalDepositIngredient[] ingredients =
+        [
+            new(metalA.Code, new ItemStack(metalA), 0.5f, 0.5f),
+            new(metalB.Code, new ItemStack(metalB), 1f / 3, 1f / 3),
+            new(metalC.Code, new ItemStack(metalC), 1f / 6, 1f / 6)
+        ];
+        // 75:50:25 normalized to the integer percentages accepted by the calculator UI.
+        var percentages = new Dictionary<int, int> { [0] = 50, [1] = 33, [2] = 17 };
+        Dictionary<int, int> amounts = AlloyCalculatorLogic.CalculateAllNuggetsRequired(
+            targetUnits, percentages, ingredients);
+        // Exact thirds cannot be represented in a 100-unit whole-nugget batch; rounding yields 105 units.
+        Assert.Equal([10, 7, 4], Enumerable.Range(0, 3).Select(index => amounts[index]));
+
+        MockItem aBits = CreateSmeltableItem(4, "metalbit-metal-a", metalA);
+        MockItem aNuggets = CreateSmeltableItem(5, "nugget-metal-a", metalA);
+        MockItem aChunks = CreateSmeltableItem(6, "chunk-metal-a", metalA);
+        MockItem bBits = CreateSmeltableItem(7, "metalbit-metal-b", metalB);
+        MockItem bNuggets = CreateSmeltableItem(8, "nugget-metal-b", metalB);
+        MockItem cBits = CreateSmeltableItem(9, "metalbit-metal-c", metalC);
+        MockItem[] forms = [aBits, aNuggets, aChunks, bBits, bNuggets, cBits];
+        int[] quantities = [15, 10, 5, 3, 4, 10];
+        var supplies = new InventoryGeneric(6, "supply", "three-metal", null!) { Api = fixture.Api };
+        for (int index = 0; index < forms.Length; index++)
+        {
+            forms[index].CombustibleProps.SmeltedRatio = 20;
+            supplies[index].Itemstack = new ItemStack(forms[index], quantities[index]);
+        }
+        var cooking = new InventoryGeneric(4, "cooking", "three-metal", null!) { Api = fixture.Api };
+        AlloyDepositPlan request = Assert.IsType<AlloyDepositPlan>(AlloyDepositPlan.CreateRequest(
+            ingredients,
+            amounts.ToDictionary(pair => pair.Key, pair => new ItemStack(
+                pair.Key == 0 ? aBits : pair.Key == 1 ? bBits : cBits, pair.Value)),
+            cooking.Count));
+
+        // A feasible layout is 10 A nuggets, 3 B bits, 4 B nuggets, and 4 C bits.
+        // Greedy smallest-stack selection instead splits A across chunks and nuggets, requiring five slots.
+        AlloyDepositPlan? plan = AlloyDepositStackPlanner.Resolve(
+            fixture.World, request, cooking.ToArray(), supplies, MatchesIngredient, spreadAcrossCookingSlots: true);
+
+        Assert.All(cooking, slot => Assert.True(slot.Empty));
+        Assert.Equal(quantities, supplies.Select(slot => slot.StackSize));
+        Assert.NotNull(plan);
+        Assert.InRange(plan.Targets.Length, 3, 4);
+        for (int index = 0; index < ingredients.Length; index++)
+        {
+            Assert.Equal(amounts[index], plan.Targets
+                .Where(target => target.Ingredient == ingredients[index]).Sum(target => target.Amount));
+        }
+    }
+
+    [Fact]
     public void CreateRequest_CapturesTotalsWithoutSpreadingAcrossCookingSlots()
     {
         MockItem copper = CreateItem(1, "ingot-copper");
