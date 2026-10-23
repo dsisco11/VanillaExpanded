@@ -22,6 +22,27 @@ public sealed class AlloyCalculatorDialogLayoutTests : IDisposable
     }
 
     [Theory]
+    [InlineData(false, false, 0, 38, 48, 64)]
+    [InlineData(false, false, 30, 38, 48, 34)]
+    [InlineData(true, false, 45, 0, 48, 19)]
+    [InlineData(false, true, 0, 38, 0, 64)]
+    [InlineData(true, true, 64, 0, 0, 0)]
+    [InlineData(false, true, 80, 38, 0, -16)]
+    public void OptionalSections_CollapseEmptySlotsAndUseMeasuredStatusHeight(
+        bool showWarning, bool showFuelSlot, double statusHeight,
+        double expectedWarningReduction, double expectedSlotReduction, double expectedStatusReduction)
+    {
+        var reductions = GuiDialogAlloyCalculator.GetOptionalSectionReductions(
+            showWarning, showFuelSlot, statusHeight);
+
+        Assert.Equal(expectedWarningReduction, reductions.WarningReduction);
+        Assert.Equal(expectedSlotReduction, reductions.SlotReduction);
+        Assert.Equal(expectedStatusReduction, reductions.StatusReduction);
+        Assert.Equal(showFuelSlot ? 48 : 0, 48 - reductions.SlotReduction);
+        Assert.Equal(statusHeight, 64 - reductions.StatusReduction);
+    }
+
+    [Theory]
     [InlineData(300, 550)]
     [InlineData(550, 300)]
     [InlineData(500, 462)]
