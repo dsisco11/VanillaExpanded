@@ -1,0 +1,111 @@
+# Alloy Deposit Planner Implementation TODO
+    Proposal: AlloyDepositPlannerProposal.md
+    Scope: implement slot-bounded fallback search without changing ingredient calculations or inventory-access policy.
+    Status: not started; the three-metal regression is intentionally failing.
+
+    ## 1. Establish Regression Coverage
+        [ ] Preserve Resolve_ThreeMetalAlloyWithOptionalForms_FindsFourSlotPlan as the primary failing regression.
+            Keep targetUnits=100, normalized weights, requested counts 10/7/4, and approved supply quantities.
+            Do not change rounding or relax assertions to make the test pass.
+        [ ] Add a valid-concrete-layout test with newly available, smaller preferred forms.
+            Assert execution-time resolution retains the exact existing layout.
+        [ ] Add a fallback case where one form needs multiple slots because of its stack limit.
+        [ ] Add a case requiring reduced use of a preferred form rather than simply skipping it.
+        [ ] Add a case requiring backtracking to an earlier ingredient to leave room for later ingredients.
+        [ ] Retain coverage for mandatory mixed forms and genuinely impossible arrangements.
+        [ ] Add repeated-input assertions proving deterministic selection.
+        [ ] Confirm new failures expose selection/layout defects rather than insufficient supply or invalid fixtures.
+
+    ## 2. Prepare Shared Planning Data
+        Depends on: 1
+        Primary file: ../VanillaExpanded/src/AlloyCalculator/AlloyDepositStackPlanner.cs
+        [ ] Extract existing merge-compatible grouping into a reusable private helper.
+            Preserve smallest-source-stack order and stable ties.
+            Aggregate by actual stack equality, not item code alone.
+        [ ] Represent each ingredient's request, ordered forms, available counts, and effective capacities.
+            Reuse existing types where practical; keep any new helper types private.
+        [ ] Keep supplies and quantities detached from live inventory mutation.
+        [ ] Preserve the service's existing CanHold eligibility and inventory-access checks.
+        [ ] Handle nonpositive capacities as unusable forms without abandoning usable alternatives.
+        [ ] Preserve the existing common cooking-slot capacity model.
+        [ ] Run existing planner tests to detect accidental ordering or capacity changes.
+
+    ## 3. Preserve Valid Concrete Layouts
+        Depends on: 2
+        [ ] Before greedy reselection, validate concrete targets when spreadAcrossCookingSlots is false.
+        [ ] Validate unique and permitted destination indices.
+        [ ] Validate positive quantities and each target's effective capacity.
+        [ ] Validate desired forms against eligible supplies and the requested ingredient identity.
+        [ ] Validate aggregate per-form supply and exact requested ingredient totals.
+        [ ] Return the existing plan unchanged when valid.
+        [ ] Fall through to selection when the layout is no longer feasible.
+        [ ] Pass the layout-preservation regression and existing execution-layout tests.
+
+    ## 4. Implement Slot-Bounded Fallback Search
+        Depends on: 2, 3
+        [ ] Retain the greedy selection as the preferred fast path.
+            Preserve its output when feasible.
+        [ ] Replace immediate rejection of an over-budget greedy selection with fallback search.
+        [ ] Search in stable ingredient and form order.
+        [ ] Track ingredient index, form index, remaining quantity, remaining slots, and selected contributions.
+        [ ] Enumerate useful positive slot allocations in preference order, then skip the form.
+            Try the greedy contribution first, then smaller allocations.
+            Cap contribution by remaining request, available supply, and allocated capacity.
+            Charge only slots actually needed; do not reserve empty slots.
+        [ ] Backtrack when the current allocation prevents completion of later ingredients.
+        [ ] Restore all branch-local selections on failure.
+        [ ] Return the first complete feasible selection without altering ingredient totals.
+        [ ] Return null only after all feasible branches have been exhausted.
+
+    ## 5. Add Pruning and Failed-State Memoization
+        Depends on: 4
+        [ ] Prune when remaining supply cannot satisfy the current ingredient.
+        [ ] Prune when an optimistic capacity bound cannot satisfy the request within the slot budget.
+        [ ] Reserve a lower bound of one slot for every remaining nonzero ingredient.
+        [ ] Memoize failed states by ingredient index, form index, remaining quantity, and remaining slots.
+            Scope the cache to one supply snapshot.
+            Document the assumption that ingredient supplies are disjoint.
+        [ ] Do not add arbitrary search-attempt limits or success-shaped fallbacks.
+        [ ] Re-run deterministic and cross-ingredient backtracking tests.
+
+    ## 6. Materialize and Integrate
+        Depends on: 4, 5
+        [ ] Feed the selected forms into existing spare-slot balancing and target construction.
+        [ ] Preserve one merge-compatible form per target.
+        [ ] Ensure every target respects both item and cooking-slot capacity.
+        [ ] Preserve exact ingredient totals and aggregate per-form availability.
+        [ ] Keep execution-time supply recollection and permission revalidation intact.
+        [ ] Keep ingredient shortages distinct from allocation failures.
+        [ ] Keep planning free of transfers, packets, stack mutations, and fuel consumption.
+        [ ] Keep deposit diagnostics Debug-only.
+
+    ## 7. Verify Correctness and Runtime
+        Depends on: 6
+        Primary tests: ../VanillaExpanded.Tests/Unit/AlloyCalculator/AlloyDepositPlanTests.cs
+        [ ] Run focused planner tests; confirm the previously failing three-metal regression now passes.
+        [ ] Add a small exhaustive allocation oracle in test code.
+            Compare feasibility against production search for bounded synthetic supply/capacity combinations.
+            Keep the oracle independent of production search logic and avoid new test packages.
+        [ ] Assert plan invariants for successful oracle cases.
+            Exact totals, available quantities, unique destinations, compatible forms, and capacity.
+        [ ] Assert no inventory mutations for both successful and failed planning.
+        [ ] Exercise representative high-form-count inputs and record runtime in the proposal.
+            Do not add flaky wall-clock assertions to ordinary unit tests.
+        [ ] Run the full alloy-calculator test group.
+        [ ] Build Debug and Release configurations; confirm no new warnings or errors.
+        [ ] Run git diff --check.
+
+    ## 8. Document and Confirm In Game
+        Depends on: 7
+        [ ] Update AlloyCalculator.md with fallback search, preference order, and layout-preservation behavior.
+        [ ] Update AlloyDepositPlannerProposal.md with implementation status and measured validation results.
+        [ ] Reproduce a four-slot mixed-form deposit requiring fallback selection.
+        [ ] Verify exact deposited quantities and inventory conservation, including unselected forms.
+        [ ] Verify an ordinary greedy-success deposit still behaves as before.
+        [ ] Confirm Release builds do not emit deposit diagnostics.
+        [ ] Record any remaining limitations without claiming unperformed in-game checks passed.
+
+    ## Completion Gate
+        [ ] All automated acceptance criteria from the proposal are verified.
+        [ ] In-game verification is recorded, or explicitly identified as pending user confirmation.
+        [ ] No changes to ratios, rounding, fuel selection, or storage-class policy are included.
