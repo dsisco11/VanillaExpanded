@@ -1,7 +1,7 @@
 # Alloy Deposit Planner Implementation TODO
     Proposal: AlloyDepositPlannerProposal.md
     Scope: implement slot-bounded fallback search without changing ingredient calculations or inventory-access policy.
-    Status: Phases 1 through 3 complete; fallback search remains pending.
+    Status: Phases 1 through 4 complete; search pruning and memoization remain pending.
     Phase 1 validation: 10 focused planner cases run; 6 passed and 4 failed as expected.
         Expected failures: primary three-metal scenario, concrete-layout preservation,
         and both fallback-capacity scenarios (multi-slot alternative and reduced preferred contribution).
@@ -56,19 +56,23 @@
 
     ## 4. Implement Slot-Bounded Fallback Search
         Depends on: 2, 3
-        [ ] Retain the greedy selection as the preferred fast path.
+        Validation: all 54 focused planner/service/opened-container cases passed.
+            The original three-metal regression and both fallback-capacity cases now pass.
+            Repeated resolutions are deterministic; concrete fallback layouts are retained at execution.
+            Execution-time fallback cannot allocate outside the request's permitted destinations.
+        [x] Retain the greedy selection as the preferred fast path.
             Preserve its output when feasible.
-        [ ] Replace immediate rejection of an over-budget greedy selection with fallback search.
-        [ ] Search in stable ingredient and form order.
-        [ ] Track ingredient index, form index, remaining quantity, remaining slots, and selected contributions.
-        [ ] Enumerate useful positive slot allocations in preference order, then skip the form.
+        [x] Replace immediate rejection of an over-budget greedy selection with fallback search.
+        [x] Search in stable ingredient and form order.
+        [x] Track ingredient index, form index, remaining quantity, remaining slots, and selected contributions.
+        [x] Enumerate useful positive slot allocations in preference order, then skip the form.
             Try the greedy contribution first, then smaller allocations.
             Cap contribution by remaining request, available supply, and allocated capacity.
             Charge only slots actually needed; do not reserve empty slots.
-        [ ] Backtrack when the current allocation prevents completion of later ingredients.
-        [ ] Restore all branch-local selections on failure.
-        [ ] Return the first complete feasible selection without altering ingredient totals.
-        [ ] Return null only after all feasible branches have been exhausted.
+        [x] Backtrack when the current allocation prevents completion of later ingredients.
+        [x] Restore all branch-local selections on failure.
+        [x] Return the first complete feasible selection without altering ingredient totals.
+        [x] Return null only after all feasible branches have been exhausted.
 
     ## 5. Add Pruning and Failed-State Memoization
         Depends on: 4

@@ -18,7 +18,13 @@ Valid layouts retain their exact forms, quantities, and slot assignments even if
 source stacks have become available. Validation checks unique in-range destinations,
 positive quantities, capacity, ingredient identity, and aggregate supply per form.
 Infeasible layouts fall through to reselection; invalid indices or nonpositive requests
-are rejected. Selection of replacement layouts is still greedy; fallback search is planned in
+are rejected. Selection prefers the existing greedy result when it fits. If greedy
+selection exceeds the available slot budget, a read-only backtracking search tries
+smaller contributions from preferred forms, then skips those forms as needed. It can
+revisit an earlier ingredient's choices to leave space for later ingredients.
+The first feasible selection is passed to the existing spare-slot balancing logic.
+Execution-time resolution remains restricted to the plan's destination indices.
+Search pruning and failed-state memoization remain pending; see
 [the planner proposal](AlloyDepositPlannerProposal.md).
 
 ## Fuel selection

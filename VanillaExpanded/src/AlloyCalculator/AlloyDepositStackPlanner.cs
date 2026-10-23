@@ -50,14 +50,20 @@ internal static class AlloyDepositStackPlanner
             foreach (FormSupply supply in ingredient.Forms)
             {
                 int amount = Math.Min(remaining, supply.Amount);
-                int slots = (amount + supply.Capacity - 1) / supply.Capacity;
+                int slots = 1 + (amount - 1) / supply.Capacity;
                 forms.Add((ingredient.Ingredient, supply.Stack, amount, slots));
                 remaining -= amount;
                 if (remaining == 0) break;
             }
             if (remaining != 0) return null;
         }
-        if (forms.Sum(static form => form.Slots) > slotIndices.Length) return null;
+        if (forms.Sum(static form => (long)form.Slots) > slotIndices.Length)
+        {
+            // Greedy preferences are not constraints: discard the failed selection and reconsider forms.
+            forms.Clear();
+            if (!TrySelectForms(ingredients, 0, 0, ingredients[0].Amount, slotIndices.Length, forms))
+                return null;
+        }
 
         // With one selected form per ingredient, existing quantities and destinations can be retained
         // even when the original concrete form is unavailable. Duplicate destinations require rebuilding.
@@ -109,6 +115,48 @@ internal static class AlloyDepositStackPlanner
         MetalDepositIngredient Ingredient,
         int Amount,
         ImmutableArray<FormSupply> Forms);
+
+    /// <summary>Backtracks over slot allocations, preferring larger contributions from earlier forms.</summary>
+    private static bool TrySelectForms(
+        ImmutableArray<IngredientSupply> ingredients,
+        int ingredientIndex,
+        int formIndex,
+        int remainingAmount,
+        int remainingSlots,
+        List<(MetalDepositIngredient Ingredient, ItemStack Stack, int Amount, int Slots)> selected)
+    {
+        if (remainingAmount == 0)
+        {
+            int nextIngredient = ingredientIndex + 1;
+            return nextIngredient == ingredients.Length
+                || TrySelectForms(ingredients, nextIngredient, 0,
+                    ingredients[nextIngredient].Amount, remainingSlots, selected);
+        }
+
+        IngredientSupply ingredient = ingredients[ingredientIndex];
+        if (remainingSlots == 0 || formIndex == ingredient.Forms.Length) return false;
+
+        FormSupply form = ingredient.Forms[formIndex];
+        int preferredAmount = Math.Min(remainingAmount, form.Amount);
+        int maximumSlots = Math.Min(remainingSlots, 1 + (preferredAmount - 1) / form.Capacity);
+        for (int slots = maximumSlots; slots > 0; slots--)
+        {
+            // For a fixed slot allocation, taking fewer items cannot help: forms contribute
+            // interchangeable counts within this ingredient and share only the slot budget.
+            int amount = (int)Math.Min(preferredAmount, (long)slots * form.Capacity);
+            int usedSlots = 1 + (amount - 1) / form.Capacity;
+            selected.Add((ingredient.Ingredient, form.Stack, amount, usedSlots));
+            if (TrySelectForms(ingredients, ingredientIndex, formIndex + 1,
+                remainingAmount - amount, remainingSlots - usedSlots, selected)) return true;
+
+            // A later ingredient may force reconsideration of this earlier choice.
+            selected.RemoveAt(selected.Count - 1);
+        }
+
+        // Skipping is essential when a small preferred source would consume an extra slot.
+        return TrySelectForms(ingredients, ingredientIndex, formIndex + 1,
+            remainingAmount, remainingSlots, selected);
+    }
 
     /// <summary>Checks the existing allocation against eligible supplies without choosing replacement forms.</summary>
     private static bool HasValidConcreteLayout(

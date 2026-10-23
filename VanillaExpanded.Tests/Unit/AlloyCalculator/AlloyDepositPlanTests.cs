@@ -229,6 +229,8 @@ public class AlloyDepositPlanTests
         }
         AssertSameLayout(plan, Assert.IsType<AlloyDepositPlan>(AlloyDepositStackPlanner.Resolve(
             fixture.World, request, cooking.ToArray(), supplies, MatchesIngredient, spreadAcrossCookingSlots: true)));
+        Assert.Same(plan, AlloyDepositStackPlanner.Resolve(
+            fixture.World, plan, cooking.ToArray(), supplies, MatchesIngredient));
     }
 
     [Fact]
@@ -333,6 +335,10 @@ public class AlloyDepositPlanTests
         }
         AssertSameLayout(plan, Assert.IsType<AlloyDepositPlan>(AlloyDepositStackPlanner.Resolve(
             fixture.World, request, cooking.ToArray(), supplies, MatchesIngredient, spreadAcrossCookingSlots: true)));
+        Assert.Same(plan, AlloyDepositStackPlanner.Resolve(
+            fixture.World, plan, cooking.ToArray(), supplies, MatchesIngredient));
+        Assert.Null(AlloyDepositStackPlanner.Resolve(
+            fixture.World, request, cooking.ToArray(), supplies, MatchesIngredient));
     }
 
     [Fact]
