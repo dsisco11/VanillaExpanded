@@ -10,8 +10,6 @@ internal sealed record WeatherConditionsSample(EnumPrecipitationType? Precipitat
     public int PrecipitationIntensity { get; init; } = Precipitation.HasValue ? 1 : 0;
     /// <summary>Gets estimated cloud coverage: zero through four are clear to overcast; null is unavailable.</summary>
     public int? CloudCoverage { get; init; }
-    /// <summary>Gets wind strength: zero is calm; one through three are light to strong.</summary>
-    public int WindIntensity { get; init; }
     /// <summary>Gets combined fog and haze strength: zero is absent; one through three are light to dense.</summary>
     public int FogIntensity { get; init; } = Fog ? 1 : 0;
     /// <summary>Gets thunder activity: zero is absent; one through three indicate increasing native event rates.</summary>
@@ -21,7 +19,7 @@ internal sealed record WeatherConditionsSample(EnumPrecipitationType? Precipitat
     /// <summary>Uses native automatic snow selection and separate entry/exit thresholds for blended conditions.</summary>
     public static WeatherConditionsSample FromWeather(float rainfall, EnumPrecipitationType type, float temperature,
         float snowThreshold, float fogDensity, WeatherConditionsSample? previous = null,
-        float cloudCoverage = float.NaN, float windSpeed = 0, float thunderRate = 0, float mistOpacity = 0)
+        float cloudCoverage = float.NaN, float thunderRate = 0, float mistOpacity = 0)
     {
         bool wet = float.IsFinite(rainfall) && rainfall > (previous?.Precipitation != null ? .005f : .01f);
         // Native weather particles resolve Auto from climate temperature and this snapshot's snow threshold.
@@ -40,7 +38,6 @@ internal sealed record WeatherConditionsSample(EnumPrecipitationType? Precipitat
                 previous?.PrecipitationIntensity ?? 0, [.01f, .25f, .65f], [.005f, .20f, .55f])),
             CloudCoverage = float.IsFinite(cloudCoverage) && cloudCoverage >= 0
                 ? Band(cloudCoverage, previous?.CloudCoverage ?? 0, [.05f, .25f, .60f, .90f], [.03f, .20f, .55f, .85f]) : null,
-            WindIntensity = Band(windSpeed, previous?.WindIntensity ?? 0, [.05f, .3f, .7f], [.035f, .25f, .6f]),
             FogIntensity = fogLevel,
             ThunderIntensity = Band(thunderRate, previous?.ThunderIntensity ?? 0, [.001f, .25f, .65f], [.0005f, .20f, .55f])
         };

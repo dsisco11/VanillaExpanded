@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" preserveAspectRatio="xMidYMid meet">
+  <title>Wind speed</title>
+  <desc>Two open airflow strokes with an upward upper hook and a downward lower hook.</desc>
+  <!-- Contrasting underlay keeps the rounded line art visible against bright scenery. -->
+  <path d="M 8 28 H 46 C 60 28 60 9 47 9 C 43 9 40 11 39 13 M 8 39 H 44 C 57 39 57 55 46 55 C 43 55 41 54 39 52" fill="none" stroke="#25343e" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 8 28 H 46 C 60 28 60 9 47 9 C 43 9 40 11 39 13 M 8 39 H 44 C 57 39 57 55 46 55 C 43 55 41 54 39 52" fill="none" stroke="#d7e4ed" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
