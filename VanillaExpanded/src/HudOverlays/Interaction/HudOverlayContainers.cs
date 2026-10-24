@@ -309,7 +309,8 @@ internal sealed class HudOverlayContainers
             }
             store.Own(key);
             result.Add(new HudLayoutContainer { Id = id,
-                Key = key, TemplateId = group.Id, Tree = tree, Padding = group.Packing.Padding });
+                Key = key, TemplateId = group.Id, Tree = tree, Padding = group.Packing.Padding,
+                Movable = group.DefaultMovable });
         }
         resolved = result.ToArray();
     }

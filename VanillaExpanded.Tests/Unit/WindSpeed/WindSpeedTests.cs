@@ -85,15 +85,14 @@ public sealed class WindSpeedTests
             texts.Add(texture);
             return texture;
         }
-        var compact = new HudOverlayIconReading(new WorkshopGaugeText(CreateText), (context, path) =>
+        System.Func<HudOverlayPreparationContext, LoadedTexture> load = context =>
         {
-            Assert.EndsWith("/wind-speed/icon.svg", path);
             var texture = new LoadedTexture(context.Api) { TextureId = 2, Width = 64, Height = 64 };
             icons.Add(texture);
             return texture;
-        });
-        using var presentation = new WindSpeedPresentation(compact,
-            new HudIndicatorTextPresentation(new WorkshopGaugeText(CreateText), new WorkshopGaugeText(CreateText)));
+        };
+        using var presentation = new WindSpeedPresentation(load,
+            new HudIndicatorTextPresentation(new WorkshopGaugeText(CreateText), new WorkshopGaugeText(CreateText)), new HudOverlayIconTextPresentation(CreateText));
         var preparation = new HudOverlayPreparationContext(api, 1, "en");
         presentation.SetContent(2);
         presentation.SetStyle(HudIndicatorStyle.Text);
@@ -110,6 +109,35 @@ public sealed class WindSpeedTests
         Assert.All(texts, texture => Assert.True(texture.Disposed));
         presentation.Prepare(preparation);
         Assert.Single(icons);
+    }
+
+    /// <summary>Native text dimensions survive scaling while the reading and icon stay centered and separated.</summary>
+    [Theory]
+    [InlineData(1, 190, 23)]
+    [InlineData(2, 430, 49)]
+    public void DrawingForwardsFullReadingDimensions(double scale, int width, int height)
+    {
+        var api = new Mock<ICoreClientAPI> { DefaultValue = DefaultValue.Mock }.Object;
+        using var presentation = new WindSpeedPresentation(context => new LoadedTexture(context.Api)
+            { TextureId = 1, Width = 64, Height = 64 }, label: new HudOverlayIconTextPresentation((context, _) =>
+                new LoadedTexture(context.Api) { TextureId = 2, Width = width, Height = height }));
+        presentation.SetContent(3);
+        presentation.Prepare(new(api, scale, "en"));
+        var bounds = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
+        bounds.absFixedX = 17; bounds.absFixedY = 29;
+        bounds.absInnerWidth = presentation.Size.Width * scale + 24;
+        bounds.absInnerHeight = presentation.Size.Height * scale + 18;
+        bounds.Initialized = true;
+        var renderer = new Mock<IRenderAPI>();
+        presentation.Draw(renderer.Object, bounds);
+        var icon = Assert.Single(renderer.Invocations, value => value.Method.Name == "RenderTexture" && (int)value.Arguments[0] == 1);
+        var text = Assert.Single(renderer.Invocations, value => value.Method.Name == "Render2DTexturePremultipliedAlpha" && (int)value.Arguments[0] == 2);
+        Assert.Equal((double)width, Convert.ToDouble(text.Arguments[3]), 4);
+        Assert.Equal((double)height, Convert.ToDouble(text.Arguments[4]), 4);
+        double center = bounds.renderX + bounds.OuterWidth / 2;
+        Assert.Equal(center, Convert.ToDouble(text.Arguments[1]) + width / 2d, 4);
+        Assert.Equal(center, Convert.ToDouble(icon.Arguments[1]) + Convert.ToDouble(icon.Arguments[3]) / 2, 4);
+        Assert.True(Convert.ToDouble(text.Arguments[2]) >= Convert.ToDouble(icon.Arguments[2]) + Convert.ToDouble(icon.Arguments[4]));
     }
     #endregion
 }

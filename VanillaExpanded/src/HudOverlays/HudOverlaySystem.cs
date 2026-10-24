@@ -59,7 +59,7 @@ public sealed class HudOverlaySystem : ModSystem, ILiveConfigurable
         Registry.RegisterGroup(new HudOverlayGroup("player-status",
             new HudOverlayPlacement(HudOverlayTargets.Hotbar,
                 HudOverlayPoint.LeftBottom, HudOverlayPoint.RightBottom, 0, 4),
-            new HudOverlayPacking(HudOverlayDirection.Horizontal, crossAlignment: HudOverlayCrossAlignment.End)));
+            new HudOverlayPacking(HudOverlayDirection.Horizontal, crossAlignment: HudOverlayCrossAlignment.End)) { DefaultMovable = true });
         Registry.RegisterGroup(new HudOverlayGroup("world-status",
             new HudOverlayPlacement(HudOverlayTargets.Screen,
                 HudOverlayPoint.RightTop, HudOverlayPoint.RightTop, screenPaddingPixels: 3),

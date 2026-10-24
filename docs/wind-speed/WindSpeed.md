@@ -1,6 +1,6 @@
 # Wind speed
 
-The wind indicator registers in the top-right `world-status` group, after weather at order 102. It supports the shared HUD's movement, grouping, hidden-item editing, hover label, and context-menu settings.
+The wind indicator registers in the bottom-left `player-status` group at order 96. The default group is unlocked and movable; explicit saved layout permissions remain authoritative. It supports the shared HUD's movement, grouping, hidden-item editing, hover label, and context-menu settings.
 
 `EnableWindSpeedOverlay` controls its visibility; global `EnableHudOverlays` also applies. `WindSpeedIndicatorStyle` selects `Icon` or `Text`. Both settings apply live and are exposed through ConfigLib and the indicator menu.
 
@@ -18,6 +18,6 @@ Values must exceed a boundary to activate or retain that band. Calm, missing, an
 
 ## Presentation and resource ownership
 
-Icon mode uses `assets/vanillaexpanded/textures/hud/wind-speed/icon.svg`, the approved double-hook line art, above a localized Light, Moderate, or Strong reading. Text mode uses the short name `WIND` above the same reading and loads no icon. Wind strength does not alter the approved icon's shape.
+Icon mode uses the standard 36-GUI-unit indicator size and normal 14-point HUD text. The reading keeps its prepared font size as GUI scale changes; longer localized readings expand the footprint. The icon uses `assets/vanillaexpanded/textures/hud/wind-speed/icon.svg`, the approved double-hook line art, above a localized Light, Moderate, or Strong reading. Text mode uses the short name `WIND` above the same reading and loads no icon. Wind strength does not alter the approved icon's shape.
 
-The shared compact-icon helper rasterizes the SVG and owns its texture; the shared text helpers own their lettering. Resources are reused across unchanged refreshes and released on style changes, API changes, completed exits, or world exit. Headless checks establish lifecycle and classification behavior; in-game appearance remains user-run validation.
+The wind presentation rasterizes the SVG and owns its texture. The shared status-indicator text helper owns the strength label; the shared text-mode helper owns the short name and reading. Resources are reused across unchanged refreshes and released on style changes, API changes, completed exits, or world exit. Headless checks establish lifecycle and classification behavior; in-game appearance remains user-run validation.

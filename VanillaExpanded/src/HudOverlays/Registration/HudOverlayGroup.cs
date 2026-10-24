@@ -10,6 +10,8 @@ public sealed record HudOverlayGroup
     public string Id { get; }
     public HudOverlayPlacement Placement { get; }
     public HudOverlayPacking Packing { get; }
+    /// <summary>Gets whether an untouched default container permits movement before a saved permission exists.</summary>
+    public bool DefaultMovable { get; init; }
     #region Public API
     /// <summary>Creates group metadata without resolving an engine target or allocating GUI resources.</summary>
     public HudOverlayGroup(string id, HudOverlayPlacement placement, HudOverlayPacking? packing = null)
