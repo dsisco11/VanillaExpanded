@@ -47,7 +47,7 @@ internal sealed class WeatherConditionsPresentation : HudIndicatorPresentation<H
             backdrop = null;
         }
         bool hasData = sample.Precipitation.HasValue || sample.Fog || sample.CloudCoverage.HasValue
-            || sample.WindIntensity > 0 || sample.ThunderIntensity > 0;
+            || sample.ThunderIntensity > 0;
         if (IsTextStyle)
         {
             if (hasData)

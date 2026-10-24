@@ -162,7 +162,6 @@ public sealed class WeatherConditionsTests
         fixture.World.SetupGet(value => value.BlockAccessor).Returns(blocks.Object);
         ClimateCondition? climate = new() { Rainfall = .5f, Temperature = 2, RainCloudOverlay = 1 };
         blocks.Setup(value => value.GetClimateAt(It.IsAny<BlockPos>(), EnumGetClimateMode.NowValues, 0)).Returns(() => climate!);
-        blocks.Setup(value => value.GetWindSpeedAt(It.IsAny<Vec3d>())).Returns(new Vec3d(.8, 0, 0));
         int loads = 0;
         using var overlay = new WeatherConditionsOverlay(context =>
         {
@@ -174,7 +173,7 @@ public sealed class WeatherConditionsTests
         Assert.Equal(EnumPrecipitationType.Snow, overlay.Sample!.Precipitation);
         Assert.True(overlay.Sample.Fog);
         Assert.Equal(2, overlay.Sample.PrecipitationIntensity);
-        Assert.Equal(3, overlay.Sample.WindIntensity);
+        blocks.Verify(value => value.GetWindSpeedAt(It.IsAny<Vec3d>()), Times.Never);
         Assert.Equal(0, overlay.Sample.ThunderIntensity);
         var preparation = new HudOverlayPreparationContext(fixture.Api.Object, 1, "en");
         overlay.Prepare(preparation);

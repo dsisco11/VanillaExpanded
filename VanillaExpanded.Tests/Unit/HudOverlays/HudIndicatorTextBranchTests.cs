@@ -53,7 +53,7 @@ public sealed class HudIndicatorTextBranchTests : IDisposable
     [InlineData("wetness", "43%")]
     [InlineData("rift", "HIGH")]
     [InlineData("storm", "IMMINENT")]
-    [InlineData("weather", "CLD4 RAIN2 WND3 FOG2 THR1")]
+    [InlineData("weather", "CLD4 RAIN2 FOG2 THR1")]
     public void TextBranchSkipsArtworkAndRetainsReading(string label, string expected)
     {
         var api = new Mock<ICoreClientAPI> { DefaultValue = DefaultValue.Mock };
@@ -94,7 +94,7 @@ public sealed class HudIndicatorTextBranchTests : IDisposable
                 using (var presentation = new WeatherConditionsPresentation(load: FailArtwork, textStyle: text))
                 {
                     presentation.SetContent(new(EnumPrecipitationType.Rain, true)
-                        { CloudCoverage = 4, PrecipitationIntensity = 2, WindIntensity = 3, FogIntensity = 2, ThunderIntensity = 1 });
+                        { CloudCoverage = 4, PrecipitationIntensity = 2, FogIntensity = 2, ThunderIntensity = 1 });
                     presentation.SetStyle(HudIndicatorStyle.Text); presentation.Prepare(context);
                 }
                 break;
@@ -121,8 +121,8 @@ public sealed class HudIndicatorTextBranchTests : IDisposable
     [Fact]
     public void UnknownCloudCoverageDoesNotEraseOtherWeatherChannels()
     {
-        Assert.Equal("CLD? SNOW3 WND2 FOG1 THR3", WeatherConditionsText.Format(new(EnumPrecipitationType.Snow, true)
-            { PrecipitationIntensity = 3, WindIntensity = 2, FogIntensity = 1, ThunderIntensity = 3 }));
+        Assert.Equal("CLD? SNOW3 FOG1 THR3", WeatherConditionsText.Format(new(EnumPrecipitationType.Snow, true)
+            { PrecipitationIntensity = 3, FogIntensity = 1, ThunderIntensity = 3 }));
     }
 
     /// <summary>Every production short label is intentionally three to five characters rather than a full indicator name.</summary>
@@ -134,7 +134,7 @@ public sealed class HudIndicatorTextBranchTests : IDisposable
         var language = Newtonsoft.Json.Linq.JObject.Parse(File.ReadAllText(Path.Combine(root!.FullName,
             "VanillaExpanded/assets/vanillaexpanded/lang/en.json")));
         var labels = language.Properties().Where(value => value.Name.StartsWith("hud-short-")).ToArray();
-        Assert.Equal(9, labels.Length);
+        Assert.Equal(10, labels.Length);
         Assert.All(labels, value => Assert.InRange(value.Value.Value<string>()!.Length, 3, 5));
     }
     #endregion

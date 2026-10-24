@@ -25,13 +25,12 @@ public sealed class WeatherConditionsCompositeTests
     public void CrowdedWeatherRetainsEveryChannel(EnumPrecipitationType type, int precipitationLayer)
     {
         var sample = WeatherConditionsSample.FromWeather(1, type, 20, 4, .05f,
-            cloudCoverage: 1, windSpeed: 1, thunderRate: 1);
+            cloudCoverage: 1, thunderRate: 1);
         Assert.Equal(3, sample.PrecipitationIntensity);
         Assert.Equal(4, sample.CloudCoverage);
-        Assert.Equal(3, sample.WindIntensity);
         Assert.Equal(3, sample.FogIntensity);
         Assert.Equal(3, sample.ThunderIntensity);
-        Assert.Equal(new[] { 4, precipitationLayer, 17, 20, 23 }, WeatherConditionsLayers.Select(sample));
+        Assert.Equal(new[] { 4, precipitationLayer, 17, 20 }, WeatherConditionsLayers.Select(sample));
     }
 
     /// <summary>Each intensity retains its own band inside the exit margin and falls independently below it.</summary>
@@ -39,28 +38,28 @@ public sealed class WeatherConditionsCompositeTests
     public void BandsHaveIndependentExitMargins()
     {
         var active = WeatherConditionsSample.FromWeather(.7f, EnumPrecipitationType.Rain, 20, 4, .03f,
-            cloudCoverage: .95f, windSpeed: .8f, thunderRate: .8f);
+            cloudCoverage: .95f, thunderRate: .8f);
         var retained = WeatherConditionsSample.FromWeather(.6f, EnumPrecipitationType.Rain, 20, 4, .018f, active,
-            cloudCoverage: .88f, windSpeed: .65f, thunderRate: .6f);
+            cloudCoverage: .88f, thunderRate: .6f);
         Assert.Equal(active, retained);
         var changed = WeatherConditionsSample.FromWeather(.54f, EnumPrecipitationType.Rain, 20, 4, .018f, retained,
-            cloudCoverage: .88f, windSpeed: .65f, thunderRate: .6f);
+            cloudCoverage: .88f, thunderRate: .6f);
         Assert.Equal(2, changed.PrecipitationIntensity);
         Assert.Equal(active with { PrecipitationIntensity = 2 }, changed);
     }
 
-    /// <summary>Clear, dry wind, fog alone, and unknown cloud data remain distinct states.</summary>
+    /// <summary>Clear, dry fog, and unknown cloud data remain distinct states.</summary>
     [Fact]
     public void IndependentDryConditionsAndUnknownSky()
     {
         var clear = WeatherConditionsSample.FromWeather(0, EnumPrecipitationType.Rain, 20, 4, .001f, cloudCoverage: 0);
         Assert.Equal(new[] { 0 }, WeatherConditionsLayers.Select(clear));
         var dry = WeatherConditionsSample.FromWeather(0, EnumPrecipitationType.Rain, 20, 4, .001f,
-            cloudCoverage: 0, windSpeed: 1, mistOpacity: .9f);
+            cloudCoverage: 0, mistOpacity: .9f);
         Assert.Null(dry.Precipitation);
-        Assert.Equal(new[] { 0, 17, 20 }, WeatherConditionsLayers.Select(dry));
+        Assert.Equal(new[] { 0, 17 }, WeatherConditionsLayers.Select(dry));
         var invalid = WeatherConditionsSample.FromWeather(float.NaN, EnumPrecipitationType.Auto, float.NaN, 4,
-            float.PositiveInfinity, cloudCoverage: float.NaN, windSpeed: float.NaN, thunderRate: float.PositiveInfinity);
+            float.PositiveInfinity, cloudCoverage: float.NaN, thunderRate: float.PositiveInfinity);
         Assert.Null(invalid.CloudCoverage);
         Assert.Equal(new[] { 5 }, WeatherConditionsLayers.Select(invalid));
         Assert.False(invalid.Fog);
@@ -123,17 +122,16 @@ public sealed class WeatherConditionsCompositeTests
 
     /// <summary>The same normalized input can independently select every cloud and intensity band.</summary>
     [Theory]
-    [InlineData(0f, 0, 0, 0)]
-    [InlineData(.1f, 1, 1, 1)]
-    [InlineData(.4f, 2, 2, 2)]
-    [InlineData(.8f, 3, 3, 3)]
-    [InlineData(1f, 4, 3, 3)]
-    public void CoverageAndIntensityBands(float value, int cloud, int wind, int precipitation)
+    [InlineData(0f, 0, 0)]
+    [InlineData(.1f, 1, 1)]
+    [InlineData(.4f, 2, 2)]
+    [InlineData(.8f, 3, 3)]
+    [InlineData(1f, 4, 3)]
+    public void CoverageAndIntensityBands(float value, int cloud, int precipitation)
     {
         var sample = WeatherConditionsSample.FromWeather(value, EnumPrecipitationType.Rain, 20, 4, 0,
-            cloudCoverage: value, windSpeed: value);
+            cloudCoverage: value);
         Assert.Equal(cloud, sample.CloudCoverage);
-        Assert.Equal(wind, sample.WindIntensity);
         Assert.Equal(precipitation, sample.PrecipitationIntensity);
     }
     #endregion
@@ -179,7 +177,7 @@ public sealed class WeatherConditionsCompositeTests
         using var presentation = new WeatherConditionsPresentation(_ => { loads++; return textures; }, _ => backdrop.Object);
         var preparation = new HudOverlayPreparationContext(api, scale, "en");
         presentation.SetContent(WeatherConditionsSample.FromWeather(1, EnumPrecipitationType.Hail, 20, 4, .05f,
-            cloudCoverage: 1, windSpeed: 1, thunderRate: 1));
+            cloudCoverage: 1, thunderRate: 1));
         presentation.Prepare(preparation);
         Assert.NotEqual(SizeF.Empty, presentation.Size);
         var bounds = ElementBounds.Fixed(0, 0, 36, 36).WithEmptyParent();
@@ -189,7 +187,7 @@ public sealed class WeatherConditionsCompositeTests
         presentation.Draw(renderer.Object, bounds);
         Assert.Single(backdrop.Invocations);
         var draws = renderer.Invocations.Where(call => call.Method.Name == "RenderTexture").ToArray();
-        Assert.Equal(new[] { 5, 15, 18, 21, 24 }, draws.Select(call => (int)call.Arguments[0]));
+        Assert.Equal(new[] { 5, 15, 18, 21 }, draws.Select(call => (int)call.Arguments[0]));
         Assert.All(draws, call =>
         {
             Assert.Equal(bounds.renderX, call.Arguments[1]);

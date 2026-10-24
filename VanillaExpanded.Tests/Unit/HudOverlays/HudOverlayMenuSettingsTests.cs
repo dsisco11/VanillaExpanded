@@ -41,6 +41,7 @@ public sealed class HudOverlayMenuSettingsTests : IDisposable
     [InlineData("BodyTemperature", "EnableBodyTemperatureOverlay", "BodyTemperatureIndicatorStyle")]
     [InlineData("PlayerWetness", "EnablePlayerWetnessOverlay", "PlayerWetnessIndicatorStyle")]
     [InlineData("WeatherConditions", "EnableWeatherConditionsOverlay", "WeatherConditionsIndicatorStyle")]
+    [InlineData("WindSpeed", "EnableWindSpeedOverlay", "WindSpeedIndicatorStyle")]
     [InlineData("TemporalStorm", "EnableTemporalStormOverlay", "TemporalStormIndicatorStyle")]
     [InlineData("RiftActivity", "EnableRiftActivityOverlay", "RiftActivityIndicatorStyle")]
     [InlineData("BowAmmunition", "EnableBowAmmunitionOverlay", "BowAmmunitionIndicatorStyle")]

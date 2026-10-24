@@ -121,6 +121,14 @@ public class VanillaExpandedConfig
         set => weatherConditionsIndicatorStyle = value == HudIndicatorStyle.Text ? value : HudIndicatorStyle.Icon;
     }
 
+    private HudIndicatorStyle windSpeedIndicatorStyle = HudIndicatorStyle.Icon;
+    /// <summary>Selects the double-hook wind icon or a short text name with the current strength.</summary>
+    public HudIndicatorStyle WindSpeedIndicatorStyle
+    {
+        get => windSpeedIndicatorStyle;
+        set => windSpeedIndicatorStyle = value == HudIndicatorStyle.Text ? value : HudIndicatorStyle.Icon;
+    }
+
     private HudIndicatorStyle riftActivityIndicatorStyle = HudIndicatorStyle.Icon;
     /// <summary>Selects icon artwork or a short text name for rift activity.</summary>
     public HudIndicatorStyle RiftActivityIndicatorStyle
@@ -187,6 +195,9 @@ public class VanillaExpandedConfig
 
     /// <summary>Shows texture icons for active local precipitation and weather fog.</summary>
     public bool EnableWeatherConditionsOverlay { get; set; } = true;
+
+    /// <summary>Shows local wind strength.</summary>
+    public bool EnableWindSpeedOverlay { get; set; } = true;
 
     /// <summary>Shows a fissure icon for non-calm native rift activity.</summary>
     public bool EnableRiftActivityOverlay { get; set; } = true;

@@ -1,23 +1,24 @@
 # Weather conditions
 
-The weather indicator occupies 24 × 24 base GUI units (36 × 36 at the standard HUD scale) in the top-left `world-status` group beside time while visible and releases its space when hidden. The composite artwork consists of transparent 64 × 64 textures drawn at the same origin, using one shared backdrop. Fog and haze share one channel; thunder has its own channel. Colour must not be the only distinction between weather types or intensity levels.
+The weather indicator occupies 24 × 24 base GUI units (36 × 36 at the standard HUD scale) in the top-right `world-status` group below the calendar while visible and releases its space when hidden. The composite artwork consists of transparent 64 × 64 textures drawn at the same origin, using one shared backdrop. Fog and haze share one channel; thunder has its own channel. Colour must not be the only distinction between weather types or intensity levels.
 
 ## Current behavior
 
 The shared HUD content multiplier is 1.5×, so this indicator's 24 × 24 base footprint displays at 36 × 36 GUI units before the game's GUI scale. The 64 × 64 source textures are unchanged.
 
-The complete 24-texture set is included. Independent sky, precipitation, wind, fog/haze, and thunder layers combine inside one fixed footprint. The renderer retains an existing-artwork fallback for missing or incomplete asset packs: precipitation and fog share the slot, while cloud coverage, wind, thunder, and intensity are unavailable in that fallback.
+The complete 21-texture set is included. Independent sky, precipitation, fog/haze, and thunder layers combine inside one fixed footprint. The renderer retains an existing-artwork fallback for missing or incomplete asset packs: precipitation and fog share the slot, while cloud coverage, thunder, and intensity are unavailable in that fallback.
 
 The complete composite set enables a visible clear-weather state. An unavailable cloud estimate selects an unknown-sky layer, rather than claiming clear skies. Disabling the feature, losing the player or climate data, and leaving the world clear presentation and transition history. Changing API ownership reloads borrowed texture bindings; GUI scale and weather changes reuse them. The engine owns the textures.
 
+See [wind speed](../wind-speed/WindSpeed.md) for local wind readings.
+
 ## Weather inputs
 
-Sampling runs on the existing one-second overlay refresh, outside rendering.
+Sampling runs every 300 ms, outside rendering.
 
 | Channel | Source and meaning |
 | --- | --- |
 | Precipitation | Local current climate rainfall, with native `BlendedPrecType`. Automatic selection uses temperature below `snowThresholdTemp` for snow and otherwise rain. Explicit rain, snow, and hail remain explicit. Invalid automatic inputs do not invent rain. |
-| Wind | Magnitude of `GetWindSpeedAt` at the player's position, including native local modifiers. Thresholds use engine units, not claimed physical wind speeds. |
 | Cloud coverage | A bounded 5 × 5 neighborhood from the existing player weather reader's cloud tiles. Average `clamp(opacity * clamp(10 * thickness, 0, 1), 0, 1)`, following the native cloud shader's alpha relationship. This is an effective local coverage estimate, not an exact visible-sky percentage; it excludes view-distance, perspective, edge fading, and shader undulation. Missing caches produce unknown. The sampler never initializes or refreshes native cloud caches. |
 | Fog/haze | Weather snapshot fog density multiplied by its weight, combined with weather flat fog evaluated at camera height. Flat fog uses `1 - exp(-(eyeY - layerY) * density)`, clamped to 0–1, with `layerY = seaLevel + weighted FlatFogYPos`. Negative density represents mist below the layer. The stronger classified fog/mist band wins. Underwater and temporal scene fog are not sampled. |
 | Thunder | Native near and distant lightning rates, summed and multiplied by local `RainCloudOverlay`, clamped to 0–1. The native minimum-temperature gate must pass. This describes current thunder activity, not a forecast or an individual lightning flash. Rain and wind alone never imply thunder. |
@@ -32,7 +33,6 @@ Channels vary independently. Values must exceed an entry boundary to advance; an
 | --- | --- | --- |
 | Cloud coverage: clear, mostly clear, partly cloudy, mostly cloudy, overcast | .05, .25, .60, .90 | .03, .20, .55, .85 |
 | Precipitation: absent, light, moderate, heavy | .01, .25, .65 | .005, .20, .55 |
-| Wind: calm, light, moderate, strong | .05, .30, .70 | .035, .25, .60 |
 | Distance fog/haze: absent, light, moderate, dense | .0025, .008, .020 | .002, .006, .016 |
 | Local mist opacity: absent, light, moderate, dense | .15, .40, .75 | .12, .32, .65 |
 | Thunder: absent, light, moderate, heavy | .001, .25, .65 | .0005, .20, .55 |
@@ -47,7 +47,6 @@ All layers live under `assets/vanillaexpanded/textures/hud/weather/composite/`. 
 | --- | --- |
 | Sky | `sky-clear`, `sky-mostly-clear`, `sky-partly-cloudy`, `sky-mostly-cloudy`, `sky-overcast`, `sky-unknown` |
 | Precipitation | `rain-light`, `rain-moderate`, `rain-heavy`; equivalent `snow-*` and `hail-*` sets |
-| Wind | `wind-light`, `wind-moderate`, `wind-strong` |
 | Fog/haze | `fog-light`, `fog-moderate`, `fog-dense` |
 | Thunder | `thunder-light`, `thunder-moderate`, `thunder-heavy` |
 
@@ -55,13 +54,9 @@ Each layer uses the entire transparent 64 × 64 canvas. Spatial allocation belon
 
 ## Selected artwork
 
-The selected design uses rounded ivory clouds and precipitation option A. There is no outer ring. Curled wind strokes sit above the cloud; straight fog bands sit below precipitation. Rain uses fine cyan diagonal streaks, snow uses simple six-spoke white flakes, and hail uses pale-blue solid round pellets with short motion ticks. A yellow lightning bolt occupies a reserved central gap. The clear-sky marker is a small sparkle, and unavailable cloud data uses a question mark.
+The selected design uses rounded ivory clouds and precipitation option A. There is no outer ring. Straight fog bands sit below precipitation. Rain uses fine cyan diagonal streaks, snow uses simple six-spoke white flakes, and hail uses pale-blue solid round pellets with short motion ticks. A yellow lightning bolt occupies a reserved central gap. The clear-sky marker is a small sparkle, and unavailable cloud data uses a question mark.
 
-Rain and hail increase from two to four to six marks. Snow increases from one to two to four larger flakes, preserving more of its distinct shape at the 24-pixel HUD size. Wind and fog increase from one to three strokes. Thunder increases bolt breadth. Cloud coverage changes canopy width while keeping its baseline fixed. Intensity distinctions and precipitation types therefore do not depend solely on colour.
+Rain and hail increase from two to four to six marks. Snow increases from one to two to four larger flakes, preserving more of its distinct shape at the 24-pixel HUD size. Fog increases from one to three strokes. Thunder increases bolt breadth. Cloud coverage changes canopy width while keeping its baseline fixed. Intensity distinctions and precipitation types therefore do not depend solely on colour.
 
-The 24 SVG sources contain the paths, colours, and contrasting outlines directly on a shared `0 0 64 64` view box. Each declares `preserveAspectRatio="xMidYMid meet"` and uses explicit fills and rounded strokes, without stylesheet rules, clones, masks, or filters. Edit these source assets directly. The existing 64 × 64 PNG textures remain the runtime assets; changing an SVG alone does not update its PNG counterpart.
-
-![Production texture review sheet](weather-textures-preview.png)
-
-The review sheet composites the actual saved textures, with enlarged views and 24 × 24 previews over bright and dark surfaces. It includes individual intensity levels and simultaneous heavy rain/snow/hail, wind, fog, and thunder. The small previews use image resampling rather than the live game renderer; in-game appearance and intensity tuning remain user-run acceptance. The game is not launched by asset generation or headless validation.
+The 21 active SVG sources contain the paths, colours, and contrasting outlines directly on a shared `0 0 64 64` view box. Each declares `preserveAspectRatio="xMidYMid meet"` and uses explicit fills and rounded strokes, without stylesheet rules, clones, masks, or filters. Edit these source assets directly. The existing 64 × 64 PNG textures remain the runtime assets; changing an SVG alone does not update its PNG counterpart.
 

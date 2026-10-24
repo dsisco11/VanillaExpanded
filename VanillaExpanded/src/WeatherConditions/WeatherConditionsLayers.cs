@@ -12,7 +12,7 @@ internal static class WeatherConditionsLayers
     [
         "sky-clear", "sky-mostly-clear", "sky-partly-cloudy", "sky-mostly-cloudy", "sky-overcast", "sky-unknown",
         "rain-light", "rain-moderate", "rain-heavy", "snow-light", "snow-moderate", "snow-heavy",
-        "hail-light", "hail-moderate", "hail-heavy", "wind-light", "wind-moderate", "wind-strong",
+        "hail-light", "hail-moderate", "hail-heavy",
         "fog-light", "fog-moderate", "fog-dense", "thunder-light", "thunder-moderate", "thunder-heavy"
     ];
 
@@ -20,16 +20,15 @@ internal static class WeatherConditionsLayers
     /// <summary>Selects independently varying channels in stable back-to-front order during preparation.</summary>
     public static int[] Select(WeatherConditionsSample sample)
     {
-        var layers = new List<int>(5) { sample.CloudCoverage is int coverage ? Math.Clamp(coverage, 0, 4) : 5 };
+        var layers = new List<int>(4) { sample.CloudCoverage is int coverage ? Math.Clamp(coverage, 0, 4) : 5 };
         // Shared full-canvas origins let approved artwork reserve space without runtime repositioning.
         if (sample.Precipitation is EnumPrecipitationType type)
         {
             int start = type switch { EnumPrecipitationType.Snow => 9, EnumPrecipitationType.Hail => 12, _ => 6 };
             layers.Add(start + Math.Clamp(sample.PrecipitationIntensity, 1, 3) - 1);
         }
-        if (sample.WindIntensity > 0) layers.Add(15 + Math.Clamp(sample.WindIntensity, 1, 3) - 1);
-        if (sample.Fog) layers.Add(18 + Math.Clamp(sample.FogIntensity, 1, 3) - 1);
-        if (sample.ThunderIntensity > 0) layers.Add(21 + Math.Clamp(sample.ThunderIntensity, 1, 3) - 1);
+        if (sample.Fog) layers.Add(15 + Math.Clamp(sample.FogIntensity, 1, 3) - 1);
+        if (sample.ThunderIntensity > 0) layers.Add(18 + Math.Clamp(sample.ThunderIntensity, 1, 3) - 1);
         return layers.ToArray();
     }
     #endregion

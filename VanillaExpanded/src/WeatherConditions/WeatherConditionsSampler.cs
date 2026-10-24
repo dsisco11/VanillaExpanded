@@ -16,8 +16,6 @@ internal static class WeatherConditionsSampler
     {
         var entity = api.World.Player.Entity;
         var ambient = snapshot.Ambient;
-        var wind = api.World.BlockAccessor.GetWindSpeedAt(entity.Pos.XYZ);
-        float speed = wind == null ? 0 : (float)wind.Length();
         float fog = Weighted(ambient?.FogDensity);
         float mist = LocalMistOpacity(Weighted(ambient?.FlatFogDensity),
             api.World.SeaLevel + Weighted(ambient?.FlatFogYPos), entity.CameraPos.Y);
@@ -26,7 +24,7 @@ internal static class WeatherConditionsSampler
             snapshot.nearLightningRate, snapshot.distantLightningRate);
         return WeatherConditionsSample.FromWeather(climate.Rainfall, snapshot.BlendedPrecType,
             climate.Temperature, snapshot.snowThresholdTemp, fog, previous,
-            EstimateCloudCoverage(weather, entity.Pos.XYZ), speed, thunder, mist);
+            EstimateCloudCoverage(weather, entity.Pos.XYZ), thunder, mist);
     }
 
     /// <summary>Combines eligible native thunder rates without interpreting rain or wind as a storm.</summary>
