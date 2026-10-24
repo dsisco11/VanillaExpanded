@@ -90,7 +90,7 @@
         "ingui": "vanillaexpanded:config-enable-wind-speed-overlay",
         "comment": "vanillaexpanded:config-enable-wind-speed-overlay-tooltip",
         "default": true,
-        "weight": 10.801,
+        "weight": 10.81,
         "clientSide": true
       },
       "EnableRiftActivityOverlay": {
@@ -382,7 +382,7 @@
         "ingui": "vanillaexpanded:config-wind-speed-indicator-style",
         "comment": "vanillaexpanded:config-hud-indicator-style-tooltip",
         "default": "icon",
-        "weight": 10.802,
+        "weight": 10.811,
         "clientSide": true,
         "mapping": {
           "icon": 0,
