@@ -35,12 +35,14 @@ public sealed class WindSpeedSystemTests
             fixture.Api.SetupGet(value => value.ModLoader).Returns(loader.Object);
             hud.StartClientSide(fixture.Api.Object);
             system.StartClientSide(fixture.Api.Object);
-            var group = hud.Registry.GetGroups().Single(value => value.Id == "world-status");
-            Assert.Equal(HudOverlayTargets.Screen, group.Placement.TargetId);
-            Assert.Equal(HudOverlayPoint.RightTop, group.Placement.Attachment);
-            Assert.Equal(HudOverlayPoint.RightTop, group.Placement.Pivot);
-            Assert.Equal(HudOverlayDirection.Vertical, group.Packing.Direction);
+            var group = hud.Registry.GetGroups().Single(value => value.Id == "player-status");
+            Assert.Equal(HudOverlayTargets.Hotbar, group.Placement.TargetId);
+            Assert.Equal(HudOverlayPoint.LeftBottom, group.Placement.Attachment);
+            Assert.Equal(HudOverlayPoint.RightBottom, group.Placement.Pivot);
+            Assert.Equal(HudOverlayDirection.Horizontal, group.Packing.Direction);
             Assert.Equal(HudOverlayCrossAlignment.End, group.Packing.CrossAlignment);
+
+            Assert.True(group.DefaultMovable);
 
             hud.Registry.BeginSession(fixture.Api.Object);
             WindSpeedOverlay? overlay = null;
@@ -49,7 +51,8 @@ public sealed class WindSpeedSystemTests
                 Assert.Equal(WindSpeedSystem.OverlayId, registration.Id);
                 Assert.Equal(300, registration.RefreshIntervalMs);
                 Assert.Null(registration.ReservedSize);
-                Assert.Equal(102, registration.Order);
+                Assert.Equal(96, registration.Order);
+                Assert.Equal("player-status", registration.GroupId);
                 overlay = Assert.IsType<WindSpeedOverlay>(registration.Overlay);
             });
             Assert.True(overlay!.IsApplicable());
@@ -77,4 +80,3 @@ public sealed class WindSpeedSystemTests
     }
     #endregion
 }
-

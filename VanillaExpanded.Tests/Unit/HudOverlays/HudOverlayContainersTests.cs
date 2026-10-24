@@ -12,6 +12,21 @@ namespace VanillaExpanded.Tests.Unit.HudOverlays;
 public sealed class HudOverlayContainersTests
 {
     #region Public API
+    /// <summary>Untouched unlocked defaults remain movable while an explicit saved lock remains authoritative.</summary>
+    [Fact]
+    public void DefaultMovementHonorsExplicitSavedLocks()
+    {
+        using var fixture = new HudLayoutFixture();
+        fixture.Registry.RegisterGroup(new VanillaExpanded.HudOverlays.Registration.HudOverlayGroup("player-status",
+            new VanillaExpanded.HudOverlays.Anchoring.HudOverlayPlacement("screen",
+                VanillaExpanded.HudOverlays.Anchoring.HudOverlayPoint.LeftBottom,
+                VanillaExpanded.HudOverlays.Anchoring.HudOverlayPoint.LeftBottom)) { DefaultMovable = true });
+        fixture.Add("test:wind", "player-status");
+        var containers = new HudOverlayContainers(fixture.Api.Object, fixture.Registry);
+        Assert.True(containers.Owner("test:wind")!.Movable);
+        Assert.True(containers.SetMovable("player-status", false, new PointF(20, 30)));
+        Assert.False(new HudOverlayContainers(fixture.Api.Object, fixture.Registry).Owner("test:wind")!.Movable);
+    }
     /// <summary>Cross-registration trees retain unavailable leaves while new registrations use filtered defaults once.</summary>
     [Fact]
     public void ExplicitCrossRegistrationOwnershipAndNewDefaultsRemainDisjoint()

@@ -37,7 +37,7 @@ internal sealed class WindSpeedSystem : ModSystem, ILiveConfigurable
             // Register wind with its settings and default placement.
             registration = hud.Registry.Register(new HudOverlayRegistration(OverlayId, overlay,
                 () => overlay.SetEnabled(VanillaExpandedModSystem.Config.EnableHudOverlays
-                    && VanillaExpandedModSystem.Config.EnableWindSpeedOverlay), "world-status", order: 102, refreshIntervalMs: 300,
+                    && VanillaExpandedModSystem.Config.EnableWindSpeedOverlay), "player-status", order: 96, refreshIntervalMs: 300,
                 hoverLabelKey: "vanillaexpanded:hud-label-wind-speed",
                 menuSettings: new HudOverlayMenuSettings(
                     new HudOverlaySetting<bool>(() => VanillaExpandedModSystem.Config.EnableWindSpeedOverlay,
