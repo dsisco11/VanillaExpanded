@@ -17,6 +17,8 @@ You can now bulk transfer matching items from your inventory into storage contai
 2. If you have items in your inventory which match items already in the container, a brief progress-bar will be shown at the center of the screen.
 3. After the progress-bar completes, all matching items from your inventory will be moved into the container.
 
+For querns, first place a grindable item in the input, then hold right-click on the quern's body to top it up with matching items from your backpack and hotbar. The output slot is left untouched, and interacting with the upper grinding section still works normally.
+
 <https://github.com/user-attachments/assets/5be8da04-435e-4200-9ecb-41ea837d2a25>
 
 ### Auto-Loot
@@ -59,10 +61,14 @@ When opening a firepit with a crucible, an Alloy Calculator dialog automatically
 - **Fine-tune ingredient ratios** using the sliders which automatically stay within valid alloy ranges
 - **See required amounts** as item stacks for easy reference
 - **Preview fuel needs** with an indicator showing the preferred available fuel and estimated count for the selected batch, even before depositing ingredients or filling the fuel slot
-- **See prewarming savings** when queued or burning fuel cannot reach the batch's melting temperature: the indicator estimates how many smelting-fuel items you can save by letting it burn before switching fuel
+- **See prewarming options** when available lower-temperature fuels can save smelting fuel: the indicator cycles through useful options and the amount of each needed to save at least one item of the selected smelting fuel. Prewarming is not automatic; burn the displayed amount of one option before switching fuel or using **Deposit**, which immediately replaces unsuitable queued fuel.
 - **Deposit button** automatically transfers the required ingredients from your backpack, hotbar, and opened storage containers into the crucible. It first reserves space for each selected ingredient form (such as nuggets and metal bits), then spreads the ingredients evenly across spare slots without mixing incompatible stacks.
 
 The calculator remembers your settings per crucible, so your preferred alloy and ratios are restored when you reopen the dialog (currently not remembered across restarts).
+
+### Animal Sex Indicators
+
+Small male and female symbols appear above living animals of generation 1 or higher, including young animals. Pregnant females display a heart-marked female symbol. Icons fade with distance and are hidden by walls and terrain. They are enabled by default; size, viewing distance, opacity, and colors can be adjusted in the [Animal Sex Indicators settings](#animal-sex-indicators-1).
 
 ### Quality of Life Additions
 
