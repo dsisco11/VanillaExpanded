@@ -7,6 +7,7 @@ using VanillaExpanded.WindSpeed;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Client;
+using Vintagestory.API.Config;
 
 namespace VanillaExpanded.Tests.Unit.WindSpeed;
 
@@ -15,6 +16,21 @@ namespace VanillaExpanded.Tests.Unit.WindSpeed;
 public sealed class WindSpeedTests
 {
     #region Public API
+    #region Conversion and classification
+    /// <summary>Percentage readings truncate like windmills and retain above-normal wind without invalid numeric output.</summary>
+    [Theory]
+    [InlineData(.659, 65)]
+    [InlineData(1.25, 125)]
+    [InlineData(.009, 0)]
+    [InlineData(double.NaN, 0)]
+    [InlineData(double.PositiveInfinity, 0)]
+    [InlineData(-1, 0)]
+    [InlineData(double.MaxValue, int.MaxValue)]
+    public void WindmillPercentageConversion(double speed, int expected)
+    {
+        Assert.Equal(expected, WindSpeedSample.ToPercentage(speed));
+    }
+
     /// <summary>Exact entry and exit boundaries remain inactive while values above them activate the band.</summary>
     [Theory]
     [InlineData(.05f, 0, 0)]
@@ -37,6 +53,8 @@ public sealed class WindSpeedTests
         Assert.Equal(expected, WindSpeedSample.Classify(speed, previous));
     }
 
+    #endregion
+    #region Sampling
     /// <summary>Sampling needs only local wind, reuses stable readings, and clears history across eligibility changes.</summary>
     [Fact]
     public void NativeWindDoesNotRequireWeatherOrClimate()
@@ -53,8 +71,12 @@ public sealed class WindSpeedTests
         Assert.Equal(3, overlay.Intensity);
         Assert.Equal(HudOverlayChange.None, overlay.Refresh());
         wind = new Vec3d(.65, 0, 0);
-        Assert.Equal(HudOverlayChange.None, overlay.Refresh());
+        Assert.NotEqual(HudOverlayChange.None, overlay.Refresh());
         Assert.Equal(3, overlay.Intensity);
+        Assert.Equal(65, overlay.Percentage);
+        wind = new Vec3d(.659, 0, 0);
+        Assert.Equal(HudOverlayChange.None, overlay.Refresh());
+        Assert.Equal(65, overlay.Percentage);
         overlay.SetEnabled(false);
         Assert.False(overlay.IsApplicable());
         Assert.Equal(0, overlay.Intensity);
@@ -69,6 +91,8 @@ public sealed class WindSpeedTests
         blocks.VerifyAll();
     }
 
+    #endregion
+    #region Presentation
     /// <summary>Text mode avoids artwork, icon mode caches its owned SVG, and style changes release old textures.</summary>
     [Fact]
     public void PresentationStylesOwnAndReleaseTheirResources()
@@ -98,7 +122,7 @@ public sealed class WindSpeedTests
         presentation.SetStyle(HudIndicatorStyle.Text);
         presentation.Prepare(preparation);
         Assert.Empty(icons);
-        Assert.Contains(values, value => value.Contains("wind-speed-moderate"));
+        Assert.Contains(values, value => value.Contains("wind-speed-reading"));
         presentation.SetStyle(HudIndicatorStyle.Icon);
         Assert.All(texts, texture => Assert.True(texture.Disposed));
         presentation.Prepare(preparation);
@@ -139,5 +163,52 @@ public sealed class WindSpeedTests
         Assert.Equal(center, Convert.ToDouble(icon.Arguments[1]) + Convert.ToDouble(icon.Arguments[3]) / 2, 4);
         Assert.True(Convert.ToDouble(text.Arguments[2]) >= Convert.ToDouble(icon.Arguments[2]) + Convert.ToDouble(icon.Arguments[4]));
     }
+
+    /// <summary>Both styles format the sampled percentage, including values above 100, and cache unchanged readings.</summary>
+    [Theory]
+    [InlineData(HudIndicatorStyle.Icon)]
+    [InlineData(HudIndicatorStyle.Text)]
+    public void StylesFormatActualPercentage(HudIndicatorStyle style)
+    {
+        var previous = Lang.AvailableLanguages.GetValueOrDefault("en");
+        var language = new Mock<ITranslationService>();
+        language.Setup(value => value.Get(It.IsAny<string>(), It.IsAny<object[]>()))
+            .Returns((string key, object[] args) => key == "vanillaexpanded:wind-speed-reading"
+                ? string.Format("{0}%", args) : "WND");
+        Lang.AvailableLanguages["en"] = language.Object;
+        try
+        {
+            var values = new List<string>();
+            var api = new Mock<ICoreClientAPI> { DefaultValue = DefaultValue.Mock }.Object;
+            /// <summary>Captures formatted readings without native font rendering.</summary>
+            LoadedTexture Create(HudOverlayPreparationContext context, string value)
+            {
+                values.Add(value);
+                return new LoadedTexture(context.Api) { TextureId = 1, Width = 37, Height = 19 };
+            }
+            using var presentation = new WindSpeedPresentation(context => new LoadedTexture(context.Api)
+                { TextureId = 2, Width = 64, Height = 64 },
+                new HudIndicatorTextPresentation(new WorkshopGaugeText(Create), new WorkshopGaugeText(Create)),
+                new HudOverlayIconTextPresentation(Create));
+            var preparation = new HudOverlayPreparationContext(api, 1, "en");
+            presentation.SetStyle(style);
+            presentation.SetContent(125);
+            presentation.Prepare(preparation);
+            Assert.Contains("125%", values);
+            int prepared = values.Count;
+            presentation.SetContent(125);
+            presentation.Prepare(preparation);
+            Assert.Equal(prepared, values.Count);
+            presentation.SetContent(126);
+            presentation.Prepare(preparation);
+            Assert.Contains("126%", values);
+        }
+        finally
+        {
+            if (previous == null) Lang.AvailableLanguages.Remove("en");
+            else Lang.AvailableLanguages["en"] = previous;
+        }
+    }
+    #endregion
     #endregion
 }

@@ -80,7 +80,7 @@ A compact calendar beneath the thermometer displays the three-letter localized m
 Each indicator supports `icon` artwork and `text`, which replaces the artwork with a short name such as `AMMO`, `WET`, or `STORM` while retaining its readings and state. Time, environmental temperature, and calendar also support `immersive` copper instruments, their default. Other indicators default to `icon`. Style selectors apply live through ConfigLib and are independent of each indicator's enable toggle. Text uses the normal HUD font, preserves fades and storm urgency pulses, and expands its width for longer readings. See the HUD configuration table below for each selector.
 ### Weather Conditions
 
-Weather and approximate time sit together at the top-right of the screen, with weather below environmental temperature. Weather occupies one 36 × 36 GUI-unit slot. Rounded clouds, precipitation below them, fog bands, and lightning combine to show cloud coverage, precipitation type, and independent weather intensities. The indicator uses transparent 64 × 64 texture layers with no outer ring. Toggle it with `EnableWeatherConditionsOverlay`; changes apply immediately. See [weather conditions](docs/weather-conditions/WeatherConditions.md) for the data and artwork. The wind indicator sits in the bottom-left status group, unlocked by default, using the double-hook icon and a light, moderate, or strong reading; calm wind hides it. Toggle it with `EnableWindSpeedOverlay`. See [wind speed](docs/wind-speed/WindSpeed.md).
+Weather and approximate time sit together at the top-right of the screen, with weather below environmental temperature. Weather occupies one 36 × 36 GUI-unit slot. Rounded clouds, precipitation below them, fog bands, and lightning combine to show cloud coverage, precipitation type, and independent weather intensities. The indicator uses transparent 64 × 64 texture layers with no outer ring. Toggle it with `EnableWeatherConditionsOverlay`; changes apply immediately. See [weather conditions](docs/weather-conditions/WeatherConditions.md) for the data and artwork. The wind indicator sits in the bottom-left status group, unlocked by default, using the double-hook icon and a whole-percentage wind reading; calm wind hides it. Toggle it with `EnableWindSpeedOverlay`. See [wind speed](docs/wind-speed/WindSpeed.md).
 
 ### Temporal Rift Activity
 
@@ -267,7 +267,7 @@ There is no AutoLoot layering option: its progress always renders above dialogs,
 | `EnvironmentalTemperatureGaugeStyle` | `immersive` | `immersive`, `icon`, `text` | Copper thermometer, compact icon, or TEMP name and Celsius reading. Applies live. |
 | `CalendarDateGaugeStyle` | `immersive` | `immersive`, `icon`, `text` | Mechanical calendar, compact icon, or DATE name and month/day. Applies live. |
 | `WeatherConditionsIndicatorStyle` | `icon` | `icon`, `text` | Composite artwork or WTHR name and independent weather bands. Applies live. |
-| `WindSpeedIndicatorStyle` | `icon` | `icon`, `text` | Double-hook icon or WIND name with local wind strength. Applies live. |
+| `WindSpeedIndicatorStyle` | `icon` | `icon`, `text` | Double-hook icon or WIND name with local wind percentage. Applies live. |
 | `RiftActivityIndicatorStyle` | `icon` | `icon`, `text` | Fissure icon or RIFT name and activity level. Applies live. |
 | `TemporalStormIndicatorStyle` | `icon` | `icon`, `text` | Fractured iris icon or STORM name and stage; both retain urgency pulses. Applies live. |
 | `EnableCalendarDateOverlay` | `true` | `true`, `false` | Show the independent month/day calendar; applies live. |
@@ -279,7 +279,7 @@ There is no AutoLoot layering option: its progress always renders above dialogs,
 | `HeldItemStatusOffsetX`      | `-4`         | -2048–2048 in ConfigLib                                                                                                                                                                                                      | Horizontal offset in GUI units; positive moves right. Nonfinite values fall back to -4. |
 | `HeldItemStatusOffsetY`      | `0`          | -2048–2048 in ConfigLib                                                                                                                                                                                                      | Vertical offset in GUI units; positive moves down. Nonfinite values fall back to 0.     |
 | `EnableWeatherConditionsOverlay` | `true` | `true`, `false` | Show the composite cloud, precipitation, fog/haze, and thunder indicator; applies live. |
-| `EnableWindSpeedOverlay` | `true` | `true`, `false` | Show local wind strength; applies live. |
+| `EnableWindSpeedOverlay` | `true` | `true`, `false` | Show local wind percentage; applies live. |
 | `EnableRiftActivityOverlay` | `true` | `true`, `false` | Show a fissure icon for temporal rift activity; hidden during calm activity. Applies live. |
 | `EnableTemporalStormOverlay` | `true` | `true`, `false` | Show approaching, imminent, and active temporal storms with a fractured iris icon. Applies live. |
 | `EnableEnvironmentalTemperatureOverlay` | `true` | `true`, `false` | Show local Celsius temperature in the selected style; applies live. |

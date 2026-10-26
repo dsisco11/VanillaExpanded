@@ -9,14 +9,14 @@ using AssetLocation = Vintagestory.API.Common.AssetLocation;
 
 namespace VanillaExpanded.WindSpeed;
 
-/// <summary>Pairs the standard-size double-hook wind icon with a normal HUD strength reading.</summary>
+/// <summary>Pairs the approved double-hook wind icon with a normal HUD percentage reading.</summary>
 internal sealed class WindSpeedPresentation : HudIndicatorPresentation<HudIndicatorStyle>
 {
     private readonly Func<HudOverlayPreparationContext, LoadedTexture> load;
     private readonly HudOverlayIconTextPresentation label;
     private readonly ElementBounds labelBounds = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
     private LoadedTexture? icon;
-    private int intensity;
+    private int percentage;
 
     #region Public API
     #region Content and rendering
@@ -29,18 +29,17 @@ internal sealed class WindSpeedPresentation : HudIndicatorPresentation<HudIndica
         this.label = label ?? new HudOverlayIconTextPresentation(fontSize: HudOverlaySizes.Text);
     }
 
-    /// <summary>Stores the classified local wind strength outside drawing.</summary>
-    public void SetContent(int value) => intensity = value;
+    /// <summary>Stores the sampled whole wind percentage outside drawing.</summary>
+    public void SetContent(int value) => percentage = value;
 
-    /// <summary>Prepares standard artwork and normal-size text, allowing localized readings to expand the footprint.</summary>
+    /// <summary>Prepares artwork and normal-size text, allowing localized readings to expand the footprint.</summary>
     public void Prepare(HudOverlayPreparationContext preparation)
     {
-        if (intensity <= 0) return;
-        string band = intensity switch { 1 => "light", 2 => "moderate", _ => "strong" };
-        string key = "vanillaexpanded:wind-speed-" + band;
+        if (percentage <= 0) return;
+        const string key = "vanillaexpanded:wind-speed-reading";
         if (IsTextStyle)
         {
-            TryPrepareText(preparation, "wind-speed", Lang.GetL(preparation.Locale, key));
+            TryPrepareText(preparation, "wind-speed", Lang.GetL(preparation.Locale, key, percentage));
             return;
         }
         if (icon == null || !ReferenceEquals(Context?.Api, preparation.Api))
@@ -50,22 +49,22 @@ internal sealed class WindSpeedPresentation : HudIndicatorPresentation<HudIndica
             icon?.Dispose();
             icon = replacement;
         }
-        label.SetContent(null, key);
+        label.SetContent(null, key, percentage);
         label.Prepare(preparation);
         Context = preparation;
-        Size = new SizeF(Math.Max(HudOverlaySizes.Standard, label.Size.Width),
-            HudOverlaySizes.Standard + HudOverlaySizes.ReadingGap + label.Size.Height);
+        Size = new SizeF(Math.Max(HudOverlaySizes.Small, label.Size.Width),
+            HudOverlaySizes.Small + HudOverlaySizes.ReadingGap + label.Size.Height);
         Visibility.Show();
     }
 
-    /// <summary>Centers the standard icon above its cached reading without fitting or shrinking the text.</summary>
+    /// <summary>Centers the icon above its cached reading without fitting or shrinking the text.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds)
     {
         if (Context == null || Size.IsEmpty) return;
         if (TryDrawText(renderer, bounds)) return;
         if (icon == null) return;
         double scale = Context.GuiScale;
-        double pixels = HudOverlaySizes.Standard * scale;
+        double pixels = HudOverlaySizes.Small * scale;
         double x = bounds.renderX + (bounds.OuterWidth - pixels) / 2;
         double y = bounds.renderY + (bounds.OuterHeight - Size.Height * scale) / 2;
         renderer.RenderTexture(icon.TextureId, x, y, pixels, pixels, 50, HudOverlayDrawOpacity.Tint);
@@ -91,7 +90,7 @@ internal sealed class WindSpeedPresentation : HudIndicatorPresentation<HudIndica
     #endregion
 
     #region Protected API
-    /// <summary>Releases owned SVG and label resources while retaining the sampled band across style changes.</summary>
+    /// <summary>Releases owned SVG and label resources while retaining the sampled percentage across style changes.</summary>
     protected override void ReleaseArtwork()
     {
         icon?.Dispose();
@@ -99,8 +98,8 @@ internal sealed class WindSpeedPresentation : HudIndicatorPresentation<HudIndica
         label.Reset();
     }
 
-    /// <summary>Clears the wind band after a completed exit or session reset.</summary>
-    protected override void ClearContent() => intensity = 0;
+    /// <summary>Clears the wind percentage after a completed exit or session reset.</summary>
+    protected override void ClearContent() => percentage = 0;
     #endregion
 
     #region Private

@@ -122,7 +122,7 @@ public class VanillaExpandedConfig
     }
 
     private HudIndicatorStyle windSpeedIndicatorStyle = HudIndicatorStyle.Icon;
-    /// <summary>Selects the double-hook wind icon or a short text name with the current strength.</summary>
+    /// <summary>Selects the double-hook wind icon or a short text name with the current wind percentage.</summary>
     public HudIndicatorStyle WindSpeedIndicatorStyle
     {
         get => windSpeedIndicatorStyle;
@@ -196,7 +196,7 @@ public class VanillaExpandedConfig
     /// <summary>Shows texture icons for active local precipitation and weather fog.</summary>
     public bool EnableWeatherConditionsOverlay { get; set; } = true;
 
-    /// <summary>Shows local wind strength.</summary>
+    /// <summary>Shows the local wind percentage.</summary>
     public bool EnableWindSpeedOverlay { get; set; } = true;
 
     /// <summary>Shows a fissure icon for non-calm native rift activity.</summary>
