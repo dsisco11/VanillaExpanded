@@ -15,6 +15,10 @@ internal sealed class BodyTemperatureThermometerPresentation : HudIndicatorPrese
 {
     internal const float IconWidth = HudOverlaySizes.ThermometerWidth, IconHeight = HudOverlaySizes.Standard, Gap = HudOverlaySizes.ReadingGap;
     private const float ChevronWidth = HudOverlaySizes.ChevronWidth, ChevronHeight = HudOverlaySizes.ChevronHeight, ChevronGap = HudOverlaySizes.ChevronGap, ReadingHeight = HudOverlaySizes.BodyReadingHeight;
+    private readonly HudIndicatorStackLayout layout = new();
+    private readonly ElementBounds thermometerBounds = ElementBounds.Fill.WithAlignment(EnumDialogArea.CenterMiddle);
+    private readonly ElementBounds textBounds = ElementBounds.Fill.WithAlignment(EnumDialogArea.CenterMiddle);
+    private readonly ElementBounds trendBounds = ElementBounds.Fill.WithAlignment(EnumDialogArea.CenterTop);
     private float readingWidth, columnWidth;
     private readonly HudOverlayIconTextPresentation text;
     private readonly System.Func<HudOverlayPreparationContext, LoadedTexture[]> createIcons;
@@ -38,6 +42,8 @@ internal sealed class BodyTemperatureThermometerPresentation : HudIndicatorPrese
         : base(HudIndicatorStyle.Icon, HudIndicatorStyle.Text, textStyle)
     {
         this.text = text;
+        layout.Icon.WithChild(thermometerBounds);
+        layout.Reading.WithChildren(textBounds, trendBounds);
         this.createIcons = createIcons ?? LoadIcons;
         this.loadBackdrop = loadBackdrop ?? HudOverlayIconBackdrop.Load;
     }
@@ -88,7 +94,19 @@ internal sealed class BodyTemperatureThermometerPresentation : HudIndicatorPrese
         columnWidth = Math.Max(readingWidth, trendWidth);
         // Keep the existing reading/chevron column together above the thermometer.
         // Its stable height reserves both trend strengths without moving the thermometer.
-        Size = new SizeF(Math.Max(HudOverlaySizes.Standard, columnWidth), IconHeight + (columnWidth > 0 ? Gap + IconHeight : 0));
+        layout.Configure(columnWidth > 0 ? new SizeF(columnWidth, IconHeight) : SizeF.Empty,
+            new SizeF(HudOverlaySizes.Standard, IconHeight), Gap);
+        thermometerBounds.percentWidth = IconWidth / (double)HudOverlaySizes.Standard;
+        textBounds.percentWidth = columnWidth > 0 ? readingWidth / (double)columnWidth : 0;
+        textBounds.percentHeight = ReadingHeight / (double)IconHeight;
+        textBounds.Alignment = sample.Trend > 0 ? EnumDialogArea.CenterBottom
+            : sample.Trend < 0 ? EnumDialogArea.CenterTop : EnumDialogArea.CenterMiddle;
+        int count = Math.Abs(sample.Trend);
+        trendBounds.percentWidth = columnWidth > 0 ? ChevronWidth / (double)columnWidth : 0;
+        trendBounds.percentHeight = count > 0 ? (count * ChevronHeight + (count - 1) * ChevronGap) / (double)IconHeight : 0;
+        trendBounds.Alignment = sample.Trend > 0 ? EnumDialogArea.CenterTop : EnumDialogArea.CenterBottom;
+        layout.Invalidate();
+        Size = layout.Size;
         Visibility.Show();
     }
     /// <summary>Draws the tinted full mask through a fill scissor, then the outline through native texture rendering within the host clip.</summary>
@@ -98,11 +116,8 @@ internal sealed class BodyTemperatureThermometerPresentation : HudIndicatorPrese
         if (TryDrawText(renderer, bounds)) return;
         if (icons == null) return;
         double scale = Context.GuiScale;
-        // Center the narrow thermometer within the same HudOverlaySizes.Standard-unit circle used by the other status icons.
-        double x = bounds.renderX + (bounds.OuterWidth - IconWidth * scale) / 2;
-        double y = bounds.renderY + (bounds.OuterHeight - Size.Height * scale) / 2;
-        double columnY = y;
-        if (columnWidth > 0) y += (IconHeight + Gap) * scale;
+        layout.Resolve(bounds, scale);
+        double x = thermometerBounds.renderX, y = thermometerBounds.renderY;
         // Reveal the full mask upward while retaining the bulb at the minimum temperature fill.
         double fillTop = y + 23.25 * (1 - sample.Fill) * scale;
         double left = Math.Max(x, clip.Left), top = Math.Max(fillTop, clip.Top);
@@ -121,10 +136,7 @@ internal sealed class BodyTemperatureThermometerPresentation : HudIndicatorPrese
         {
             // Stack strength vertically in the reading's column; the taller drawing gives the strokes slightly more weight.
             bool warming = sample.Trend > 0;
-            int count = Math.Abs(sample.Trend);
-            double stackHeight = (count * ChevronHeight + (count - 1) * ChevronGap) * scale;
-            double arrowX = bounds.renderX + (bounds.OuterWidth - ChevronWidth * scale) / 2;
-            double arrowY = warming ? columnY : columnY + IconHeight * scale - stackHeight;
+            double arrowX = trendBounds.renderX, arrowY = trendBounds.renderY;
             for (int index = 0; index < Math.Abs(sample.Trend); index++)
             {
                 renderer.RenderTexture(icons[warming ? 2 : 3].TextureId, arrowX, arrowY + index * (ChevronHeight + ChevronGap) * scale,
@@ -133,13 +145,6 @@ internal sealed class BodyTemperatureThermometerPresentation : HudIndicatorPrese
         }
         if (showReading)
         {
-            // Use an independent cached bounds object only for the text's native draw coordinates.
-            textBounds.absFixedX = bounds.renderX + (bounds.OuterWidth - readingWidth * scale) / 2;
-            // Reserve the stacked-arrow band on the active trend side; neutral text remains vertically centered.
-            textBounds.absFixedY = columnY + (sample.Trend > 0 ? IconHeight - ReadingHeight : sample.Trend < 0 ? 0 : (IconHeight - ReadingHeight) / 2) * scale;
-            textBounds.absInnerWidth = readingWidth * scale;
-            textBounds.absInnerHeight = ReadingHeight * scale;
-            textBounds.Initialized = true;
             text.Draw(renderer, textBounds, clip, deltaTime, maximumTextHeight: ReadingHeight);
         }
     }
@@ -148,10 +153,8 @@ internal sealed class BodyTemperatureThermometerPresentation : HudIndicatorPrese
     public void CollectBackdrops(IRenderAPI renderer, ElementBounds bounds)
     {
         if (sample == null || icons == null || Context == null) return;
-        double pixels = HudOverlaySizes.Standard * Context.GuiScale;
-        double y = bounds.renderY + (bounds.OuterHeight - Size.Height * Context.GuiScale) / 2
-            + (columnWidth > 0 ? (IconHeight + Gap) * Context.GuiScale : 0);
-        backdrop?.Queue(renderer, bounds.renderX + (bounds.OuterWidth - pixels) / 2, y, Context.GuiScale);
+        layout.Resolve(bounds, Context.GuiScale);
+        backdrop?.Queue(renderer, layout.Icon.renderX, layout.Icon.renderY, Context.GuiScale);
     }
     #region Lifecycle
     /// <summary>Ends shared presentation ownership and disposes feature-owned helpers.</summary>
@@ -178,7 +181,6 @@ internal sealed class BodyTemperatureThermometerPresentation : HudIndicatorPrese
     #endregion
 
     #region Private
-    private readonly ElementBounds textBounds = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
     /// <summary>Loads borrowed texture wrappers through the engine cache without taking disposal ownership.</summary>
     private static LoadedTexture[] LoadIcons(HudOverlayPreparationContext preparation)
     {

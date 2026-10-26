@@ -17,7 +17,7 @@ internal sealed class RiftActivityPresentation : HudIndicatorPresentation<HudInd
     private IHudOverlayIconBackdrop? backdrop;
     private RiftActivityLevel? activity;
     private readonly HudOverlayIconTextPresentation label;
-    private readonly ElementBounds labelBounds = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
+    private readonly HudIndicatorStackLayout layout = new();
 
     #region Public API
     #region Content and rendering
@@ -50,8 +50,8 @@ internal sealed class RiftActivityPresentation : HudIndicatorPresentation<HudInd
         Context = preparation;
         label.SetContent(null, "vanillaexpanded:rift-activity-short-" + activity.Value.ToString().ToLowerInvariant());
         label.Prepare(preparation);
-        Size = new SizeF(Math.Max(HudOverlaySizes.Standard, label.Size.Width),
-            HudOverlaySizes.Standard + HudOverlaySizes.ReadingGap + label.Size.Height);
+        layout.Configure(label.Size, new SizeF(HudOverlaySizes.Standard, HudOverlaySizes.Standard), HudOverlaySizes.ReadingGap);
+        Size = layout.Size;
         Visibility.Show();
     }
     /// <summary>Draws prepared artwork without native activity sampling.</summary>
@@ -60,18 +60,10 @@ internal sealed class RiftActivityPresentation : HudIndicatorPresentation<HudInd
         if (!activity.HasValue || Context == null) return;
         if (TryDrawText(renderer, bounds)) return;
         if (icons == null) return;
-        double pixels = HudOverlaySizes.Standard * Context.GuiScale;
-        double x = bounds.renderX + (bounds.OuterWidth - pixels) / 2;
-        double top = bounds.renderY + (bounds.OuterHeight - Size.Height * Context.GuiScale) / 2;
-        double y = top + (label.Size.Height + HudOverlaySizes.ReadingGap) * Context.GuiScale;
-        renderer.RenderTexture(icons[(int)activity.Value].TextureId, x, y, pixels, pixels, 50, HudOverlayDrawOpacity.Tint);
-        // Keep the cached reading centered above the artwork without changing its font size to fit the icon.
-        labelBounds.absFixedX = bounds.renderX + (bounds.OuterWidth - label.Size.Width * Context.GuiScale) / 2;
-        labelBounds.absFixedY = top;
-        labelBounds.absInnerWidth = label.Size.Width * Context.GuiScale;
-        labelBounds.absInnerHeight = label.Size.Height * Context.GuiScale;
-        labelBounds.Initialized = true;
-        label.Draw(renderer, labelBounds, new RectangleF((float)bounds.renderX, (float)bounds.renderY,
+        layout.Resolve(bounds, Context.GuiScale);
+        var artwork = layout.Icon;
+        renderer.RenderTexture(icons[(int)activity.Value].TextureId, artwork.renderX, artwork.renderY, artwork.OuterWidth, artwork.OuterHeight, 50, HudOverlayDrawOpacity.Tint);
+        label.Draw(renderer, layout.Reading, new RectangleF((float)bounds.renderX, (float)bounds.renderY,
             (float)bounds.OuterWidth, (float)bounds.OuterHeight), 0);
     }
     #endregion
@@ -79,10 +71,8 @@ internal sealed class RiftActivityPresentation : HudIndicatorPresentation<HudInd
     public void CollectBackdrops(IRenderAPI renderer, ElementBounds bounds)
     {
         if (!activity.HasValue || icons == null || Context == null) return;
-        double pixels = HudOverlaySizes.Standard * Context.GuiScale;
-        double y = bounds.renderY + (bounds.OuterHeight - Size.Height * Context.GuiScale) / 2
-            + (label.Size.Height + HudOverlaySizes.ReadingGap) * Context.GuiScale;
-        backdrop?.Queue(renderer, bounds.renderX + (bounds.OuterWidth - pixels) / 2, y, Context.GuiScale);
+        layout.Resolve(bounds, Context.GuiScale);
+        backdrop?.Queue(renderer, layout.Icon.renderX, layout.Icon.renderY, Context.GuiScale);
     }
     /// <summary>Releases the owned label and shared presentation state.</summary>
     public override void Dispose()

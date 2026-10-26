@@ -16,6 +16,7 @@ public sealed class HudOverlayIconTextPresentation : IDisposable
 {
     private readonly System.Func<HudOverlayPreparationContext, string, LoadedTexture> createText;
     private readonly System.Func<HudOverlayPreparationContext, float, LoadedTexture>? createIconBackground;
+    private readonly HudIndicatorStackLayout stack = new();
     private readonly float iconSize;
     private readonly float gap;
     private readonly bool textBeforeIcon;
@@ -121,12 +122,14 @@ public sealed class HudOverlayIconTextPresentation : IDisposable
         double textY = y + (height - textHeight) / 2;
         if (Direction == HudOverlayDirection.Vertical)
         {
-            // Reserve the full stacked footprint; text retains its prepared font size and both rows share a center.
-            iconX += (bounds.OuterWidth - iconSize * scale) / 2;
-            double top = y + (height - Size.Height * scale) / 2;
-            iconY = top + (text == null ? 0 : textHeight + (slot.Itemstack == null ? 0 : gap * scale));
-            textX += (bounds.OuterWidth - textWidth) / 2;
-            textY = top;
+            stack.Configure(new SizeF((float)(textWidth / scale), (float)(textHeight / scale)),
+                slot.Itemstack == null ? SizeF.Empty : new SizeF(iconSize, iconSize), gap,
+                minimumHeight: Size.Height);
+            stack.Resolve(bounds, scale);
+            iconX = stack.Icon.renderX;
+            iconY = stack.Icon.renderY;
+            textX = stack.Reading.renderX;
+            textY = stack.Reading.renderY;
         }
         else if (slot.Itemstack != null)
         {

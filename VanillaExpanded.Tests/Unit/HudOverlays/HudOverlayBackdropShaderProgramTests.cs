@@ -102,7 +102,9 @@ public sealed class HudOverlayBackdropShaderProgramTests : IDisposable
             It.IsAny<double>(), It.IsAny<double>(), It.IsAny<float>(), It.IsAny<Vintagestory.API.MathTools.Vec4f>()))
             .Callback(() => calls.Add("icon"));
         var context = new VanillaExpanded.HudOverlays.Registration.HudOverlayPreparationContext(api.Object, 1, "en");
-        var bounds = ElementBounds.Fixed(0, 0, 51, 46).WithEmptyParent(); bounds.CalcWorldBounds();
+        var bounds = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
+        // Supply framebuffer geometry directly, independently of the uninitialized native GUI scale.
+        bounds.absInnerWidth = 51; bounds.absInnerHeight = 46; bounds.Initialized = true;
         /// <summary>Provides borrowed placeholder handles without allocating textures.</summary>
         LoadedTexture[] Load(VanillaExpanded.HudOverlays.Registration.HudOverlayPreparationContext value) =>
             Enumerable.Range(1, 7).Select(id => new LoadedTexture(value.Api) { TextureId = id, IgnoreUndisposed = true }).ToArray();

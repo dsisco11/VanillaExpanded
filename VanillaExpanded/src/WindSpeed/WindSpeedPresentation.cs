@@ -14,7 +14,7 @@ internal sealed class WindSpeedPresentation : HudIndicatorPresentation<HudIndica
 {
     private readonly Func<HudOverlayPreparationContext, LoadedTexture> load;
     private readonly HudOverlayIconTextPresentation label;
-    private readonly ElementBounds labelBounds = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
+    private readonly HudIndicatorStackLayout layout = new();
     private LoadedTexture? icon;
     private int percentage;
 
@@ -52,8 +52,8 @@ internal sealed class WindSpeedPresentation : HudIndicatorPresentation<HudIndica
         label.SetContent(null, key, percentage);
         label.Prepare(preparation);
         Context = preparation;
-        Size = new SizeF(Math.Max(HudOverlaySizes.Small, label.Size.Width),
-            HudOverlaySizes.Small + HudOverlaySizes.ReadingGap + label.Size.Height);
+        layout.Configure(label.Size, new SizeF(HudOverlaySizes.Small, HudOverlaySizes.Small), HudOverlaySizes.ReadingGap);
+        Size = layout.Size;
         Visibility.Show();
     }
 
@@ -63,19 +63,10 @@ internal sealed class WindSpeedPresentation : HudIndicatorPresentation<HudIndica
         if (Context == null || Size.IsEmpty) return;
         if (TryDrawText(renderer, bounds)) return;
         if (icon == null) return;
-        double scale = Context.GuiScale;
-        double pixels = HudOverlaySizes.Small * scale;
-        double x = bounds.renderX + (bounds.OuterWidth - pixels) / 2;
-        double top = bounds.renderY + (bounds.OuterHeight - Size.Height * scale) / 2;
-        double y = top + (label.Size.Height + HudOverlaySizes.ReadingGap) * scale;
-        renderer.RenderTexture(icon.TextureId, x, y, pixels, pixels, 50, HudOverlayDrawOpacity.Tint);
-        // Give lettering its full measured bounds so native GUI scaling never becomes text fitting.
-        labelBounds.absFixedX = bounds.renderX + (bounds.OuterWidth - label.Size.Width * scale) / 2;
-        labelBounds.absFixedY = top;
-        labelBounds.absInnerWidth = label.Size.Width * scale;
-        labelBounds.absInnerHeight = label.Size.Height * scale;
-        labelBounds.Initialized = true;
-        label.Draw(renderer, labelBounds, new RectangleF((float)bounds.renderX, (float)bounds.renderY,
+        layout.Resolve(bounds, Context.GuiScale);
+        var artwork = layout.Icon;
+        renderer.RenderTexture(icon.TextureId, artwork.renderX, artwork.renderY, artwork.OuterWidth, artwork.OuterHeight, 50, HudOverlayDrawOpacity.Tint);
+        label.Draw(renderer, layout.Reading, new RectangleF((float)bounds.renderX, (float)bounds.renderY,
             (float)bounds.OuterWidth, (float)bounds.OuterHeight), 0);
     }
     #endregion
