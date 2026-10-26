@@ -48,17 +48,18 @@ internal sealed class HudOverlayIconReading : IDisposable
         context = preparation;
     }
 
-    /// <summary>Centers the icon above its reading using only cached resources and shared opacity.</summary>
+    /// <summary>Centers the icon below its reading using only cached resources and shared opacity.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds)
     {
         if (icon == null || context == null) return;
         double scale = context.GuiScale;
         double diameter = (hasReading ? HudOverlaySizes.Small : HudOverlaySizes.Standard) * scale;
-        double y = bounds.renderY + (bounds.OuterHeight - Size.Height * scale) / 2;
+        double top = bounds.renderY + (bounds.OuterHeight - Size.Height * scale) / 2;
+        double y = top + (hasReading ? (text.Size.Height + HudOverlaySizes.ReadingGap) * scale : 0);
         renderer.RenderTexture(icon.TextureId, bounds.renderX + (bounds.OuterWidth - diameter) / 2, y, diameter, diameter, 50, HudOverlayDrawOpacity.Tint);
         if (hasReading)
         {
-            text.Draw(renderer, new RectangleF((float)bounds.renderX, (float)(y + diameter + HudOverlaySizes.ReadingGap * scale),
+            text.Draw(renderer, new RectangleF((float)bounds.renderX, (float)top,
                 (float)bounds.OuterWidth, (float)(text.Size.Height * scale)), 51);
         }
     }

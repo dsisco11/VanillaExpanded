@@ -57,7 +57,7 @@ internal sealed class WindSpeedPresentation : HudIndicatorPresentation<HudIndica
         Visibility.Show();
     }
 
-    /// <summary>Centers the icon above its cached reading without fitting or shrinking the text.</summary>
+    /// <summary>Centers the icon below its cached reading without fitting or shrinking the text.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds)
     {
         if (Context == null || Size.IsEmpty) return;
@@ -66,11 +66,12 @@ internal sealed class WindSpeedPresentation : HudIndicatorPresentation<HudIndica
         double scale = Context.GuiScale;
         double pixels = HudOverlaySizes.Small * scale;
         double x = bounds.renderX + (bounds.OuterWidth - pixels) / 2;
-        double y = bounds.renderY + (bounds.OuterHeight - Size.Height * scale) / 2;
+        double top = bounds.renderY + (bounds.OuterHeight - Size.Height * scale) / 2;
+        double y = top + (label.Size.Height + HudOverlaySizes.ReadingGap) * scale;
         renderer.RenderTexture(icon.TextureId, x, y, pixels, pixels, 50, HudOverlayDrawOpacity.Tint);
         // Give lettering its full measured bounds so native GUI scaling never becomes text fitting.
         labelBounds.absFixedX = bounds.renderX + (bounds.OuterWidth - label.Size.Width * scale) / 2;
-        labelBounds.absFixedY = y + pixels + HudOverlaySizes.ReadingGap * scale;
+        labelBounds.absFixedY = top;
         labelBounds.absInnerWidth = label.Size.Width * scale;
         labelBounds.absInnerHeight = label.Size.Height * scale;
         labelBounds.Initialized = true;

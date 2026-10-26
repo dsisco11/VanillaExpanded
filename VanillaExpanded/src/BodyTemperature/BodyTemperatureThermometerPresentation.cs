@@ -86,7 +86,7 @@ internal sealed class BodyTemperatureThermometerPresentation : HudIndicatorPrese
         readingWidth = showReading ? text.Size.Width * Math.Min(1, ReadingHeight / Math.Max(1, text.Size.Height)) : 0;
         float trendWidth = sample.Trend == 0 ? 0 : ChevronWidth;
         columnWidth = Math.Max(readingWidth, trendWidth);
-        // Keep the existing reading/chevron column together, below the icon instead of beside it.
+        // Keep the existing reading/chevron column together above the thermometer.
         // Its stable height reserves both trend strengths without moving the thermometer.
         Size = new SizeF(Math.Max(HudOverlaySizes.Standard, columnWidth), IconHeight + (columnWidth > 0 ? Gap + IconHeight : 0));
         Visibility.Show();
@@ -101,7 +101,8 @@ internal sealed class BodyTemperatureThermometerPresentation : HudIndicatorPrese
         // Center the narrow thermometer within the same HudOverlaySizes.Standard-unit circle used by the other status icons.
         double x = bounds.renderX + (bounds.OuterWidth - IconWidth * scale) / 2;
         double y = bounds.renderY + (bounds.OuterHeight - Size.Height * scale) / 2;
-        double columnY = y + (IconHeight + Gap) * scale;
+        double columnY = y;
+        if (columnWidth > 0) y += (IconHeight + Gap) * scale;
         // Reveal the full mask upward while retaining the bulb at the minimum temperature fill.
         double fillTop = y + 23.25 * (1 - sample.Fill) * scale;
         double left = Math.Max(x, clip.Left), top = Math.Max(fillTop, clip.Top);
@@ -148,7 +149,8 @@ internal sealed class BodyTemperatureThermometerPresentation : HudIndicatorPrese
     {
         if (sample == null || icons == null || Context == null) return;
         double pixels = HudOverlaySizes.Standard * Context.GuiScale;
-        double y = bounds.renderY + (bounds.OuterHeight - Size.Height * Context.GuiScale) / 2;
+        double y = bounds.renderY + (bounds.OuterHeight - Size.Height * Context.GuiScale) / 2
+            + (columnWidth > 0 ? (IconHeight + Gap) * Context.GuiScale : 0);
         backdrop?.Queue(renderer, bounds.renderX + (bounds.OuterWidth - pixels) / 2, y, Context.GuiScale);
     }
     #region Lifecycle

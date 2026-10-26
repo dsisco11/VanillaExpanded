@@ -115,9 +115,9 @@ public sealed class PlayerWetnessOverlayTests : IDisposable
         renderer.Verify(value => value.PushScissor(It.IsAny<ElementBounds>(), It.IsAny<bool>()), Times.Never);
         renderer.Verify(value => value.PopScissor(), Times.Never);
     }
-    /// <summary>Whole percentages reuse text until they change, render below both drops, and release on reset.</summary>
+    /// <summary>Whole percentages reuse text until they change, render above both drops, and release on reset.</summary>
     [Fact]
-    public void PercentageIsCachedCenteredBelowDropsAndReleased()
+    public void PercentageIsCachedCenteredAboveDropsAndReleased()
     {
         var api = new Mock<ICoreClientAPI>() { DefaultValue = DefaultValue.Mock };
         var readings = new List<string>();
@@ -145,9 +145,9 @@ public sealed class PlayerWetnessOverlayTests : IDisposable
         double x = (double)reading.Arguments[1], y = (double)reading.Arguments[2];
         double width = (double)reading.Arguments[3], height = (double)reading.Arguments[4];
         Assert.Equal(bounds.renderX + bounds.OuterWidth / 2, x + width / 2, 5);
-        var dropBottom = renderer.Invocations.Where(call => call.Method.Name == "Render2DTexture")
-            .Max(call => (float)call.Arguments[2] + (float)call.Arguments[4]);
-        Assert.True(y >= dropBottom && y + height <= bounds.renderY + bounds.OuterHeight);
+        var dropTop = renderer.Invocations.Where(call => call.Method.Name == "Render2DTexture")
+            .Min(call => (float)call.Arguments[2]);
+        Assert.True(y >= bounds.renderY && y + height <= dropTop);
         presentation.Reset();
         Assert.Equal(0, renderedText[1].TextureId);
         Assert.Equal(SizeF.Empty, presentation.Size);

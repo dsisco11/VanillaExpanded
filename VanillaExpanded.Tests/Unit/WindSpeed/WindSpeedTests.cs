@@ -161,7 +161,7 @@ public sealed class WindSpeedTests
         double center = bounds.renderX + bounds.OuterWidth / 2;
         Assert.Equal(center, Convert.ToDouble(text.Arguments[1]) + width / 2d, 4);
         Assert.Equal(center, Convert.ToDouble(icon.Arguments[1]) + Convert.ToDouble(icon.Arguments[3]) / 2, 4);
-        Assert.True(Convert.ToDouble(text.Arguments[2]) >= Convert.ToDouble(icon.Arguments[2]) + Convert.ToDouble(icon.Arguments[4]));
+        Assert.True(Convert.ToDouble(text.Arguments[2]) + Convert.ToDouble(text.Arguments[4]) <= Convert.ToDouble(icon.Arguments[2]));
     }
 
     /// <summary>Both styles format the sampled percentage, including values above 100, and cache unchanged readings.</summary>

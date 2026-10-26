@@ -34,13 +34,13 @@ public sealed class RiftActivityLabelTests : IDisposable
         if (english == null) Lang.AvailableLanguages.Remove("en"); else Lang.AvailableLanguages["en"] = english;
     }
 
-    /// <summary>Each native activity uses a cached abbreviation centered below its matching artwork and backdrop.</summary>
+    /// <summary>Each native activity uses a cached abbreviation centered above its matching artwork and backdrop.</summary>
     [Theory]
     [InlineData(0, "LOW", 1, 70, 15, 9, 17, 140, 120)]
     [InlineData(1, "MED", 1.5, 25, 18, 20, 30, 150, 180)]
     [InlineData(2, "HIGH", 2, 100, 25, 1, 2, 240, 200)]
     [InlineData(3, "APOC", 1, 55, 16, 4, 8, 160, 140)]
-    public void AbbreviationIsCachedBelowCenteredArtwork(int level, string expected, double scale,
+    public void AbbreviationIsCachedAboveCenteredArtwork(int level, string expected, double scale,
         int textWidth, int textHeight, double x, double y, double width, double height)
     {
         var api = new Mock<ICoreClientAPI> { DefaultValue = DefaultValue.Mock };
@@ -69,7 +69,7 @@ public sealed class RiftActivityLabelTests : IDisposable
         double textX = (double)textDraw.Arguments[1], textY = (double)textDraw.Arguments[2];
         Assert.Equal(x + width / 2, iconX + iconWidth / 2, 5);
         Assert.Equal(iconX + iconWidth / 2, textX + textWidth / 2d, 5);
-        Assert.True(textY >= iconY + iconHeight);
+        Assert.True(textY + textHeight <= iconY);
         Assert.True(textY + textHeight <= y + height);
         var queued = Assert.Single(backdrop.Invocations);
         Assert.Equal(iconX, queued.Arguments[1]); Assert.Equal(iconY, queued.Arguments[2]);
