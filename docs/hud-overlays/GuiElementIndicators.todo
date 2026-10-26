@@ -11,29 +11,157 @@ Preserve current IDs, settings, layouts, locks, grouping/editing, hidden-item pr
 
 ## Implementation decisions to resolve
 
-    ☐ Resolve exact native-presentation capability and element-factory signatures during Phase 1; the proposal establishes an optional capability, not its concrete API names.
-    ☐ Verify source and binary compatibility obligations of existing public contracts before selecting the adapter boundary. Do not silently add required members to IHudOverlay or change existing registration signatures.
-    ☐ Verify which native text element satisfies update, contrast, measurement, opacity, and disposal requirements. Use a small custom text GuiElement only where that verification establishes a concrete native gap.
-    ☐ Establish how independent source/preview compositions retain or recreate visual elements without sharing disposable elements, duplicating subscriptions, or releasing resources still used by a surviving composition.
+    ☑ Resolve exact native-presentation capability and element-factory signatures during Phase 1; the proposal establishes an optional capability, not its concrete API names.
+    ☑ Verify source and binary compatibility obligations of existing public contracts before selecting the adapter boundary. Do not silently add required members to IHudOverlay or change existing registration signatures.
+    ☑ Verify which native text element satisfies update, contrast, measurement, opacity, and disposal requirements. Use a small custom text GuiElement only where that verification establishes a concrete native gap.
+    ☑ Establish how independent source/preview compositions retain or recreate visual elements without sharing disposable elements, duplicating subscriptions, or releasing resources still used by a surviving composition.
 
 ## Phase 1: Establish native and existing-system contracts
 
 Outcome: the refactor has verified integration boundaries and an explicit ownership/invalidation design.
 
-    ☐ Read the approved proposal, current HudOverlays.md, applicable AGENTS.md instructions, and the current host, registry, scheduler, session, layout, controls, previews, and presentation implementations.
-    ☐ Inventory all built-ins and every supported style: bow ammunition, wind speed, rift activity, temporal storm, player wetness, body temperature, weather conditions, approximate time, environmental temperature, and calendar date.
-    ☐ Record which shared helpers each consumer uses and which current draw/backdrop paths still configure, fit, measure, invalidate, or resolve component layout.
-    ☐ Inspect the supported game's GuiComposer, GuiElement, ElementBounds, native text, clipping, and disposal implementations; verify installed behavior where source/API drift could affect the design.
-        ☐ Distinguish adding/replacing elements, updating existing text, recalculating bounds, recomposition, and per-frame rendering. Establish the actual native calls for each required operation.
-        ☐ Verify passive elements do not acquire focus or intercept input merely because they use the composer's dynamic-element registration path.
-    ☐ Resolve the decisions above and record a compact responsibility/lifetime table and invalidation matrix alongside implementation evidence.
-        ☐ Cover content-only changes, changed measurement, style, membership, GUI scale, viewport, host movement, animation, visibility exits, previews, world changes, and removal.
-        ☐ Define exactly-once resource ownership for composers, elements, controller state, generated GUI resources, and borrowed engine resources.
-    ☐ Reconcile any native limitation against the proposal before depending on an alternative; do not claim that subclassing GuiElement automatically provides measurement or invalidation.
+    ☑ Read the approved proposal, current HudOverlays.md, applicable AGENTS.md instructions, and the current host, registry, scheduler, session, layout, controls, previews, and presentation implementations.
+    ☑ Inventory all built-ins and every supported style: bow ammunition, wind speed, rift activity, temporal storm, player wetness, body temperature, weather conditions, approximate time, environmental temperature, and calendar date.
+    ☑ Record which shared helpers each consumer uses and which current draw/backdrop paths still configure, fit, measure, invalidate, or resolve component layout.
+    ☑ Inspect the supported game's GuiComposer, GuiElement, ElementBounds, native text, clipping, and disposal implementations; verify installed behavior where source/API drift could affect the design.
+        ☑ Distinguish adding/replacing elements, updating existing text, recalculating bounds, recomposition, and per-frame rendering. Establish the actual native calls for each required operation.
+        ☑ Verify passive elements do not acquire focus or intercept input merely because they use the composer's dynamic-element registration path.
+    ☑ Resolve the decisions above and record a compact responsibility/lifetime table and invalidation matrix alongside implementation evidence.
+        ☑ Cover content-only changes, changed measurement, style, membership, GUI scale, viewport, host movement, animation, visibility exits, previews, world changes, and removal.
+        ☑ Define exactly-once resource ownership for composers, elements, controller state, generated GUI resources, and borrowed engine resources.
+    ☑ Reconcile any native limitation against the proposal before depending on an alternative; do not claim that subclassing GuiElement automatically provides measurement or invalidation.
 
 Completion criteria:
-    ☐ Every proposal boundary has a verified owner and integration route; unresolved implementation choices are settled without unsupported scope.
-    ☐ A second review confirms compatibility and lifetime decisions before foundational code is introduced.
+    ☑ Every proposal boundary has a verified owner and integration route; unresolved implementation choices are settled without unsupported scope.
+    ☑ A second review confirms compatibility and lifetime decisions before foundational code is introduced.
+
+### Phase 1 contract and evidence — 2026-10-26
+
+This section settles the implementation contract; the native capability and elements below are not yet implemented. The existing runtime remains the baseline. Read the source proposal as the design authority and HudOverlays.md as the current behavior contract, including its public registration, editing, clipping, visibility, preparation, and lifecycle sections.
+
+Completion: second review and independent audit-stage-completion passed. The audit's hidden-proxy footprint correction was reconciled against HudOverlays.md and HudOverlayEditPreviews.Update and independently rechecked. No unresolved Phase 1 findings remain; later phases stay unchecked.
+
+#### Documentation and source traceability
+
+Paths below are repository-relative unless prefixed with `../vsapi`. These references apply to the entire contract, including its matrices; they are not substitutes for the controlling proposal.
+
+| Task group | Consulted sources | Requirements and observed evidence |
+|---|---|---|
+| Scope and preserved behavior | GuiElementIndicators.proposal.md, HudOverlays.md; user-supplied AGENTS instructions; VanillaExpanded.Tests/AGENTS.md | Actual component elements, existing policy owners, all styles, public compatibility, resource ownership, no render-time layout; tests cover relationships and lifecycle rather than prescribed pixels. Proposal status now records the conversation approval. |
+| Host/lifecycle/layout/input | VanillaExpanded/src/HudOverlays/{Rendering,Registration,Updating,Lifecycle,Layout,Interaction} implementations, specifically HudOverlayHost, HudOverlayGroupElement, HudOverlayRegistry, HudOverlayScheduler, HudOverlaySession, HudOverlayGroupLayout, HudOverlayContainers, HudOverlayGroupControls, HudOverlayDragPreview, HudOverlayEditPreviews and visibility/opacity helpers | Existing BeforeRender barrier, one composer per effective container, backdrop-before-foreground order, pass-deferred registry changes, retained exit content, independent controls/artwork input, frozen source geometry, hidden proxies and reverse-order teardown provide the integration route described below. Locate files by class name within HudOverlays; the brace list groups responsibilities rather than prescribing new directories. |
+| Consumers/helpers | The ten source directories and presentation/helper classes in the inventory below; HudIndicatorPresentation, HudIndicatorTextPresentation, HudOverlayIconTextPresentation, HudOverlayIconReading, HudIndicatorStackLayout, WorkshopGaugeText | Complete style inventory, current layout sites, generated versus borrowed resources, and the shared-helper retirement boundary are recorded below. ApproximateTimeOverlay.Refresh supplies calendar.HourOfDay for HH:mm text; the stale current-doc table was corrected without changing runtime behavior. |
+| Public compatibility | VanillaExpanded/src/HudOverlays/Registration/{IHudOverlay,HudOverlayRegistration,HudOverlayPreparationContext,HudOverlayChange}.cs and public HudOverlayIconTextPresentation | Existing public signatures remain intact; the new capability is optional. Existing source and compiled callers keep the same referenced members. A compiled old-consumer fixture belongs to implementation qualification, not a claim established by this design pass. |
+| Native integration | ../vsapi/Client/UI/GuiComposer.cs, ElementBounds.cs, Elements/Impl/GuiElement.cs, Elements/Impl/Interactive/Text/GuiElementDynamicText.cs, Elements/Impl/Static/GuiElementTextBase.cs, Elements/Impl/Misc/GuiElementClip.cs; native CairoFont and TextDrawUtil | Direct source inspection plus the installed-assembly probe below establish registration, composition, text, clipping, passive-input and disposal constraints. |
+
+#### Built-in/style and current-layout inventory
+
+All ten retain their existing controller, sampling, applicability, configuration, measured footprint and style defaults. Icon means the current icon style, not a new standardization of its dimensions. In particular, wind currently uses its configured Small artwork size. No visual redesign is authorized here.
+
+| Controller/presentation directory | Supported styles | Existing helpers and layout work to transfer from rendering |
+|---|---|---|
+| BowAmmunition | Icon, Text | HudOverlayIconTextPresentation owns the selected-arrow copy and count resources; vertical stacks Resolve and text fitting occur in Draw, with manual horizontal placement also supported by the public helper. Text style uses HudIndicatorTextPresentation. Preserve item rendering, empty state and circle. |
+| WindSpeed | Icon, Text | HudIndicatorStackLayout.Configure in preparation; Resolve in Draw. Preserve recent average, percentage, calm visibility, SVG and current dimensions. |
+| RiftActivity | Icon, Text | Stack Configure in preparation; Resolve in Draw and backdrop collection. Preserve localized activity and circle alignment. |
+| TemporalStorm | Icon, Text | Icon/backdrop rectangles are derived in Draw/CollectBackdrops; text uses the shared text helper. Urgency pulse advances in Draw today; move advancement to once per feature per frame, not once per view. |
+| PlayerWetness | Icon, Text | Stack Resolve in drawing/backdrop, reading fit and drop geometry in drawing. Preserve percentage, fill, text above drops and footprint. |
+| BodyTemperature | Icon, Text | Stack configuration/invalidation in preparation, Resolve in drawing/backdrop; reading fit, trend and fill/clip placement in drawing. Preserve optional reading/markers, narrow thermometer and masking. |
+| WeatherConditions | Icon, Text | No stack in layered artwork; drawing/backdrop calculate composite/fallback rectangles. Preserve shared layer origins/order, complete-pack fallback and borrowed PNGs. |
+| ApproximateTime | Immersive, Icon, Text | HudOverlayIconReading compact stack plus WorkshopGaugeText fitting; immersive drawing calculates face/reading/pointer regions. Preserve estimated pointer, authored seasonal layers and actual HH:mm text reading. |
+| EnvironmentalTemperature | Immersive, Icon, Text | Compact icon-reading stack; immersive screen/reading/thermometer regions and text fit in drawing. Preserve calibration and reveal. |
+| CalendarDate | Immersive, Icon, Text | Compact icon-reading stack; immersive mechanism/window/reading geometry and fitting in drawing. Preserve mechanical order and animation. |
+
+HudIndicatorPresentation selects style and delegates text style to HudIndicatorTextPresentation. Its name/reading WorkshopGaugeText objects cache glyphs, but Draw still computes fitting/centering and row placement. HudOverlayIconReading similarly calls stack Resolve and WorkshopGaugeText.Draw. HudIndicatorStackLayout caches geometry yet still configures/checks/resolves from render paths; GuiElement inheritance alone will not remove that work. Transfer component arrangement and fitting to native composition/preparation; retain effect-specific calculations such as rotating artwork or changing a fill reveal when they do not change component layout.
+
+#### Settled optional capability and view boundary
+
+Add these public contracts under the existing HUD registration boundary in Phase 2 (signatures are design declarations here):
+
+```csharp
+/// <summary>Identifies the moving/live view or its frozen drag-source trace.</summary>
+public enum HudOverlayNativeViewRole { Live, SourceTrace }
+
+/// <summary>Creates independent native visuals over one controller's prepared data.</summary>
+public interface IHudOverlayNativePresentation
+{
+    /// <summary>Creates one unmounted view without sampling or subscribing.</summary>
+    IHudOverlayNativeView CreateView(ICoreClientAPI api, HudOverlayNativeViewRole role);
+    /// <summary>Advances shared visual effects once per feature per rendered frame.</summary>
+    void BeginFrame(float deltaTime);
+}
+
+/// <summary>Tracks unique composer-owned components without owning gameplay state.</summary>
+public interface IHudOverlayNativeView : IDisposable
+{
+    /// <summary>Mounts unique component elements under the supplied native member bounds.</summary>
+    void AddTo(GuiComposer composer, ElementBounds memberBounds, string keyPrefix);
+    /// <summary>Updates changed component content from already-prepared feature state.</summary>
+    void Prepare(HudOverlayPreparationContext context);
+    /// <summary>Caches fitting, clipping and backdrop targets after native bounds resolve.</summary>
+    void LayoutCompleted(RectangleF clip);
+    /// <summary>Sets the host visibility and drag multiplier without rebuilding resources.</summary>
+    void SetOpacity(float opacity);
+    /// <summary>Submits prepared backdrop geometry without performing layout.</summary>
+    void CollectBackdrops(IRenderAPI renderer);
+}
+```
+
+The controller implements the optional capability alongside IHudOverlay. Existing IHudOverlay.Prepare/Measure remain the scheduler's canonical pre-render preparation/measurement boundary: native implementations produce stable data and metrics there, and move generated GUI resources into elements. A view reads that prepared state; it never samples gameplay or subscribes. CreateView creates an independent visual instance. AddTo mounts it exactly once in one composer, using BeginChildElements(memberBounds)/EndChildElements and unique prefixed component keys. The view is bookkeeping for that composition, not a second layout tree or a full-indicator rendering callback. Native component elements perform foreground rendering; there is deliberately no view.Draw method.
+
+Prepare runs when prepared content/context changes or a view is newly created; it updates component state/local bounds and dirty resources. LayoutCompleted runs after changed native bounds are resolved/composed and caches fitted draw geometry, effective pixel clip and backdrop targets. First-time resources needing resolved bounds are finalized there. Same-size content updates reuse that geometry and update only dirty glyph/art resources during Prepare. Neither method runs from component rendering or backdrop collection. Host invalidation derives from existing scheduler presentation/measurement changes plus composition/context changes; it must fan content changes out to every surviving view even when Measure returns the same size.
+
+BeginFrame advances only visual effect state once per feature per rendered frame, including storm pulse, then every view reads the same state. It does not prepare content, measure, lay out or sample. SetOpacity supplies each view's current visibility times drag multiplier; components combine this with feature pulse/tint without regenerating glyphs. CollectBackdrops submits cached geometry/state only. View disposal releases non-element bookkeeping; after mounting, elements/resources belong to the composer. Construction failure before mounting releases untransferred elements locally; partial mounting failure retires the failed composer and disposes only unattached leftovers. Disposal must tolerate repeated native calls.
+
+The native route is selected by optional capability, not registration signature changes. Preserve IHudOverlay's existing methods and both HudOverlayRegistration constructor overloads, including parameter types, ordering and defaults. Preserve public helper entry points (including HudOverlayIconTextPresentation) unless a separate compatibility review establishes removal is safe. An external-only legacy adapter registers a passive callback element borrowing IHudOverlay and retains Draw/opacity/clip/error behavior without sampling, owning or disposing the controller. Unknown external Draw implementations cannot be promised free of their own layout; the zero-layout guarantee covers host/native built-ins. All ten built-ins must exercise the native route after migration, with tests rejecting silent legacy fallback. No temporary forwarding facade or second built-in dispatcher is required by this contract.
+
+#### Verified native operations and limitations
+
+| Operation | Verified behavior and selected route |
+|---|---|
+| Register/replace | AddInteractiveElement registers the same instance in both dynamic and static dictionaries, parents its bounds and assigns tab order only if Focusable. Duplicate keys throw; it does not replace. Structural/style membership changes build a distinct composition generation, then retire the old one once no surviving visual uses it. Do not append into a composed tree or share elements. |
+| Compose/recompose | Compose(false) calculates bounds, calls ComposeElements, builds dynamic draw order and uploads the static surface; OnlyDynamic suppresses static rendering, not composition allocation. ReCompose resets Composed and calls Compose(false). Use these only on initial/structural/static-resource invalidation; custom dynamic glyph updates do not require group recomposition. |
+| Move/resize | Set native root/member fixed or proportional fields, mark affected bounds dirty, then CalcWorldBounds before both passes. Resolve descendants and refresh cached clips/fits/backdrops. Position-only updates retain unchanged glyphs/textures/meshes; changed raster scale or dimensions invalidate only affected resources. Use correctly sized real parents, not ElementBounds.Empty as a viewport (Empty has special fixed unit dimensions). |
+| Native text | GuiElementDynamicText.SetNewText(text, autoHeight, forceRedraw, async) recalculates bounds and recomposes text when changed/forced; optional auto-height changes dimensions. It is a preparation call, not a draw-time setter. CairoFont stroke/TextDrawUtil support contrast, but the dynamic text texture is private and its rendering has no per-frame opacity argument. |
+| Text decision | Implement a small HudIndicatorTextElement derived from GuiElementTextBase, using native CairoFont, measurement and glyph composition with an owned cached texture and passive handlers. The concrete gap is per-frame host fade/pulse opacity with prepared fitting, not lack of native fonts/contrast. Do not reflect private DynamicText texture state or re-rasterize on fades. Use native text directly only for components whose requirements fit its actual contract. |
+| Render/native deferral | GuiComposer.Render can ReCompose when recomposeOnRender is set; PostRender can CalcWorldBounds/ReCompose when the parent is dirty. The host preparation barrier must settle all affected parents/compositions first. Selected content elements must not request deferred recomposition; do not rely on Render/PostRender to flush layout, patch the engine, or manipulate private flags. Unchanged rendering only reads resolved bounds/resources. |
+| Passive input | Focusable=false prevents tab focus but does not make an element passive: base OnMouseDownOnElement sets Handled=true. Custom content elements must override mouse-down to leave input untouched and install no other consuming handlers/cursors. Keep the existing passive artwork dialog and separate editing/menu controls; native registration does not expand its input routing. |
+| Clipping | GuiElementClip calls PushScissor(bounds, false), replacing the outer clip. Do not assume BeginClip intersects. Custom content rendering uses the cached effective clip with PushScissor(..., true) and an exception-safe PopScissor; preserve existing framebuffer state boundaries and feature error isolation. No arrangement or measurement occurs inside that scope. |
+| Release | GuiComposer.Clear/Dispose visit both dictionaries, so a dynamic element receives Dispose twice. Exactly-once resource release requires idempotent custom Dispose and retirement; the proposal promises resource ownership, not one engine callback. Borrowed engine textures and services are never disposed. |
+
+Installed verification: a temporary NativePhaseOneProbeTests case ran through the validation subagent against `G:/Vintagestory/VintagestoryAPI.dll` version **1.22.7.0**, MVID `83c0addd-72c9-42ba-a23e-5e05fe098ba0`, SHA256 `034283E7E9D98EAE45EE63005576FD89BADC3C995B531CC4C3FE46F3EB2D3296`; VintagestoryLib.dll SHA256 `E08F22B493B92FEAF0AAEB79D22437EA0F7EFC38AA7F72A04A47F98BC0E40DF0`. Result: **1 passed, 0 failed**. The probe exercised registration, duplicate-key rejection, passive mouse-down behavior, double-disposal and scissor behavior, and inspected installed method call targets for composition/text/render paths. Command: `dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --configuration Release --filter FullyQualifiedName~NativePhaseOneProbeTests -p:UseSharedCompilation=false --no-restore --logger "console;verbosity=detailed"`. The temporary probe was removed after execution; durable focused native contract tests are required in Phase 2. This is headless/API evidence, not a graphics, appearance, performance, package or live-input qualification.
+
+#### Responsibility and lifetime
+
+| Owner | Responsibility and release boundary |
+|---|---|
+| Registry/feature controller | Existing registration identity, applicability, subscriptions, sampling and canonical prepared data/metrics. BeginSession/EndSession remain session boundaries; final removal ends session before controller.Dispose. View replacement never resets gameplay state. |
+| Scheduler/session | Existing refresh cadence, preparation/measurement invalidation, applicability and visibility. Complete exit transitions in the preparation barrier so opacity getters cannot retire visuals during drawing. Retain final prepared exit state/size until completion. |
+| Host/container layout | Existing anchors, packing, overflow, movement, grouping, persistence and clip policy; tracks per-view content/geometry dirtiness and composition generations. Uses existing Session.BeforeRender barrier, not a new rendering stage. |
+| Host/composer generation | Owns unique mounted elements and member bounds; composer retired on replacement/removal, completed exit or session teardown. Host disposes visual compositions before registry EndSession releases shared controller/session state. Failed generation cleanup cannot dispose the surviving generation. |
+| Native component element | Owns generated glyphs, GUI textures, copied item render resources and instrument/frame/mask resources it creates. Dispose releases each resource once despite repeated callbacks. Component types each own one visual concern, not an old entire presentation Draw. |
+| Engine/asset providers | Borrowed API/render services, cached PNGs/atlas textures and live inventory objects. A selected-arrow presentation copy is retained separately from mutable inventory; ownership of generated item-render resources is explicit. |
+| Independent preview/source view | Each composer gets distinct elements, bounds and owned GPU resources; immutable prepared CPU data and borrowed engine assets may be shared. No new controller/subscriptions. Frozen source bounds remain until commit/cancel; cancellation restores original layout without saving. Grouping preview suppresses source ghost as today. |
+| Hidden edit proxy | Host-owned passive native proxy, using ReservedSize or the standard square fallback, as HudOverlayEditPreviews does today. Never invokes disabled feature sampling/preparation/view factories, fabricates readings or enables the feature. Existing editing and lock permissions remain authoritative. |
+
+#### Invalidation and sequencing
+
+The barrier orders: settle lifecycle/visibility and registry changes; consume scheduler-prepared data and measure changed content; select membership/views; update view content; pack affected groups and assign native bounds; calculate/recompose only dirty native structure; finalize cached fit/clip/backdrop state; advance shared frame effects once and set per-view opacity; then collect/flush backdrops and render composer elements. Preserve the current sublayer sequence: live backdrops/background controls, live foreground, source-trace backdrops/foreground, then hover/editing cues. Host frame observations such as viewport/anchor changes may be checked each frame; unchanged observations do not trigger component work. No callback in either render pass may cause resource retirement, content fitting or native layout. Each custom element isolates and reports its owning feature's render failure and restores native state so one throwing component cannot abort unrelated members in GuiComposer.Render; host proxies report to the host boundary instead. Preparation failures use the existing scheduler failure path, with registry changes deferred until the active pass ends.
+
+| Change | Preparation/layout/resource work before rendering |
+|---|---|
+| Same-size content or numeric reading | Scheduler publishes changed state; prepare each view's changed component resources only. Keep packing/bounds/tree and unchanged resources. Update cached text fit only if its glyph metrics changed, outside drawing. |
+| Changed canonical measurement/optional rows | Prepare/measure once for the feature, repack affected container, assign native bounds and resolve children, then finalize fits/clips/backdrops; no new gameplay sample. |
+| Style | Preserve feature state/timing; prepare new style and measurement, create new unique components/composer generation, retire old visual resources safely. |
+| Membership/regrouping | Existing effective-container rules repack source/destination; new generations own distinct elements. Preserve IDs, stored groups/positions/locks and source reservation behavior. |
+| GUI scale | Context invalidates affected fonts/raster resources, measures and native bounds. Repack with existing scale policy and finalize geometry before passes. |
+| Viewport/anchor | Existing policy refreshes root/clip and affected packing; native geometry/clip caches update. Retain glyphs unless their required raster dimensions changed. Minimized/zero viewport skips drawing safely. |
+| Host movement | Update root positions, native descendant coordinates, cached clips and backdrop targets. Do not rebuild unchanged text, texture or item mesh resources. |
+| Animation/fade | BeginFrame advances visual state once; each view receives opacity/effect values. Components draw transforms/reveals/pulse from prepared state without arrangement, fitting, measurement or texture creation. |
+| Exit/completed exit | Keep last prepared content/resources and measured reservation while exiting. Barrier observes completion, removes members/retire views, then repacks; no release in render callbacks. |
+| Movement previews/cancel | Independent destination/live and frozen source compositions share prepared data only. Update moving geometry without resampling or rerasterizing unchanged resources; discard only obsolete view ownership on commit/cancel. Hidden proxies remain host-owned. |
+| World/player/entity change | End old bindings using existing identity checks; dispose host/composers/proxies before controller EndSession, then bind clean session. No stale views or duplicated subscriptions survive. |
+| Removal/initialization exception | Preserve registry pass deferral, isolate/report feature failure, release partial unique resources and any failed composer, then EndSession/Dispose in existing ownership order. Never release another composition's resources. |
+
+These native constraints require explicit preparation, passive handlers, intersecting scissor scopes and idempotent element disposal; none requires expanding the approved scope or retaining built-in legacy dispatch. Phase 2 must turn these decisions into code and durable tests; later qualification and user-run acceptance remain open.
 
 ## Phase 2: Add native presentation capability and visual elements
 
