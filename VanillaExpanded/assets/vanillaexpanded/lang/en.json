@@ -4,7 +4,7 @@
   "wind-speed-reading": "{0}%",
   "config-wind-speed-indicator-style": "Wind indicator style",
   "config-enable-wind-speed-overlay": "Show wind speed",
-  "config-enable-wind-speed-overlay-tooltip": "Shows local wind speed as a percentage. Calm wind hides the indicator. Changes take effect immediately.",
+  "config-enable-wind-speed-overlay-tooltip": "Shows the recent five-second average wind speed as a percentage. Calm wind hides the indicator. Changes take effect immediately.",
   "mappingkey-immersive": "Immersive",
   "mappingkey-icon": "Icon",
   "mappingkey-text": "Text",
