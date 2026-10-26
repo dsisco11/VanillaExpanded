@@ -249,7 +249,7 @@ Every built-in indicator has an independent style selector. Compact indicators u
 | Environmental temperature | `EnvironmentalTemperatureGaugeStyle` | `TEMP` | Whole-degree local Celsius reading |
 | Calendar | `CalendarDateGaugeStyle` | `DATE` | Three-letter localized month and native day |
 | Weather | `WeatherConditionsIndicatorStyle` | `WTHR` | Independent weather bands |
-| Wind speed | `WindSpeedIndicatorStyle` | `WIND` | Localized light, moderate, or strong wind |
+| Wind speed | `WindSpeedIndicatorStyle` | `WIND` | Whole native wind percentage |
 | Rift activity | `RiftActivityIndicatorStyle` | `RIFT` | Native activity level |
 | Temporal storm | `TemporalStormIndicatorStyle` | `STORM` | Storm stage, with the existing urgency pulse |
 

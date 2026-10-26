@@ -21,6 +21,8 @@ internal sealed class WindSpeedOverlay : IHudOverlay, IHudOverlayVisibilityTrans
     #region Lifecycle and configuration
     /// <summary>Gets the last classified wind strength, with zero representing calm or unavailable wind.</summary>
     internal int Intensity { get; private set; }
+    /// <summary>Gets the sampled whole wind percentage using the native windmill calculation.</summary>
+    internal int Percentage { get; private set; }
     /// <summary>Gets the shared visibility transition used by the host.</summary>
     public HudOverlayVisibilityTransition Visibility => presentation.Visibility;
 
@@ -61,20 +63,23 @@ internal sealed class WindSpeedOverlay : IHudOverlay, IHudOverlayVisibilityTrans
         return applicable;
     }
 
-    /// <summary>Reads native wind magnitude and updates stable bands outside the drawing path.</summary>
+    /// <summary>Reads native wind magnitude and updates the percentage and visibility bands outside drawing.</summary>
     public HudOverlayChange Refresh()
     {
         if (!IsApplicable()) return HudOverlayChange.None;
         var entity = api!.World.Player.Entity;
         var wind = api.World.BlockAccessor.GetWindSpeedAt(entity.Pos.XYZ);
+        double speed = wind == null ? 0 : wind.Length();
+        int percentage = WindSpeedSample.ToPercentage(speed);
         // Transition history belongs to the sampled entity, never a replacement player or a new world.
-        int next = WindSpeedSample.Classify(wind == null ? 0 : (float)wind.Length(),
+        int next = WindSpeedSample.Classify((float)speed,
             ReferenceEquals(sampledEntity, entity) ? Intensity : 0);
         sampledEntity = entity;
-        if (next == Intensity && !styleChanged) return HudOverlayChange.None;
+        if (next == Intensity && percentage == Percentage && !styleChanged) return HudOverlayChange.None;
         styleChanged = false;
         Intensity = next;
-        if (next > 0) presentation.SetContent(next);
+        Percentage = percentage;
+        if (next > 0) presentation.SetContent(percentage);
         else presentation.Hide();
         return HudOverlayChange.Presentation | HudOverlayChange.Measurement;
     }
@@ -100,6 +105,7 @@ internal sealed class WindSpeedOverlay : IHudOverlay, IHudOverlayVisibilityTrans
     public void HidePresentation()
     {
         Intensity = 0;
+        Percentage = 0;
         sampledEntity = null;
         presentation.Hide();
     }
@@ -112,6 +118,7 @@ internal sealed class WindSpeedOverlay : IHudOverlay, IHudOverlayVisibilityTrans
         api = null;
         sampledEntity = null;
         Intensity = 0;
+        Percentage = 0;
         presentation.Reset();
     }
 
