@@ -245,7 +245,7 @@ Every built-in indicator has an independent style selector. Compact indicators u
 | Bow ammunition | `BowAmmunitionIndicatorStyle` | `AMMO` | Eligible ammunition count, including zero |
 | Body temperature | `BodyTemperatureIndicatorStyle` | `BODY` | Risk and trend; Celsius when its reading option is enabled |
 | Player wetness | `PlayerWetnessIndicatorStyle` | `WET` | Whole percentage |
-| Approximate time | `ApproximateTimeGaugeStyle` | `TIME` | Estimated day period |
+| Approximate time | `ApproximateTimeGaugeStyle` | `TIME` | Calendar time (`HH:mm`) |
 | Environmental temperature | `EnvironmentalTemperatureGaugeStyle` | `TEMP` | Whole-degree local Celsius reading |
 | Calendar | `CalendarDateGaugeStyle` | `DATE` | Three-letter localized month and native day |
 | Weather | `WeatherConditionsIndicatorStyle` | `WTHR` | Independent weather bands |

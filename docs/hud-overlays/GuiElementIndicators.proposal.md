@@ -1,6 +1,6 @@
 # Native GUI elements for HUD indicators
 
-Status: Proposed; awaiting approval. Design only; no implementation checklist or runtime changes are included.
+Status: Approved by the user in conversation. Design authority for the [implementation plan](GuiElementIndicators.todo); this document does not claim runtime implementation.
 
 ## Problem
 
