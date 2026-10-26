@@ -10,6 +10,7 @@ namespace VanillaExpanded.HudOverlays.Rendering;
 internal sealed class HudOverlayIconReading : IDisposable
 {
     private readonly WorkshopGaugeText text;
+    private readonly HudIndicatorStackLayout layout = new();
     private readonly Func<HudOverlayPreparationContext, string, LoadedTexture> load;
     private LoadedTexture? icon;
     private HudOverlayPreparationContext? context;
@@ -26,9 +27,7 @@ internal sealed class HudOverlayIconReading : IDisposable
     }
 
     /// <summary>Gets the compact footprint in unscaled GUI units.</summary>
-    public SizeF Size => hasReading
-        ? new SizeF(Math.Max(HudOverlaySizes.Small, text.Size.Width), HudOverlaySizes.Small + HudOverlaySizes.ReadingGap + text.Size.Height)
-        : new SizeF(HudOverlaySizes.Standard, HudOverlaySizes.Standard);
+    public SizeF Size => layout.Size;
 
     /// <summary>Loads only changed artwork and prepares the optional reading outside drawing.</summary>
     public void Prepare(HudOverlayPreparationContext preparation, string assetPath, string? reading = null)
@@ -45,6 +44,8 @@ internal sealed class HudOverlayIconReading : IDisposable
         hasReading = !string.IsNullOrEmpty(reading);
         if (hasReading) { text.SetContent(reading!); text.Prepare(preparation); }
         else text.Reset();
+        float diameter = hasReading ? HudOverlaySizes.Small : HudOverlaySizes.Standard;
+        layout.Configure(hasReading ? text.Size : SizeF.Empty, new SizeF(diameter, diameter), HudOverlaySizes.ReadingGap);
         context = preparation;
     }
 
@@ -52,15 +53,14 @@ internal sealed class HudOverlayIconReading : IDisposable
     public void Draw(IRenderAPI renderer, ElementBounds bounds)
     {
         if (icon == null || context == null) return;
-        double scale = context.GuiScale;
-        double diameter = (hasReading ? HudOverlaySizes.Small : HudOverlaySizes.Standard) * scale;
-        double top = bounds.renderY + (bounds.OuterHeight - Size.Height * scale) / 2;
-        double y = top + (hasReading ? (text.Size.Height + HudOverlaySizes.ReadingGap) * scale : 0);
-        renderer.RenderTexture(icon.TextureId, bounds.renderX + (bounds.OuterWidth - diameter) / 2, y, diameter, diameter, 50, HudOverlayDrawOpacity.Tint);
+        layout.Resolve(bounds, context.GuiScale);
+        var artwork = layout.Icon;
+        renderer.RenderTexture(icon.TextureId, artwork.renderX, artwork.renderY, artwork.OuterWidth, artwork.OuterHeight, 50, HudOverlayDrawOpacity.Tint);
         if (hasReading)
         {
-            text.Draw(renderer, new RectangleF((float)bounds.renderX, (float)top,
-                (float)bounds.OuterWidth, (float)(text.Size.Height * scale)), 51);
+            var reading = layout.Reading;
+            text.Draw(renderer, new RectangleF((float)reading.renderX, (float)reading.renderY,
+                (float)reading.OuterWidth, (float)reading.OuterHeight), 51);
         }
     }
 
@@ -68,6 +68,7 @@ internal sealed class HudOverlayIconReading : IDisposable
     public void Reset()
     {
         text.Reset();
+        layout.Configure(SizeF.Empty, new SizeF(HudOverlaySizes.Standard, HudOverlaySizes.Standard), HudOverlaySizes.ReadingGap);
         if (ownsIcon) icon?.Dispose();
         icon = null; context = null; path = null; ownsIcon = false; hasReading = false;
     }

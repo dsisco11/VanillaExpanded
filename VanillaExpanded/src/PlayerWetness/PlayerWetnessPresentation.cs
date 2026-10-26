@@ -16,7 +16,7 @@ internal sealed class PlayerWetnessPresentation : HudIndicatorPresentation<HudIn
     private readonly Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?> loadBackdrop;
     private const float ReadingHeight = HudOverlaySizes.WetnessReadingHeight;
     private readonly HudOverlayIconTextPresentation text;
-    private readonly ElementBounds textBounds = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
+    private readonly HudIndicatorStackLayout layout = new();
     private float readingWidth;
     private int percentage;
     private readonly Vec4f fillTint = new(.25f, .65f, 1, 1);
@@ -60,7 +60,9 @@ internal sealed class PlayerWetnessPresentation : HudIndicatorPresentation<HudIn
         text.SetContent(null, "vanillaexpanded:player-wetness-reading", percentage);
         text.Prepare(preparation);
         readingWidth = text.Size.Width * Math.Min(1, ReadingHeight / Math.Max(1, text.Size.Height));
-        Size = new SizeF(Math.Max(HudOverlaySizes.Standard, readingWidth), HudOverlaySizes.Standard);
+        layout.Configure(new SizeF(readingWidth, ReadingHeight),
+            new SizeF(HudOverlaySizes.Standard, HudOverlaySizes.Standard - ReadingHeight), 0);
+        Size = layout.Size;
         Visibility.Show();
     }
     #endregion
@@ -69,8 +71,8 @@ internal sealed class PlayerWetnessPresentation : HudIndicatorPresentation<HudIn
     public void CollectBackdrops(IRenderAPI renderer, ElementBounds bounds)
     {
         if (Context == null || textures == null) return;
-        double pixels = HudOverlaySizes.Standard * Context.GuiScale;
-        backdrop?.Queue(renderer, bounds.renderX, bounds.renderY + (bounds.OuterHeight - pixels) / 2, Context.GuiScale);
+        layout.Resolve(bounds, Context.GuiScale);
+        backdrop?.Queue(renderer, layout.Icon.renderX, layout.Reading.renderY, Context.GuiScale);
     }
     /// <summary>Draws the twin drops below a centered cached percentage within the shared indicator height.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip)
@@ -78,18 +80,12 @@ internal sealed class PlayerWetnessPresentation : HudIndicatorPresentation<HudIn
         if (Context == null) return;
         if (TryDrawText(renderer, bounds)) return;
         if (textures == null) return;
+        layout.Resolve(bounds, Context.GuiScale);
         double scale = Context.GuiScale;
-        double x = bounds.renderX + (Size.Width - HudOverlaySizes.Standard) * scale / 2;
-        double y = bounds.renderY + (bounds.OuterHeight - HudOverlaySizes.Standard * scale) / 2;
-        DrawDrop(renderer, x + 2.25 * scale, y + (ReadingHeight + 1.5) * scale, 22.5 * scale);
-        DrawDrop(renderer, x + 17.25 * scale, y + ReadingHeight * scale, 13.5 * scale);
-        // Keep the normal-sized reading above the artwork without increasing the HUD row height.
-        textBounds.absFixedX = bounds.renderX + (Size.Width - readingWidth) * scale / 2;
-        textBounds.absFixedY = y;
-        textBounds.absInnerWidth = readingWidth * scale;
-        textBounds.absInnerHeight = ReadingHeight * scale;
-        textBounds.Initialized = true;
-        text.Draw(renderer, textBounds, clip, 0, maximumTextHeight: ReadingHeight);
+        var artwork = layout.Icon;
+        DrawDrop(renderer, artwork.renderX + 2.25 * scale, artwork.renderY + 1.5 * scale, 22.5 * scale);
+        DrawDrop(renderer, artwork.renderX + 17.25 * scale, artwork.renderY, 13.5 * scale);
+        text.Draw(renderer, layout.Reading, clip, 0, maximumTextHeight: ReadingHeight);
     }
     #endregion
     #region Lifecycle
