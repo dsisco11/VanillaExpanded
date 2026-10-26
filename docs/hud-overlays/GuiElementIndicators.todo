@@ -1,0 +1,174 @@
+# Native GuiElement HUD Indicators — Implementation Plan
+
+Source proposal: [GuiElementIndicators.proposal.md](GuiElementIndicators.proposal.md), approved by the user in conversation.
+Scope: implementation of that proposal only. Every task below is initially unchecked; this document does not authorize unrelated indicator redesigns.
+
+## Goal and constraints
+
+Move all built-in indicator presentations into actual native GuiElements registered with the existing effective-container composers. Keep sampling and feature state in their owning controllers. Native bounds and the composition lifecycle own component arrangement; foreground and backdrop rendering consume already-prepared state and geometry.
+
+Preserve current IDs, settings, layouts, locks, grouping/editing, hidden-item proxies, input pass-through, dimensions, spacing, text-above-icon order, sampling semantics, clipping, animation, fades, and backdrop ordering. Do not introduce another widget tree, layout framework, rendering stage, or gameplay controller per visual instance. Preserve the public registration boundary and a documented external-consumer adapter; built-ins must not use that adapter after migration.
+
+## Implementation decisions to resolve
+
+    ☐ Resolve exact native-presentation capability and element-factory signatures during Phase 1; the proposal establishes an optional capability, not its concrete API names.
+    ☐ Verify source and binary compatibility obligations of existing public contracts before selecting the adapter boundary. Do not silently add required members to IHudOverlay or change existing registration signatures.
+    ☐ Verify which native text element satisfies update, contrast, measurement, opacity, and disposal requirements. Use a small custom text GuiElement only where that verification establishes a concrete native gap.
+    ☐ Establish how independent source/preview compositions retain or recreate visual elements without sharing disposable elements, duplicating subscriptions, or releasing resources still used by a surviving composition.
+
+## Phase 1: Establish native and existing-system contracts
+
+Outcome: the refactor has verified integration boundaries and an explicit ownership/invalidation design.
+
+    ☐ Read the approved proposal, current HudOverlays.md, applicable AGENTS.md instructions, and the current host, registry, scheduler, session, layout, controls, previews, and presentation implementations.
+    ☐ Inventory all built-ins and every supported style: bow ammunition, wind speed, rift activity, temporal storm, player wetness, body temperature, weather conditions, approximate time, environmental temperature, and calendar date.
+    ☐ Record which shared helpers each consumer uses and which current draw/backdrop paths still configure, fit, measure, invalidate, or resolve component layout.
+    ☐ Inspect the supported game's GuiComposer, GuiElement, ElementBounds, native text, clipping, and disposal implementations; verify installed behavior where source/API drift could affect the design.
+        ☐ Distinguish adding/replacing elements, updating existing text, recalculating bounds, recomposition, and per-frame rendering. Establish the actual native calls for each required operation.
+        ☐ Verify passive elements do not acquire focus or intercept input merely because they use the composer's dynamic-element registration path.
+    ☐ Resolve the decisions above and record a compact responsibility/lifetime table and invalidation matrix alongside implementation evidence.
+        ☐ Cover content-only changes, changed measurement, style, membership, GUI scale, viewport, host movement, animation, visibility exits, previews, world changes, and removal.
+        ☐ Define exactly-once resource ownership for composers, elements, controller state, generated GUI resources, and borrowed engine resources.
+    ☐ Reconcile any native limitation against the proposal before depending on an alternative; do not claim that subclassing GuiElement automatically provides measurement or invalidation.
+
+Completion criteria:
+    ☐ Every proposal boundary has a verified owner and integration route; unresolved implementation choices are settled without unsupported scope.
+    ☐ A second review confirms compatibility and lifetime decisions before foundational code is introduced.
+
+## Phase 2: Add native presentation capability and visual elements
+
+Depends on Phase 1. Outcome: native presentations can be built, updated, measured, and disposed independently of feature sampling.
+
+    ☐ Add the optional native-presentation capability while retaining existing public registration contracts and legacy consumer behavior.
+    ☐ Implement the external IHudOverlay adapter at that boundary; keep legacy rendering distinguishable from native registration and prevent accidental built-in fallback from being hidden by the adapter.
+    ☐ Establish composer-owned native icon/reading components and reusable parented ElementBounds using the native contracts verified in Phase 1.
+        ☐ Use native text elements where suitable; implement only the small custom GuiElements required for prepared item or texture artwork and specialized visual effects.
+        ☐ Keep measurement, text fitting, content preparation, and native bounds calculation outside rendering callbacks. Preserve optional-row behavior and current measured footprints.
+        ☐ Keep unchanged text and textures cached; define content updates independently from element-tree changes.
+    ☐ Make creation, failed initialization, disposal, and borrowed resource handling explicit. An element instance may belong to only one composer.
+    ☐ Add focused contract tests for real native elements, component parenting, content updates, measurements, passive behavior, and owned-versus-borrowed cleanup.
+
+Completion criteria:
+    ☐ A representative native icon-and-reading presentation operates through actual composer-registered components, not a callback around the old full-indicator Draw routine.
+    ☐ The optional capability and legacy adapter preserve existing registration callers and their lifecycle.
+
+## Phase 3: Integrate native presentation lifetime with the host
+
+Depends on Phase 2. Outcome: the shared host schedules composition and layout before both rendering passes.
+
+    ☐ Update HudOverlayHost and its session/scheduler integration to bind native indicator elements into the existing one-composer-per-effective-container structure.
+    ☐ Wire the agreed invalidation matrix: prepare content, measure changed content, pack visible members, assign native bounds, then resolve/recompose only the affected native structure before backdrop or foreground rendering.
+        ☐ Position-only changes, including movement previews, update bounds without rebuilding unchanged text, textures, or item meshes.
+        ☐ Same-size numeric changes use the element's update mechanism; measurement changes also invalidate the owning container's packing.
+        ☐ Unchanged frames perform no component arrangement, fitting, stack configuration, or CalcWorldBounds from either render pass.
+    ☐ Retain existing anchor, packing, clipping, overflow, persistence, and permission owners. Do not replace those policies with a new general layout service.
+    ☐ Integrate native elements with backdrop batching, ordering, shared opacity, fade exits, and animated drawing without changing their established contracts.
+    ☐ Integrate regrouping, drag source reservations, active previews, cancellation, and hidden-item edit proxies.
+        ☐ Ensure every surviving composer has distinct owned elements and valid resources; visual duplication must not create a second gameplay controller or subscription set.
+        ☐ Retire discarded compositions and release resources only after remaining users are safe. Preserve original/restored layouts on cancellation.
+    ☐ Keep legacy external overlays functional while migrated built-ins use the native path. Any transitional internal dispatcher is temporary and must be removed in Phase 7.
+    ☐ Test host-driven invalidation, movement, render ordering, preview ownership, missing content, exceptions during preparation/composition, and session teardown.
+
+Completion criteria:
+    ☐ Both render passes see the same prepared native geometry, and unchanged rendering triggers no arrangement or recomposition.
+    ☐ Native and legacy registrations coexist without sharing disposable elements or changing saved layout semantics.
+
+## Phase 4: Migrate icon-and-reading indicators
+
+Depends on Phase 3. Outcome: the simpler built-ins exercise native composition end to end.
+
+    ☐ Migrate bow ammunition, wind speed, rift activity, and temporal storm to the native presentation capability.
+        ☐ Bow: retain selected-arrow presentation copies, counts, no-arrows state, item rendering, and circular backdrop.
+        ☐ Wind: retain native percentage conversion, recent averaging, calm visibility, approved SVG, and current icon/reading dimensions.
+        ☐ Rift: retain activity labels and visibility. Storm: retain stage, flashing, and continuous urgency-pulse behavior without component layout during animation.
+    ☐ Migrate their text-only styles through the shared native text composition; preserve localized names/readings and style-switch invalidation.
+    ☐ Transfer presentation resources into element ownership and remove these consumers' manual component positioning and render-time Resolve/Configure/fitting calls.
+    ☐ Verify each consumer uses the native capability rather than the compatibility adapter, with unchanged sampling and configuration behavior.
+
+Completion criteria:
+    ☐ All four consumers' supported styles pass native registration, layout-relationship, update/cache, opacity, and lifetime tests.
+
+## Phase 5: Migrate layered status artwork
+
+Depends on Phase 4. Outcome: native composition supports custom layered effects without taking over gameplay logic.
+
+    ☐ Migrate player wetness, body temperature, and composite weather, including their text-only styles.
+        ☐ Wetness: preserve filled drops, percentage fitting and current footprint, text-above order, and backdrop alignment.
+        ☐ Body temperature: compose reading, trend markers, narrow thermometer, and backdrop through native bounds; retain fill masking, clipping, tint, optional readings, and warming/cooling marker semantics.
+        ☐ Weather: retain independent layer selection, shared origins, draw order, complete-pack/fallback behavior, and borrowed textures.
+    ☐ Keep custom elements focused on their visual responsibility. Do not port entire old presentation routines unchanged into callback elements.
+    ☐ Test optional components, simultaneous layers, trend strengths, clipping, native bounds, scale changes, and owned/borrowed cleanup against existing behavioral relationships.
+
+Completion criteria:
+    ☐ All three consumers render from prepared native component geometry; masking and animation do not trigger component layout.
+
+## Phase 6: Migrate environmental instruments and compact styles
+
+Depends on Phase 5. Outcome: every built-in style uses native presentations.
+
+    ☐ Migrate approximate time, environmental temperature, and calendar date across immersive, icon, and text styles.
+    ☐ Replace compact HudOverlayIconReading arrangements with native icon/reading components, retaining absent-reading behavior and localized measurements.
+    ☐ Compose instrument layers and registered reading/mechanism regions through parented native bounds. Retain authored canvases, aspect ratios, scales, calibration, clock segments/pointer, thermometer reveal, and mechanical layer order.
+    ☐ Keep native dynamic elements responsible for prepared instrument artwork and visual animation; updates must not resample gameplay or rearrange components during rendering.
+    ☐ Verify style changes preserve feature state and timing while releasing superseded GUI resources and invalidating only the necessary measurement/composition work.
+
+Completion criteria:
+    ☐ The Phase 1 consumer/style inventory is fully migrated; no built-in style relies on the legacy adapter or full-indicator manual Draw dispatch.
+
+## Phase 7: Retire superseded presentation infrastructure and document the boundary
+
+Depends on Phase 6. Outcome: the native architecture is the sole built-in presentation path.
+
+    ☐ Remove HudIndicatorStackLayout and obsolete group-wide built-in dispatch, manual component absolute-bounds assignment, and presentation helpers whose responsibilities have been replaced.
+        ☐ Preserve necessary framebuffer/scissor boundaries and custom artwork calculations; do not confuse those with component layout.
+        ☐ Retain the public legacy adapter and any required compatibility facade. Do not delete a public helper without reconciling existing consumer obligations.
+    ☐ Reconcile resource owners, removal handles, style switches, exit completion, and world lifecycle for double disposal, stale visual state, or obsolete callbacks.
+    ☐ Update HudOverlays.md and public integration examples to describe the current native capability, element/composer ownership, invalidation, and supported legacy adapter.
+    ☐ Update affected feature documentation where its presentation implementation changed; permanent documentation must describe active code rather than refactor history.
+    ☐ Search source and linked documentation for stale claims, built-in legacy fallbacks, render-time layout calls, and orphaned infrastructure/tests. Reconcile every remaining match against its intended responsibility.
+
+Completion criteria:
+    ☐ Cleanup is complete without breaking external callers, and documentation matches the resulting implementation.
+
+## Phase 8: Qualify the complete implementation
+
+Depends on Phase 7. Outcome: the final candidate has automated, package, and review evidence without implying visual acceptance.
+
+    ☐ Reconcile every approved proposal requirement against implementation and focused evidence; inspect all ten consumers and every supported style.
+    ☐ Verify repeated native rendering performs no arrangement, fitting, measurement, bounds calculation, or resource creation for unchanged content. Test relevant invalidations separately from content-only and animation-only changes.
+    ☐ Verify parent/child relationships, scaling, containment, centering, optional rows, clipping, text-above order, backdrop alignment, passive input, fades, and animation continuity.
+    ☐ Exercise grouping, movement, resize, GUI-scale/style changes, hidden proxies, previews/cancellation, saved layouts/locks, disabled content, removal, failed initialization, and repeated world transitions.
+    ☐ Verify actual native element registration and the public legacy adapter, including supported source/binary compatibility and exactly-once ownership across regrouping/previews.
+    ☐ Run appropriate affected tests and the canonical Release build/package through subagents, as required by the user's instructions. Inspect package contents and verify relevant assets and DLL identity against the qualified candidate.
+        ☐ Follow Tests/AGENTS.md: test relationships, supplied geometry, caching, invalidation, ordering, and lifecycle; do not lock tests to prescribed visual sizes, palettes, fonts, or pixels.
+        ☐ Distinguish source inspection, headless native integration, package identity, skips, and any remaining runtime evidence. Do not present them as measured performance or appearance acceptance.
+    ☐ Complete a second implementation review and independent completion audit. Resolve findings against the whole proposal/plan before recording completion.
+
+Completion criteria:
+    ☐ Required automated checks, package verification, documentation reconciliation, and reviews pass on the final candidate; remaining visual/input acceptance stays explicitly open.
+
+## Phase 9: User-run in-game acceptance
+
+Depends on Phase 8. Outcome: rendered appearance and native interaction have been checked by the user.
+
+    ☐ Provide the qualified package and a concise user-run checklist. Do not launch the game on the user's behalf.
+    ☐ Obtain user results for representative indicators in every supported style, normal/high GUI scales, resizing, text updates, optional readings, layer ordering, instrument animation, and visibility transitions.
+    ☐ Obtain user results for passive input, dialogs/tooltips, editing, grouping, movement, preview cancellation, hidden-item proxies, persisted locks/layouts, and world exit/rejoin.
+    ☐ Resolve reported discrepancies within scope, rerun checks appropriate to any changes, and obtain renewed user acceptance where appearance/input changed.
+
+Completion criteria:
+    ☐ User-run acceptance is recorded separately from automated results. Unperformed checks remain unchecked.
+
+## Final acceptance
+
+    ☐ Every proposal requirement is satisfied, or a scope change has explicit user approval; implementation convenience is not an implicit deferral.
+    ☐ All built-in presentations are actual native GuiElements with composer-owned lifetimes and layout resolved before rendering.
+    ☐ The external compatibility path is documented and working; superseded internal layout/dispatch paths are retired.
+    ☐ Automated qualification, package verification, documentation, reviews, and user-run acceptance are complete with truthful evidence and no unsupported performance claims.
+
+## Proposal coverage
+
+- Proposed design: Phases 1–6 establish native components, retained controller responsibilities, and complete built-in/style migration.
+- Update and rendering contract: Phases 1, 3–6, and 8 establish invalidation and prove rendering consumes prepared geometry; Phase 7 removes superseded machinery.
+- Ownership and compatibility: Phases 1–3, 7, and 8 cover optional capability, external adapter, composer ownership, previews, lifecycle, and preserved user state.
+- Acceptance: Phases 8–9 distinguish automated/package evidence from user-run visual and input acceptance.
