@@ -22,6 +22,6 @@ Values must exceed a boundary to activate or retain that band. Calm, missing, an
 
 ## Presentation and resource ownership
 
-Icon mode uses the shared compact icon size and normal HUD text. The reading keeps its prepared font size as GUI scale changes; wider readings expand the footprint. The icon uses `assets/vanillaexpanded/textures/hud/wind-speed/icon.svg`, the approved double-hook line art, above a localized whole-percentage reading such as `65%`. Text mode uses the short name `WIND` above the same reading and loads no icon. Wind strength does not alter the approved icon's shape.
+Icon mode uses the shared compact icon size and normal HUD text. The reading keeps its prepared font size as GUI scale changes; wider readings expand the footprint. The icon uses `assets/vanillaexpanded/textures/hud/wind-speed/icon.svg`, the approved double-hook line art, below a localized whole-percentage reading such as `65%`. Text mode uses the short name `WIND` above the same reading and loads no icon. Wind strength does not alter the approved icon's shape.
 
 The wind presentation rasterizes the SVG and owns its texture. The shared status-indicator text helper owns the percentage label; the shared text-mode helper owns the short name and reading. Resources are reused across unchanged refreshes and released on style changes, API changes, completed exits, or world exit. Headless checks establish lifecycle and classification behavior; in-game appearance remains user-run validation.

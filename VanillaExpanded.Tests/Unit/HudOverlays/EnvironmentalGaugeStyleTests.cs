@@ -146,12 +146,12 @@ public sealed class EnvironmentalGaugeStyleTests : IDisposable
         var icon = Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture");
 
         var text = Assert.Single(renderer.Invocations, call => call.Method.Name == "Render2DTexturePremultipliedAlpha");
-        Assert.True((double)text.Arguments[2] > (double)icon.Arguments[2] + (double)icon.Arguments[4]);
+        Assert.True((double)text.Arguments[2] + (double)text.Arguments[4] < (double)icon.Arguments[2]);
         Assert.Equal((double)icon.Arguments[1] + (double)icon.Arguments[3] / 2, (double)text.Arguments[1] + (double)text.Arguments[3] / 2, 5);
         compact.Reset();
         Assert.True(owned.Disposed);
     }
-    /// <summary>Wide and narrow readings remain centered below compact artwork without changing prepared pixel size.</summary>
+    /// <summary>Wide and narrow readings remain centered above compact artwork without changing prepared pixel size.</summary>
     [Theory]
     [InlineData(1, 11, 9)]
     [InlineData(1.5, 93, 17)]
@@ -175,10 +175,10 @@ public sealed class EnvironmentalGaugeStyleTests : IDisposable
         var renderer = new Mock<IRenderAPI>(); compact.Draw(renderer.Object, bounds);
         var icon = Assert.Single(renderer.Invocations, value => value.Method.Name == "RenderTexture");
         var text = Assert.Single(renderer.Invocations, value => value.Method.Name == "Render2DTexturePremultipliedAlpha");
-        Assert.True((double)text.Arguments[2] > (double)icon.Arguments[2] + (double)icon.Arguments[4]);
+        Assert.True((double)text.Arguments[2] + (double)text.Arguments[4] < (double)icon.Arguments[2]);
         Assert.Equal((double)icon.Arguments[1] + (double)icon.Arguments[3] / 2, (double)text.Arguments[1] + (double)text.Arguments[3] / 2, 5);
         Assert.Equal((double)width, text.Arguments[3]); Assert.Equal((double)height, text.Arguments[4]);
-        Assert.Equal(bounds.renderY + bounds.OuterHeight, (double)text.Arguments[2] + height, 5);
+        Assert.Equal(bounds.renderY, (double)text.Arguments[2], 5);
         Assert.Equal(1, uploads);
     }
     #endregion

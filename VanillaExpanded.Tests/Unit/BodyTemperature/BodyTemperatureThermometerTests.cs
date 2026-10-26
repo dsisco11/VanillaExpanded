@@ -147,7 +147,7 @@ public sealed class BodyTemperatureThermometerTests : IDisposable
         var renderer = new Mock<IRenderAPI>();
         presentation.Draw(renderer.Object, bounds, new RectangleF(0, 0, 1000, 1000), .1f);
         var outline = Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture" && (int)call.Arguments[0] == 1);
-        Assert.Equal(bounds.renderY, (double)outline.Arguments[2]);
+        Assert.InRange((double)outline.Arguments[2], bounds.renderY, bounds.renderY + bounds.OuterHeight - (double)outline.Arguments[4]);
         var chevrons = renderer.Invocations.Where(call => call.Method.Name == "RenderTexture" && (int)call.Arguments[0] == (trend > 0 ? 3 : 4)).ToArray();
         Assert.Equal(Math.Abs(trend), chevrons.Length);
         for (int index = 0; index < chevrons.Length; index++)
@@ -161,10 +161,10 @@ public sealed class BodyTemperatureThermometerTests : IDisposable
         }
     }
 
-    /// <summary>Stacked trends stay below the thermometer and outside fitted text at different GUI scales.</summary>
+    /// <summary>Stacked trends stay above the thermometer and outside fitted text at different GUI scales.</summary>
     [Theory]
     [InlineData(1, 2)] [InlineData(1.5, -2)] [InlineData(2, 1)] [InlineData(2, -1)]
-    public void ReadingAndTrendsFitBelowThermometer(double scale, int trend)
+    public void ReadingAndTrendsFitAboveThermometer(double scale, int trend)
     {
         var api = new Mock<ICoreClientAPI>() { DefaultValue = DefaultValue.Mock };
         var text = new HudOverlayIconTextPresentation((context, _) => new LoadedTexture(context.Api)
@@ -181,8 +181,8 @@ public sealed class BodyTemperatureThermometerTests : IDisposable
         var reading = Assert.Single(renderer.Invocations, call => call.Method.Name == "Render2DTexturePremultipliedAlpha");
         double textTop = (double)reading.Arguments[2], textBottom = textTop + (double)reading.Arguments[4];
         var outline = Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture" && (int)call.Arguments[0] == 1);
-        double iconBottom = (double)outline.Arguments[2] + (double)outline.Arguments[4];
-        Assert.True(textTop > iconBottom);
+        double iconTop = (double)outline.Arguments[2];
+        Assert.True(textBottom < iconTop);
         Assert.Equal((double)outline.Arguments[1] + (double)outline.Arguments[3] / 2, (double)reading.Arguments[1] + (double)reading.Arguments[3] / 2, 5);
         Assert.InRange(textTop, bounds.renderY, bounds.renderY + bounds.OuterHeight);
         Assert.InRange(textBottom, bounds.renderY, bounds.renderY + bounds.OuterHeight);
@@ -190,7 +190,7 @@ public sealed class BodyTemperatureThermometerTests : IDisposable
         {
             double arrowTop = (double)arrow.Arguments[2], arrowBottom = arrowTop + (double)arrow.Arguments[4];
             Assert.True(trend > 0 ? arrowBottom < textTop : arrowTop > textBottom);
-            Assert.True(arrowTop > iconBottom);
+            Assert.True(arrowBottom < iconTop);
             Assert.InRange((double)arrow.Arguments[1], bounds.renderX, bounds.renderX + bounds.OuterWidth - (double)arrow.Arguments[3]);
         }
     }

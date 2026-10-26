@@ -57,7 +57,7 @@ public sealed class HudOverlayIconTextPresentationTests : IDisposable
     [InlineData(1, 22, 7, 14, 5)]
     [InlineData(1.5, 30, 3, 58, 16)]
     [InlineData(2, 16, 4, 27, 9)]
-    public void VerticalReadingCentersBelowItem(double scale, float iconSize, float gap, int textWidth, int textHeight)
+    public void VerticalReadingCentersAboveItem(double scale, float iconSize, float gap, int textWidth, int textHeight)
     {
         var api = new Mock<ICoreClientAPI>(); var renderer = new Mock<IRenderAPI>();
         api.SetupGet(value => value.Render).Returns(renderer.Object);
@@ -80,11 +80,43 @@ public sealed class HudOverlayIconTextPresentationTests : IDisposable
         var text = Assert.Single(renderer.Invocations, value => value.Method.Name == "Render2DTexturePremultipliedAlpha");
         double textX = (double)text.Arguments[1], textY = (double)text.Arguments[2];
         Assert.Equal((double)icon.Arguments[1], textX + textWidth / 2d, 5);
-        Assert.Equal(bounds.renderY + iconSize * scale + gap * scale, textY, 5);
+        Assert.Equal(bounds.renderY, textY, 5);
+        Assert.Equal(textY + textHeight + gap * scale + iconSize * scale / 2, (double)icon.Arguments[2], 5);
         Assert.Equal((double)textWidth, text.Arguments[3]); Assert.Equal((double)textHeight, text.Arguments[4]);
         Assert.True(bounds.renderY + bounds.OuterHeight >= textY + textHeight);
         Assert.Equal(1, builds);
     }
+    /// <summary>Vertical stacks omit spacing for absent content and center each remaining element.</summary>
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(false, false)]
+    public void VerticalMissingContentDoesNotReserveAnEmptyBand(bool hasIcon, bool hasText)
+    {
+        var api = new Mock<ICoreClientAPI>();
+        var renderer = new Mock<IRenderAPI>();
+        api.SetupGet(value => value.Render).Returns(renderer.Object);
+        using var presentation = new HudOverlayIconTextPresentation((context, _) =>
+            new LoadedTexture(context.Api) { Width = 41, Height = 13 }, iconSize: 27, gap: 8)
+            { Direction = HudOverlayDirection.Vertical };
+        presentation.SetContent(hasIcon ? new ItemStack(new Item { Code = new AssetLocation("game:arrow-flint") }) : null,
+            hasText ? "reading" : "");
+        presentation.Prepare(new(api.Object, 1.5, "en"));
+        var bounds = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
+        bounds.absFixedX = 18; bounds.absFixedY = 29;
+        bounds.absInnerWidth = presentation.Size.Width * 1.5;
+        bounds.absInnerHeight = presentation.Size.Height * 1.5;
+        bounds.Initialized = true;
+        presentation.Draw(renderer.Object, bounds, new(0, 0, 1000, 1000), 0);
+        var icons = renderer.Invocations.Where(value => value.Method.Name == "RenderItemstackToGui").ToArray();
+        var texts = renderer.Invocations.Where(value => value.Method.Name == "Render2DTexturePremultipliedAlpha").ToArray();
+        Assert.Equal(hasIcon ? 1 : 0, icons.Length);
+        Assert.Equal(hasText ? 1 : 0, texts.Length);
+        if (hasText) Assert.Equal(bounds.renderY, (double)texts[0].Arguments[2], 5);
+        if (hasIcon) Assert.Equal(bounds.renderY + bounds.OuterHeight / 2, (double)icons[0].Arguments[2], 5);
+        if (!hasIcon && !hasText) Assert.Equal(SizeF.Empty, presentation.Size);
+    }
+
     /// <summary>Unchanged contexts reuse text while relevant locale, font, scale and content changes rebuild once.</summary>
     [Fact]
     public void PreparationCachesNativeTextAndDrawUsesCopiedStack()

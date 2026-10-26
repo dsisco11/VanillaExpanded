@@ -9,7 +9,7 @@ using Vintagestory.API.MathTools;
 
 namespace VanillaExpanded.PlayerWetness;
 
-/// <summary>Borrows slim droplet artwork and owns a percentage reading beneath two fully filled drops.</summary>
+/// <summary>Borrows slim droplet artwork and owns a percentage reading above two fully filled drops.</summary>
 internal sealed class PlayerWetnessPresentation : HudIndicatorPresentation<HudIndicatorStyle>
 {
     private readonly Func<HudOverlayPreparationContext, LoadedTexture[]> createTextures;
@@ -72,7 +72,7 @@ internal sealed class PlayerWetnessPresentation : HudIndicatorPresentation<HudIn
         double pixels = HudOverlaySizes.Standard * Context.GuiScale;
         backdrop?.Queue(renderer, bounds.renderX, bounds.renderY + (bounds.OuterHeight - pixels) / 2, Context.GuiScale);
     }
-    /// <summary>Draws the twin drops above a centered cached percentage within the shared indicator height.</summary>
+    /// <summary>Draws the twin drops below a centered cached percentage within the shared indicator height.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip)
     {
         if (Context == null) return;
@@ -81,11 +81,11 @@ internal sealed class PlayerWetnessPresentation : HudIndicatorPresentation<HudIn
         double scale = Context.GuiScale;
         double x = bounds.renderX + (Size.Width - HudOverlaySizes.Standard) * scale / 2;
         double y = bounds.renderY + (bounds.OuterHeight - HudOverlaySizes.Standard * scale) / 2;
-        DrawDrop(renderer, x + 2.25 * scale, y + 1.5 * scale, 22.5 * scale);
-        DrawDrop(renderer, x + 17.25 * scale, y, 13.5 * scale);
-        // Keep the normal-sized reading below the artwork without increasing the HUD row height.
+        DrawDrop(renderer, x + 2.25 * scale, y + (ReadingHeight + 1.5) * scale, 22.5 * scale);
+        DrawDrop(renderer, x + 17.25 * scale, y + ReadingHeight * scale, 13.5 * scale);
+        // Keep the normal-sized reading above the artwork without increasing the HUD row height.
         textBounds.absFixedX = bounds.renderX + (Size.Width - readingWidth) * scale / 2;
-        textBounds.absFixedY = y + 24 * scale;
+        textBounds.absFixedY = y;
         textBounds.absInnerWidth = readingWidth * scale;
         textBounds.absInnerHeight = ReadingHeight * scale;
         textBounds.Initialized = true;

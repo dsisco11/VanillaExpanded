@@ -8,7 +8,7 @@ using Vintagestory.API.Common;
 
 namespace VanillaExpanded.RiftActivity;
 
-/// <summary>Borrows cached rift textures and owns a localized activity abbreviation below the icon.</summary>
+/// <summary>Borrows cached rift textures and owns a localized activity abbreviation above the icon.</summary>
 internal sealed class RiftActivityPresentation : HudIndicatorPresentation<HudIndicatorStyle>
 {
     private readonly System.Func<HudOverlayPreparationContext, LoadedTexture[]> load;
@@ -62,11 +62,12 @@ internal sealed class RiftActivityPresentation : HudIndicatorPresentation<HudInd
         if (icons == null) return;
         double pixels = HudOverlaySizes.Standard * Context.GuiScale;
         double x = bounds.renderX + (bounds.OuterWidth - pixels) / 2;
-        double y = bounds.renderY + (bounds.OuterHeight - Size.Height * Context.GuiScale) / 2;
+        double top = bounds.renderY + (bounds.OuterHeight - Size.Height * Context.GuiScale) / 2;
+        double y = top + (label.Size.Height + HudOverlaySizes.ReadingGap) * Context.GuiScale;
         renderer.RenderTexture(icons[(int)activity.Value].TextureId, x, y, pixels, pixels, 50, HudOverlayDrawOpacity.Tint);
-        // Keep the cached reading centered below the artwork without changing its font size to fit the icon.
+        // Keep the cached reading centered above the artwork without changing its font size to fit the icon.
         labelBounds.absFixedX = bounds.renderX + (bounds.OuterWidth - label.Size.Width * Context.GuiScale) / 2;
-        labelBounds.absFixedY = y + pixels + HudOverlaySizes.ReadingGap * Context.GuiScale;
+        labelBounds.absFixedY = top;
         labelBounds.absInnerWidth = label.Size.Width * Context.GuiScale;
         labelBounds.absInnerHeight = label.Size.Height * Context.GuiScale;
         labelBounds.Initialized = true;
@@ -79,7 +80,8 @@ internal sealed class RiftActivityPresentation : HudIndicatorPresentation<HudInd
     {
         if (!activity.HasValue || icons == null || Context == null) return;
         double pixels = HudOverlaySizes.Standard * Context.GuiScale;
-        double y = bounds.renderY + (bounds.OuterHeight - Size.Height * Context.GuiScale) / 2;
+        double y = bounds.renderY + (bounds.OuterHeight - Size.Height * Context.GuiScale) / 2
+            + (label.Size.Height + HudOverlaySizes.ReadingGap) * Context.GuiScale;
         backdrop?.Queue(renderer, bounds.renderX + (bounds.OuterWidth - pixels) / 2, y, Context.GuiScale);
     }
     /// <summary>Releases the owned label and shared presentation state.</summary>

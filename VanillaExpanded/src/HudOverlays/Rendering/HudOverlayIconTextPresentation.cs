@@ -32,7 +32,7 @@ public sealed class HudOverlayIconTextPresentation : IDisposable
     private bool disposed;
     private double scale = 1;
     public SizeF Size { get; private set; }
-    /// <summary>Selects whether the cached reading is beside or below its item icon.</summary>
+    /// <summary>Selects whether the cached reading is beside or above its item icon.</summary>
     public HudOverlayDirection Direction { get; init; } = HudOverlayDirection.Horizontal;
     #region Public API
     #region Content and preparation
@@ -123,9 +123,10 @@ public sealed class HudOverlayIconTextPresentation : IDisposable
         {
             // Reserve the full stacked footprint; text retains its prepared font size and both rows share a center.
             iconX += (bounds.OuterWidth - iconSize * scale) / 2;
-            iconY = y + (height - Size.Height * scale) / 2;
+            double top = y + (height - Size.Height * scale) / 2;
+            iconY = top + (text == null ? 0 : textHeight + (slot.Itemstack == null ? 0 : gap * scale));
             textX += (bounds.OuterWidth - textWidth) / 2;
-            textY = iconY + (slot.Itemstack == null ? 0 : (iconSize + gap) * scale);
+            textY = top;
         }
         else if (slot.Itemstack != null)
         {
