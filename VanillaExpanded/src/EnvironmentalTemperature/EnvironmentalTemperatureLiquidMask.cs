@@ -59,7 +59,7 @@ internal sealed class EnvironmentalTemperatureLiquidMask : IDisposable
     public void Draw(IRenderAPI renderer, RectangleF bounds)
     {
         if (texture == null) return;
-        renderer.RenderTexture(texture.TextureId, bounds.X, bounds.Y, bounds.Width, bounds.Height, 51, HudOverlayDrawOpacity.Tint);
+        renderer.RenderTexture(texture.TextureId, bounds.X, bounds.Y, bounds.Width, bounds.Height, 51, DrawOpacity.Tint);
     }
 
     /// <summary>Releases owned GPU storage and drops CPU artwork at world exit or completed fade.</summary>

@@ -115,9 +115,9 @@ internal sealed class PlayerWetnessPresentation : HudIndicatorPresentation<HudIn
     /// <summary>Draws the complete blue silhouette beneath its outline; the host supplies clipping.</summary>
     private void DrawDrop(IRenderAPI renderer, double x, double y, double pixels)
     {
-        fillTint.Set(.25f, .65f, 1, HudOverlayDrawOpacity.Current);
+        fillTint.Set(.25f, .65f, 1, DrawOpacity.Current);
         renderer.Render2DTexture(textures![1].TextureId, (float)x, (float)y, (float)pixels, (float)pixels, 50, fillTint);
-        renderer.Render2DTexture(textures![0].TextureId, (float)x, (float)y, (float)pixels, (float)pixels, 50, HudOverlayDrawOpacity.Tint);
+        renderer.Render2DTexture(textures![0].TextureId, (float)x, (float)y, (float)pixels, (float)pixels, 50, DrawOpacity.Tint);
     }
     #endregion
 

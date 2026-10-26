@@ -104,9 +104,9 @@ internal sealed class ApproximateTimePresentation : HudIndicatorPresentation<Env
         if (icons == null || face == null) return;
         float pixels = (float)(HudOverlaySizes.Clock * Context.GuiScale);
         var screen = new RectangleF((float)bounds.renderX, (float)(bounds.renderY + (bounds.OuterHeight - pixels) / 2), pixels, pixels);
-        renderer.Render2DTexturePremultipliedAlpha(face.TextureId, screen.X, screen.Y, pixels, pixels, 51, HudOverlayDrawOpacity.PremultipliedTint);
-        dial.Draw(renderer, icons[0].TextureId, screen, HudOverlayDrawOpacity.Current, rotation);
-        renderer.RenderTexture(icons[1].TextureId, screen.X, screen.Y, pixels, pixels, 53, HudOverlayDrawOpacity.Tint);
+        renderer.Render2DTexturePremultipliedAlpha(face.TextureId, screen.X, screen.Y, pixels, pixels, 51, DrawOpacity.PremultipliedTint);
+        dial.Draw(renderer, icons[0].TextureId, screen, DrawOpacity.Current, rotation);
+        renderer.RenderTexture(icons[1].TextureId, screen.X, screen.Y, pixels, pixels, 53, DrawOpacity.Tint);
     }
 
     #endregion

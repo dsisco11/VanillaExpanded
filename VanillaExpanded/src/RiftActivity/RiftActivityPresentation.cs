@@ -62,7 +62,7 @@ internal sealed class RiftActivityPresentation : HudIndicatorPresentation<HudInd
         if (icons == null) return;
         layout.Resolve(bounds, Context.GuiScale);
         var artwork = layout.Icon;
-        renderer.RenderTexture(icons[(int)activity.Value].TextureId, artwork.renderX, artwork.renderY, artwork.OuterWidth, artwork.OuterHeight, 50, HudOverlayDrawOpacity.Tint);
+        renderer.RenderTexture(icons[(int)activity.Value].TextureId, artwork.renderX, artwork.renderY, artwork.OuterWidth, artwork.OuterHeight, 50, DrawOpacity.Tint);
         label.Draw(renderer, layout.Reading, new RectangleF((float)bounds.renderX, (float)bounds.renderY,
             (float)bounds.OuterWidth, (float)bounds.OuterHeight), 0);
     }

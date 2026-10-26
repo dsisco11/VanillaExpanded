@@ -72,7 +72,7 @@ internal sealed class TemporalStormPresentation : HudIndicatorPresentation<HudIn
         tint.W = pulsing ? pulse.Advance(deltaTime) : 1;
         renderer.RenderTexture(icons[(int)stage.Value].TextureId, bounds.renderX,
             bounds.renderY + (bounds.OuterHeight - pixels) / 2, pixels, pixels, 50,
-            pulsing && !Visibility.Animating ? HudOverlayDrawOpacity.Multiply(tint) : HudOverlayDrawOpacity.Tint);
+            pulsing && !Visibility.Animating ? DrawOpacity.Multiply(tint) : DrawOpacity.Tint);
     }
     #endregion
     /// <summary>Queues the prepared icon circle separately from foreground drawing.</summary>

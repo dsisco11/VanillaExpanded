@@ -47,7 +47,7 @@ internal sealed class HudIndicatorTextPresentation : IDisposable
         float scale = (float)context.GuiScale;
         float height = HudOverlaySizes.Standard * scale;
         float y = (float)(bounds.renderY + (bounds.OuterHeight - height) / 2);
-        float alpha = HudOverlayDrawOpacity.Current * opacity;
+        float alpha = DrawOpacity.Current * opacity;
         tint.Set(alpha, alpha, alpha, alpha);
         var area = new RectangleF((float)bounds.renderX, y, Size.Width * scale, hasReading ? height / 2 : height);
         name.Draw(renderer, area, 50, tint);

@@ -78,19 +78,19 @@ Add these public contracts under the existing HUD registration boundary in Phase
 
 ```csharp
 /// <summary>Identifies the moving/live view or its frozen drag-source trace.</summary>
-public enum HudOverlayNativeViewRole { Live, SourceTrace }
+public enum NativeViewRole { Live, SourceTrace }
 
 /// <summary>Creates independent native visuals over one controller's prepared data.</summary>
-public interface IHudOverlayNativePresentation
+public interface INativePresentation
 {
     /// <summary>Creates one unmounted view without sampling or subscribing.</summary>
-    IHudOverlayNativeView CreateView(ICoreClientAPI api, HudOverlayNativeViewRole role);
+    INativeView CreateView(ICoreClientAPI api, NativeViewRole role);
     /// <summary>Advances shared visual effects once per feature per rendered frame.</summary>
     void BeginFrame(float deltaTime);
 }
 
 /// <summary>Tracks unique composer-owned components without owning gameplay state.</summary>
-public interface IHudOverlayNativeView : IDisposable
+public interface INativeView : IDisposable
 {
     /// <summary>Mounts unique component elements under the supplied native member bounds.</summary>
     void AddTo(GuiComposer composer, ElementBounds memberBounds, string keyPrefix);
@@ -121,7 +121,7 @@ The native route is selected by optional capability, not registration signature 
 | Compose/recompose | Compose(false) calculates bounds, calls ComposeElements, builds dynamic draw order and uploads the static surface; OnlyDynamic suppresses static rendering, not composition allocation. ReCompose resets Composed and calls Compose(false). Use these only on initial/structural/static-resource invalidation; custom dynamic glyph updates do not require group recomposition. |
 | Move/resize | Set native root/member fixed or proportional fields, mark affected bounds dirty, then CalcWorldBounds before both passes. Resolve descendants and refresh cached clips/fits/backdrops. Position-only updates retain unchanged glyphs/textures/meshes; changed raster scale or dimensions invalidate only affected resources. Use correctly sized real parents, not ElementBounds.Empty as a viewport (Empty has special fixed unit dimensions). |
 | Native text | GuiElementDynamicText.SetNewText(text, autoHeight, forceRedraw, async) recalculates bounds and recomposes text when changed/forced; optional auto-height changes dimensions. It is a preparation call, not a draw-time setter. CairoFont stroke/TextDrawUtil support contrast, but the dynamic text texture is private and its rendering has no per-frame opacity argument. |
-| Text decision | Implement a small HudIndicatorTextElement derived from GuiElementTextBase, using native CairoFont, measurement and glyph composition with an owned cached texture and passive handlers. The concrete gap is per-frame host fade/pulse opacity with prepared fitting, not lack of native fonts/contrast. Do not reflect private DynamicText texture state or re-rasterize on fades. Use native text directly only for components whose requirements fit its actual contract. |
+| Text decision | Implement a small TextElement derived from GuiElementTextBase, using native CairoFont, measurement and glyph composition with an owned cached texture and passive handlers. The concrete gap is per-frame host fade/pulse opacity with prepared fitting, not lack of native fonts/contrast. Do not reflect private DynamicText texture state or re-rasterize on fades. Use native text directly only for components whose requirements fit its actual contract. |
 | Render/native deferral | GuiComposer.Render can ReCompose when recomposeOnRender is set; PostRender can CalcWorldBounds/ReCompose when the parent is dirty. The host preparation barrier must settle all affected parents/compositions first. Selected content elements must not request deferred recomposition; do not rely on Render/PostRender to flush layout, patch the engine, or manipulate private flags. Unchanged rendering only reads resolved bounds/resources. |
 | Passive input | Focusable=false prevents tab focus but does not make an element passive: base OnMouseDownOnElement sets Handled=true. Custom content elements must override mouse-down to leave input untouched and install no other consuming handlers/cursors. Keep the existing passive artwork dialog and separate editing/menu controls; native registration does not expand its input routing. |
 | Clipping | GuiElementClip calls PushScissor(bounds, false), replacing the outer clip. Do not assume BeginClip intersects. Custom content rendering uses the cached effective clip with PushScissor(..., true) and an exception-safe PopScissor; preserve existing framebuffer state boundaries and feature error isolation. No arrangement or measurement occurs inside that scope. |
@@ -167,18 +167,25 @@ These native constraints require explicit preparation, passive handlers, interse
 
 Depends on Phase 1. Outcome: native presentations can be built, updated, measured, and disposed independently of feature sampling.
 
-    ☐ Add the optional native-presentation capability while retaining existing public registration contracts and legacy consumer behavior.
-    ☐ Implement the external IHudOverlay adapter at that boundary; keep legacy rendering distinguishable from native registration and prevent accidental built-in fallback from being hidden by the adapter.
-    ☐ Establish composer-owned native icon/reading components and reusable parented ElementBounds using the native contracts verified in Phase 1.
-        ☐ Use native text elements where suitable; implement only the small custom GuiElements required for prepared item or texture artwork and specialized visual effects.
-        ☐ Keep measurement, text fitting, content preparation, and native bounds calculation outside rendering callbacks. Preserve optional-row behavior and current measured footprints.
-        ☐ Keep unchanged text and textures cached; define content updates independently from element-tree changes.
-    ☐ Make creation, failed initialization, disposal, and borrowed resource handling explicit. An element instance may belong to only one composer.
-    ☐ Add focused contract tests for real native elements, component parenting, content updates, measurements, passive behavior, and owned-versus-borrowed cleanup.
+    ☑ Add the optional native-presentation capability while retaining existing public registration contracts and legacy consumer behavior.
+    ☑ Implement the external IHudOverlay adapter at that boundary; keep legacy rendering distinguishable from native registration and prevent accidental built-in fallback from being hidden by the adapter.
+    ☑ Establish composer-owned native icon/reading components and reusable parented ElementBounds using the native contracts verified in Phase 1.
+        ☑ Use native text elements where suitable; implement only the small custom GuiElements required for prepared item or texture artwork and specialized visual effects.
+        ☑ Keep measurement, text fitting, content preparation, and native bounds calculation outside rendering callbacks. Preserve optional-row behavior and current measured footprints.
+        ☑ Keep unchanged text and textures cached; define content updates independently from element-tree changes.
+    ☑ Make creation, failed initialization, disposal, and borrowed resource handling explicit. An element instance may belong to only one composer.
+    ☑ Add focused contract tests for real native elements, component parenting, content updates, measurements, passive behavior, and owned-versus-borrowed cleanup.
 
 Completion criteria:
-    ☐ A representative native icon-and-reading presentation operates through actual composer-registered components, not a callback around the old full-indicator Draw routine.
-    ☐ The optional capability and legacy adapter preserve existing registration callers and their lifecycle.
+    ☑ A representative native icon-and-reading presentation operates through actual composer-registered components, not a callback around the old full-indicator Draw routine.
+    ☑ The optional capability and legacy adapter preserve existing registration callers and their lifecycle.
+
+Implementation evidence (2026-10-26; second review and independent audit-stage-completion passed with no unresolved findings):
+
+- Capability/compatibility tasks -> approved proposal Ownership and compatibility, Phase 1 capability signatures, HudOverlays.md registration/lifecycle contract -> three additive Registration contracts plus Rendering/Native/ViewFactory and LegacyView/Element. Existing public members and constructors remain unchanged; internal selection rejects built-in fallback. Host dispatch is unchanged until Phase 3.
+- Component/preparation/cache tasks -> approved proposal Proposed design and Update and rendering contract, Phase 1 native text/clip decisions, inspected GuiComposer/GuiElement/ElementBounds/GuiElementTextBase -> IconReadingView, TextElement, TextureElement and ElementState. Real registered components use native parentage, prepared fitting/clips, content/context invalidation and independent owned glyph/art resources; no old full-indicator Draw callback is used by the representative native view.
+- Ownership/failure tasks -> Phase 1 responsibility/lifetime table and native duplicate-disposal findings -> NativeView transfers mounted elements to exactly one composer, cleans partial mounting, rejects foreign API/self-parenting, and retains local cleanup before mounting. Legacy controllers and engine-cached textures stay borrowed. Native element disposal is idempotent.
+- Verification -> VanillaExpanded.Tests/AGENTS.md -> HudNativeComponentTests and HudNativeCompatibilityTests cover actual native composition, supplied geometry/scaling, optional rows, cached rendering, content/context updates, independent views, ownership/failures, passive input, clipping/opacity, both registration overloads and registry lifecycle. Release HUD baseline: 678 passed; current candidate: 700 passed (22 new cases), zero failed/skipped, through the validation subagent. Second code/documentation review and diff whitespace checks passed. This is headless correctness evidence; package and user-run acceptance remain in their later phases.
 
 ## Phase 3: Integrate native presentation lifetime with the host
 
