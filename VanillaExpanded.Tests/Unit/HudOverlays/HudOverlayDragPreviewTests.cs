@@ -132,7 +132,7 @@ public sealed class HudOverlayDragPreviewTests : IDisposable
             int failures = 0; var draws = new List<(double X, double Y, float Dt, float Opacity)>();
             var backdrops = new List<(double X, float Opacity)>();
             var order = new List<string>();
-            provider.Setup(value => value.CollectBackdrops(renderer.Object, It.IsAny<ElementBounds>())).Callback<IRenderAPI, ElementBounds>((_, bounds) => { backdrops.Add((bounds.renderX, HudOverlayDrawOpacity.Current)); order.Add(bounds.renderX == source.Single().Bounds.renderX ? "source backdrop" : "moving backdrop"); });
+            provider.Setup(value => value.CollectBackdrops(renderer.Object, It.IsAny<ElementBounds>())).Callback<IRenderAPI, ElementBounds>((_, bounds) => { backdrops.Add((bounds.renderX, DrawOpacity.Current)); order.Add(bounds.renderX == source.Single().Bounds.renderX ? "source backdrop" : "moving backdrop"); });
             var batch = new Mock<IHudOverlayBackdropBatch>();
             batch.Setup(value => value.Collect(It.IsAny<RectangleF>(), It.IsAny<Action>())).Callback<RectangleF, Action>((_, collect) => collect());
             using var host = new HudOverlayHost(storage.Api.Object, storage.Registry, _ => !drawable, (_, _) => failures++, backdropBatch: batch.Object);
@@ -142,7 +142,7 @@ public sealed class HudOverlayDragPreviewTests : IDisposable
             layout.Root.renderOffsetX += x; layout.Root.renderOffsetY += y;
             overlay.Setup(value => value.Draw(renderer.Object, It.IsAny<ElementBounds>(), It.IsAny<RectangleF>(), It.IsAny<float>()))
                 .Callback<IRenderAPI, ElementBounds, RectangleF, float>((_, bounds, _, dt) => {
-                    draws.Add((bounds.renderX, bounds.renderY, dt, HudOverlayDrawOpacity.Current));
+                    draws.Add((bounds.renderX, bounds.renderY, dt, DrawOpacity.Current));
                     order.Add(dt == 0 ? "source foreground" : "moving foreground");
                     if (failSource && dt == 0) throw new InvalidOperationException();
                 });
@@ -166,7 +166,7 @@ public sealed class HudOverlayDragPreviewTests : IDisposable
                 movement.Cancel(); draws.Clear(); HudOverlayNativeRenderPass.Render(host, .1f);
                 Assert.Single(draws); Assert.Equal(1, draws[0].Opacity);
             }
-            Assert.Equal(1, HudOverlayDrawOpacity.Current);
+            Assert.Equal(1, DrawOpacity.Current);
             overlay.Verify(value => value.Refresh(), Times.Never); overlay.Verify(value => value.Prepare(It.IsAny<HudOverlayPreparationContext>()), Times.Never);
             movement.Cancel();
         }

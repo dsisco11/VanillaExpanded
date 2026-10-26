@@ -72,10 +72,10 @@ internal sealed class CalendarDatePresentation : HudIndicatorPresentation<Enviro
         if (textures == null) return;
         float width = (float)(HudOverlaySizes.Calendar * Context.GuiScale), height = width * Canvas.Height / Canvas.Width;
         var screen = new RectangleF((float)bounds.renderX, (float)(bounds.renderY + (bounds.OuterHeight - height) / 2), width, height);
-        renderer.RenderTexture(textures[0].TextureId, screen.X, screen.Y, width, height, 50, HudOverlayDrawOpacity.Tint);
+        renderer.RenderTexture(textures[0].TextureId, screen.X, screen.Y, width, height, 50, DrawOpacity.Tint);
         for (int index = 0; index < characters.Length; index++)
             characters[index].Draw(renderer, WorkshopGaugeArtwork.Map(screen, Canvas, Windows[index]), 51);
-        renderer.RenderTexture(textures[1].TextureId, screen.X, screen.Y, width, height, 52, HudOverlayDrawOpacity.Tint);
+        renderer.RenderTexture(textures[1].TextureId, screen.X, screen.Y, width, height, 52, DrawOpacity.Tint);
     }
 
     #endregion

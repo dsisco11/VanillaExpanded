@@ -175,6 +175,14 @@ The fragment uses `VanillaExpanded.HudOverlays` and `VanillaExpanded.HudOverlays
 
 ## Implementing the lifecycle
 
+### Native presentation contracts
+
+`INativePresentation` is an optional capability alongside `IHudOverlay`. Its `CreateView(api, role)` factory creates a fresh `INativeView` for a live composition or frozen source trace; `BeginFrame(deltaTime)` advances shared visual effects once per feature. A view mounts its unique elements once with `AddTo`, updates already-prepared content with `Prepare`, caches resolved geometry with `LayoutCompleted`, and receives host opacity through `SetOpacity`. `CollectBackdrops` submits cached geometry. Composers own mounted elements, elements own generated GUI resources, and view disposal handles unmounted resources and bookkeeping. Engine-cached assets remain borrowed. Dynamic element cleanup is idempotent because the native composer can call it repeatedly.
+
+The internal native icon/reading components use parented native bounds, cached glyphs, passive input and prepared clipping/fitting. The explicit external legacy adapter borrows the existing overlay and preserves its `Draw` contract without acquiring its lifecycle. Capability selection rejects legacy fallback for built-ins. The current host still dispatches registered content through `IHudOverlay.Draw`; implementing the optional capability alone does not change its rendering route.
+
+### Session lifetime
+
 A registered overlay may survive several world sessions. Keep session resources separate from the registration's lifetime.
 
 | Method                                    | Integration responsibility                                                                                                                  |

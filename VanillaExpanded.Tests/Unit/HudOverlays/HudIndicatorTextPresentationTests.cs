@@ -66,7 +66,7 @@ public sealed class HudIndicatorTextPresentationTests : IDisposable
         var bounds = ElementBounds.Fixed(0, 0, presentation.Size.Width, 36).WithEmptyParent();
         bounds.absInnerWidth = presentation.Size.Width * scale; bounds.absInnerHeight = 36 * scale; bounds.Initialized = true;
         var renderer = new Mock<IRenderAPI>();
-        using (new HudOverlayDrawOpacity(animated.Object)) presentation.Draw(renderer.Object, bounds, .4f);
+        using (new DrawOpacity(animated.Object)) presentation.Draw(renderer.Object, bounds, .4f);
         Assert.Equal(2, renderer.Invocations.Count);
         foreach (var call in renderer.Invocations)
         {

@@ -55,7 +55,7 @@ internal sealed class WorkshopGaugeText : IDisposable
         double width = texture.Width * fit, height = texture.Height * fit;
         renderer.Render2DTexturePremultipliedAlpha(texture.TextureId,
             aperture.X + (aperture.Width - width) / 2, aperture.Y + (aperture.Height - height) / 2,
-            width, height, depth, tint ?? HudOverlayDrawOpacity.PremultipliedTint);
+            width, height, depth, tint ?? DrawOpacity.PremultipliedTint);
     }
 
     /// <summary>Releases session-owned pixels and forces preparation on the next session.</summary>

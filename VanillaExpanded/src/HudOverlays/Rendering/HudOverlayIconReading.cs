@@ -55,7 +55,7 @@ internal sealed class HudOverlayIconReading : IDisposable
         if (icon == null || context == null) return;
         layout.Resolve(bounds, context.GuiScale);
         var artwork = layout.Icon;
-        renderer.RenderTexture(icon.TextureId, artwork.renderX, artwork.renderY, artwork.OuterWidth, artwork.OuterHeight, 50, HudOverlayDrawOpacity.Tint);
+        renderer.RenderTexture(icon.TextureId, artwork.renderX, artwork.renderY, artwork.OuterWidth, artwork.OuterHeight, 50, DrawOpacity.Tint);
         if (hasReading)
         {
             var reading = layout.Reading;

@@ -74,7 +74,7 @@ internal sealed class WeatherConditionsPresentation : HudIndicatorPresentation<H
         double x = bounds.renderX, y = bounds.renderY + (bounds.OuterHeight - pixels) / 2;
         if (icons.Length == WeatherConditionsLayers.Names.Length)
         {
-            foreach (int layer in layers) renderer.RenderTexture(icons[layer].TextureId, x, y, pixels, pixels, 50, HudOverlayDrawOpacity.Tint);
+            foreach (int layer in layers) renderer.RenderTexture(icons[layer].TextureId, x, y, pixels, pixels, 50, DrawOpacity.Tint);
             return;
         }
         // Until the complete approved layer set exists, retain both existing weather symbols inside the one slot.
@@ -84,12 +84,12 @@ internal sealed class WeatherConditionsPresentation : HudIndicatorPresentation<H
         if (sample.Precipitation is EnumPrecipitationType type)
         {
             int index = type switch { EnumPrecipitationType.Snow => 1, EnumPrecipitationType.Hail => 2, _ => 0 };
-            renderer.RenderTexture(icons[index].TextureId, x, legacyY, legacySize, legacySize, 50, HudOverlayDrawOpacity.Tint);
+            renderer.RenderTexture(icons[index].TextureId, x, legacyY, legacySize, legacySize, 50, DrawOpacity.Tint);
         }
         if (sample.Fog)
         {
             double fogX = both ? x + legacySize : x;
-            renderer.RenderTexture(icons[3].TextureId, fogX, legacyY, legacySize, legacySize, 50, HudOverlayDrawOpacity.Tint);
+            renderer.RenderTexture(icons[3].TextureId, fogX, legacyY, legacySize, legacySize, 50, DrawOpacity.Tint);
         }
     }
     #endregion

@@ -396,7 +396,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
                 || editPreviews?.IsDrawable(member.Registration) == true
                 || member.Clip.Width <= 0 || member.Clip.Height <= 0
                 || member.Registration.Overlay is not IHudOverlayBackdropProvider provider) continue;
-            using var opacity = new HudOverlayDrawOpacity(member.Registration.Overlay,
+            using var opacity = new DrawOpacity(member.Registration.Overlay,
                 dragPreview.Contains(member.Registration) ? HudOverlayDragPreview.Opacity : 1);
             try { backdropBatch.Collect(member.Clip, () => provider.CollectBackdrops(capi.Render, member.Bounds)); }
             catch (Exception error) { failure(member.Registration, error); }
@@ -419,7 +419,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
             capi.Render.PushScissor(clip, true);
             try
             {
-                using var opacity = new HudOverlayDrawOpacity(preview ? (object)editPreviews! : member.Registration.Overlay,
+                using var opacity = new DrawOpacity(preview ? (object)editPreviews! : member.Registration.Overlay,
                     dragPreview.Contains(member.Registration) ? HudOverlayDragPreview.Opacity : 1);
                 if (preview) editPreviews!.Draw(member.Registration, capi.Render, member.Bounds);
                 else

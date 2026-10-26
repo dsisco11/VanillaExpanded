@@ -57,11 +57,11 @@ internal sealed class HudOverlayGroupHighlight : IDisposable
         if (bounds.Width <= 0 || bounds.Height <= 0) return;
         if (!movable)
         {
-            dashedBorder.Draw(bounds, HudOverlayDrawOpacity.Current);
+            dashedBorder.Draw(bounds, DrawOpacity.Current);
             return;
         }
         int color = border;
-        color = (color & 0x00FFFFFF) | ((int)(((uint)color >> 24) * HudOverlayDrawOpacity.Current) << 24);
+        color = (color & 0x00FFFFFF) | ((int)(((uint)color >> 24) * DrawOpacity.Current) << 24);
         // Keep all segments inside the supplied footprint. Drawing after artwork prevents opaque
         // instrument housings from hiding the movement cue; members inherit their group's permission.
         if (movable)

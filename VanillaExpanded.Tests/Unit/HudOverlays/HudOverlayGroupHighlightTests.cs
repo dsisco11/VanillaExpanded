@@ -93,7 +93,7 @@ public sealed class HudOverlayGroupHighlightTests
         var bounds = new RectangleF(x, y, width, height);
         using (var highlight = new HudOverlayGroupHighlight(api.Object, dashed.Object))
         {
-            using (new HudOverlayDrawOpacity(new object(), opacity)) highlight.DrawOutline(bounds, false);
+            using (new DrawOpacity(new object(), opacity)) highlight.DrawOutline(bounds, false);
             dashed.Verify(value => value.Draw(bounds, opacity), Times.Once);
             render.Verify(value => value.RenderRectangle(It.IsAny<float>(), It.IsAny<float>(), It.IsAny<float>(),
                 It.IsAny<float>(), It.IsAny<float>(), It.IsAny<int>()), Times.Never);

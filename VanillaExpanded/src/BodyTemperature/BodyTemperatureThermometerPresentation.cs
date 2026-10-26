@@ -128,10 +128,10 @@ internal sealed class BodyTemperatureThermometerPresentation : HudIndicatorPrese
             fillClip.absInnerWidth = right - left; fillClip.absInnerHeight = bottom - top;
             fillClip.Initialized = true;
             renderer.PushScissor(fillClip, true);
-            try { renderer.RenderTexture(icons[1].TextureId, x, y, IconWidth * scale, IconHeight * scale, 50, HudOverlayDrawOpacity.Multiply(tint)); }
+            try { renderer.RenderTexture(icons[1].TextureId, x, y, IconWidth * scale, IconHeight * scale, 50, DrawOpacity.Multiply(tint)); }
             finally { renderer.PopScissor(); }
         }
-        renderer.RenderTexture(icons[0].TextureId, x, y, IconWidth * scale, IconHeight * scale, 50, HudOverlayDrawOpacity.Tint);
+        renderer.RenderTexture(icons[0].TextureId, x, y, IconWidth * scale, IconHeight * scale, 50, DrawOpacity.Tint);
         if (sample.Trend != 0)
         {
             // Stack strength vertically in the reading's column; the taller drawing gives the strokes slightly more weight.
@@ -140,7 +140,7 @@ internal sealed class BodyTemperatureThermometerPresentation : HudIndicatorPrese
             for (int index = 0; index < Math.Abs(sample.Trend); index++)
             {
                 renderer.RenderTexture(icons[warming ? 2 : 3].TextureId, arrowX, arrowY + index * (ChevronHeight + ChevronGap) * scale,
-                    ChevronWidth * scale, ChevronHeight * scale, 50, HudOverlayDrawOpacity.Multiply(warming ? warmingTint : coolingTint));
+                    ChevronWidth * scale, ChevronHeight * scale, 50, DrawOpacity.Multiply(warming ? warmingTint : coolingTint));
             }
         }
         if (showReading)

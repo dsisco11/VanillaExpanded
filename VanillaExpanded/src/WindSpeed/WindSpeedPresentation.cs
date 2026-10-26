@@ -65,7 +65,7 @@ internal sealed class WindSpeedPresentation : HudIndicatorPresentation<HudIndica
         if (icon == null) return;
         layout.Resolve(bounds, Context.GuiScale);
         var artwork = layout.Icon;
-        renderer.RenderTexture(icon.TextureId, artwork.renderX, artwork.renderY, artwork.OuterWidth, artwork.OuterHeight, 50, HudOverlayDrawOpacity.Tint);
+        renderer.RenderTexture(icon.TextureId, artwork.renderX, artwork.renderY, artwork.OuterWidth, artwork.OuterHeight, 50, DrawOpacity.Tint);
         label.Draw(renderer, layout.Reading, new RectangleF((float)bounds.renderX, (float)bounds.renderY,
             (float)bounds.OuterWidth, (float)bounds.OuterHeight), 0);
     }
