@@ -6,9 +6,11 @@ The wind indicator registers in the bottom-left `player-status` group at order 9
 
 ## Sampling and visibility
 
-Every 300 ms, the indicator reads the magnitude of native `GetWindSpeedAt(player.Pos.XYZ)`, including local modifiers. The readout uses the windmill calculation `(int)(100 * speed)`: fractional percentages are truncated and values above 100% remain visible. These are native wind-strength percentages, not physical velocity units. It requires a living local player.
+Every 300 ms, the indicator reads the magnitude of native `GetWindSpeedAt(player.Pos.XYZ)`, including local modifiers. Valid samples from the most recent five seconds are averaged before percentage conversion and visibility classification. Startup uses only available samples, so there is no ramp from an invented zero. Samples expire by elapsed client time; repeated refreshes at the same timestamp replace that sample. Missing or nonfinite input clears the average immediately. Player replacement, disabling, death, world exit, and a backwards clock clear the history.
 
-The existing bands control calm-wind visibility and transition history; they do not select the displayed percentage. Percentage changes refresh the reading even within the same band.
+The readout uses the windmill calculation `(int)(100 * speed)`: fractional percentages are truncated and values above 100% remain visible. These are native wind-strength percentages, not physical velocity units. It requires a living local player.
+
+The bands control calm-wind visibility and transition history; they do not select the displayed percentage. Percentage changes refresh the reading even within the same band.
 
 | Band | Entry boundary | Exit boundary |
 | --- | --- | --- |

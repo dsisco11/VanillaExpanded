@@ -13,6 +13,7 @@ namespace VanillaExpanded.WindSpeed;
 internal sealed class WindSpeedOverlay : IHudOverlay, IHudOverlayVisibilityTransition
 {
     private readonly WindSpeedPresentation presentation;
+    private readonly WindSpeedAverage average = new();
     private ICoreClientAPI? api;
     private Entity? sampledEntity;
     private bool enabled = true, disposed, styleChanged;
@@ -21,7 +22,7 @@ internal sealed class WindSpeedOverlay : IHudOverlay, IHudOverlayVisibilityTrans
     #region Lifecycle and configuration
     /// <summary>Gets the last classified wind strength, with zero representing calm or unavailable wind.</summary>
     internal int Intensity { get; private set; }
-    /// <summary>Gets the sampled whole wind percentage using the native windmill calculation.</summary>
+    /// <summary>Gets the recent-average wind percentage using the native windmill calculation.</summary>
     internal int Percentage { get; private set; }
     /// <summary>Gets the shared visibility transition used by the host.</summary>
     public HudOverlayVisibilityTransition Visibility => presentation.Visibility;
@@ -63,13 +64,15 @@ internal sealed class WindSpeedOverlay : IHudOverlay, IHudOverlayVisibilityTrans
         return applicable;
     }
 
-    /// <summary>Reads native wind magnitude and updates the percentage and visibility bands outside drawing.</summary>
+    /// <summary>Averages recent native wind magnitudes before updating the percentage and visibility outside drawing.</summary>
     public HudOverlayChange Refresh()
     {
         if (!IsApplicable()) return HudOverlayChange.None;
         var entity = api!.World.Player.Entity;
         var wind = api.World.BlockAccessor.GetWindSpeedAt(entity.Pos.XYZ);
-        double speed = wind == null ? 0 : wind.Length();
+        // Samples and transition history belong to one living player in one client world.
+        if (!ReferenceEquals(sampledEntity, entity)) average.Reset();
+        double speed = average.Update(wind == null ? double.NaN : wind.Length(), api.World.ElapsedMilliseconds);
         int percentage = WindSpeedSample.ToPercentage(speed);
         // Transition history belongs to the sampled entity, never a replacement player or a new world.
         int next = WindSpeedSample.Classify((float)speed,
@@ -107,6 +110,7 @@ internal sealed class WindSpeedOverlay : IHudOverlay, IHudOverlayVisibilityTrans
         Intensity = 0;
         Percentage = 0;
         sampledEntity = null;
+        average.Reset();
         presentation.Hide();
     }
     #endregion
@@ -117,6 +121,7 @@ internal sealed class WindSpeedOverlay : IHudOverlay, IHudOverlayVisibilityTrans
     {
         api = null;
         sampledEntity = null;
+        average.Reset();
         Intensity = 0;
         Percentage = 0;
         presentation.Reset();
