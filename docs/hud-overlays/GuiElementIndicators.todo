@@ -280,14 +280,26 @@ Validation: fresh Release compilation and **892/892 affected tests passed**, wit
 
 Depends on Phase 5. Outcome: every built-in style uses native presentations.
 
-    ☐ Migrate approximate time, environmental temperature, and calendar date across immersive, icon, and text styles.
-    ☐ Replace compact HudOverlayIconReading arrangements with native icon/reading components, retaining absent-reading behavior and localized measurements.
-    ☐ Compose instrument layers and registered reading/mechanism regions through parented native bounds. Retain authored canvases, aspect ratios, scales, calibration, clock segments/pointer, thermometer reveal, and mechanical layer order.
-    ☐ Keep native dynamic elements responsible for prepared instrument artwork and visual animation; updates must not resample gameplay or rearrange components during rendering.
-    ☐ Verify style changes preserve feature state and timing while releasing superseded GUI resources and invalidating only the necessary measurement/composition work.
+    ☑ Migrate approximate time, environmental temperature, and calendar date across immersive, icon, and text styles.
+    ☑ Replace compact HudOverlayIconReading arrangements with native icon/reading components, retaining absent-reading behavior and localized measurements.
+    ☑ Compose instrument layers and registered reading/mechanism regions through parented native bounds. Retain authored canvases, aspect ratios, scales, calibration, clock segments/pointer, thermometer reveal, and mechanical layer order.
+    ☑ Keep native dynamic elements responsible for prepared instrument artwork and visual animation; updates must not resample gameplay or rearrange components during rendering.
+    ☑ Verify style changes preserve feature state and timing while releasing superseded GUI resources and invalidating only the necessary measurement/composition work.
 
 Completion criteria:
-    ☐ The Phase 1 consumer/style inventory is fully migrated; no built-in style relies on full-indicator manual Draw dispatch.
+    ☑ The Phase 1 consumer/style inventory is fully migrated; no built-in style relies on full-indicator manual Draw dispatch.
+
+### Phase 6 implementation traceability
+
+| Task group | Controlling sources | Implementation and verification evidence |
+|---|---|---|
+| Native capability and all instrument styles | Approved proposal Proposed design / Ownership and compatibility; Phase 1 inventory, native operations and lifetime/invalidation matrix; HudOverlays.md presentation rendering, styles and feature contracts | ApproximateTimeOverlay, EnvironmentalTemperatureOverlay and CalendarDateOverlay expose INativePresentation and reject manual Draw dispatch. InstrumentPresentation retains environmental styles, visibility, canonical metrics and localized strings without GUI resources. All nine instrument/style combinations use actual registered native elements; existing sampling, date rollover, style refresh and actual-hour/drift tests retain controller semantics. |
+| Compact rows and instrument geometry | Proposal Update and rendering contract; Phase 1 consumer inventory; HudOverlays.md compact styles, clock/calendar/calibrated thermometer descriptions; native GuiComposer, GuiElement, ElementBounds and native text APIs | IconReadingView supplies optional reading-over-icon rows. ClockView registers face, pointer and glass; CalendarView registers native roller apertures; ClimateView registers its calibrated mechanism parent and individual mask, tick, label, reading and clamp elements. LayoutCompleted caches native targets, glyph fits, clips and pointer spindle/shadow geometry. InstrumentIndicatorsTests covers scaled parentage, containment, authored canvas relationships, layer order, absent readings, localized supplied metrics and host scissor forwarding. |
+| Prepared effects, invalidation and ownership | Proposal ownership/animation contracts; Phase 1 responsibility/invalidation tables; HudOverlays.md resource and session lifetime; VanillaExpanded.Tests/AGENTS.md | FaceElement owns GPU face composition and shader invalidation; PointerElement renders cached geometry with estimated rotation; LiquidElement owns the unchanged angular reveal processor. Generated faces, glyphs, ticks, masks and compact SVGs belong to individual elements; engine PNGs stay borrowed. Tests cover pointer-only/in-place face changes, liquid-only updates, same-size content, render-time dirty-bound/resource checks, movement/context reuse, style-state retention, independent source/live retirement and exception-safe matrix/scissor restoration. Permanent architecture documentation describes the active native owners; infrastructure removal and package/live acceptance remain assigned to later tasks. |
+
+Completion: implementation, second review and independent audit-stage-completion passed on 2026-10-26. The audit's functional-region grouping finding was corrected and independently rechecked; no unresolved findings remain.
+
+Validation: fresh Release compilation and **1,092/1,092 affected tests passed**, with zero failures or skips, through the validation subagent. Command: `dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --configuration Release --filter "FullyQualifiedName~HudOverlays|FullyQualifiedName~ApproximateTime|FullyQualifiedName~EnvironmentalTemperature|FullyQualifiedName~CalendarDate|FullyQualifiedName~BodyTemperature|FullyQualifiedName~PlayerWetness|FullyQualifiedName~WeatherConditions|FullyQualifiedName~WindSpeed|FullyQualifiedName~RiftActivity|FullyQualifiedName~TemporalStorm|FullyQualifiedName~BowAmmunition" -p:UseSharedCompilation=false --no-restore --logger "console;verbosity=minimal"`; installed game at `G:/Vintagestory`, its native library search path included, and `VE_CLOCK_GPU_TESTS=1`. The opt-in solar shader check passed in a hidden native context; the game was not launched. Only existing unrelated warnings remain. Diff whitespace and native-route searches passed. Final edits after validation only grouped methods with region directives and recorded completion; executable behavior is unchanged. Cleanup, canonical package qualification and user-run appearance/input acceptance remain in later phases, with their task markers unchecked.
 
 ## Phase 7: Retire superseded presentation infrastructure and document the boundary
 

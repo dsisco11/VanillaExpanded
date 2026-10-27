@@ -7,8 +7,8 @@ using Vintagestory.API.Client;
 
 namespace VanillaExpanded.CalendarDate;
 
-/// <summary>Samples the native date and owns the independent mechanical calendar indicator.</summary>
-internal sealed class CalendarDateOverlay : IHudOverlay, IHudOverlayVisibilityTransition
+/// <summary>Samples the native date and retains the independent mechanical calendar data.</summary>
+internal sealed class CalendarDateOverlay : IHudOverlay, INativePresentation, IHudOverlayVisibilityTransition
 {
     private readonly CalendarDatePresentation presentation;
     private ICoreClientAPI? api;
@@ -81,8 +81,13 @@ internal sealed class CalendarDateOverlay : IHudOverlay, IHudOverlayVisibilityTr
     }
     /// <summary>Returns the complete mechanical instrument footprint.</summary>
     public SizeF Measure() => presentation.Size;
-    /// <summary>Draws cached artwork without accessing world or calendar state.</summary>
-    public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime) => presentation.Draw(renderer, bounds);
+    /// <summary>Creates one independent native composition over the feature's prepared data.</summary>
+    public INativeView CreateView(ICoreClientAPI api, NativeViewRole role) => presentation.CreateView(api);
+    /// <summary>Has no elapsed visual effect; the estimated state advances only through scheduled sampling.</summary>
+    public void BeginFrame(float deltaTime) { }
+    /// <summary>Rejects manual dispatch because registered native components own rendering.</summary>
+    public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime) =>
+        throw new InvalidOperationException("Render this indicator through its native view.");
     /// <summary>Clears sampling state while retaining the prepared date through a fade.</summary>
     public void HidePresentation()
     {

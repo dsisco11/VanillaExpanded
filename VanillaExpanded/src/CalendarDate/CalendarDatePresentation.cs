@@ -4,103 +4,46 @@ using System.Globalization;
 using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering;
+using VanillaExpanded.HudOverlays.Rendering.Native;
 using Vintagestory.API.Client;
 
 namespace VanillaExpanded.CalendarDate;
 
-/// <summary>Composes native date characters between a blank mechanical roller housing and its glass.</summary>
-internal sealed class CalendarDatePresentation : HudIndicatorPresentation<EnvironmentalGaugeStyle>
+/// <summary>Retains sampled date lettering and dimensions while native elements own the roller artwork.</summary>
+internal sealed class CalendarDatePresentation : InstrumentPresentation
 {
-    private static readonly SizeF Canvas = new(512, 192);
-    private static readonly RectangleF[] Windows = [new(44, 34, 254, 124), new(324, 34, 144, 124)];
-    private readonly Func<HudOverlayPreparationContext, LoadedTexture[]> load;
-    private readonly WorkshopGaugeText[] characters;
-    private LoadedTexture[]? textures;
-    private CalendarDateReading? date;
-    private readonly HudOverlayIconReading compact;
-
     #region Public API
-
-    #region Content and rendering
-    /// <summary>Accepts borrowed artwork and owned text factories for headless validation.</summary>
-    public CalendarDatePresentation(Func<HudOverlayPreparationContext, LoadedTexture[]>? load = null,
-        Func<WorkshopGaugeText>? createText = null, HudOverlayIconReading? compact = null,
-        HudIndicatorTextPresentation? textStyle = null)
-        : base(EnvironmentalGaugeStyle.Immersive, EnvironmentalGaugeStyle.Text, textStyle)
+    /// <summary>Gets the authored canvas used by housing and registered apertures.</summary>
+    internal static readonly SizeF Canvas = new(512, 192);
+    /// <summary>Gets the registered month and day apertures in authored coordinates.</summary>
+    internal static readonly RectangleF[] Windows = [new(44, 34, 254, 124), new(324, 34, 144, 124)];
+    /// <summary>Gets the sampled native date.</summary>
+    internal CalendarDateReading? Date { get; private set; }
+    /// <summary>Gets prepared month lettering.</summary>
+    internal string Month { get; private set; } = string.Empty;
+    /// <summary>Gets prepared day lettering.</summary>
+    internal string Day { get; private set; } = string.Empty;
+    /// <summary>Accepts CPU metrics and independent native resource factories.</summary>
+    public CalendarDatePresentation(Func<HudOverlayPreparationContext, string, SizeF>? measure = null,
+        Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? createText = null,
+        Func<HudOverlayPreparationContext, string, TextureBinding>? load = null) : base(measure, createText, load) { }
+    /// <summary>Stores the native date without querying the world during presentation.</summary>
+    public void SetContent(CalendarDateReading value) => Date = value;
+    /// <summary>Prepares localized strings and canvas dimensions before packing.</summary>
+    public void Prepare(HudOverlayPreparationContext context)
     {
-        this.load = load ?? (preparation => WorkshopGaugeArtwork.Load(preparation, "calendar/layer-0", "calendar/layer-2"));
-        createText ??= () => new WorkshopGaugeText();
-        characters = [createText(), createText()];
-        this.compact = compact ?? new();
+        if (Date is not CalendarDateReading value) return;
+        Month = value.MonthAbbreviation(context.Locale); Day = value.Day.ToString(CultureInfo.InvariantCulture);
+        if (PrepareSimple(context, "date", Month + " " + Day, "textures/hud/calendar-date/icon.svg")) return;
+        Size = new(HudOverlaySizes.Calendar, HudOverlaySizes.Calendar * Canvas.Height / Canvas.Width); Visibility.Show();
     }
-
-
-    /// <summary>Stores sampled native date content without querying the world during drawing.</summary>
-    public void SetContent(CalendarDateReading value) => date = value;
-
-    /// <summary>Prepares localized month lettering and cached number textures before layout.</summary>
-    public void Prepare(HudOverlayPreparationContext preparation)
-    {
-        if (date is not CalendarDateReading value) return;
-        if (IsTextStyle)
-        {
-            TryPrepareText(preparation, "date", value.MonthAbbreviation(preparation.Locale) + " " + value.Day.ToString(CultureInfo.InvariantCulture));
-            return;
-        }
-        if (Style == EnvironmentalGaugeStyle.Icon)
-        {
-            compact.Prepare(preparation, "textures/hud/calendar-date/icon.svg",
-                value.MonthAbbreviation(preparation.Locale) + " " + value.Day.ToString(CultureInfo.InvariantCulture));
-            Context = preparation; Size = compact.Size; Visibility.Show();
-            return;
-        }
-        if (textures == null || !ReferenceEquals(Context?.Api, preparation.Api)) textures = load(preparation);
-        characters[0].SetContent(value.MonthAbbreviation(preparation.Locale));
-        characters[1].SetContent(value.Day.ToString(CultureInfo.InvariantCulture));
-        foreach (var text in characters) text.Prepare(preparation);
-        Context = preparation;
-        Size = new(HudOverlaySizes.Calendar, HudOverlaySizes.Calendar * Canvas.Height / Canvas.Width);
-        Visibility.Show();
-    }
-
-    /// <summary>Draws all characters inside the registered roller apertures before the glass foreground.</summary>
-    public void Draw(IRenderAPI renderer, ElementBounds bounds)
-    {
-        if (Context == null) return;
-        if (TryDrawText(renderer, bounds)) return;
-        if (Style == EnvironmentalGaugeStyle.Icon) { compact.Draw(renderer, bounds); return; }
-        if (textures == null) return;
-        float width = (float)(HudOverlaySizes.Calendar * Context.GuiScale), height = width * Canvas.Height / Canvas.Width;
-        var screen = new RectangleF((float)bounds.renderX, (float)(bounds.renderY + (bounds.OuterHeight - height) / 2), width, height);
-        renderer.RenderTexture(textures[0].TextureId, screen.X, screen.Y, width, height, 50, DrawOpacity.Tint);
-        for (int index = 0; index < characters.Length; index++)
-            characters[index].Draw(renderer, WorkshopGaugeArtwork.Map(screen, Canvas, Windows[index]), 51);
-        renderer.RenderTexture(textures[1].TextureId, screen.X, screen.Y, width, height, 52, DrawOpacity.Tint);
-    }
-
+    /// <summary>Creates composer-owned native roller windows or the selected simple style.</summary>
+    public INativeView CreateView(ICoreClientAPI api) => Style == EnvironmentalGaugeStyle.Immersive
+        ? new CalendarView(api, this, Load, CreateText) : CreateSimpleView(api);
     #endregion
-    #region Lifetime
-    /// <summary>Ends shared presentation ownership and disposes feature-owned helpers.</summary>
-    public override void Dispose()
-    {
-        base.Dispose();
-        compact.Dispose(); foreach (var text in characters) text.Dispose();
-    }
-    #endregion
-    #endregion
-
 
     #region Protected API
-    /// <summary>Releases feature artwork without changing sampled content or feature timers.</summary>
-    protected override void ReleaseArtwork()
-    {
-        compact.Reset(); foreach (var text in characters) text.Reset(); textures = null;
-    }
-
-    /// <summary>Clears feature contents after a completed exit or world change.</summary>
-    protected override void ClearContent()
-    {
-        date = null;
-    }
+    /// <summary>Clears native date data after exit or world teardown.</summary>
+    protected override void ClearContent() { Date = null; Month = Day = string.Empty; }
     #endregion
 }

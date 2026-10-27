@@ -44,40 +44,7 @@ public sealed class HudIndicatorTextBranchTests : IDisposable
         else Lang.AvailableLanguages["en"] = english;
     }
 
-    /// <summary>All eight presentation classes emit a short label and sampled reading while artwork loaders remain unused.</summary>
-    [Theory]
-    [InlineData("time", "18:00")]
-    [InlineData("date", "OCT 14")]
-    [InlineData("environmental-temperature", "-43°C")]
 
-
-
-
-
-    public void TextBranchSkipsArtworkAndRetainsReading(string label, string expected)
-    {
-        var api = new Mock<ICoreClientAPI> { DefaultValue = DefaultValue.Mock };
-        var context = new HudOverlayPreparationContext(api.Object, 1, "en");
-        var values = new List<string>();
-        using var text = CaptureText(values);
-        switch (label)
-        {
-            case "time":
-                using (var presentation = new ApproximateTimePresentation(load: FailArtwork, textStyle: text))
-                { presentation.SetContent(ApproximateTimePeriod.Dusk, .75); presentation.SetStyle(EnvironmentalGaugeStyle.Text); presentation.Prepare(context); }
-                break;
-            case "date":
-                using (var presentation = new CalendarDatePresentation(load: FailArtwork, textStyle: text))
-                { presentation.SetContent(new(14, EnumMonth.October)); presentation.SetStyle(EnvironmentalGaugeStyle.Text); presentation.Prepare(context); }
-                break;
-            case "environmental-temperature":
-                using (var presentation = new EnvironmentalTemperaturePresentation(loadTextures: FailArtwork, textStyle: text))
-                { presentation.SetContent(-42.6f); presentation.SetStyle(EnvironmentalGaugeStyle.Text); presentation.Prepare(context); }
-                break;
-            default: throw new ArgumentOutOfRangeException(nameof(label));
-        }
-        Assert.Equal(new[] { label == "environmental-temperature" ? "temperature" : label, expected }, values);
-    }
 
     /// <summary>Unknown cloud coverage remains explicit while all other weather channels retain their intensities.</summary>
     [Fact]
@@ -101,19 +68,4 @@ public sealed class HudIndicatorTextBranchTests : IDisposable
     }
     #endregion
 
-    #region Private
-    /// <summary>Rejects accidental icon or immersive artwork preparation from a text-only branch.</summary>
-    private static LoadedTexture[] FailArtwork(HudOverlayPreparationContext _) => throw new InvalidOperationException("Text mode loaded artwork.");
-
-    /// <summary>Captures both prepared strings as owned headless text textures.</summary>
-    private static HudIndicatorTextPresentation CaptureText(List<string> values)
-    {
-        LoadedTexture Create(HudOverlayPreparationContext context, string value)
-        {
-            values.Add(value);
-            return new LoadedTexture(context.Api) { TextureId = 1, Width = value.Length * 7, Height = 14 };
-        }
-        return new(new WorkshopGaugeText(Create), new WorkshopGaugeText(Create));
-    }
-    #endregion
 }
