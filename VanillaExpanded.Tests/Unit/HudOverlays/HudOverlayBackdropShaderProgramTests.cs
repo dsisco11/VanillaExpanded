@@ -86,8 +86,8 @@ public sealed class HudOverlayBackdropShaderProgramTests : IDisposable
 
     /// <summary>Every status presentation draws its shared backdrop before artwork and removes it with hidden content.</summary>
     [Theory]
-    [InlineData("temperature")]
-    [InlineData("weather")]
+
+
     [InlineData("time")]
 
     public void StatusPresentationsBorrowBackdropAndHideTogether(string kind)
@@ -112,17 +112,6 @@ public sealed class HudOverlayBackdropShaderProgramTests : IDisposable
         // Exercise the shared borrowing boundary in each production presentation, replacing only graphics services.
         switch (kind)
         {
-            case "temperature":
-                var temperature = new VanillaExpanded.BodyTemperature.BodyTemperatureThermometerPresentation(new HudOverlayIconTextPresentation(), Load, _ => backdrop.Object);
-                temperature.SetContent(new(34, 37, VanillaExpanded.BodyTemperature.BodyTemperatureRisk.Cold, .25f), false);
-                collect = () => temperature.CollectBackdrops(renderer.Object, bounds); owner = temperature; prepare = () => temperature.Prepare(context);
-                draw = () => temperature.Draw(renderer.Object, bounds, System.Drawing.RectangleF.Empty, 0); reset = temperature.Reset;
-                break;
-            case "weather":
-                var weather = new VanillaExpanded.WeatherConditions.WeatherConditionsPresentation(Load, _ => backdrop.Object);
-                weather.SetContent(new(Vintagestory.GameContent.EnumPrecipitationType.Rain, false));
-                collect = () => weather.CollectBackdrops(renderer.Object, bounds); owner = weather; prepare = () => weather.Prepare(context); draw = () => weather.Draw(renderer.Object, bounds); reset = weather.Reset;
-                break;
             case "time":
                 var time = new VanillaExpanded.ApproximateTime.ApproximateTimePresentation(Load, new Mock<VanillaExpanded.ApproximateTime.IApproximateTimeDialRenderer>().Object, (preparation, _) => new LoadedTexture(preparation.Api) { TextureId = 20 });
                 time.SetContent(VanillaExpanded.ApproximateTime.ApproximateTimePeriod.Noon, .5);

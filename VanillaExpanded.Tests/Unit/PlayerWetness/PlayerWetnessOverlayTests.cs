@@ -48,110 +48,26 @@ public sealed class PlayerWetnessOverlayTests : IDisposable
         Assert.Equal(raw, fixture.Entity.WatchedAttributes.GetFloat("wetness"));
     }
 
-    /// <summary>Fill-only updates reuse artwork; drying, disabling, and world exit release bindings without reading gameplay during draw.</summary>
+    /// <summary>Drying, disabling and world exit clear eligibility and prepared dimensions.</summary>
     [Fact]
     public void FillUpdatesReuseArtworkAndDryingCollapses()
     {
         var fixture = CreateFixture();
-        int builds = 0;
-        var artwork = new List<LoadedTexture>();
-        using var presentation = new PlayerWetnessPresentation(context =>
-        {
-            builds++;
-            var textures = new[] { new LoadedTexture(context.Api) { TextureId = 1 }, new LoadedTexture(context.Api) { TextureId = 2 } };
-            artwork.AddRange(textures); return textures;
-        }, _ => null, CreateText());
-        using var overlay = new PlayerWetnessOverlay(presentation);
-        overlay.BeginSession(fixture.Api.Object);
-        var preparation = new HudOverlayPreparationContext(fixture.Api.Object, 1, "en");
-        fixture.Entity.WatchedAttributes.SetFloat("wetness", .25f);
-        overlay.Refresh(); overlay.Prepare(preparation);
-        Assert.NotEqual(SizeF.Empty, overlay.Measure());
-        fixture.Entity.WatchedAttributes.SetFloat("wetness", .75f);
-        overlay.Refresh(); overlay.Prepare(preparation);
-        Assert.Equal(1, builds);
-        fixture.World.Invocations.Clear(); fixture.Player.Invocations.Clear();
-        var renderer = new Mock<IRenderAPI>();
-        var bounds = Bounds();
-        overlay.Draw(renderer.Object, bounds, new RectangleF(0, 0, 1000, 1000), 0);
-        Assert.Empty(fixture.World.Invocations); Assert.Empty(fixture.Player.Invocations);
-        Assert.Equal(4, renderer.Invocations.Count(call => call.Method.Name == "Render2DTexture"));
-        fixture.Entity.WatchedAttributes.SetFloat("wetness", 0);
-        overlay.Refresh();
-        Assert.Equal(SizeF.Empty, overlay.Measure()); Assert.All(artwork, texture => Assert.NotEqual(0, texture.TextureId));
-        fixture.Entity.WatchedAttributes.SetFloat("wetness", 1);
-        overlay.Refresh(); overlay.Prepare(preparation); overlay.SetEnabled(false);
-        Assert.Null(overlay.Wetness); Assert.Equal(SizeF.Empty, overlay.Measure());
-        overlay.SetEnabled(true); overlay.Refresh(); overlay.Prepare(preparation); overlay.EndSession();
-        Assert.Null(overlay.Wetness); Assert.All(artwork, texture => Assert.NotEqual(0, texture.TextureId));
+        using var presentation = new PlayerWetnessPresentation(measure: (_, _) => new(30, 14), loadBackdrop: _ => null);
+        using var overlay = new PlayerWetnessOverlay(presentation); overlay.BeginSession(fixture.Api.Object);
+        var context = new HudOverlayPreparationContext(fixture.Api.Object, 1, "en");
+        fixture.Entity.WatchedAttributes.SetFloat("wetness", .25f); overlay.Refresh(); overlay.Prepare(context);
+        Assert.False(overlay.Measure().IsEmpty);
+        fixture.Entity.WatchedAttributes.SetFloat("wetness", .75f); overlay.Refresh(); overlay.Prepare(context);
+        Assert.Equal("75%", presentation.Reading);
+        fixture.Entity.WatchedAttributes.SetFloat("wetness", 0); overlay.Refresh(); Assert.True(overlay.Measure().IsEmpty);
+        fixture.Entity.WatchedAttributes.SetFloat("wetness", 1); overlay.Refresh(); overlay.Prepare(context); overlay.SetEnabled(false);
+        Assert.Null(overlay.Wetness); Assert.True(overlay.Measure().IsEmpty);
+        overlay.SetEnabled(true); overlay.Refresh(); overlay.Prepare(context); overlay.EndSession(); Assert.Null(overlay.Wetness);
     }
 
-    /// <summary>Both silhouettes remain fully drawn at every wetness while the numeric percentage changes.</summary>
-    [Theory]
-    [InlineData(.01f, "1%")] [InlineData(.5f, "50%")] [InlineData(1, "100%")]
-    public void FullDropsRemainIdenticalAcrossWetness(float wetness, string expectedReading)
-    {
-        var api = new Mock<ICoreClientAPI>() { DefaultValue = DefaultValue.Mock };
-        string? reading = null;
-        using var text = new HudOverlayIconTextPresentation((context, value) =>
-        {
-            reading = value;
-            return new LoadedTexture(context.Api) { TextureId = 3, Width = 30, Height = 14 };
-        });
-        using var presentation = new PlayerWetnessPresentation(context =>
-            [new LoadedTexture(context.Api) { TextureId = 1 }, new LoadedTexture(context.Api) { TextureId = 2 }], _ => null, text);
-        presentation.SetContent(wetness); presentation.Prepare(new(api.Object, 1, "en"));
-        var renderer = new Mock<IRenderAPI>();
-        presentation.Draw(renderer.Object, Bounds(), new RectangleF(0, 0, 36, 36));
-        Assert.Equal(expectedReading, reading);
-        var draws = renderer.Invocations.Where(call => call.Method.Name == "Render2DTexture").ToArray();
-        Assert.Equal(new[] { 2, 1, 2, 1 }, draws.Select(call => (int)call.Arguments[0]));
-        // Full mask and outline share each drop's rectangle; the host alone owns scissor state.
-        for (int index = 0; index < draws.Length; index++)
-        {
-            var pair = draws[index / 2 * 2];
-            Assert.Equal(pair.Arguments.Skip(1).Take(4), draws[index].Arguments.Skip(1).Take(4));
-        }
-        renderer.Verify(value => value.PushScissor(It.IsAny<ElementBounds>(), It.IsAny<bool>()), Times.Never);
-        renderer.Verify(value => value.PopScissor(), Times.Never);
-    }
-    /// <summary>Whole percentages reuse text until they change, render above both drops, and release on reset.</summary>
-    [Fact]
-    public void PercentageIsCachedCenteredAboveDropsAndReleased()
-    {
-        var api = new Mock<ICoreClientAPI>() { DefaultValue = DefaultValue.Mock };
-        var readings = new List<string>();
-        var renderedText = new List<LoadedTexture>();
-        using var text = new HudOverlayIconTextPresentation((context, value) =>
-        {
-            readings.Add(value);
-            var texture = new LoadedTexture(context.Api) { TextureId = 30 + readings.Count, Width = 30, Height = 14 };
-            renderedText.Add(texture);
-            return texture;
-        });
-        using var presentation = new PlayerWetnessPresentation(context =>
-            [new LoadedTexture(context.Api) { TextureId = 1 }, new LoadedTexture(context.Api) { TextureId = 2 }], _ => null, text);
-        var preparation = new HudOverlayPreparationContext(api.Object, 1, "en");
-        presentation.SetContent(.251f); presentation.Prepare(preparation);
-        presentation.SetContent(.254f); presentation.Prepare(preparation);
-        Assert.Equal(new[] { "25%" }, readings);
-        presentation.SetContent(.26f); presentation.Prepare(preparation);
-        Assert.Equal(new[] { "25%", "26%" }, readings);
-        Assert.Equal(0, renderedText[0].TextureId);
-        var renderer = new Mock<IRenderAPI>();
-        var bounds = Bounds();
-        presentation.Draw(renderer.Object, bounds, new RectangleF(0, 0, (float)bounds.OuterWidth, (float)bounds.OuterHeight));
-        var reading = Assert.Single(renderer.Invocations, call => call.Method.Name == "Render2DTexturePremultipliedAlpha");
-        double x = (double)reading.Arguments[1], y = (double)reading.Arguments[2];
-        double width = (double)reading.Arguments[3], height = (double)reading.Arguments[4];
-        Assert.Equal(bounds.renderX + bounds.OuterWidth / 2, x + width / 2, 5);
-        var dropTop = renderer.Invocations.Where(call => call.Method.Name == "Render2DTexture")
-            .Min(call => (float)call.Arguments[2]);
-        Assert.True(y >= bounds.renderY && y + height <= dropTop);
-        presentation.Reset();
-        Assert.Equal(0, renderedText[1].TextureId);
-        Assert.Equal(SizeF.Empty, presentation.Size);
-    }
+
+
     /// <summary>Creative, spectator, and dead players release wetness state.</summary>
     [Theory]
     [InlineData(EnumGameMode.Creative)] [InlineData(EnumGameMode.Spectator)]
@@ -167,28 +83,10 @@ public sealed class PlayerWetnessOverlayTests : IDisposable
         Assert.False(overlay.IsApplicable());
     }
 
-    /// <summary>PNG layers load from the engine cache without transferring texture ownership.</summary>
-    [Fact]
-    public void DropletLayersLoadTextureAssetsWithoutOwningCacheStorage()
-    {
-        var api = new Mock<ICoreClientAPI>();
-        var renderer = new Mock<IRenderAPI>();
-        api.SetupGet(value => value.Render).Returns(renderer.Object);
-        var paths = new List<string>();
-        renderer.Setup(value => value.GetOrLoadTexture(It.IsAny<AssetLocation>(), ref It.Ref<LoadedTexture>.IsAny))
-            .Callback(new TextureLoad((AssetLocation location, ref LoadedTexture texture) => paths.Add(location.ToString())));
-        var textures = PlayerWetnessIconTextures.Create(new(api.Object, 1, "en"));
-        Assert.Equal(new[] { "vanillaexpanded:textures/hud/player-wetness/outline.png",
-            "vanillaexpanded:textures/hud/player-wetness/fill-mask.png" }, paths);
-        Assert.All(textures, texture => Assert.True(texture.IgnoreUndisposed));
-        api.Verify(value => value.Gui, Times.Never);
-    }
+
     #endregion
 
     #region Private
-    /// <summary>Supplies owned text pixels without invoking native font rendering.</summary>
-    private static HudOverlayIconTextPresentation CreateText() => new((context, _) =>
-        new LoadedTexture(context.Api) { TextureId = 3, Width = 30, Height = 14 });
     /// <summary>Supplies a living survival player with mutable native game-mode metadata.</summary>
     private static BowAmmunitionSamplerTests.Fixture CreateFixture()
     {
@@ -199,14 +97,5 @@ public sealed class PlayerWetnessOverlayTests : IDisposable
         fixture.Entity.Alive = true;
         return fixture;
     }
-    /// <summary>Supplies absolute pixel bounds without depending on the engine's global GUI scale.</summary>
-    private static ElementBounds Bounds()
-    {
-        var bounds = ElementBounds.Fixed(0, 0, 36, 36).WithEmptyParent();
-        bounds.absFixedX = 0; bounds.absFixedY = 0; bounds.absInnerWidth = 36; bounds.absInnerHeight = 36; bounds.Initialized = true;
-        return bounds;
-    }
-    /// <summary>Matches the engine cached-texture load boundary.</summary>
-    private delegate void TextureLoad(AssetLocation location, ref LoadedTexture texture);
     #endregion
 }

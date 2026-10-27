@@ -9,7 +9,7 @@ using Vintagestory.API.Common;
 namespace VanillaExpanded.PlayerWetness;
 
 /// <summary>Samples synchronized player wetness without changing the native temperature simulation.</summary>
-internal sealed class PlayerWetnessOverlay : IHudOverlay, IHudOverlayBackdropProvider, IHudOverlayVisibilityTransition
+internal sealed class PlayerWetnessOverlay : IHudOverlay, INativePresentation, IHudOverlayVisibilityTransition
 {
     private readonly PlayerWetnessPresentation presentation;
     private ICoreClientAPI? api;
@@ -71,6 +71,11 @@ internal sealed class PlayerWetnessOverlay : IHudOverlay, IHudOverlayBackdropPro
     }
     #endregion
     #region Presentation
+    /// <summary>Creates independent native visuals without sampling or subscribing.</summary>
+    public INativeView CreateView(ICoreClientAPI api, NativeViewRole role) => presentation.CreateView(api);
+    /// <summary>This indicator has no shared per-frame visual effect.</summary>
+    public void BeginFrame(float deltaTime) { }
+
     /// <summary>Prepares only sampled nonzero wetness outside the draw path.</summary>
     public void Prepare(HudOverlayPreparationContext context)
     {
@@ -78,10 +83,11 @@ internal sealed class PlayerWetnessOverlay : IHudOverlay, IHudOverlayBackdropPro
     }
     /// <summary>Reports the prepared droplet footprint.</summary>
     public SizeF Measure() => presentation.Size;
-    /// <summary>Draws cached layers without accessing gameplay state.</summary>
-    public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime) => presentation.Draw(renderer, bounds, clip);
-    /// <summary>Supplies the cached backdrop to the shared batch.</summary>
-    public void CollectBackdrops(IRenderAPI renderer, ElementBounds bounds) => presentation.CollectBackdrops(renderer, bounds);
+    /// <summary>Requires foreground rendering through the registered native components.</summary>
+    public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime)
+    {
+        throw new InvalidOperationException("Native indicator components render through their composer.");
+    }
     /// <summary>Clears sampled eligibility while retaining artwork for an exit.</summary>
     public void HidePresentation()
     {
@@ -90,7 +96,7 @@ internal sealed class PlayerWetnessOverlay : IHudOverlay, IHudOverlayBackdropPro
     }
     #endregion
     #region Cleanup
-    /// <summary>Releases borrowed world state and artwork bindings immediately.</summary>
+    /// <summary>Clears borrowed world state and prepared presentation data immediately.</summary>
     public void EndSession()
     {
         api = null; Wetness = null; presentation.Reset();
@@ -106,4 +112,3 @@ internal sealed class PlayerWetnessOverlay : IHudOverlay, IHudOverlayBackdropPro
     #endregion
     #endregion
 }
-

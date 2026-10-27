@@ -23,7 +23,8 @@ public sealed class BodyTemperatureOverlayTests : IDisposable
     public BodyTemperatureOverlayTests()
     {
         var service = new Mock<Vintagestory.API.Config.ITranslationService>();
-        service.Setup(value => value.Get(It.IsAny<string>(), It.IsAny<object[]>())).Returns((string key, object[] arguments) => key);
+        service.Setup(value => value.Get(It.IsAny<string>(), It.IsAny<object[]>()))
+            .Returns((string key, object[] arguments) => arguments.Length > 0 ? arguments[0] + "°C" : key);
         Vintagestory.API.Config.Lang.AvailableLanguages["en"] = service.Object;
     }
     /// <summary>Restores borrowed global language state after each test.</summary>
@@ -58,62 +59,30 @@ public sealed class BodyTemperatureOverlayTests : IDisposable
         }
     }
 
-    /// <summary>Sampling changes only when displayed state changes and releases warnings on recovery, death, or disable.</summary>
+    /// <summary>Sampling preserves prepared data until synchronized changes, recovery, death or disable.</summary>
     [Fact]
     public void SamplesSynchronizedStateAndCachesPreparedText()
     {
         var fixture = CreateFixture();
-        int builds = 0;
-        var textures = new List<LoadedTexture>();
-        var presentation = new HudOverlayIconTextPresentation((context, _) =>
-        {
-            builds++;
-            var texture = new LoadedTexture(context.Api) { Width = 90, Height = 18 };
-            textures.Add(texture);
-            return texture;
-        });
-        using var overlay = new BodyTemperatureOverlay(presentation, CreateIcons);
+        using var presentation = new BodyTemperatureThermometerPresentation(measure: (_, _) => new(90, 18), loadBackdrop: _ => null);
+        using var overlay = new BodyTemperatureOverlay(presentation);
         overlay.BeginSession(fixture.Api.Object);
-        Assert.Equal(HudOverlayChange.None, overlay.Refresh());
-        Assert.Equal(SizeF.Empty, overlay.Measure());
-        SetTemperature(fixture, 34);
-        Assert.NotEqual(HudOverlayChange.None, overlay.Refresh());
-        var preparation = new HudOverlayPreparationContext(fixture.Api.Object, 1, "en");
-        overlay.Prepare(preparation);
-        Assert.Equal(1, builds);
-        Assert.NotEqual(SizeF.Empty, overlay.Measure());
-        SetTemperature(fixture, 34.01f);
-        Assert.NotEqual(HudOverlayChange.None, overlay.Refresh());
-        overlay.Prepare(preparation);
-        Assert.Equal(1, builds);
-        // Drawing uses the snapshot even if synchronized gameplay changes before the next refresh.
-        SetTemperature(fixture, 32);
-        var bounds = ElementBounds.Fixed(0, 0, 90, 18).WithEmptyParent();
-        bounds.CalcWorldBounds();
-        overlay.Draw(new Mock<IRenderAPI>().Object, bounds, new RectangleF(0, 0, 90, 18), .1f);
-        Assert.False(overlay.Sample!.Dangerous);
-        overlay.Refresh();
-        Assert.True(overlay.Sample!.Dangerous);
-        overlay.Prepare(preparation);
-        Assert.Equal(2, builds);
-        Assert.True(textures[0].Disposed);
-        SetTemperature(fixture, 35.25f);
-        overlay.Refresh();
-        Assert.Null(overlay.Sample);
-        Assert.True(textures[1].Disposed);
-        Assert.Equal(SizeF.Empty, overlay.Measure());
-        SetTemperature(fixture, 32);
-        overlay.Refresh();
-        overlay.SetEnabled(false);
-        Assert.Null(overlay.Sample);
-        Assert.False(overlay.IsApplicable());
-        overlay.SetEnabled(true);
-        overlay.Refresh();
-        fixture.Entity.Alive = false;
-        Assert.False(overlay.IsApplicable());
-        Assert.Null(overlay.Sample);
-        overlay.EndSession();
-        overlay.EndSession();
+        Assert.Equal(HudOverlayChange.None, overlay.Refresh()); Assert.True(overlay.Measure().IsEmpty);
+        SetTemperature(fixture, 34); overlay.Refresh();
+        var context = new HudOverlayPreparationContext(fixture.Api.Object, 1, "en");
+        overlay.Prepare(context); Assert.False(overlay.Measure().IsEmpty);
+        string before = presentation.Reading;
+        SetTemperature(fixture, 34.01f); overlay.Refresh(); overlay.Prepare(context);
+        Assert.Equal(before, presentation.Reading);
+        SetTemperature(fixture, 32); Assert.False(overlay.Sample!.Dangerous);
+        overlay.Refresh(); Assert.True(overlay.Sample!.Dangerous);
+        overlay.Prepare(context); Assert.NotEqual(before, presentation.Reading);
+        SetTemperature(fixture, 35.25f); overlay.Refresh(); Assert.Null(overlay.Sample); Assert.True(overlay.Measure().IsEmpty);
+        SetTemperature(fixture, 32); overlay.Refresh(); overlay.SetEnabled(false);
+        Assert.Null(overlay.Sample); Assert.False(overlay.IsApplicable());
+        overlay.SetEnabled(true); overlay.Refresh(); fixture.Entity.Alive = false;
+        Assert.False(overlay.IsApplicable()); Assert.Null(overlay.Sample);
+        overlay.EndSession(); overlay.EndSession();
     }
 
     /// <summary>Ordinary warming to the native simulation ceiling clears rather than showing a red warning.</summary>
@@ -193,8 +162,8 @@ public sealed class BodyTemperatureOverlayTests : IDisposable
     public void ExemptGameModesClearPreparedWarning(EnumGameMode mode)
     {
         var fixture = CreateFixture();
-        var texture = new LoadedTexture(fixture.Api.Object) { Width = 90, Height = 18 };
-        using var overlay = new BodyTemperatureOverlay(new HudOverlayIconTextPresentation((_, _) => texture), CreateIcons);
+
+        using var overlay = new BodyTemperatureOverlay(new BodyTemperatureThermometerPresentation(measure: (_, _) => new(90, 18), loadBackdrop: _ => null));
         overlay.BeginSession(fixture.Api.Object);
         SetTemperature(fixture, 32);
         overlay.Refresh();
@@ -205,7 +174,7 @@ public sealed class BodyTemperatureOverlayTests : IDisposable
         fixture.Player.SetupGet(value => value.WorldData).Returns(worldData.Object);
         Assert.False(overlay.IsApplicable());
         Assert.Null(overlay.Sample);
-        Assert.True(texture.Disposed);
+
         Assert.Equal(SizeF.Empty, overlay.Measure());
         Assert.Equal(HudOverlayChange.None, overlay.Refresh());
     }
@@ -242,63 +211,35 @@ public sealed class BodyTemperatureOverlayTests : IDisposable
         overlay.Refresh(); Assert.Null(overlay.Sample);
     }
 
-    /// <summary>The optional reading releases text while preserving thermometer artwork and updates layout live.</summary>
+    /// <summary>The optional reading changes canonical measurement without resampling temperature.</summary>
     [Fact]
     public void ReadingPreferenceChangesMeasurementWithoutRebuildingArtwork()
     {
-        var fixture = CreateFixture(); int artBuilds = 0, textBuilds = 0;
-        var ownedText = new List<LoadedTexture>();
-        var text = new HudOverlayIconTextPresentation((context, _) =>
-        {
-            textBuilds++; var texture = new LoadedTexture(context.Api) { Width = 28, Height = 18 };
-            ownedText.Add(texture); return texture;
-        });
-        using var overlay = new BodyTemperatureOverlay(text, context => { artBuilds++; return CreateIcons(context); });
+        var fixture = CreateFixture();
+        using var overlay = new BodyTemperatureOverlay(new BodyTemperatureThermometerPresentation(measure: (_, _) => new(28, 18), loadBackdrop: _ => null));
         overlay.BeginSession(fixture.Api.Object); SetTemperature(fixture, 34); overlay.Refresh();
         var context = new HudOverlayPreparationContext(fixture.Api.Object, 1, "en"); overlay.Prepare(context);
         var withReading = overlay.Measure();
-        Assert.NotEqual(SizeF.Empty, withReading);
-        var bounds = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
-        bounds.absFixedX = 100; bounds.absFixedY = 200;
-        bounds.absInnerWidth = withReading.Width; bounds.absInnerHeight = withReading.Height; bounds.Initialized = true;
-        var renderer = new Mock<IRenderAPI>(); overlay.Draw(renderer.Object, bounds, new RectangleF(0, 0, 1000, 1000), .1f);
-        var calls = renderer.Invocations.Where(call => call.Method.Name == "Render2DTexturePremultipliedAlpha" || call.Method.Name == "RenderTexture" && (float)call.Arguments[5] != 49).ToArray();
-        Assert.Equal(3, calls.Length);
-        Assert.True((double)calls[2].Arguments[1] >= bounds.renderX);
-        Assert.Equal(new[] { "PushScissor", "RenderTexture", "PopScissor", "RenderTexture", "Render2DTexturePremultipliedAlpha" }, renderer.Invocations.Where(call => call.Method.Name != "RenderTexture" || (float)call.Arguments[5] != 49).Select(call => call.Method.Name));
         overlay.SetShowReading(false); Assert.NotEqual(HudOverlayChange.None, overlay.Refresh()); overlay.Prepare(context);
-        Assert.True(overlay.Measure().Height < withReading.Height); Assert.True(ownedText[0].Disposed);
-        Assert.Equal(1, artBuilds); Assert.Equal(1, textBuilds);
+        Assert.True(overlay.Measure().Height < withReading.Height);
         overlay.SetShowReading(true); overlay.Refresh(); overlay.Prepare(context);
-        Assert.Equal(1, artBuilds); Assert.Equal(2, textBuilds); Assert.Equal(withReading, overlay.Measure());
+        Assert.Equal(withReading, overlay.Measure());
     }
 
-    /// <summary>Strength-only changes reuse text and art, while zero clears native cold immediately.</summary>
+    /// <summary>Native strength changes update the warning, while zero clears cold immediately.</summary>
     [Fact]
     public void NativeStrengthChangesReuseResourcesAndClearColdAtZero()
     {
-        var fixture = CreateFixture(); int textBuilds = 0, iconBuilds = 0;
-        var layers = new List<LoadedTexture>();
-        using var overlay = new BodyTemperatureOverlay(new HudOverlayIconTextPresentation((context, _) =>
-        {
-            textBuilds++; return new LoadedTexture(context.Api) { Width = 28, Height = 18 };
-        }), context => { iconBuilds++; var result = CreateIcons(context); layers.AddRange(result); return result; });
+        var fixture = CreateFixture();
+        using var overlay = new BodyTemperatureOverlay();
         overlay.BeginSession(fixture.Api.Object);
         SetTemperature(fixture, 32, 0); overlay.Refresh(); Assert.Null(overlay.Sample);
         fixture.Entity.WatchedAttributes.RemoveAttribute("freezingEffectStrength");
         overlay.Refresh(); Assert.Null(overlay.Sample);
         SetTemperature(fixture, 37, .25f); overlay.Refresh(); Assert.NotNull(overlay.Sample);
-        var context = new HudOverlayPreparationContext(fixture.Api.Object, 1, "en"); overlay.Prepare(context);
-        var bounds = ElementBounds.Fixed(0, 0, 45, 24).WithEmptyParent(); bounds.CalcWorldBounds();
-        var renderer = new Mock<IRenderAPI>();
-        overlay.Draw(renderer.Object, bounds, new RectangleF(0, 0, 100, 100), .1f);
-        SetTemperature(fixture, 37, .75f);
-        Assert.NotEqual(HudOverlayChange.None, overlay.Refresh()); overlay.Prepare(context);
-        Assert.Equal(1, textBuilds); Assert.Equal(1, iconBuilds);
-        renderer.Invocations.Clear(); overlay.Draw(renderer.Object, bounds, new RectangleF(0, 0, 100, 100), .1f);
-        Assert.Equal(37, overlay.Sample!.DisplayCelsius);
-        SetTemperature(fixture, 32, 0); overlay.Refresh(); Assert.Null(overlay.Sample);
-        Assert.Equal(2, layers.Count); Assert.Equal(SizeF.Empty, overlay.Measure());
+        SetTemperature(fixture, 37, .75f); Assert.NotEqual(HudOverlayChange.None, overlay.Refresh());
+        Assert.Equal(37, overlay.Sample!.DisplayCelsius); Assert.True(overlay.Sample.Dangerous);
+        SetTemperature(fixture, 32, 0); overlay.Refresh(); Assert.Null(overlay.Sample); Assert.True(overlay.Measure().IsEmpty);
         SetTemperature(fixture, 97, 0); overlay.Refresh(); Assert.Equal(BodyTemperatureRisk.Hot, overlay.Sample!.Risk);
     }
 
@@ -306,9 +247,6 @@ public sealed class BodyTemperatureOverlayTests : IDisposable
     #endregion
 
     #region Private
-    /// <summary>Supplies owned texture layers without opening a graphics context.</summary>
-    private static LoadedTexture[] CreateIcons(HudOverlayPreparationContext context) =>
-        [new(context.Api) { TextureId = 1, IgnoreUndisposed = true }, new(context.Api) { TextureId = 2, IgnoreUndisposed = true }];
     /// <summary>Attaches the native temperature behavior without running the game's server simulation.</summary>
     private static BowAmmunitionSamplerTests.Fixture CreateFixture()
     {

@@ -14,6 +14,7 @@ internal sealed class TextureElement : GuiElement
     private TextureBinding? binding;
     private string? path;
     private bool disposed;
+    private readonly bool guiTexture;
 
     #region Public API
     /// <summary>Gets cached clipping, geometry and opacity.</summary>
@@ -21,9 +22,10 @@ internal sealed class TextureElement : GuiElement
     #region Preparation
     /// <summary>Creates a passive component with explicit asset ownership and failure isolation.</summary>
     public TextureElement(ICoreClientAPI api, ElementBounds bounds, Action<Exception> failure,
-        Func<HudOverlayPreparationContext, string, TextureBinding>? load = null) : base(api, bounds)
+        Func<HudOverlayPreparationContext, string, TextureBinding>? load = null, bool guiTexture = false) : base(api, bounds)
     {
         this.load = load ?? LoadTexture;
+        this.guiTexture = guiTexture;
         State = new(failure); draw = DrawTexture;
     }
     /// <summary>Loads only changed artwork; scale and movement reuse the prepared asset.</summary>
@@ -68,7 +70,8 @@ internal sealed class TextureElement : GuiElement
     private void DrawTexture()
     {
         var target = State.Target;
-        api.Render.RenderTexture(binding!.Value.Texture.TextureId, target.X, target.Y, target.Width, target.Height, 50, State.Tint(false));
+        if (guiTexture) api.Render.Render2DTexture(binding!.Value.Texture.TextureId, target.X, target.Y, target.Width, target.Height, 50, State.Tint(false));
+        else api.Render.RenderTexture(binding!.Value.Texture.TextureId, target.X, target.Y, target.Width, target.Height, 50, State.Tint(false));
     }
     /// <summary>Rasterizes owned SVGs or borrows engine-cached PNGs with the existing sampling policy.</summary>
     private static TextureBinding LoadTexture(HudOverlayPreparationContext context, string path)

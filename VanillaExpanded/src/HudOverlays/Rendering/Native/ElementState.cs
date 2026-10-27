@@ -11,6 +11,7 @@ internal sealed class ElementState
     private readonly ElementBounds scissor = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
     private readonly Vec4f straight = new(1, 1, 1, 1), premultiplied = new(1, 1, 1, 1);
     private bool clipped;
+    private bool colored;
 
     #region Public API
     /// <summary>Gets the resolved target; rendering never derives component geometry.</summary>
@@ -21,6 +22,7 @@ internal sealed class ElementState
     public bool Drawable => clipped && Opacity > 0 && Target.Width > 0 && Target.Height > 0;
     /// <summary>Receives a component failure without interrupting sibling rendering.</summary>
     public Action<Exception> Failure { get; set; }
+    #region Preparation
     /// <summary>Creates an explicit feature or host error boundary.</summary>
     public ElementState(Action<Exception> failure)
     {
@@ -43,10 +45,19 @@ internal sealed class ElementState
         if (!float.IsFinite(value) || value < 0 || value > 1) throw new ArgumentOutOfRangeException(nameof(value));
         Opacity = value;
         straight.W = value;
-        premultiplied.X = premultiplied.Y = premultiplied.Z = premultiplied.W = value;
+        premultiplied.Set(straight.X * value, straight.Y * value, straight.Z * value, value);
     }
+    /// <summary>Updates prepared artwork color independently of the host fade.</summary>
+    public void SetColor(float red, float green, float blue)
+    {
+        straight.X = red; straight.Y = green; straight.Z = blue;
+        colored = red != 1 || green != 1 || blue != 1;
+        premultiplied.Set(red * Opacity, green * Opacity, blue * Opacity, Opacity);
+    }
+    #endregion
+    #region Rendering
     /// <summary>Returns the cached tint appropriate for the texture's alpha convention.</summary>
-    public Vec4f? Tint(bool isPremultiplied) => Opacity == 1 ? null : isPremultiplied ? premultiplied : straight;
+    public Vec4f? Tint(bool isPremultiplied) => Opacity == 1 && !colored ? null : isPremultiplied ? premultiplied : straight;
     /// <summary>Draws through an intersecting, exception-safe scissor without arranging content.</summary>
     public void Render(IRenderAPI renderer, Action draw)
     {
@@ -59,6 +70,7 @@ internal sealed class ElementState
         }
         catch (Exception error) { Failure(error); }
     }
+    #endregion
     #endregion
 
     #region Private

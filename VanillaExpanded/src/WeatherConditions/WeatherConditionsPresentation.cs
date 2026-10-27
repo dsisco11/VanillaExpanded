@@ -3,146 +3,97 @@ using System.Drawing;
 using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering;
+using VanillaExpanded.HudOverlays.Rendering.Native;
 using Vintagestory.API.Client;
-using Vintagestory.API.Common;
+using AssetLocation = Vintagestory.API.Common.AssetLocation;
 using Vintagestory.GameContent;
 
 namespace VanillaExpanded.WeatherConditions;
 
-/// <summary>Composes borrowed weather layers into one fixed HUD footprint with one shared backdrop.</summary>
-internal sealed class WeatherConditionsPresentation : HudIndicatorPresentation<HudIndicatorStyle>
+/// <summary>Prepares independent weather layer identities and metrics without owning GUI textures.</summary>
+internal sealed class WeatherConditionsPresentation : IndicatorPresentation
 {
-    private const float Diameter = HudOverlaySizes.Standard;
-    private readonly System.Func<HudOverlayPreparationContext, LoadedTexture[]> load;
-    private readonly System.Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?> loadBackdrop;
-    private LoadedTexture[]? icons;
-    private IHudOverlayIconBackdrop? backdrop;
     private WeatherConditionsSample? sample;
-    private int[] layers = [];
+    private ICoreClientAPI? packApi;
+    private bool? complete;
+    private readonly Func<HudOverlayPreparationContext, bool> hasCompletePack;
+    private readonly Func<HudOverlayPreparationContext, string, TextureBinding>? load;
+    private readonly Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?> loadBackdrop;
+
     #region Public API
-    #region Content and rendering
-    /// <summary>Uses native cached assets, with an injectable loader for headless lifecycle checks.</summary>
-    public WeatherConditionsPresentation(System.Func<HudOverlayPreparationContext, LoadedTexture[]>? load = null,
-        System.Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null,
-        HudIndicatorTextPresentation? textStyle = null)
-        : base(HudIndicatorStyle.Icon, HudIndicatorStyle.Text, textStyle)
+    /// <summary>Gets the selected ordered layers with local GUI-unit geometry.</summary>
+    public WeatherLayer[] Layers { get; private set; } = [];
+    /// <summary>Gets the borrowed procedural circle service.</summary>
+    public IHudOverlayIconBackdrop? Backdrop { get; private set; }
+    /// <summary>Accepts CPU measurements, pack availability and per-element resource boundaries.</summary>
+    public WeatherConditionsPresentation(Func<HudOverlayPreparationContext, string, SizeF>? measure = null,
+        Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? createText = null,
+        Func<HudOverlayPreparationContext, string, TextureBinding>? load = null,
+        Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null,
+        Func<HudOverlayPreparationContext, bool>? hasCompletePack = null) : base(measure: measure, createText: createText)
     {
-        this.load = load ?? LoadIcons;
-        this.loadBackdrop = loadBackdrop ?? HudOverlayIconBackdrop.Load;
+        this.load = load; this.loadBackdrop = loadBackdrop ?? HudOverlayIconBackdrop.Load;
+        this.hasCompletePack = hasCompletePack ?? CompletePack;
     }
-    /// <summary>Stores the immutable visible conditions for the next preparation.</summary>
-    public void SetContent(WeatherConditionsSample value)
-    {
-        sample = value;
-        layers = WeatherConditionsLayers.Select(value);
-    }
-    /// <summary>Loads artwork once per API binding and measures active icons in unscaled GUI units.</summary>
-    public void Prepare(HudOverlayPreparationContext preparation)
+    /// <summary>Retains immutable sampled weather channels independently of native elements.</summary>
+    public void SetContent(WeatherConditionsSample value) => sample = value;
+    /// <summary>Selects a complete composite or the precipitation/fog fallback before native composition.</summary>
+    public void Prepare(HudOverlayPreparationContext context)
     {
         if (sample == null) return;
-        // An empty update can still cross API ownership; discard old cache bindings before deferring the loads.
-        if (!ReferenceEquals(Context?.Api, preparation.Api))
+        bool hasData = sample.Precipitation.HasValue || sample.Fog || sample.CloudCoverage.HasValue || sample.ThunderIntensity > 0;
+        if (Style == HudIndicatorStyle.Text)
         {
-            icons = null;
-            backdrop = null;
-        }
-        bool hasData = sample.Precipitation.HasValue || sample.Fog || sample.CloudCoverage.HasValue
-            || sample.ThunderIntensity > 0;
-        if (IsTextStyle)
-        {
-            if (hasData)
-            {
-                TryPrepareText(preparation, "weather", WeatherConditionsText.Format(sample));
-            }
+            if (hasData) PrepareText(context, "weather", WeatherConditionsText.Format(sample));
             else Size = SizeF.Empty;
             return;
         }
-        if (hasData && icons == null) icons = load(preparation);
-        bool visible = hasData && (icons?.Length == WeatherConditionsLayers.Names.Length || sample.Precipitation.HasValue || sample.Fog);
-        if (visible && backdrop == null) backdrop = loadBackdrop(preparation);
-        Context = preparation;
-        Size = visible ? new SizeF(Diameter, Diameter) : SizeF.Empty;
-        if (visible) Visibility.Show();
-    }
-    /// <summary>Draws only borrowed prepared textures; the host owns clipping and GUI visibility.</summary>
-    public void Draw(IRenderAPI renderer, ElementBounds bounds)
-    {
-        if (sample == null || Context == null || Size.IsEmpty) return;
-        if (TryDrawText(renderer, bounds)) return;
-        if (icons == null) return;
-        double pixels = Diameter * Context.GuiScale;
-        double x = bounds.renderX, y = bounds.renderY + (bounds.OuterHeight - pixels) / 2;
-        if (icons.Length == WeatherConditionsLayers.Names.Length)
+        if (!ReferenceEquals(packApi, context.Api)) { packApi = context.Api; complete = null; Backdrop = null; }
+        // Choose one compatible pack before a view can request textures; never mix partial composite artwork.
+        if (hasData) complete ??= hasCompletePack(context);
+        bool visible = hasData && (complete == true || sample.Precipitation.HasValue || sample.Fog);
+        Size = visible ? new(HudOverlaySizes.Standard, HudOverlaySizes.Standard) : SizeF.Empty;
+        if (!visible) { Layers = []; return; }
+        if (complete == true)
         {
-            foreach (int layer in layers) renderer.RenderTexture(icons[layer].TextureId, x, y, pixels, pixels, 50, DrawOpacity.Tint);
-            return;
+            int[] selected = WeatherConditionsLayers.Select(sample);
+            Layers = new WeatherLayer[selected.Length];
+            for (int index = 0; index < selected.Length; index++)
+                Layers[index] = new("textures/hud/weather/composite/" + WeatherConditionsLayers.Names[selected[index]] + ".png",
+                    new(0, 0, Size.Width, Size.Height));
         }
-        // Until the complete approved layer set exists, retain both existing weather symbols inside the one slot.
-        bool both = sample.Precipitation.HasValue && sample.Fog;
-        double legacySize = both ? pixels / 2 : pixels;
-        double legacyY = both ? y + pixels / 4 : y;
-        if (sample.Precipitation is EnumPrecipitationType type)
+        else
         {
-            int index = type switch { EnumPrecipitationType.Snow => 1, EnumPrecipitationType.Hail => 2, _ => 0 };
-            renderer.RenderTexture(icons[index].TextureId, x, legacyY, legacySize, legacySize, 50, DrawOpacity.Tint);
+            // The fallback splits the native slot only when precipitation and fog must coexist.
+            bool both = sample.Precipitation.HasValue && sample.Fog;
+            float side = both ? Size.Width / 2 : Size.Width, top = both ? Size.Height / 4 : 0;
+            var layers = new System.Collections.Generic.List<WeatherLayer>(2);
+            if (sample.Precipitation is EnumPrecipitationType type)
+            {
+                string name = type switch { EnumPrecipitationType.Snow => "snow", EnumPrecipitationType.Hail => "hail", _ => "rain" };
+                layers.Add(new("textures/hud/weather/" + name + ".png", new(0, top, side, side)));
+            }
+            if (sample.Fog) layers.Add(new("textures/hud/weather/fog.png", new(both ? side : 0, top, side, side)));
+            Layers = layers.ToArray();
         }
-        if (sample.Fog)
-        {
-            double fogX = both ? x + legacySize : x;
-            renderer.RenderTexture(icons[3].TextureId, fogX, legacyY, legacySize, legacySize, 50, DrawOpacity.Tint);
-        }
+        Backdrop = loadBackdrop(context); Visibility.Show();
     }
+    /// <summary>Creates native text or distinct borrowed weather-layer elements for one composer.</summary>
+    public INativeView CreateView(ICoreClientAPI api) => Style == HudIndicatorStyle.Text ? CreateTextView(api) : new WeatherView(api, this, load);
     #endregion
-    #region Lifetime
-    /// <summary>Queues one shared backdrop only when the prepared composite is visible.</summary>
-    public void CollectBackdrops(IRenderAPI renderer, ElementBounds bounds)
-    {
-        if (sample == null || icons == null || Context == null || Size.IsEmpty) return;
-        double y = bounds.renderY + (bounds.OuterHeight - HudOverlaySizes.Standard * Context.GuiScale) / 2;
-        backdrop?.Queue(renderer, bounds.renderX, y, Context.GuiScale);
-    }
-    #endregion
-    #endregion
-    #region Protected API
-    /// <summary>Releases feature artwork without changing sampled content or feature timers.</summary>
-    protected override void ReleaseArtwork()
-    {
-        icons = null; backdrop = null;
-    }
 
-    /// <summary>Clears feature contents after a completed exit or world change.</summary>
-    protected override void ClearContent()
-    {
-        sample = null; layers = [];
-    }
+    #region Protected API
+    /// <summary>Clears sampled data and asset-pack availability at completed exit or world change.</summary>
+    protected override void ClearContent() { sample = null; Layers = []; Backdrop = null; complete = null; packApi = null; }
     #endregion
 
     #region Private
-    /// <summary>Loads straight-alpha asset textures while leaving disposal ownership with the game.</summary>
-    private static LoadedTexture[] LoadIcons(HudOverlayPreparationContext preparation)
+    /// <summary>Checks the complete full-canvas pack before requesting any of its textures.</summary>
+    private static bool CompletePack(HudOverlayPreparationContext context)
     {
-        string[] names = WeatherConditionsLayers.Names;
-        string folder = "textures/hud/weather/composite/";
-        // A partial or absent art pack must not request missing textures or mix incompatible full-canvas artwork.
-        foreach (string name in names)
-        {
-            if (preparation.Api.Assets.Exists(new AssetLocation(Constants.ModId, folder + name + ".png"))) continue;
-            names = ["rain", "snow", "hail", "fog"];
-            folder = "textures/hud/weather/";
-            break;
-        }
-        var textures = new LoadedTexture[names.Length];
-        for (int index = 0; index < names.Length; index++)
-        {
-            var texture = new LoadedTexture(preparation.Api);
-            preparation.Api.Render.GetOrLoadTexture(new AssetLocation(Constants.ModId,
-                folder + names[index] + ".png"), ref texture);
-            HudOverlayTextureFiltering.Prepare(texture);
-            texture.IgnoreUndisposed = true;
-            textures[index] = texture;
-        }
-        return textures;
+        foreach (string name in WeatherConditionsLayers.Names)
+            if (!context.Api.Assets.Exists(new AssetLocation(Constants.ModId, "textures/hud/weather/composite/" + name + ".png"))) return false;
+        return true;
     }
     #endregion
-
 }

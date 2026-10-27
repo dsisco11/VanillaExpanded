@@ -1,125 +1,55 @@
 using System;
 using System.Drawing;
 using VanillaExpanded.HudOverlays.Configuration;
-using Vintagestory.API.Config;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering;
+using VanillaExpanded.HudOverlays.Rendering.Native;
 using Vintagestory.API.Client;
-using Vintagestory.API.MathTools;
+using Vintagestory.API.Config;
 
 namespace VanillaExpanded.PlayerWetness;
 
-/// <summary>Borrows slim droplet artwork and owns a percentage reading above two fully filled drops.</summary>
-internal sealed class PlayerWetnessPresentation : HudIndicatorPresentation<HudIndicatorStyle>
+/// <summary>Prepares wetness readings and metrics while native elements own the drop and glyph resources.</summary>
+internal sealed class PlayerWetnessPresentation : IndicatorPresentation
 {
-    private readonly Func<HudOverlayPreparationContext, LoadedTexture[]> createTextures;
-    private readonly Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?> loadBackdrop;
-    private const float ReadingHeight = HudOverlaySizes.WetnessReadingHeight;
-    private readonly HudOverlayIconTextPresentation text;
-    private readonly HudIndicatorStackLayout layout = new();
-    private float readingWidth;
     private int percentage;
-    private readonly Vec4f fillTint = new(.25f, .65f, 1, 1);
-    private LoadedTexture[]? textures;
-    private IHudOverlayIconBackdrop? backdrop;
+    private readonly Func<HudOverlayPreparationContext, string, TextureBinding>? load;
+    private readonly Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?> loadBackdrop;
 
     #region Public API
-    #region Content and preparation
-    /// <summary>Accepts borrowed artwork loaders and an optional owned text presentation for headless verification.</summary>
-    public PlayerWetnessPresentation(Func<HudOverlayPreparationContext, LoadedTexture[]>? createTextures = null,
-        Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null,
-        HudOverlayIconTextPresentation? text = null, HudIndicatorTextPresentation? textStyle = null)
-        : base(HudIndicatorStyle.Icon, HudIndicatorStyle.Text, textStyle)
+    /// <summary>Gets prepared localized lettering and its fitted GUI-unit width.</summary>
+    public string Reading { get; private set; } = string.Empty;
+    /// <summary>Gets the width of the reading fitted into its reserved row.</summary>
+    public float ReadingWidth { get; private set; }
+    /// <summary>Gets the borrowed procedural backdrop service.</summary>
+    public IHudOverlayIconBackdrop? Backdrop { get; private set; }
+    /// <summary>Accepts CPU measurements and per-element upload boundaries for headless verification.</summary>
+    public PlayerWetnessPresentation(Func<HudOverlayPreparationContext, string, SizeF>? measure = null,
+        Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? createText = null,
+        Func<HudOverlayPreparationContext, string, TextureBinding>? load = null,
+        Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null) : base(measure: measure, createText: createText)
     {
-        this.text = text ?? new HudOverlayIconTextPresentation(fontSize: HudOverlaySizes.Text);
-        this.createTextures = createTextures ?? PlayerWetnessIconTextures.Create;
-        this.loadBackdrop = loadBackdrop ?? HudOverlayIconBackdrop.Load;
+        this.load = load; this.loadBackdrop = loadBackdrop ?? HudOverlayIconBackdrop.Load;
     }
-    /// <summary>Updates the cached whole-percentage reading without regenerating icon artwork.</summary>
-    public void SetContent(float value)
+    /// <summary>Rounds the synchronized wetness while retaining a visible percentage for nonzero samples.</summary>
+    public void SetContent(float value) => percentage = Math.Clamp((int)Math.Round(value * 100, MidpointRounding.AwayFromZero), 1, 100);
+    /// <summary>Prepares localized data and canonical metrics without allocating glyphs or drop textures.</summary>
+    public void Prepare(HudOverlayPreparationContext context)
     {
-        // The percentage carries intensity while the artwork remains fully filled.
-        percentage = Math.Clamp((int)Math.Round(value * 100, MidpointRounding.AwayFromZero), 1, 100);
-        text.SetContent(null, "vanillaexpanded:player-wetness-reading", percentage);
+        Reading = Lang.GetL(context.Locale, "vanillaexpanded:player-wetness-reading", percentage);
+        if (Style == HudIndicatorStyle.Text) { PrepareText(context, "wetness", Reading); return; }
+        var text = MeasureText(context, Reading, 1.5);
+        ReadingWidth = text.Width * Math.Min(1, HudOverlaySizes.WetnessReadingHeight / Math.Max(1, text.Height));
+        Size = new(Math.Max(HudOverlaySizes.Standard, ReadingWidth), HudOverlaySizes.Standard);
+        Backdrop = loadBackdrop(context); Visibility.Show();
     }
-    /// <summary>Loads cached artwork at the preparation boundary and reuses it for subsequent readings.</summary>
-    public void Prepare(HudOverlayPreparationContext preparation)
-    {
-        if (IsTextStyle)
-        {
-            TryPrepareText(preparation, "wetness", Lang.GetL(preparation.Locale, "vanillaexpanded:player-wetness-reading", percentage));
-            return;
-        }
-        if (textures == null || !ReferenceEquals(Context?.Api, preparation.Api))
-        {
-            var replacement = createTextures(preparation);
-            textures = replacement;
-            backdrop = loadBackdrop(preparation);
-        }
-        Context = preparation;
-        text.SetContent(null, "vanillaexpanded:player-wetness-reading", percentage);
-        text.Prepare(preparation);
-        readingWidth = text.Size.Width * Math.Min(1, ReadingHeight / Math.Max(1, text.Size.Height));
-        layout.Configure(new SizeF(readingWidth, ReadingHeight),
-            new SizeF(HudOverlaySizes.Standard, HudOverlaySizes.Standard - ReadingHeight), 0);
-        Size = layout.Size;
-        Visibility.Show();
-    }
+    /// <summary>Creates unique native glyph and drop components for one composer.</summary>
+    public INativeView CreateView(ICoreClientAPI api) => Style == HudIndicatorStyle.Text ? CreateTextView(api)
+        : new WetnessView(api, this, CreateText, load);
     #endregion
-    #region Rendering
-    /// <summary>Queues the shared backdrop separately from the foreground layers.</summary>
-    public void CollectBackdrops(IRenderAPI renderer, ElementBounds bounds)
-    {
-        if (Context == null || textures == null) return;
-        layout.Resolve(bounds, Context.GuiScale);
-        backdrop?.Queue(renderer, layout.Icon.renderX, layout.Reading.renderY, Context.GuiScale);
-    }
-    /// <summary>Draws the twin drops below a centered cached percentage within the shared indicator height.</summary>
-    public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip)
-    {
-        if (Context == null) return;
-        if (TryDrawText(renderer, bounds)) return;
-        if (textures == null) return;
-        layout.Resolve(bounds, Context.GuiScale);
-        double scale = Context.GuiScale;
-        var artwork = layout.Icon;
-        DrawDrop(renderer, artwork.renderX + 2.25 * scale, artwork.renderY + 1.5 * scale, 22.5 * scale);
-        DrawDrop(renderer, artwork.renderX + 17.25 * scale, artwork.renderY, 13.5 * scale);
-        text.Draw(renderer, layout.Reading, clip, 0, maximumTextHeight: ReadingHeight);
-    }
-    #endregion
-    #region Lifecycle
-    /// <summary>Ends shared presentation ownership and disposes feature-owned helpers.</summary>
-    public override void Dispose()
-    {
-        base.Dispose();
-        text.Dispose();
-    }
-    #endregion
-    #endregion
+
     #region Protected API
-    /// <summary>Releases feature artwork without changing sampled content or feature timers.</summary>
-    protected override void ReleaseArtwork()
-    {
-        text.Reset(); textures = null; backdrop = null;
-    }
-
-    /// <summary>Clears feature contents after a completed exit or world change.</summary>
-    protected override void ClearContent()
-    {
-        readingWidth = 0; percentage = 0;
-    }
+    /// <summary>Clears retained wetness and prepared data at completed exit or world change.</summary>
+    protected override void ClearContent() { percentage = 0; Reading = string.Empty; ReadingWidth = 0; Backdrop = null; }
     #endregion
-
-    #region Private
-    /// <summary>Draws the complete blue silhouette beneath its outline; the host supplies clipping.</summary>
-    private void DrawDrop(IRenderAPI renderer, double x, double y, double pixels)
-    {
-        fillTint.Set(.25f, .65f, 1, DrawOpacity.Current);
-        renderer.Render2DTexture(textures![1].TextureId, (float)x, (float)y, (float)pixels, (float)pixels, 50, fillTint);
-        renderer.Render2DTexture(textures![0].TextureId, (float)x, (float)y, (float)pixels, (float)pixels, 50, DrawOpacity.Tint);
-    }
-    #endregion
-
-
 }

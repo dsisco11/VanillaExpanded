@@ -9,7 +9,7 @@ using Vintagestory.API.Common;
 namespace VanillaExpanded.WeatherConditions;
 
 /// <summary>Samples local native weather and owns a passive icon presentation.</summary>
-internal sealed class WeatherConditionsOverlay : IHudOverlay, IHudOverlayBackdropProvider, IHudOverlayVisibilityTransition
+internal sealed class WeatherConditionsOverlay : IHudOverlay, INativePresentation, IHudOverlayVisibilityTransition
 {
     private readonly WeatherConditionsPresentation presentation;
     private ICoreClientAPI? api;
@@ -30,11 +30,10 @@ internal sealed class WeatherConditionsOverlay : IHudOverlay, IHudOverlayBackdro
     public void SetStyle(HudIndicatorStyle style) => styleChanged |= presentation.SetStyle(style);
 
     #region Lifecycle
-    /// <summary>Creates an icon-only presentation with optional headless asset loading.</summary>
-    public WeatherConditionsOverlay(System.Func<HudOverlayPreparationContext, LoadedTexture[]>? load = null,
-        System.Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null)
+    /// <summary>Accepts prepared native weather state without transferring element ownership to the controller.</summary>
+    public WeatherConditionsOverlay(WeatherConditionsPresentation? presentation = null)
     {
-        presentation = new WeatherConditionsPresentation(load, loadBackdrop);
+        this.presentation = presentation ?? new();
     }
     /// <summary>Binds a borrowed weather provider for one client world.</summary>
     public void BeginSession(ICoreClientAPI api)
@@ -53,7 +52,7 @@ internal sealed class WeatherConditionsOverlay : IHudOverlay, IHudOverlayBackdro
         if (!value) Clear();
         return value;
     }
-    /// <summary>Releases borrowed weather and texture bindings at world exit.</summary>
+    /// <summary>Clears borrowed weather state and prepared presentation data at world exit.</summary>
     public void EndSession()
     {
         api = null;
@@ -102,28 +101,27 @@ internal sealed class WeatherConditionsOverlay : IHudOverlay, IHudOverlayBackdro
     }
     #endregion
     #region Presentation
-    /// <summary>Supplies prepared backdrop positions to the shared host pass.</summary>
-    public void CollectBackdrops(IRenderAPI renderer, ElementBounds bounds)
-    {
-        presentation.CollectBackdrops(renderer, bounds);
-    }
+    /// <summary>Creates independent native visuals without sampling or subscribing.</summary>
+    public INativeView CreateView(ICoreClientAPI api, NativeViewRole role) => presentation.CreateView(api);
+    /// <summary>This indicator has no shared per-frame visual effect.</summary>
+    public void BeginFrame(float deltaTime) { }
 
-    /// <summary>Prepares cached artwork for the latest valid sample, including clear skies.</summary>
+    /// <summary>Prepares layer identities and metrics for the latest valid weather sample.</summary>
     public void Prepare(HudOverlayPreparationContext context)
     {
         if (Sample != null) presentation.Prepare(context);
     }
     /// <summary>Measures the composite slot, or zero when no supported artwork is visible.</summary>
     public SizeF Measure() => presentation.Size;
-    /// <summary>Draws prepared weather layers under the host clip without native sampling.</summary>
+    /// <summary>Requires foreground rendering through the registered native components.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime)
     {
-        presentation.Draw(renderer, bounds);
+        throw new InvalidOperationException("Native indicator components render through their composer.");
     }
     #endregion
     #endregion
     #region Private
-    /// <summary>Clears entity-specific transition history and borrowed presentation bindings.</summary>
+    /// <summary>Clears entity-specific transition history while retaining prepared data for an exit.</summary>
     private void Clear()
     {
         sampledEntity = null;
