@@ -49,11 +49,11 @@ public sealed class HudIndicatorTextBranchTests : IDisposable
     [InlineData("time", "18:00")]
     [InlineData("date", "OCT 14")]
     [InlineData("environmental-temperature", "-43°C")]
-    [InlineData("body-temperature", "37°C COLD +2")]
-    [InlineData("wetness", "43%")]
 
 
-    [InlineData("weather", "CLD4 RAIN2 FOG2 THR1")]
+
+
+
     public void TextBranchSkipsArtworkAndRetainsReading(string label, string expected)
     {
         var api = new Mock<ICoreClientAPI> { DefaultValue = DefaultValue.Mock };
@@ -73,22 +73,6 @@ public sealed class HudIndicatorTextBranchTests : IDisposable
             case "environmental-temperature":
                 using (var presentation = new EnvironmentalTemperaturePresentation(loadTextures: FailArtwork, textStyle: text))
                 { presentation.SetContent(-42.6f); presentation.SetStyle(EnvironmentalGaugeStyle.Text); presentation.Prepare(context); }
-                break;
-            case "body-temperature":
-                using (var presentation = new BodyTemperatureThermometerPresentation(new(), createIcons: FailArtwork, textStyle: text))
-                { presentation.SetContent(new(37, 37, BodyTemperatureRisk.Cold, Trend: 2), true); presentation.SetStyle(HudIndicatorStyle.Text); presentation.Prepare(context); }
-                break;
-            case "wetness":
-                using (var presentation = new PlayerWetnessPresentation(createTextures: FailArtwork, textStyle: text))
-                { presentation.SetContent(.426f); presentation.SetStyle(HudIndicatorStyle.Text); presentation.Prepare(context); }
-                break;
-            case "weather":
-                using (var presentation = new WeatherConditionsPresentation(load: FailArtwork, textStyle: text))
-                {
-                    presentation.SetContent(new(EnumPrecipitationType.Rain, true)
-                        { CloudCoverage = 4, PrecipitationIntensity = 2, FogIntensity = 2, ThunderIntensity = 1 });
-                    presentation.SetStyle(HudIndicatorStyle.Text); presentation.Prepare(context);
-                }
                 break;
             default: throw new ArgumentOutOfRangeException(nameof(label));
         }

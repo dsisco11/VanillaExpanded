@@ -41,7 +41,8 @@ internal sealed class SimpleIndicatorsFixture : IDisposable
         Native = new(scale);
         var translation = new Mock<ITranslationService>();
         translation.Setup(value => value.Get(It.IsAny<string>(), It.IsAny<object[]>())).Returns((string key, object[] args) =>
-            key == "vanillaexpanded:wind-speed-reading" ? args[0] + "%" :
+            key is "vanillaexpanded:wind-speed-reading" or "vanillaexpanded:player-wetness-reading" ? args[0] + "%" :
+            key == "vanillaexpanded:body-temperature-reading" ? args[0] + "°C" :
             key == "vanillaexpanded:bow-ammunition-count" ? args[0].ToString()! :
             key == "vanillaexpanded:bow-ammunition-empty" ? "No arrows / 0" :
             key.StartsWith("vanillaexpanded:hud-short-") ? key[26..].ToUpperInvariant() :

@@ -9,7 +9,7 @@ using Vintagestory.API.Common;
 namespace VanillaExpanded.BodyTemperature;
 
 /// <summary>Samples synchronized temperature warnings and owns its cached passive temperature presentation.</summary>
-internal sealed class BodyTemperatureOverlay : IHudOverlay, IHudOverlayBackdropProvider, IHudOverlayVisibilityTransition
+internal sealed class BodyTemperatureOverlay : IHudOverlay, INativePresentation, IHudOverlayVisibilityTransition
 {
     private readonly BodyTemperatureThermometerPresentation thermometer;
     private bool showReading = true;
@@ -33,12 +33,10 @@ internal sealed class BodyTemperatureOverlay : IHudOverlay, IHudOverlayBackdropP
     public void SetStyle(HudIndicatorStyle style) => styleChanged |= thermometer.SetStyle(style);
 
     #region Lifecycle
-    /// <summary>Creates a dynamic thermometer and compact whole-degree text with preparation outside the render path.</summary>
-    public BodyTemperatureOverlay(HudOverlayIconTextPresentation? presentation = null,
-        System.Func<HudOverlayPreparationContext, LoadedTexture[]>? createIconTextures = null,
-        System.Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null)
+    /// <summary>Retains prepared native temperature data independently of composer-owned resources.</summary>
+    public BodyTemperatureOverlay(BodyTemperatureThermometerPresentation? presentation = null)
     {
-        thermometer = new BodyTemperatureThermometerPresentation(presentation ?? new(CreateReadingText), createIconTextures, loadBackdrop);
+        thermometer = presentation ?? new();
     }
     /// <summary>Changes the reading preference and requests a fresh measurement on the next scheduled sample.</summary>
     public void SetShowReading(bool value)
@@ -63,7 +61,7 @@ internal sealed class BodyTemperatureOverlay : IHudOverlay, IHudOverlayBackdropP
         if (!value) Clear();
         return value;
     }
-    /// <summary>Releases sampled state and native textures on world exit.</summary>
+    /// <summary>Clears sampled and prepared state on world exit.</summary>
     public void EndSession()
     {
         api = null;
@@ -71,7 +69,7 @@ internal sealed class BodyTemperatureOverlay : IHudOverlay, IHudOverlayBackdropP
         sampledEntity = null;
         thermometer.Reset();
     }
-    /// <summary>Finally releases owned presentation resources exactly once.</summary>
+    /// <summary>Finally releases controller and prepared presentation state exactly once.</summary>
     public void Dispose()
     {
         if (disposed) return;
@@ -117,36 +115,28 @@ internal sealed class BodyTemperatureOverlay : IHudOverlay, IHudOverlayBackdropP
     }
     #endregion
     #region Presentation
-    /// <summary>Supplies prepared backdrop positions to the shared host pass.</summary>
-    public void CollectBackdrops(IRenderAPI renderer, ElementBounds bounds)
-    {
-        thermometer.CollectBackdrops(renderer, bounds);
-    }
+    /// <summary>Creates independent native visuals without sampling or subscribing.</summary>
+    public INativeView CreateView(ICoreClientAPI api, NativeViewRole role) => thermometer.CreateView(api);
+    /// <summary>This indicator has no shared per-frame visual effect.</summary>
+    public void BeginFrame(float deltaTime) { }
 
-    /// <summary>Prepares thermometer artwork and optional localized text for a visible warning.</summary>
+    /// <summary>Prepares localized temperature data and metrics for a visible warning.</summary>
     public void Prepare(HudOverlayPreparationContext context)
     {
         if (Sample != null) thermometer.Prepare(context);
     }
     /// <summary>Returns zero dimensions while healthy or cached thermometer dimensions during a warning.</summary>
     public SizeF Measure() => Sample == null ? SizeF.Empty : thermometer.Size;
-    /// <summary>Draws cached thermometer layers and optional text without sampling or generating textures.</summary>
+    /// <summary>Requires foreground rendering through the registered native components.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime)
     {
-        thermometer.Draw(renderer, bounds, clip, deltaTime);
+        throw new InvalidOperationException("Native indicator components render through their composer.");
     }
     #endregion
     #endregion
 
     #region Private
-    /// <summary>Creates the reading at ordinary HUD font size, applying only the game's native GUI scale.</summary>
-    private static LoadedTexture CreateReadingText(HudOverlayPreparationContext context, string localized)
-    {
-        var font = CairoFont.WhiteSmallText().WithFontSize(HudOverlaySizes.Text)
-            .WithStroke(new double[] { 0, 0, 0, .85 }, 1.5);
-        return HudOverlayTextureFiltering.Prepare(context.Api.Gui.TextTexture.GenTextTexture(localized, font));
-    }
-    /// <summary>Clears stale readings and their owned texture when the player becomes ineligible.</summary>
+    /// <summary>Clears stale samples while retaining prepared data for a visible exit.</summary>
     private void Clear()
     {
         sampledEntity = null;

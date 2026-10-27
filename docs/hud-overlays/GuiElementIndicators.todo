@@ -253,15 +253,28 @@ Validation: fresh Release compilation and **832/832 affected tests passed**, wit
 
 Depends on Phase 4. Outcome: native composition supports custom layered effects without taking over gameplay logic.
 
-    ☐ Migrate player wetness, body temperature, and composite weather, including their text-only styles.
-        ☐ Wetness: preserve filled drops, percentage fitting and current footprint, text-above order, and backdrop alignment.
-        ☐ Body temperature: compose reading, trend markers, narrow thermometer, and backdrop through native bounds; retain fill masking, clipping, tint, optional readings, and warming/cooling marker semantics.
-        ☐ Weather: retain independent layer selection, shared origins, draw order, complete-pack/fallback behavior, and borrowed textures.
-    ☐ Keep custom elements focused on their visual responsibility. Do not port entire old presentation routines unchanged into callback elements.
-    ☐ Test optional components, simultaneous layers, trend strengths, clipping, native bounds, scale changes, and owned/borrowed cleanup against existing behavioral relationships.
+    ☑ Migrate player wetness, body temperature, and composite weather, including their text-only styles.
+        ☑ Wetness: preserve filled drops, percentage fitting and current footprint, text-above order, and backdrop alignment.
+        ☑ Body temperature: compose reading, trend markers, narrow thermometer, and backdrop through native bounds; retain fill masking, clipping, tint, optional readings, and warming/cooling marker semantics.
+        ☑ Weather: retain independent layer selection, shared origins, draw order, complete-pack/fallback behavior, and borrowed textures.
+    ☑ Keep custom elements focused on their visual responsibility. Do not port entire old presentation routines unchanged into callback elements.
+    ☑ Test optional components, simultaneous layers, trend strengths, clipping, native bounds, scale changes, and owned/borrowed cleanup against existing behavioral relationships.
 
 Completion criteria:
-    ☐ All three consumers render from prepared native component geometry; masking and animation do not trigger component layout.
+    ☑ All three consumers render from prepared native component geometry; masking and animation do not trigger component layout.
+
+### Phase 5 implementation traceability
+
+| Task group | Controlling sources | Implementation and verification evidence |
+|---|---|---|
+| Native capability, text styles and retained policy | Approved proposal Proposed design / Ownership and compatibility; Phase 1 consumer inventory, native operations and lifetime matrix; HudOverlays.md presentation rendering, visibility, text-style and session contracts | PlayerWetnessOverlay, BodyTemperatureOverlay and WeatherConditionsOverlay expose INativePresentation. Their IndicatorPresentation subclasses retain sampled data, localized strings and canonical metrics; TextView owns text-mode composition. Sampling, settings, IDs and registrations retain their existing owners. Native factory tests exercise all six consumer/style combinations. |
+| Wetness and body-temperature artwork | Proposal Update and rendering contract; Phase 1 consumer inventory and invalidation matrix; HudOverlays.md wetness and body-temperature component relationships; native GuiComposer.AddInteractiveElement, GuiElement and ElementBounds | WetnessView registers separate fill/outline elements for both drops and a fitted reading. ThermometerView registers the reading, narrow fill/outline and individual trend sprites under native parent bounds. Fill reveal, host intersection, text fit and backdrop anchors are cached during LayoutCompleted; color updates are prepared separately from host opacity. LayeredIndicatorsTests covers reading/marker relationships, optional rows, strengths, fill-only bounds retention, scaling, full drops, clipping and draw failure restoration. |
+| Weather pack, channel selection and ownership | Proposal component/ownership contracts; docs/weather-conditions/WeatherConditions.md composition, visibility and artwork contracts; Phase 1 ownership table; VanillaExpanded.Tests/AGENTS.md | WeatherConditionsPresentation checks complete-pack availability and selects independent channel paths or the precipitation/fog fallback before native rendering. WeatherView mounts four ordered TextureElements with shared composite origins or fallback native bounds. Element-owned glyphs and borrowed cache wrappers remain independent across source/live compositions; production PNG loader and exactly-once glyph cleanup tests cover native cache ownership. Layered tests replace superseded manual component-drawing tests. |
+| Current architecture documentation | User instructions for current-state permanent docs; HudOverlays.md and WeatherConditions.md | Rendering-path tables, native component owners, wetness glyph ownership, thermometer clipping and weather selection describe active code. Implementation traceability and validation receipts stay in this planning document. |
+
+Completion: implementation, second review and independent audit-stage-completion passed on 2026-10-26. The audit's stale weather artwork-size description was corrected and independently rechecked; no unresolved findings remain.
+
+Validation: fresh Release compilation and **892/892 affected tests passed**, with zero failures or skips, through the validation subagent. Command: `dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --configuration Release --filter "FullyQualifiedName~HudOverlays|FullyQualifiedName~BodyTemperature|FullyQualifiedName~PlayerWetness|FullyQualifiedName~WeatherConditions" -p:UseSharedCompilation=false --no-restore --logger "console;verbosity=minimal"`; installed game at `G:/Vintagestory`, including its native library search path. Only existing unrelated warnings remain. Diff whitespace and superseded-path searches passed. Native registration, cached geometry/resources, masks, optional rows, layer selection, source ownership and cleanup are covered by headless checks. Package qualification and user-run appearance/input acceptance remain in their later phases; later task markers remain unchecked.
 
 ## Phase 6: Migrate environmental instruments and compact styles
 
