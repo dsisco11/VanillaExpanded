@@ -332,18 +332,34 @@ Validation: fresh production/test Release compilation and **3,073/3,073 full-sui
 
 Depends on Phase 7. Outcome: the final candidate has automated, package, and review evidence without implying visual acceptance.
 
-    ☐ Reconcile every approved proposal requirement against implementation and focused evidence; inspect all ten consumers and every supported style.
-    ☐ Verify repeated native rendering performs no arrangement, fitting, measurement, bounds calculation, or resource creation for unchanged content. Test relevant invalidations separately from content-only and animation-only changes.
-    ☐ Verify parent/child relationships, scaling, containment, centering, optional rows, clipping, text-above order, backdrop alignment, passive input, fades, and animation continuity.
-    ☐ Exercise grouping, movement, resize, GUI-scale/style changes, hidden proxies, previews/cancellation, saved layouts/locks, disabled content, removal, failed initialization, and repeated world transitions.
-    ☐ Verify actual native element registration and exactly-once ownership across regrouping/previews.
-    ☐ Run appropriate affected tests and the canonical Release build/package through subagents, as required by the user's instructions. Inspect package contents and verify relevant assets and DLL identity against the qualified candidate.
-        ☐ Follow Tests/AGENTS.md: test relationships, supplied geometry, caching, invalidation, ordering, and lifecycle; do not lock tests to prescribed visual sizes, palettes, fonts, or pixels.
-        ☐ Distinguish source inspection, headless native integration, package identity, skips, and any remaining runtime evidence. Do not present them as measured performance or appearance acceptance.
-    ☐ Complete a second implementation review and independent completion audit. Resolve findings against the whole proposal/plan before recording completion.
+    ☑ Reconcile every approved proposal requirement against implementation and focused evidence; inspect all ten consumers and every supported style.
+    ☑ Verify repeated native rendering performs no arrangement, fitting, measurement, bounds calculation, or resource creation for unchanged content. Test relevant invalidations separately from content-only and animation-only changes.
+    ☑ Verify parent/child relationships, scaling, containment, centering, optional rows, clipping, text-above order, backdrop alignment, passive input, fades, and animation continuity.
+    ☑ Exercise grouping, movement, resize, GUI-scale/style changes, hidden proxies, previews/cancellation, saved layouts/locks, disabled content, removal, failed initialization, and repeated world transitions.
+    ☑ Verify actual native element registration and exactly-once ownership across regrouping/previews.
+    ☑ Run appropriate affected tests and the canonical Release build/package through subagents, as required by the user's instructions. Inspect package contents and verify relevant assets and DLL identity against the qualified candidate.
+        ☑ Follow VanillaExpanded.Tests/AGENTS.md: test relationships, supplied geometry, caching, invalidation, ordering, and lifecycle; do not lock tests to prescribed visual sizes, palettes, fonts, or pixels.
+        ☑ Distinguish source inspection, headless native integration, package identity, skips, and any remaining runtime evidence. Do not present them as measured performance or appearance acceptance.
+    ☑ Complete a second implementation review and independent completion audit. Resolve findings against the whole proposal/plan before recording completion.
 
 Completion criteria:
-    ☐ Required automated checks, package verification, documentation reconciliation, and reviews pass on the final candidate; remaining visual/input acceptance stays explicitly open.
+    ☑ Required automated checks, package verification, documentation reconciliation, and reviews pass on the final candidate; remaining visual/input acceptance stays explicitly open.
+
+### Phase 8 qualification traceability
+
+| Task group | Controlling sources | Implementation and verification evidence |
+|---|---|---|
+| All consumers, styles and prepared rendering | Approved proposal Proposed design / Update and rendering contract; plan constraints and native invalidation matrix; HudOverlays.md presentation rendering; native GuiComposer, GuiElement and ElementBounds | Direct review of all ten controller/view routes and all 23 supported consumer/style combinations. SimpleIndicatorsTests, LayeredIndicatorsTests and InstrumentIndicatorsTests verify actual passive native components, prepared resources, geometry relationships and repeated rendering without measurement, resource creation or bounds resolution. HudNativeHostTests and HudNativeSchedulerTests separately cover content, measurement, movement, scale and structure invalidation; storm and instrument tests cover animation without rearrangement. |
+| Preserved geometry, interaction and ownership | Proposal Ownership and compatibility / Acceptance; scope amendment; plan lifetime matrix; HudOverlays.md editing, persistence, source traces and session contracts; WindSpeed.md and WeatherConditions.md; VanillaExpanded.Tests/AGENTS.md | Component/native-host tests cover parentage, centering, scaling, optional readings/trends, clipping, backdrop order, fades and independent composer resources. Group controls, grouping transactions, drag preview, edit proxy, layout store, movement, menu/style and session tests cover preview/cancellation, locks/layouts, disabled content, resizing, removal, partial initialization and repeated world/player transitions. The first-appearance temperature regression covers both trend directions, reversal and reappearance at normal/high scale. Tests assert relationships and ownership rather than prescribed presentation pixels. Current architecture/feature documentation reconciles with these owners. |
+| Final candidate and package | Proposal Acceptance; canonical build.ps1 and CakeBuild/Program.cs; phase task and completion criteria | Full Release suite and canonical ValidateJson/Build/Package succeeded through the validation subagent. Archive entry set and bytes were checked against publish output, source assets and metadata. Tested and packaged DLL identities match; the independent auditor directly checked the TRX and archive evidence. |
+
+Completion: second implementation review and independent audit-stage-completion passed on 2026-10-27 with no unresolved findings. Qualification required no runtime or test source changes. Candidate HEAD: `5a9c8a077fe5d9987050750d9160b154763f9b38`; only this planning receipt changed after qualification. Phase 9 and final acceptance remain unchecked.
+
+Validation: **3,081/3,081 full-suite tests passed**, zero failures or skips. Command: `dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --configuration Release --no-restore -p:UseSharedCompilation=false --logger "trx;LogFileName=phase8-full.trx"`; `VINTAGE_STORY=G:/Vintagestory`, game and Lib directories on PATH, `VE_CLOCK_GPU_TESTS=1`. The opt-in solar shader check used a hidden native context. TRX: `VanillaExpanded.Tests/TestResults/phase8-full.trx` (ignored build output).
+
+Canonical command: `./build.ps1 --configuration=Release`. Package: `Releases/vanillaexpanded_999.99.9.zip`, 170 files including 165 source-identical assets (97 HUD textures and 30 shader files). Exact expected entry names, publish files and root metadata matched, with no missing, duplicate or stale entries. Tested, production, publish and packaged DLL SHA256: `B622377C95C1BF7FC19D82B6DB194E7A109DB4F169B7372D4F9B1AF546A0B879`. ZIP SHA256: `1CDA142E89AF8F158EABB569C6B2513E3A8B406056FD5CD4CBDA0FCCCFA661E2`.
+
+Existing nullable/unused-field compiler warnings remain. Cake dependency restore reports NU1902/NU1903 advisories for its transitive System.Security.Cryptography.Pkcs 10.0.12 build-tool dependency; dependency upgrades are outside this presentation refactor. Scoped network access resolved the initially sandbox-blocked NuGet restore. No installation or game launch occurred. Source inspection, headless native integration and package identity establish these automated contracts, not measured performance or user appearance/input acceptance.
 
 ## Phase 9: User-run in-game acceptance
 
