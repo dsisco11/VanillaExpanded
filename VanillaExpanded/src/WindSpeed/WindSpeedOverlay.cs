@@ -10,7 +10,7 @@ using Vintagestory.API.Common.Entities;
 namespace VanillaExpanded.WindSpeed;
 
 /// <summary>Samples native local wind and owns its HUD presentation.</summary>
-internal sealed class WindSpeedOverlay : IHudOverlay, IHudOverlayVisibilityTransition
+internal sealed class WindSpeedOverlay : IHudOverlay, INativePresentation, IHudOverlayVisibilityTransition
 {
     private readonly WindSpeedPresentation presentation;
     private readonly WindSpeedAverage average = new();
@@ -89,7 +89,13 @@ internal sealed class WindSpeedOverlay : IHudOverlay, IHudOverlayVisibilityTrans
     #endregion
 
     #region Presentation
-    /// <summary>Prepares the icon or text only while wind is active.</summary>
+    /// <summary>Creates unique native visuals without sampling or subscribing.</summary>
+    public INativeView CreateView(ICoreClientAPI api, NativeViewRole role) => presentation.CreateView(api);
+
+    /// <summary>Advances shared visual effects once before all visual instances render.</summary>
+    public void BeginFrame(float deltaTime) { }
+
+    /// <summary>Prepares localized data and metrics only while wind is active.</summary>
     public void Prepare(HudOverlayPreparationContext context)
     {
         if (Intensity > 0) presentation.Prepare(context);
@@ -98,10 +104,10 @@ internal sealed class WindSpeedOverlay : IHudOverlay, IHudOverlayVisibilityTrans
     /// <summary>Reports the prepared wind footprint to the shared layout host.</summary>
     public SizeF Measure() => presentation.Size;
 
-    /// <summary>Draws cached wind content under the shared host's clip and opacity.</summary>
+    /// <summary>Requires native rendering through the registered component elements.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime)
     {
-        presentation.Draw(renderer, bounds);
+        throw new InvalidOperationException("Native indicator components render through their composer.");
     }
 
     /// <summary>Clears eligibility and hysteresis while retaining prepared content for the exit transition.</summary>
@@ -116,7 +122,7 @@ internal sealed class WindSpeedOverlay : IHudOverlay, IHudOverlayVisibilityTrans
     #endregion
 
     #region Cleanup
-    /// <summary>Releases borrowed world bindings and owned presentation resources at world exit.</summary>
+    /// <summary>Clears world bindings, wind history and prepared presentation data at world exit.</summary>
     public void EndSession()
     {
         api = null;

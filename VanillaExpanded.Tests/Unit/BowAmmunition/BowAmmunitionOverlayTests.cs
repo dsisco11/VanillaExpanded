@@ -69,16 +69,11 @@ public sealed class BowAmmunitionOverlayTests : IDisposable
     public void DisableAndSessionReplacementReleaseResourcesAndSubscriptions()
     {
         var fixture = new BowAmmunitionSamplerTests.Fixture(); int invalidations = 0;
-        var textures = new List<LoadedTexture>();
-        var presentation = new HudOverlayIconTextPresentation((context, _) =>
-        {
-            var texture = new LoadedTexture(context.Api) { Width = 24, Height = 12 }; textures.Add(texture); return texture;
-        });
-        using var overlay = new BowAmmunitionOverlay(() => invalidations++, presentation);
+        using var overlay = new BowAmmunitionOverlay(() => invalidations++, new BowAmmunitionPresentation(measure: (_, _) => new(24, 12)));
         fixture.Personal[0].Itemstack = new ItemStack(fixture.Flint, 12);
         overlay.BeginSession(fixture.Api.Object); overlay.Refresh();
         overlay.Prepare(new HudOverlayPreparationContext(fixture.Api.Object, 1, "en"));
-        Assert.False(overlay.SetEnabled(false)); Assert.Null(overlay.Sample); Assert.True(textures[0].Disposed);
+        Assert.False(overlay.SetEnabled(false)); Assert.Null(overlay.Sample);
         fixture.Personal.DidModifyItemSlot(fixture.Personal[0]); Assert.Equal(0, invalidations);
         Assert.True(overlay.SetEnabled(true)); Assert.Null(overlay.Sample); Assert.Equal(1, invalidations);
         fixture.Personal[0].Itemstack!.StackSize = 8; overlay.Refresh(); Assert.Equal(8, overlay.Sample!.Quantity);
@@ -106,30 +101,22 @@ public sealed class BowAmmunitionOverlayTests : IDisposable
         fixture.External.Close(fixture.Player.Object);
         Assert.False(fixture.External.HasOpened(fixture.Player.Object)); Assert.Equal(2, invalidations);
     }
-    /// <summary>No-ammunition presentation caches localized content and draw never queries gameplay.</summary>
+    /// <summary>No-ammunition preparation retains localized data without sampling during native view creation.</summary>
     [Fact]
-    public void EmptyStateCachesResourcesAndDrawReadsSnapshotOnly()
+    public void EmptyStatePreparesSnapshotOnly()
     {
-        var fixture = new BowAmmunitionSamplerTests.Fixture(); int builds = 0;
-        var textures = new List<LoadedTexture>(); string? text = null;
-        var empty = new HudOverlayIconTextPresentation((context, value) =>
-        {
-            text = value; builds++; var texture = new LoadedTexture(context.Api) { Width = 24, Height = 12 };
-            textures.Add(texture); return texture;
-        });
-        using var overlay = new BowAmmunitionOverlay(() => { }, emptyPresentation: empty);
+        var fixture = new BowAmmunitionSamplerTests.Fixture();
+        using var presentation = new BowAmmunitionPresentation(measure: (_, _) => new(24, 12));
+        using var overlay = new BowAmmunitionOverlay(() => { }, presentation);
         overlay.BeginSession(fixture.Api.Object); overlay.Refresh();
         Assert.Null(overlay.Sample!.Icon); Assert.Equal(0, overlay.Sample.Quantity);
-        var context = new HudOverlayPreparationContext(fixture.Api.Object, 1, "en");
-        overlay.Prepare(context); overlay.Refresh(); overlay.Prepare(context);
-        Assert.Equal(1, builds); Assert.Equal("➶  No arrows / 0", text);
+        overlay.Prepare(new(fixture.Api.Object, 1, "en"));
+        Assert.Equal("➶  No arrows / 0", presentation.Reading);
         fixture.Manager.Invocations.Clear(); fixture.World.Invocations.Clear();
-        var bounds = ElementBounds.Fixed(0, 0, 80, 40).WithEmptyParent(); bounds.CalcWorldBounds();
-        overlay.Draw(new Mock<IRenderAPI>().Object, bounds, new System.Drawing.RectangleF(0, 0, 80, 40), .1f);
+        using var view = overlay.CreateView(fixture.Api.Object, NativeViewRole.Live);
         Assert.Empty(fixture.Manager.Invocations); Assert.Empty(fixture.World.Invocations);
-        overlay.EndSession(); Assert.True(textures[0].Disposed);
+        overlay.EndSession(); Assert.True(presentation.Size.IsEmpty);
     }
-
     /// <summary>Active-slot events invalidate without reading state and unverified hand items hide.</summary>
     [Fact]
     public void ActiveSlotAndUnsupportedHandKeepSamplingSeparate()

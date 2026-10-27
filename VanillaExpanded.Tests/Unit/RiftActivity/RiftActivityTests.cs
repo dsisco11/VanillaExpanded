@@ -53,7 +53,7 @@ public sealed class RiftActivityTests : IDisposable
         Assert.Null(RiftActivitySource.Read(null));
     }
 
-    /// <summary>Calm remains pollable and active categories select cached textures until visibility ends.</summary>
+    /// <summary>Calm remains pollable and active categories prepare stable measurements until visibility ends.</summary>
     [Fact]
     public void ActivityTransitionsAndCleanup()
     {
@@ -63,23 +63,15 @@ public sealed class RiftActivityTests : IDisposable
         var loader = new Mock<IModLoader>();
         loader.Setup(value => value.GetModSystem<ModSystemRiftWeather>(true)).Returns(weather);
         fixture.Api.SetupGet(value => value.ModLoader).Returns(loader.Object);
-        var renderer = new Mock<IRenderAPI>();
-        int loads = 0;
-        using var label = new HudOverlayIconTextPresentation((context, _) => new LoadedTexture(context.Api) { TextureId = 40, Width = 30, Height = 14 });
-        using var overlay = new RiftActivityOverlay(context =>
-        {
-            loads++;
-            return Enumerable.Range(1, 4).Select(id => new LoadedTexture(context.Api)
-                { TextureId = id, IgnoreUndisposed = true }).ToArray();
-        }, label: label);
+        using var overlay = new RiftActivityOverlay(new RiftActivityPresentation(measure: (_, _) => new(30, 14), loadBackdrop: _ => null));
         overlay.BeginSession(fixture.Api.Object);
         var preparation = new HudOverlayPreparationContext(fixture.Api.Object, 1, "en", 0);
         Assert.True(overlay.IsApplicable());
         overlay.Refresh(); overlay.Prepare(preparation);
         Assert.Equal(SizeF.Empty, overlay.Measure());
-        Assert.Equal(0, loads);
 
-        // Change the packet through each category and observe only mocked draw arguments.
+
+        // Change the packet through each category without allocating visual resources.
         string[] categories = ["low", "medium", "high", "apocalyptic"];
         for (int index = 0; index < categories.Length; index++)
         {
@@ -88,20 +80,11 @@ public sealed class RiftActivityTests : IDisposable
             overlay.Prepare(preparation);
             Assert.NotEqual(SizeF.Empty, overlay.Measure());
             Assert.Equal(HudOverlayChange.None, overlay.Refresh());
-            renderer.Invocations.Clear();
-            overlay.Draw(renderer.Object, ElementBounds.Fixed(0, 0, 24, 24).WithEmptyParent(), RectangleF.Empty, 0);
-            var iconCall = Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture" && (float)call.Arguments[5] == 50);
-            Assert.Equal(index + 1, Assert.Single(renderer.Invocations, call => call.Method.Name == "RenderTexture" && (float)call.Arguments[5] == 50).Arguments[0]);
         }
-        Assert.Equal(1, loads);
         Pattern(weather) = new CurrentPattern { Code = "calm" };
         Assert.NotEqual(HudOverlayChange.None, overlay.Refresh());
         Assert.True(overlay.IsApplicable());
         Assert.Equal(SizeF.Empty, overlay.Measure());
-        renderer.Invocations.Clear();
-        overlay.Draw(renderer.Object, ElementBounds.Fixed(0, 0, 24, 24).WithEmptyParent(), RectangleF.Empty, 0);
-        Assert.Empty(renderer.Invocations);
-
         Pattern(weather) = new CurrentPattern { Code = "low" };
         overlay.Refresh(); overlay.Prepare(preparation);
         overlay.SetEnabled(false);

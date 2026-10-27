@@ -9,7 +9,7 @@ using Vintagestory.GameContent;
 namespace VanillaExpanded.RiftActivity;
 
 /// <summary>Samples synchronized native rift activity and owns its passive fissure presentation.</summary>
-internal sealed class RiftActivityOverlay : IHudOverlay, IHudOverlayBackdropProvider, IHudOverlayVisibilityTransition
+internal sealed class RiftActivityOverlay : IHudOverlay, INativePresentation, IHudOverlayVisibilityTransition
 {
     private readonly RiftActivityPresentation presentation;
     private ICoreClientAPI? api;
@@ -30,12 +30,10 @@ internal sealed class RiftActivityOverlay : IHudOverlay, IHudOverlayBackdropProv
     public void SetStyle(HudIndicatorStyle style) => styleChanged |= presentation.SetStyle(style);
 
     #region Lifecycle
-    /// <summary>Creates the presentation with optional headless texture loading.</summary>
-    public RiftActivityOverlay(System.Func<HudOverlayPreparationContext, LoadedTexture[]>? load = null,
-        System.Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null,
-        HudOverlayIconTextPresentation? label = null)
+    /// <summary>Accepts prepared native presentation state for focused integration checks.</summary>
+    public RiftActivityOverlay(RiftActivityPresentation? presentation = null)
     {
-        presentation = new RiftActivityPresentation(load, loadBackdrop, label: label);
+        this.presentation = presentation ?? new();
     }
     /// <summary>Binds the native packet provider for the current client world.</summary>
     public void BeginSession(ICoreClientAPI api)
@@ -54,7 +52,7 @@ internal sealed class RiftActivityOverlay : IHudOverlay, IHudOverlayBackdropProv
         if (!value) Clear();
         return value;
     }
-    /// <summary>Drops borrowed native state and artwork at world exit.</summary>
+    /// <summary>Drops borrowed native state and prepared presentation data at world exit.</summary>
     public void EndSession()
     {
         api = null;
@@ -93,23 +91,23 @@ internal sealed class RiftActivityOverlay : IHudOverlay, IHudOverlayBackdropProv
     }
     #endregion
     #region Presentation
-    /// <summary>Supplies prepared backdrop positions to the shared host pass.</summary>
-    public void CollectBackdrops(IRenderAPI renderer, ElementBounds bounds)
-    {
-        presentation.CollectBackdrops(renderer, bounds);
-    }
+    /// <summary>Creates unique native visuals without sampling or subscribing.</summary>
+    public INativeView CreateView(ICoreClientAPI api, NativeViewRole role) => presentation.CreateView(api);
 
-    /// <summary>Loads artwork only for a visible activity category.</summary>
+    /// <summary>Advances shared visual effects once before all visual instances render.</summary>
+    public void BeginFrame(float deltaTime) { }
+
+    /// <summary>Prepares localized data and metrics only for a visible activity category.</summary>
     public void Prepare(HudOverlayPreparationContext context)
     {
         if (activity.HasValue) presentation.Prepare(context);
     }
     /// <summary>Reports the active icon footprint, or zero during calm activity.</summary>
     public SizeF Measure() => presentation.Size;
-    /// <summary>Draws cached artwork without polling the native activity system.</summary>
+    /// <summary>Requires native rendering through the registered component elements.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime)
     {
-        presentation.Draw(renderer, bounds);
+        throw new InvalidOperationException("Native indicator components render through their composer.");
     }
     #endregion
     #endregion

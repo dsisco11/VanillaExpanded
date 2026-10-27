@@ -1,6 +1,5 @@
 using System;
 using System.Drawing;
-using System.Globalization;
 using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering;
@@ -11,46 +10,34 @@ using Vintagestory.GameContent;
 namespace VanillaExpanded.BowAmmunition;
 
 /// <summary>Owns bow applicability, stable ammunition samples, notifications, and passive presentation.</summary>
-internal sealed class BowAmmunitionOverlay : IHudOverlay, IHudOverlayVisibilityTransition
+internal sealed class BowAmmunitionOverlay : IHudOverlay, INativePresentation, IHudOverlayVisibilityTransition
 {
     private readonly Action invalidate;
-    private readonly HudOverlayIconTextPresentation presentation;
-    private readonly HudOverlayIconTextPresentation emptyPresentation;
+    private readonly BowAmmunitionPresentation presentation;
     private ICoreClientAPI? api;
     private IPlayer? player;
     private BowAmmunitionInventorySubscriptions? subscriptions;
     private bool enabled = true;
     private bool disposed;
     internal BowAmmunitionSample? Sample { get; private set; }
-    private HudOverlayIconTextPresentation? preparedPresentation;
-    private readonly HudIndicatorTextPresentation textStyle;
-    private HudIndicatorStyle style;
-    private bool styleChanged, preparedText;
+    private bool styleChanged;
     /// <summary>Controls visibility independently of the current ammunition sample.</summary>
-    public HudOverlayVisibilityTransition Visibility { get; } = new();
+    public HudOverlayVisibilityTransition Visibility => presentation.Visibility;
     /// <summary>Retains the last preparation for the shared host's exit transition.</summary>
     public void HidePresentation() => ClearSample();
     #region Public API
     #region Lifecycle
-    /// <summary>Uses cached native icon/count presentation and muted text for the generic empty-arrow state.</summary>
-    public BowAmmunitionOverlay(Action invalidate, HudOverlayIconTextPresentation? presentation = null,
-        HudOverlayIconTextPresentation? emptyPresentation = null, HudIndicatorTextPresentation? textStyle = null)
+    /// <summary>Retains one gameplay owner and prepared native presentation state.</summary>
+    public BowAmmunitionOverlay(Action invalidate, BowAmmunitionPresentation? presentation = null)
     {
         this.invalidate = invalidate;
-        this.presentation = presentation ?? new(iconSize: HudOverlaySizes.Small, gap: HudOverlaySizes.ReadingGap, fontSize: HudOverlaySizes.Text, circularIconBackground: true, useItemPresentation: true)
-        { Direction = VanillaExpanded.HudOverlays.Layout.HudOverlayDirection.Vertical };
-        this.emptyPresentation = emptyPresentation ?? new(CreateMutedText);
-        this.textStyle = textStyle ?? new();
+        this.presentation = presentation ?? new();
     }
-    /// <summary>Changes symbol style without changing the chosen arrow, inventory subscriptions, or visibility.</summary>
+    /// <summary>Changes visual structure without changing selection or inventory subscriptions.</summary>
     public void SetStyle(HudIndicatorStyle value)
     {
-        var next = value == HudIndicatorStyle.Text ? value : HudIndicatorStyle.Icon;
-        if (next == style) return;
-        presentation.Reset(); emptyPresentation.Reset(); textStyle.Reset();
-        preparedPresentation = null; preparedText = false;
-        style = next; styleChanged = true;
-        invalidate();
+        if (!presentation.SetStyle(value)) return;
+        styleChanged = true; invalidate();
     }
     /// <summary>Binds one fresh player session with no retained arrow sample.</summary>
     public void BeginSession(ICoreClientAPI api)
@@ -85,19 +72,14 @@ internal sealed class BowAmmunitionOverlay : IHudOverlay, IHudOverlayVisibilityT
         subscriptions?.Dispose(); subscriptions = null;
         api = null; player = null;
         ClearSample();
-        ReleasePresentation();
+        presentation.Reset();
     }
-    /// <summary>Finally releases the consumer and its presentation helpers exactly once.</summary>
+    /// <summary>Finally releases the consumer and its prepared presentation state exactly once.</summary>
     public void Dispose()
     {
         if (disposed) return;
         disposed = true;
-        try { EndSession(); }
-        finally
-        {
-            try { presentation.Dispose(); }
-            finally { emptyPresentation.Dispose(); textStyle.Dispose(); }
-        }
+        try { EndSession(); } finally { presentation.Dispose(); }
     }
     #endregion
     #region Sampling
@@ -125,63 +107,36 @@ internal sealed class BowAmmunitionOverlay : IHudOverlay, IHudOverlayVisibilityT
         Sample = next;
         styleChanged = false;
         if (!changed) return HudOverlayChange.None;
-        if (next.Icon == null) emptyPresentation.SetContent(null, "vanillaexpanded:bow-ammunition-empty");
-        else presentation.SetContent(next.Icon, "vanillaexpanded:bow-ammunition-count", next.Quantity);
+        presentation.SetContent(next);
         return HudOverlayChange.Presentation | HudOverlayChange.Measurement;
     }
     #endregion
     #region Presentation
-    /// <summary>Prepares only sampled content in the shared scheduler's resource boundary.</summary>
+    /// <summary>Creates independent native text and arrow elements without sampling.</summary>
+    public INativeView CreateView(ICoreClientAPI api, NativeViewRole role) => presentation.CreateView(api);
+    /// <summary>Ammunition has no shared per-frame visual effect.</summary>
+    public void BeginFrame(float deltaTime) { }
+    /// <summary>Prepares localized snapshot data before native component composition.</summary>
     public void Prepare(HudOverlayPreparationContext context)
     {
-        if (Sample != null)
-        {
-            if (style == HudIndicatorStyle.Text)
-            {
-                textStyle.Prepare(context, "ammunition", Sample.Quantity.ToString(CultureInfo.InvariantCulture));
-                preparedText = true; preparedPresentation = null; Visibility.Show();
-                return;
-            }
-            CurrentPresentation.Prepare(context);
-            preparedText = false;
-            preparedPresentation = CurrentPresentation;
-            Visibility.Show();
-        }
+        if (Sample != null) presentation.Prepare(context);
     }
     /// <summary>Reports cached dimensions without accessing inventory.</summary>
-    public SizeF Measure() => Sample == null ? SizeF.Empty : style == HudIndicatorStyle.Text ? textStyle.Size : CurrentPresentation.Size;
-    /// <summary>Draws the cached icon/count or muted empty state without gameplay queries.</summary>
+    public SizeF Measure() => presentation.Size;
+    /// <summary>Requires native rendering through the registered component elements.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime)
     {
-        if (preparedText) textStyle.Draw(renderer, bounds);
-        else preparedPresentation?.Draw(renderer, bounds, clip, deltaTime);
+        throw new InvalidOperationException("Native indicator components render through their composer.");
     }
     #endregion
     #endregion
     #region Private
-    /// <summary>Selects the cached presentation using sampled state only.</summary>
-    private HudOverlayIconTextPresentation CurrentPresentation => Sample?.Icon == null ? emptyPresentation : presentation;
-    /// <summary>Releases both possible cached presentations and removes the old sampled arrow.</summary>
+    /// <summary>Clears the current sample while retaining prepared arrow data for a visible exit.</summary>
     private void ClearSample()
     {
         Sample = null;
-        Visibility.Hide(ReleasePresentation);
+        presentation.Hide();
     }
-    /// <summary>Releases cached artwork after fading or immediately at world exit.</summary>
-    private void ReleasePresentation()
-    {
-        Visibility.Reset();
-        textStyle.Reset(); preparedText = false;
-        preparedPresentation = null;
-        try { presentation.Reset(); }
-        finally { emptyPresentation.Reset(); }
-    }
-    /// <summary>Renders the generic arrow glyph and localized empty state with muted accessible contrast.</summary>
-    private static LoadedTexture CreateMutedText(HudOverlayPreparationContext context, string text)
-    {
-        var font = CairoFont.WhiteSmallText().WithFontSize(HudOverlaySizes.Text).WithColor(new double[] { .7, .7, .7, 1 })
-            .WithStroke(new double[] { 0, 0, 0, .85 }, 1.5);
-        return context.Api.Gui.TextTexture.GenTextTexture(text, font);
-    }
+
     #endregion
 }

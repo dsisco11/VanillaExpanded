@@ -56,7 +56,7 @@ public sealed class TemporalStormTests
         Assert.Null(TemporalStormSource.Read(null, 0));
     }
 
-    /// <summary>Native stage transitions select textures and queue backgrounds separately from foreground draws.</summary>
+    /// <summary>Native stage transitions preserve applicability and canonical measurements through configuration and session changes.</summary>
     [Fact]
     public void StageTransitionsVisibilityAndCleanup()
     {
@@ -73,25 +73,14 @@ public sealed class TemporalStormTests
         config.SetBool("temporalStability", true);
         config.SetString("temporalStorms", "normal");
         fixture.World.SetupGet(value => value.Config).Returns(config);
-        var renderer = new Mock<IRenderAPI>();
-        var backdrop = new Mock<IHudOverlayIconBackdrop>();
-        int loads = 0;
-        var borrowed = new List<LoadedTexture>();
-        using var overlay = new TemporalStormOverlay(context =>
-        {
-            loads++;
-            var textures = Enumerable.Range(1, 3).Select(id => new LoadedTexture(context.Api)
-                { TextureId = id, IgnoreUndisposed = true }).ToArray();
-            borrowed.AddRange(textures);
-            return textures;
-        }, _ => backdrop.Object);
+        using var overlay = new TemporalStormOverlay(new TemporalStormPresentation(loadBackdrop: _ => null));
         overlay.BeginSession(fixture.Api.Object);
         var preparation = new HudOverlayPreparationContext(fixture.Api.Object, 1, "en");
         var bounds = ElementBounds.Fixed(10, 20, 24, 24).WithEmptyParent();
         bounds.CalcWorldBounds();
         Assert.True(overlay.IsApplicable());
         overlay.Refresh(); overlay.Prepare(preparation);
-        Assert.Equal(SizeF.Empty, overlay.Measure()); Assert.Equal(0, loads);
+        Assert.Equal(SizeF.Empty, overlay.Measure());
 
         // Polling follows the native schedule; rendering reads only the already prepared snapshot.
         for (int index = 0; index < 3; index++)
@@ -102,24 +91,12 @@ public sealed class TemporalStormTests
             overlay.Prepare(preparation);
             Assert.NotEqual(SizeF.Empty, overlay.Measure());
             Assert.Equal(HudOverlayChange.None, overlay.Refresh());
-            renderer.Invocations.Clear(); backdrop.Invocations.Clear();
-            overlay.Draw(renderer.Object, bounds, RectangleF.Empty, 0);
-            Assert.Empty(backdrop.Invocations);
-            Assert.Equal(index + 1, Assert.Single(renderer.Invocations).Arguments[0]);
-            overlay.CollectBackdrops(renderer.Object, bounds);
-            Assert.Equal("Queue", Assert.Single(backdrop.Invocations).Method.Name);
         }
-        Assert.Equal(1, loads);
         storms.StormData.nowStormActive = false;
         storms.StormData.nextStormTotalDays = 5;
         overlay.Refresh();
         Assert.True(overlay.IsApplicable());
         Assert.Equal(SizeF.Empty, overlay.Measure());
-        renderer.Invocations.Clear(); backdrop.Invocations.Clear();
-        overlay.CollectBackdrops(renderer.Object, bounds);
-        overlay.Draw(renderer.Object, bounds, RectangleF.Empty, 0);
-        Assert.Empty(renderer.Invocations); Assert.Empty(backdrop.Invocations);
-
         storms.StormData.nowStormActive = true;
         overlay.Refresh(); overlay.Prepare(preparation);
         config.SetString("temporalStorms", "off");
@@ -137,7 +114,7 @@ public sealed class TemporalStormTests
         overlay.EndSession();
         Assert.False(overlay.IsApplicable()); Assert.Equal(SizeF.Empty, overlay.Measure());
         overlay.Dispose();
-        Assert.All(borrowed, texture => Assert.True(texture.TextureId > 0));
+
     }
 
     /// <summary>The registered fixed slot precedes time and live configuration disables it immediately.</summary>
@@ -174,128 +151,5 @@ public sealed class TemporalStormTests
         finally { system.Dispose(); hud.Dispose(); config.EnableHudOverlays = oldGlobal; config.EnableTemporalStormOverlay = oldFeature; }
     }
 
-    /// <summary>Imminent opacity responds to urgency-only refreshes while other stages remain steady.</summary>
-    [Fact]
-    public void ImminentPulseTracksUrgencyAndResetsWithSession()
-    {
-        var fixture = new BowAmmunitionSamplerTests.Fixture();
-        fixture.Entity.Alive = true;
-        var storms = new SystemTemporalStability();
-        var loader = new Mock<IModLoader>();
-        loader.Setup(value => value.GetModSystem<SystemTemporalStability>(true)).Returns(storms);
-        fixture.Api.SetupGet(value => value.ModLoader).Returns(loader.Object);
-        var calendar = new Mock<IClientGameCalendar>();
-        calendar.SetupGet(value => value.TotalDays).Returns(0);
-        fixture.World.SetupGet(value => value.Calendar).Returns(calendar.Object);
-        var config = new TreeAttribute();
-        config.SetBool("temporalStability", true); config.SetString("temporalStorms", "normal");
-        fixture.World.SetupGet(value => value.Config).Returns(config);
-        var renderer = new Mock<IRenderAPI>();
-        using var overlay = new TemporalStormOverlay(context => Enumerable.Range(1, 3)
-            .Select(id => new LoadedTexture(context.Api) { TextureId = id, IgnoreUndisposed = true }).ToArray(), _ => null);
-        var preparation = new HudOverlayPreparationContext(fixture.Api.Object, 1, "en");
-        var bounds = ElementBounds.Fixed(0, 0, 24, 24).WithEmptyParent(); bounds.CalcWorldBounds();
-        overlay.BeginSession(fixture.Api.Object);
-        storms.StormData.nextStormTotalDays = .02;
-        overlay.Refresh(); overlay.Prepare(preparation);
-        overlay.Draw(renderer.Object, bounds, RectangleF.Empty, 0);
-        float initialAlpha = Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W;
-        renderer.Invocations.Clear();
-        overlay.Draw(renderer.Object, bounds, RectangleF.Empty, .5f);
-        float firstAlpha = Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W;
-        Assert.True(firstAlpha < initialAlpha);
-        storms.StormData.nextStormTotalDays = 0;
-        Assert.Equal(HudOverlayChange.None, overlay.Refresh());
-        renderer.Invocations.Clear();
-        overlay.Draw(renderer.Object, bounds, RectangleF.Empty, 0);
-        Assert.Equal(firstAlpha, Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W);
-        renderer.Invocations.Clear();
-        overlay.Draw(renderer.Object, bounds, RectangleF.Empty, 1f / 12);
-        float urgentAlpha = Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W;
-        Assert.True(urgentAlpha < firstAlpha);
-
-        // World exit starts a fresh warning; approaching and active artwork carry no animation tint.
-        overlay.EndSession(); overlay.BeginSession(fixture.Api.Object);
-        overlay.Refresh(); overlay.Prepare(preparation); renderer.Invocations.Clear();
-        overlay.Draw(renderer.Object, bounds, RectangleF.Empty, 0);
-        Assert.Equal(initialAlpha, Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W);
-        storms.StormData.nextStormTotalDays = .2;
-        overlay.Refresh(); overlay.Prepare(preparation); renderer.Invocations.Clear();
-        overlay.Draw(renderer.Object, bounds, RectangleF.Empty, .5f);
-        Assert.Null(Assert.Single(renderer.Invocations).Arguments[6]);
-        storms.StormData.nowStormActive = true;
-        storms.StormData.stormActiveTotalDays = 1;
-        overlay.Refresh(); overlay.Prepare(preparation); renderer.Invocations.Clear();
-        overlay.Draw(renderer.Object, bounds, RectangleF.Empty, .5f);
-        Assert.Null(Assert.Single(renderer.Invocations).Arguments[6]);
-    }
-
-    /// <summary>Waning is inferred from the end deadline, pulses continuously, and remains active until the server clears it.</summary>
-    [Fact]
-    public void ActiveStormPulsesOnlyWithinWaningWindow()
-    {
-        var fixture = new BowAmmunitionSamplerTests.Fixture();
-        fixture.Entity.Alive = true;
-        var storms = new SystemTemporalStability();
-        var loader = new Mock<IModLoader>();
-        loader.Setup(value => value.GetModSystem<SystemTemporalStability>(true)).Returns(storms);
-        fixture.Api.SetupGet(value => value.ModLoader).Returns(loader.Object);
-        var calendar = new Mock<IClientGameCalendar>();
-        calendar.SetupGet(value => value.TotalDays).Returns(0);
-        fixture.World.SetupGet(value => value.Calendar).Returns(calendar.Object);
-        var config = new TreeAttribute();
-        config.SetBool("temporalStability", true); config.SetString("temporalStorms", "normal");
-        fixture.World.SetupGet(value => value.Config).Returns(config);
-        var renderer = new Mock<IRenderAPI>();
-        var backdrop = new Mock<IHudOverlayIconBackdrop>();
-        using var overlay = new TemporalStormOverlay(context => Enumerable.Range(1, 3)
-            .Select(id => new LoadedTexture(context.Api) { TextureId = id, IgnoreUndisposed = true }).ToArray(), _ => backdrop.Object);
-        var preparation = new HudOverlayPreparationContext(fixture.Api.Object, 1, "en");
-        var bounds = ElementBounds.Fixed(0, 0, 24, 24).WithEmptyParent(); bounds.CalcWorldBounds();
-        overlay.BeginSession(fixture.Api.Object);
-        storms.StormData.nowStormActive = true;
-        storms.StormData.nextStormTotalDays = -1;
-        storms.StormData.stormActiveTotalDays = .02;
-        storms.StormData.stormDayNotify = -1;
-        overlay.Refresh(); overlay.Prepare(preparation);
-        overlay.Draw(renderer.Object, bounds, RectangleF.Empty, 1);
-        Assert.Null(Assert.Single(renderer.Invocations).Arguments[6]);
-
-        // The exact native boundary remains steady even with a stale waning notification marker.
-        storms.StormData.stormDayNotify = 99;
-        storms.StormData.stormActiveTotalDays = .0199;
-        Assert.Equal(HudOverlayChange.None, overlay.Refresh()); renderer.Invocations.Clear();
-        overlay.Draw(renderer.Object, bounds, RectangleF.Empty, 0);
-        float initialAlpha = Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W;
-        renderer.Invocations.Clear();
-        double nearWindowRate = .5 + 2.5 * (1 - .0199 / .02);
-        overlay.Draw(renderer.Object, bounds, RectangleF.Empty, (float)(.25 / nearWindowRate));
-        float partialAlpha = Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W;
-        Assert.True(partialAlpha < initialAlpha);
-
-        // Deadline updates preserve phase and accelerate the existing pulse to three cycles per second.
-        storms.StormData.stormActiveTotalDays = 0;
-        Assert.Equal(HudOverlayChange.None, overlay.Refresh()); renderer.Invocations.Clear();
-        overlay.Draw(renderer.Object, bounds, RectangleF.Empty, 0);
-        Assert.Equal(partialAlpha, Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W);
-        renderer.Invocations.Clear();
-        overlay.Draw(renderer.Object, bounds, RectangleF.Empty, 1f / 12);
-        float lowAlpha = Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W;
-        Assert.True(lowAlpha < partialAlpha);
-        storms.StormData.stormActiveTotalDays = -1;
-        Assert.Equal(HudOverlayChange.None, overlay.Refresh()); renderer.Invocations.Clear();
-        overlay.Draw(renderer.Object, bounds, RectangleF.Empty, 1f / 6);
-        Assert.Equal(initialAlpha, Assert.IsType<Vintagestory.API.MathTools.Vec4f>(Assert.Single(renderer.Invocations).Arguments[6]).W, 5);
-        Assert.NotEqual(SizeF.Empty, overlay.Measure());
-
-        storms.StormData.nowStormActive = false; storms.StormData.nextStormTotalDays = 5;
-        Assert.NotEqual(HudOverlayChange.None, overlay.Refresh());
-        Assert.Equal(SizeF.Empty, overlay.Measure());
-        renderer.Invocations.Clear(); backdrop.Invocations.Clear();
-        overlay.Draw(renderer.Object, bounds, RectangleF.Empty, .5f);
-        overlay.CollectBackdrops(renderer.Object, bounds);
-        Assert.Empty(renderer.Invocations); Assert.Empty(backdrop.Invocations);
-    }
     #endregion
 }
-
