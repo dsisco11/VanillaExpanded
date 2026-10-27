@@ -285,6 +285,41 @@ public sealed class LayeredIndicatorsTests
         content.SetContent(new(34, 37, BodyTemperatureRisk.Cold, .25f), false); content.Prepare(fixture.Context); composition.Update(fixture.Context);
         Assert.True(content.Size.Height < firstSize.Height); Assert.Equal(assets, fixture.Bindings.Count);
     }
+    /// <summary>First host composition and newly visible trend markers keep chevrons outside the temperature reading.</summary>
+    [Theory]
+    [InlineData(-2, 1, false)] [InlineData(2, 1, false)] [InlineData(-2, 2, false)] [InlineData(2, 2, false)]
+    [InlineData(-2, 1, true)] [InlineData(2, 1, true)] [InlineData(-2, 2, true)] [InlineData(2, 2, true)]
+    public void BodyTrendFirstAppearanceUsesResolvedNativeRows(int direction, float scale, bool initiallyTrending)
+    {
+        using var host = new HudNativeHostFixture();
+        using var fixture = new LayeredIndicatorsFixture(scale);
+        using var content = new BodyTemperatureThermometerPresentation(fixture.Measure, fixture.CreateText, fixture.Load, _ => null);
+        content.SetContent(new(34, 37, BodyTemperatureRisk.Cold, .25f, initiallyTrending ? direction : 0), true);
+        content.Prepare(host.Components.Context); host.Size = content.Size;
+        host.Native.Setup(value => value.CreateView(host.Components.Api.Object, It.IsAny<NativeViewRole>()))
+            .Returns(() => content.CreateView(host.Components.Api.Object));
+        host.Synchronize();
+        if (!initiallyTrending)
+        {
+            content.SetContent(new(34, 37, BodyTemperatureRisk.Cold, .25f, direction), true);
+            content.Prepare(host.Components.Context); host.Size = content.Size; host.Revision++;
+            host.Synchronize();
+        }
+        var composer = host.Host.Composers[host.Group.Id];
+        AssertBodyTrendRows(composer, host.Registration.Id, direction);
+        int glyphs = fixture.Glyphs.Count;
+        foreach (int next in new[] { -direction, 0, Math.Sign(direction), direction })
+        {
+            content.SetContent(new(34, 37, BodyTemperatureRisk.Cold, .25f, next), true);
+            content.Prepare(host.Components.Context); host.Revision++;
+            host.Synchronize();
+            Assert.Same(composer, host.Host.Composers[host.Group.Id]);
+            AssertBodyTrendRows(composer, host.Registration.Id, next);
+            Assert.Equal(glyphs, fixture.Glyphs.Count);
+        }
+        Assert.Empty(host.Failures);
+    }
+
     /// <summary>Fill clipping intersects the supplied host clip and restores scissor state after native draw failure.</summary>
     [Fact]
     public void ThermometerClipIsPreparedAndExceptionSafe()
@@ -387,6 +422,22 @@ public sealed class LayeredIndicatorsTests
     #endregion
 
     #region Private
+    /// <summary>Checks native marker direction and centering against the actual prepared reading and icon targets.</summary>
+    private static void AssertBodyTrendRows(GuiComposer composer, string prefix, int direction)
+    {
+        var reading = Assert.IsType<TextElement>(composer.GetElement(prefix + ":reading"));
+        var outline = Assert.IsType<TextureElement>(composer.GetElement(prefix + ":outline"));
+        Assert.True(reading.State.Target.Bottom <= outline.State.Target.Top);
+        for (int index = 0; index < Math.Abs(direction); index++)
+        {
+            var marker = Assert.IsType<TextureElement>(composer.GetElement(prefix + ":trend-" + index));
+            Assert.True(direction > 0 ? marker.State.Target.Bottom <= reading.State.Target.Top : marker.State.Target.Top >= reading.State.Target.Bottom,
+                $"trend={direction}, marker={marker.State.Target}, reading={reading.State.Target}");
+            Assert.True(marker.State.Target.Bottom <= outline.State.Target.Top);
+            Assert.Equal(reading.State.Target.X + reading.State.Target.Width / 2,
+                marker.State.Target.X + marker.State.Target.Width / 2, 4);
+        }
+    }
     /// <summary>Mounts the actual controller's native capability and wires its component failure boundary.</summary>
     private static IndicatorComposition Mount(LayeredIndicatorsFixture fixture, IHudOverlay overlay, IndicatorPresentation presentation, NativeViewRole role = NativeViewRole.Live) =>
         new(fixture.Context.Api, ViewFactory.Create(overlay, fixture.Context.Api, role, fixture.Resources.Native.Failures.Add), fixture.Context, presentation.Size);

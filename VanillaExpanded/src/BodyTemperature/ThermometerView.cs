@@ -15,6 +15,7 @@ internal sealed class ThermometerView : NativeView
     private readonly ElementBounds column = ElementBounds.Fixed(0, 0, 0, 0).WithAlignment(EnumDialogArea.CenterTop);
     private readonly ElementBounds icon = ElementBounds.Fixed(0, 0, HudOverlaySizes.Standard, HudOverlaySizes.Standard).WithAlignment(EnumDialogArea.CenterTop);
     private readonly ElementBounds trend = ElementBounds.Fixed(0, 0, 0, 0).WithAlignment(EnumDialogArea.CenterTop);
+    private readonly ElementBounds readingRow = ElementBounds.Fixed(0, 0, 0, 0).WithAlignment(EnumDialogArea.LeftMiddle);
     private readonly TextElement reading;
     private readonly TextureElement fill, outline;
     private readonly TextureElement[] chevrons = new TextureElement[2];
@@ -30,7 +31,8 @@ internal sealed class ThermometerView : NativeView
         Func<HudOverlayPreparationContext, string, TextureBinding>? load = null) : base(api)
     {
         this.content = content;
-        reading = Own(new TextElement(api, ElementBounds.Fixed(0, 0, 0, 0), _ => { }, createText, 1.5));
+        reading = Own(new TextElement(api, ElementBounds.Fixed(0, 0, 0, 0)
+            .WithAlignment(EnumDialogArea.CenterMiddle), _ => { }, createText, 1.5));
         try
         {
             fill = Own(new TextureElement(api, ElementBounds.Fixed(0, 0, HudOverlaySizes.ThermometerWidth, HudOverlaySizes.Standard)
@@ -38,7 +40,8 @@ internal sealed class ThermometerView : NativeView
             outline = Own(new TextureElement(api, ElementBounds.Fixed(0, 0, HudOverlaySizes.ThermometerWidth, HudOverlaySizes.Standard)
                 .WithAlignment(EnumDialogArea.CenterMiddle), _ => { }, load));
             for (int index = 0; index < chevrons.Length; index++)
-                chevrons[index] = Own(new TextureElement(api, ElementBounds.Fixed(0, 0, 0, 0), _ => { }, load));
+                chevrons[index] = Own(new TextureElement(api, ElementBounds.Fixed(0, 0, 0, 0)
+                    .WithAlignment(EnumDialogArea.CenterTop), _ => { }, load));
         }
         catch { Dispose(); throw; }
     }
@@ -123,7 +126,9 @@ internal sealed class ThermometerView : NativeView
                 composer.BeginChildElements(trend);
                 try { for (int index = 0; index < chevrons.Length; index++) composer.AddInteractiveElement(chevrons[index], prefix + ":trend-" + index); }
                 finally { composer.EndChildElements(); }
-                composer.AddInteractiveElement(reading, prefix + ":reading");
+                composer.BeginChildElements(readingRow);
+                try { composer.AddInteractiveElement(reading, prefix + ":reading"); }
+                finally { composer.EndChildElements(); }
             }
             finally { composer.EndChildElements(); }
         }
@@ -139,11 +144,14 @@ internal sealed class ThermometerView : NativeView
         column.fixedWidth = content.ColumnWidth; column.fixedHeight = content.ColumnWidth > 0 ? HudOverlaySizes.Standard : 0;
         icon.fixedY = content.ColumnWidth > 0 ? HudOverlaySizes.Standard + HudOverlaySizes.ReadingGap : 0;
         reading.Bounds.fixedWidth = content.ReadingWidth; reading.Bounds.fixedHeight = content.ReadingWidth > 0 ? HudOverlaySizes.BodyReadingHeight : 0;
-        reading.Bounds.Alignment = direction > 0 ? EnumDialogArea.CenterBottom : direction < 0 ? EnumDialogArea.CenterTop : EnumDialogArea.CenterMiddle;
+        readingRow.fixedWidth = column.fixedWidth; readingRow.fixedHeight = reading.Bounds.fixedHeight;
+        // LeftTop explicitly clears native vertical margins when a row leaves middle/bottom alignment.
+        // CenterTop only updates the horizontal margin, so switching to it retains a stale vertical offset.
+        readingRow.Alignment = direction > 0 ? EnumDialogArea.LeftBottom : direction < 0 ? EnumDialogArea.LeftTop : EnumDialogArea.LeftMiddle;
         int count = Math.Abs(direction);
-        trend.fixedWidth = count > 0 ? HudOverlaySizes.ChevronWidth : 0;
+        trend.fixedWidth = count > 0 ? column.fixedWidth : 0;
         trend.fixedHeight = count > 0 ? count * HudOverlaySizes.ChevronHeight + (count - 1) * HudOverlaySizes.ChevronGap : 0;
-        trend.Alignment = direction > 0 ? EnumDialogArea.CenterTop : EnumDialogArea.CenterBottom;
+        trend.Alignment = direction > 0 ? EnumDialogArea.LeftTop : EnumDialogArea.LeftBottom;
         for (int index = 0; index < chevrons.Length; index++)
         {
             chevrons[index].Bounds.fixedY = index * (HudOverlaySizes.ChevronHeight + HudOverlaySizes.ChevronGap);
