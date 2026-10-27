@@ -226,16 +226,28 @@ Validation: fresh Release compilation and the complete HUD suite passed **715/71
 
 Depends on Phase 3. Outcome: the simpler built-ins exercise native composition end to end.
 
-    ☐ Migrate bow ammunition, wind speed, rift activity, and temporal storm to the native presentation capability.
-        ☐ Bow: retain selected-arrow presentation copies, counts, no-arrows state, item rendering, and circular backdrop.
-        ☐ Wind: retain native percentage conversion, recent averaging, calm visibility, approved SVG, and current icon/reading dimensions.
-        ☐ Rift: retain activity labels and visibility. Storm: retain stage, flashing, and continuous urgency-pulse behavior without component layout during animation.
-    ☐ Migrate their text-only styles through the shared native text composition; preserve localized names/readings and style-switch invalidation.
-    ☐ Transfer presentation resources into element ownership and remove these consumers' manual component positioning and render-time Resolve/Configure/fitting calls.
-    ☐ Verify each consumer uses native components rather than manual dispatch, with unchanged sampling and configuration behavior.
+    ☑ Migrate bow ammunition, wind speed, rift activity, and temporal storm to the native presentation capability.
+        ☑ Bow: retain selected-arrow presentation copies, counts, no-arrows state, item rendering, and circular backdrop.
+        ☑ Wind: retain native percentage conversion, recent averaging, calm visibility, approved SVG, and current icon/reading dimensions.
+        ☑ Rift: retain activity labels and visibility. Storm: retain stage, flashing, and continuous urgency-pulse behavior without component layout during animation.
+    ☑ Migrate their text-only styles through the shared native text composition; preserve localized names/readings and style-switch invalidation.
+    ☑ Transfer presentation resources into element ownership and remove these consumers' manual component positioning and render-time Resolve/Configure/fitting calls.
+    ☑ Verify each consumer uses native components rather than manual dispatch, with unchanged sampling and configuration behavior.
 
 Completion criteria:
-    ☐ All four consumers' supported styles pass native registration, layout-relationship, update/cache, opacity, and lifetime tests.
+    ☑ All four consumers' supported styles pass native registration, layout-relationship, update/cache, opacity, and lifetime tests.
+
+### Phase 4 implementation traceability
+
+| Task group | Controlling sources | Implementation and verification evidence |
+|---|---|---|
+| Four controllers and supported styles | Approved proposal Proposed design / Ownership and compatibility; Phase 1 consumer inventory, lifetime and invalidation contracts; HudOverlays.md native presentation, visibility and text-style contracts | BowAmmunitionOverlay, WindSpeedOverlay, RiftActivityOverlay and TemporalStormOverlay implement INativePresentation. Their presentations retain prepared strings/metrics and sampled data; IconReadingView, TextView and ArrowView register real native component elements. Canonical TextMetrics mirrors the installed TextTextureUtil boxing without generating duplicate glyphs. NativeTextMetricsTests compares CPU metrics with actual native text upload dimensions. Sampling, settings, IDs and registration defaults remain with existing owners. |
+| Content, layout and animation | Proposal Update and rendering contract; Phase 1 native operations and sequencing; native GuiComposer, ElementBounds, GuiElementTextBase, CairoFont and TextTextureUtil; VanillaExpanded.Tests/AGENTS.md | Shared TextView supplies localized name/reading styles. Reading and artwork rows use native parentage; fitting and clips finalize before rendering. Same-size updates retain bounds and unchanged glyph/art resources. Storm BeginFrame advances one shared urgency effect; backdrop collection retains host fade independently. SimpleIndicatorsTests covers all eight consumer/style combinations, scaled relationships, passive input, prepared geometry, same-size invalidation, labels, percentage conversion, source ownership, style changes, empty arrows and urgency continuity. Existing sampling/configuration tests remain in the affected suite. |
+| Resources and retirement | Proposal Ownership and compatibility; Phase 1 responsibility table; HudOverlays.md resource lifecycle; docs/wind-speed/WindSpeed.md presentation contract | Elements own glyphs, generated wind SVGs, per-view cloned arrow stacks and circles. Rift/storm cached PNGs and procedural backdrop service remain borrowed. Controllers own no generated GUI textures. Manual component positioning and old consumer Draw/CollectBackdrops paths are removed; IHudOverlay.Draw rejects accidental dispatch while the shared interface remains required by other consumers. Native ownership/cache tests replace superseded manual presentation tests. Current architecture and wind documentation describe active owners. |
+
+Completion: implementation, second review and independent audit-stage-completion passed on 2026-10-26. Stale ownership/preparation descriptions in architecture documentation and XML summaries were corrected and independently rechecked. No unresolved findings remain.
+
+Validation: fresh Release compilation and **832/832 affected tests passed**, with zero failures or skips, through the validation subagent. Command: `dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --configuration Release --filter "FullyQualifiedName~HudOverlays|FullyQualifiedName~BowAmmunition|FullyQualifiedName~WindSpeed|FullyQualifiedName~RiftActivity|FullyQualifiedName~TemporalStorm" -p:UseSharedCompilation=false --no-restore --logger "console;verbosity=minimal"`; installed game at `G:/Vintagestory`, including its native library search path. Only existing unrelated warnings remain. Diff whitespace checks passed. These results establish headless native registration, geometry, caching, animation and ownership behavior; package qualification and user-run appearance/input acceptance remain in their later phases. Later task markers remain unchecked.
 
 ## Phase 5: Migrate layered status artwork
 

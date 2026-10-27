@@ -12,6 +12,10 @@ internal sealed class IconReadingView : NativeView
     private readonly ElementBounds root = ElementBounds.Fixed(0, 0, 0, 0).WithAlignment(EnumDialogArea.CenterMiddle);
     private readonly TextElement reading;
     private readonly TextureElement icon;
+    private readonly Func<float> effect;
+    private readonly Func<IHudOverlayIconBackdrop?>? backdrop;
+    private double scale;
+    private float hostOpacity = 1;
 
     #region Public API
     /// <summary>Gets the prepared intrinsic footprint, excluding absent rows and their spacing.</summary>
@@ -21,12 +25,14 @@ internal sealed class IconReadingView : NativeView
     public IconReadingView(ICoreClientAPI api, Func<IconReadingContent> content,
         Action<Exception> failure,
         Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? createText = null,
-        Func<HudOverlayPreparationContext, string, TextureBinding>? loadIcon = null) : base(api)
+        Func<HudOverlayPreparationContext, string, TextureBinding>? loadIcon = null,
+        Func<IHudOverlayIconBackdrop?>? backdrop = null, Func<float>? effect = null, double strokeWidth = 1) : base(api)
     {
         ArgumentNullException.ThrowIfNull(content);
         this.content = content;
+        this.backdrop = backdrop; this.effect = effect ?? (() => 1);
         reading = Own(new TextElement(api, ElementBounds.Fixed(0, 0, 0, 0)
-            .WithAlignment(EnumDialogArea.CenterTop), failure, createText));
+            .WithAlignment(EnumDialogArea.CenterTop), failure, createText, strokeWidth));
         try
         {
             icon = Own(new TextureElement(api, ElementBounds.Fixed(0, 0, 0, 0)
@@ -42,7 +48,8 @@ internal sealed class IconReadingView : NativeView
         Validate(next);
         reading.Prepare(context, next.Reading);
         icon.Prepare(context, next.IconPath);
-        var textSize = reading.Size;
+        scale = context.GuiScale;
+        var textSize = next.ReadingSize ?? reading.Size;
         float readingFit = textSize.Height > 0 ? Math.Min(1, next.MaximumReadingHeight / textSize.Height) : 1;
         textSize = new(textSize.Width * readingFit, textSize.Height * readingFit);
         SizeF iconSize = string.IsNullOrEmpty(next.IconPath) ? SizeF.Empty : next.IconSize;
@@ -69,10 +76,16 @@ internal sealed class IconReadingView : NativeView
     public override void SetOpacity(float opacity)
     {
         ThrowIfDisposed();
-        reading.State.SetOpacity(opacity); icon.State.SetOpacity(opacity);
+        hostOpacity = opacity;
+        reading.State.SetOpacity(opacity * effect()); icon.State.SetOpacity(opacity * effect());
     }
-    /// <summary>Leaves backdrop submission empty for an unadorned icon/reading pair.</summary>
-    public override void CollectBackdrops(IRenderAPI renderer) { }
+    /// <summary>Submits the cached icon target; feature pulse affects foreground only.</summary>
+    public override void CollectBackdrops(IRenderAPI renderer)
+    {
+        if (!icon.State.Drawable) return;
+        using var opacity = new DrawOpacity(hostOpacity);
+        backdrop?.Invoke()?.Queue(renderer, icon.State.Target.X, icon.State.Target.Y, scale);
+    }
     /// <summary>Assigns the same feature failure boundary to each independently drawn component.</summary>
     public override void SetFailureHandler(Action<Exception> failure)
     {

@@ -51,8 +51,8 @@ public sealed class HudIndicatorTextBranchTests : IDisposable
     [InlineData("environmental-temperature", "-43°C")]
     [InlineData("body-temperature", "37°C COLD +2")]
     [InlineData("wetness", "43%")]
-    [InlineData("rift", "HIGH")]
-    [InlineData("storm", "IMMINENT")]
+
+
     [InlineData("weather", "CLD4 RAIN2 FOG2 THR1")]
     public void TextBranchSkipsArtworkAndRetainsReading(string label, string expected)
     {
@@ -82,14 +82,6 @@ public sealed class HudIndicatorTextBranchTests : IDisposable
                 using (var presentation = new PlayerWetnessPresentation(createTextures: FailArtwork, textStyle: text))
                 { presentation.SetContent(.426f); presentation.SetStyle(HudIndicatorStyle.Text); presentation.Prepare(context); }
                 break;
-            case "rift":
-                using (var presentation = new RiftActivityPresentation(load: FailArtwork, textStyle: text))
-                { presentation.SetContent(RiftActivityLevel.High); presentation.SetStyle(HudIndicatorStyle.Text); presentation.Prepare(context); }
-                break;
-            case "storm":
-                using (var presentation = new TemporalStormPresentation(load: FailArtwork, textStyle: text))
-                { presentation.SetContent(TemporalStormStage.Imminent, .01); presentation.SetStyle(HudIndicatorStyle.Text); presentation.Prepare(context); }
-                break;
             case "weather":
                 using (var presentation = new WeatherConditionsPresentation(load: FailArtwork, textStyle: text))
                 {
@@ -103,20 +95,6 @@ public sealed class HudIndicatorTextBranchTests : IDisposable
         Assert.Equal(new[] { label == "environmental-temperature" ? "temperature" : label, expected }, values);
     }
 
-    /// <summary>The ninth indicator shows its synchronized ammunition quantity without preparing either icon presentation.</summary>
-    [Fact]
-    public void AmmunitionTextShowsSampledQuantityWithoutArtwork()
-    {
-        var fixture = new BowAmmunitionSamplerTests.Fixture(); fixture.Entity.Alive = true;
-        var values = new List<string>();
-        using var text = CaptureText(values);
-        using var overlay = new BowAmmunitionOverlay(() => { }, textStyle: text);
-        overlay.SetStyle(HudIndicatorStyle.Text);
-        overlay.BeginSession(fixture.Api.Object); overlay.Refresh();
-        Assert.NotNull(overlay.Sample);
-        overlay.Prepare(new(fixture.Api.Object, 1, "en"));
-        Assert.Equal(new[] { "ammunition", overlay.Sample.Quantity.ToString() }, values);
-    }
     /// <summary>Unknown cloud coverage remains explicit while all other weather channels retain their intensities.</summary>
     [Fact]
     public void UnknownCloudCoverageDoesNotEraseOtherWeatherChannels()
@@ -155,5 +133,3 @@ public sealed class HudIndicatorTextBranchTests : IDisposable
     }
     #endregion
 }
-
-

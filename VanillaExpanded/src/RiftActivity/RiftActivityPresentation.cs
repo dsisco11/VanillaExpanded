@@ -3,115 +3,62 @@ using System.Drawing;
 using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering;
+using VanillaExpanded.HudOverlays.Rendering.Native;
 using Vintagestory.API.Client;
-using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 
 namespace VanillaExpanded.RiftActivity;
 
-/// <summary>Borrows cached rift textures and owns a localized activity abbreviation above the icon.</summary>
-internal sealed class RiftActivityPresentation : HudIndicatorPresentation<HudIndicatorStyle>
+/// <summary>Prepares stable rift content while native elements own artwork and lettering.</summary>
+internal sealed class RiftActivityPresentation : IndicatorPresentation
 {
-    private readonly System.Func<HudOverlayPreparationContext, LoadedTexture[]> load;
-    private readonly System.Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?> loadBackdrop;
-    private LoadedTexture[]? icons;
+    private RiftActivityLevel? value;
+    private IconReadingContent? content;
     private IHudOverlayIconBackdrop? backdrop;
-    private RiftActivityLevel? activity;
-    private readonly HudOverlayIconTextPresentation label;
-    private readonly HudIndicatorStackLayout layout = new();
+    private readonly Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?> loadBackdrop;
+    private readonly Func<HudOverlayPreparationContext, string, TextureBinding>? load;
+
 
     #region Public API
-    #region Content and rendering
-    /// <summary>Uses native cached texture loading, with an injectable loader for headless checks.</summary>
-    public RiftActivityPresentation(System.Func<HudOverlayPreparationContext, LoadedTexture[]>? load = null,
-        System.Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null,
-        HudIndicatorTextPresentation? textStyle = null, HudOverlayIconTextPresentation? label = null)
-        : base(HudIndicatorStyle.Icon, HudIndicatorStyle.Text, textStyle)
+    /// <summary>Accepts headless measurement/resource factories while retaining controller data only.</summary>
+    public RiftActivityPresentation(Func<HudOverlayPreparationContext, string, SizeF>? measure = null,
+        Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? createText = null,
+        Func<HudOverlayPreparationContext, string, TextureBinding>? load = null,
+        Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null)
+        : base(measure: measure, createText: createText)
     {
-        this.load = load ?? LoadIcons;
-        this.loadBackdrop = loadBackdrop ?? HudOverlayIconBackdrop.Load;
-        this.label = label ?? new HudOverlayIconTextPresentation(fontSize: HudOverlaySizes.Text);
+        this.load = load; this.loadBackdrop = loadBackdrop ?? HudOverlayIconBackdrop.Load;
     }
-    /// <summary>Stores the native activity category.</summary>
-    public void SetContent(RiftActivityLevel value)
+    /// <summary>Stores the synchronized native activity category.</summary>
+    public void SetContent(RiftActivityLevel next) => value = next;
+    /// <summary>Prepares localized data and canonical metrics before host packing.</summary>
+    public void Prepare(HudOverlayPreparationContext context)
     {
-        activity = value;
-    }
-    /// <summary>Loads borrowed textures once per client API and reserves a fixed HudOverlaySizes.Standard-unit icon slot.</summary>
-    public void Prepare(HudOverlayPreparationContext preparation)
-    {
-        if (!activity.HasValue) return;
-        if (IsTextStyle)
+        if (!value.HasValue) return;
+        if (Style == HudIndicatorStyle.Text)
         {
-            TryPrepareText(preparation, "rift", activity.Value.ToString().ToUpperInvariant());
-            return;
+            PrepareText(context, "rift", value.Value.ToString().ToUpperInvariant()); return;
         }
-        if (icons == null || !ReferenceEquals(Context?.Api, preparation.Api)) icons = load(preparation);
-        if (backdrop == null || !ReferenceEquals(Context?.Api, preparation.Api)) backdrop = loadBackdrop(preparation);
-        Context = preparation;
-        label.SetContent(null, "vanillaexpanded:rift-activity-short-" + activity.Value.ToString().ToLowerInvariant());
-        label.Prepare(preparation);
-        layout.Configure(label.Size, new SizeF(HudOverlaySizes.Standard, HudOverlaySizes.Standard), HudOverlaySizes.ReadingGap);
-        Size = layout.Size;
+        string[] names = ["low", "medium", "high", "apocalyptic"];
+        string reading = Lang.GetL(context.Locale, "vanillaexpanded:rift-activity-short-" + value.Value.ToString().ToLowerInvariant());
+        SizeF text = MeasureText(context, reading, 1.5);
+        content = new("textures/hud/rift-activity/" + names[(int)value.Value] + ".png",
+            new(HudOverlaySizes.Standard, HudOverlaySizes.Standard), reading, HudOverlaySizes.ReadingGap, ReadingSize: text);
+        Size = new(Math.Max(text.Width, content.IconSize.Width), text.Height + content.Gap + content.IconSize.Height);
+        backdrop = loadBackdrop(context);
         Visibility.Show();
     }
-    /// <summary>Draws prepared artwork without native activity sampling.</summary>
-    public void Draw(IRenderAPI renderer, ElementBounds bounds)
-    {
-        if (!activity.HasValue || Context == null) return;
-        if (TryDrawText(renderer, bounds)) return;
-        if (icons == null) return;
-        layout.Resolve(bounds, Context.GuiScale);
-        var artwork = layout.Icon;
-        renderer.RenderTexture(icons[(int)activity.Value].TextureId, artwork.renderX, artwork.renderY, artwork.OuterWidth, artwork.OuterHeight, 50, DrawOpacity.Tint);
-        label.Draw(renderer, layout.Reading, new RectangleF((float)bounds.renderX, (float)bounds.renderY,
-            (float)bounds.OuterWidth, (float)bounds.OuterHeight), 0);
-    }
+    /// <summary>Creates independent native components borrowing prepared feature data.</summary>
+    public INativeView CreateView(ICoreClientAPI api) => Style == HudIndicatorStyle.Text ? CreateTextView(api)
+        : new IconReadingView(api, () => content ?? throw new InvalidOperationException("rift content is not prepared."),
+            _ => { }, CreateText, load, () => backdrop, strokeWidth: 1.5);
     #endregion
-    /// <summary>Queues the prepared icon circle separately from foreground drawing.</summary>
-    public void CollectBackdrops(IRenderAPI renderer, ElementBounds bounds)
-    {
-        if (!activity.HasValue || icons == null || Context == null) return;
-        layout.Resolve(bounds, Context.GuiScale);
-        backdrop?.Queue(renderer, layout.Icon.renderX, layout.Icon.renderY, Context.GuiScale);
-    }
-    /// <summary>Releases the owned label and shared presentation state.</summary>
-    public override void Dispose()
-    {
-        base.Dispose();
-        label.Dispose();
-    }
-    #endregion
-    #region Protected API
-    /// <summary>Releases feature artwork without changing sampled content or feature timers.</summary>
-    protected override void ReleaseArtwork()
-    {
-        icons = null; backdrop = null; label.Reset();
-    }
 
-    /// <summary>Clears feature contents after a completed exit or world change.</summary>
+    #region Protected API
+    /// <summary>Clears sampled and prepared state after a completed exit or world change.</summary>
     protected override void ClearContent()
     {
-        activity = null;
+        value = null; content = null; backdrop = null;
     }
     #endregion
-
-    #region Private
-    /// <summary>Loads transparent rift activity assets in increasing activity order with engine cache ownership.</summary>
-    private static LoadedTexture[] LoadIcons(HudOverlayPreparationContext preparation)
-    {
-        string[] names = ["low", "medium", "high", "apocalyptic"];
-        var textures = new LoadedTexture[names.Length];
-        for (int index = 0; index < names.Length; index++)
-        {
-            var texture = new LoadedTexture(preparation.Api);
-            preparation.Api.Render.GetOrLoadTexture(new AssetLocation(Constants.ModId,
-                "textures/hud/rift-activity/" + names[index] + ".png"), ref texture);
-            HudOverlayTextureFiltering.Prepare(texture);
-            texture.IgnoreUndisposed = true;
-            textures[index] = texture;
-        }
-        return textures;
-    }
-    #endregion
-
 }

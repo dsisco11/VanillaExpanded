@@ -15,6 +15,7 @@ internal sealed class TextElement : GuiElementTextBase
     private HudOverlayPreparationContext? context;
     private RectangleF aperture, clip;
     private bool hasLayout, disposed;
+    private readonly double strokeWidth;
 
     #region Public API
     /// <summary>Gets pre-render clip, target, tint and failure state.</summary>
@@ -25,10 +26,11 @@ internal sealed class TextElement : GuiElementTextBase
     #region Preparation
     /// <summary>Creates a passive native text element with an optional headless glyph factory.</summary>
     public TextElement(ICoreClientAPI api, ElementBounds bounds, Action<Exception> failure,
-        Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? create = null)
-        : base(api, string.Empty, CreateFont(), bounds)
+        Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? create = null, double strokeWidth = 1)
+        : base(api, string.Empty, TextMetrics.Font(strokeWidth), bounds)
     {
         this.create = create ?? CreateTexture;
+        this.strokeWidth = strokeWidth;
         State = new(failure);
         draw = DrawTexture;
     }
@@ -40,7 +42,7 @@ internal sealed class TextElement : GuiElementTextBase
         if (!ReferenceEquals(api, preparation.Api)) throw new ArgumentException("A native element cannot change API ownership.", nameof(preparation));
         value ??= string.Empty;
         if (context == preparation && text == value) return;
-        CairoFont nextFont = context == preparation ? Font : CreateFont();
+        CairoFont nextFont = context == preparation ? Font : TextMetrics.Font(strokeWidth);
         // Allocate before replacing the surviving resource so generation failure preserves cleanup ownership.
         LoadedTexture? replacement = value.Length == 0 ? null : create(preparation, value, nextFont)
             ?? throw new InvalidOperationException("Native glyph preparation returned no texture.");
@@ -93,9 +95,6 @@ internal sealed class TextElement : GuiElementTextBase
         var target = State.Target;
         api.Render.Render2DTexturePremultipliedAlpha(texture!.TextureId, target.X, target.Y, target.Width, target.Height, 51, State.Tint(true));
     }
-    /// <summary>Uses the normal HUD font and native dark stroke.</summary>
-    private static CairoFont CreateFont() => CairoFont.WhiteSmallText().WithFontSize(HudOverlaySizes.Text)
-        .WithStroke(new double[] { 0, 0, 0, .85 }, 1);
     /// <summary>Generates native glyph pixels and applies the shared texture filtering policy.</summary>
     private static LoadedTexture CreateTexture(HudOverlayPreparationContext context, string value, CairoFont font)
     {

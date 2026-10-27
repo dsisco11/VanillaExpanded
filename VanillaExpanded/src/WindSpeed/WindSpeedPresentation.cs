@@ -3,103 +3,49 @@ using System.Drawing;
 using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering;
+using VanillaExpanded.HudOverlays.Rendering.Native;
 using Vintagestory.API.Client;
 using Vintagestory.API.Config;
-using AssetLocation = Vintagestory.API.Common.AssetLocation;
 
 namespace VanillaExpanded.WindSpeed;
 
-/// <summary>Pairs the approved double-hook wind icon with a normal HUD percentage reading.</summary>
-internal sealed class WindSpeedPresentation : HudIndicatorPresentation<HudIndicatorStyle>
+/// <summary>Prepares wind percentage data for independently owned native text and SVG elements.</summary>
+internal sealed class WindSpeedPresentation : IndicatorPresentation
 {
-    private readonly Func<HudOverlayPreparationContext, LoadedTexture> load;
-    private readonly HudOverlayIconTextPresentation label;
-    private readonly HudIndicatorStackLayout layout = new();
-    private LoadedTexture? icon;
     private int percentage;
+    private IconReadingContent? content;
+    private readonly Func<HudOverlayPreparationContext, string, TextureBinding>? load;
 
     #region Public API
-    #region Content and rendering
-    /// <summary>Accepts optional SVG and text factories while retaining ownership of their prepared resources.</summary>
-    public WindSpeedPresentation(Func<HudOverlayPreparationContext, LoadedTexture>? load = null,
-        HudIndicatorTextPresentation? text = null, HudOverlayIconTextPresentation? label = null)
-        : base(HudIndicatorStyle.Icon, HudIndicatorStyle.Text, text)
+    /// <summary>Accepts CPU measurement and element resource factories without retaining their resources.</summary>
+    public WindSpeedPresentation(Func<HudOverlayPreparationContext, string, SizeF>? measure = null,
+        Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? createText = null,
+        Func<HudOverlayPreparationContext, string, TextureBinding>? load = null) : base(measure: measure, createText: createText)
     {
-        this.load = load ?? LoadIcon;
-        this.label = label ?? new HudOverlayIconTextPresentation(fontSize: HudOverlaySizes.Text);
+        this.load = load;
     }
-
-    /// <summary>Stores the sampled whole wind percentage outside drawing.</summary>
+    /// <summary>Stores the sampled whole wind percentage outside native rendering.</summary>
     public void SetContent(int value) => percentage = value;
-
-    /// <summary>Prepares artwork and normal-size text, allowing localized readings to expand the footprint.</summary>
-    public void Prepare(HudOverlayPreparationContext preparation)
+    /// <summary>Localizes and measures the reading without allocating element textures.</summary>
+    public void Prepare(HudOverlayPreparationContext context)
     {
         if (percentage <= 0) return;
-        const string key = "vanillaexpanded:wind-speed-reading";
-        if (IsTextStyle)
-        {
-            TryPrepareText(preparation, "wind-speed", Lang.GetL(preparation.Locale, key, percentage));
-            return;
-        }
-        if (icon == null || !ReferenceEquals(Context?.Api, preparation.Api))
-        {
-            // Replace only after a successful load, retaining cleanup ownership if rasterization fails.
-            var replacement = load(preparation);
-            icon?.Dispose();
-            icon = replacement;
-        }
-        label.SetContent(null, key, percentage);
-        label.Prepare(preparation);
-        Context = preparation;
-        layout.Configure(label.Size, new SizeF(HudOverlaySizes.Small, HudOverlaySizes.Small), HudOverlaySizes.ReadingGap);
-        Size = layout.Size;
+        string reading = Lang.GetL(context.Locale, "vanillaexpanded:wind-speed-reading", percentage);
+        if (Style == HudIndicatorStyle.Text) { PrepareText(context, "wind-speed", reading); return; }
+        SizeF text = MeasureText(context, reading, 1.5);
+        content = new("textures/hud/wind-speed/icon.svg", new(HudOverlaySizes.Small, HudOverlaySizes.Small),
+            reading, HudOverlaySizes.ReadingGap, ReadingSize: text);
+        Size = new(Math.Max(text.Width, content.IconSize.Width), text.Height + content.Gap + content.IconSize.Height);
         Visibility.Show();
     }
-
-    /// <summary>Centers the icon below its cached reading without fitting or shrinking the text.</summary>
-    public void Draw(IRenderAPI renderer, ElementBounds bounds)
-    {
-        if (Context == null || Size.IsEmpty) return;
-        if (TryDrawText(renderer, bounds)) return;
-        if (icon == null) return;
-        layout.Resolve(bounds, Context.GuiScale);
-        var artwork = layout.Icon;
-        renderer.RenderTexture(icon.TextureId, artwork.renderX, artwork.renderY, artwork.OuterWidth, artwork.OuterHeight, 50, DrawOpacity.Tint);
-        label.Draw(renderer, layout.Reading, new RectangleF((float)bounds.renderX, (float)bounds.renderY,
-            (float)bounds.OuterWidth, (float)bounds.OuterHeight), 0);
-    }
-    #endregion
-
-    #region Lifetime
-    /// <summary>Ends ownership of the wind label and shared text resources.</summary>
-    public override void Dispose()
-    {
-        base.Dispose();
-        label.Dispose();
-    }
-    #endregion
+    /// <summary>Creates unique composer-owned lettering and approved artwork for this visual instance.</summary>
+    public INativeView CreateView(ICoreClientAPI api) => Style == HudIndicatorStyle.Text ? CreateTextView(api)
+        : new IconReadingView(api, () => content ?? throw new InvalidOperationException("Wind content is not prepared."),
+            _ => { }, CreateText, load, strokeWidth: 1.5);
     #endregion
 
     #region Protected API
-    /// <summary>Releases owned SVG and label resources while retaining the sampled percentage across style changes.</summary>
-    protected override void ReleaseArtwork()
-    {
-        icon?.Dispose();
-        icon = null;
-        label.Reset();
-    }
-
-    /// <summary>Clears the wind percentage after a completed exit or session reset.</summary>
-    protected override void ClearContent() => percentage = 0;
-    #endregion
-
-    #region Private
-    /// <summary>Rasterizes the approved SVG into an owned texture using shared HUD filtering.</summary>
-    private static LoadedTexture LoadIcon(HudOverlayPreparationContext preparation)
-    {
-        var location = new AssetLocation(Constants.ModId, "textures/hud/wind-speed/icon.svg");
-        return HudOverlayTextureFiltering.Prepare(preparation.Api.Gui.LoadSvg(location, 64, 64, 64, 64));
-    }
+    /// <summary>Clears sampled wind and prepared data after the exit completes.</summary>
+    protected override void ClearContent() { percentage = 0; content = null; }
     #endregion
 }

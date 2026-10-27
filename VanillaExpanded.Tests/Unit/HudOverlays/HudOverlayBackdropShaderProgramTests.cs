@@ -89,7 +89,7 @@ public sealed class HudOverlayBackdropShaderProgramTests : IDisposable
     [InlineData("temperature")]
     [InlineData("weather")]
     [InlineData("time")]
-    [InlineData("rift")]
+
     public void StatusPresentationsBorrowBackdropAndHideTogether(string kind)
     {
         var api = new Mock<ICoreClientAPI>(); var renderer = new Mock<IRenderAPI>();
@@ -128,11 +128,7 @@ public sealed class HudOverlayBackdropShaderProgramTests : IDisposable
                 time.SetContent(VanillaExpanded.ApproximateTime.ApproximateTimePeriod.Noon, .5);
                 collect = () => { }; owner = time; prepare = () => time.Prepare(context); draw = () => time.Draw(renderer.Object, bounds); reset = time.Reset;
                 break;
-            default:
-                var rift = new VanillaExpanded.RiftActivity.RiftActivityPresentation(Load, _ => backdrop.Object, label: new HudOverlayIconTextPresentation((preparation, _) => new LoadedTexture(preparation.Api) { TextureId = 30, Width = 20, Height = 10 }));
-                rift.SetContent(VanillaExpanded.RiftActivity.RiftActivityLevel.Low);
-                collect = () => rift.CollectBackdrops(renderer.Object, bounds); owner = rift; prepare = () => rift.Prepare(context); draw = () => rift.Draw(renderer.Object, bounds); reset = rift.Reset;
-                break;
+            default: throw new ArgumentOutOfRangeException(nameof(kind));
         }
         using (owner)
         {

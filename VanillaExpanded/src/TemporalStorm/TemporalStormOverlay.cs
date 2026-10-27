@@ -9,7 +9,7 @@ using Vintagestory.GameContent;
 namespace VanillaExpanded.TemporalStorm;
 
 /// <summary>Samples the synchronized native storm schedule and owns its passive fractured iris presentation.</summary>
-internal sealed class TemporalStormOverlay : IHudOverlay, IHudOverlayBackdropProvider, IHudOverlayVisibilityTransition
+internal sealed class TemporalStormOverlay : IHudOverlay, INativePresentation, IHudOverlayVisibilityTransition
 {
     private readonly TemporalStormPresentation presentation;
     private ICoreClientAPI? api;
@@ -30,11 +30,10 @@ internal sealed class TemporalStormOverlay : IHudOverlay, IHudOverlayBackdropPro
     public void SetStyle(HudIndicatorStyle style) => styleChanged |= presentation.SetStyle(style);
 
     #region Lifecycle
-    /// <summary>Creates the presentation with optional headless texture loading.</summary>
-    public TemporalStormOverlay(System.Func<HudOverlayPreparationContext, LoadedTexture[]>? load = null,
-        System.Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null)
+    /// <summary>Accepts prepared native presentation state for focused integration checks.</summary>
+    public TemporalStormOverlay(TemporalStormPresentation? presentation = null)
     {
-        presentation = new TemporalStormPresentation(load, loadBackdrop);
+        this.presentation = presentation ?? new();
     }
     /// <summary>Binds the native storm provider for the current client world.</summary>
     public void BeginSession(ICoreClientAPI api)
@@ -53,7 +52,7 @@ internal sealed class TemporalStormOverlay : IHudOverlay, IHudOverlayBackdropPro
         if (!value) Clear();
         return value;
     }
-    /// <summary>Drops borrowed native state and artwork at world exit.</summary>
+    /// <summary>Drops borrowed native state and prepared presentation data at world exit.</summary>
     public void EndSession()
     {
         api = null;
@@ -105,23 +104,23 @@ internal sealed class TemporalStormOverlay : IHudOverlay, IHudOverlayBackdropPro
     }
     #endregion
     #region Presentation
-    /// <summary>Supplies prepared backdrop positions to the shared host pass.</summary>
-    public void CollectBackdrops(IRenderAPI renderer, ElementBounds bounds)
-    {
-        presentation.CollectBackdrops(renderer, bounds);
-    }
+    /// <summary>Creates unique native visuals without sampling or subscribing.</summary>
+    public INativeView CreateView(ICoreClientAPI api, NativeViewRole role) => presentation.CreateView(api);
 
-    /// <summary>Loads artwork only for a visible storm stage.</summary>
+    /// <summary>Advances shared visual effects once before all visual instances render.</summary>
+    public void BeginFrame(float deltaTime) => presentation.BeginFrame(deltaTime);
+
+    /// <summary>Prepares localized data and metrics only for a visible storm stage.</summary>
     public void Prepare(HudOverlayPreparationContext context)
     {
         if (stage.HasValue) presentation.Prepare(context);
     }
     /// <summary>Reports the active icon footprint, or zero during quiet periods.</summary>
     public SizeF Measure() => presentation.Size;
-    /// <summary>Draws cached artwork without polling the native storm system.</summary>
+    /// <summary>Requires native rendering through the registered component elements.</summary>
     public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime)
     {
-        presentation.Draw(renderer, bounds, deltaTime);
+        throw new InvalidOperationException("Native indicator components render through their composer.");
     }
     #endregion
     #endregion
