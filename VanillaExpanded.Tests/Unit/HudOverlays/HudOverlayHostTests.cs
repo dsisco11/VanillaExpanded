@@ -93,13 +93,13 @@ public sealed class HudOverlayHostTests : IDisposable
             HudOverlayPoint.LeftBottom, 4, 4), new HudOverlayPacking(HudOverlayDirection.Horizontal));
         registry.RegisterGroup(group);
         var weather = new Mock<IHudOverlay>(); var time = new Mock<IHudOverlay>();
-        using var icon = new ApproximateTimePresentation(context => Enumerable.Range(1, 7)
-            .Select(id => new LoadedTexture(context.Api) { TextureId = id, IgnoreUndisposed = true }).ToArray(),
-            new Mock<IApproximateTimeDialRenderer>().Object, (context, _) => new LoadedTexture(context.Api) { TextureId = 20 });
+        using var icon = new ApproximateTimePresentation(
+            load: (context, _) => new(new LoadedTexture(context.Api) { TextureId = 1, IgnoreUndisposed = true }, false),
+            createFace: (context, _) => new LoadedTexture(context.Api) { TextureId = 20 });
+        time.As<INativePresentation>().Setup(value => value.CreateView(api.Object, It.IsAny<NativeViewRole>()))
+            .Returns(() => icon.CreateView(api.Object));
         icon.SetContent(ApproximateTimePeriod.Unknown, .5);
         time.Setup(value => value.Prepare(It.IsAny<HudOverlayPreparationContext>())).Callback<HudOverlayPreparationContext>(icon.Prepare);
-        time.Setup(value => value.Draw(renderer.Object, It.IsAny<ElementBounds>(), It.IsAny<RectangleF>(), .1f))
-            .Callback<IRenderAPI, ElementBounds, RectangleF, float>((render, bounds, _, _) => icon.Draw(render, bounds));
         weather.Setup(value => value.IsApplicable()).Returns(true); time.Setup(value => value.IsApplicable()).Returns(true);
         SizeF weatherSize = SizeF.Empty;
         weather.Setup(value => value.Measure()).Returns(() => weatherSize); time.Setup(value => value.Measure()).Returns(() => icon.Size);
@@ -120,7 +120,7 @@ public sealed class HudOverlayHostTests : IDisposable
         using var host = new HudOverlayHost(api.Object, registry, scheduler.IsDrawable, (_, error) => throw error);
         host.Synchronize(new Dictionary<string, HudOverlayGroupLayout> { [group.Id] = layout });
         host.TryOpen(false); HudOverlayNativeRenderPass.Render(host, .1f);
-        time.Verify(value => value.Draw(renderer.Object, member.Bounds, member.Clip, .1f), Times.Once);
+        time.Verify(value => value.Draw(It.IsAny<IRenderAPI>(), It.IsAny<ElementBounds>(), It.IsAny<RectangleF>(), It.IsAny<float>()), Times.Never);
         weather.Verify(value => value.Draw(It.IsAny<IRenderAPI>(), It.IsAny<ElementBounds>(), It.IsAny<RectangleF>(), It.IsAny<float>()), Times.Never);
         renderer.Verify(value => value.Render2DTexturePremultipliedAlpha(20, It.IsAny<float>(), It.IsAny<float>(),
             It.IsAny<float>(), It.IsAny<float>(), 51, null), Times.Once);

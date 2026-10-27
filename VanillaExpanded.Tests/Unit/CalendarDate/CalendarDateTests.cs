@@ -43,54 +43,7 @@ public sealed class CalendarDateTests : IDisposable
         Assert.Equal(new CalendarDateReading(expected, EnumMonth.October), CalendarDateReading.Read(calendar.Object));
     }
 
-    /// <summary>Calendar rendering scales every layer from one canvas and releases only owned lettering.</summary>
-    [Theory]
-    [InlineData(1)] [InlineData(2)]
-    public void SandwichOrderAndScale(double scale)
-    {
-        var api = new Mock<ICoreClientAPI> { DefaultValue = DefaultValue.Mock };
-        var textValues = new List<string>();
-        var owned = new List<LoadedTexture>();
-        var backing = new LoadedTexture(api.Object) { TextureId = 1, IgnoreUndisposed = true };
-        var glass = new LoadedTexture(api.Object) { TextureId = 2, IgnoreUndisposed = true };
-        using var presentation = new CalendarDatePresentation(_ => [backing, glass], () => new WorkshopGaugeText((context, content) =>
-        {
-            textValues.Add(content);
-            var texture = new LoadedTexture(context.Api)
-                { TextureId = 10 + owned.Count, Width = (int)(content.Length * 10 * scale), Height = (int)(14 * scale) };
-            owned.Add(texture); return texture;
-        }));
-        presentation.SetContent(new(14, EnumMonth.October));
-        var context = new HudOverlayPreparationContext(api.Object, scale, "en");
-        presentation.Prepare(context); presentation.Prepare(context);
-        Assert.Equal(new[] { "OCT", "14" }, textValues);
-        Assert.NotEqual(SizeF.Empty, presentation.Size);
-        var renderer = new Mock<IRenderAPI>();
-        var bounds = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
-        bounds.absFixedX = 20; bounds.absFixedY = 30;
-        bounds.absInnerWidth = presentation.Size.Width * scale; bounds.absInnerHeight = presentation.Size.Height * scale;
-        bounds.Initialized = true;
-        presentation.Draw(renderer.Object, bounds);
-        Assert.Equal(new[] { 1, 10, 11, 2 }, renderer.Invocations.Select(call => (int)call.Arguments[0]));
-        var lettering = renderer.Invocations.Where(call => call.Method.Name == "Render2DTexturePremultipliedAlpha").ToArray();
-        Assert.Equal(2, lettering.Length);
-        Assert.True((double)lettering[0].Arguments[1] < (double)lettering[1].Arguments[1]);
-        // Lettering forwards supplied texture dimensions rather than asserting a font or artwork preset.
-        for (int index = 0; index < lettering.Length; index++)
-        {
-            Assert.Equal((double)owned[index].Width, lettering[index].Arguments[3]);
-            Assert.Equal((double)owned[index].Height, lettering[index].Arguments[4]);
-        }
-        foreach (var call in renderer.Invocations.Where(call => call.Method.Name == "RenderTexture"))
-        {
-            Assert.Equal(bounds.renderX, call.Arguments[1]); Assert.Equal(bounds.renderY, call.Arguments[2]);
-            Assert.Equal(bounds.OuterWidth, call.Arguments[3]);
-            Assert.Equal(bounds.OuterHeight, call.Arguments[4]);
-        }
-        presentation.Reset();
-        Assert.All(owned, texture => Assert.True(texture.Disposed));
-        Assert.False(backing.Disposed); Assert.False(glass.Disposed);
-    }
+
 
     /// <summary>The independent overlay refreshes on date changes, never queries calendar during drawing, and clears on exit.</summary>
     [Fact]
@@ -113,7 +66,7 @@ public sealed class CalendarDateTests : IDisposable
         day = 0; year = 1387;
         Assert.NotEqual(HudOverlayChange.None, overlay.Refresh());
         calendar.Invocations.Clear();
-        overlay.Draw(Mock.Of<IRenderAPI>(), ElementBounds.Empty, RectangleF.Empty, 0);
+        overlay.BeginFrame(0);
         Assert.Empty(calendar.Invocations);
         overlay.SetEnabled(false); Assert.False(overlay.IsApplicable()); Assert.Equal(SizeF.Empty, overlay.Measure());
         overlay.EndSession(); Assert.False(overlay.IsApplicable());

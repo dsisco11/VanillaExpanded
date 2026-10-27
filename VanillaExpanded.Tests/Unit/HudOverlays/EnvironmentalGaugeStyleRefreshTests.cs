@@ -45,8 +45,7 @@ public sealed class EnvironmentalGaugeStyleRefreshTests : IDisposable
         blocks.Setup(value => value.GetClimateAt(It.IsAny<BlockPos>(), EnumGetClimateMode.NowValues, 0))
             .Returns(new ClimateCondition { Temperature = 12 });
         fixture.World.SetupGet(value => value.BlockAccessor).Returns(blocks.Object);
-        using var compact = CreateCompact();
-        using var overlay = new EnvironmentalTemperatureOverlay(new EnvironmentalTemperaturePresentation(compact: compact));
+        using var overlay = new EnvironmentalTemperatureOverlay(new EnvironmentalTemperaturePresentation(measure: (_, value) => new(value.Length * 7, 13)));
         overlay.BeginSession(fixture.Api.Object);
         overlay.Refresh();
         Assert.Equal(HudOverlayChange.None, overlay.Refresh());
@@ -71,8 +70,7 @@ public sealed class EnvironmentalGaugeStyleRefreshTests : IDisposable
         calendar.SetupGet(value => value.DayOfYear).Returns(8);
         calendar.SetupGet(value => value.MonthName).Returns(EnumMonth.October);
         fixture.World.SetupGet(value => value.Calendar).Returns(calendar.Object);
-        using var compact = CreateCompact();
-        using var overlay = new CalendarDateOverlay(new CalendarDatePresentation(compact: compact));
+        using var overlay = new CalendarDateOverlay(new CalendarDatePresentation(measure: (_, value) => new(value.Length * 7, 13)));
         overlay.BeginSession(fixture.Api.Object);
         overlay.Refresh();
         Assert.Equal(HudOverlayChange.None, overlay.Refresh());
@@ -86,12 +84,4 @@ public sealed class EnvironmentalGaugeStyleRefreshTests : IDisposable
     }
     #endregion
 
-    #region Private
-    /// <summary>Creates owned headless textures without accessing native rendering APIs.</summary>
-    private static HudOverlayIconReading CreateCompact() =>
-        new(new WorkshopGaugeText((context, _) => new LoadedTexture(context.Api)
-            { TextureId = 9, Width = 40, Height = 14 }),
-            (context, _) => new LoadedTexture(context.Api) { TextureId = 8 });
-    #endregion
 }
-

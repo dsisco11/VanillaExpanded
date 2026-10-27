@@ -10,8 +10,8 @@ using Vintagestory.API.Common.Entities;
 
 namespace VanillaExpanded.ApproximateTime;
 
-/// <summary>Reads synchronized observation age and owns the cached approximate time icon.</summary>
-internal sealed class ApproximateTimeOverlay : IHudOverlay, IHudOverlayVisibilityTransition
+/// <summary>Reads synchronized observation age and retains prepared approximate-time data.</summary>
+internal sealed class ApproximateTimeOverlay : IHudOverlay, INativePresentation, IHudOverlayVisibilityTransition
 {
 
     private readonly ApproximateTimePresentation presentation;
@@ -131,11 +131,13 @@ internal sealed class ApproximateTimeOverlay : IHudOverlay, IHudOverlayVisibilit
     }
     /// <summary>Returns prepared icon dimensions in unscaled GUI units.</summary>
     public SizeF Measure() => presentation.Size;
-    /// <summary>Draws cached artwork without calendar or terrain queries.</summary>
-    public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime)
-    {
-        presentation.Draw(renderer, bounds);
-    }
+    /// <summary>Creates one independent native composition over the feature's prepared data.</summary>
+    public INativeView CreateView(ICoreClientAPI api, NativeViewRole role) => presentation.CreateView(api);
+    /// <summary>Has no elapsed visual effect; the estimated state advances only through scheduled sampling.</summary>
+    public void BeginFrame(float deltaTime) { }
+    /// <summary>Rejects manual dispatch because registered native components own rendering.</summary>
+    public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime) =>
+        throw new InvalidOperationException("Render this indicator through its native view.");
     #endregion
     #endregion
     #region Private

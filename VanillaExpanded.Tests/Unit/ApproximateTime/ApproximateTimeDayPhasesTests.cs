@@ -81,48 +81,8 @@ public sealed class ApproximateTimeDayPhasesTests
         }
     }
 
-    /// <summary>A renderer may refresh its cached texture in place without presentation disposing that shared identity.</summary>
-    [Fact]
-    public void CoverageChangeRetainsSameCachedTextureUntilReset()
-    {
-        var api = new Mock<ICoreClientAPI> { DefaultValue = DefaultValue.Mock };
-        var face = new LoadedTexture(api.Object) { TextureId = 40 };
-        int refreshes = 0;
-        using var presentation = new ApproximateTimePresentation(context => Enumerable.Range(1, 3)
-            .Select(id => new LoadedTexture(context.Api) { TextureId = id, IgnoreUndisposed = true }).ToArray(),
-            Mock.Of<IApproximateTimeDialRenderer>(), (_, _) => { refreshes++; return face; });
-        var context = new HudOverlayPreparationContext(api.Object, 1, "en");
-        presentation.SetContent(ApproximateTimePeriod.Noon, .5, ApproximateTimeDayPhases.Sample(0, _ => .5f));
-        presentation.Prepare(context);
-        presentation.SetContent(ApproximateTimePeriod.Night, .9, ApproximateTimeDayPhases.Sample(0, _ => -.5f));
-        presentation.Prepare(context);
-        Assert.Equal(2, refreshes);
-        Assert.False(face.Disposed);
-        presentation.Reset();
-        Assert.True(face.Disposed);
-    }
 
-    /// <summary>Pointer refreshes reuse the face; changed coverage replaces it and reset releases owned resources.</summary>
-    [Fact]
-    public void PointerChangesReuseFaceWhileCoverageChangesReplaceOwnedPixels()
-    {
-        var api = new Mock<ICoreClientAPI> { DefaultValue = DefaultValue.Mock };
-        var faces = new List<LoadedTexture>();
-        var dial = new Mock<IApproximateTimeDialRenderer>();
-        using var presentation = new ApproximateTimePresentation(context => Enumerable.Range(1, 3)
-            .Select(id => new LoadedTexture(context.Api) { TextureId = id, IgnoreUndisposed = true }).ToArray(), dial.Object,
-            (context, _) => { var texture = new LoadedTexture(context.Api) { TextureId = 10 + faces.Count }; faces.Add(texture); return texture; });
-        var context = new HudOverlayPreparationContext(api.Object, 1, "en");
-        presentation.SetContent(ApproximateTimePeriod.Noon, .5, ApproximateTimeDayPhases.Sample(0, _ => .5f));
-        presentation.Prepare(context);
-        presentation.SetContent(ApproximateTimePeriod.Afternoon, .6, ApproximateTimeDayPhases.Sample(0, _ => .5f));
-        presentation.Prepare(context);
-        Assert.Single(faces);
-        presentation.SetContent(ApproximateTimePeriod.Night, .9, ApproximateTimeDayPhases.Sample(0, _ => -.5f));
-        presentation.Prepare(context);
-        Assert.Equal(2, faces.Count); Assert.True(faces[0].Disposed);
-        presentation.Reset();
-        Assert.True(faces[1].Disposed);
-    }
+
+
     #endregion
 }

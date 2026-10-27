@@ -9,7 +9,7 @@ using Vintagestory.API.Common;
 namespace VanillaExpanded.EnvironmentalTemperature;
 
 /// <summary>Samples current local climate temperature independently of the player body-temperature simulation.</summary>
-internal sealed class EnvironmentalTemperatureOverlay : IHudOverlay, IHudOverlayVisibilityTransition
+internal sealed class EnvironmentalTemperatureOverlay : IHudOverlay, INativePresentation, IHudOverlayVisibilityTransition
 {
     private readonly EnvironmentalTemperaturePresentation presentation;
     private ICoreClientAPI? api;
@@ -76,8 +76,13 @@ internal sealed class EnvironmentalTemperatureOverlay : IHudOverlay, IHudOverlay
     }
     /// <summary>Reports the prepared reading and scale footprint.</summary>
     public SizeF Measure() => presentation.Size;
-    /// <summary>Draws cached layers without accessing gameplay state.</summary>
-    public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime) => presentation.Draw(renderer, bounds, clip);
+    /// <summary>Creates one independent native composition over the feature's prepared data.</summary>
+    public INativeView CreateView(ICoreClientAPI api, NativeViewRole role) => presentation.CreateView(api);
+    /// <summary>Has no elapsed visual effect; the estimated state advances only through scheduled sampling.</summary>
+    public void BeginFrame(float deltaTime) { }
+    /// <summary>Rejects manual dispatch because registered native components own rendering.</summary>
+    public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime) =>
+        throw new InvalidOperationException("Render this indicator through its native view.");
     /// <summary>Clears sampled eligibility while retaining artwork for an exit.</summary>
     public void HidePresentation()
     {

@@ -16,6 +16,7 @@ internal sealed class TextElement : GuiElementTextBase
     private RectangleF aperture, clip;
     private bool hasLayout, disposed;
     private readonly double strokeWidth;
+    private readonly float depth;
 
     #region Public API
     /// <summary>Gets pre-render clip, target, tint and failure state.</summary>
@@ -26,11 +27,11 @@ internal sealed class TextElement : GuiElementTextBase
     #region Preparation
     /// <summary>Creates a passive native text element with an optional headless glyph factory.</summary>
     public TextElement(ICoreClientAPI api, ElementBounds bounds, Action<Exception> failure,
-        Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? create = null, double strokeWidth = 1)
+        Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? create = null, double strokeWidth = 1, float depth = 51)
         : base(api, string.Empty, TextMetrics.Font(strokeWidth), bounds)
     {
         this.create = create ?? CreateTexture;
-        this.strokeWidth = strokeWidth;
+        this.strokeWidth = strokeWidth; this.depth = depth;
         State = new(failure);
         draw = DrawTexture;
     }
@@ -93,7 +94,7 @@ internal sealed class TextElement : GuiElementTextBase
     private void DrawTexture()
     {
         var target = State.Target;
-        api.Render.Render2DTexturePremultipliedAlpha(texture!.TextureId, target.X, target.Y, target.Width, target.Height, 51, State.Tint(true));
+        api.Render.Render2DTexturePremultipliedAlpha(texture!.TextureId, target.X, target.Y, target.Width, target.Height, depth, State.Tint(true));
     }
     /// <summary>Generates native glyph pixels and applies the shared texture filtering policy.</summary>
     private static LoadedTexture CreateTexture(HudOverlayPreparationContext context, string value, CairoFont font)
