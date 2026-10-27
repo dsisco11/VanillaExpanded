@@ -4,13 +4,13 @@ using Vintagestory.API.Client;
 
 namespace VanillaExpanded.HudOverlays.Registration;
 
-/// <summary>Owns one arbitrary bounded passive presentation and its stable sampled state.</summary>
+/// <summary>Owns stable sampled state and supplies independent bounded native presentations.</summary>
 /// <remarks>All calls occur on the client main thread. Engine/API/inventory resources are borrowed.
 /// No method handles input. Snapshots retain presentation copies rather than mutable live inventory state.
-/// Drawing honors the assigned clip (including oversized content), restores temporary native draw state,
-/// reads only sampled/prepared state, and creates no resources for unchanged content.
+/// Native elements honor the assigned clip (including oversized content), restore temporary native draw state,
+/// read only sampled/prepared state, and create no resources for unchanged content.
 /// Final removal calls EndSession before Dispose; Dispose releases only owned resources, never borrowed ones.</remarks>
-public interface IHudOverlay : IDisposable
+public interface IHudOverlay : IDisposable, INativePresentation
 {
     #region Public API
     #region Lifecycle
@@ -26,12 +26,10 @@ public interface IHudOverlay : IDisposable
     HudOverlayChange Refresh();
     #endregion
     #region Presentation
-    /// <summary>Prepares owned presentation resources for sampled content; reuses them when context/content is unchanged.</summary>
+    /// <summary>Prepares stable presentation data and canonical measurements without allocating element-owned GUI resources.</summary>
     void Prepare(HudOverlayPreparationContext context);
     /// <summary>Measures finite, nonnegative dimensions in unscaled GUI units without another gameplay sample.</summary>
     SizeF Measure();
-    /// <summary>Draws prepared state within native bounds and a finite framebuffer-pixel clip with nonnegative dimensions; performs no sampling or input.</summary>
-    void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime);
     #endregion
     #endregion
 }

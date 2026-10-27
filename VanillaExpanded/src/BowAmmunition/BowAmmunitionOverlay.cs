@@ -10,7 +10,7 @@ using Vintagestory.GameContent;
 namespace VanillaExpanded.BowAmmunition;
 
 /// <summary>Owns bow applicability, stable ammunition samples, notifications, and passive presentation.</summary>
-internal sealed class BowAmmunitionOverlay : IHudOverlay, INativePresentation, IHudOverlayVisibilityTransition
+internal sealed class BowAmmunitionOverlay : IHudOverlay, IHudOverlayVisibilityTransition
 {
     private readonly Action invalidate;
     private readonly BowAmmunitionPresentation presentation;
@@ -66,7 +66,7 @@ internal sealed class BowAmmunitionOverlay : IHudOverlay, INativePresentation, I
         }
         return value;
     }
-    /// <summary>Detaches session handlers and clears owned resources without disposing borrowed objects.</summary>
+    /// <summary>Detaches session handlers and clears copied ammunition data without disposing borrowed inventory objects.</summary>
     public void EndSession()
     {
         subscriptions?.Dispose(); subscriptions = null;
@@ -123,11 +123,7 @@ internal sealed class BowAmmunitionOverlay : IHudOverlay, INativePresentation, I
     }
     /// <summary>Reports cached dimensions without accessing inventory.</summary>
     public SizeF Measure() => presentation.Size;
-    /// <summary>Requires native rendering through the registered component elements.</summary>
-    public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime)
-    {
-        throw new InvalidOperationException("Native indicator components render through their composer.");
-    }
+
     #endregion
     #endregion
     #region Private

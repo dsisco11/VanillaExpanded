@@ -113,7 +113,6 @@ public sealed class HudOverlayDragPreviewTests : IDisposable
         {
             using var storage = new HudLayoutFixture(); storage.Add("test:other");
             var overlayMock = new Mock<IHudOverlay>();
-            var provider = overlayMock.As<IHudOverlayBackdropProvider>();
             var registration = new HudOverlayRegistration("test:a", overlayMock.Object, () => true, "test");
             using var registrationHandle = storage.Registry.Register(registration);
             var overlay = Mock.Get(registration.Overlay); var renderer = new Mock<IRenderAPI>();
@@ -132,20 +131,29 @@ public sealed class HudOverlayDragPreviewTests : IDisposable
             int failures = 0; var draws = new List<(double X, double Y, float Dt, float Opacity)>();
             var backdrops = new List<(double X, float Opacity)>();
             var order = new List<string>();
-            provider.Setup(value => value.CollectBackdrops(renderer.Object, It.IsAny<ElementBounds>())).Callback<IRenderAPI, ElementBounds>((_, bounds) => { backdrops.Add((bounds.renderX, DrawOpacity.Current)); order.Add(bounds.renderX == source.Single().Bounds.renderX ? "source backdrop" : "moving backdrop"); });
             var batch = new Mock<IHudOverlayBackdropBatch>();
             batch.Setup(value => value.Collect(It.IsAny<RectangleF>(), It.IsAny<Action>())).Callback<RectangleF, Action>((_, collect) => collect());
+            overlay.Setup(value => value.CreateView(storage.Api.Object, It.IsAny<NativeViewRole>())).Returns(() =>
+            {
+                CallbackView view = null!;
+                view = new CallbackView(storage.Api.Object, (bounds, dt) =>
+                {
+                    draws.Add((bounds.renderX, bounds.renderY, dt, DrawOpacity.Current));
+                    order.Add(dt == 0 ? "source foreground" : "moving foreground");
+                    if (failSource && dt == 0) throw new InvalidOperationException();
+                }, () =>
+                {
+                    backdrops.Add((view.Bounds.renderX, DrawOpacity.Current));
+                    order.Add(view.Bounds.renderX == source.Single().Bounds.renderX ? "source backdrop" : "moving backdrop");
+                });
+                return view;
+            });
             using var host = new HudOverlayHost(storage.Api.Object, storage.Registry, _ => !drawable, (_, _) => failures++, backdropBatch: batch.Object);
             host.Synchronize(new Dictionary<string, HudOverlayGroupLayout> { ["test"] = layout });
             var preview = (HudOverlayDragPreview)typeof(HudOverlayHost).GetField("dragPreview", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(host)!;
             movement.Begin(PointF.Empty, PointF.Empty, 1); preview.Begin(movement, source);
             layout.Root.renderOffsetX += x; layout.Root.renderOffsetY += y;
-            overlay.Setup(value => value.Draw(renderer.Object, It.IsAny<ElementBounds>(), It.IsAny<RectangleF>(), It.IsAny<float>()))
-                .Callback<IRenderAPI, ElementBounds, RectangleF, float>((_, bounds, _, dt) => {
-                    draws.Add((bounds.renderX, bounds.renderY, dt, DrawOpacity.Current));
-                    order.Add(dt == 0 ? "source foreground" : "moving foreground");
-                    if (failSource && dt == 0) throw new InvalidOperationException();
-                });
+
             storage.Registry.BeginSession(storage.Api.Object);
             if (remove) registrationHandle.Dispose();
             host.TryOpen(false); HudOverlayNativeRenderPass.Render(host, .1f);

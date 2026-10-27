@@ -115,8 +115,7 @@ internal sealed class HudOverlayScheduler
                     // Remove before invoking user code: notifications raised during refresh remain pending.
                     invalidated.Remove(registration.Id);
                     HudOverlayChange change = registration.Overlay.Refresh();
-                    state.PresentationDirty |= (change & HudOverlayChange.Presentation) != 0
-                        || registration.Overlay is INativePresentation && change != HudOverlayChange.None;
+                    state.PresentationDirty |= change != HudOverlayChange.None;
                     state.MeasurementDirty |= (change & HudOverlayChange.Measurement) != 0;
                     state.NextRefresh = now + registration.RefreshIntervalMs;
                     state.NeedsFresh = false;
@@ -162,8 +161,7 @@ internal sealed class HudOverlayScheduler
         CheckThread();
         registry.RunPass(registration =>
         {
-            if (registration.Overlay is not INativePresentation
-                || !states.TryGetValue(registration.Id, out var state)
+            if (!states.TryGetValue(registration.Id, out var state)
                 || !ReferenceEquals(state.Registration, registration) || state.Context == null
                 || state.Context == preparation || !Drawable(state)
                 || registration.Overlay is IHudOverlayVisibilityTransition fading && fading.Visibility.Exiting) return;

@@ -75,7 +75,7 @@ public sealed class HudOverlayMenuInputTests : IDisposable
         };
         f.Host.OnRenderGUI(.1f);
         Assert.Equal(1, draws);
-        f.Feature.Verify(value => value.Draw(It.IsAny<IRenderAPI>(), It.IsAny<ElementBounds>(), It.IsAny<RectangleF>(), It.IsAny<float>()), Times.Never);
+        f.Feature.Verify(value => value.CreateView(It.IsAny<ICoreClientAPI>(), It.IsAny<NativeViewRole>()), Times.Never);
     }
     /// <summary>Reset targets only the selected indicator and retires stale menu ownership after dispatch.</summary>
     [Fact]
@@ -381,6 +381,7 @@ public sealed class HudOverlayMenuInputTests : IDisposable
         /// <summary>Initializes native composer and host seams without a graphics context.</summary>
         public Fixture(bool disabled = false)
         {
+            Feature.Setup(value => value.CreateView(Layout.Api.Object, It.IsAny<NativeViewRole>())).Returns(() => new CallbackView(Layout.Api.Object));
             Layout.Api.SetupGet(x => x.Input).Returns(Mock.Of<IInputAPI>());
             Layout.Gui.SetupGet(x => x.WindowBounds).Returns(new Window());
             Layout.Gui.SetupGet(x => x.OpenedGuis).Returns(Opened);
@@ -400,6 +401,7 @@ public sealed class HudOverlayMenuInputTests : IDisposable
             Menu = new(Layout.Api.Object, (_, rows, select, _, _) => { Rows = rows; Select = select; return Popup; }, (_, key) => key);
             Host = new(Layout.Api.Object, Layout.Registry, _ => Drawable, (_, error) => throw error, containers: Containers, contextMenu: Menu);
             Host.TryOpen(false); Host.Synchronize(new Dictionary<string, HudOverlayGroupLayout> { ["test"] = Group });
+            Feature.Invocations.Clear();
         }
         /// <summary>Targets the first member's clipped content rather than titlebar chrome.</summary>
         public MouseEvent Press() { var b = Group.Members[0].Clip; return new((int)b.Left + 1, (int)b.Top + 1, EnumMouseButton.Right, 0); }

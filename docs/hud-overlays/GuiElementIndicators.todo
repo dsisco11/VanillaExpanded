@@ -305,16 +305,28 @@ Validation: fresh Release compilation and **1,092/1,092 affected tests passed**,
 
 Depends on Phase 6. Outcome: the native architecture is the sole built-in presentation path.
 
-    ☐ Remove HudIndicatorStackLayout and obsolete group-wide built-in dispatch, manual component absolute-bounds assignment, and presentation helpers whose responsibilities have been replaced.
-        ☐ Preserve necessary framebuffer/scissor boundaries and custom artwork calculations; do not confuse those with component layout.
-        ☐ Remove superseded helpers and dispatch paths once their consumers are migrated; no external compatibility facade is required.
-    ☐ Reconcile resource owners, removal handles, style switches, exit completion, and world lifecycle for double disposal, stale visual state, or obsolete callbacks.
-    ☐ Update HudOverlays.md and public integration examples to describe the current native capability, element/composer ownership and invalidation.
-    ☐ Update affected feature documentation where its presentation implementation changed; permanent documentation must describe active code rather than refactor history.
-    ☐ Search source and linked documentation for stale claims, manual drawing fallbacks, render-time layout calls, and orphaned infrastructure/tests. Reconcile every remaining match against its intended responsibility.
+    ☑ Remove HudIndicatorStackLayout and obsolete group-wide built-in dispatch, manual component absolute-bounds assignment, and presentation helpers whose responsibilities have been replaced.
+        ☑ Preserve necessary framebuffer/scissor boundaries and custom artwork calculations; do not confuse those with component layout.
+        ☑ Remove superseded helpers and dispatch paths once their consumers are migrated; no external compatibility facade is required.
+    ☑ Reconcile resource owners, removal handles, style switches, exit completion, and world lifecycle for double disposal, stale visual state, or obsolete callbacks.
+    ☑ Update HudOverlays.md and public integration examples to describe the current native capability, element/composer ownership and invalidation.
+    ☑ Update affected feature documentation where its presentation implementation changed; permanent documentation must describe active code rather than refactor history.
+    ☑ Search source and linked documentation for stale claims, manual drawing fallbacks, render-time layout calls, and orphaned infrastructure/tests. Reconcile every remaining match against its intended responsibility.
 
 Completion criteria:
-    ☐ Cleanup is complete and documentation matches the resulting implementation.
+    ☑ Cleanup is complete and documentation matches the resulting implementation.
+
+### Phase 7 implementation traceability
+
+| Task group | Controlling sources | Implementation and verification evidence |
+|---|---|---|
+| Native-only registration and removal of superseded helpers | Approved proposal Proposed design / Update and rendering contract / Ownership and compatibility; scope amendment; Phase 1 responsibility and invalidation tables; current HudOverlays.md | IHudOverlay inherits INativePresentation and has no Draw entry point. Host and scheduler use that required native contract directly. Group dispatch, compatibility branches, manual stack/text/icon helpers, unused coordinate mapping and dial rendering helpers, and their orphaned tests are removed. Native component and host tests cover their retained responsibilities; item-presentation integration now exercises ArrowElement. Named native capability and registration identities remain explicit; no external facade is required. |
+| Resource, lifecycle and preview cleanup | Proposal unique-composer ownership and before-render geometry; Phase 1 native operations/lifetime matrix; HudOverlays.md source traces, hidden editing and teardown contracts; native GuiComposer, GuiElement and ElementBounds | Composer retirement still precedes controller release, including source/live replacement, removal, completed exits and world teardown. Edit-preview membership stores metadata only; EditProxyView uses the shared native TextElement and owns no separate lettering cache. Proxy glyph failures, context changes, locale changes between heartbeats, passive input, no hidden feature calls, native peer failure isolation, render-state restoration and independent resource cleanup are covered by focused tests. Absolute bounds remain only at framebuffer/scissor and frozen-layout snapshot boundaries; native component arrangement resolves before rendering. |
+| Active documentation and reconciliation | HudOverlays.md public registration/lifecycle examples and rendering/resource contracts; WindSpeed.md; WeatherConditions.md; README HUD references; user instructions for permanent documentation; VanillaExpanded.Tests/AGENTS.md | Architecture examples show required CreateView/BeginFrame, composer registration, preparation/finalization, passive components and exclusive ownership. Feature docs retain their active sampling and native presentation descriptions. Source XML comments describe controller data ownership. Source and current-document searches find no superseded helper, manual fallback or full-indicator Draw path; planning documents retain their approved design context and historical receipts. Current API examples use public registration and native GUI APIs. |
+
+Completion: implementation, second review and independent audit-stage-completion passed on 2026-10-26. No unresolved findings remain. Phase 8 and later task markers remain unchecked.
+
+Validation: fresh production/test Release compilation and **3,073/3,073 full-suite tests passed**, with zero failures or skips, through the validation subagent. Command: `dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --configuration Release --no-restore -p:UseSharedCompilation=false --logger "trx;LogFileName=phase7-full-final.trx"`; `VINTAGE_STORY=G:/Vintagestory`, game and Lib directories on PATH, `VE_CLOCK_GPU_TESTS=1`. This includes the opt-in hidden solar shader check, proxy locale regression and retained native pointer geometry checks. The affected suite also passed earlier during cleanup. Only existing unrelated nullable/unused warnings remain. Final whitespace and source/current-document searches passed; remaining absolute bounds serve framebuffer scissors or immutable drag snapshots, and native layout calculation occurs in preparation. Changes after final validation only corrected XML summaries and recorded completion. No package build or game launch was performed; canonical package qualification and user-run appearance/input acceptance remain in their designated later phases.
 
 ## Phase 8: Qualify the complete implementation
 

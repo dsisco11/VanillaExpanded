@@ -49,7 +49,6 @@ public sealed class LayeredIndicatorsTests
                 Assert.True(name.State.Target.Bottom <= reading.State.Target.Top + .001);
                 Assert.Empty(fixture.Bindings); Assert.Equal(0, fixture.PackChecks);
             }
-            Assert.Throws<InvalidOperationException>(() => overlay.Draw(fixture.Resources.Native.Render.Object, composition.Composer.Bounds, new(0, 0, 900, 900), 0));
             composition.Composer.Render(.1f);
             Assert.Empty(fixture.Resources.Native.Failures);
         }

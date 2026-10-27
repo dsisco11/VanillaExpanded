@@ -1,6 +1,5 @@
 using System;
 using System.Drawing;
-using VanillaExpanded.HudOverlays.Rendering;
 
 namespace VanillaExpanded.EnvironmentalTemperature;
 
@@ -13,9 +12,6 @@ internal static class EnvironmentalTemperatureGaugeLayout
     public const float Center = 256, TubeRadius = 196, StartDegrees = 150, SweepDegrees = 240;
 
     #region Public API
-    /// <summary>Fits the tube, bulb, and clamps inside the generic radial housing aperture.</summary>
-    public static RectangleF MechanismBounds(RectangleF housing) => RadialGaugeLayout.MechanismBounds(housing, MechanismScale);
-
     /// <summary>Clamps only the visual fill while preserving the actual numeric reading.</summary>
     public static float Fill(float celsius) => Math.Clamp((celsius + 40) / 100, 0, 1);
 

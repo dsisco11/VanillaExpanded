@@ -132,6 +132,7 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
     /// <summary>Creates native controls for any registered group.</summary>
     private HudOverlayGroupControlsTests(string groupId, float scale = 1, bool structuralGroup = true)
     {
+        overlay.Setup(value => value.CreateView(api.Object, It.IsAny<NativeViewRole>())).Returns(() => new CallbackView(api.Object));
         RuntimeEnv.GUIScale = scale;
         var language = new Mock<ITranslationService>();
         language.Setup(value => value.Get(It.IsAny<string>(), It.IsAny<object[]>()))
@@ -168,7 +169,7 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
         var strings = new Mock<ISettingsClass<string>>();
         HudLayoutFixture.BindSettings(api, strings, new Dictionary<string, string>());
         var registry = new HudOverlayRegistry(); registry.RegisterGroup(group); registry.Register(registration);
-        if (structuralGroup) registry.Register(new HudOverlayRegistration("test:fixture-hidden", Mock.Of<IHudOverlay>(), () => false, group.Id));
+        if (structuralGroup) registry.Register(new HudOverlayRegistration("test:fixture-hidden", CreateOverlay(), () => false, group.Id));
         movement = new HudOverlayContainers(api.Object, registry).Get(groupId);
         Relayout();
         initial = Origin();
@@ -208,7 +209,7 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
         registry.Register(registration);
         var secondGroup = new HudOverlayGroup("mod:second", group.Placement, group.Packing);
         registry.RegisterGroup(secondGroup);
-        var secondRegistration = new HudOverlayRegistration("test:second", new Mock<IHudOverlay>().Object, () => true, secondGroup.Id);
+        var secondRegistration = new HudOverlayRegistration("test:second", CreateOverlay(), () => true, secondGroup.Id);
         registry.Register(secondRegistration);
         using var secondLayout = new HudOverlayGroupLayout();
         secondLayout.Apply(anchors, secondGroup, new[] { new KeyValuePair<HudOverlayRegistration, SizeF>(secondRegistration, new SizeF(30, 25)) });
@@ -259,7 +260,7 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
     public void HostRetainsDistinctMemberAndContainerMovementIdentities()
     {
         using var registry = new HudOverlayRegistry(); registry.RegisterGroup(group); registry.Register(registration);
-        var second = new HudOverlayRegistration("test:second", Mock.Of<IHudOverlay>(), () => true, group.Id); registry.Register(second);
+        var second = new HudOverlayRegistration("test:second", CreateOverlay(), () => true, group.Id); registry.Register(second);
         var containers = new HudOverlayContainers(api.Object, registry);
         layout.Apply(anchors, group, new[] { new KeyValuePair<HudOverlayRegistration, SizeF>(registration, new SizeF(30, 20)), new KeyValuePair<HudOverlayRegistration, SizeF>(second, new SizeF(40, 25)) });
         using var host = new HudOverlayHost(api.Object, registry, _ => true, (_, failure) => throw failure, containers: containers);
@@ -277,11 +278,11 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
     public void IndividualBodyDragSurvivesPreviewHostSynchronization(bool cancel, bool hidden, bool rightCancel)
     {
         using var registry = new HudOverlayRegistry(); registry.RegisterGroup(group); registry.Register(registration);
-        var second = new HudOverlayRegistration("test:second", Mock.Of<IHudOverlay>(), () => true, group.Id); registry.Register(second);
+        var second = new HudOverlayRegistration("test:second", CreateOverlay(), () => true, group.Id); registry.Register(second);
         var containers = new HudOverlayContainers(api.Object, registry); containers.SetMovable(group.Id, true, initial);
         var members = new[] { registration, second }; var effective = new Dictionary<string, HudOverlayGroupLayout>();
         using var previews = new HudOverlayEditPreviews(api.Object, registry, value => !hidden || value != registration, () => true,
-            (_, failure) => throw failure, () => new WorkshopGaugeText((context, _) => new LoadedTexture(context.Api) { TextureId = 42, Width = 50, Height = 12, IgnoreUndisposed = true }));
+            (_, failure) => throw failure, (context, _, _) => new LoadedTexture(context.Api) { TextureId = 42, Width = 50, Height = 12, IgnoreUndisposed = true });
         previews.Update(new HudOverlayPreparationContext(api.Object, RuntimeEnv.GUIScale, "en"));
         using var host = new HudOverlayHost(api.Object, registry, value => !hidden || value != registration || previews.IsDrawable(value),
             (_, failure) => throw failure, containers: containers, editPreviews: previews);
@@ -346,7 +347,7 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
     public void MemberBodyCannotBypassFixedGroupOrForegroundWindow(bool foreground)
     {
         using var registry = new HudOverlayRegistry(); registry.RegisterGroup(group); registry.Register(registration);
-        registry.Register(new HudOverlayRegistration("test:second", Mock.Of<IHudOverlay>(), () => true, group.Id));
+        registry.Register(new HudOverlayRegistration("test:second", CreateOverlay(), () => true, group.Id));
         var containers = new HudOverlayContainers(api.Object, registry);
         containers.SetMovable(group.Id, foreground, initial);
         if (foreground)
@@ -367,7 +368,7 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
     public void OnlyContainerTitlebarIsPreparedAndMemberChromeCannotCapture()
     {
         using var registry = new HudOverlayRegistry(); registry.RegisterGroup(group); registry.Register(registration);
-        registry.Register(new HudOverlayRegistration("test:hidden", Mock.Of<IHudOverlay>(), () => false, group.Id));
+        registry.Register(new HudOverlayRegistration("test:hidden", CreateOverlay(), () => false, group.Id));
         var containers = new HudOverlayContainers(api.Object, registry); containers.SetMovable(group.Id, true, initial);
         using var host = new HudOverlayHost(api.Object, registry, value => value.Id == registration.Id, (_, failure) => throw failure, containers: containers);
         var clip = Assert.Single(layout.Members).Clip;
@@ -390,7 +391,7 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
     public void CaptionRecreationReparentsBoundsAfterSingletonCycle()
     {
         using var registry = new HudOverlayRegistry(); registry.RegisterGroup(group); registry.Register(registration);
-        var second = new HudOverlayRegistration("test:cycle", Mock.Of<IHudOverlay>(), () => false, group.Id);
+        var second = new HudOverlayRegistration("test:cycle", CreateOverlay(), () => false, group.Id);
         var handle = registry.Register(second);
         var containers = new HudOverlayContainers(api.Object, registry);
         using var cue = new HudOverlayGroupControls(api.Object, new Mock<GuiDialog>(api.Object).Object,
@@ -401,7 +402,7 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
         handle.Dispose(); containers.Synchronize(); cue.Synchronize(layouts);
         var composerField = typeof(HudOverlayGroupControls).GetField("composer", BindingFlags.Instance | BindingFlags.NonPublic)!;
         Assert.Null(composerField.GetValue(cue));
-        using var returned = registry.Register(new HudOverlayRegistration("test:cycle", Mock.Of<IHudOverlay>(), () => false, group.Id)); containers.Synchronize();
+        using var returned = registry.Register(new HudOverlayRegistration("test:cycle", CreateOverlay(), () => false, group.Id)); containers.Synchronize();
         var origin = new PointF(initial.X + 100, initial.Y + 70);
         layout.Apply(anchors, group, new[] { new KeyValuePair<HudOverlayRegistration, SizeF>(registration, new SizeF(90, 90)) }, origin);
         pointer = new PointF(origin.X + 5, origin.Y + 5); cue.Synchronize(layouts);
@@ -479,7 +480,7 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
     {
         using var registry = new HudOverlayRegistry();
         registry.RegisterGroup(group); registry.Register(registration);
-        var second = new HudOverlayRegistration("test:second", Mock.Of<IHudOverlay>(), () => true, group.Id);
+        var second = new HudOverlayRegistration("test:second", CreateOverlay(), () => true, group.Id);
         registry.Register(second);
         var containers = new HudOverlayContainers(api.Object, registry);
         containers.SetMovable(group.Id, movable, initial);
@@ -672,14 +673,14 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
         using var registry = new HudOverlayRegistry(); registry.RegisterGroup(group); var sourceRegistration = registry.Register(registration);
         // A retained collapsed sibling forces body routing through the individual control with no titlebar.
         if (cancellation == 8 && hiddenPlaceholder)
-            registry.Register(new HudOverlayRegistration("test:collapsed", Mock.Of<IHudOverlay>(), () => false, group.Id));
+            registry.Register(new HudOverlayRegistration("test:collapsed", CreateOverlay(), () => false, group.Id));
         var targetGroup = new HudOverlayGroup("target", new HudOverlayPlacement("screen", HudOverlayPoint.LeftTop, HudOverlayPoint.LeftTop, 300, 200));
-        var target = new HudOverlayRegistration("test:target", Mock.Of<IHudOverlay>(), () => true, targetGroup.Id); registry.RegisterGroup(targetGroup); registry.Register(target);
+        var target = new HudOverlayRegistration("test:target", CreateOverlay(), () => true, targetGroup.Id); registry.RegisterGroup(targetGroup); registry.Register(target);
         var containers = new HudOverlayContainers(api.Object, registry); containers.SetMovable(group.Id, true, initial);
         bool targetDrawable = true;
         var members = new List<HudOverlayRegistration> { registration, target }; var effective = new Dictionary<string, HudOverlayGroupLayout>();
         using var previews = new HudOverlayEditPreviews(api.Object, registry, value => value != registration || !hiddenPlaceholder, () => true,
-            (_, failure) => throw failure, () => new WorkshopGaugeText((context, _) => new LoadedTexture(context.Api) { TextureId = 42, Width = 50, Height = 12, IgnoreUndisposed = true }));
+            (_, failure) => throw failure, (context, _, _) => new LoadedTexture(context.Api) { TextureId = 42, Width = 50, Height = 12, IgnoreUndisposed = true });
         previews.Update(new HudOverlayPreparationContext(api.Object, RuntimeEnv.GUIScale, "en"));
         using var host = new HudOverlayHost(api.Object, registry, value => value == registration && hiddenPlaceholder ? previews.IsDrawable(value) : value != target || targetDrawable,
             (_, failure) => throw failure, containers: containers, editPreviews: previews);
@@ -837,4 +838,14 @@ public sealed class HudOverlayGroupControlsTests : IDisposable
         #endregion
     }
     #endregion
+    #region Private native fixtures
+    /// <summary>Creates a passive native peer for movement tests without feature resource allocation.</summary>
+    private IHudOverlay CreateOverlay()
+    {
+        var peer = new Mock<IHudOverlay>();
+        peer.Setup(value => value.CreateView(api.Object, It.IsAny<NativeViewRole>())).Returns(() => new CallbackView(api.Object));
+        return peer.Object;
+    }
+    #endregion
+
 }

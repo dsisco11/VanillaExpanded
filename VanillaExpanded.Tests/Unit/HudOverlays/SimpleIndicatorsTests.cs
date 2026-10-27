@@ -61,7 +61,6 @@ public sealed class SimpleIndicatorsTests
             reading.OnMouseDownOnElement(fixture.Native.Api.Object, press);
             Assert.False(press.Handled);
             // These migrated controllers deliberately reject accidental manual dispatch.
-            Assert.Throws<InvalidOperationException>(() => overlay.Draw(fixture.Native.Render.Object, composition.Composer.Bounds, new(0, 0, 900, 900), 0));
             composition.Composer.Render(.1f);
             Assert.Empty(fixture.Native.Failures);
         }

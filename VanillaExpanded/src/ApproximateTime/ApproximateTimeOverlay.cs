@@ -11,7 +11,7 @@ using Vintagestory.API.Common.Entities;
 namespace VanillaExpanded.ApproximateTime;
 
 /// <summary>Reads synchronized observation age and retains prepared approximate-time data.</summary>
-internal sealed class ApproximateTimeOverlay : IHudOverlay, INativePresentation, IHudOverlayVisibilityTransition
+internal sealed class ApproximateTimeOverlay : IHudOverlay, IHudOverlayVisibilityTransition
 {
 
     private readonly ApproximateTimePresentation presentation;
@@ -35,7 +35,7 @@ internal sealed class ApproximateTimeOverlay : IHudOverlay, INativePresentation,
     public void SetStyle(EnvironmentalGaugeStyle style) => styleChanged |= presentation.SetStyle(style);
 
     #region Lifecycle
-    /// <summary>Creates an asset-backed icon presentation with optional headless loading.</summary>
+    /// <summary>Retains approximate-time presentation data with optional preparation dependencies.</summary>
     public ApproximateTimeOverlay(ApproximateTimePresentation? presentation = null)
     {
         this.presentation = presentation ?? new();
@@ -62,7 +62,7 @@ internal sealed class ApproximateTimeOverlay : IHudOverlay, INativePresentation,
         Clear();
         presentation.Reset();
     }
-    /// <summary>Releases borrowed artwork bindings and session bindings exactly once.</summary>
+    /// <summary>Clears prepared feature data and session bindings exactly once.</summary>
     public void Dispose()
     {
         if (disposed) return;
@@ -124,7 +124,7 @@ internal sealed class ApproximateTimeOverlay : IHudOverlay, INativePresentation,
         bool readingChanged = presentation.SetContent(next, estimatedDay, phases, calendar.HourOfDay);
         return HudOverlayChange.Presentation | (periodChanged || readingChanged ? HudOverlayChange.Measurement : HudOverlayChange.None);
     }
-    /// <summary>Prepares cached artwork for the estimated part of the day.</summary>
+    /// <summary>Prepares estimated pointer data, localized clock text and canonical dimensions.</summary>
     public void Prepare(HudOverlayPreparationContext context)
     {
         if (period.HasValue) presentation.Prepare(context);
@@ -135,13 +135,10 @@ internal sealed class ApproximateTimeOverlay : IHudOverlay, INativePresentation,
     public INativeView CreateView(ICoreClientAPI api, NativeViewRole role) => presentation.CreateView(api);
     /// <summary>Has no elapsed visual effect; the estimated state advances only through scheduled sampling.</summary>
     public void BeginFrame(float deltaTime) { }
-    /// <summary>Rejects manual dispatch because registered native components own rendering.</summary>
-    public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime) =>
-        throw new InvalidOperationException("Render this indicator through its native view.");
     #endregion
     #endregion
     #region Private
-    /// <summary>Clears character-specific presentation and releases borrowed artwork bindings.</summary>
+    /// <summary>Clears character-specific sampling and retains the last prepared snapshot during its exit.</summary>
     private void Clear()
     {
         entity = null;

@@ -9,7 +9,7 @@ using Vintagestory.API.Common;
 namespace VanillaExpanded.EnvironmentalTemperature;
 
 /// <summary>Samples current local climate temperature independently of the player body-temperature simulation.</summary>
-internal sealed class EnvironmentalTemperatureOverlay : IHudOverlay, INativePresentation, IHudOverlayVisibilityTransition
+internal sealed class EnvironmentalTemperatureOverlay : IHudOverlay, IHudOverlayVisibilityTransition
 {
     private readonly EnvironmentalTemperaturePresentation presentation;
     private ICoreClientAPI? api;
@@ -80,10 +80,7 @@ internal sealed class EnvironmentalTemperatureOverlay : IHudOverlay, INativePres
     public INativeView CreateView(ICoreClientAPI api, NativeViewRole role) => presentation.CreateView(api);
     /// <summary>Has no elapsed visual effect; the estimated state advances only through scheduled sampling.</summary>
     public void BeginFrame(float deltaTime) { }
-    /// <summary>Rejects manual dispatch because registered native components own rendering.</summary>
-    public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime) =>
-        throw new InvalidOperationException("Render this indicator through its native view.");
-    /// <summary>Clears sampled eligibility while retaining artwork for an exit.</summary>
+    /// <summary>Clears sampled eligibility while retaining prepared climate data through its exit.</summary>
     public void HidePresentation()
     {
         Temperature = null;
@@ -91,7 +88,7 @@ internal sealed class EnvironmentalTemperatureOverlay : IHudOverlay, INativePres
     }
     #endregion
     #region Cleanup
-    /// <summary>Releases borrowed world state and artwork bindings immediately.</summary>
+    /// <summary>Releases borrowed world state and clears prepared climate data.</summary>
     public void EndSession()
     {
         api = null; Temperature = null; presentation.Reset();

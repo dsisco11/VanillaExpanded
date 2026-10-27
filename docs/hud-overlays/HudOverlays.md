@@ -32,11 +32,11 @@ The group hover titlebar uses normal HUD lettering and the radial-menu orange pa
 
 The body-temperature reading and trend column sit above the icon. Warming chevrons stack vertically above the reading; cooling chevrons stack below it. The column reserves a stable height for both trend strengths and uses normal HUD lettering. With the reading hidden, active chevrons remain above the icon. The measured footprint includes the full stacked layout, and the backdrop remains centered on the thermometer.
 
-Reference `VanillaExpanded.dll` and the compatible Vintage Story API assemblies, and declare `vanillaexpanded` as a dependency in your mod metadata. `HudOverlaySystem`, `IHudOverlay`, registration and placement contracts, and the shared icon-and-text presentation are public and can be used from a separate mod assembly. Obtain the running system through the client mod loader; the game owns its lifetime.
+Reference `VanillaExpanded.dll` and the compatible Vintage Story API assemblies, and declare `vanillaexpanded` as a dependency in your mod metadata. `HudOverlaySystem`, `IHudOverlay`, `INativeView`, registration and placement contracts are public. An overlay supplies its sampled data and creates independent native views. Obtain the running system through the client mod loader; the game owns its lifetime.
 
 When HUD edit mode is active in a ready world with the global HUD enabled and visible, session-owned `HudOverlayEditPreviews` makes every registered item available for editing. Normal drawable content keeps its presentation. Hidden, disabled, inapplicable, empty, or failed content instead receives a compact labeled stand-in with full hidden-item identity on hover. Placeholders use their reserved footprint or the standard square size, and participate in the same effective layout, direct dragging, snapping, permissions, cancellation, and commit boundary. They never call hidden feature drawing/backdrops or invent readings, change enable toggles, or alter normal sampling. Unknown saved integrations without a registration have no placeholder.
 
-Placeholder lettering prepares on the heartbeat and on edit-mode transitions, then remains cached through frame layout and dragging. A session-owned Before-stage renderer observes only editing transitions, allowing an all-hidden HUD to open its placeholders while the pause menu suspends gameplay ticks; it does not run feature refreshes. Leaving edit mode, mouse capture, hidden GUI, global HUD disabling, or loss of the ready session immediately removes edit targets; resources retire on the edit transition, heartbeat, or teardown. Normal visibility and transitions remain authoritative outside editing. If a default native anchor is missing, editing uses a transient screen fallback; only an explicit layout action persists it. Entering/exiting editing never writes preferences.
+Placeholder membership, hover labels and footprints prepare on the heartbeat and on edit-mode transitions. Each proxy view owns a native text element whose glyphs prepare before rendering and remain cached through movement. The membership service retains metadata only. A session-owned Before-stage renderer observes only editing transitions, allowing an all-hidden HUD to open its placeholders while the pause menu suspends gameplay ticks; it does not run feature refreshes. Leaving edit mode, mouse capture, hidden GUI, global HUD disabling, or loss of the ready session immediately removes edit targets; resources retire on the edit transition, heartbeat, or teardown. Normal visibility and transitions remain authoritative outside editing. If a default native anchor is missing, editing uses a transient screen fallback; only an explicit layout action persists it. Entering/exiting editing never writes preferences.
 
 ## Runtime structure
 
@@ -134,7 +134,7 @@ Each effective container has one flat membership set. Its internal `HudLayoutNod
 
 ## Registering an overlay
 
-Implement `IHudOverlay` and register an instance through `HudOverlaySystem.Registry` during client startup, after the HUD system has registered its groups. Existing consumers use `ExecuteOrder() => 1` for this ordering.
+Implement `IHudOverlay`, which inherits `INativePresentation`, and register an instance through `HudOverlaySystem.Registry` during client startup, after the HUD system has registered its groups. Existing consumers use `ExecuteOrder() => 1` for this ordering.
 
 A `HudOverlayRegistration` specifies:
 
@@ -172,7 +172,36 @@ catch
 // Retain registration and dispose it when the integration is removed.
 ```
 
-The fragment uses `VanillaExpanded.HudOverlays` and `VanillaExpanded.HudOverlays.Registration`. Placement types are in `.Anchoring`, packing types in `.Layout`, and `HudOverlayIconTextPresentation` in `.Rendering`. Registration and overlay callbacks run on the client main thread. Dispose your registration handle when unloading; the shared system and registry remain owned by VanillaExpanded.
+The fragment uses `VanillaExpanded.HudOverlays` and `VanillaExpanded.HudOverlays.Registration`. Placement types are in `.Anchoring` and packing types in `.Layout`. Native view contracts are in `.Registration`; custom components derive from the base game’s `GuiElement` types. Registration and overlay callbacks run on the client main thread. Dispose your registration handle when unloading; the shared system and registry remain owned by VanillaExpanded.
+
+The controller creates a new view over its prepared data for each requested role:
+
+```csharp
+/// <summary>Creates independent visual resources over the prepared reading.</summary>
+public INativeView CreateView(ICoreClientAPI api, NativeViewRole role) =>
+    new ExampleView(api, () => preparedReading);
+
+/// <summary>Has no elapsed visual effect for this reading.</summary>
+public void BeginFrame(float deltaTime) { }
+```
+
+Inside that view's `AddTo`, mount its unique reading and icon elements under the supplied member bounds. Here `reading` and `icon` are native `GuiElement` instances constructed by `ExampleView`; their parented bounds express the reading-above-icon arrangement:
+
+```csharp
+/// <summary>Transfers the view's unique components to its owning composer.</summary>
+public void AddTo(GuiComposer composer, ElementBounds memberBounds, string keyPrefix)
+{
+    composer.BeginChildElements(memberBounds);
+    try
+    {
+        composer.AddInteractiveElement(reading, keyPrefix + ":reading");
+        composer.AddInteractiveElement(icon, keyPrefix + ":icon");
+    }
+    finally { composer.EndChildElements(); }
+}
+```
+
+Mount each view once. `Prepare` updates changed strings, resources and local dimensions from the controller's snapshot. `LayoutCompleted` caches glyph fitting, effective clipping and backdrop anchors after the host resolves bounds. `SetOpacity` updates the host fade without creating resources; `CollectBackdrops` submits cached targets. Dynamic elements render prepared geometry and leave focus and mouse presses untouched. Composers own mounted elements; elements own generated textures and release them idempotently. Before mounting, the view cleans up its untransferred elements on failure. After mounting, disposing view bookkeeping must leave its composer's elements intact. Source traces require fresh elements and generated resources over the same controller data, with no gameplay sampling or subscriptions in view creation.
 
 ## Implementing the lifecycle
 
@@ -182,9 +211,9 @@ The host owns one content `GuiComposer` per effective container. Rendering follo
 
 | Indicators | Presentation contract | Visual and resource ownership |
 | --- | --- | --- |
-| Bow ammunition, wind speed, rift activity, temporal storm, player wetness, body temperature, weather conditions, approximate time, environmental temperature, calendar date | `IHudOverlay` and `INativePresentation` | Composer-owned native components render text, textures and arrow items. Elements own generated glyphs, SVG textures, arrow copies, circle textures, clock faces, calibrated ticks and liquid masks; authored PNGs are borrowed from the engine cache. |
+| Bow ammunition, wind speed, rift activity, temporal storm, player wetness, body temperature, weather conditions, approximate time, environmental temperature, calendar date | `IHudOverlay` (including `INativePresentation`) | Composer-owned native components render text, textures and arrow items. Elements own generated glyphs, SVG textures, arrow copies, circle textures, clock faces, calibrated ticks and liquid masks; authored PNGs are borrowed from the engine cache. |
 
-`INativePresentation.CreateView(api, role)` creates a fresh `INativeView` for a live composition or frozen source trace. `BeginFrame(deltaTime)` advances shared visual effects once per feature. A view mounts unique elements once with `AddTo`, updates prepared content with `Prepare`, caches resolved geometry with `LayoutCompleted`, and receives host opacity through `SetOpacity`. `CollectBackdrops` submits cached geometry. Composers own mounted elements; view disposal handles unmounted resources and bookkeeping. Element cleanup is idempotent because the native composer can call it repeatedly. A native factory failure is reported through the feature failure boundary without invoking `IHudOverlay.Draw`.
+`INativePresentation.CreateView(api, role)` creates a fresh `INativeView` for a live composition or frozen source trace. `BeginFrame(deltaTime)` advances shared visual effects once per feature. A view mounts unique elements once with `AddTo`, updates prepared content with `Prepare`, caches resolved geometry with `LayoutCompleted`, and receives host opacity through `SetOpacity`. `CollectBackdrops` submits cached geometry. Composers own mounted elements; view disposal handles unmounted resources and bookkeeping. Element cleanup is idempotent because the native composer can call it repeatedly. A native factory failure is reported through the feature failure boundary and retried through native composition.
 
 `IndicatorPresentation` owns prepared strings, canonical measurements, style selection and visibility for the native component presentations. `TextMetrics` measures native font boxes without allocating glyph textures. `TextView` registers separate name and reading elements; `IconReadingView` registers reading and texture elements; ammunition uses `ArrowView` and `ArrowElement` for its count, copied arrow and circular background. `WetnessView` registers separate fill and outline sprites for each drop. `ThermometerView` registers its reading, trend markers, fill and outline; its fill reveal is intersected with the host clip during geometry preparation. `WeatherView` registers ordered texture elements for sky, precipitation, fog and thunder, or native bounds for the precipitation/fog fallback. Storm `BeginFrame` advances one shared urgency pulse consumed by every visual instance; its backdrop uses the host fade independently of that pulse.
 
@@ -205,7 +234,8 @@ A registered overlay may survive several world sessions. Keep session resources 
 | `Refresh()`                               | Capture a stable snapshot and report what changed.                                                                                          |
 | `Prepare(context)`                        | Prepare snapshot data and canonical measurements; native views prepare element-owned GUI resources.                                                                                  |
 | `Measure()`                               | Return finite, nonnegative `SizeF` dimensions in unscaled GUI units.                                                                        |
-| `Draw(renderer, bounds, clip, deltaTime)` | The shared controller interface retains this entry point; built-ins reject manual dispatch and render through their registered elements.                                                                                |
+| `CreateView(api, role)` | Create a fresh unmounted native view over already-prepared controller data. |
+| `BeginFrame(deltaTime)` | Advance shared visual effects once per feature without sampling or layout. |
 | `EndSession()`                            | Detach events, release owned session resources, and clear world references. Make this safe after partial initialization and repeated calls. |
 | `Dispose()`                               | Perform final cleanup when the registration is removed.                                                                                     |
 
@@ -223,7 +253,7 @@ The environmental thermometer registers independently in `world-status` before t
 
 Player wetness registers in `player-status` immediately before temperature (order 97). It reads the synchronized `wetness` attribute as a finite value from 0 to 1 and displays two fully filled slim blue drops. A centered whole-number percentage sits above the drops within the same 36-unit height. Nonzero wetness displays at least 1%; the artwork remains fully filled at every visible wetness level. Reading textures are cached until the displayed percentage or preparation context changes and are owned by their native text elements. Dry or unavailable values hide the indicator, releasing its footprint after the fade. The two transparent 128 × 128 PNG layers in `textures/hud/player-wetness` are loaded through the engine texture cache and reused for changing percentage readings. The engine owns GPU storage; world exit, removal, or a completed exit releases presentation bindings. `EnablePlayerWetnessOverlay` controls it live.
 
-Drawing consumes the prepared snapshot. Avoid gameplay queries and resource creation in `Draw`. The supplied `clip` is in framebuffer pixels, while measurement and placement offsets use unscaled GUI units. Honor the clip for oversized content and restore any temporary render state. The runtime retries failed refresh or preparation work without interrupting other overlays.
+Native elements draw the prepared snapshot. Rendering and backdrop collection perform no gameplay queries, resource creation, component measurement or bounds resolution. The `LayoutCompleted` clip is in framebuffer pixels, while measurement and placement offsets use unscaled GUI units. Honor the clip for oversized content and restore any temporary render state. The runtime retries failed refresh or preparation work without interrupting other overlays.
 
 ## Choosing placement
 

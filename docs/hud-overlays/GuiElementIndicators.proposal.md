@@ -39,6 +39,6 @@ Approval covers this presentation refactor. A dependency-ordered implementation 
 
 ## Source boundaries
 
-- [Current host](../../VanillaExpanded/src/HudOverlays/Rendering/HudOverlayHost.cs) and [group dispatcher](../../VanillaExpanded/src/HudOverlays/Rendering/HudOverlayGroupElement.cs).
+- [Current host](../../VanillaExpanded/src/HudOverlays/Rendering/HudOverlayHost.cs).
 - [Public overlay contract](../../VanillaExpanded/src/HudOverlays/Registration/IHudOverlay.cs).
 - Native [GuiComposer](../../../vsapi/Client/UI/GuiComposer.cs), [GuiElement](../../../vsapi/Client/UI/Elements/Impl/GuiElement.cs), and [ElementBounds](../../../vsapi/Client/UI/ElementBounds.cs).

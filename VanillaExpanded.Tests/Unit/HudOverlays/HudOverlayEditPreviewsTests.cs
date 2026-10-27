@@ -27,43 +27,81 @@ public sealed class HudOverlayEditPreviewsTests
         fixture.Previews.Update(fixture.Context);
         Assert.Empty(fixture.Previews.GetMembers());
         Assert.False(fixture.Previews.IsDrawable(fixture.Registration));
-        Assert.All(fixture.Textures, texture => Assert.True(texture.Disposed));
+        Assert.Empty(fixture.Textures);
         fixture.VerifyNoFeatureCalls();
     }
 
-    /// <summary>One failed stand-in does not hide healthy registrations and can recover on a later heartbeat.</summary>
+    /// <summary>One failed native glyph preparation is isolated and can recover without sampling the hidden feature.</summary>
     [Fact]
     public void FailedPlaceholderPreparationIsIsolatedAndRetryable()
     {
-        using var fixture = new Fixture(); int attempts = 0, failures = 0;
-        var other = new HudOverlayRegistration("mod:other", Mock.Of<IHudOverlay>(), () => false, fixture.Group.Id); fixture.Registry.Register(other);
-        using var previews = new HudOverlayEditPreviews(fixture.Api.Object, fixture.Registry, _ => false, () => true, (_, _) => failures++,
-            () => new WorkshopGaugeText((context, _) => {
-                if (++attempts == 1) throw new InvalidOperationException();
-                return new LoadedTexture(context.Api) { TextureId = 42, Width = 50, Height = 12, IgnoreUndisposed = true };
-            }));
-        previews.Update(fixture.Context); Assert.Single(previews.GetMembers()); Assert.Equal(1, failures);
-        previews.Update(fixture.Context); Assert.Equal(2, previews.GetMembers().Count); Assert.Equal(1, failures);
-        fixture.VerifyNoFeatureCalls();
+        using var fixture = new Fixture(); fixture.FailGlyph = true;
+        fixture.Previews.Update(fixture.Context);
+        var view = new VanillaExpanded.HudOverlays.Rendering.Native.EditProxyView(fixture.Api.Object, fixture.Previews, fixture.Registration, _ => { });
+        using (view)
+        {
+            Assert.Throws<InvalidOperationException>(() => view.Prepare(fixture.Context));
+            fixture.FailGlyph = false;
+            using var composition = new IndicatorComposition(fixture.Api.Object, view, fixture.Context, fixture.Registration.ReservedSize!.Value);
+            composition.Composer.Render(0);
+            Assert.Single(fixture.Textures);
+        }
+        Assert.True(fixture.Textures.Single().Disposed); fixture.VerifyNoFeatureCalls();
     }
 
-    /// <summary>Stable lettering is cached, invalidated by preparation changes, and retired when editing ends.</summary>
+
+    /// <summary>Membership prepares no glyphs; the native element caches them and owns cleanup independently of metadata.</summary>
     [Fact]
     public void HiddenPlaceholderCachesPreparationAndReleasesOwnedResources()
     {
-        using var fixture = new Fixture();
-        fixture.Previews.Update(fixture.Context);
-        Assert.Single(fixture.Previews.GetMembers()); Assert.Single(fixture.Textures);
-        fixture.Previews.Update(fixture.Context); Assert.Single(fixture.Textures);
-        fixture.Previews.Update(new HudOverlayPreparationContext(fixture.Api.Object, 2, "en"));
+        using var fixture = new Fixture(); fixture.Previews.Update(fixture.Context);
+        Assert.Single(fixture.Previews.GetMembers()); Assert.Empty(fixture.Textures);
+        using var view = new VanillaExpanded.HudOverlays.Rendering.Native.EditProxyView(fixture.Api.Object, fixture.Previews, fixture.Registration, _ => { });
+        using var composition = new IndicatorComposition(fixture.Api.Object, view, fixture.Context, fixture.Registration.ReservedSize!.Value);
+        Assert.Single(fixture.Textures);
+        fixture.Previews.Update(fixture.Context); composition.View.Prepare(fixture.Context); Assert.Single(fixture.Textures);
+        composition.View.Prepare(new(fixture.Api.Object, 2, "en"));
         Assert.Equal(2, fixture.Textures.Count); Assert.True(fixture.Textures[0].Disposed);
-        fixture.Grabbed = true;
-        Assert.False(fixture.Previews.IsDrawable(fixture.Registration)); Assert.Empty(fixture.Previews.GetMembers());
-        fixture.Previews.Update(fixture.Context); Assert.True(fixture.Textures[1].Disposed);
-        fixture.Grabbed = false; fixture.Previews.Update(fixture.Context); Assert.Equal(3, fixture.Textures.Count);
-        fixture.Previews.Dispose(); Assert.True(fixture.Textures[2].Disposed);
+        fixture.Grabbed = true; Assert.False(fixture.Previews.IsDrawable(fixture.Registration));
+        fixture.Previews.Update(fixture.Context); Assert.Empty(fixture.Previews.GetMembers());
+        Assert.False(fixture.Textures[1].Disposed);
+        composition.Dispose(); Assert.True(fixture.Textures[1].Disposed);
         fixture.VerifyNoFeatureCalls();
     }
+
+    /// <summary>A view locale change localizes proxy lettering before the next metadata heartbeat without feature calls.</summary>
+    [Fact]
+    public void NativeProxyLocaleRefreshDoesNotWaitForMetadataHeartbeat()
+    {
+        using var fixture = new Fixture();
+        var previous = Lang.AvailableLanguages.GetValueOrDefault("de");
+        var german = new Mock<ITranslationService>();
+        german.Setup(value => value.HasTranslation(It.IsAny<string>(), false)).Returns(true);
+        german.Setup(value => value.Get(It.IsAny<string>(), It.IsAny<object[]>())).Returns("Versteckter Gegenstand");
+        Lang.AvailableLanguages["de"] = german.Object;
+        try
+        {
+            var registration = new HudOverlayRegistration("mod:localized", Mock.Of<IHudOverlay>(), () => false,
+                fixture.Group.Id, hoverLabelKey: "mod:hidden-label");
+            using var handle = fixture.Registry.Register(registration);
+            fixture.Previews.Update(fixture.Context);
+            using var view = new VanillaExpanded.HudOverlays.Rendering.Native.EditProxyView(fixture.Api.Object,
+                fixture.Previews, registration, _ => { });
+            using var composition = new IndicatorComposition(fixture.Api.Object, view, fixture.Context, new(74, 31));
+            string initial = fixture.Values.Single();
+            view.Prepare(new(fixture.Api.Object, 1, "de"));
+            Assert.Equal("VG", fixture.Values.Last()); Assert.NotEqual(initial, fixture.Values.Last());
+            Assert.True(fixture.Textures[0].Disposed);
+            Assert.False(fixture.Textures[1].Disposed);
+            fixture.VerifyNoFeatureCalls();
+        }
+        finally
+        {
+            if (previous == null) Lang.AvailableLanguages.Remove("de");
+            else Lang.AvailableLanguages["de"] = previous;
+        }
+    }
+
 
     /// <summary>Restored live content immediately supersedes placeholders and preserves the registration-owned reserved footprint.</summary>
     [Fact]
@@ -72,7 +110,7 @@ public sealed class HudOverlayEditPreviewsTests
         using var fixture = new Fixture(); fixture.Previews.Update(fixture.Context);
         Assert.Equal(fixture.Registration.ReservedSize, Assert.Single(fixture.Previews.GetMembers()).Value);
         fixture.Live = true; Assert.False(fixture.Previews.IsDrawable(fixture.Registration));
-        fixture.Previews.Update(fixture.Context); Assert.True(fixture.Textures.Single().Disposed);
+        fixture.Previews.Update(fixture.Context); Assert.Empty(fixture.Textures);
         fixture.Live = false; fixture.Previews.Update(fixture.Context);
         fixture.Handle.Dispose(); Assert.Empty(fixture.Previews.GetMembers());
         fixture.Previews.Update(fixture.Context); Assert.All(fixture.Textures, texture => Assert.True(texture.Disposed));
@@ -98,9 +136,11 @@ public sealed class HudOverlayEditPreviewsTests
         host.TryOpen(false); HudOverlayNativeRenderPass.Render(host, .1f);
         Assert.Contains(fixture.Render.Invocations, call => call.Method.Name == nameof(IRenderAPI.Render2DTexturePremultipliedAlpha));
         fixture.VerifyNoFeatureCalls();
-        fixture.Live = true; fixture.Render.Invocations.Clear(); HudOverlayNativeRenderPass.Render(host, .1f);
-        fixture.Overlay.Verify(value => value.Draw(fixture.Render.Object, It.IsAny<ElementBounds>(), It.IsAny<RectangleF>(), .1f), Times.Once);
-        fixture.Backdrop.Verify(value => value.CollectBackdrops(fixture.Render.Object, It.IsAny<ElementBounds>()), Times.Once);
+        fixture.Live = true; fixture.Render.Invocations.Clear();
+        host.Synchronize(new Dictionary<string, HudOverlayGroupLayout> { [fixture.Group.Id] = layout });
+        HudOverlayNativeRenderPass.Render(host, .1f);
+        fixture.Overlay.Verify(value => value.CreateView(fixture.Api.Object, NativeViewRole.Live), Times.Once);
+        Assert.Equal(1, fixture.LiveDraws); Assert.Equal(1, fixture.LiveBackdrops);
     }
 
     /// <summary>Native proxy resources belong to the composer without invoking hidden native factories.</summary>
@@ -120,14 +160,13 @@ public sealed class HudOverlayEditPreviewsTests
         int allocations = fixture.Textures.Count;
         HudOverlayNativeRenderPass.Render(host, .1f);
         Assert.Equal(allocations, fixture.Textures.Count);
-        Assert.IsType<VanillaExpanded.HudOverlays.Rendering.Native.EditProxyElement>(
+        Assert.IsType<VanillaExpanded.HudOverlays.Rendering.Native.TextElement>(
             host.Composers[fixture.Group.Id].GetElement(fixture.Registration.Id + ":proxy"));
         fixture.Overlay.As<INativePresentation>().Verify(native => native.CreateView(It.IsAny<ICoreClientAPI>(),
             It.IsAny<NativeViewRole>()), Times.Never);
         fixture.VerifyNoFeatureCalls();
         host.Dispose();
-        Assert.False(fixture.Textures.First().Disposed);
-        Assert.All(fixture.Textures.Skip(1), texture => Assert.True(texture.Disposed));
+        Assert.Single(fixture.Textures); Assert.All(fixture.Textures, texture => Assert.True(texture.Disposed));
     }
     #endregion
 
@@ -140,7 +179,6 @@ public sealed class HudOverlayEditPreviewsTests
         public readonly Mock<IRenderAPI> Render = new();
         public readonly Mock<IInputAPI> Input = new();
         public readonly Mock<IHudOverlay> Overlay = new();
-        public readonly Mock<IHudOverlayBackdropProvider> Backdrop;
         public readonly HudOverlayRegistry Registry = new();
         public readonly HudOverlayGroup Group = new("group", new HudOverlayPlacement("screen", HudOverlayPoint.LeftTop, HudOverlayPoint.LeftTop));
         public readonly HudOverlayRegistration Registration;
@@ -148,9 +186,11 @@ public sealed class HudOverlayEditPreviewsTests
         public readonly HudOverlayEditPreviews Previews;
         public readonly HudOverlayPreparationContext Context;
         public readonly List<LoadedTexture> Textures = new();
+        public readonly List<string> Values = new();
         private readonly ITranslationService? english = Lang.AvailableLanguages.GetValueOrDefault("en");
         private readonly float oldScale = RuntimeEnv.GUIScale;
-        public bool Grabbed, Live;
+        public bool Grabbed, Live, FailGlyph;
+        public int LiveDraws, LiveBackdrops;
         #region Public API
         /// <summary>Creates deterministic text dimensions and actual native layout without graphics allocation.</summary>
         public Fixture(bool native = false)
@@ -165,20 +205,19 @@ public sealed class HudOverlayEditPreviewsTests
             Api.SetupGet(value => value.Input).Returns(Input.Object); Input.SetupGet(value => value.MouseGrabbed).Returns(() => Grabbed);
             HudOverlayEditFixture.Open(Api, Gui);
             if (native) Overlay.As<INativePresentation>();
-            Backdrop = Overlay.As<IHudOverlayBackdropProvider>();
+            Overlay.Setup(value => value.CreateView(Api.Object, It.IsAny<NativeViewRole>())).Returns(() => new CallbackView(Api.Object, (_, _) => LiveDraws++, () => LiveBackdrops++));
             Registry.RegisterGroup(Group); Registration = new HudOverlayRegistration("mod:hidden", Overlay.Object, () => false, Group.Id, reservedSize: new SizeF(74, 31));
             Handle = Registry.Register(Registration); Registry.BeginSession(Api.Object);
             Context = new HudOverlayPreparationContext(Api.Object, 1, "en");
             Previews = new HudOverlayEditPreviews(Api.Object, Registry, _ => Live, () => true, (_, failure) => throw failure,
-                () => new WorkshopGaugeText((context, _) => { var texture = new LoadedTexture(context.Api) { TextureId = 42, Width = 64, Height = 12, IgnoreUndisposed = true }; Textures.Add(texture); return texture; }));
+                (context, value, _) => { if (FailGlyph) throw new InvalidOperationException("glyph"); Values.Add(value); var texture = new LoadedTexture(context.Api) { TextureId = 42, Width = 64, Height = 12, IgnoreUndisposed = true }; Textures.Add(texture); return texture; });
         }
         /// <summary>Asserts stand-ins never invoke feature sampling, sizing, preparation, foreground or backdrop methods.</summary>
         public void VerifyNoFeatureCalls()
         {
             Overlay.Verify(value => value.Refresh(), Times.Never); Overlay.Verify(value => value.Prepare(It.IsAny<HudOverlayPreparationContext>()), Times.Never);
             Overlay.Verify(value => value.Measure(), Times.Never); Overlay.Verify(value => value.IsApplicable(), Times.Never);
-            Overlay.Verify(value => value.Draw(It.IsAny<IRenderAPI>(), It.IsAny<ElementBounds>(), It.IsAny<RectangleF>(), It.IsAny<float>()), Times.Never);
-            Backdrop.Verify(value => value.CollectBackdrops(It.IsAny<IRenderAPI>(), It.IsAny<ElementBounds>()), Times.Never);
+            Overlay.Verify(value => value.CreateView(It.IsAny<ICoreClientAPI>(), It.IsAny<NativeViewRole>()), Times.Never);
         }
         /// <summary>Retires preview-owned resources before their registration metadata.</summary>
         public void Dispose() { try { Previews.Dispose(); Registry.Dispose(); } finally { RuntimeEnv.GUIScale = oldScale; if (english == null) Lang.AvailableLanguages.Remove("en"); else Lang.AvailableLanguages["en"] = english; } }

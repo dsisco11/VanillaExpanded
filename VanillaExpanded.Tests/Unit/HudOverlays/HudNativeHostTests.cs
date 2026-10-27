@@ -34,8 +34,6 @@ public sealed class HudNativeHostTests
         Assert.True(fixture.Calls.IndexOf("frame") < fixture.Calls.IndexOf("live backdrop"));
         Assert.True(fixture.Calls.IndexOf("live backdrop") < fixture.Calls.IndexOf("flush"));
         Assert.True(fixture.Calls.IndexOf("flush") < fixture.Calls.IndexOf("foreground"));
-        fixture.Overlay.Verify(overlay => overlay.Draw(It.IsAny<IRenderAPI>(), It.IsAny<ElementBounds>(),
-            It.IsAny<RectangleF>(), It.IsAny<float>()), Times.Never);
         Assert.Empty(fixture.Failures);
     }
 
@@ -134,15 +132,17 @@ public sealed class HudNativeHostTests
         fixture.Overlay.Verify(overlay => overlay.EndSession(), Times.Never);
     }
 
-    /// <summary>A failed native factory leaves a manual-drawing peer drawable in the same container.</summary>
+    /// <summary>A failed native factory leaves another native peer drawable in the same container.</summary>
     [Fact]
-    public void NativeFactoryFailureDoesNotSuppressManualPeer()
+    public void NativeFactoryFailureDoesNotSuppressNativePeer()
     {
         using var fixture = new HudNativeHostFixture();
         fixture.Native.Setup(native => native.CreateView(It.IsAny<ICoreClientAPI>(), It.IsAny<NativeViewRole>()))
             .Throws(new InvalidOperationException("factory"));
-        var manual = new Mock<IHudOverlay>();
-        var registration = new HudOverlayRegistration("example:manual", manual.Object, () => true, fixture.Group.Id);
+        var peer = new Mock<IHudOverlay>();
+        int peerDraws = 0;
+        peer.Setup(value => value.CreateView(fixture.Components.Api.Object, It.IsAny<NativeViewRole>())).Returns(() => new CallbackView(fixture.Components.Api.Object, (_, _) => peerDraws++));
+        var registration = new HudOverlayRegistration("example:peer", peer.Object, () => true, fixture.Group.Id);
         fixture.Registry.Register(registration);
         fixture.Anchors.BeginFrame();
         fixture.Layout.Apply(fixture.Anchors, fixture.Group, new[]
@@ -154,8 +154,7 @@ public sealed class HudNativeHostTests
             { [fixture.Group.Id] = fixture.Layout });
         fixture.Render();
         Assert.NotEmpty(fixture.Failures);
-        manual.Verify(overlay => overlay.Draw(fixture.Components.Render.Object, It.IsAny<ElementBounds>(),
-            It.IsAny<RectangleF>(), .1f), Times.Once);
+        Assert.Equal(1, peerDraws);
         Assert.Empty(fixture.Views);
     }
 
