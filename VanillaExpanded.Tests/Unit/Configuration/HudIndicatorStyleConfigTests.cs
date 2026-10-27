@@ -6,7 +6,7 @@ using Vintagestory.API.Datastructures;
 
 namespace VanillaExpanded.Tests.Unit.Configuration;
 
-/// <summary>Checks independently persisted text preferences across all nine registered HUD indicators.</summary>
+/// <summary>Checks independently persisted text preferences across registered HUD indicators.</summary>
 public sealed class HudIndicatorStyleConfigTests
 {
     #region Public API
@@ -15,6 +15,7 @@ public sealed class HudIndicatorStyleConfigTests
     [InlineData(nameof(VanillaExpandedConfig.BowAmmunitionIndicatorStyle), false)]
     [InlineData(nameof(VanillaExpandedConfig.BodyTemperatureIndicatorStyle), false)]
     [InlineData(nameof(VanillaExpandedConfig.PlayerWetnessIndicatorStyle), false)]
+    [InlineData(nameof(VanillaExpandedConfig.ShelterIndicatorStyle), false)]
     [InlineData(nameof(VanillaExpandedConfig.WeatherConditionsIndicatorStyle), false)]
     [InlineData(nameof(VanillaExpandedConfig.RiftActivityIndicatorStyle), false)]
     [InlineData(nameof(VanillaExpandedConfig.TemporalStormIndicatorStyle), false)]
@@ -51,7 +52,7 @@ public sealed class HudIndicatorStyleConfigTests
         property.SetValue(config, Enum.ToObject(property.PropertyType, 999));
         Assert.Equal(defaultValue, property.GetValue(config));
     }
-    /// <summary>All ten style selectors use localized HUD-section choices with enum-compatible numeric indices.</summary>
+    /// <summary>All style selectors use localized HUD-section choices with enum-compatible numeric indices.</summary>
     [Fact]
     public void ConfigLibChoicesStayInHudSectionAndMatchTypedEnums()
     {
@@ -64,7 +65,7 @@ public sealed class HudIndicatorStyleConfigTests
             "vanillaexpanded:config-section-hud-overlays")["weight"]!.Value<double>();
         var properties = typeof(VanillaExpandedConfig).GetProperties().Where(value =>
             value.PropertyType == typeof(HudIndicatorStyle) || value.PropertyType == typeof(EnvironmentalGaugeStyle)).ToArray();
-        Assert.Equal(10, properties.Length);
+        Assert.Equal(11, properties.Length);
         foreach (var property in properties)
         {
             var setting = patch["settings"]!["integer"]![property.Name]!;
@@ -80,4 +81,3 @@ public sealed class HudIndicatorStyleConfigTests
     }
     #endregion
 }
-

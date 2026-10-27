@@ -1,4 +1,10 @@
 {
+  "hud-label-shelter": "Sheltered",
+  "hud-short-shelter": "SHLTR",
+  "shelter-reading": "Sheltered",
+  "config-shelter-indicator-style": "Shelter indicator style",
+  "config-enable-shelter-overlay": "Show shelter indicator",
+  "config-enable-shelter-overlay-tooltip": "Shows an indicator only while the game's room or cave cold-and-wind protection applies. Does not indicate rain cover. Hidden for dead players and in Creative or Spectator mode. Applies immediately.",
   "hud-label-wind-speed": "Wind Speed",
   "hud-short-wind-speed": "WIND",
   "wind-speed-reading": "{0}%",
