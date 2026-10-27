@@ -51,7 +51,8 @@ internal sealed class HudOverlaySession : IDisposable, IRenderer
         this.createEditText = createEditText;
         this.createHost = createHost ?? ((scheduler, _) => new HudOverlayHost(api, registry,
             registration => scheduler.IsDrawable(registration) || editPreviews?.IsDrawable(registration) == true,
-            scheduler.ReportDrawFailure, scheduler.ReportBoundaryFailure, containers: positions, editPreviews: editPreviews));
+            scheduler.ReportDrawFailure, scheduler.ReportBoundaryFailure, containers: positions, editPreviews: editPreviews,
+            presentationRevision: scheduler.PresentationRevision, structureRevision: scheduler.StructureRevision));
     }
 
     /// <summary>Starts one ready-world heartbeat, including a cheap wait when the player is not available yet.</summary>
@@ -164,7 +165,7 @@ internal sealed class HudOverlaySession : IDisposable, IRenderer
         positions?.RepairMirrors();
         anchors!.BeginFrame(visible);
         var preparation = new HudOverlayPreparationContext(api, anchors.GuiScale,
-            Lang.CurrentLocale ?? "en", FontRevision());
+            Lang.CurrentLocale ?? "en", FontRevision.Calculate());
         Scheduler!.Update(anchors, preparation, visible, enabled());
         editPreviews!.Update(preparation);
         editingActive = editPreviews.Active;
@@ -203,7 +204,7 @@ internal sealed class HudOverlaySession : IDisposable, IRenderer
     #endregion
 
     #region Prepared frame layout
-    /// <summary>Tracks visibility and native anchors during drawing without gameplay sampling or preparation.</summary>
+    /// <summary>Settles visibility, native context and packed geometry before drawing without gameplay sampling.</summary>
     private void BeforeRender()
     {
         if (disposed || anchors == null || Scheduler == null) return;
@@ -216,7 +217,7 @@ internal sealed class HudOverlaySession : IDisposable, IRenderer
             // Pause-menu entry cannot depend on gameplay ticks. Prepare only host-owned edit proxies
             // on this transition; feature sampling remains on the normal scheduler heartbeat.
             editPreviews.Update(new HudOverlayPreparationContext(api, anchors.GuiScale,
-                Lang.CurrentLocale ?? "en", FontRevision()));
+                Lang.CurrentLocale ?? "en", FontRevision.Calculate()));
             editingActive = editPreviews.Active;
         }
         SynchronizeLayouts();
@@ -227,6 +228,8 @@ internal sealed class HudOverlaySession : IDisposable, IRenderer
     {
         if (host == null || anchors == null || Scheduler == null) return;
         if (positions == null) return;
+        Scheduler.PrepareContext(new HudOverlayPreparationContext(api, anchors.GuiScale,
+            Lang.CurrentLocale ?? "en", FontRevision.Calculate()));
         var live = positions.Resolved.Select(item => item.Id).ToHashSet(StringComparer.Ordinal);
         // Keep both sides of a transient snap available for reuse until release/cancel ends the transaction.
         foreach (string id in layouts.Keys.Where(id => !live.Contains(id) && positions.ActiveContainer == null).ToArray())
@@ -265,15 +268,6 @@ internal sealed class HudOverlaySession : IDisposable, IRenderer
     private bool IsCurrentSession() => world != null && player != null && ReferenceEquals(api.World, world)
         && ReferenceEquals(api.World.Player, player) && ReferenceEquals(player.Entity, playerEntity);
 
-    /// <summary>Includes the native reusable text font and contrast color in preparation invalidation.</summary>
-    private static long FontRevision()
-    {
-        var hash = new HashCode();
-        hash.Add(GuiStyle.StandardFontName);
-        hash.Add(GuiStyle.SmallFontSize);
-        foreach (double component in GuiStyle.DialogDefaultTextColor) hash.Add(component);
-        return hash.ToHashCode();
-    }
     #endregion
 
     #region Diagnostics and cleanup

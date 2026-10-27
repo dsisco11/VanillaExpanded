@@ -1,18 +1,20 @@
 # Native GuiElement HUD Indicators — Implementation Plan
 
 Source proposal: [GuiElementIndicators.proposal.md](GuiElementIndicators.proposal.md), approved by the user in conversation.
+Scope amendment (2026-10-26): the user confirmed there are no external consumers and removed the external compatibility requirement. Do not implement or retain an external adapter or binary compatibility fixture. This overrides earlier compatibility-preservation decisions and historical receipts below. Adapter removal passed fresh Release compilation and 711/711 HUD tests, with zero failures or skips; four adapter-only cases were removed.
+
 Scope: implementation of that proposal only. Every task below is initially unchecked; this document does not authorize unrelated indicator redesigns.
 
 ## Goal and constraints
 
 Move all built-in indicator presentations into actual native GuiElements registered with the existing effective-container composers. Keep sampling and feature state in their owning controllers. Native bounds and the composition lifecycle own component arrangement; foreground and backdrop rendering consume already-prepared state and geometry.
 
-Preserve current IDs, settings, layouts, locks, grouping/editing, hidden-item proxies, input pass-through, dimensions, spacing, text-above-icon order, sampling semantics, clipping, animation, fades, and backdrop ordering. Do not introduce another widget tree, layout framework, rendering stage, or gameplay controller per visual instance. Preserve the public registration boundary and a documented external-consumer adapter; built-ins must not use that adapter after migration.
+Preserve current IDs, settings, layouts, locks, grouping/editing, hidden-item proxies, input pass-through, dimensions, spacing, text-above-icon order, sampling semantics, clipping, animation, fades, and backdrop ordering. Do not introduce another widget tree, layout framework, rendering stage, or gameplay controller per visual instance. Use the registration boundary for feature controllers; all indicators migrate to native views. No external-consumer adapter or source/binary compatibility qualification is required.
 
 ## Implementation decisions to resolve
 
     ☑ Resolve exact native-presentation capability and element-factory signatures during Phase 1; the proposal establishes an optional capability, not its concrete API names.
-    ☑ Verify source and binary compatibility obligations of existing public contracts before selecting the adapter boundary. Do not silently add required members to IHudOverlay or change existing registration signatures.
+    ☑ Establish controller and native-view registration boundaries. External source/binary compatibility obligations are waived by the user: there are no external consumers.
     ☑ Verify which native text element satisfies update, contrast, measurement, opacity, and disposal requirements. Use a small custom text GuiElement only where that verification establishes a concrete native gap.
     ☑ Establish how independent source/preview compositions retain or recreate visual elements without sharing disposable elements, duplicating subscriptions, or releasing resources still used by a surviving composition.
 
@@ -50,7 +52,7 @@ Paths below are repository-relative unless prefixed with `../vsapi`. These refer
 | Scope and preserved behavior | GuiElementIndicators.proposal.md, HudOverlays.md; user-supplied AGENTS instructions; VanillaExpanded.Tests/AGENTS.md | Actual component elements, existing policy owners, all styles, public compatibility, resource ownership, no render-time layout; tests cover relationships and lifecycle rather than prescribed pixels. Proposal status now records the conversation approval. |
 | Host/lifecycle/layout/input | VanillaExpanded/src/HudOverlays/{Rendering,Registration,Updating,Lifecycle,Layout,Interaction} implementations, specifically HudOverlayHost, HudOverlayGroupElement, HudOverlayRegistry, HudOverlayScheduler, HudOverlaySession, HudOverlayGroupLayout, HudOverlayContainers, HudOverlayGroupControls, HudOverlayDragPreview, HudOverlayEditPreviews and visibility/opacity helpers | Existing BeforeRender barrier, one composer per effective container, backdrop-before-foreground order, pass-deferred registry changes, retained exit content, independent controls/artwork input, frozen source geometry, hidden proxies and reverse-order teardown provide the integration route described below. Locate files by class name within HudOverlays; the brace list groups responsibilities rather than prescribing new directories. |
 | Consumers/helpers | The ten source directories and presentation/helper classes in the inventory below; HudIndicatorPresentation, HudIndicatorTextPresentation, HudOverlayIconTextPresentation, HudOverlayIconReading, HudIndicatorStackLayout, WorkshopGaugeText | Complete style inventory, current layout sites, generated versus borrowed resources, and the shared-helper retirement boundary are recorded below. ApproximateTimeOverlay.Refresh supplies calendar.HourOfDay for HH:mm text; the stale current-doc table was corrected without changing runtime behavior. |
-| Public compatibility | VanillaExpanded/src/HudOverlays/Registration/{IHudOverlay,HudOverlayRegistration,HudOverlayPreparationContext,HudOverlayChange}.cs and public HudOverlayIconTextPresentation | Existing public signatures remain intact; the new capability is optional. Existing source and compiled callers keep the same referenced members. A compiled old-consumer fixture belongs to implementation qualification, not a claim established by this design pass. |
+| Public compatibility | VanillaExpanded/src/HudOverlays/Registration/{IHudOverlay,HudOverlayRegistration,HudOverlayPreparationContext,HudOverlayChange}.cs and public HudOverlayIconTextPresentation | Existing public signatures remain intact; the new capability is optional. Internal callers retain the registration methods they use during migration. External-consumer qualification is not required; there are no external consumers. |
 | Native integration | ../vsapi/Client/UI/GuiComposer.cs, ElementBounds.cs, Elements/Impl/GuiElement.cs, Elements/Impl/Interactive/Text/GuiElementDynamicText.cs, Elements/Impl/Static/GuiElementTextBase.cs, Elements/Impl/Misc/GuiElementClip.cs; native CairoFont and TextDrawUtil | Direct source inspection plus the installed-assembly probe below establish registration, composition, text, clipping, passive-input and disposal constraints. |
 
 #### Built-in/style and current-layout inventory
@@ -111,7 +113,7 @@ Prepare runs when prepared content/context changes or a view is newly created; i
 
 BeginFrame advances only visual effect state once per feature per rendered frame, including storm pulse, then every view reads the same state. It does not prepare content, measure, lay out or sample. SetOpacity supplies each view's current visibility times drag multiplier; components combine this with feature pulse/tint without regenerating glyphs. CollectBackdrops submits cached geometry/state only. View disposal releases non-element bookkeeping; after mounting, elements/resources belong to the composer. Construction failure before mounting releases untransferred elements locally; partial mounting failure retires the failed composer and disposes only unattached leftovers. Disposal must tolerate repeated native calls.
 
-The native route is selected by optional capability, not registration signature changes. Preserve IHudOverlay's existing methods and both HudOverlayRegistration constructor overloads, including parameter types, ordering and defaults. Preserve public helper entry points (including HudOverlayIconTextPresentation) unless a separate compatibility review establishes removal is safe. An external-only legacy adapter registers a passive callback element borrowing IHudOverlay and retains Draw/opacity/clip/error behavior without sampling, owning or disposing the controller. Unknown external Draw implementations cannot be promised free of their own layout; the zero-layout guarantee covers host/native built-ins. All ten built-ins must exercise the native route after migration, with tests rejecting silent legacy fallback. No temporary forwarding facade or second built-in dispatcher is required by this contract.
+The native route is selected by optional capability, not registration signature changes. Keep the controller API used by current feature registrations during migration. Retire superseded methods, overloads and helpers once their internal consumers are migrated; external source/binary compatibility is not required. No external adapter is required. Existing manual presentations retain their dispatch until migration. All ten built-ins must exercise the native route after migration, with tests rejecting fallback after native factory failure. No temporary forwarding facade or second built-in dispatcher is required by this contract.
 
 #### Verified native operations and limitations
 
@@ -167,8 +169,8 @@ These native constraints require explicit preparation, passive handlers, interse
 
 Depends on Phase 1. Outcome: native presentations can be built, updated, measured, and disposed independently of feature sampling.
 
-    ☑ Add the optional native-presentation capability while retaining existing public registration contracts and legacy consumer behavior.
-    ☑ Implement the external IHudOverlay adapter at that boundary; keep legacy rendering distinguishable from native registration and prevent accidental built-in fallback from being hidden by the adapter.
+    ☑ Add native-presentation capability alongside the controller registration contracts.
+    ☑ Keep native factory selection explicit and prevent failed native factories from falling back to manual rendering. No external adapter is required.
     ☑ Establish composer-owned native icon/reading components and reusable parented ElementBounds using the native contracts verified in Phase 1.
         ☑ Use native text elements where suitable; implement only the small custom GuiElements required for prepared item or texture artwork and specialized visual effects.
         ☑ Keep measurement, text fitting, content preparation, and native bounds calculation outside rendering callbacks. Preserve optional-row behavior and current measured footprints.
@@ -178,35 +180,47 @@ Depends on Phase 1. Outcome: native presentations can be built, updated, measure
 
 Completion criteria:
     ☑ A representative native icon-and-reading presentation operates through actual composer-registered components, not a callback around the old full-indicator Draw routine.
-    ☑ The optional capability and legacy adapter preserve existing registration callers and their lifecycle.
+    ☑ Native views retain registry-owned controller lifetimes.
 
 Implementation evidence (2026-10-26; second review and independent audit-stage-completion passed with no unresolved findings):
 
-- Capability/compatibility tasks -> approved proposal Ownership and compatibility, Phase 1 capability signatures, HudOverlays.md registration/lifecycle contract -> three additive Registration contracts plus Rendering/Native/ViewFactory and LegacyView/Element. Existing public members and constructors remain unchanged; internal selection rejects built-in fallback. Host dispatch is unchanged until Phase 3.
+- Capability/compatibility tasks -> approved proposal Ownership and compatibility, Phase 1 capability signatures, HudOverlays.md registration/lifecycle contract -> three Registration contracts plus Rendering/Native/ViewFactory. Existing public members and constructors remain unchanged; internal selection rejects built-in fallback. Host dispatch is unchanged until Phase 3.
 - Component/preparation/cache tasks -> approved proposal Proposed design and Update and rendering contract, Phase 1 native text/clip decisions, inspected GuiComposer/GuiElement/ElementBounds/GuiElementTextBase -> IconReadingView, TextElement, TextureElement and ElementState. Real registered components use native parentage, prepared fitting/clips, content/context invalidation and independent owned glyph/art resources; no old full-indicator Draw callback is used by the representative native view.
-- Ownership/failure tasks -> Phase 1 responsibility/lifetime table and native duplicate-disposal findings -> NativeView transfers mounted elements to exactly one composer, cleans partial mounting, rejects foreign API/self-parenting, and retains local cleanup before mounting. Legacy controllers and engine-cached textures stay borrowed. Native element disposal is idempotent.
-- Verification -> VanillaExpanded.Tests/AGENTS.md -> HudNativeComponentTests and HudNativeCompatibilityTests cover actual native composition, supplied geometry/scaling, optional rows, cached rendering, content/context updates, independent views, ownership/failures, passive input, clipping/opacity, both registration overloads and registry lifecycle. Release HUD baseline: 678 passed; current candidate: 700 passed (22 new cases), zero failed/skipped, through the validation subagent. Second code/documentation review and diff whitespace checks passed. This is headless correctness evidence; package and user-run acceptance remain in their later phases.
+- Ownership/failure tasks -> Phase 1 responsibility/lifetime table and native duplicate-disposal findings -> NativeView transfers mounted elements to exactly one composer, cleans partial mounting, rejects foreign API/self-parenting, and retains local cleanup before mounting. Feature controllers and engine-cached textures stay borrowed. Native element disposal is idempotent.
+- Verification -> VanillaExpanded.Tests/AGENTS.md -> HudNativeComponentTests and HudNativeFactoryTests cover actual native composition, supplied geometry/scaling, optional rows, cached rendering, content/context updates, independent views, ownership/failures, passive input, clipping/opacity, both registration overloads and registry lifecycle. Release HUD baseline: 678 passed; current candidate: 700 passed (22 new cases), zero failed/skipped, through the validation subagent. Second code/documentation review and diff whitespace checks passed. This is headless correctness evidence; package and user-run acceptance remain in their later phases.
 
 ## Phase 3: Integrate native presentation lifetime with the host
 
 Depends on Phase 2. Outcome: the shared host schedules composition and layout before both rendering passes.
 
-    ☐ Update HudOverlayHost and its session/scheduler integration to bind native indicator elements into the existing one-composer-per-effective-container structure.
-    ☐ Wire the agreed invalidation matrix: prepare content, measure changed content, pack visible members, assign native bounds, then resolve/recompose only the affected native structure before backdrop or foreground rendering.
-        ☐ Position-only changes, including movement previews, update bounds without rebuilding unchanged text, textures, or item meshes.
-        ☐ Same-size numeric changes use the element's update mechanism; measurement changes also invalidate the owning container's packing.
-        ☐ Unchanged frames perform no component arrangement, fitting, stack configuration, or CalcWorldBounds from either render pass.
-    ☐ Retain existing anchor, packing, clipping, overflow, persistence, and permission owners. Do not replace those policies with a new general layout service.
-    ☐ Integrate native elements with backdrop batching, ordering, shared opacity, fade exits, and animated drawing without changing their established contracts.
-    ☐ Integrate regrouping, drag source reservations, active previews, cancellation, and hidden-item edit proxies.
-        ☐ Ensure every surviving composer has distinct owned elements and valid resources; visual duplication must not create a second gameplay controller or subscription set.
-        ☐ Retire discarded compositions and release resources only after remaining users are safe. Preserve original/restored layouts on cancellation.
-    ☐ Keep legacy external overlays functional while migrated built-ins use the native path. Any transitional internal dispatcher is temporary and must be removed in Phase 7.
-    ☐ Test host-driven invalidation, movement, render ordering, preview ownership, missing content, exceptions during preparation/composition, and session teardown.
+    ☑ Update HudOverlayHost and its session/scheduler integration to bind native indicator elements into the existing one-composer-per-effective-container structure.
+    ☑ Wire the agreed invalidation matrix: prepare content, measure changed content, pack visible members, assign native bounds, then resolve/recompose only the affected native structure before backdrop or foreground rendering.
+        ☑ Position-only changes, including movement previews, update bounds without rebuilding unchanged text, textures, or item meshes.
+        ☑ Same-size numeric changes use the element's update mechanism; measurement changes also invalidate the owning container's packing.
+        ☑ Unchanged frames perform no component arrangement, fitting, stack configuration, or CalcWorldBounds from either render pass.
+    ☑ Retain existing anchor, packing, clipping, overflow, persistence, and permission owners. Do not replace those policies with a new general layout service.
+    ☑ Integrate native elements with backdrop batching, ordering, shared opacity, fade exits, and animated drawing without changing their established contracts.
+    ☑ Integrate regrouping, drag source reservations, active previews, cancellation, and hidden-item edit proxies.
+        ☑ Ensure every surviving composer has distinct owned elements and valid resources; visual duplication must not create a second gameplay controller or subscription set.
+        ☑ Retire discarded compositions and release resources only after remaining users are safe. Preserve original/restored layouts on cancellation.
+    ☑ Keep unmigrated presentations functional through their existing dispatcher while migrated indicators use native views. Remove that dispatcher in Phase 7.
+    ☑ Test host-driven invalidation, movement, render ordering, preview ownership, missing content, exceptions during preparation/composition, and session teardown.
 
 Completion criteria:
-    ☐ Both render passes see the same prepared native geometry, and unchanged rendering triggers no arrangement or recomposition.
-    ☐ Native and legacy registrations coexist without sharing disposable elements or changing saved layout semantics.
+    ☑ Both render passes see the same prepared native geometry, and unchanged rendering triggers no arrangement or recomposition.
+    ☑ Native and manual presentations coexist without sharing disposable elements or changing saved layout semantics.
+
+### Phase 3 implementation traceability and evidence
+
+Completion: implementation, second review and independent audit-stage-completion passed on 2026-10-26. The audit identified a layout-finalization retry defect; it was corrected, regression-tested and independently rechecked. No unresolved findings remain.
+
+| Task group | Controlling sources | Implementation and verification evidence |
+|---|---|---|
+| Host, scheduler and invalidation | Approved proposal Proposed design / Update and rendering contract; Phase 1 capability, native-operation and invalidation contracts; HudOverlays.md native presentation and refresh/lifecycle sections; native GuiComposer and ElementBounds | Session retains canonical preparation/measurement and group packing. Scheduler publishes successful content/style revisions and handles native context changes without gameplay refreshes. Host selects views and Composition owns generation membership, content updates, dirty-bounds resolution and cached geometry before both passes. HudNativeHostTests and HudNativeSchedulerTests exercise content, measurement, context, style, movement, optional content and unchanged-frame calculation/composition counters. |
+| Ownership, previews and compatibility | Approved proposal Ownership and compatibility; Phase 1 lifetime table; HudOverlays.md source traces, editing, registration and session lifetime contracts; GuiComposer dynamic-element disposal and passive input behavior | Each composition owns distinct mounted views, bounds and generated resources. Independent source traces retain frozen geometry and resources while grouping suppresses drawing; host-owned EditProxyView never invokes a hidden feature factory. Registry BeforeRelease retires visual users before controller cleanup. Session disposes host resources before EndSession. ViewFactory creates native views; unmigrated presentations retain DispatchView/DrawGroup dispatch until Phase 7. Existing packing, attachment, clipping, input and persistence owners are unchanged. Native host/component, native factory, drag-preview, edit-proxy and session tests cover these boundaries. |
+| Error boundaries and rendering order | Proposal Update and rendering contract / Acceptance; Phase 1 sequencing, failure and ownership requirements; VanillaExpanded.Tests/AGENTS.md | Host settles one shared effect advance and frame opacity before live backdrops/foreground, then source backdrops/foreground and editing cues. Failed factories, preparation, mounting and composition retire partial ownership and permit recovery; failed native mounting rebuilds unaffected members in a fresh composer. Tests cover native/manual coexistence, failure recovery, snapshot-deferred removal, independent source resources and removal/teardown order. Headless relationships and ownership checks do not establish appearance or live input acceptance. |
+
+Validation: fresh Release compilation and the complete HUD suite passed **715/715**, with zero failures or skips. Command: `dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --configuration Release --filter FullyQualifiedName~HudOverlays -p:UseSharedCompilation=false --no-restore --logger "console;verbosity=minimal"`; installed game at `G:/Vintagestory`, including its native library search path. Only existing unrelated warnings remain. Tests were run by the validation subagent. Native bounds/composition counters cover unchanged rendering; recovery tests include failed geometry finalization and root-origin rebasing with a stationary member. Headless results do not establish live appearance or input acceptance. Later phases remain unchecked.
 
 ## Phase 4: Migrate icon-and-reading indicators
 
@@ -218,7 +232,7 @@ Depends on Phase 3. Outcome: the simpler built-ins exercise native composition e
         ☐ Rift: retain activity labels and visibility. Storm: retain stage, flashing, and continuous urgency-pulse behavior without component layout during animation.
     ☐ Migrate their text-only styles through the shared native text composition; preserve localized names/readings and style-switch invalidation.
     ☐ Transfer presentation resources into element ownership and remove these consumers' manual component positioning and render-time Resolve/Configure/fitting calls.
-    ☐ Verify each consumer uses the native capability rather than the compatibility adapter, with unchanged sampling and configuration behavior.
+    ☐ Verify each consumer uses native components rather than manual dispatch, with unchanged sampling and configuration behavior.
 
 Completion criteria:
     ☐ All four consumers' supported styles pass native registration, layout-relationship, update/cache, opacity, and lifetime tests.
@@ -248,7 +262,7 @@ Depends on Phase 5. Outcome: every built-in style uses native presentations.
     ☐ Verify style changes preserve feature state and timing while releasing superseded GUI resources and invalidating only the necessary measurement/composition work.
 
 Completion criteria:
-    ☐ The Phase 1 consumer/style inventory is fully migrated; no built-in style relies on the legacy adapter or full-indicator manual Draw dispatch.
+    ☐ The Phase 1 consumer/style inventory is fully migrated; no built-in style relies on full-indicator manual Draw dispatch.
 
 ## Phase 7: Retire superseded presentation infrastructure and document the boundary
 
@@ -256,14 +270,14 @@ Depends on Phase 6. Outcome: the native architecture is the sole built-in presen
 
     ☐ Remove HudIndicatorStackLayout and obsolete group-wide built-in dispatch, manual component absolute-bounds assignment, and presentation helpers whose responsibilities have been replaced.
         ☐ Preserve necessary framebuffer/scissor boundaries and custom artwork calculations; do not confuse those with component layout.
-        ☐ Retain the public legacy adapter and any required compatibility facade. Do not delete a public helper without reconciling existing consumer obligations.
+        ☐ Remove superseded helpers and dispatch paths once their consumers are migrated; no external compatibility facade is required.
     ☐ Reconcile resource owners, removal handles, style switches, exit completion, and world lifecycle for double disposal, stale visual state, or obsolete callbacks.
-    ☐ Update HudOverlays.md and public integration examples to describe the current native capability, element/composer ownership, invalidation, and supported legacy adapter.
+    ☐ Update HudOverlays.md and public integration examples to describe the current native capability, element/composer ownership and invalidation.
     ☐ Update affected feature documentation where its presentation implementation changed; permanent documentation must describe active code rather than refactor history.
-    ☐ Search source and linked documentation for stale claims, built-in legacy fallbacks, render-time layout calls, and orphaned infrastructure/tests. Reconcile every remaining match against its intended responsibility.
+    ☐ Search source and linked documentation for stale claims, manual drawing fallbacks, render-time layout calls, and orphaned infrastructure/tests. Reconcile every remaining match against its intended responsibility.
 
 Completion criteria:
-    ☐ Cleanup is complete without breaking external callers, and documentation matches the resulting implementation.
+    ☐ Cleanup is complete and documentation matches the resulting implementation.
 
 ## Phase 8: Qualify the complete implementation
 
@@ -273,7 +287,7 @@ Depends on Phase 7. Outcome: the final candidate has automated, package, and rev
     ☐ Verify repeated native rendering performs no arrangement, fitting, measurement, bounds calculation, or resource creation for unchanged content. Test relevant invalidations separately from content-only and animation-only changes.
     ☐ Verify parent/child relationships, scaling, containment, centering, optional rows, clipping, text-above order, backdrop alignment, passive input, fades, and animation continuity.
     ☐ Exercise grouping, movement, resize, GUI-scale/style changes, hidden proxies, previews/cancellation, saved layouts/locks, disabled content, removal, failed initialization, and repeated world transitions.
-    ☐ Verify actual native element registration and the public legacy adapter, including supported source/binary compatibility and exactly-once ownership across regrouping/previews.
+    ☐ Verify actual native element registration and exactly-once ownership across regrouping/previews.
     ☐ Run appropriate affected tests and the canonical Release build/package through subagents, as required by the user's instructions. Inspect package contents and verify relevant assets and DLL identity against the qualified candidate.
         ☐ Follow Tests/AGENTS.md: test relationships, supplied geometry, caching, invalidation, ordering, and lifecycle; do not lock tests to prescribed visual sizes, palettes, fonts, or pixels.
         ☐ Distinguish source inspection, headless native integration, package identity, skips, and any remaining runtime evidence. Do not present them as measured performance or appearance acceptance.
@@ -298,12 +312,12 @@ Completion criteria:
 
     ☐ Every proposal requirement is satisfied, or a scope change has explicit user approval; implementation convenience is not an implicit deferral.
     ☐ All built-in presentations are actual native GuiElements with composer-owned lifetimes and layout resolved before rendering.
-    ☐ The external compatibility path is documented and working; superseded internal layout/dispatch paths are retired.
+    ☐ Superseded internal layout/dispatch paths are retired; no compatibility adapter remains.
     ☐ Automated qualification, package verification, documentation, reviews, and user-run acceptance are complete with truthful evidence and no unsupported performance claims.
 
 ## Proposal coverage
 
 - Proposed design: Phases 1–6 establish native components, retained controller responsibilities, and complete built-in/style migration.
 - Update and rendering contract: Phases 1, 3–6, and 8 establish invalidation and prove rendering consumes prepared geometry; Phase 7 removes superseded machinery.
-- Ownership and compatibility: Phases 1–3, 7, and 8 cover optional capability, external adapter, composer ownership, previews, lifecycle, and preserved user state.
+- Ownership and compatibility: Phases 1–3, 7, and 8 cover native capability, composer ownership, previews, lifecycle, and preserved user state.
 - Acceptance: Phases 8–9 distinguish automated/package evidence from user-run visual and input acceptance.

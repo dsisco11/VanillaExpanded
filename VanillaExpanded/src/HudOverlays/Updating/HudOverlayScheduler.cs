@@ -22,6 +22,7 @@ internal sealed class HudOverlayScheduler
     private readonly HashSet<string> invalidated = new(StringComparer.Ordinal);
     private long nextHeartbeat;
     private bool started;
+    private long revision;
 
     #region Public API
     #region Construction and notifications
@@ -114,7 +115,8 @@ internal sealed class HudOverlayScheduler
                     // Remove before invoking user code: notifications raised during refresh remain pending.
                     invalidated.Remove(registration.Id);
                     HudOverlayChange change = registration.Overlay.Refresh();
-                    state.PresentationDirty |= (change & HudOverlayChange.Presentation) != 0;
+                    state.PresentationDirty |= (change & HudOverlayChange.Presentation) != 0
+                        || registration.Overlay is INativePresentation && change != HudOverlayChange.None;
                     state.MeasurementDirty |= (change & HudOverlayChange.Measurement) != 0;
                     state.NextRefresh = now + registration.RefreshIntervalMs;
                     state.NeedsFresh = false;
@@ -124,6 +126,13 @@ internal sealed class HudOverlayScheduler
                     registration.Overlay.Prepare(preparation);
                     state.Context = preparation;
                     state.PresentationDirty = false;
+                    state.PresentationRevision = ++revision;
+                    var style = registration.MenuSettings?.Style?.Value;
+                    if (!Equals(state.Style, style))
+                    {
+                        state.Style = style;
+                        state.StructureRevision++;
+                    }
                     // Context changes affect font metrics; content-only changes may explicitly retain size.
                     state.MeasurementDirty |= contextChanged;
                 }
@@ -146,6 +155,44 @@ internal sealed class HudOverlayScheduler
 
     #endregion
     #region Prepared state and cleanup
+    #region Native publication
+    /// <summary>Reprepares visible native snapshots after context changes without polling or refreshing gameplay.</summary>
+    public void PrepareContext(HudOverlayPreparationContext preparation)
+    {
+        CheckThread();
+        registry.RunPass(registration =>
+        {
+            if (registration.Overlay is not INativePresentation
+                || !states.TryGetValue(registration.Id, out var state)
+                || !ReferenceEquals(state.Registration, registration) || state.Context == null
+                || state.Context == preparation || !Drawable(state)
+                || registration.Overlay is IHudOverlayVisibilityTransition fading && fading.Visibility.Exiting) return;
+            try
+            {
+                // Canonical metrics must be current before the session packs the native member bounds.
+                // Exits retain their final prepared snapshot rather than re-entering through preparation.
+                registration.Overlay.Prepare(preparation);
+                SizeF size = registration.Overlay.Measure();
+                if (!float.IsFinite(size.Width) || !float.IsFinite(size.Height) || size.Width < 0 || size.Height < 0)
+                    throw new InvalidOperationException("Overlay measurements must be finite and nonnegative.");
+                state.Size = size; state.Context = preparation; state.PresentationRevision = ++revision;
+            }
+            catch (Exception error) { Fail(state, error, clock()); }
+        }, ReportBoundaryFailure);
+    }
+
+    /// <summary>Identifies the last successfully prepared snapshot without refreshing the controller.</summary>
+    public long PresentationRevision(HudOverlayRegistration registration) =>
+        states.TryGetValue(registration.Id, out var state) && ReferenceEquals(state.Registration, registration)
+            ? state.PresentationRevision : 0;
+
+    /// <summary>Identifies a prepared style change requiring a new native element structure.</summary>
+    public long StructureRevision(HudOverlayRegistration registration) =>
+        states.TryGetValue(registration.Id, out var state) && ReferenceEquals(state.Registration, registration)
+            ? state.StructureRevision : 0;
+    #endregion
+
+    #region Membership
     /// <summary>Provides fixed reservations independently of visibility and measured sizes for ordinary drawable members.</summary>
     public IReadOnlyList<KeyValuePair<HudOverlayRegistration, SizeF>> GetMembers(string groupId)
     {
@@ -166,7 +213,9 @@ internal sealed class HudOverlayScheduler
         return states.TryGetValue(registration.Id, out var state)
             && ReferenceEquals(state.Registration, registration) && Drawable(state) && state.Size.Width > 0 && state.Size.Height > 0;
     }
+    #endregion
 
+    #region Diagnostics and reset
     /// <summary>Reports one drained lifecycle-boundary failure without interrupting healthy registrations.</summary>
     public void ReportBoundaryFailure(Exception failure)
     {
@@ -191,6 +240,7 @@ internal sealed class HudOverlayScheduler
         started = false;
         nextHeartbeat = 0;
     }
+    #endregion
     #endregion
     #endregion
 
@@ -238,5 +288,7 @@ internal sealed class HudOverlayScheduler
         public long NextRefresh;
         public SizeF Size;
         public HudOverlayPreparationContext? Context;
+        public long PresentationRevision, StructureRevision;
+        public Enum? Style;
     }
 }

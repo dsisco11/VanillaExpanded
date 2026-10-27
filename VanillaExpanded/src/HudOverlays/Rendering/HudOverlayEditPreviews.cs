@@ -92,6 +92,13 @@ internal sealed class HudOverlayEditPreviews : IDisposable
 
     /// <summary>Provides the full hidden-item identity for hover text while the compact proxy uses initials.</summary>
     public string Label(HudOverlayRegistration registration) => entries[registration.Id].Label;
+
+    /// <summary>Creates independent proxy lettering without invoking the hidden feature.</summary>
+    public WorkshopGaugeText CreateLettering() => createText();
+
+    /// <summary>Gets the compact prepared identity for composer-owned proxy lettering.</summary>
+    public string Caption(HudOverlayRegistration registration) => Abbreviate(registration.HoverLabelKey == null
+        ? registration.Id : Lang.Get(registration.HoverLabelKey));
     #endregion
 
     #region Drawing and lifetime

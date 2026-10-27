@@ -58,6 +58,24 @@ internal sealed class WorkshopGaugeText : IDisposable
             width, height, depth, tint ?? DrawOpacity.PremultipliedTint);
     }
 
+    /// <summary>Calculates a centered glyph target during geometry preparation.</summary>
+    public RectangleF Fit(RectangleF aperture)
+    {
+        if (texture == null || dirty) return RectangleF.Empty;
+        double fit = Math.Min(1, Math.Min(aperture.Width / Math.Max(1, texture.Width), aperture.Height / Math.Max(1, texture.Height)));
+        double width = texture.Width * fit, height = texture.Height * fit;
+        return new((float)(aperture.X + (aperture.Width - width) / 2),
+            (float)(aperture.Y + (aperture.Height - height) / 2), (float)width, (float)height);
+    }
+
+    /// <summary>Draws an already fitted target without measuring or arranging glyphs.</summary>
+    public void DrawAt(IRenderAPI renderer, RectangleF target, float depth, Vec4f? tint = null)
+    {
+        if (texture == null || dirty) return;
+        renderer.Render2DTexturePremultipliedAlpha(texture.TextureId,
+            (double)target.X, target.Y, target.Width, target.Height, depth, tint ?? DrawOpacity.PremultipliedTint);
+    }
+
     /// <summary>Releases session-owned pixels and forces preparation on the next session.</summary>
     public void Reset()
     {
