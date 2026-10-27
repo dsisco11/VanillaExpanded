@@ -39,6 +39,15 @@
         "weight": 10.4,
         "clientSide": true
       },
+      "EnableShelterOverlay": {
+        "code": "EnableShelterOverlay",
+        "name": "EnableShelterOverlay",
+        "ingui": "vanillaexpanded:config-enable-shelter-overlay",
+        "comment": "vanillaexpanded:config-enable-shelter-overlay-tooltip",
+        "default": true,
+        "weight": 10.46,
+        "clientSide": true
+      },
       "EnablePlayerWetnessOverlay": {
         "code": "EnablePlayerWetnessOverlay",
         "name": "EnablePlayerWetnessOverlay",
@@ -344,6 +353,19 @@
         "comment": "vanillaexpanded:config-hud-indicator-style-tooltip",
         "default": "icon",
         "weight": 10.301,
+        "clientSide": true,
+        "mapping": {
+          "icon": 0,
+          "text": 1
+        }
+      },
+      "ShelterIndicatorStyle": {
+        "code": "ShelterIndicatorStyle",
+        "name": "ShelterIndicatorStyle",
+        "ingui": "vanillaexpanded:config-shelter-indicator-style",
+        "comment": "vanillaexpanded:config-hud-indicator-style-tooltip",
+        "default": "icon",
+        "weight": 10.461,
         "clientSide": true,
         "mapping": {
           "icon": 0,

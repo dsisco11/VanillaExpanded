@@ -63,7 +63,7 @@ public sealed class HudIndicatorTextBranchTests : IDisposable
         var language = Newtonsoft.Json.Linq.JObject.Parse(File.ReadAllText(Path.Combine(root!.FullName,
             "VanillaExpanded/assets/vanillaexpanded/lang/en.json")));
         var labels = language.Properties().Where(value => value.Name.StartsWith("hud-short-")).ToArray();
-        Assert.Equal(10, labels.Length);
+        Assert.Equal(11, labels.Length);
         Assert.All(labels, value => Assert.InRange(value.Value.Value<string>()!.Length, 3, 5));
     }
     #endregion

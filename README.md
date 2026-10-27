@@ -102,6 +102,12 @@ While a temperature warning is visible, orange chevrons above the reading indica
 
 The warning uses synchronized body temperature and stays hidden in Creative and Spectator modes. Toggle it through `EnableBodyTemperatureOverlay`, or turn off `ShowBodyTemperatureReading` for the icon alone.
 
+### Shelter Indicator
+
+A roof-and-person icon beside the hotbar shows when a room or cave shelters you from cold and wind. It disappears when you leave shelter and does not indicate protection from rain.
+
+Move it using HUD editing, choose an icon or text display with `ShelterIndicatorStyle`, or turn it off with `EnableShelterOverlay`. It stays hidden while dead and in Creative or Spectator mode.
+
 ### Bow Ammunition
 
 While holding a supported base-game bow in your main hand, an arrow icon with its ammunition count centered above it shows the next arrow type and its total positive quantity in inventories eligible for bow selection.
@@ -263,6 +269,7 @@ There is no AutoLoot layering option: its progress always renders above dialogs,
 | `BowAmmunitionIndicatorStyle` | `icon` | `icon`, `text` | Ammunition icon or AMMO name and count. Applies live. |
 | `BodyTemperatureIndicatorStyle` | `icon` | `icon`, `text` | Thermometer icon or BODY name, risk, trend, and optional temperature. Applies live. |
 | `PlayerWetnessIndicatorStyle` | `icon` | `icon`, `text` | Droplet icon or WET name and percentage. Applies live. |
+| `ShelterIndicatorStyle` | `icon` | `icon`, `text` | Roof-and-person icon or SHLTR name and Sheltered reading. Applies live. |
 | `ApproximateTimeGaugeStyle` | `immersive` | `immersive`, `icon`, `text` | Copper clock, time-period icon, or TIME name and estimated period. Applies live. |
 | `EnvironmentalTemperatureGaugeStyle` | `immersive` | `immersive`, `icon`, `text` | Copper thermometer, compact icon, or TEMP name and Celsius reading. Applies live. |
 | `CalendarDateGaugeStyle` | `immersive` | `immersive`, `icon`, `text` | Mechanical calendar, compact icon, or DATE name and month/day. Applies live. |
@@ -274,6 +281,7 @@ There is no AutoLoot layering option: its progress always renders above dialogs,
 | `EnableBowAmmunitionOverlay` | `true`       | `true`, `false`                                                                                                                                                                                                              | Show the next-arrow type and type-total quantity while holding a supported bow.         |
 | `EnableBodyTemperatureOverlay` | `true` | `true`, `false` | Show the dynamic thermometer when too cold or hot; applies live. |
 | `EnablePlayerWetnessOverlay` | `true` | `true`, `false` | Show player wetness and a percentage in the selected style; applies live. |
+| `EnableShelterOverlay` | `true` | `true`, `false` | Show native room/cave cold-and-wind protection only while sheltered; applies live. |
 | `ShowBodyTemperatureReading` | `true` | `true`, `false` | Show whole degrees above the thermometer; disable for the icon alone. |
 | `HeldItemStatusAnchor`       | `saturation` | `saturation`, `hotbar`, `screen-left-top`, `screen-center-top`, `screen-right-top`, `screen-left-middle`, `screen-center-middle`, `screen-right-middle`, `screen-left-bottom`, `screen-center-bottom`, `screen-right-bottom` | Select native docking or a screen position. Unknown values fall back to saturation.     |
 | `HeldItemStatusOffsetX`      | `-4`         | -2048–2048 in ConfigLib                                                                                                                                                                                                      | Horizontal offset in GUI units; positive moves right. Nonfinite values fall back to -4. |

@@ -105,6 +105,14 @@ public class VanillaExpandedConfig
         set => bodyTemperatureIndicatorStyle = value == HudIndicatorStyle.Text ? value : HudIndicatorStyle.Icon;
     }
 
+    private HudIndicatorStyle shelterIndicatorStyle = HudIndicatorStyle.Icon;
+    /// <summary>Selects shelter artwork or a short text name for native room/cave protection.</summary>
+    public HudIndicatorStyle ShelterIndicatorStyle
+    {
+        get => shelterIndicatorStyle;
+        set => shelterIndicatorStyle = value == HudIndicatorStyle.Text ? value : HudIndicatorStyle.Icon;
+    }
+
     private HudIndicatorStyle playerWetnessIndicatorStyle = HudIndicatorStyle.Icon;
     /// <summary>Selects icon artwork or a short text name for player wetness.</summary>
     public HudIndicatorStyle PlayerWetnessIndicatorStyle
@@ -156,6 +164,9 @@ public class VanillaExpandedConfig
 
     /// <summary>Shows a filling droplet while synchronized player wetness is nonzero.</summary>
     public bool EnablePlayerWetnessOverlay { get; set; } = true;
+
+    /// <summary>Shows an indicator while native room/cave cold-and-wind protection applies.</summary>
+    public bool EnableShelterOverlay { get; set; } = true;
 
     /// <summary>Shows a whole-degree reading beside the thermometer; disabling retains the dynamic icon.</summary>
     public bool ShowBodyTemperatureReading { get; set; } = true;
