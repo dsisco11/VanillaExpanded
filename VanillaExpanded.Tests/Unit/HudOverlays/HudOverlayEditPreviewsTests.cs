@@ -102,6 +102,33 @@ public sealed class HudOverlayEditPreviewsTests
         fixture.Overlay.Verify(value => value.Draw(fixture.Render.Object, It.IsAny<ElementBounds>(), It.IsAny<RectangleF>(), .1f), Times.Once);
         fixture.Backdrop.Verify(value => value.CollectBackdrops(fixture.Render.Object, It.IsAny<ElementBounds>()), Times.Once);
     }
+
+    /// <summary>Native proxy resources belong to the composer without invoking hidden native factories.</summary>
+    [Fact]
+    public void NativeProxyCachesIndependentLetteringWithoutCreatingFeatureView()
+    {
+        using var fixture = new Fixture(native: true); fixture.Previews.Update(fixture.Context);
+        fixture.Gui.Setup(value => value.CreateCompo(It.IsAny<string>(), It.IsAny<ElementBounds>()))
+            .Returns((string name, ElementBounds bounds) => (GuiComposer)Activator.CreateInstance(typeof(GuiComposer), BindingFlags.Instance | BindingFlags.NonPublic,
+                null, new object[] { fixture.Api.Object, bounds, name }, null)!);
+        var anchors = new HudOverlayAnchorContext(new Window(), () => 1, () => null); anchors.BeginFrame();
+        using var layout = new HudOverlayGroupLayout(); layout.Apply(anchors, fixture.Group, fixture.Previews.GetMembers());
+        using var host = new HudOverlayHost(fixture.Api.Object, fixture.Registry, fixture.Previews.IsDrawable,
+            (_, error) => throw error, editPreviews: fixture.Previews);
+        host.Synchronize(new Dictionary<string, HudOverlayGroupLayout> { [fixture.Group.Id] = layout });
+        host.TryOpen(false); HudOverlayNativeRenderPass.Render(host, .1f);
+        int allocations = fixture.Textures.Count;
+        HudOverlayNativeRenderPass.Render(host, .1f);
+        Assert.Equal(allocations, fixture.Textures.Count);
+        Assert.IsType<VanillaExpanded.HudOverlays.Rendering.Native.EditProxyElement>(
+            host.Composers[fixture.Group.Id].GetElement(fixture.Registration.Id + ":proxy"));
+        fixture.Overlay.As<INativePresentation>().Verify(native => native.CreateView(It.IsAny<ICoreClientAPI>(),
+            It.IsAny<NativeViewRole>()), Times.Never);
+        fixture.VerifyNoFeatureCalls();
+        host.Dispose();
+        Assert.False(fixture.Textures.First().Disposed);
+        Assert.All(fixture.Textures.Skip(1), texture => Assert.True(texture.Disposed));
+    }
     #endregion
 
     #region Private
@@ -126,7 +153,7 @@ public sealed class HudOverlayEditPreviewsTests
         public bool Grabbed, Live;
         #region Public API
         /// <summary>Creates deterministic text dimensions and actual native layout without graphics allocation.</summary>
-        public Fixture()
+        public Fixture(bool native = false)
         {
             RuntimeEnv.GUIScale = 1;
             var language = new Mock<ITranslationService>();
@@ -137,6 +164,7 @@ public sealed class HudOverlayEditPreviewsTests
             Gui.SetupGet(value => value.WindowBounds).Returns(new Window());
             Api.SetupGet(value => value.Input).Returns(Input.Object); Input.SetupGet(value => value.MouseGrabbed).Returns(() => Grabbed);
             HudOverlayEditFixture.Open(Api, Gui);
+            if (native) Overlay.As<INativePresentation>();
             Backdrop = Overlay.As<IHudOverlayBackdropProvider>();
             Registry.RegisterGroup(Group); Registration = new HudOverlayRegistration("mod:hidden", Overlay.Object, () => false, Group.Id, reservedSize: new SizeF(74, 31));
             Handle = Registry.Register(Registration); Registry.BeginSession(Api.Object);

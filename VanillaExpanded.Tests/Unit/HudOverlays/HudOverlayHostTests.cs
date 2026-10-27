@@ -65,6 +65,10 @@ public sealed class HudOverlayHostTests : IDisposable
         Assert.All(calls.Where(x => x.StartsWith("draw:")), x => Assert.True(calls.IndexOf(x) > calls.IndexOf("flush")));
         Assert.Contains("collect:b", calls); Assert.Contains("draw:b", calls);
         batch.Verify(x => x.Clear(), Times.Exactly(2));
+        // Removal retires the generation before releasing its controller. Rebuild surviving members
+        // before exercising the separate composer enablement and unavailable-anchor gates.
+        registry.RunPass(_ => { });
+        host.Synchronize(new Dictionary<string, HudOverlayGroupLayout> { [group.Id] = layout });
         calls.Clear(); host.Composers[group.Id].Enabled = false; HudOverlayNativeRenderPass.Render(host, .1f);
         Assert.Equal(new[] { "flush" }, calls);
         calls.Clear(); host.Composers[group.Id].Enabled = true;
@@ -225,6 +229,8 @@ public sealed class HudOverlayHostTests : IDisposable
         var overlay = new Mock<IHudOverlay>();
         var registration = new HudOverlayRegistration("mod:a", overlay.Object, () => true, "group");
         var window = ElementBounds.Fixed(0, 0, 200, 100).WithEmptyParent();
+        registry.RegisterGroup(new HudOverlayGroup("group", new HudOverlayPlacement("screen", HudOverlayPoint.LeftTop, HudOverlayPoint.LeftTop)));
+        registry.Register(registration);
         window.CalcWorldBounds();
         var anchors = new HudOverlayAnchorContext(window, () => 1, () => null);
         anchors.BeginFrame();

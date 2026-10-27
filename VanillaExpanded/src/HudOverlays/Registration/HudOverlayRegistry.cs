@@ -22,6 +22,8 @@ public sealed class HudOverlayRegistry : IDisposable
     private bool inPass;
     private bool disposalRequested;
     private bool disposed;
+    /// <summary>Lets session visuals retire before a removed controller releases its shared prepared state.</summary>
+    internal event Action<HudOverlayRegistration>? BeforeRelease;
 
     #region Public API
     #region Registration
@@ -257,6 +259,7 @@ public sealed class HudOverlayRegistry : IDisposable
         entry.Released = true;
         retiredInstances.Add(entry.Registration.Overlay, new object());
         List<Exception>? failures = null;
+        TryAction(() => BeforeRelease?.Invoke(entry.Registration), ref failures);
         TryAction(() => End(entry), ref failures);
         TryAction(entry.Registration.Overlay.Dispose, ref failures);
         ThrowFailures(failures);

@@ -21,6 +21,8 @@ internal sealed class HudOverlayDragPreview
     #region Public API
     /// <summary>Gets source copies during free dragging, suppressing them while a destination group is previewed.</summary>
     public IReadOnlyList<HudOverlayMemberLayout> Originals => Active && !groupingPreview ? originals : Array.Empty<HudOverlayMemberLayout>();
+    /// <summary>Retains source-view ownership while a reversible grouping preview suppresses its drawing.</summary>
+    public IReadOnlyList<HudOverlayMemberLayout> Captured => Active ? originals : Array.Empty<HudOverlayMemberLayout>();
 
     /// <summary>Copies current bounds before input can detach, reflow, or merge the native layouts.</summary>
     public static HudOverlayMemberLayout[] Capture(IEnumerable<HudOverlayGroupLayout> groups) => groups

@@ -29,13 +29,13 @@ Retire `HudIndicatorStackLayout` and manual per-component absolute-bounds assign
 
 Composers own their elements; elements own their generated GUI resources. Engine-cached textures, inventory objects, and API services remain borrowed. Each element belongs to one composer. Regrouping and drag previews must not share a disposable element between composers or duplicate gameplay controllers and subscriptions. Style changes, completed exits, world changes, and disposal must release each owned resource exactly once.
 
-Preserve indicator IDs, settings, saved layouts and locks, grouping/editing, hidden-item proxies, passive input behavior, current sizes, and text-above-icon ordering. Preserve the public registration boundary: add an optional native-presentation capability and retain a documented adapter for existing external `IHudOverlay` consumers. All built-in indicators migrate to native presentations; the legacy adapter must not become their rendering path.
+Preserve indicator IDs, settings, saved layouts and locks, grouping/editing, hidden-item proxies, passive input behavior, current sizes, and text-above-icon ordering. Add a native-presentation capability alongside the controller registration boundary. All indicators migrate to native presentations. There are no external consumers, so no compatibility adapter or external source/binary compatibility obligation is required.
 
 ## Acceptance
 
-Verify native element registration, change-driven composition, and zero layout work during repeated rendering. Cover text updates, scaling, optional components, backdrop alignment, animation, dragging/regrouping, preview cancellation, public compatibility, and resource cleanup. Run appropriate tests and the canonical package build. User-run in-game review establishes appearance and input behavior.
+Verify native element registration, change-driven composition, and zero layout work during repeated rendering. Cover text updates, scaling, optional components, backdrop alignment, animation, dragging/regrouping, preview cancellation, controller ownership, and resource cleanup. Run appropriate tests and the canonical package build. User-run in-game review establishes appearance and input behavior.
 
-Approval covers this presentation refactor and its compatibility boundary. A dependency-ordered implementation checklist follows only after approval.
+Approval covers this presentation refactor. A dependency-ordered implementation checklist follows only after approval.
 
 ## Source boundaries
 

@@ -5,7 +5,9 @@ using System.Drawing;
 using VanillaExpanded.HudOverlays.Layout;
 using VanillaExpanded.HudOverlays.Interaction;
 using VanillaExpanded.HudOverlays.Registration;
+using VanillaExpanded.HudOverlays.Rendering.Native;
 using Vintagestory.API.Client;
+using Vintagestory.API.Config;
 
 namespace VanillaExpanded.HudOverlays.Rendering;
 
@@ -34,6 +36,10 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     private readonly Dictionary<HudOverlayMemberLayout, ElementBounds> clips = new();
     private HashSet<HudOverlayRegistration> active = new();
     private bool disposed, rendering, synchronizing;
+    private readonly Dictionary<string, Composition> compositions = new(StringComparer.Ordinal);
+    private Composition? sourceComposition;
+    private readonly Func<HudOverlayRegistration, long> presentationRevision, structureRevision;
+    private readonly Dictionary<HudOverlayRegistration, float> frameOpacity = new();
     public Action? BeforeRender { get; set; }
     public override bool Focusable => menuInput?.Capturing == true;
     public override bool UnregisterOnClose => true;
@@ -47,11 +53,15 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     public HudOverlayHost(ICoreClientAPI api, HudOverlayRegistry registry, Func<HudOverlayRegistration, bool> isDrawable,
         Action<HudOverlayRegistration, Exception> failure, Action<Exception>? boundaryFailure = null,
         IHudOverlayBackdropBatch? backdropBatch = null, HudOverlayContainers? containers = null,
-        HudOverlayEditPreviews? editPreviews = null, HudOverlayContextMenu? contextMenu = null) : base(api)
+        HudOverlayEditPreviews? editPreviews = null, HudOverlayContextMenu? contextMenu = null,
+        Func<HudOverlayRegistration, long>? presentationRevision = null,
+        Func<HudOverlayRegistration, long>? structureRevision = null) : base(api)
     {
         this.registry = registry;
         this.isDrawable = isDrawable;
         this.failure = failure;
+        this.presentationRevision = presentationRevision ?? (_ => 0);
+        this.structureRevision = structureRevision ?? (_ => 0);
         this.boundaryFailure = boundaryFailure;
         hoverLabels = new HudOverlayHoverLabels(api);
         this.backdropBatch = backdropBatch ?? api.ModLoader?.GetModSystem<HudOverlaySystem>()?.Backdrop;
@@ -62,6 +72,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         nativeBoundaries = new HudOverlayNativeBoundaries(api);
         snapHighlight = new HudSnapHighlight(api);
         artworkDialog = new HudOverlayArtworkDialog(api, DrawArtwork);
+        registry.BeforeRelease += RetireRegistration;
 
     }
     /// <summary>Registers a live session host through the native GUI lifecycle without taking focus.</summary>
@@ -78,14 +89,11 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         HashSet<string>? visibleControls = null;
         visibleGroups = layouts.Keys.ToHashSet(StringComparer.Ordinal);
         if (containers?.ActiveContainer == null) RetireContent(layouts);
-        foreach (var pair in layouts)
+        registry.RunSnapshotPass(snapshot => SynchronizeContent(layouts, snapshot.ToHashSet()), boundaryFailure);
+        if (dragPreview.Captured.Count == 0 && sourceComposition != null)
         {
-            if (!pair.Value.Available || groups.ContainsKey(pair.Key)) continue;
-            var dispatchBounds = ElementBounds.Fill.WithParent(pair.Value.Root);
-            var element = new HudOverlayGroupElement(capi, dispatchBounds, dt => DrawGroup(pair.Value.Members, dt));
-            Composers[pair.Key] = capi.Gui.CreateCompo("vanillaexpanded:hud:content:group:" + pair.Key, pair.Value.Root)
-                .OnlyDynamic().AddInteractiveElement(element).Compose(false);
-            groups.Add(pair.Key, pair.Value);
+            var source = sourceComposition; sourceComposition = null;
+            try { source.Dispose(); } catch (Exception error) { boundaryFailure?.Invoke(error); }
         }
         var retained = (containers?.ActiveContainer != null ? groups.Values : layouts.Values)
             .SelectMany(group => group.Members).Concat(dragPreview.Originals).ToHashSet();
@@ -255,6 +263,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     {
         if (disposed) return;
         disposed = true;
+        registry.BeforeRelease -= RetireRegistration;
         BeforeRender = null;
         var failures = new List<Exception>();
         // A failing native release must not strand the other controls or compositions on session replacement.
@@ -265,23 +274,200 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         TryRelease(hoverLabels.Dispose, failures);
         TryRelease(snapHighlight.Dispose, failures);
         TryRelease(() => TryClose(), failures);
-        foreach (var composer in Composers.Values.ToArray()) TryRelease(composer.Dispose, failures);
+        foreach (var composition in compositions.Values) TryRelease(composition.Dispose, failures);
+        compositions.Clear();
+        if (sourceComposition != null) TryRelease(sourceComposition.Dispose, failures);
+        sourceComposition = null;
         foreach (var pair in ((IEnumerable<KeyValuePair<string, GuiComposer>>)Composers).ToArray()) Composers.Remove(pair.Key);
         TryRelease(() => base.Dispose(), failures);
         dragPreview.Clear();
-        groups.Clear(); clips.Clear(); active.Clear();
+        groups.Clear(); clips.Clear(); active.Clear(); frameOpacity.Clear();
         if (failures.Count > 0) throw new AggregateException(failures);
     }
     #endregion
     #endregion
     #region Private
+    #region Native visual lifetime
+    #region Removal
+    /// <summary>Retires visual users before registry removal releases the controller's prepared data.</summary>
+    private void RetireRegistration(HudOverlayRegistration registration)
+    {
+        var errors = new List<Exception>();
+        foreach (string id in compositions.Where(pair => pair.Value.Contains(registration)).Select(pair => pair.Key).ToArray())
+        {
+            var composition = compositions[id];
+            compositions.Remove(id); Composers.Remove(id); groups.Remove(id);
+            TryRelease(composition.Dispose, errors);
+        }
+        if (sourceComposition?.Contains(registration) == true)
+        {
+            var source = sourceComposition; sourceComposition = null;
+            TryRelease(source.Dispose, errors);
+        }
+        if (errors.Count > 0) throw new AggregateException(errors);
+    }
+    #endregion
+    #region Prepared content
+    /// <summary>Consumes canonical measurements and prepares independent visuals under the existing packed roots.</summary>
+    private void SynchronizeContent(IReadOnlyDictionary<string, HudOverlayGroupLayout> layouts,
+        IReadOnlySet<HudOverlayRegistration> registrations)
+    {
+        var context = PreparationContext();
+        foreach (var pair in layouts)
+        {
+            if (!pair.Value.Available)
+            {
+                // Unavailable anchors have no drawable native members. Retire their independent visual
+                // resources even when the saved container remains part of the effective membership.
+                if (compositions.Remove(pair.Key, out var unavailable))
+                {
+                    Composers.Remove(pair.Key); groups.Remove(pair.Key);
+                    try { unavailable.Dispose(); } catch (Exception error) { boundaryFailure?.Invoke(error); }
+                }
+                continue;
+            }
+            var members = VisualMembers(pair.Value.Members.Where(member => registrations.Contains(member.Registration)));
+            if (!compositions.TryGetValue(pair.Key, out var composition)
+                || !ReferenceEquals(groups[pair.Key], pair.Value)
+                || !composition.Matches(members, IsProxy, structureRevision))
+            {
+                var replacement = CreateComposition("group:" + pair.Key, pair.Value.Root, members, NativeViewRole.Live, context);
+                if (replacement == null) continue;
+                // Publish a complete generation before retiring the previous one. Every generation mounts
+                // its own child bounds and resources; cleanup never clears a borrowed layout root.
+                compositions[pair.Key] = replacement;
+                Composers[pair.Key] = replacement.Composer;
+                groups[pair.Key] = pair.Value;
+                try { composition?.Dispose(); } catch (Exception error) { boundaryFailure?.Invoke(error); }
+                composition = replacement;
+            }
+            else composition.Prepare(context, presentationRevision);
+        }
+    }
+
+    /// <summary>Omits absent native content so completed exits retire views without invoking hidden factories.</summary>
+    private HudOverlayMemberLayout[] VisualMembers(IEnumerable<HudOverlayMemberLayout> members) => members
+        .Where(member => member.Registration.Overlay is not INativePresentation || isDrawable(member.Registration)).ToArray();
+
+    /// <summary>Identifies host-owned hidden-item artwork without asking the feature to create a view.</summary>
+    private bool IsProxy(HudOverlayRegistration registration) => editPreviews?.IsDrawable(registration) == true;
+
+    /// <summary>Captures the same font, locale and scale invalidators used by canonical preparation.</summary>
+    private HudOverlayPreparationContext PreparationContext() => new(capi, RuntimeEnv.GUIScale,
+        Lang.CurrentLocale ?? "en", FontRevision.Calculate());
+    #endregion
+
+    #region Composer generations
+    /// <summary>Builds a fully prepared generation while containing factory, mounting and composition failures.</summary>
+    private Composition? CreateComposition(string id, ElementBounds root, IReadOnlyList<HudOverlayMemberLayout> members,
+        NativeViewRole role, HudOverlayPreparationContext context)
+    {
+        Composition? candidate = null;
+        HudOverlayRegistration? current = null;
+        try
+        {
+            candidate = new Composition(capi.Gui.CreateCompo("vanillaexpanded:hud:content:" + id, root).OnlyDynamic(),
+                (registration, error) => ReportVisualFailure(registration, error));
+            foreach (var member in members)
+            {
+                current = member.Registration;
+                bool proxy = IsProxy(current);
+                INativeView view;
+                try
+                {
+                    if (proxy) view = new EditProxyView(capi, editPreviews!, current, error => boundaryFailure?.Invoke(error));
+                    else if (current.Overlay is INativePresentation)
+                        view = ViewFactory.Create(current.Overlay, capi, role,
+                            error => failure(member.Registration, error));
+                    else view = new DispatchView(capi, member, dt => DrawGroup(new[] { member },
+                        role == NativeViewRole.SourceTrace ? 0 : dt));
+                }
+                catch (Exception error) { ReportVisualFailure(current, error); continue; }
+                candidate.Add(member, view, proxy, structureRevision(current));
+            }
+            current = null;
+            candidate.Prepare(context, presentationRevision);
+            return candidate;
+        }
+        catch (Exception error)
+        {
+            if (current != null) ReportVisualFailure(current, error);
+            else foreach (var member in members) ReportVisualFailure(member.Registration, error);
+            try { candidate?.Dispose(); } catch (Exception cleanup) { boundaryFailure?.Invoke(cleanup); }
+            // A failed native add can poison its composer. Rebuild the unaffected members in a fresh
+            // generation rather than mounting more elements into that failed native dictionary.
+            if (current != null)
+                return CreateComposition(id, root, members.Where(member => !ReferenceEquals(member.Registration, current)).ToArray(), role, context);
+            return null;
+        }
+    }
+
+    /// <summary>Keeps proxy failures in the host boundary and feature failures in the scheduler recovery path.</summary>
+    private void ReportVisualFailure(HudOverlayRegistration registration, Exception error)
+    {
+        if (IsProxy(registration)) boundaryFailure?.Invoke(error); else failure(registration, error);
+    }
+    #endregion
+
+    #region Frame state
+    /// <summary>Prepares source ownership, shared effects and opacity once before backdrop or foreground callbacks.</summary>
+    private void PrepareFrame(float deltaTime)
+    {
+        SynchronizeContent(groups.Where(pair => visibleGroups.Contains(pair.Key))
+            .ToDictionary(pair => pair.Key, pair => pair.Value), active);
+        var captured = VisualMembers(dragPreview.Captured.Where(member => active.Contains(member.Registration)));
+        var context = PreparationContext();
+        if (captured.Length == 0)
+        {
+            var old = sourceComposition; sourceComposition = null;
+            try { old?.Dispose(); } catch (Exception error) { boundaryFailure?.Invoke(error); }
+        }
+        else if (sourceComposition == null || !sourceComposition.Matches(captured, IsProxy, structureRevision))
+        {
+            var rectangle = captured.Select(member => new RectangleF((float)member.Bounds.renderX,
+                (float)member.Bounds.renderY, (float)member.Bounds.OuterWidth, (float)member.Bounds.OuterHeight))
+                .Aggregate(RectangleF.Union);
+            var root = ElementBounds.Fixed(rectangle.X / context.GuiScale, rectangle.Y / context.GuiScale,
+                rectangle.Width / context.GuiScale, rectangle.Height / context.GuiScale).WithEmptyParent();
+            root.CalcWorldBounds();
+            var replacement = CreateComposition("source", root, captured, NativeViewRole.SourceTrace, context);
+            if (replacement != null)
+            {
+                var old = sourceComposition; sourceComposition = replacement;
+                try { old?.Dispose(); } catch (Exception error) { boundaryFailure?.Invoke(error); }
+            }
+        }
+        else sourceComposition.Prepare(context, presentationRevision);
+
+        frameOpacity.Clear();
+        foreach (var registration in active)
+        {
+            try
+            {
+                bool drawable = isDrawable(registration);
+                if (drawable && !IsProxy(registration) && registration.Overlay is INativePresentation native)
+                    native.BeginFrame(deltaTime);
+                float opacity = !drawable ? 0 : !IsProxy(registration)
+                    && registration.Overlay is IHudOverlayVisibilityTransition animated ? animated.Visibility.Opacity : 1;
+                frameOpacity[registration] = opacity * (dragPreview.Contains(registration) ? HudOverlayDragPreview.Opacity : 1);
+            }
+            catch (Exception error) { frameOpacity[registration] = 0; ReportVisualFailure(registration, error); }
+        }
+        float Opacity(HudOverlayRegistration registration) => frameOpacity.GetValueOrDefault(registration);
+        foreach (var composition in compositions.Values) composition.SetFrame(Opacity);
+        sourceComposition?.SetFrame(Opacity);
+    }
+    #endregion
+    #endregion
     #region Interaction and layout lifetime
     /// <summary>Releases only compositions absent from the effective layout after a transaction has ended.</summary>
     private void RetireContent(IReadOnlyDictionary<string, HudOverlayGroupLayout> layouts)
     {
         foreach (string id in groups.Keys.Where(id => !layouts.ContainsKey(id)).ToArray())
         {
-            Composers[id].Dispose(); Composers.Remove(id); groups.Remove(id);
+            if (compositions.Remove(id, out var composition))
+                try { composition.Dispose(); } catch (Exception error) { boundaryFailure?.Invoke(error); }
+            Composers.Remove(id); groups.Remove(id);
         }
     }
     /// <summary>Rechecks targets during stationary drags, including Shift, visibility, and size changes.</summary>
@@ -340,6 +526,9 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         try { registry.RunSnapshotPass(snapshot =>
         {
             active.UnionWith(snapshot);
+            try
+            {
+            PrepareFrame(deltaTime);
             capi.Render.GlPushMatrix();
             try
             {
@@ -356,7 +545,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
                     catch (Exception error) { boundaryFailure?.Invoke(error); }
                 }
                 // Source traces remain available during free dragging; a group preview displays only the destination.
-                DrawGroup(dragPreview.Originals, 0);
+                if (dragPreview.Originals.Count > 0) sourceComposition?.Composer.Render(0);
                 hoverLabels.Draw(groups.Where(pair => visibleGroups.Contains(pair.Key)).Select(pair => pair.Value),
                     registration => active.Contains(registration) && isDrawable(registration), deltaTime,
                     registration => editPreviews?.IsDrawable(registration) == true ? editPreviews.Label(registration)
@@ -378,7 +567,9 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
                 }
                 finally { capi.Render.GlPopMatrix(); }
             }
-            finally { backdropBatch?.Clear(); capi.Render.GlPopMatrix(); active.Clear(); }
+            finally { backdropBatch?.Clear(); capi.Render.GlPopMatrix(); }
+            }
+            finally { active.Clear(); frameOpacity.Clear(); }
         }, boundaryFailure); }
         finally { rendering = false; }
     }
@@ -387,20 +578,10 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     {
         if (backdropBatch == null) return;
         backdropBatch.Clear();
-        IEnumerable<HudOverlayMemberLayout> members = original ? dragPreview.Originals
-            : groups.Where(pair => visibleGroups.Contains(pair.Key) && pair.Value.Available && Composers[pair.Key].Enabled)
-                .SelectMany(pair => pair.Value.Members);
-        foreach (var member in members)
-        {
-            if (!active.Contains(member.Registration) || !isDrawable(member.Registration)
-                || editPreviews?.IsDrawable(member.Registration) == true
-                || member.Clip.Width <= 0 || member.Clip.Height <= 0
-                || member.Registration.Overlay is not IHudOverlayBackdropProvider provider) continue;
-            using var opacity = new DrawOpacity(member.Registration.Overlay,
-                dragPreview.Contains(member.Registration) ? HudOverlayDragPreview.Opacity : 1);
-            try { backdropBatch.Collect(member.Clip, () => provider.CollectBackdrops(capi.Render, member.Bounds)); }
-            catch (Exception error) { failure(member.Registration, error); }
-        }
+        if (original) sourceComposition?.CollectBackdrops(capi.Render, backdropBatch);
+        else foreach (var pair in compositions)
+            if (visibleGroups.Contains(pair.Key) && groups[pair.Key].Available)
+                pair.Value.CollectBackdrops(capi.Render, backdropBatch);
     }
     /// <summary>Applies the engine scissor stack around each bounded presentation, restoring it even after a consumer error.</summary>
     private void DrawGroup(IEnumerable<HudOverlayMemberLayout> members, float deltaTime)
@@ -419,8 +600,9 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
             capi.Render.PushScissor(clip, true);
             try
             {
-                using var opacity = new DrawOpacity(preview ? (object)editPreviews! : member.Registration.Overlay,
-                    dragPreview.Contains(member.Registration) ? HudOverlayDragPreview.Opacity : 1);
+                using var opacity = frameOpacity.TryGetValue(member.Registration, out float settled)
+                    ? new DrawOpacity(settled) : new DrawOpacity(preview ? (object)editPreviews! : member.Registration.Overlay,
+                        dragPreview.Contains(member.Registration) ? HudOverlayDragPreview.Opacity : 1);
                 if (preview) editPreviews!.Draw(member.Registration, capi.Render, member.Bounds);
                 else
                 {

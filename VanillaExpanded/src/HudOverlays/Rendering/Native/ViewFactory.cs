@@ -4,11 +4,11 @@ using Vintagestory.API.Client;
 
 namespace VanillaExpanded.HudOverlays.Rendering.Native;
 
-/// <summary>Selects optional native capability or the explicit external compatibility boundary.</summary>
+/// <summary>Creates independent native visuals and binds their feature failure boundary.</summary>
 internal static class ViewFactory
 {
     #region Public API
-    /// <summary>Creates an independent visual instance; built-ins can never silently fall back to legacy dispatch.</summary>
+    /// <summary>Creates an independent visual instance from the native presentation capability.</summary>
     public static INativeView Create(IHudOverlay overlay, ICoreClientAPI api,
         NativeViewRole role, Action<Exception> failure)
     {
@@ -26,9 +26,7 @@ internal static class ViewFactory
             }
             catch { view.Dispose(); throw; }
         }
-        if (overlay.GetType().Assembly == typeof(ViewFactory).Assembly)
-            throw new InvalidOperationException("Built-in HUD indicators require native presentation capability.");
-        return new LegacyView(api, overlay, role, failure);
+        throw new InvalidOperationException("HUD indicators require native presentation capability.");
     }
     #endregion
 }
