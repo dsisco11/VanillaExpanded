@@ -9,7 +9,7 @@ using Vintagestory.GameContent;
 namespace VanillaExpanded.TemporalStorm;
 
 /// <summary>Samples the synchronized native storm schedule and owns its passive fractured iris presentation.</summary>
-internal sealed class TemporalStormOverlay : IHudOverlay, INativePresentation, IHudOverlayVisibilityTransition
+internal sealed class TemporalStormOverlay : IHudOverlay, IHudOverlayVisibilityTransition
 {
     private readonly TemporalStormPresentation presentation;
     private ICoreClientAPI? api;
@@ -117,11 +117,7 @@ internal sealed class TemporalStormOverlay : IHudOverlay, INativePresentation, I
     }
     /// <summary>Reports the active icon footprint, or zero during quiet periods.</summary>
     public SizeF Measure() => presentation.Size;
-    /// <summary>Requires native rendering through the registered component elements.</summary>
-    public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime)
-    {
-        throw new InvalidOperationException("Native indicator components render through their composer.");
-    }
+
     #endregion
     #endregion
     #region Private

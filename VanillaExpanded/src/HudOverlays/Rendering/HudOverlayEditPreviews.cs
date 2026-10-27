@@ -10,7 +10,7 @@ using Vintagestory.API.Config;
 
 namespace VanillaExpanded.HudOverlays.Rendering;
 
-/// <summary>Owns labeled edit-only stand-ins for registered indicators without drawable live content.</summary>
+/// <summary>Prepares labeled edit-only stand-ins for registered indicators without drawable live content.</summary>
 internal sealed class HudOverlayEditPreviews : IDisposable
 {
     private readonly ICoreClientAPI api;
@@ -18,23 +18,22 @@ internal sealed class HudOverlayEditPreviews : IDisposable
     private readonly Func<HudOverlayRegistration, bool> liveDrawable;
     private readonly Func<bool> enabled;
     private readonly Action<string, Exception> diagnostic;
-    private readonly Func<WorkshopGaugeText> createText;
-    private readonly Dictionary<string, (HudOverlayRegistration Registration, WorkshopGaugeText Text, SizeF Size, string Label)> entries = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (HudOverlayRegistration Registration, SizeF Size, string Label)> entries = new(StringComparer.Ordinal);
     private readonly HashSet<string> reported = new(StringComparer.Ordinal);
     private bool disposed;
 
     #region Public API
-    #region Preparation and membership
-    /// <summary>Borrows normal visibility without changing feature state; owns only placeholder lettering and decoration.</summary>
+    #region Preparation
+    /// <summary>Borrows normal visibility without changing feature state; prepares only placeholder metadata.</summary>
     public HudOverlayEditPreviews(ICoreClientAPI api, HudOverlayRegistry registry, Func<HudOverlayRegistration, bool> liveDrawable,
-        Func<bool> enabled, Action<string, Exception> diagnostic, Func<WorkshopGaugeText>? createText = null)
+        Func<bool> enabled, Action<string, Exception> diagnostic, Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? createText = null)
     {
         this.api = api;
         this.registry = registry;
         this.liveDrawable = liveDrawable;
         this.enabled = enabled;
         this.diagnostic = diagnostic;
-        this.createText = createText ?? (() => new WorkshopGaugeText());
+        CreateText = createText;
     }
 
     /// <summary>Gates edit-only drawing immediately when pointer capture, global HUD visibility, or session availability changes.</summary>
@@ -49,24 +48,17 @@ internal sealed class HudOverlayEditPreviews : IDisposable
         {
             seen.Add(registration.Id);
             if (liveDrawable(registration)) { Remove(registration.Id); return; }
-            WorkshopGaugeText? text = null;
             try
             {
-                if (entries.TryGetValue(registration.Id, out var previous) && ReferenceEquals(previous.Registration, registration)) text = previous.Text;
-                else { Remove(registration.Id); text = createText(); }
                 string label = registration.HoverLabelKey == null ? registration.Id : Lang.GetL(context.Locale, registration.HoverLabelKey);
-                text.SetContent(Abbreviate(label));
-                text.Prepare(context);
                 // Compact proxies do not stretch a status row into unreadable clipped labels. Hover retains the full identity.
                 var size = registration.ReservedSize ?? new SizeF(HudOverlaySizes.Standard, HudOverlaySizes.Standard);
-                entries[registration.Id] = (registration, text, size, Lang.GetL(context.Locale, "vanillaexpanded:hud-edit-hidden", label));
+                entries[registration.Id] = (registration, size, Lang.GetL(context.Locale, "vanillaexpanded:hud-edit-hidden", label));
                 reported.Remove(registration.Id);
             }
             catch (Exception failure)
             {
                 entries.Remove(registration.Id);
-                try { text?.Dispose(); }
-                catch (Exception cleanup) { Report(registration.Id, cleanup); }
                 if (reported.Add(registration.Id)) Report(registration.Id, failure);
             }
         }, failure => Report("edit preview binding", failure));
@@ -74,6 +66,8 @@ internal sealed class HudOverlayEditPreviews : IDisposable
         reported.IntersectWith(seen);
     }
 
+    #endregion
+    #region Membership and identity
     /// <summary>Returns only current registration identities, preventing removed integrations from remaining edit targets.</summary>
     public IReadOnlyList<KeyValuePair<HudOverlayRegistration, SizeF>> GetMembers()
     {
@@ -93,24 +87,16 @@ internal sealed class HudOverlayEditPreviews : IDisposable
     /// <summary>Provides the full hidden-item identity for hover text while the compact proxy uses initials.</summary>
     public string Label(HudOverlayRegistration registration) => entries[registration.Id].Label;
 
-    /// <summary>Creates independent proxy lettering without invoking the hidden feature.</summary>
-    public WorkshopGaugeText CreateLettering() => createText();
+    /// <summary>Gets the optional per-element proxy glyph factory; mounted elements own every generated texture.</summary>
+    public Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? CreateText { get; }
 
-    /// <summary>Gets the compact prepared identity for composer-owned proxy lettering.</summary>
-    public string Caption(HudOverlayRegistration registration) => Abbreviate(registration.HoverLabelKey == null
-        ? registration.Id : Lang.Get(registration.HoverLabelKey));
+    /// <summary>Prepares compact lettering in the view's locale, including context changes between metadata heartbeats.</summary>
+    public string Caption(HudOverlayRegistration registration, string locale) => Abbreviate(registration.HoverLabelKey == null
+        ? registration.Id : Lang.GetL(locale, registration.HoverLabelKey));
     #endregion
 
-    #region Drawing and lifetime
-    /// <summary>Draws cached edit lettering without feature calls, visibility animations, or fabricated readings.</summary>
-    public void Draw(HudOverlayRegistration registration, IRenderAPI renderer, ElementBounds bounds)
-    {
-        if (!IsDrawable(registration)) return;
-        var rectangle = new RectangleF((float)bounds.renderX, (float)bounds.renderY, (float)bounds.OuterWidth, (float)bounds.OuterHeight);
-        entries[registration.Id].Text.Draw(renderer, rectangle, 50);
-    }
-
-    /// <summary>Releases all edit-owned resources on session exit without disposing feature presentations.</summary>
+    #region Lifetime
+    /// <summary>Clears prepared edit metadata on session exit without disposing feature presentations.</summary>
     public void Dispose()
     {
         if (disposed) return;
@@ -134,12 +120,7 @@ internal sealed class HudOverlayEditPreviews : IDisposable
     /// <summary>Retires one placeholder when live content returns or its registration changes.</summary>
     private void Remove(string id)
     {
-        if (entries.Remove(id, out var entry))
-        {
-            try { entry.Text.Dispose(); }
-            catch (Exception failure) { Report(id, failure); }
-        }
-        reported.Remove(id);
+        entries.Remove(id); reported.Remove(id);
     }
 
     /// <summary>Contains diagnostic failures so one edit placeholder cannot interrupt other registered items.</summary>
@@ -148,7 +129,7 @@ internal sealed class HudOverlayEditPreviews : IDisposable
         try { diagnostic(id, failure); } catch { }
     }
 
-    /// <summary>Retires edit resources after mouse capture without touching saved membership or normal feature state.</summary>
+    /// <summary>Clears edit metadata after mouse capture without touching saved membership or normal feature state.</summary>
     private void Clear()
     {
         foreach (string id in entries.Keys.ToArray()) Remove(id);

@@ -38,16 +38,17 @@ public sealed class HudOverlayHostTests : IDisposable
         var handles = new List<IDisposable>();
         foreach (string name in new[] { "a", "b", "hidden", "empty" })
         {
-            var overlay = new Mock<IHudOverlay>(); var provider = overlay.As<IHudOverlayBackdropProvider>();
+            var overlay = new Mock<IHudOverlay>();
+        overlay.Setup(value => value.CreateView(api.Object, It.IsAny<NativeViewRole>())).Returns(() => new CallbackView(api.Object));
             var registration = new HudOverlayRegistration("mod:" + name, overlay.Object, () => true, group.Id);
             handles.Add(registry.Register(registration));
             sizes.Add(new(registration, name == "empty" ? SizeF.Empty : new SizeF(20, 10)));
-            provider.Setup(x => x.CollectBackdrops(renderer.Object, It.IsAny<ElementBounds>())).Callback(() =>
+            overlay.Setup(value => value.CreateView(api.Object, It.IsAny<NativeViewRole>())).Returns(() => new CallbackView(api.Object,
+                (_, _) => calls.Add("draw:" + name), () =>
             {
                 calls.Add("collect:" + name);
                 if (name == "a") { handles[0].Dispose(); overlay.Verify(x => x.Dispose(), Times.Never); throw new InvalidOperationException(); }
-            });
-            overlay.Setup(x => x.Draw(renderer.Object, It.IsAny<ElementBounds>(), It.IsAny<RectangleF>(), .1f)).Callback(() => calls.Add("draw:" + name));
+            }));
         }
         registry.BeginSession(api.Object);
         var anchors = new HudOverlayAnchorContext(new Window(), () => 1, () => null); anchors.BeginFrame();
@@ -93,6 +94,7 @@ public sealed class HudOverlayHostTests : IDisposable
             HudOverlayPoint.LeftBottom, 4, 4), new HudOverlayPacking(HudOverlayDirection.Horizontal));
         registry.RegisterGroup(group);
         var weather = new Mock<IHudOverlay>(); var time = new Mock<IHudOverlay>();
+        weather.Setup(value => value.CreateView(api.Object, It.IsAny<NativeViewRole>())).Returns(() => new CallbackView(api.Object));
         using var icon = new ApproximateTimePresentation(
             load: (context, _) => new(new LoadedTexture(context.Api) { TextureId = 1, IgnoreUndisposed = true }, false),
             createFace: (context, _) => new LoadedTexture(context.Api) { TextureId = 20 });
@@ -120,11 +122,9 @@ public sealed class HudOverlayHostTests : IDisposable
         using var host = new HudOverlayHost(api.Object, registry, scheduler.IsDrawable, (_, error) => throw error);
         host.Synchronize(new Dictionary<string, HudOverlayGroupLayout> { [group.Id] = layout });
         host.TryOpen(false); HudOverlayNativeRenderPass.Render(host, .1f);
-        time.Verify(value => value.Draw(It.IsAny<IRenderAPI>(), It.IsAny<ElementBounds>(), It.IsAny<RectangleF>(), It.IsAny<float>()), Times.Never);
-        weather.Verify(value => value.Draw(It.IsAny<IRenderAPI>(), It.IsAny<ElementBounds>(), It.IsAny<RectangleF>(), It.IsAny<float>()), Times.Never);
         renderer.Verify(value => value.Render2DTexturePremultipliedAlpha(20, It.IsAny<float>(), It.IsAny<float>(),
             It.IsAny<float>(), It.IsAny<float>(), 51, null), Times.Once);
-        // Resize the already composed group through rain and fair weather without replacing its native composer.
+        // Entering and leaving drawable membership replaces the native generation; the time view remains visible.
         var composer = host.Composers[group.Id];
         foreach (SizeF nextSize in new[] { new SizeF(36, 36), SizeF.Empty })
         {
@@ -132,7 +132,7 @@ public sealed class HudOverlayHostTests : IDisposable
             scheduler.Update(anchors, new HudOverlayPreparationContext(api.Object, 1, "en"), true);
             layout.Apply(anchors, group, scheduler.GetMembers(group.Id));
             host.Synchronize(new Dictionary<string, HudOverlayGroupLayout> { [group.Id] = layout });
-            Assert.Same(composer, host.Composers[group.Id]);
+            Assert.NotSame(composer, host.Composers[group.Id]);
             Assert.True(layout.Members.Single(value => value.Registration.Id == "mod:time").Clip.Width > 0);
             HudOverlayNativeRenderPass.Render(host, .1f);
         }
@@ -186,34 +186,20 @@ public sealed class HudOverlayHostTests : IDisposable
         gui.Verify(x => x.TriggerDialogClosed(host), Times.Exactly(2));
         gui.Verify(x => x.TriggerDialogClosed(artwork), Times.Exactly(2));
     }
-    /// <summary>Assigned oversized clipping is supplied to the native scissor and restored on consumer failure.</summary>
+    /// <summary>Native component failures restore the supplied scissor and reach the feature diagnostic boundary.</summary>
     [Fact]
     public void ConsumerFailureRestoresNativeScissorAndDispatchesDiagnostic()
     {
-        var api = new Mock<ICoreClientAPI>();
-        var render = new Mock<IRenderAPI>();
-        api.SetupGet(x => x.Render).Returns(render.Object);
-        using var registry = new HudOverlayRegistry();
-        var overlay = new Mock<IHudOverlay>();
-        var registration = new HudOverlayRegistration("mod:a", overlay.Object, () => true, "group");
-        var window = new Window();
-        window.CalcWorldBounds();
-        var anchors = new HudOverlayAnchorContext(window, () => 1, () => null);
-        anchors.BeginFrame();
-        using var layout = new HudOverlayGroupLayout();
-        layout.Apply(anchors, new HudOverlayGroup("group", new HudOverlayPlacement("screen", HudOverlayPoint.LeftTop, HudOverlayPoint.LeftTop)),
-            new[] { new KeyValuePair<HudOverlayRegistration, SizeF>(registration, new SizeF(400, 40)) });
-        int failures = 0;
-        using var host = new HudOverlayHost(api.Object, registry, _ => true, (_, _) => failures++);
-        ((HashSet<HudOverlayRegistration>)typeof(HudOverlayHost).GetField("active", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(host)!).Add(registration);
-        var member = layout.Members.Single();
-        overlay.Setup(x => x.Draw(render.Object, member.Bounds, member.Clip, .1f)).Throws(new InvalidOperationException());
-        typeof(HudOverlayHost).GetMethod("DrawGroup", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(host, new object[] { layout.Members, .1f });
-        Assert.Equal(1, failures);
-        render.Verify(x => x.PushScissor(It.Is<ElementBounds>(bounds => bounds.renderX == member.Clip.X && bounds.renderY == member.Clip.Y
-            && bounds.OuterWidth == member.Clip.Width && bounds.OuterHeight == member.Clip.Height), true), Times.Once);
-        render.Verify(x => x.PopScissor(), Times.Once);
+        using var fixture = new HudNativeHostFixture();
+        fixture.Native.Setup(value => value.CreateView(fixture.Components.Api.Object, It.IsAny<NativeViewRole>()))
+            .Returns(() => new CallbackView(fixture.Components.Api.Object, (_, _) => throw new InvalidOperationException("draw")));
+        fixture.Synchronize();
+        fixture.Render(); Assert.Single(fixture.Failures);
+        var calls = fixture.Components.Render.Invocations;
+        Assert.Equal(calls.Count(call => call.Method.Name == "PushScissor"), calls.Count(call => call.Method.Name == "PopScissor"));
+        Assert.Contains(calls, call => call.Method.Name == "PushScissor" && ((ElementBounds)call.Arguments[0]).OuterWidth == fixture.Layout.Members.Single().Clip.Width);
     }
+
     /// <summary>Uses installed native composer registration and composition, reusing it for position-only changes.</summary>
     [Fact]
     public void NativeComposerUsesDistinctChildAndReusesUnchangedResources()
@@ -227,6 +213,7 @@ public sealed class HudOverlayHostTests : IDisposable
                 null, new object[] { api.Object, bounds, name }, null)!);
         using var registry = new HudOverlayRegistry();
         var overlay = new Mock<IHudOverlay>();
+        overlay.Setup(value => value.CreateView(api.Object, It.IsAny<NativeViewRole>())).Returns(() => new CallbackView(api.Object));
         var registration = new HudOverlayRegistration("mod:a", overlay.Object, () => true, "group");
         var window = ElementBounds.Fixed(0, 0, 200, 100).WithEmptyParent();
         registry.RegisterGroup(new HudOverlayGroup("group", new HudOverlayPlacement("screen", HudOverlayPoint.LeftTop, HudOverlayPoint.LeftTop)));
@@ -281,15 +268,18 @@ public sealed class HudOverlayHostTests : IDisposable
         layout.Apply(anchors, group, new[] { new KeyValuePair<HudOverlayRegistration, SizeF>(ra, new SizeF(20, 10)),
             new KeyValuePair<HudOverlayRegistration, SizeF>(rb, new SizeF(20, 10)) });
         using var host = new HudOverlayHost(api.Object, registry, _ => true, (_, _) => { });
-        host.Synchronize(new Dictionary<string, HudOverlayGroupLayout> { ["group"] = layout });
-        a.Setup(x => x.Draw(renderer.Object, It.IsAny<ElementBounds>(), It.IsAny<RectangleF>(), .1f)).Callback(() =>
+        a.Setup(value => value.CreateView(api.Object, It.IsAny<NativeViewRole>())).Returns(() => new CallbackView(api.Object, (_, _) =>
         {
             handle.Dispose();
             a.Verify(x => x.Dispose(), Times.Never);
-        }).Throws(new InvalidOperationException());
+            throw new InvalidOperationException();
+        }));
+        int bDraws = 0;
+        b.Setup(value => value.CreateView(api.Object, It.IsAny<NativeViewRole>())).Returns(() => new CallbackView(api.Object, (_, _) => bDraws++));
+        host.Synchronize(new Dictionary<string, HudOverlayGroupLayout> { ["group"] = layout });
         host.TryOpen(false);
         HudOverlayNativeRenderPass.Render(host, .1f);
-        b.Verify(x => x.Draw(renderer.Object, It.IsAny<ElementBounds>(), It.IsAny<RectangleF>(), .1f), Times.Once);
+        Assert.Equal(1, bDraws);
         a.Verify(x => x.Refresh(), Times.Never);
         a.Verify(x => x.Prepare(It.IsAny<HudOverlayPreparationContext>()), Times.Never);
         renderer.Verify(x => x.GlTranslate(0, 0, It.Is<float>(depth => depth < 0)), Times.Once);

@@ -2,8 +2,8 @@ using Vintagestory.API.Client;
 
 namespace VanillaExpanded.HudOverlays.Registration;
 
-/// <summary>Optionally supplies independent native visuals over one overlay's prepared data.</summary>
-/// <remarks>Implement alongside IHudOverlay. Creating views never samples gameplay or subscribes;
+/// <summary>Supplies independent native visuals over one overlay's prepared data.</summary>
+/// <remarks>Inherited by IHudOverlay. Creating views never samples gameplay or subscribes;
 /// each composer receives fresh elements and owned resources. The host calls BeginFrame once per
 /// feature, then all its views read the same visual effect state.</remarks>
 public interface INativePresentation

@@ -20,7 +20,7 @@ internal sealed class HudOverlaySession : IDisposable, IRenderer
     private readonly Func<HudOverlayScheduler, HudOverlayAnchorContext, IHudOverlayHost> createHost;
     private readonly Func<long> clock;
     private readonly Func<bool> enabled;
-    private readonly Func<WorkshopGaugeText>? createEditText;
+    private readonly Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? createEditText;
     private readonly Dictionary<string, HudOverlayGroupLayout> layouts = new(StringComparer.Ordinal);
     private long? tickId;
     private bool rendererRegistered;
@@ -40,7 +40,7 @@ internal sealed class HudOverlaySession : IDisposable, IRenderer
     /// <summary>Stores borrowed services and a native-host creation boundary without allocating world resources.</summary>
     public HudOverlaySession(ICoreClientAPI api, HudOverlayRegistry registry,
         Func<HudOverlayScheduler, HudOverlayAnchorContext, IHudOverlayHost>? createHost = null,
-        Func<long>? clock = null, Func<bool>? enabled = null, Func<WorkshopGaugeText>? createEditText = null)
+        Func<long>? clock = null, Func<bool>? enabled = null, Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? createEditText = null)
     {
         ArgumentNullException.ThrowIfNull(api);
         ArgumentNullException.ThrowIfNull(registry);

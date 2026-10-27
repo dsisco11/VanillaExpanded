@@ -8,7 +8,7 @@ using Vintagestory.API.Client;
 namespace VanillaExpanded.CalendarDate;
 
 /// <summary>Samples the native date and retains the independent mechanical calendar data.</summary>
-internal sealed class CalendarDateOverlay : IHudOverlay, INativePresentation, IHudOverlayVisibilityTransition
+internal sealed class CalendarDateOverlay : IHudOverlay, IHudOverlayVisibilityTransition
 {
     private readonly CalendarDatePresentation presentation;
     private ICoreClientAPI? api;
@@ -22,7 +22,7 @@ internal sealed class CalendarDateOverlay : IHudOverlay, INativePresentation, IH
     public void SetStyle(EnvironmentalGaugeStyle style) => styleChanged |= presentation.SetStyle(style);
 
     #region Lifecycle
-    /// <summary>Gets the presentation's retained-resource transition.</summary>
+    /// <summary>Gets the shared visibility transition for the prepared date.</summary>
     public HudOverlayVisibilityTransition Visibility => presentation.Visibility;
     /// <summary>Creates the feature-owned calendar presentation.</summary>
     public CalendarDateOverlay(CalendarDatePresentation? presentation = null) => this.presentation = presentation ?? new();
@@ -41,7 +41,7 @@ internal sealed class CalendarDateOverlay : IHudOverlay, INativePresentation, IH
         if (!value) HidePresentation();
         return value;
     }
-    /// <summary>Ends a world binding and releases presentation resources immediately.</summary>
+    /// <summary>Ends the world binding and clears prepared date data.</summary>
     public void EndSession()
     {
         api = null; date = null; presentation.Reset();
@@ -85,9 +85,6 @@ internal sealed class CalendarDateOverlay : IHudOverlay, INativePresentation, IH
     public INativeView CreateView(ICoreClientAPI api, NativeViewRole role) => presentation.CreateView(api);
     /// <summary>Has no elapsed visual effect; the estimated state advances only through scheduled sampling.</summary>
     public void BeginFrame(float deltaTime) { }
-    /// <summary>Rejects manual dispatch because registered native components own rendering.</summary>
-    public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime) =>
-        throw new InvalidOperationException("Render this indicator through its native view.");
     /// <summary>Clears sampling state while retaining the prepared date through a fade.</summary>
     public void HidePresentation()
     {

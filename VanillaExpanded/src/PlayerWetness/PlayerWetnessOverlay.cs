@@ -9,7 +9,7 @@ using Vintagestory.API.Common;
 namespace VanillaExpanded.PlayerWetness;
 
 /// <summary>Samples synchronized player wetness without changing the native temperature simulation.</summary>
-internal sealed class PlayerWetnessOverlay : IHudOverlay, INativePresentation, IHudOverlayVisibilityTransition
+internal sealed class PlayerWetnessOverlay : IHudOverlay, IHudOverlayVisibilityTransition
 {
     private readonly PlayerWetnessPresentation presentation;
     private ICoreClientAPI? api;
@@ -76,19 +76,15 @@ internal sealed class PlayerWetnessOverlay : IHudOverlay, INativePresentation, I
     /// <summary>This indicator has no shared per-frame visual effect.</summary>
     public void BeginFrame(float deltaTime) { }
 
-    /// <summary>Prepares only sampled nonzero wetness outside the draw path.</summary>
+    /// <summary>Prepares sampled nonzero wetness before native rendering.</summary>
     public void Prepare(HudOverlayPreparationContext context)
     {
         if (Wetness.HasValue) presentation.Prepare(context);
     }
     /// <summary>Reports the prepared droplet footprint.</summary>
     public SizeF Measure() => presentation.Size;
-    /// <summary>Requires foreground rendering through the registered native components.</summary>
-    public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime)
-    {
-        throw new InvalidOperationException("Native indicator components render through their composer.");
-    }
-    /// <summary>Clears sampled eligibility while retaining artwork for an exit.</summary>
+
+    /// <summary>Clears sampled eligibility while retaining prepared wetness data through its exit.</summary>
     public void HidePresentation()
     {
         Wetness = null;

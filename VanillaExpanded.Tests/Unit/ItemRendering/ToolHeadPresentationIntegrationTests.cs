@@ -63,7 +63,7 @@ public sealed class ToolHeadPresentationIntegrationTests : IDisposable
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void HudRoutingKeepsCountOutsideClippedIcon(bool configured)
+    public void NativeArrowRoutingUsesPreparedClippedIcon(bool configured)
     {
         var f = new Fixture();
         if (!configured) f.Item.Attributes = null;
@@ -75,19 +75,16 @@ public sealed class ToolHeadPresentationIntegrationTests : IDisposable
         try
         {
             field.SetValue(null, f.Renderer);
-            using var presentation = new VanillaExpanded.HudOverlays.Rendering.HudOverlayIconTextPresentation(
-                (_, _) => new LoadedTexture(f.Api.Object) { Width = 20, Height = 14 }, iconSize: 24,
-                textBeforeIcon: true, gap: 4, fontSize: 14, useItemPresentation: true);
-            presentation.SetContent(new ItemStack(f.Item), "20x");
-            presentation.Prepare(new VanillaExpanded.HudOverlays.Registration.HudOverlayPreparationContext(f.Api.Object, 1, "en"));
-            var bounds = ElementBounds.Fixed(0, 0, 48, 24).WithEmptyParent();
-            bounds.absFixedX = 10; bounds.absFixedY = 20; bounds.absInnerWidth = 48; bounds.absInnerHeight = 24;
-            presentation.Draw(f.Render.Object, bounds, new System.Drawing.RectangleF(40, 22, 16, 20), .1f);
+            using var element = new VanillaExpanded.BowAmmunition.ArrowElement(f.Api.Object, ElementBounds.Fixed(0, 0, 24, 24).WithEmptyParent(),
+                (context, _) => new LoadedTexture(context.Api));
+            element.Prepare(new(f.Api.Object, 1, "en"), new ItemStack(f.Item));
+            var bounds = element.Bounds;
+            bounds.absFixedX = 34; bounds.absFixedY = 20; bounds.absInnerWidth = 24; bounds.absInnerHeight = 24; bounds.Initialized = true;
+            element.LayoutCompleted(new(40, 22, 16, 20)); element.SetOpacity(1); element.RenderInteractiveElements(.1f);
             Assert.Equal(configured ? 1 : 0, f.Draws);
             Assert.Equal(configured ? 1 : 0, f.Preparations);
             f.Render.Verify(render => render.RenderItemstackToGui(It.IsAny<ItemSlot>(), 46, 32, 50, 24, -1, .1f, true, false, false),
                 configured ? Times.Never() : Times.Once());
-            f.Render.Verify(render => render.Render2DTexturePremultipliedAlpha(0, 10, It.Is<double>(y => Math.Abs(y - 25) < .001), 20, 14, 50), Times.Once());
             f.Render.Verify(render => render.PushScissor(It.Is<ElementBounds>(clip => clip.renderX == 40 && clip.renderY == 22
                 && clip.OuterWidth == 16 && clip.OuterHeight == 20), true), Times.Once());
             f.Render.Verify(render => render.PopScissor(), Times.Once());
@@ -113,13 +110,13 @@ public sealed class ToolHeadPresentationIntegrationTests : IDisposable
         try
         {
             field.SetValue(null, f.Renderer);
-            using var presentation = new VanillaExpanded.HudOverlays.Rendering.HudOverlayIconTextPresentation(
-                (_, _) => new LoadedTexture(f.Api.Object), iconSize: 24, useItemPresentation: true);
-            presentation.SetContent(new ItemStack(f.Item), "20x");
-            presentation.Prepare(new VanillaExpanded.HudOverlays.Registration.HudOverlayPreparationContext(f.Api.Object, 1, "en"));
-            var bounds = ElementBounds.Fixed(10, 20, 24, 24).WithEmptyParent();
-            bounds.CalcWorldBounds();
-            Assert.Throws<InvalidOperationException>(() => presentation.Draw(f.Render.Object, bounds, new System.Drawing.RectangleF(0, 0, 100, 100), .1f));
+            using var element = new VanillaExpanded.BowAmmunition.ArrowElement(f.Api.Object, ElementBounds.Fixed(10, 20, 24, 24).WithEmptyParent(),
+                (context, _) => new LoadedTexture(context.Api));
+            element.Prepare(new(f.Api.Object, 1, "en"), new ItemStack(f.Item));
+            var failures = new List<Exception>(); element.State.Failure = failures.Add;
+            element.Bounds.absFixedX = 10; element.Bounds.absFixedY = 20; element.Bounds.absInnerWidth = 24; element.Bounds.absInnerHeight = 24; element.Bounds.Initialized = true;
+            element.LayoutCompleted(new(0, 0, 100, 100)); element.SetOpacity(1);
+            element.RenderInteractiveElements(.1f); Assert.Single(failures);
             f.Render.Verify(render => render.PopScissor(), Times.Once());
             caller.Verify(shader => shader.Stop(), Times.Once());
             caller.Verify(shader => shader.Use(), Times.Once());

@@ -484,7 +484,9 @@ public sealed class HudOverlayRegistryTests
         /// <summary>Measures a bounded non-icon presentation in GUI units.</summary>
         public SizeF Measure() => new(20, 10);
         /// <summary>Consumes only prepared state; no game or graphics context is needed by the probe.</summary>
-        public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime) { }
+        public INativeView CreateView(ICoreClientAPI api, NativeViewRole role) => new CallbackView(api);
+        /// <summary>Has no visual animation in this lifecycle probe.</summary>
+        public void BeginFrame(float deltaTime) { }
         #endregion
         #endregion
     }

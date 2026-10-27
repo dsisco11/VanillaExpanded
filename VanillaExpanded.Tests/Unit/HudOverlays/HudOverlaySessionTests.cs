@@ -297,7 +297,7 @@ public sealed class HudOverlaySessionTests
             Registry.RegisterGroup(new HudOverlayGroup("group", new HudOverlayPlacement("screen", HudOverlayPoint.LeftTop, HudOverlayPoint.LeftTop)));
             Registration = new HudOverlayRegistration("mod:test", Probe, () => FeatureEnabled, "group", reservedSize: animated ? new SizeF(33, 27) : null); Registry.Register(Registration);
             Session = new HudOverlaySession(Api.Object, Registry, (_, _) => { var host = new Host(); Hosts.Add(host); return host; }, () => now, () => Enabled,
-                () => new WorkshopGaugeText((context, _) => { EditPreparations++; return new LoadedTexture(context.Api) { TextureId = 42, Width = 80, Height = 12, IgnoreUndisposed = true }; }));
+                (context, _, _) => { EditPreparations++; return new LoadedTexture(context.Api) { TextureId = 42, Width = 80, Height = 12, IgnoreUndisposed = true }; });
         }
         /// <summary>Advances one heartbeat with the currently exposed world/player.</summary>
         public void Tick() { now += 100; tick!(0); }
@@ -350,8 +350,10 @@ public sealed class HudOverlaySessionTests
         public virtual void Prepare(HudOverlayPreparationContext context) => Preparations++;
         /// <summary>Measures stable logical content dimensions.</summary>
         public SizeF Measure() => Measurement;
-        /// <summary>Rejects accidental gameplay/render coupling in lifecycle paths.</summary>
-        public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime) => throw new InvalidOperationException();
+        /// <summary>Creates an independent passive native probe without feature sampling.</summary>
+        public INativeView CreateView(ICoreClientAPI api, NativeViewRole role) => new CallbackView(api);
+        /// <summary>Has no visual animation in this lifecycle probe.</summary>
+        public void BeginFrame(float deltaTime) { }
         #endregion
         /// <summary>Records final feature ownership release.</summary>
         public void Dispose() => Disposals++;

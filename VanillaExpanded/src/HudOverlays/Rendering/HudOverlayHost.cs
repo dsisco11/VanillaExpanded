@@ -11,7 +11,7 @@ using Vintagestory.API.Config;
 
 namespace VanillaExpanded.HudOverlays.Rendering;
 
-/// <summary>Owns native group composers, optional group controls, and prepared presentation dispatch.</summary>
+/// <summary>Owns native group composers, optional group controls, and native presentation lifetimes.</summary>
 internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
 {
     private readonly HudOverlayRegistry registry;
@@ -33,7 +33,6 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     private HudOverlayGroupControls? ActiveControls => groupControls.Values.FirstOrDefault(control => control.Active);
     private readonly Dictionary<string, HudOverlayGroupLayout> groups = new(StringComparer.Ordinal);
     private HashSet<string> visibleGroups = new(StringComparer.Ordinal);
-    private readonly Dictionary<HudOverlayMemberLayout, ElementBounds> clips = new();
     private HashSet<HudOverlayRegistration> active = new();
     private bool disposed, rendering, synchronizing;
     private readonly Dictionary<string, Composition> compositions = new(StringComparer.Ordinal);
@@ -95,9 +94,6 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
             var source = sourceComposition; sourceComposition = null;
             try { source.Dispose(); } catch (Exception error) { boundaryFailure?.Invoke(error); }
         }
-        var retained = (containers?.ActiveContainer != null ? groups.Values : layouts.Values)
-            .SelectMany(group => group.Members).Concat(dragPreview.Originals).ToHashSet();
-        foreach (var member in clips.Keys.Where(member => !retained.Contains(member)).ToArray()) clips.Remove(member);
         if (containers != null)
         {
             var targets = new Dictionary<string, HudOverlayGroupMovement>(StringComparer.Ordinal);
@@ -281,7 +277,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
         foreach (var pair in ((IEnumerable<KeyValuePair<string, GuiComposer>>)Composers).ToArray()) Composers.Remove(pair.Key);
         TryRelease(() => base.Dispose(), failures);
         dragPreview.Clear();
-        groups.Clear(); clips.Clear(); active.Clear(); frameOpacity.Clear();
+        groups.Clear(); active.Clear(); frameOpacity.Clear();
         if (failures.Count > 0) throw new AggregateException(failures);
     }
     #endregion
@@ -347,7 +343,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
 
     /// <summary>Omits absent native content so completed exits retire views without invoking hidden factories.</summary>
     private HudOverlayMemberLayout[] VisualMembers(IEnumerable<HudOverlayMemberLayout> members) => members
-        .Where(member => member.Registration.Overlay is not INativePresentation || isDrawable(member.Registration)).ToArray();
+        .Where(member => isDrawable(member.Registration)).ToArray();
 
     /// <summary>Identifies host-owned hidden-item artwork without asking the feature to create a view.</summary>
     private bool IsProxy(HudOverlayRegistration registration) => editPreviews?.IsDrawable(registration) == true;
@@ -376,11 +372,8 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
                 try
                 {
                     if (proxy) view = new EditProxyView(capi, editPreviews!, current, error => boundaryFailure?.Invoke(error));
-                    else if (current.Overlay is INativePresentation)
-                        view = ViewFactory.Create(current.Overlay, capi, role,
+                    else view = ViewFactory.Create(current.Overlay, capi, role,
                             error => failure(member.Registration, error));
-                    else view = new DispatchView(capi, member, dt => DrawGroup(new[] { member },
-                        role == NativeViewRole.SourceTrace ? 0 : dt));
                 }
                 catch (Exception error) { ReportVisualFailure(current, error); continue; }
                 candidate.Add(member, view, proxy, structureRevision(current));
@@ -445,8 +438,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
             try
             {
                 bool drawable = isDrawable(registration);
-                if (drawable && !IsProxy(registration) && registration.Overlay is INativePresentation native)
-                    native.BeginFrame(deltaTime);
+                if (drawable && !IsProxy(registration)) registration.Overlay.BeginFrame(deltaTime);
                 float opacity = !drawable ? 0 : !IsProxy(registration)
                     && registration.Overlay is IHudOverlayVisibilityTransition animated ? animated.Visibility.Opacity : 1;
                 frameOpacity[registration] = opacity * (dragPreview.Contains(registration) ? HudOverlayDragPreview.Opacity : 1);
@@ -583,40 +575,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
             if (visibleGroups.Contains(pair.Key) && groups[pair.Key].Available)
                 pair.Value.CollectBackdrops(capi.Render, backdropBatch);
     }
-    /// <summary>Applies the engine scissor stack around each bounded presentation, restoring it even after a consumer error.</summary>
-    private void DrawGroup(IEnumerable<HudOverlayMemberLayout> members, float deltaTime)
-    {
-        foreach (var member in members)
-        {
-            if (!active.Contains(member.Registration) || !isDrawable(member.Registration) || member.Clip.Width <= 0 || member.Clip.Height <= 0) continue;
-            if (!clips.TryGetValue(member, out var clip)) clips[member] = clip = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
-            // Scissor receives initialized absolute pixel bounds, avoiding a second scale conversion.
-            clip.absFixedX = member.Clip.X;
-            clip.absFixedY = member.Clip.Y;
-            clip.absInnerWidth = member.Clip.Width;
-            clip.absInnerHeight = member.Clip.Height;
-            clip.Initialized = true;
-            bool preview = editPreviews?.IsDrawable(member.Registration) == true;
-            capi.Render.PushScissor(clip, true);
-            try
-            {
-                using var opacity = frameOpacity.TryGetValue(member.Registration, out float settled)
-                    ? new DrawOpacity(settled) : new DrawOpacity(preview ? (object)editPreviews! : member.Registration.Overlay,
-                        dragPreview.Contains(member.Registration) ? HudOverlayDragPreview.Opacity : 1);
-                if (preview) editPreviews!.Draw(member.Registration, capi.Render, member.Bounds);
-                else
-                {
-                    member.Registration.Overlay.Draw(capi.Render, member.Bounds, member.Clip, deltaTime);
-                }
-            }
-            catch (Exception error)
-            {
-                // Placeholder rendering is host-owned; its failure must not mark a healthy feature sample as failed.
-                if (preview) boundaryFailure?.Invoke(error); else failure(member.Registration, error);
-            }
-            finally { capi.Render.PopScissor(); }
-        }
-    }
+
     #endregion
     #endregion
 }

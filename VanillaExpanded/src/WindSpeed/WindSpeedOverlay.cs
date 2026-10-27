@@ -10,7 +10,7 @@ using Vintagestory.API.Common.Entities;
 namespace VanillaExpanded.WindSpeed;
 
 /// <summary>Samples native local wind and owns its HUD presentation.</summary>
-internal sealed class WindSpeedOverlay : IHudOverlay, INativePresentation, IHudOverlayVisibilityTransition
+internal sealed class WindSpeedOverlay : IHudOverlay, IHudOverlayVisibilityTransition
 {
     private readonly WindSpeedPresentation presentation;
     private readonly WindSpeedAverage average = new();
@@ -104,11 +104,7 @@ internal sealed class WindSpeedOverlay : IHudOverlay, INativePresentation, IHudO
     /// <summary>Reports the prepared wind footprint to the shared layout host.</summary>
     public SizeF Measure() => presentation.Size;
 
-    /// <summary>Requires native rendering through the registered component elements.</summary>
-    public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime)
-    {
-        throw new InvalidOperationException("Native indicator components render through their composer.");
-    }
+
 
     /// <summary>Clears eligibility and hysteresis while retaining prepared content for the exit transition.</summary>
     public void HidePresentation()

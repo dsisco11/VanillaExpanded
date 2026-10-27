@@ -9,7 +9,7 @@ using Vintagestory.GameContent;
 namespace VanillaExpanded.RiftActivity;
 
 /// <summary>Samples synchronized native rift activity and owns its passive fissure presentation.</summary>
-internal sealed class RiftActivityOverlay : IHudOverlay, INativePresentation, IHudOverlayVisibilityTransition
+internal sealed class RiftActivityOverlay : IHudOverlay, IHudOverlayVisibilityTransition
 {
     private readonly RiftActivityPresentation presentation;
     private ICoreClientAPI? api;
@@ -104,11 +104,7 @@ internal sealed class RiftActivityOverlay : IHudOverlay, INativePresentation, IH
     }
     /// <summary>Reports the active icon footprint, or zero during calm activity.</summary>
     public SizeF Measure() => presentation.Size;
-    /// <summary>Requires native rendering through the registered component elements.</summary>
-    public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime)
-    {
-        throw new InvalidOperationException("Native indicator components render through their composer.");
-    }
+
     #endregion
     #endregion
     #region Private

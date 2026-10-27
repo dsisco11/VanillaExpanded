@@ -37,7 +37,6 @@ public sealed class InstrumentIndicatorsTests
                 element.OnMouseDownOnElement(fixture.Context.Api, mouse); Assert.False(mouse.Handled);
             }
             composition.Composer.Render(.1f);
-            Assert.Throws<InvalidOperationException>(() => overlay.Draw(fixture.Resources.Native.Render.Object, composition.Composer.Bounds, new(0, 0, 100, 100), 0));
             if (style == EnvironmentalGaugeStyle.Text)
             {
                 Assert.Empty(fixture.Resources.Artwork); Assert.Empty(fixture.Faces); Assert.Empty(fixture.Ticks); Assert.Empty(fixture.Uploads);
@@ -185,6 +184,32 @@ public sealed class InstrumentIndicatorsTests
             Assert.Equal(2, fixture.Faces.Count); Assert.Equal(!inPlace, old.Disposed);
             composition.Dispose(); Assert.All(fixture.Faces, face => Assert.True(face.Disposed));
         }
+    }
+    /// <summary>Native hand rotation retains its spindle and fixed lighting offset while supplied geometry moves and scales.</summary>
+    [Theory]
+    [InlineData(.3f)] [InlineData(1.7f)]
+    public void NativePointerSpindleAndShadowFollowSuppliedCanvas(float rotation)
+    {
+        using var fixture = new InstrumentIndicatorsFixture();
+        var bounds = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
+        using var pointer = new PointerElement(fixture.Context.Api, bounds, fixture.Resources.Load);
+        bounds.absFixedX = 31; bounds.absFixedY = 59; bounds.absInnerWidth = 120; bounds.absInnerHeight = 135; bounds.Initialized = true;
+        pointer.Prepare(fixture.Context, rotation); pointer.LayoutCompleted(new(0, 0, 900, 900)); pointer.RenderInteractiveElements(0);
+        var first = fixture.Resources.Native.Render.Invocations.Where(call => call.Method.Name == "GlTranslate").ToArray();
+        Assert.Equal(2, first.Length);
+        double spindleX = Convert.ToDouble(first[1].Arguments[0]), spindleY = Convert.ToDouble(first[1].Arguments[1]);
+        double offsetX = Convert.ToDouble(first[0].Arguments[0]) - spindleX, offsetY = Convert.ToDouble(first[0].Arguments[1]) - spindleY;
+        fixture.Resources.Native.Render.Invocations.Clear();
+        bounds.absFixedX += 17; bounds.absFixedY += 23; bounds.absInnerWidth *= 2; bounds.absInnerHeight *= 2;
+        pointer.Prepare(fixture.Context, rotation + 1); pointer.LayoutCompleted(new(0, 0, 900, 900)); pointer.RenderInteractiveElements(0);
+        var next = fixture.Resources.Native.Render.Invocations.Where(call => call.Method.Name == "GlTranslate").ToArray();
+        Assert.Equal(2, next.Length);
+        double nextX = Convert.ToDouble(next[1].Arguments[0]), nextY = Convert.ToDouble(next[1].Arguments[1]);
+        Assert.Equal(bounds.renderX + (spindleX - 31) * 2, nextX, 4);
+        Assert.Equal(bounds.renderY + (spindleY - 59) * 2, nextY, 4);
+        Assert.Equal(offsetX * 2, Convert.ToDouble(next[0].Arguments[0]) - nextX, 4);
+        Assert.Equal(offsetY * 2, Convert.ToDouble(next[0].Arguments[1]) - nextY, 4);
+        fixture.Resources.Native.Render.Verify(value => value.GlPopMatrix(), Times.Exactly(2));
     }
     #endregion
 

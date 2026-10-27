@@ -9,7 +9,7 @@ using Vintagestory.API.Common;
 namespace VanillaExpanded.BodyTemperature;
 
 /// <summary>Samples synchronized temperature warnings and owns its cached passive temperature presentation.</summary>
-internal sealed class BodyTemperatureOverlay : IHudOverlay, INativePresentation, IHudOverlayVisibilityTransition
+internal sealed class BodyTemperatureOverlay : IHudOverlay, IHudOverlayVisibilityTransition
 {
     private readonly BodyTemperatureThermometerPresentation thermometer;
     private bool showReading = true;
@@ -127,11 +127,7 @@ internal sealed class BodyTemperatureOverlay : IHudOverlay, INativePresentation,
     }
     /// <summary>Returns zero dimensions while healthy or cached thermometer dimensions during a warning.</summary>
     public SizeF Measure() => Sample == null ? SizeF.Empty : thermometer.Size;
-    /// <summary>Requires foreground rendering through the registered native components.</summary>
-    public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime)
-    {
-        throw new InvalidOperationException("Native indicator components render through their composer.");
-    }
+
     #endregion
     #endregion
 

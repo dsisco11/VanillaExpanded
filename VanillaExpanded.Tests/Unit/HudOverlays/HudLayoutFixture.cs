@@ -33,7 +33,9 @@ internal sealed class HudLayoutFixture : IDisposable
     {
         if (!Registry.GetGroups().Any(value => value.Id == group))
             Registry.RegisterGroup(new HudOverlayGroup(group, new HudOverlayPlacement(anchor, HudOverlayPoint.LeftTop, HudOverlayPoint.LeftTop)));
-        var registration = new HudOverlayRegistration(id, Mock.Of<IHudOverlay>(), () => true, group);
+        var overlay = new Mock<IHudOverlay>();
+        overlay.Setup(value => value.CreateView(Api.Object, It.IsAny<NativeViewRole>())).Returns(() => new CallbackView(Api.Object));
+        var registration = new HudOverlayRegistration(id, overlay.Object, () => true, group);
         Registry.Register(registration);
         return registration;
     }

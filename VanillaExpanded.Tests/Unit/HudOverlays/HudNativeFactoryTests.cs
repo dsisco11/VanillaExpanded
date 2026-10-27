@@ -13,9 +13,9 @@ public sealed class HudNativeFactoryTests
 {
     #region Public API
     #region Native capability
-    /// <summary>Optional capability selects real native components without touching controller sampling or lifecycle.</summary>
+    /// <summary>The controller contract creates real native components without touching controller sampling or lifecycle.</summary>
     [Fact]
-    public void OptionalCapabilityCreatesIndependentViewsWithoutSampling()
+    public void NativeContractCreatesIndependentViewsWithoutSampling()
     {
         using var fixture = new HudNativeComponentFixture();
         var overlay = new Mock<IHudOverlay>();
@@ -44,19 +44,13 @@ public sealed class HudNativeFactoryTests
         Assert.Throws<InvalidOperationException>(() => ViewFactory.Create(Mock.Of<IHudOverlay>(),
             fixture.Api.Object, NativeViewRole.Live, fixture.Failures.Add));
         using var overlay = new WindSpeedOverlay();
-        // This check continues to apply after this particular built-in gains the optional capability.
-        if ((IHudOverlay)overlay is INativePresentation)
-        {
-            using var view = ViewFactory.Create(overlay, fixture.Api.Object, NativeViewRole.Live, fixture.Failures.Add);
-            Assert.NotNull(view);
-        }
-        else
-            Assert.Throws<InvalidOperationException>(() => ViewFactory.Create(overlay, fixture.Api.Object,
-                NativeViewRole.Live, fixture.Failures.Add));
+        using var view = ViewFactory.Create(overlay, fixture.Api.Object, NativeViewRole.Live, fixture.Failures.Add);
+        Assert.NotNull(view);
+        Assert.True(typeof(INativePresentation).IsAssignableFrom(typeof(IHudOverlay)));
     }
-    /// <summary>A broken native provider is not silently retried through the old drawing contract.</summary>
+    /// <summary>A broken native provider reports failure without disposing its controller.</summary>
     [Fact]
-    public void FailedNativeFactoryNeverCallsManualDrawing()
+    public void FailedNativeFactoryPreservesControllerOwnership()
     {
         using var fixture = new HudNativeComponentFixture();
         var overlay = new Mock<IHudOverlay>();
@@ -65,7 +59,6 @@ public sealed class HudNativeFactoryTests
             .Throws(new InvalidOperationException("factory failure"));
         Assert.Throws<InvalidOperationException>(() => ViewFactory.Create(overlay.Object, fixture.Api.Object,
             NativeViewRole.Live, fixture.Failures.Add));
-        overlay.Verify(overlay => overlay.Draw(It.IsAny<IRenderAPI>(), It.IsAny<ElementBounds>(), It.IsAny<RectangleF>(), It.IsAny<float>()), Times.Never);
         overlay.Verify(overlay => overlay.Dispose(), Times.Never);
     }
     #endregion

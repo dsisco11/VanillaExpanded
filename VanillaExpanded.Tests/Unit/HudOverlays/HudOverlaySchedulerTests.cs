@@ -161,9 +161,9 @@ public sealed class HudOverlaySchedulerTests : IDisposable
         fixture.Probe.Change = HudOverlayChange.Presentation; fixture.Scheduler.Invalidate("mod:test"); fixture.Tick(200);
         Assert.Equal(2, fixture.Probe.Preparations); Assert.Equal(1, fixture.Probe.Measurements);
         fixture.Probe.Change = HudOverlayChange.Measurement; fixture.Scheduler.Invalidate("mod:test"); fixture.Tick(300);
-        Assert.Equal(2, fixture.Probe.Preparations); Assert.Equal(2, fixture.Probe.Measurements);
+        Assert.Equal(3, fixture.Probe.Preparations); Assert.Equal(2, fixture.Probe.Measurements);
         fixture.Locale = "de"; fixture.Tick(400);
-        Assert.Equal(3, fixture.Probe.Preparations); Assert.Equal(3, fixture.Probe.Measurements);
+        Assert.Equal(4, fixture.Probe.Preparations); Assert.Equal(3, fixture.Probe.Measurements);
         Assert.Equal(3, fixture.Probe.Refreshes);
     }
 
@@ -318,8 +318,10 @@ public sealed class HudOverlaySchedulerTests : IDisposable
         public virtual void Prepare(HudOverlayPreparationContext context) { Preparations++; Throw("prepare"); }
         /// <summary>Counts measurement of stable content.</summary>
         public SizeF Measure() { Measurements++; Throw("measure"); return Size; }
-        /// <summary>Rejects accidental drawing by scheduler work.</summary>
-        public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime) => throw new InvalidOperationException();
+        /// <summary>Creates an independent passive native probe when requested by a host.</summary>
+        public INativeView CreateView(ICoreClientAPI api, NativeViewRole role) => new CallbackView(api);
+        /// <summary>Has no visual animation in this lifecycle probe.</summary>
+        public void BeginFrame(float deltaTime) { }
         /// <summary>Records exact final ownership cleanup.</summary>
         public void Dispose() => Disposals++;
         #endregion

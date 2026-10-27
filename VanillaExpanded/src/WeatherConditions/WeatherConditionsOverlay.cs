@@ -9,7 +9,7 @@ using Vintagestory.API.Common;
 namespace VanillaExpanded.WeatherConditions;
 
 /// <summary>Samples local native weather and owns a passive icon presentation.</summary>
-internal sealed class WeatherConditionsOverlay : IHudOverlay, INativePresentation, IHudOverlayVisibilityTransition
+internal sealed class WeatherConditionsOverlay : IHudOverlay, IHudOverlayVisibilityTransition
 {
     private readonly WeatherConditionsPresentation presentation;
     private ICoreClientAPI? api;
@@ -113,11 +113,7 @@ internal sealed class WeatherConditionsOverlay : IHudOverlay, INativePresentatio
     }
     /// <summary>Measures the composite slot, or zero when no supported artwork is visible.</summary>
     public SizeF Measure() => presentation.Size;
-    /// <summary>Requires foreground rendering through the registered native components.</summary>
-    public void Draw(IRenderAPI renderer, ElementBounds bounds, RectangleF clip, float deltaTime)
-    {
-        throw new InvalidOperationException("Native indicator components render through their composer.");
-    }
+
     #endregion
     #endregion
     #region Private

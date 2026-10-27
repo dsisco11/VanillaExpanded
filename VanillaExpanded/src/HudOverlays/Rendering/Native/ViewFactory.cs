@@ -16,17 +16,13 @@ internal static class ViewFactory
         ArgumentNullException.ThrowIfNull(api);
         ArgumentNullException.ThrowIfNull(failure);
         if (!Enum.IsDefined(role)) throw new ArgumentOutOfRangeException(nameof(role));
-        if (overlay is INativePresentation native)
+        var view = overlay.CreateView(api, role) ?? throw new InvalidOperationException("Native capability returned no view.");
+        try
         {
-            var view = native.CreateView(api, role) ?? throw new InvalidOperationException("Native capability returned no view.");
-            try
-            {
-                if (view is NativeView owned) owned.SetFailureHandler(failure);
-                return view;
-            }
-            catch { view.Dispose(); throw; }
+            if (view is NativeView owned) owned.SetFailureHandler(failure);
+            return view;
         }
-        throw new InvalidOperationException("HUD indicators require native presentation capability.");
+        catch { view.Dispose(); throw; }
     }
     #endregion
 }
