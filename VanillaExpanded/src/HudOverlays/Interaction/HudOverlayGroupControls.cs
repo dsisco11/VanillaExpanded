@@ -320,15 +320,7 @@ internal sealed class HudOverlayGroupControls : IDisposable
     /// <summary>Defers to foreground windows and modal input ownership before accepting HUD controls.</summary>
     private bool Blocked(PointF pointer)
     {
-        foreach (var dialog in api.Gui.OpenedGuis ?? Enumerable.Empty<GuiDialog>())
-        {
-            if (ReferenceEquals(dialog, host) || !dialog.IsOpened()) continue;
-            if (HudOverlayEditing.BlocksAllInput(dialog)) return true;
-            if (dialog.DialogType == EnumDialogType.HUD) continue;
-            if (dialog.Composers.Values.Any(composition => composition.Enabled
-                && composition.Bounds.PointInside(pointer.X, pointer.Y))) return true;
-        }
-        return false;
+        return HudOverlayEditing.BlocksPointer(api, host, pointer);
     }
 
     /// <summary>Maps displayed content, rather than titlebar coordinates, to native persisted GUI units.</summary>

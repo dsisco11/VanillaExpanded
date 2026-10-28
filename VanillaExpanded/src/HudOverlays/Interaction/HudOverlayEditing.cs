@@ -1,4 +1,5 @@
 using System;
+using System.Drawing;
 using System.Linq;
 using Vintagestory.API.Client;
 using Vintagestory.Client.NoObf;
@@ -20,5 +21,11 @@ internal static class HudOverlayEditing
 
     /// <summary>Preserves other modal owners while allowing targeted HUD input outside the pause menu's bounds.</summary>
     public static bool BlocksAllInput(GuiDialog dialog) => !IsPauseMenu(dialog) && dialog.CaptureAllInputs();
+
+    /// <summary>Defers HUD targeting to modal owners and foreground windows at the pointer, but not passive HUDs.</summary>
+    public static bool BlocksPointer(ICoreClientAPI api, GuiDialog host, PointF pointer) =>
+        (api.Gui.OpenedGuis ?? Enumerable.Empty<GuiDialog>()).Any(dialog => !ReferenceEquals(dialog, host) && dialog.IsOpened()
+            && (BlocksAllInput(dialog) || dialog.DialogType != EnumDialogType.HUD && dialog.Composers.Values.Any(composer =>
+                composer.Enabled && composer.Bounds.PointInside(pointer.X, pointer.Y))));
     #endregion
 }
