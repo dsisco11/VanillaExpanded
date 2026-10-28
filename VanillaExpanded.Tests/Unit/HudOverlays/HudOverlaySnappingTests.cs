@@ -15,6 +15,38 @@ namespace VanillaExpanded.Tests.Unit.HudOverlays;
 public sealed class HudOverlaySnappingTests
 {
     #region Public API
+    /// <summary>A standalone indicator can rejoin between members through either its container or member grip.</summary>
+    [Theory]
+    [InlineData(1, false)] [InlineData(1.5, false)] [InlineData(2, false)]
+    [InlineData(1, true)] [InlineData(1.5, true)] [InlineData(2, true)]
+    public void StandaloneIndicatorCanInsertBetweenExistingMembers(float scale, bool individual)
+    {
+        using var fixture = new Fixture(scale, individual: individual, targetPaired: true);
+        fixture.Begin(); fixture.Repack();
+        var target = fixture.Layouts["target"].Members.Single(member => member.Registration.Id == "test:b").Bounds;
+        var pointer = new PointF((float)(target.renderX + target.OuterWidth), (float)(target.renderY + target.OuterHeight / 2));
+        fixture.Movement.Move(pointer); fixture.Repack(); fixture.Update(pointer);
+        var selected = fixture.Snapping.Selected;
+        Assert.NotNull(selected);
+        Assert.True(selected.Grouping);
+        Assert.Equal("test:b", selected.Target!.Member);
+        Assert.Equal(HudSnapSide.Right, selected.Side);
+        Assert.True(fixture.Snapping.DropAllowed);
+        var preview = fixture.Snapping.Insertion;
+        fixture.Repack();
+        var joined = fixture.Containers.Owner("test:a")!;
+        Assert.Equal(new[] { "test:b", "test:a", "test:b2" }, joined.Tree.Leaves());
+        var members = fixture.Layouts[joined.Id].Members.ToDictionary(member => member.Registration.Id);
+        Assert.Equal(preview, ReadRectangle(members["test:a"].Bounds));
+        Assert.True(members["test:b"].Bounds.renderX + members["test:b"].Bounds.OuterWidth <= members["test:a"].Bounds.renderX);
+        Assert.True(members["test:a"].Bounds.renderX + members["test:a"].Bounds.OuterWidth <= members["test:b2"].Bounds.renderX);
+        fixture.Movement.Commit(fixture.Containers.Origin(joined)!.Value); fixture.Repack();
+        Assert.Equal(preview, ReadRectangle(fixture.Layouts[joined.Id].Members.Single(member => member.Registration.Id == "test:a").Bounds));
+        var restored = fixture.Restart();
+        Assert.Equal(joined.Tree, restored.Owner("test:a")!.Tree);
+        Assert.Equal(new[] { "test:b", "test:a", "test:b2" }, restored.Owner("test:a")!.Tree.Leaves());
+    }
+
     /// <summary>An empty reserved remainder still validates an integration that returns before commit.</summary>
     [Theory]
     [InlineData(false, 100, 100, 20, 20, 100, 30, 130, 100, 300, 200)]
@@ -637,13 +669,20 @@ public sealed class HudOverlaySnappingTests
         public HudOverlayAnchorContext Anchors => anchors;
         #region Public API
         /// <summary>Builds caller-defined instrument geometry at a selected native scale.</summary>
-        public Fixture(float scale, SizeF? measured = null, PointF? targetOrigin = null, bool paired = false, SizeF? sourceSize = null, bool individual = false, RectangleF? viewport = null, bool sourceThird = false)
+        public Fixture(float scale, SizeF? measured = null, PointF? targetOrigin = null, bool paired = false, SizeF? sourceSize = null, bool individual = false, RectangleF? viewport = null, bool sourceThird = false, bool targetPaired = false)
         {
             RuntimeEnv.GUIScale = scale; size = measured ?? new SizeF(40, 30);
             window = new Window(viewport);
             this.sourceSize = sourceSize ?? size;
             members.Add(storage.Add("test:a", "source")); members.Add(storage.Add("test:b", "target"));
-            if (paired) { members.Add(storage.Add("test:a2", "source")); members.Add(storage.Add("test:b2", "target")); }
+            if (paired) members.Add(storage.Add("test:a2", "source"));
+            if (paired || targetPaired) members.Add(storage.Add("test:b2", "target"));
+            if (targetPaired)
+            {
+                var target = storage.Registry.GetGroups().Single(group => group.Id == "target");
+                storage.Registry.UpdateGroup(new HudOverlayGroup(target.Id, target.Placement,
+                    new HudOverlayPacking(HudOverlayDirection.Horizontal, crossAlignment: HudOverlayCrossAlignment.End)));
+            }
             if (sourceThird) members.Add(storage.Add("test:a3", "source"));
             // These geometry fixtures start with explicit free positions rather than registered default anchors.
             storage.Positions[HudOverlayPositionKeys.Group("source")] = new(30, 40);
