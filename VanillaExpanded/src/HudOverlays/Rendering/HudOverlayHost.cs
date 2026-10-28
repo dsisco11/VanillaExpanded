@@ -245,10 +245,18 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
     }
     #endregion
     #region Rendering and lifecycle
-    /// <summary>Draws the focused popup in its native dialog slot, independently of passive HUD artwork.</summary>
+    /// <summary>Draws hover labels and the focused popup above native HUDs, independently of passive artwork.</summary>
     public override void OnRenderGUI(float deltaTime)
     {
         if (disposed || !IsOpened()) return;
+        if (!capi.HideGuis && menuInput?.IsOpened != true && capi.Input != null
+            && !HudOverlayEditing.BlocksPointer(capi, this, new PointF(capi.Input.MouseX, capi.Input.MouseY)))
+        {
+            hoverLabels.Draw(groups.Where(pair => visibleGroups.Contains(pair.Key)).Select(pair => pair.Value),
+                isDrawable, deltaTime,
+                registration => editPreviews?.IsDrawable(registration) == true ? editPreviews.Label(registration)
+                    : Lang.Get(registration.HoverLabelKey!));
+        }
         menuInput?.Draw(deltaTime);
     }
 
@@ -538,10 +546,6 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
                 }
                 // Source traces remain available during free dragging; a group preview displays only the destination.
                 if (dragPreview.Originals.Count > 0) sourceComposition?.Composer.Render(0);
-                hoverLabels.Draw(groups.Where(pair => visibleGroups.Contains(pair.Key)).Select(pair => pair.Value),
-                    registration => active.Contains(registration) && isDrawable(registration), deltaTime,
-                    registration => editPreviews?.IsDrawable(registration) == true ? editPreviews.Label(registration)
-                        : Vintagestory.API.Config.Lang.Get(registration.HoverLabelKey!));
                 // Foreground editing cues occupy a later sublayer of this HUD slot. Their shaders
                 // retain depth testing, so foreground native dialogs still occlude every cue uniformly.
                 capi.Render.GlPushMatrix();

@@ -53,9 +53,8 @@ internal sealed class HudOverlayHoverLabels : IDisposable
             tooltip = new GuiElementHoverText(api, localized, CairoFont.WhiteSmallText(), 280,
                 ElementBounds.Fixed(0, 0, 1, 1).WithEmptyParent());
             tooltip.SetAutoDisplay(false);
-            // Native tooltips default to a depth spanning several dialog slots. Keep HUD labels
-            // above their artwork but behind the independent context menu and ordinary windows.
-            tooltip.ZPosition = 160;
+            // Keep the background and rich text within the host's foreground dialog slot.
+            tooltip.ZPosition = 100;
             tooltip.SetAutoWidth(true);
             tooltip.SetVisible(true);
         }

@@ -219,9 +219,7 @@ internal sealed class HudOverlayMenuInput : IDisposable
     /// <summary>Defers to foreground windows over their native bounds and to modal ownership everywhere.</summary>
     private bool Blocked(PointF pointer)
     {
-        return (api.Gui.OpenedGuis ?? Enumerable.Empty<GuiDialog>()).Any(dialog => !ReferenceEquals(dialog, host) && dialog.IsOpened()
-            && (HudOverlayEditing.BlocksAllInput(dialog) || dialog.DialogType != EnumDialogType.HUD && dialog.Composers.Values.Any(composer =>
-                composer.Enabled && composer.Bounds.PointInside(pointer.X, pointer.Y))));
+        return HudOverlayEditing.BlocksPointer(api, host, pointer);
     }
     #endregion
 }
