@@ -71,7 +71,8 @@ internal sealed class HudOverlaySnapping
                 sizes[member.Registration.Id] = new SizeF((float)member.Bounds.fixedWidth, (float)member.Bounds.fixedHeight);
             if (pair.Key == source.Id || record.Tree.Leaves().Any(excluded.Contains)) continue;
             float gap = (float)(containers.Definition(record).Packing.Gap * scale);
-            if (movement.IndicatorId == null)
+            // Standalone grips can insert within groups; singleton destinations retain their padded container target.
+            if (movement.IndicatorId == null && (source.Tree.Indicator == null || record.Tree.Indicator != null))
             {
                 if (pair.Value.Members.Any(item => sizes.ContainsKey(item.Registration.Id) && item.Clip.Width > 0 && item.Clip.Height > 0))
                     targets.Add(new HudSnapTarget(pair.Key, null, Bounds(pair.Value), gap));
