@@ -553,7 +553,7 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
                         HudOverlayHoverBorder.Draw(capi.Render, hovered.Clip);
                     if (ActiveControls?.Movement.Dragging == true && snapping?.Selected is { } selected)
                     {
-                        if (selected.Grouping) snapHighlight.DrawConnection(snapping.ConnectionTarget, snapping.Insertion, selected.Side);
+                        if (selected.Grouping) snapHighlight.DrawGrouping(snapping.ConnectionTarget, snapping.Insertion, selected.Side, selected.Alignment);
                         else snapHighlight.DrawGuide(selected.Guide);
                     }
                 }

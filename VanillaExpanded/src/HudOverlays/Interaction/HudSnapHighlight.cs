@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using Cairo;
+using VanillaExpanded.HudOverlays.Layout;
+using VanillaExpanded.ItemSlotIndicators;
 using Vintagestory.API.Client;
 using Vintagestory.API.MathTools;
 
@@ -12,7 +14,10 @@ internal sealed class HudSnapHighlight : IDisposable
 {
     private readonly ICoreClientAPI api;
     private readonly Dictionary<HudSnapSide, LoadedTexture> gradients = new();
-    private readonly int line = ColorUtil.ToRgba(255, 215, 85, 100);
+    private readonly int line = ColorUtil.ToRgba(255,
+        (int)(IndicatorColorPallette.Yellow.X * 255),
+        (int)(IndicatorColorPallette.Yellow.Y * 255),
+        (int)(IndicatorColorPallette.Yellow.Z * 255));
 
     #region Public API
     /// <summary>Borrows the session render API and owns only cached gradient textures.</summary>
@@ -42,7 +47,20 @@ internal sealed class HudSnapHighlight : IDisposable
         api.Render.Render2DTexturePremultipliedAlpha(texture.TextureId, band.X, band.Y, band.Width, band.Height, 0);
     }
 
-    /// <summary>Draws alignment-only feedback without implying group membership.</summary>
+    /// <summary>Shows both the grouping connection and the cross-axis alignment that will be saved.</summary>
+    public void DrawGrouping(RectangleF destination, RectangleF insertion, HudSnapSide side, HudOverlayCrossAlignment alignment)
+    {
+        if (destination.Width <= 0 || destination.Height <= 0 || insertion.Width <= 0 || insertion.Height <= 0) return;
+        DrawConnection(destination, insertion, side);
+        float factor = alignment == HudOverlayCrossAlignment.Start ? 0 : alignment == HudOverlayCrossAlignment.End ? 1 : .5f;
+        bool horizontal = side is HudSnapSide.Left or HudSnapSide.Right;
+        var span = RectangleF.Union(destination, insertion);
+        DrawGuide(horizontal
+            ? new RectangleF(span.Left, destination.Top + factor * destination.Height, span.Width, 0)
+            : new RectangleF(destination.Left + factor * destination.Width, span.Top, 0, span.Height));
+    }
+
+    /// <summary>Draws the selected edge or center alignment across the participating content.</summary>
     public void DrawGuide(RectangleF guide) => api.Render.RenderRectangle(guide.X, guide.Y, 1,
         Math.Max(1, guide.Width), Math.Max(1, guide.Height), line);
 
@@ -71,4 +89,3 @@ internal sealed class HudSnapHighlight : IDisposable
     }
     #endregion
 }
-
