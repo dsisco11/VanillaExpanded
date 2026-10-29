@@ -50,13 +50,23 @@ internal sealed class GuiElementCraftingTile : GuiElementTextButton
             (Bounds.absX >= clip.absX + clip.OuterWidth || Bounds.absX + Bounds.OuterWidth <= clip.absX
                 || Bounds.absY >= clip.absY + clip.OuterHeight || Bounds.absY + Bounds.OuterHeight <= clip.absY))) return;
         base.RenderInteractiveElements(deltaTime);
-        if (icon != null)
-            api.Render.RenderItemstackToGui(icon, Bounds.renderX + Bounds.InnerWidth / 2,
-                Bounds.renderY + Bounds.InnerHeight / 2, 220, (float)(Bounds.InnerWidth * .8),
-                selection!.Evaluation.CanCraft ? ColorUtil.WhiteArgb : unchecked((int)0xff777777),
-                showStackSize: true);
-        if (!selection!.Evaluation.CanCraft) Badge(selection.Evaluation.IsSupported ? "!" : "?", Bounds.renderX);
-        if (selection.Output.Alternatives.Length > 1) Badge("+", Bounds.renderX + Bounds.InnerWidth - scaled(14));
+        api.Render.PushScissor(Bounds, true);
+        try
+        {
+            double itemSize = Math.Min(Bounds.InnerWidth, Bounds.InnerHeight)
+                * GuiElementPassiveItemSlot.unscaledItemSize / GuiElementPassiveItemSlot.unscaledSlotSize;
+            if (icon != null)
+                api.Render.RenderItemstackToGui(icon, Bounds.renderX + Bounds.InnerWidth / 2,
+                    Bounds.renderY + Bounds.InnerHeight / 2, 220, (float)itemSize,
+                    selection!.Evaluation.CanCraft ? ColorUtil.WhiteArgb : unchecked((int)0xff777777),
+                    showStackSize: true);
+            if (!selection!.Evaluation.CanCraft) Badge(selection.Evaluation.IsSupported ? "!" : "?", Bounds.renderX);
+            if (selection.Output.Alternatives.Length > 1) Badge("+", Bounds.renderX + Bounds.InnerWidth - scaled(14));
+        }
+        finally
+        {
+            api.Render.PopScissor();
+        }
     }
 
     private void Badge(string text, double x)

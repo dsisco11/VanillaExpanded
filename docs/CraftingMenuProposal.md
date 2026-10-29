@@ -24,6 +24,8 @@ Use the game's composer, native bounds hierarchy, clipping, containers and contr
 
 Each tile shows an output icon and the recipe's output quantity. Fully available recipes appear normally. Unavailable recipes are greyed out but retain hover, focus, and click interactions. An additional unavailable marker avoids relying on color alone.
 
+Fit each icon to the smaller button dimension using the native inventory-slot item/slot size ratio. Clip tile contents to the button bounds with a stacking scissor, preserving the scroll viewport's clip; GUI scaling must not enlarge icons beyond their slots.
+
 Search filters by localized output name, with item-code matching as a secondary convenience. Matching ignores case and trims whitespace; multiple words must all match. Search filters the catalogue without replacing inventory relevance ordering. Empty searches show the full catalogue, and an empty result set displays a clear message.
 
 | Interaction | Result |

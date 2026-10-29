@@ -92,10 +92,15 @@ public sealed class CraftingMenuLifecycleTests
         Assert.Equal(0, f.Builds);
     }
 
-    [Fact]
-    public void NativeTilesComposeRenderOnlyVisibleIconsAndDisposeTheirTexturesAndSubscriptions()
+    [Theory]
+    [InlineData(0.75f)]
+    [InlineData(1f)]
+    [InlineData(1.5f)]
+    [InlineData(2f)]
+    public void NativeTilesFitAndClipVisibleIconsAndDisposeTheirTexturesAndSubscriptions(float scale)
     {
         using var scope = new NativeScope();
+        RuntimeEnv.GUIScale = scale;
         var f = new AllocationFixture();
         var recipes = Enumerable.Range(1, 256).Select(id =>
             f.Recipe(f.Ingredient(f.Stack(id, "ingredient-" + id, 1)))).ToArray();
@@ -113,6 +118,33 @@ public sealed class CraftingMenuLifecycleTests
         api.SetupGet(value => value.Gui).Returns(gui.Object);
         api.SetupGet(value => value.Render).Returns(render.Object);
         api.SetupGet(value => value.Input).Returns(Mock.Of<IInputAPI>());
+        var clips = new Stack<ElementBounds>();
+        render.Setup(value => value.PushScissor(It.IsAny<ElementBounds>(), It.IsAny<bool>()))
+            .Callback<ElementBounds, bool>((bounds, stacking) =>
+            {
+                Assert.True(stacking);
+                Assert.Equal(46 * scale, bounds.InnerWidth, 4);
+                Assert.Equal(46 * scale, bounds.InnerHeight, 4);
+                clips.Push(bounds);
+            });
+        render.Setup(value => value.PopScissor()).Callback(() =>
+        {
+            Assert.Single(clips);
+            clips.Pop();
+        });
+        render.Setup(value => value.RenderItemstackToGui(It.IsAny<ItemSlot>(), It.IsAny<double>(),
+            It.IsAny<double>(), It.IsAny<double>(), It.IsAny<float>(), It.IsAny<int>(),
+            It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
+            .Callback<ItemSlot, double, double, double, float, int, bool, bool, bool>(
+                (slot, x, y, z, size, color, shading, rotate, showStackSize) =>
+                {
+                    var bounds = Assert.Single(clips);
+                    Assert.Equal(bounds.renderX + bounds.InnerWidth / 2, x, 4);
+                    Assert.Equal(bounds.renderY + bounds.InnerHeight / 2, y, 4);
+                    Assert.Equal(46 * scale * GuiElementPassiveItemSlot.unscaledItemSize
+                        / GuiElementPassiveItemSlot.unscaledSlotSize, size, 4);
+                    Assert.True(showStackSize);
+                });
         gui.SetupGet(value => value.TextTexture).Returns(new TextTextureUtil(api.Object));
         int nextTexture = 1;
         var liveTextures = new HashSet<int>();
@@ -147,11 +179,13 @@ public sealed class CraftingMenuLifecycleTests
                 render.Invocations.Clear();
                 tiles.RenderInteractiveElements(0);
                 Assert.Equal(4, render.Invocations.Count(call => call.Method.Name == nameof(IRenderAPI.RenderItemstackToGui)));
+                Assert.Empty(clips);
             }
-            tiles.Scroll(24);
+            tiles.Scroll(24 * scale);
             render.Invocations.Clear();
             tiles.RenderInteractiveElements(0);
             Assert.Equal(6, render.Invocations.Count(call => call.Method.Name == nameof(IRenderAPI.RenderItemstackToGui)));
+            Assert.Empty(clips);
             Assert.Equal(1, captures);
             tiles.Dispose();
             Assert.Empty(liveTextures);
