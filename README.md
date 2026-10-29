@@ -42,6 +42,23 @@ AutoLoot runs entirely on the client: neither VanillaExpanded nor ConfigLib is r
 
 Compatibility evidence currently covers inspection of the Vintage Story **1.22.7** native protocol and automated tests. In-game acceptance, including unmodified-server gameplay, latency, and simultaneous looters, remains pending; see the [AutoLoot proposal](docs/AutoLootProposal.md).
 
+### Crafting Menu
+
+Open your inventory's crafting grid and use the **Recipes** button to browse and search crafting-grid outputs. Search by item name or item code; hover or keyboard-focus a tile to see its ingredients and missing quantities. Use the arrow buttons below the list to cycle alternative recipes for the selected output, or **Auto** to restore automatic selection.
+
+- **Click a recipe:** place available ingredients for one craft. Missing ingredients remain absent.
+- **Shift-click a recipe:** fill its ingredient positions as far as available stock and stack limits allow, even if another ingredient is missing.
+- **Craft normally afterward:** click the vanilla crafting result slot. The menu only moves ingredients; it never takes the result or crafts automatically.
+- **Colors:** full color means ingredients are available, grey means ingredients are missing, and near-black means placement is unsupported. Unsupported entries remain searchable and inspectable; their tooltips explain the limitation.
+
+Ingredients come from your ordinary hotbar, backpack storage and the nine crafting-grid inputs. The result slot, cursor-held stack, off-hand/equipment, bag-equipping slots and remote containers are excluded. This menu handles the native 3x3 crafting grid, not cooking, smithing, knapping, clay forming or other workstations.
+
+Closing the inventory hides the menu without forgetting that it was enabled. It reopens with the crafting grid during the current client session; use **Recipes**, the menu's close button or Escape to keep it closed.
+
+Placement uses native inventory transfers and server synchronization. Having all ingredients does not guarantee room to rearrange the grid: if displaced contents cannot be safely returned to carried storage, placement is refused without changing the inventory. If a native transfer is interrupted after some moves, those moves may remain; the game reconciles inventory normally. The menu does not roll back or automatically retry the arrangement, drop items to make room, or report server-confirmed batch success.
+
+Dynamic-output recipes use generic previews when the exact result cannot be known beforehand; unsupported semantics and unverified inventory replacements may prevent placement. The catalogue is fixed for the loaded world, while availability updates with inventory changes. Icons are static previews, not animated items. Recipe-family coverage is automated; live acceptance was a representative wooden-planks smoke test, not an exhaustive recipe/modpack or dedicated multiplayer certification.
+
 ### Quick Tools
 
 Hold the Quick Tools hotkey (assign it in Controls) to open a radial menu of available tools, weapons, healing items, and light sources from your hotbar and backpack. Select an item to equip it instantly; use the center **Unequip** action to restore your previous item or stow the item currently held.
