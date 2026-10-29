@@ -213,46 +213,60 @@ Controlling sources: the complete [proposal](./CraftingMenuProposal.md), especia
 Dependencies: Phases 1 and 2.
 Outcome: deterministic inventory snapshots produce consistent availability, missing requirements, and placement allocations.
 
-    ☐ Build eligible inventory snapshots using the verified source list.
-        ☐ Count existing grid contents once and retain stable inventory/slot identity.
-        ☐ Read game-owned mutable data only on its owning thread; expose safe snapshots to any deferred work.
-    ☐ Allocate against the complete recipe through native matching semantics or verified supported adapters.
-        ☐ Preserve wildcards, restricted alternatives, repeated requirements, attributes, tool presence, durability, and relationships between choices.
-        ☐ Resolve overlapping alternatives globally; never let a flexible requirement consume the only item usable by a restricted requirement.
-        ☐ Prevent double allocation of physical items and incompatible-stack merging; each grid position holds one compatible stack.
-        ☐ Preserve tools/non-consumed requirements as such, rather than ordinary consumable quantities.
-        ☐ Return explicit unsupported reasons for exceptional semantics without a supported adapter.
-    ☐ Derive one-execution coverage, relevance, availability, and missing explanations from shared results.
-        ☐ Compute A/R from maximally allocatable simultaneous ordinary units; a valid presence-only tool contributes one required unit.
-        ☐ Require a complete valid allocation for availability; distinguish this from transfer feasibility.
-        ☐ Aggregate identical missing requirements only when constraints are preserved; describe alternatives as choices, not separate mandatory ingredients.
-        ☐ Keep unsupported relevance unknown and avoid fabricated deficits.
-    ☐ Implement deterministic ranking and integrate it with Phase 2 selection/search.
-        ☐ Sort satisfiable recipes first, then incomplete supported recipes by descending relevance.
-        ☐ Break ties by fewer missing units, localized output name, then stable output/recipe identifier.
-        ☐ Sort selected unsupported recipes last by localized output name and stable identifiers, even when another alternative is supported.
-    ☐ Produce ordinary-click allocations for one execution.
-        ☐ Preserve shaped layouts and choose a stable legal shapeless layout.
-        ☐ Populate partial quantities and leave wholly missing requirements empty without fabricating inventory stacks.
-    ☐ Produce shift-click allocations by joint lexicographic optimization.
-        ☐ First maximize single-execution coverage, spreading scarce shared ingredients across required positions.
-        ☐ Next maximize supported complete executions under per-position requirements and slot limits.
-        ☐ Finally place remaining compatible surplus without reducing earlier optima; prefer least-filled equivalent positions with stable grid-position ties.
-        ☐ Reconsider preliminary variants when later objectives improve without weakening earlier objectives; use inventory order only among equally optimal choices.
-        ☐ Continue filling available positions when another ingredient is entirely missing; retain permitted surplus for later manual crafting.
-        ☐ Do not auto-replace tools or claim crafting beyond their actual durability.
-    ☐ Add focused unit tests under VanillaExpanded.Tests/Unit/{Feature}, marked Category=Unit, reusing existing mocks and real InventoryGeneric where appropriate.
-        ☐ Prove four boards plus two sticks with three boards and one stick scores 4/6, missing one of each; board surplus cannot compensate for missing sticks.
-        ☐ Prove two repeated one-unit positions receive 10/10 from 20 units and 64/63 from 127 units with 64-unit limits.
-        ☐ Prove one early oak board does not lock a position when 64 pine boards improve batch size at equal first-execution coverage.
-        ☐ Cover constrained-overlap allocation, incompatible variants, non-stackable tools, insufficient durability, missing ingredients, shaped/shapeless layouts, and stable ties.
-        ☐ Check conservation, slot limits, no double counting, ranking/tooltip agreement, and maximality against exhaustive feasible allocations for small bounded fixtures.
+    ✔ Build eligible inventory snapshots using the verified source list.
+        ✔ Count existing grid contents once and retain stable inventory/slot identity.
+        ✔ Read game-owned mutable data only on its owning thread; expose safe snapshots to any deferred work.
+    ✔ Allocate against the complete recipe through native matching semantics or verified supported adapters.
+        ✔ Preserve wildcards, restricted alternatives, repeated requirements, attributes, tool presence, durability, and relationships between choices.
+        ✔ Resolve overlapping alternatives globally; never let a flexible requirement consume the only item usable by a restricted requirement.
+        ✔ Prevent double allocation of physical items and incompatible-stack merging; each grid position holds one compatible stack.
+        ✔ Preserve tools/non-consumed requirements as such, rather than ordinary consumable quantities.
+        ✔ Return explicit unsupported reasons for exceptional semantics without a supported adapter.
+    ✔ Derive one-execution coverage, relevance, availability, and missing explanations from shared results.
+        ✔ Compute A/R from maximally allocatable simultaneous ordinary units; a valid presence-only tool contributes one required unit.
+        ✔ Require a complete valid allocation for availability; distinguish this from transfer feasibility.
+        ✔ Aggregate identical missing requirements only when constraints are preserved; describe alternatives as choices, not separate mandatory ingredients.
+        ✔ Keep unsupported relevance unknown and avoid fabricated deficits.
+    ✔ Implement deterministic ranking and integrate it with Phase 2 selection/search.
+        ✔ Sort satisfiable recipes first, then incomplete supported recipes by descending relevance.
+        ✔ Break ties by fewer missing units, localized output name, then stable output/recipe identifier.
+        ✔ Sort selected unsupported recipes last by localized output name and stable identifiers, even when another alternative is supported.
+    ✔ Produce ordinary-click allocations for one execution.
+        ✔ Preserve shaped layouts and choose a stable legal shapeless layout.
+        ✔ Populate partial quantities and leave wholly missing requirements empty without fabricating inventory stacks.
+    ✔ Produce shift-click allocations by joint lexicographic optimization.
+        ✔ First maximize single-execution coverage, spreading scarce shared ingredients across required positions.
+        ✔ Next maximize supported complete executions under per-position requirements and slot limits.
+        ✔ Finally place remaining compatible surplus without reducing earlier optima; prefer least-filled equivalent positions with stable grid-position ties.
+        ✔ Reconsider preliminary variants when later objectives improve without weakening earlier objectives; use inventory order only among equally optimal choices.
+        ✔ Continue filling available positions when another ingredient is entirely missing; retain permitted surplus for later manual crafting.
+        ✔ Do not auto-replace tools or claim crafting beyond their actual durability.
+    ✔ Add focused unit tests under VanillaExpanded.Tests/Unit/{Feature}, marked Category=Unit, reusing existing mocks and real InventoryGeneric where appropriate.
+        ✔ Prove four boards plus two sticks with three boards and one stick scores 4/6, missing one of each; board surplus cannot compensate for missing sticks.
+        ✔ Prove two repeated one-unit positions receive 10/10 from 20 units and 64/63 from 127 units with 64-unit limits.
+        ✔ Prove one early oak board does not lock a position when 64 pine boards improve batch size at equal first-execution coverage.
+        ✔ Cover constrained-overlap allocation, incompatible variants, non-stackable tools, insufficient durability, missing ingredients, shaped/shapeless layouts, and stable ties.
+        ✔ Check conservation, slot limits, no double counting, ranking/tooltip agreement, and maximality against exhaustive feasible allocations for small bounded fixtures.
 
 Completion criteria:
 
-    ☐ Focused allocation/ranking tests pass, including the proposal's numerical examples and constrained-variant cases.
-    ☐ Preview, missing lists, availability, and placement consume shared semantic results rather than separate matching implementations.
-    ☐ Shift-click satisfies each objective before tie-breaking, including incomplete recipes; unsupported recipes cannot produce actionable allocations.
+    ✔ Focused allocation/ranking tests pass, including the proposal's numerical examples and constrained-variant cases.
+    ✔ Preview, missing lists, availability, and placement consume shared semantic results rather than separate matching implementations.
+    ✔ Shift-click satisfies each objective before tie-breaking, including incomplete recipes; unsupported recipes cannot produce actionable allocations.
+
+### Phase 3 traceability and verification
+
+Controlling sources consulted: the complete [proposal](./CraftingMenuProposal.md), especially Inventory and ingredient matching, Relevance and availability, both placement sections, Missing-ingredient tooltip, and Catalogue lifecycle and performance; Phase 1's verified sources/decisions and Phase 2's catalogue contracts above; [repository instructions](../.github/copilot-instructions.md) and [project.todo](./project.todo). Phase 3 is complete after focused verification, second review, and the independent completion audit, including affected-requirement rechecks (2026-10-28).
+
+- Snapshot tasks -> proposal Inventory and ingredient matching / Catalogue lifecycle -> `CraftingInventorySnapshot.Capture` reads only verified player-owned hotbar 0-9, backpack contents from 4, and crafting inputs, with native access/take checks, stable inventory/slot addresses, defensive persistent/temporary attribute copies, and an owning-thread guard. Unknown inventory adapters/topologies are explicit errors. Deferred native matching is not enabled: collectible references and native predicates remain owning-thread-only.
+- Matching/support tasks -> proposal native authority / exceptional-adapter baseline -> `CraftingAllocator` uses original custom-type detection, native `SatisfiesAsIngredient`, `MatchesForCrafting`, consume properties and remaining durability. The bounded adapter supports independent base grid/ingredient semantics and unmodified collectible callbacks, including native average-durability output with an honest generic preview (no output attributes are manufactured). Custom relationships/output callbacks, copied/merged attributes, freshness-transforming outputs, exceptional non-consumed quantities, and attribute-transforming merges are explicitly unsupported, never assigned fake deficits. The mandatory independent-policy input must certify inventory-independent event/access rules and unambiguous output semantics even for incomplete layouts; absent/unknown certification must return a reason. Actual client policy binding is later integration, not an implicit permissive fallback.
+- Native source parity -> [CraftingRecipeIngredient.cs](../../../vsapi/Common/Crafting/CraftingRecipeIngredient.cs), SatisfiesAsIngredient/GetConsumeProperties; [Collectible.cs](../../../vsapi/Common/Collectible/Collectible.cs), MatchesForCrafting/GetRemainingDurability/GetMergableQuantity; [RecipeBase.cs](../../../vsapi/Common/Crafting/RecipeBase.cs), shaped/shapeless matching; [GridRecipe.cs](../../../vsapi/Common/Crafting/GridRecipe.cs), Matches and its two native event gates. Installed 1.22.7.0 `InventoryCraftingGrid.FindMatchingRecipe` was rechecked: native candidate order is input-slot then ingredient-index order, deduplicated and enabled-only, followed by shaped-before-shapeless matching. It is not simply registry order. Complete planned layouts validate this winner without generating or consuming output.
+- Allocation/relevance/placement tasks -> proposal joint objectives -> one solver enumerates compatible variant assignments globally (canonicalizing exchangeable positions), computes simultaneous single-execution coverage, batch limits including tool durability/reserved tools, then compatible surplus. Per-group bounded water-filling spreads scarce units and surplus, with grid-position ties. Separate ordinary/shift plans retain exact source contributions; both share requirement descriptors and one-execution missing/evaluation data. Missing entries retain per-position native choice constraints instead of unsafe aggregation.
+- Selection/ranking tasks -> proposal single selected-recipe state -> `CraftingCatalogueView.ReplaceAllocations` supplies the exact shared evaluation and source-backed placement result to Phase 2 ordering/search/pinning. Fresh candidate union controls expensive source matching; verified independent non-candidates are evaluated against an empty supply, while unknown/custom cases stay unsupported. No inventory results are retained across computations.
+- Focused evidence planned/implemented in `CraftingAllocationTests` and `CraftingInventorySnapshotTests`: numerical examples, global constrained overlaps, incompatible variants/attributes, allowed/skipped wildcards, tool presence/durability, shaped holes/shapeless layout, native events/winner ordering, fresh candidate recomputation, shared ranking/missing/plans, stable ties, source conservation, snapshot eligibility/ownership and slot limits. The bounded exhaustive oracle independently enumerates every two-position variant/count allocation for stock 0-3, demand 1-2, and all nonempty two-variant acceptance sets.
+- Second review checked the implementation against every mapped requirement and added regressions/fixes for exchangeable-position balancing before inventory ties, aliased physical stack rejection, accurate insufficient-durability explanations, finite maximum durability versus unbounded presence, and huge source quantities bounded by usable grid capacity. The independent audit identified one additional support-boundary issue: custom native durability mutation could invalidate execution counts. Unverified `DamageItem`/`DestroyItem` overrides are now rejected, with a source-only custom-damage regression. Independent affected-requirement rechecks, including negative native durability-cost overflow handling, and exact-current verification passed; the final independent verdict found no unresolved Phase 3 issues or evidence gaps.
+- Separate exact-revision verification ran `dotnet test .\VanillaExpanded.Tests\VanillaExpanded.Tests.csproj --no-restore --filter "Category=Unit&FullyQualifiedName~CraftingMenu"`: 73 passed, 0 failed, 0 skipped (net10.0/VSTest); production/test compilation succeeded with 34 existing unrelated warnings and none in CraftingMenu. Whitespace checks and localization JSON parsing passed. This includes the negative native durability-cost overflow regression added during the final support-boundary recheck.
+- Transfer preflight/execution, actual GUI/event/access-policy integration, deferred computation, live-client compatibility and performance thresholds remain later phases. Allocations do not mutate inventory, consume ingredients, generate output, send packets, or promise transfer feasibility.
 
 ## Phase 4: Implement native client bulk transfer planning and execution
 

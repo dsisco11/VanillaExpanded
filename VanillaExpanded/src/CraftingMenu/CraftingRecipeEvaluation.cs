@@ -3,7 +3,7 @@ using System.Collections.Immutable;
 
 namespace VanillaExpanded.CraftingMenu;
 
-internal sealed record CraftingMissingRequirement(string IngredientId, int Quantity);
+internal sealed record CraftingMissingRequirement(string IngredientId, int Quantity, string? Reason = null);
 
 internal sealed record CraftingRecipeEvaluation
 {

@@ -93,6 +93,10 @@
   "craftingmenu-unresolved-ingredients": "This recipe's ingredients could not be resolved.",
   "craftingmenu-unresolved-output": "This recipe has no resolved output preview.",
   "craftingmenu-evaluation-pending": "This recipe has not yet been evaluated for safe placement.",
+  "craftingmenu-unsupported-semantics": "This recipe uses requirements or item behavior without a verified allocation adapter.",
+  "craftingmenu-unsupported-merge": "Matching stacks have differing attributes whose merge behavior cannot be safely predicted.",
+  "craftingmenu-native-mismatch": "The native crafting grid does not resolve this arrangement to the selected recipe.",
+  "craftingmenu-insufficient-durability": "A matching tool does not have enough durability for one execution.",
 
   "config-section-features": "Feature Toggles",
   "config-section-timing": "Timing Settings",

@@ -9,7 +9,8 @@ internal sealed record CraftingRecipeSelection(
     CraftingOutputGroup Output,
     CraftingRecipeEntry Recipe,
     CraftingRecipeEvaluation Evaluation,
-    bool IsExplicit)
+    bool IsExplicit,
+    CraftingAllocation? Allocation = null)
 {
     internal bool CanPlace => Evaluation.IsSupported;
 }
@@ -21,6 +22,7 @@ internal sealed class CraftingCatalogueView
     private readonly CraftingCatalogue catalogue;
     private readonly Dictionary<int, int> pinnedRecipes = new();
     private Dictionary<int, CraftingRecipeEvaluation> evaluations = new();
+    private Dictionary<int, CraftingAllocation> allocations = new();
 
     internal CraftingCatalogueView(CraftingCatalogue catalogue)
     {
@@ -40,6 +42,20 @@ internal sealed class CraftingCatalogueView
             replacement.Add(pair.Key, pair.Value);
         }
         evaluations = replacement;
+        allocations.Clear();
+    }
+
+    internal void ReplaceAllocations(IReadOnlyDictionary<int, CraftingAllocation> results)
+    {
+        ArgumentNullException.ThrowIfNull(results);
+        var replacement = new Dictionary<int, CraftingAllocation>();
+        foreach (var pair in results)
+        {
+            ArgumentNullException.ThrowIfNull(pair.Value);
+            replacement.Add(pair.Key, pair.Value);
+        }
+        ReplaceEvaluations(replacement.ToDictionary(pair => pair.Key, pair => pair.Value.Evaluation));
+        allocations = replacement;
     }
 
     internal void SelectAlternative(int outputId, int recipeId)
@@ -64,7 +80,7 @@ internal sealed class CraftingCatalogueView
         if (pinnedRecipes.TryGetValue(outputId, out int pinned))
         {
             var selected = group.Alternatives.First(entry => entry.Id == pinned);
-            return new(group, selected, GetEvaluation(selected), true);
+            return new(group, selected, GetEvaluation(selected), true, allocations.GetValueOrDefault(selected.Id));
         }
         var automatic = group.Alternatives
             .OrderByDescending(entry => GetEvaluation(entry).IsSupported)
@@ -72,7 +88,7 @@ internal sealed class CraftingCatalogueView
             .ThenBy(entry => GetEvaluation(entry).MissingUnits)
             .ThenBy(entry => entry.StableId, StringComparer.Ordinal)
             .First();
-        return new(group, automatic, GetEvaluation(automatic), false);
+        return new(group, automatic, GetEvaluation(automatic), false, allocations.GetValueOrDefault(automatic.Id));
     }
 
     internal ImmutableArray<CraftingRecipeSelection> Search(string? query)
