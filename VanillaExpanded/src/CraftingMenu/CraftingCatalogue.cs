@@ -51,6 +51,7 @@ internal sealed class CraftingRecipeEntry
     internal ItemStack? GetPreview() => preview?.Clone();
     internal bool HasSameOutputAttributes(ItemStack stack, IWorldAccessor world) =>
         preview != null && preview.Attributes.Equals(world, stack.Attributes);
+
 }
 
 internal sealed record CraftingOutputGroup(int Id, ImmutableArray<CraftingRecipeEntry> Alternatives);

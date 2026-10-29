@@ -350,7 +350,7 @@ internal sealed class CraftingAllocator
         return sink.Collectible.GetMergableQuantity(sink, right, EnumMergePriority.AutoMerge) > 0;
     }
 
-    private static bool PlainCollectible(CollectibleObject collectible)
+    internal static bool PlainCollectible(CollectibleObject collectible)
     {
         if ((collectible.CollectibleBehaviors?.Length ?? 0) > 0
             || collectible.Attributes?["noConsumeOnCrafting"].AsBool(false) == true) return false;
@@ -360,9 +360,15 @@ internal sealed class CraftingAllocator
             nameof(CollectibleObject.SetDurability), nameof(CollectibleObject.GetTransitionableProperties),
             nameof(CollectibleObject.DamageItem), nameof(CollectibleObject.DestroyItem),
             nameof(CollectibleObject.GetMergableQuantity), nameof(CollectibleObject.TryMergeStacks),
+            nameof(CollectibleObject.GetStorageFlags), nameof(CollectibleObject.GetTemperature),
+            nameof(CollectibleObject.HasTemperature), nameof(CollectibleObject.SetTemperature),
+            nameof(CollectibleObject.GetCollectibleInterface), nameof(CollectibleObject.GetCollectibleBehavior),
+            "GetBehavior",
+            nameof(CollectibleObject.OnModifiedInInventorySlot),
+            nameof(CollectibleObject.UpdateAndGetTransitionStates), "UpdateAndGetTransitionStatesNative",
             nameof(CollectibleObject.ConsumeCraftingIngredients),
             nameof(CollectibleObject.OnConsumedByCrafting), nameof(CollectibleObject.OnCreatedByCrafting) };
-        return !collectible.GetType().GetMethods(BindingFlags.Instance | BindingFlags.Public)
+        return !collectible.GetType().GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
             .Any(method => methods.Contains(method.Name) && method.DeclaringType != typeof(CollectibleObject)
                 && method.DeclaringType != typeof(object));
     }

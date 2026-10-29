@@ -97,6 +97,13 @@
   "craftingmenu-unsupported-merge": "Matching stacks have differing attributes whose merge behavior cannot be safely predicted.",
   "craftingmenu-native-mismatch": "The native crafting grid does not resolve this arrangement to the selected recipe.",
   "craftingmenu-insufficient-durability": "A matching tool does not have enough durability for one execution.",
+  "craftingmenu-placement-invalid": "The ingredient placement plan is invalid.",
+  "craftingmenu-placement-space": "The grid cannot be rearranged safely with the available carried-storage space and slot restrictions.",
+  "craftingmenu-placement-empty": "No matching ingredients are available to place.",
+  "craftingmenu-placement-unsafe": "An inventory, item restriction, or hot item prevents safe placement.",
+  "craftingmenu-placement-stale": "The inventory changed or the crafting panel closed. Open the panel and try again.",
+  "craftingmenu-placement-busy": "An ingredient placement is already being dispatched.",
+  "craftingmenu-placement-interrupted": "Placement was interrupted. Accepted moves remain; pending moves will synchronize normally.",
 
   "config-section-features": "Feature Toggles",
   "config-section-timing": "Timing Settings",
