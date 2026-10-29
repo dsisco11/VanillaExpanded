@@ -20,6 +20,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
     private string search = "";
     private bool disposed;
     internal event Action? Disposed;
+    internal event Action? CloseRequestedByUser;
 
     internal GuiDialogCraftingMenu(ICoreClientAPI api, GuiDialog parent, GuiComposer parentComposer,
         CraftingCatalogue catalogue, CraftingAllocator allocator, CraftingIconCache icons) : base(api)
@@ -41,6 +42,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
     public override double DrawOrder => 0.21;
     public override bool PrefersUngrabbedMouse => true;
     public override bool CaptureAllInputs() => IsOpened() && (SingleComposer?.GetTextInput("search")?.HasFocus ?? false);
+    public override bool OnEscapePressed() => CloseByUser();
 
     public override bool TryOpen()
     {
@@ -95,7 +97,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         newTooltip.SetAutoDisplay(false);
         var composer = capi.Gui.CreateCompo("vanillaexpanded-craftingmenu", bounds)
             .AddShadedDialogBG(ElementBounds.Fill)
-            .AddDialogTitleBar(Lang.Get("vanillaexpanded:craftingmenu-title"), CloseWithParent)
+            .AddDialogTitleBar(Lang.Get("vanillaexpanded:craftingmenu-title"), () => CloseByUser(), key: "titlebar")
             .BeginChildElements(content)
             .AddTextInput(searchBounds, text =>
             {
@@ -218,7 +220,13 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
     }
 
     private void Error(string reason) => capi.TriggerIngameError(this, "craftingmenu", Lang.Get(reason));
-    private void CloseWithParent() { TryClose(); Dispose(); }
+    private bool CloseByUser()
+    {
+        if (IsOpened()) CloseRequestedByUser?.Invoke();
+        return TryClose();
+    }
+
+    internal void CloseWithParent() { TryClose(); Dispose(); }
 
     public override void OnGuiClosed()
     {
@@ -239,5 +247,6 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         base.Dispose();
         Disposed?.Invoke();
         Disposed = null;
+        CloseRequestedByUser = null;
     }
 }

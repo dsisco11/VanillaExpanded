@@ -92,6 +92,7 @@
 
   <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
     <None Include="$(VINTAGE_STORY)\Lib\libcairo-2.dll" Link="libcairo-2.dll" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(VINTAGE_STORY)\Lib\libSkiaSharp.dll" Link="libSkiaSharp.dll" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

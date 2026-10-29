@@ -15,6 +15,105 @@ namespace VanillaExpanded.Tests.Unit.CraftingMenu;
 public sealed class CraftingMenuLifecycleTests
 {
     [Fact]
+    public void ParentReopeningRestoresTheOpenMenuWithoutDuplicateDialogs()
+    {
+        using var f = new MenuFixture();
+        f.Parent.Opening = f.Recompose;
+        f.Parent.TryOpen();
+        Assert.Empty(f.Menus);
+        f.Toggle();
+        var first = Assert.Single(f.Menus);
+        for (int cycle = 0; cycle < 3; cycle++)
+        {
+            f.Parent.TryClose();
+            Assert.Empty(f.Menus);
+            f.Parent.TryOpen();
+            var restored = Assert.Single(f.Menus);
+            Assert.NotSame(first, restored);
+            Assert.True(restored.IsOpened());
+            f.Lifecycle.Drain();
+            Assert.Same(restored, Assert.Single(f.Menus));
+            first = restored;
+        }
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void AutomaticPanelCleanupDoesNotForgetTheOpenPreference(int closeMode)
+    {
+        using var f = new MenuFixture();
+        f.Parent.TryOpen();
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        if (closeMode == 0) menu.CloseWithParent();
+        else if (closeMode == 1) menu.TryClose();
+        else menu.Dispose();
+        Assert.Empty(f.Menus);
+        f.Parent.TryClose();
+        f.Parent.TryOpen();
+        Assert.True(Assert.Single(f.Menus).IsOpened());
+    }
+
+    [Theory]
+    [InlineData("toggle")]
+    [InlineData("escape")]
+    [InlineData("titlebar")]
+    public void ExplicitlyClosingTheMenuKeepsItClosedWhenTheParentReopens(string action)
+    {
+        using var f = new MenuFixture();
+        f.Parent.TryOpen();
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        if (action == "toggle") f.Toggle();
+        else if (action == "escape") Assert.True(menu.OnEscapePressed());
+        else f.ClickCloseButton(menu);
+        Assert.Empty(f.Menus);
+        f.Parent.TryClose();
+        f.Parent.TryOpen();
+        Assert.Empty(f.Menus);
+        f.Toggle();
+        Assert.True(Assert.Single(f.Menus).IsOpened());
+    }
+
+    [Fact]
+    public void RecompositionRestoresOnlyTheLatestComposerAndPreservesOpenPreference()
+    {
+        using var f = new MenuFixture();
+        f.Parent.TryOpen();
+        f.Toggle();
+        var first = Assert.Single(f.Menus);
+        f.Recompose();
+        f.Recompose();
+        Assert.Empty(f.Menus);
+        f.Lifecycle.Drain();
+        var restored = Assert.Single(f.Menus);
+        Assert.NotSame(first, restored);
+        f.Parent.TryClose();
+        f.Parent.TryOpen();
+        Assert.True(Assert.Single(f.Menus).IsOpened());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void WorldCleanupDetachesRestorationAndInvalidatesQueuedRecomposition(bool dispose)
+    {
+        using var f = new MenuFixture();
+        f.Parent.TryOpen();
+        f.Toggle();
+        f.Recompose();
+        if (dispose) f.Lifecycle.System.Dispose();
+        else f.Lifecycle.Events.Raise(value => value.LeaveWorld += null);
+        f.Lifecycle.Drain();
+        Assert.Empty(f.Menus);
+        f.Parent.TryClose();
+        f.Parent.TryOpen();
+        Assert.Empty(f.Menus);
+    }
+
+    [Fact]
     public void FinalizeCachesImmutableCatalogueWhileEachNewSessionReadsFreshInventory()
     {
         using var scope = new NativeScope();
@@ -259,9 +358,116 @@ public sealed class CraftingMenuLifecycleTests
         }
     }
 
+    private sealed class MenuFixture : IDisposable
+    {
+        private readonly CraftingRenderFixture graphics = new();
+        internal readonly LifecycleFixture Lifecycle = new();
+        internal readonly ParentDialog Parent;
+        private readonly List<GuiDialog> loaded = new();
+        private readonly List<GuiComposer> composers = new();
+        private readonly string originalLocale = Lang.CurrentLocale;
+        private readonly ITranslationService? originalEnglish = Lang.AvailableLanguages.GetValueOrDefault("en");
+        internal IEnumerable<GuiDialogCraftingMenu> Menus => loaded.OfType<GuiDialogCraftingMenu>();
+
+        internal MenuFixture()
+        {
+            var translations = new Mock<ITranslationService>();
+            translations.Setup(value => value.Get(It.IsAny<string>(), It.IsAny<object[]>()))
+                .Returns((string key, object[] _) => key);
+            Lang.AvailableLanguages["en"] = translations.Object;
+            Lang.ChangeLanguage("en");
+            var api = Lifecycle.Api;
+            api.SetupGet(value => value.Gui).Returns(graphics.Gui.Object);
+            api.SetupGet(value => value.Render).Returns(graphics.Render.Object);
+            api.SetupGet(value => value.Input).Returns(graphics.Api.Object.Input);
+            api.SetupGet(value => value.Logger).Returns(Mock.Of<ILogger>());
+            api.SetupGet(value => value.Network).Returns(Mock.Of<IClientNetworkAPI>());
+            var assets = new Mock<IAssetManager>();
+            assets.Setup(value => value.Get(It.IsAny<AssetLocation>()))
+                .Returns(Mock.Of<IAsset>(value => value.Data == Array.Empty<byte>()));
+            api.SetupGet(value => value.Assets).Returns(assets.Object);
+            graphics.Render.Setup(value => value.BitmapCreateFromPng(It.IsAny<byte[]>()))
+                .Returns(() => new BitmapExternal(2, 2));
+            graphics.Gui.SetupGet(value => value.Icons).Returns(new IconUtil(api.Object));
+            graphics.Gui.SetupGet(value => value.LoadedGuis).Returns(loaded);
+            graphics.Gui.Setup(value => value.RegisterDialog(It.IsAny<GuiDialog[]>()))
+                .Callback<GuiDialog[]>(dialogs => loaded.AddRange(dialogs));
+            var window = ElementBounds.Fixed(0, 0, 1920, 1080).WithEmptyParent();
+            window.CalcWorldBounds();
+            graphics.Gui.SetupGet(value => value.WindowBounds).Returns(window);
+            graphics.Gui.Setup(value => value.CreateCompo(It.IsAny<string>(), It.IsAny<ElementBounds>()))
+                .Returns((string name, ElementBounds bounds) => CreateComposer(name, bounds));
+            Lifecycle.World.SetupGet(value => value.Player).Returns(Lifecycle.F.Player);
+            var manager = (ClientPlayerInventoryManager)Lifecycle.F.Player.InventoryManager;
+            manager.Inventories.Clear();
+            var grid = new InventoryCraftingGrid("craftinggrid-test", null!) { Api = Lifecycle.F.Api.Object };
+            grid.InvNetworkUtil.Api = Lifecycle.F.Api.Object;
+            grid.Open(Lifecycle.F.Player);
+            manager.Inventories.Add(grid.InventoryID, grid);
+            Lifecycle.Recipes.Clear();
+            Lifecycle.FinalizeWorld();
+            Parent = new ParentDialog(api.Object);
+            Recompose();
+            Lifecycle.System.Attach(Parent, Parent.Composers["maininventory"]);
+        }
+
+        private GuiComposer CreateComposer(string name, ElementBounds bounds) =>
+            (GuiComposer)Activator.CreateInstance(typeof(GuiComposer), BindingFlags.Instance | BindingFlags.NonPublic,
+                null, new object[] { Lifecycle.Api.Object, bounds, name }, null)!;
+
+        internal void Recompose()
+        {
+            var composer = CreateComposer("inventory", ElementBounds.Fixed(500, 100, 400, 500).WithEmptyParent());
+            composers.Add(composer);
+            composer.AddStaticElement(new GuiElementParent(Lifecycle.Api.Object,
+                ElementBounds.Fixed(20, 50, 144, 144)), "craftinggrid");
+            composer.AddStaticElement(new GuiElementParent(Lifecycle.Api.Object,
+                ElementBounds.Fixed(180, 90, 48, 48)), "outputslot");
+            Lifecycle.System.Attach(Parent, composer);
+            Parent.Composers["maininventory"] = composer;
+        }
+
+        internal void Toggle()
+        {
+            var button = Parent.Composers["maininventory"].GetElement("vanillaexpanded-crafting-toggle");
+            var args = new MouseEvent((int)(button.Bounds.absX + 5), (int)(button.Bounds.absY + 5),
+                EnumMouseButton.Left, 0);
+            button.OnMouseDownOnElement(Lifecycle.Api.Object, args);
+            button.OnMouseUpOnElement(Lifecycle.Api.Object, args);
+            Assert.True(args.Handled);
+        }
+
+        internal void ClickCloseButton(GuiDialogCraftingMenu menu)
+        {
+            var titlebar = menu.SingleComposer.GetTitleBar("titlebar");
+            var args = new MouseEvent((int)(titlebar.Bounds.absX + titlebar.Bounds.OuterWidth
+                - GuiElement.scaled(12 + GuiElementDialogTitleBar.unscaledCloseIconSize / 2.0)),
+                (int)(titlebar.Bounds.absY + GuiElement.scaled(10)), EnumMouseButton.Left, 0);
+            titlebar.OnMouseUpOnElement(Lifecycle.Api.Object, args);
+            Assert.True(args.Handled);
+        }
+
+        public void Dispose()
+        {
+            Lifecycle.Dispose();
+            Parent.Dispose();
+            foreach (var composer in composers.Take(composers.Count - 1)) composer.Dispose();
+            graphics.Dispose();
+            if (originalEnglish == null) Lang.AvailableLanguages.Remove("en");
+            else Lang.AvailableLanguages["en"] = originalEnglish;
+            Lang.ChangeLanguage(originalLocale);
+        }
+    }
+
     private sealed class ParentDialog(ICoreClientAPI api) : GuiDialog(api)
     {
+        internal Action? Opening;
         public override string ToggleKeyCombinationCode => "";
+        public override void OnGuiOpened()
+        {
+            base.OnGuiOpened();
+            Opening?.Invoke();
+        }
     }
 
     private sealed class NativeScope : IDisposable
