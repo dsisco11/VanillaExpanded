@@ -14,7 +14,7 @@ Non-goals: cooking, smithing, knapping, clay forming, other workstation/process 
 
 ## Assumptions and open decisions
 
-- Player recipe visibility, access rules, and grid dimensions are immutable between world/recipe-registry catalogue rebuilds. Inventory changes affect availability, not eligibility.
+- Recipes, player recipe visibility, access rules, and grid dimensions are immutable while the world is loaded. The user confirmed world-loading-only catalogue rebuilds (2026-10-29), with no in-world registry observer or recipe-change checks. Inventory changes affect availability, not eligibility.
 - The user confirmed grid-only scope and quantity-based relevance. Any subsequent scope change must first be reconciled with the proposal and this plan.
 - Phase 1 records verified inventory identifiers/native integration and the user-selected client operation below. The fresh client-design completion audit passed; the earlier server-design audit is superseded.
 - The user selected a compact recipe chooser with Auto/deselection releasing explicit selection and conservative dynamic-output support; the Phase 1 decisions below govern those behaviors.
@@ -22,7 +22,7 @@ Non-goals: cooking, smithing, knapping, clay forming, other workstation/process 
 - The user approved a local execution guard, not a server-settlement gate: another click is allowed after the current client burst is dispatched, while earlier operations may still be in flight. Guard release is not a success acknowledgement.
 - Unsupported recipes must remain discoverable and inspectable, with unknown relevance, explicit reasons, deterministic ordering, and no placement. Detailed dynamic-output decisions cannot weaken that baseline.
 - Exceptional recipe requirements require supported adapters; otherwise use the unsupported state rather than approximate native semantics.
-- Performance thresholds are intentionally unset until representative vanilla and heavily modded measurements exist.
+- The user removed mandatory vanilla/heavily modded measurements and numerical performance-threshold acceptance (2026-10-29). Bounded visible rendering, lifecycle cleanup and change-driven recomputation remain required.
 - Inventory relevance uses a fresh candidate union on popout opening and full recomputation when eligible inventory changes while open, as explicitly selected by the user. Reuse native immutable ingredient indexes, but do not maintain an incremental inventory-result/dependency cache.
 
 ## Phase 1: Verify integration and settle blocking decisions
@@ -123,7 +123,7 @@ Task-to-document traceability and observed evidence:
    - Intended internal modules under VanillaExpanded/src/CraftingMenu: client catalogue/output identity, search/order and selection state, ingredient allocator with ordinary/shift objectives, transfer planner, native client inventory-operation coordinator, panel integration, and popout renderer. This is a responsibility map, not a requirement for one file per responsibility.
    - Intended test locations: VanillaExpanded.Tests/Unit/CraftingMenu and, for actual integration cases, VanillaExpanded.Tests/E2E/CraftingMenu; the E2E folder does not yet exist. Use Category=Unit/Category=E2E and existing mocks/real InventoryGeneric patterns. Existing [AlloyDepositSystemTests.cs](../VanillaExpanded.Tests/Unit/AlloyCalculator/AlloyDepositSystemTests.cs) provides network-fixture conventions.
    - No custom catalogue/placement packets or server-side handlers are selected. [VanillaExpandedModSystem.cs](../VanillaExpanded/src/VanillaExpandedModSystem.cs) remains registration/Harmony lifecycle prior art; remove client feature subscriptions/resources on Dispose/LeaveWorld.
-   - Catalogue initialization can use IClientEventAPI.LevelFinalize once player/client recipes are ready; LeaveWorld provides teardown. Rebuild on actual client registry changes, keeping local catalogue identity separate from inventory snapshots. A dedicated registry-change event remains unverified; do not invent a server manifest or treat every inventory event as a recipe change.
+   - Catalogue initialization uses IClientEventAPI.LevelFinalize once player/client recipes are ready; LeaveWorld provides teardown. The user subsequently confirmed world-loading-only rebuilds (2026-10-29), superseding the earlier registry-change-observer requirement. Recipes are immutable while loaded; do not add a registry observer, server manifest, per-placement recipe validation or inventory-driven catalogue rebuild.
    - Planned focused commands after code exists: dotnet build .\VanillaExpanded\VanillaExpanded.csproj --no-restore; dotnet test .\VanillaExpanded.Tests\VanillaExpanded.Tests.csproj --no-restore --filter "Category=Unit&FullyQualifiedName~CraftingMenu"; corresponding Category=E2E feature filter when actual integration tests exist. Use the existing Cake build in Phase 7. Missing dependencies may be restored only after a command reports that requirement.
    - Observed validation: read-only source/decompilation inspection only. No build/test execution is needed to validate these documentation-only findings; any later execution must use the required separate verification subagent. These notes do not satisfy Phase 4 transfer tests or Phase 7 live evidence.
 
@@ -333,7 +333,7 @@ Outcome: the actual crafting panel exposes searchable previews and safe placemen
         ✔ Keep shift-click tooltips about the first execution, not a hypothetical maximum-batch deficit.
         ✔ Route ordinary and shift-click through the client native-operation coordinator and display concise refusal reasons.
         ✔ Use non-interactive missing-position outlines only if supported by existing UI; never materialize preview items.
-    ✔ Update availability, deficits, and ordering after relevant inventory/recipe changes.
+    ✔ Update availability, deficits, and ordering after relevant inventory changes; world loading creates fresh recipe state.
         ✔ Resolve and validate native crafting-grid full-contents refresh coverage without packet interception; that path bypasses SlotModified/MarkedDirty and currently exposes only native rendering dirty-slot state. Do not claim complete event coverage until this is proven.
         ✔ Keep selection stable and defer visible reordering of hovered/interacting tiles until the interaction finishes.
         ✔ Revalidate clicks against current state even while visible ordering is deferred.
@@ -366,28 +366,37 @@ Separate live-client cases, intentionally pending Phase 7: toggle/recompose afte
 
 Native-GUI follow-up verification: the focused CraftingMenu command above passed 165 tests, 0 failed, 0 skipped, with normal inherited PATH, successful production/test compilation and no CraftingMenu warnings (34 unrelated existing warnings). Added regressions prove a 256-recipe list uses six recycled native buttons in a 96x72 viewport; forward/reverse Tab traverses virtual rows and enters/exits both ends correctly; native clipping rejects overscan clicks; mouse press/release remains bound to one recipe during refresh, attempted scrolling and partially visible-row focus; keyboard activation restores focused-tile inspection without stationary-pointer polling. Existing allocation, native transfer and full-contents refresh coverage still passes. No new independent completion audit or live-client rendering run was performed for this refactor. Phase 6 lifecycle/performance work and Phase 7 live acceptance remain pending.
 
-## Phase 6: Complete catalogue/resource lifecycle and measure performance
+## Phase 6: Complete catalogue/resource lifecycle and bounded rendering
 
 Dependencies: Phase 5.
-Outcome: the integrated feature has bounded rendering work and correct world/panel cleanup.
+Outcome: the integrated feature has bounded rendering work and correct world/panel cleanup. User-approved scope amendments (2026-10-29): catalogue rebuilds occur only at world loading because recipes are immutable while loaded; vanilla/heavily modded benchmarks and numerical thresholds are not required.
 
-    ☐ Rebuild the catalogue on world/recipe-registry changes and clear obsolete selections/results as appropriate.
-        ☐ Apply the documented immutable visibility/access/grid assumption between rebuilds; do not add independent eligibility-refresh behavior.
-        ☐ Cache normalized search text and immutable metadata; recompute the fresh inventory candidate union and allocations on opening/relevant changes, without an incremental inventory cache or per-render computation.
-    ☐ Render only visible tiles for large catalogues and release GUI/render resources when the panel or world closes.
-        ☐ Remove event subscriptions and dispose any feature patches/network lifecycle resources according to existing patterns.
-        ☐ Discard stale deferred computations and requests during inventory/catalogue changes or closure; keep mutable game data on its owning thread.
-        ☐ Verify repeated open/close and world transitions do not accumulate callbacks or render resources.
-    ☐ Measure representative vanilla and heavily modded catalogues.
-        ☐ Record catalogue sizes, test environment, search/allocation/update timings, and visible-tile rendering behavior.
-        ☐ Set explicit performance thresholds from these measurements before declaring performance acceptance; do not invent unsupported compatibility/runtime-cost claims.
-        ☐ Recheck measured thresholds after any required optimization, without changing matching or placement semantics.
+    ✔ Build a catalogue for each loaded world and clear obsolete catalogue/selection/results on world exit; do not observe in-world recipe-registry changes.
+        ✔ Apply the documented immutable visibility/access/grid assumption between rebuilds; do not add independent eligibility-refresh behavior.
+        ✔ Cache normalized search text and immutable metadata; recompute the fresh inventory candidate union and allocations on opening/relevant changes, without an incremental inventory cache or per-render computation.
+    ✔ Render only visible tiles for large catalogues and release GUI/render resources when the panel or world closes.
+        ✔ Remove event subscriptions and dispose any feature patches/network lifecycle resources according to existing patterns.
+        ✔ Discard stale deferred computations and requests during inventory/catalogue changes or closure; keep mutable game data on its owning thread.
+        ✔ Verify repeated open/close and world transitions do not accumulate callbacks or render resources.
+    ✔ Verify bounded rendering and change-driven recomputation with focused tests; do not invent unsupported compatibility/runtime-cost claims.
 
 Completion criteria:
 
-    ☐ Lifecycle tests/evidence cover rebuild, close/reopen, stale-result rejection, and owning-thread access.
-    ☐ Offscreen tiles are not rendered and allocation does not run once per frame without relevant changes.
-    ☐ Representative measurements and resulting thresholds are recorded, with observed results meeting those thresholds.
+    ✔ Lifecycle tests/evidence cover rebuild, close/reopen, stale-result rejection, and owning-thread access.
+    ✔ Offscreen tiles are not rendered and allocation does not run once per frame without relevant changes.
+    ✔ Focused tests establish bounded visible rendering and no inventory allocation work on unchanged render frames.
+
+### Phase 6 working evidence and traceability (2026-10-29)
+
+Status: complete after implementation, second source review, delegated feature verification and a fresh independent read-only completion audit. The audit independently consulted governing documents, implementation/dependencies, native sources and the installed finalization sequence and found no required-now issues, partial requirements or material evidence gaps. The user explicitly removed mandatory catalogue benchmarks/measurement-derived thresholds and confirmed world-loading-only rebuilds; the proposal and this phase reflect those decisions. No registry observer, recipe-identity/version check or incremental inventory-result cache was added.
+
+Controlling sources consulted: inherited [proposal](./CraftingMenuProposal.md), especially Scope, Player experience, Relevance and availability, Proposed implementation boundaries and Catalogue lifecycle and performance; Phase 1 native lifecycle evidence and Phases 2-5 state/allocation/native-operation contracts; [repository instructions](../.github/copilot-instructions.md) and [project.todo](./project.todo) conventions. Native API/survival source revisions remain 63d33f70/849fa8c; installed concrete GUI/event methods were inspected in 1.22.7.0.
+
+- World catalogue/metadata tasks -> proposal Scope and Catalogue lifecycle; [IClientEventAPI.cs](../../../vsapi/Client/API/IClientEventAPI.cs), LevelFinalize/LeaveWorld -> CraftingMenuSystem builds and retains one catalogue/policy/allocator context at world finalization, clears it and open dialogs at world exit, and reuses only immutable metadata across popout openings. Installed ClientSystemStartup.HandleLevelFinalize calls native client systems, including SystemModHandler's AssetsFinalize phase, before TriggerLevelFinalize; it also performs GL work on that client/render path. Existing CraftingCatalogue entries retain normalized SearchText and immutable preview/ingredient metadata. A new CraftingMenuSession performs fresh capture/allocation for every opening; selected outputs, explicit alternatives and inventory results are not world caches. Lifecycle tests cover empty/ready cache state, reuse, fresh stock on reopening, selection reset, new-world recipe replacement and owning-thread initialization. Inventory candidate/allocator semantics are unchanged.
+- Panel/world cleanup tasks -> proposal native UI/lifecycle and owning-thread boundaries; [GuiDialog.cs](../../../vsapi/Client/UI/Dialog/GuiDialog.cs), TryClose/OnClosed/Dispose; [GuiElementContainer.cs](../../../vsapi/Client/UI/Elements/Impl/Interactive/GuiElementContainer.cs), native child/resource disposal; existing AlloyCalculator lifecycle conventions -> dialog disposal removes the system's dictionary entry immediately through its Disposed event, in addition to releasing coordinator, parent/world/session subscriptions, composer/tooltip resources and LoadedGuis registration. System disposal detaches static composition and world-finalization/exit handlers. Repeated native-dialog tests cover parent close, world exit and direct disposal across five cycles per path, idempotence, removal from native GUI registration, and queued inventory callbacks being discarded. Existing coordinator tests retain coalescing, owner-thread checks, native inventory-close cleanup and refusal after disposal; no deferred recipe computation or custom network lifecycle is introduced.
+- Bounded rendering/change-driven work tasks -> proposal visible-only rendering and native controls; [GuiElementTextButton.cs](../../../vsapi/Client/UI/Elements/Impl/Interactive/Controls/GuiElementTextButton.cs) and native container composition -> existing viewport-sized button recycling remains bounded independently of catalogue size. Item rendering now rejects zero-area clip-boundary contact as well as fully offscreen tiles. A real Cairo/native-control composition test uses 256 recipes with a six-button pool, observes exactly four icon-render calls in a 96x96 viewport and six for partial rows after scrolling 24 pixels, tracks all 28 native texture handles and releases them across five compose/render/dispose cycles. Multiple unchanged render frames and search/scroll operations leave inventory capture count at one. This is native control/Cairo composition with mocked GPU upload/render endpoints, not a live OpenGL or timing claim.
+
+Observed delegated verification: dotnet test .\VanillaExpanded.Tests\VanillaExpanded.Tests.csproj --no-restore --filter "FullyQualifiedName~CraftingMenu" passes 172 tests (the original 165 plus seven new lifecycle/rendering cases), zero failures/skips, successful production/test compilation and no new CraftingMenu warnings. git diff --check and localization JSON parsing pass. Second review checked the source contract, world/cache ownership, disposal callback ownership, native notification queue cancellation, thread affinity, unchanged allocator/transfer paths and strict clip-boundary culling. Live layout, actual OpenGL presentation, multiplayer and packaging remain Phase 7; mandatory representative timing acceptance was removed by the user, not deferred.
 
 ## Phase 7: Validate end-to-end behavior and deliver the feature
 
@@ -427,5 +436,5 @@ Completion criteria:
     ☐ Ordinary placement and joint lexicographic shift placement preserve native recipe, stack, attribute, tool, and layout semantics.
     ☐ Local preflight refusals leave original state intact. Native partial refusals/competing updates cannot lose, duplicate, automatically drop, or incorrectly consume items; accepted moves are retained and explicitly reconciled without unsafe replay.
     ☐ Existing manual crafting/output-taking and usable panel/search/tooltip/small-screen behavior are verified in the live client.
-    ☐ Source verification, focused tests, actual integration/multiplayer evidence, package validation, performance measurements, documentation, and cleanup are complete.
+    ☐ Source verification, focused tests, actual integration/multiplayer evidence, package validation, bounded-rendering/lifecycle verification, documentation, and cleanup are complete.
     ☐ Every requirement is implemented or covered by an explicitly approved proposal/plan amendment; no unapproved deferral is hidden by a checked completion box.

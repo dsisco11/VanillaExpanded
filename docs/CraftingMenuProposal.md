@@ -12,7 +12,7 @@ This document specifies proposed behavior, not implemented functionality. Source
 
 The initial glossary includes all enabled crafting-grid recipes available to the player in the current world, including compatible mod recipes. Recipes must fit the player's grid and satisfy the game's recipe visibility and access rules.
 
-For this design, the player's recipe visibility, access rules, and grid dimensions are assumed immutable between catalogue rebuilds. Eligibility is evaluated when the catalogue is built or rebuilt; inventory changes affect ingredient availability, not catalogue eligibility. See Catalogue lifecycle and performance for rebuild triggers.
+For this design, recipes, player recipe visibility, access rules, and grid dimensions are immutable while the world is loaded. Eligibility is evaluated when the world's catalogue is built; inventory changes affect ingredient availability, not catalogue eligibility. See Catalogue lifecycle and performance for world-loading boundaries.
 
 “All craftable items” means all outputs craftable through this panel. Cooking, smithing, knapping, clay forming, and other workstation or process recipes are outside this initial scope. A broader glossary could link to those systems later, but cannot fulfill their recipes by populating this grid.
 
@@ -68,7 +68,7 @@ For example, a recipe requiring four boards and two sticks has relevance 4/6 whe
 
 Availability requires a complete valid allocation for one execution, including recipe constraints. Ingredient sufficiency and the ability to rearrange a full inventory are separate: a tile may have all ingredients while its placement action fails because displaced grid contents cannot be returned. Explain that failure when clicked.
 
-Recompute availability and ordering after relevant inventory or recipe changes. Keep a stable selection and avoid moving a hovered tile immediately before a click; defer the visible reorder until the interaction finishes while revalidating the action against current inventory.
+Recompute availability and ordering after relevant inventory changes. A newly loaded world gets a fresh catalogue and selection state. Keep a stable selection and avoid moving a hovered tile immediately before a click; defer the visible reorder until the interaction finishes while revalidating the action against current inventory.
 
 ## Ordinary click placement
 
@@ -126,19 +126,19 @@ Use the native inventory open/transfer/synchronize lifecycle. Reuse inventories 
 
 ## Catalogue lifecycle and performance
 
-Build the recipe/output catalogue when loaded recipes are available, and rebuild when the world or recipe registry changes. Cache normalized search text and immutable recipe metadata.
+Build the recipe/output catalogue at world finalization, when loaded recipes are available, and clear it on world exit. A newly loaded world gets a new catalogue. The user explicitly selected world-loading-only rebuilds: recipes are immutable while loaded, so do not observe in-world registry reloads or add recipe-change checks. Cache normalized search text and immutable recipe metadata for that world.
 
 On opening the popout, compute inventory relevance from a fresh eligible-inventory snapshot: union the eligible recipes that accept any inventory item, deduplicate that candidate list, then perform exact allocation/availability evaluation on the candidates. Broad matching must not collapse attribute-sensitive stacks into an item-code-only identity, require full ingredient quantities, or claim craftability. Keep recipes outside that attention list in the searchable catalogue; handle zero-ingredient and exceptional recipes conservatively rather than excluding them through the ingredient union.
 
 The user selected complete recomputation from a fresh snapshot when eligible inventory changes while the popout is open. Do not maintain an incremental inventory-result/dependency cache between changes or compute every render frame. Native immutable ingredient indexes may be reused; per-computation deduplication is not a long-lived inventory cache. Later integration should coalesce notifications belonging to one inventory action and revalidate clicks against current state.
 
-Recipe visibility, access rules, and grid dimensions are immutable between these rebuilds under the Scope assumption, so no independent player-eligibility refresh is required.
+Recipe visibility, access rules, and grid dimensions are immutable during that loaded-world lifetime under the Scope assumption, so no independent player-eligibility refresh is required.
 
 Native slot notifications schedule a coalesced refresh from current inventory while the popout is open, including notifications caused by placement itself. They are invalidation signals, not server acknowledgements. The installed crafting-grid full-contents synchronization path bypasses both SlotModified and MarkedDirty notifications. A feature-owned GUI element observes the native output dirty-slot flag before native slot-grid finalization consumes it and schedules the same refresh. This is native GUI lifecycle integration, not packet or rendering-method interception; it neither clears native flags nor evaluates recipes every frame. Controlled installed-native tests cover contents replacement and the native output element clearing the flag; live-client coverage remains a separate validation obligation.
 
 Render only visible tiles for large catalogues, reuse the game's item-icon rendering, and release GUI/render resources when the panel or world closes. Any deferred computation must use safe snapshots and discard stale results; game-owned mutable inventory data must remain on its owning thread.
 
-Performance targets should be set after measuring representative vanilla and heavily modded catalogues. No runtime cost or compatibility claim is established by this proposal.
+The user removed mandatory vanilla/heavily modded benchmarking and measurement-derived performance thresholds. Verify bounded visible-tile rendering and change-driven inventory recomputation through focused tests; representative timing measurements are not an acceptance requirement. Do not infer untested runtime-cost or modpack-compatibility claims.
 
 ## Acceptance criteria
 

@@ -96,6 +96,7 @@
   "craftingmenu-auto": "Auto",
   "craftingmenu-alternative-hint": "Click a tile to select it. Arrows pin an alternative; Auto releases it. + marks alternatives; ! marks missing ingredients; ? marks unsupported recipes.",
   "craftingmenu-empty": "No matching recipes.",
+  "craftingmenu-loading": "Crafting recipes are not ready yet.",
   "craftingmenu-ingredients": "Ingredients for one execution:",
   "craftingmenu-tool": "Tool; durability cost",
   "craftingmenu-oneof": "One of:",

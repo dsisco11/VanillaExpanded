@@ -46,7 +46,9 @@ internal sealed class GuiElementCraftingTile : GuiElementTextButton
 
     public override void RenderInteractiveElements(float deltaTime)
     {
-        if (!Visible || (InsideClipBounds != null && !Bounds.PartiallyInside(InsideClipBounds))) return;
+        if (!Visible || (InsideClipBounds is { } clip &&
+            (Bounds.absX >= clip.absX + clip.OuterWidth || Bounds.absX + Bounds.OuterWidth <= clip.absX
+                || Bounds.absY >= clip.absY + clip.OuterHeight || Bounds.absY + Bounds.OuterHeight <= clip.absY))) return;
         base.RenderInteractiveElements(deltaTime);
         if (icon != null)
             api.Render.RenderItemstackToGui(icon, Bounds.renderX + Bounds.InnerWidth / 2,

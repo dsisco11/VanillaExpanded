@@ -23,6 +23,15 @@ public sealed class CraftingMenuSystem : ModSystem
 {
     private ICoreClientAPI? api;
     private readonly Dictionary<GuiDialog, GuiDialogCraftingMenu> dialogs = new();
+    private readonly System.Func<ICoreClientAPI, (CraftingCatalogue Catalogue, CraftingAllocator Allocator)> build;
+    private (CraftingCatalogue Catalogue, CraftingAllocator Allocator)? context;
+
+    public CraftingMenuSystem() : this(BuildCatalogue) { }
+
+    internal CraftingMenuSystem(System.Func<ICoreClientAPI, (CraftingCatalogue, CraftingAllocator)> build) =>
+        this.build = build;
+
+    internal CraftingCatalogue? Catalogue => context?.Catalogue;
 
     public override bool ShouldLoad(EnumAppSide forSide) => forSide == EnumAppSide.Client;
 
@@ -30,7 +39,22 @@ public sealed class CraftingMenuSystem : ModSystem
     {
         this.api = api;
         CraftingMenuDialogPatch.Composed += Attach;
+        api.Event.LevelFinalize += Initialize;
         api.Event.LeaveWorld += Clear;
+    }
+
+    private static (CraftingCatalogue, CraftingAllocator) BuildCatalogue(ICoreClientAPI api)
+    {
+        var policy = new CraftingClientPolicy(api, api.World.Player);
+        return (CraftingCatalogue.Build(api.World.GridRecipes, api.World, 3, 3, policy.CanAccess),
+            new CraftingAllocator(api.World, api.World.Player, policy.UnsupportedReason));
+    }
+
+    private void Initialize()
+    {
+        CraftingInventorySnapshot.EnsureThread(RuntimeEnv.MainThreadId);
+        Clear();
+        context = build(api!);
     }
 
     private void Attach(GuiDialogInventory parent, GuiComposer composer)
@@ -50,11 +74,13 @@ public sealed class CraftingMenuSystem : ModSystem
             font.Clone().WithColor(GuiStyle.ActiveButtonTextColor), () =>
         {
             if (dialogs.TryGetValue(parent, out var open) && open.IsOpened()) { Close(parent); return true; }
-            var policy = new CraftingClientPolicy(api, api.World.Player);
-            var catalogue = CraftingCatalogue.Build(api.World.GridRecipes, api.World, 3, 3, policy.CanAccess);
-            var allocator = new CraftingAllocator(api.World, api.World.Player, policy.UnsupportedReason);
+            if (context is not { } current)
+            {
+                api.TriggerIngameError(this, "craftingmenu", Lang.Get("vanillaexpanded:craftingmenu-loading"));
+                return true;
+            }
             GuiDialogCraftingMenu dialog;
-            try { dialog = new(api, parent, composer, catalogue, allocator); }
+            try { dialog = new(api, parent, composer, current.Catalogue, current.Allocator); }
             catch (NotSupportedException ex)
             {
                 api.Logger.Warning("[VanillaExpanded] Crafting menu inventory is unsupported: {0}", ex.Message);
@@ -62,6 +88,7 @@ public sealed class CraftingMenuSystem : ModSystem
                 return true;
             }
             dialogs[parent] = dialog;
+            dialog.Disposed += () => dialogs.Remove(parent);
             if (!dialog.TryOpen()) Close(parent);
             return true;
         }, ElementBounds.Fixed(bounds.fixedX, bounds.fixedY - 30, bounds.fixedWidth, 24)),
@@ -83,14 +110,20 @@ public sealed class CraftingMenuSystem : ModSystem
 
     private void Clear()
     {
+        CraftingInventorySnapshot.EnsureThread(RuntimeEnv.MainThreadId);
         foreach (var parent in new List<GuiDialog>(dialogs.Keys)) Close(parent);
+        context = null;
     }
 
     public override void Dispose()
     {
         CraftingMenuDialogPatch.Composed -= Attach;
-        if (api != null) api.Event.LeaveWorld -= Clear;
-        Clear();
+        if (api != null)
+        {
+            api.Event.LevelFinalize -= Initialize;
+            api.Event.LeaveWorld -= Clear;
+            Clear();
+        }
         api = null;
         base.Dispose();
     }

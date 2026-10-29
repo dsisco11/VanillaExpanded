@@ -17,6 +17,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
     private string? tooltipText;
     private string search = "";
     private bool disposed;
+    internal event Action? Disposed;
 
     internal GuiDialogCraftingMenu(ICoreClientAPI api, GuiDialog parent, GuiComposer parentComposer,
         CraftingCatalogue catalogue, CraftingAllocator allocator) : base(api)
@@ -228,5 +229,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         session.Changed -= UpdateLabels;
         capi.Gui.LoadedGuis.Remove(this);
         base.Dispose();
+        Disposed?.Invoke();
+        Disposed = null;
     }
 }
