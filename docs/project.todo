@@ -11,7 +11,6 @@
         ☐ Temporal gear amulets should provide information about when the next storm is expected to occur (approximately, with increasing accuracy as the storm gets closer).
         ☐ Wearing a temporal gear amulet should provide a subtle HUD indicator when a storm is approaching.
         ☐ Targeted items such as tools on toolracks have a subtle highlight to indicate that they are targeted.
-        ☐ New "crafting menu" similar to minecraft: shows all craftable items with current inventory, allows searching. (Maybe this can just be added to the handbook?)
 
     ## Death Penalties:
         ☐ New death penalty option: lose *bag* items on death (items in inventory are lost, items on hotbar and equipped armor and weapons are kept).
