@@ -11,7 +11,7 @@ internal sealed class CraftingRecipeEntry
 {
     private readonly ItemStack? preview;
 
-    internal CraftingRecipeEntry(int id, GridRecipe recipe, string displayName)
+    internal CraftingRecipeEntry(int id, GridRecipe recipe, string displayName, int? previewId = null)
     {
         Id = id;
         Recipe = recipe;
@@ -20,8 +20,9 @@ internal sealed class CraftingRecipeEntry
         OutputCode = recipe.Output?.ResolvedItemStack?.Collectible.Code?.ToString()
             ?? recipe.Output?.Code?.ToString() ?? recipe.Name?.ToString() ?? StableId;
         OutputQuantity = recipe.Output?.Quantity ?? 0;
-        preview = recipe.Output?.ResolvedItemStack?.Clone();
-        if (preview != null) preview.StackSize = OutputQuantity;
+        preview = recipe.Output?.ResolvedItemStack is { } output ? CraftingStackSnapshot.Copy(output) : null;
+        preview?.StackSize = OutputQuantity;
+        PreviewId = preview == null ? null : previewId ?? id;
         HasCustomIngredientPredicates = recipe.ResolvedIngredients?.Any(ingredient =>
             ingredient != null && ingredient.GetType() != typeof(CraftingRecipeIngredient)) ?? false;
         Ingredients = recipe.ResolvedIngredients?.Select(ingredient => ingredient?.Clone()).ToImmutableArray()
@@ -42,14 +43,15 @@ internal sealed class CraftingRecipeEntry
     internal string DisplayName { get; }
     internal string OutputCode { get; }
     internal int OutputQuantity { get; }
+    internal int? PreviewId { get; }
     internal bool IsGenericPreview { get; }
     internal bool HasCustomIngredientPredicates { get; }
     internal string? UnresolvedReason { get; }
     internal ImmutableArray<CraftingRecipeIngredient?> Ingredients { get; }
     internal string SearchText { get; }
-    internal ItemStack? GetPreview() => preview?.Clone();
-    internal bool HasSameOutputAttributes(ItemStack stack, IWorldAccessor world) =>
-        preview != null && preview.Attributes.Equals(world, stack.Attributes);
+    internal ItemStack? GetPreview() => preview == null ? null : CraftingStackSnapshot.Copy(preview);
+    internal bool HasSameOutput(ItemStack stack, IWorldAccessor world) =>
+        preview != null && preview.Equals(world, stack);
 
 }
 
@@ -58,11 +60,13 @@ internal sealed record CraftingOutputGroup(int Id, ImmutableArray<CraftingRecipe
 internal sealed class CraftingCatalogue
 {
     private readonly Dictionary<GridRecipe, CraftingRecipeEntry> byRecipe;
+    private readonly IWorldAccessor world;
     private readonly KeyValuePair<IRecipeIngredientBase, List<IRecipeBase>>[] ingredientIndex;
     private readonly ImmutableArray<CraftingRecipeEntry> unindexed;
 
     private CraftingCatalogue(IWorldAccessor world, ImmutableArray<CraftingOutputGroup> groups)
     {
+        this.world = world;
         Groups = groups;
         Recipes = groups.SelectMany(group => group.Alternatives).OrderBy(entry => entry.Id).ToImmutableArray();
         byRecipe = new Dictionary<GridRecipe, CraftingRecipeEntry>(ReferenceEqualityComparer.Instance);
@@ -93,6 +97,7 @@ internal sealed class CraftingCatalogue
 
         var groups = new List<List<CraftingRecipeEntry>>();
         var buckets = new Dictionary<(EnumItemClass, int), List<int>>();
+        var previews = new Dictionary<(EnumItemClass, int), List<(ItemStack Stack, int Id)>>();
         var seen = new HashSet<GridRecipe>(ReferenceEqualityComparer.Instance);
         int id = 0;
         foreach (var source in recipes)
@@ -105,7 +110,22 @@ internal sealed class CraftingCatalogue
             var output = recipe.Output?.ResolvedItemStack;
             string name = output != null ? getDisplayName(output)
                 : recipe.Output?.Code?.ToString() ?? recipe.Name?.ToString() ?? $"recipe#{entryId:D8}";
-            var entry = new CraftingRecipeEntry(entryId, recipe, name);
+            int previewId = entryId;
+            if (output != null)
+            {
+                var key = (output.Class, output.Id);
+                if (!previews.TryGetValue(key, out var variants)) previews.Add(key, variants = new());
+                bool shared = false;
+                foreach (var variant in variants)
+                {
+                    if (!variant.Stack.Equals(world, output)) continue;
+                    previewId = variant.Id;
+                    shared = true;
+                    break;
+                }
+                if (!shared) variants.Add((output, previewId));
+            }
+            var entry = new CraftingRecipeEntry(entryId, recipe, name, previewId);
             int groupId = -1;
             if (output != null)
             {
@@ -117,7 +137,7 @@ internal sealed class CraftingCatalogue
                 }
                 foreach (int candidate in candidates)
                 {
-                    if (groups[candidate][0].HasSameOutputAttributes(output, world))
+                    if (groups[candidate][0].HasSameOutput(output, world))
                     {
                         groupId = candidate;
                         break;
@@ -143,7 +163,7 @@ internal sealed class CraftingCatalogue
                 .ToImmutableArray())).ToImmutableArray());
     }
 
-    internal CraftingIngredientLookup CreateLookup() => new(ingredientIndex);
+    internal CraftingIngredientLookup CreateLookup() => new(world, ingredientIndex);
 
     internal ImmutableArray<CraftingRecipeEntry> FindCandidates(IEnumerable<ItemStack> eligibleStacks) =>
         FindCandidates(eligibleStacks, CreateLookup());

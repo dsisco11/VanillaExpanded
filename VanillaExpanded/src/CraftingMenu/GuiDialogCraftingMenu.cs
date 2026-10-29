@@ -13,6 +13,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
     private readonly GuiComposer parentComposer;
     private readonly CraftingMenuSession session;
     private readonly CraftingTransferCoordinator coordinator;
+    private readonly CraftingIconCache icons;
     private double composedScale;
     private GuiElementHoverText? tooltip;
     private string? tooltipText;
@@ -21,10 +22,11 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
     internal event Action? Disposed;
 
     internal GuiDialogCraftingMenu(ICoreClientAPI api, GuiDialog parent, GuiComposer parentComposer,
-        CraftingCatalogue catalogue, CraftingAllocator allocator) : base(api)
+        CraftingCatalogue catalogue, CraftingAllocator allocator, CraftingIconCache icons) : base(api)
     {
         this.parent = parent;
         this.parentComposer = parentComposer;
+        this.icons = icons;
         coordinator = new(api, allocator, result => Error(result.Reason!));
         session = new(catalogue, allocator,
             () => CraftingInventorySnapshot.Capture(api.World.Player, 3, 3, RuntimeEnv.MainThreadId, false),
@@ -87,7 +89,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         var next = ElementBounds.Fixed(0, 0, 24, 24).RightOf(auto, 3);
         var label = ElementBounds.Fixed(0, 2, Math.Max(1, content.fixedWidth - 104), 24).RightOf(next, 4);
         var tiles = new GuiElementCraftingTiles(capi, ElementBounds.Fixed(0, 0, viewport.fixedWidth, viewport.fixedHeight),
-            viewport, session, Inspect, Activate);
+            viewport, session, Inspect, Activate, icons);
         var newTooltip = new GuiElementHoverText(capi, "", CairoFont.WhiteSmallText(), 420,
             ElementBounds.Fixed(0, 0, 1, 1));
         newTooltip.SetAutoDisplay(false);

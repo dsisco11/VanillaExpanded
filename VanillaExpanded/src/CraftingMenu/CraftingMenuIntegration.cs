@@ -24,7 +24,7 @@ public sealed class CraftingMenuSystem : ModSystem
     private ICoreClientAPI? api;
     private readonly Dictionary<GuiDialog, GuiDialogCraftingMenu> dialogs = new();
     private readonly System.Func<ICoreClientAPI, (CraftingCatalogue Catalogue, CraftingAllocator Allocator)> build;
-    private (CraftingCatalogue Catalogue, CraftingAllocator Allocator)? context;
+    private (CraftingCatalogue Catalogue, CraftingAllocator Allocator, CraftingIconCache Icons)? context;
 
     public CraftingMenuSystem() : this(BuildCatalogue) { }
 
@@ -32,6 +32,7 @@ public sealed class CraftingMenuSystem : ModSystem
         this.build = build;
 
     internal CraftingCatalogue? Catalogue => context?.Catalogue;
+    internal CraftingIconCache? IconCache => context?.Icons;
 
     public override bool ShouldLoad(EnumAppSide forSide) => forSide == EnumAppSide.Client;
 
@@ -54,7 +55,8 @@ public sealed class CraftingMenuSystem : ModSystem
     {
         CraftingInventorySnapshot.EnsureThread(RuntimeEnv.MainThreadId);
         Clear();
-        context = build(api!);
+        var current = build(api!);
+        context = (current.Catalogue, current.Allocator, new CraftingIconCache(api!));
     }
 
     private void Attach(GuiDialogInventory parent, GuiComposer composer)
@@ -80,7 +82,7 @@ public sealed class CraftingMenuSystem : ModSystem
                 return true;
             }
             GuiDialogCraftingMenu dialog;
-            try { dialog = new(api, parent, composer, current.Catalogue, current.Allocator); }
+            try { dialog = new(api, parent, composer, current.Catalogue, current.Allocator, current.Icons); }
             catch (NotSupportedException ex)
             {
                 api.Logger.Warning("[VanillaExpanded] Crafting menu inventory is unsupported: {0}", ex.Message);
@@ -112,6 +114,7 @@ public sealed class CraftingMenuSystem : ModSystem
     {
         CraftingInventorySnapshot.EnsureThread(RuntimeEnv.MainThreadId);
         foreach (var parent in new List<GuiDialog>(dialogs.Keys)) Close(parent);
+        context?.Icons.Dispose();
         context = null;
     }
 

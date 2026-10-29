@@ -101,7 +101,7 @@ internal sealed class CraftingTransferState
         if (source == destination || !Accessible(source) || !Accessible(destination)
             || !from.CanTake() || !to.CanHold(from) || !to.CanTakeFrom(from)
             || !SafeStack(from.Itemstack) || !SafeStack(to.Itemstack)) return 0;
-        if (to.Itemstack != null && !SameKind(world, from.Itemstack!, to.Itemstack)) return 0;
+        if (to.Itemstack != null && !from.Itemstack!.Equals(world, to.Itemstack)) return 0;
         int capacity = Math.Min(to.GetRemainingSlotSpace(from.Itemstack!),
             from.Itemstack!.Collectible.MaxStackSize - to.StackSize);
         if (to.Itemstack != null)
@@ -123,11 +123,8 @@ internal sealed class CraftingTransferState
     }
 
     internal static ItemStack? Copy(ItemStack? stack) => stack == null ? null : CraftingStackSnapshot.Copy(stack);
-    internal static bool SameKind(IWorldAccessor world, ItemStack left, ItemStack right) =>
-        left.Class == right.Class && left.Id == right.Id && ReferenceEquals(left.Collectible, right.Collectible)
-        && left.Attributes.Equals(world, right.Attributes) && left.TempAttributes.Equals(world, right.TempAttributes);
     internal static bool Same(IWorldAccessor world, ItemStack? left, ItemStack? right) =>
-        left == null ? right == null : right != null && left.StackSize == right.StackSize && SameKind(world, left, right);
+        left == null ? right == null : right != null && left.StackSize == right.StackSize && left.Equals(world, right);
 }
 
 internal sealed class CraftingTransferPlanner
@@ -165,7 +162,7 @@ internal sealed class CraftingTransferPlanner
             {
                 if (source.Quantity <= 0 || !state.Slots.TryGetValue(source.Slot, out var slot)
                     || slot.Shadow.Itemstack == null || !slot.Shadow.CanTake() || !state.Accessible(slot)
-                    || !CraftingTransferState.SameKind(world, stack, slot.Shadow.Itemstack))
+                    || !stack.Equals(world, slot.Shadow.Itemstack))
                     return CraftingTransferPlan.Refused(Invalid);
                 used[source.Slot] = used.GetValueOrDefault(source.Slot) + source.Quantity;
                 if (used[source.Slot] > slot.Shadow.StackSize) return CraftingTransferPlan.Refused(Invalid);
@@ -180,7 +177,7 @@ internal sealed class CraftingTransferPlanner
         var moves = ImmutableArray.CreateBuilder<CraftingTransfer>();
         int Retained(CraftingTransferState.Slot slot) => slot.Grid
             && targets.TryGetValue(slot.Id.Index, out var target) && slot.Shadow.Itemstack != null
-            && CraftingTransferState.SameKind(world, target, slot.Shadow.Itemstack)
+            && target.Equals(world, slot.Shadow.Itemstack)
                 ? Math.Min(target.StackSize, slot.Shadow.StackSize) : 0;
         int Excess(CraftingTransferState.Slot slot) => slot.Shadow.StackSize - Retained(slot);
         bool Complete() => state.Grid.All(slot => CraftingTransferState.Same(world, slot.Shadow.Itemstack,
@@ -198,7 +195,7 @@ internal sealed class CraftingTransferPlanner
         while (!Complete())
         {
             string signature = string.Join(";", state.Slots.Values.Select(slot => slot.Shadow.Empty ? "-"
-                : Array.FindIndex(kinds, stack => CraftingTransferState.SameKind(world, stack, slot.Shadow.Itemstack!))
+                : Array.FindIndex(kinds, stack => stack.Equals(world, slot.Shadow.Itemstack!))
                     + ":" + slot.Shadow.StackSize));
             if (!seen.Add(signature)) return CraftingTransferPlan.Refused(Space);
             bool progress = false;
@@ -206,13 +203,13 @@ internal sealed class CraftingTransferPlanner
             {
                 if (!targets.TryGetValue(destination.Id.Index, out var target)
                     || destination.Shadow.Itemstack != null
-                        && !CraftingTransferState.SameKind(world, target, destination.Shadow.Itemstack)) continue;
+                        && !target.Equals(world, destination.Shadow.Itemstack)) continue;
                 int missing = target.StackSize - destination.Shadow.StackSize;
                 if (missing <= 0) continue;
                 foreach (var source in state.Grid.Concat(state.Storage))
                 {
                     if (source.Shadow.Itemstack == null
-                        || !CraftingTransferState.SameKind(world, target, source.Shadow.Itemstack)) continue;
+                        || !target.Equals(world, source.Shadow.Itemstack)) continue;
                     int amount = Math.Min(missing, Math.Min(Excess(source), state.Capacity(source, destination)));
                     if (amount <= 0) continue;
                     Move(source, destination, amount);
@@ -245,7 +242,7 @@ internal sealed class CraftingTransferPlanner
             foreach (var source in state.Storage.Concat(state.Grid))
             {
                 if (source.Shadow.Empty || Excess(source) != source.Shadow.StackSize
-                    || !targets.Any(target => CraftingTransferState.SameKind(world, target.Value, source.Shadow.Itemstack!)
+                    || !targets.Any(target => target.Value.Equals(world, source.Shadow.Itemstack!)
                         && !CraftingTransferState.Same(world, target.Value, state.Grid[target.Key].Shadow.Itemstack))) continue;
                 var buffer = state.Grid.FirstOrDefault(slot => slot.Shadow.Empty
                     && state.Capacity(source, slot) >= source.Shadow.StackSize);

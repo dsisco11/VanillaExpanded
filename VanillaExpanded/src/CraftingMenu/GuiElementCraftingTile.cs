@@ -1,26 +1,23 @@
 using System;
-using System.Collections.Generic;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
-using Vintagestory.API.MathTools;
 
 namespace VanillaExpanded.CraftingMenu;
 
+internal enum CraftingTileStatus { Available, MissingIngredients, Unsupported }
+
 internal sealed class GuiElementCraftingTile : GuiElementTextButton
 {
-    private readonly IReadOnlyDictionary<string, LoadedTexture> badges;
     private readonly Action<int, bool> activate;
     private readonly Action<GuiElementCraftingTile> focus;
     private readonly Action inspect;
     private CraftingRecipeSelection? selection;
-    private ItemSlot? icon;
 
     internal GuiElementCraftingTile(ICoreClientAPI api, ElementBounds bounds,
-        IReadOnlyDictionary<string, LoadedTexture> badges, Action<int, bool> activate,
+        Action<int, bool> activate,
         Action<GuiElementCraftingTile> focus, Action inspect)
         : base(api, "", CairoFont.WhiteSmallText(), CairoFont.WhiteSmallText(), () => true, bounds)
     {
-        this.badges = badges;
         this.activate = activate;
         this.focus = focus;
         this.inspect = inspect;
@@ -31,8 +28,6 @@ internal sealed class GuiElementCraftingTile : GuiElementTextButton
         get => selection;
         set
         {
-            if (selection?.Recipe != value?.Recipe)
-                icon = value?.Recipe.GetPreview() is { } preview ? new DummySlot(preview) : null;
             selection = value;
             Visible = value != null;
             if (!Visible && HasFocus) OnFocusLost();
@@ -40,40 +35,19 @@ internal sealed class GuiElementCraftingTile : GuiElementTextButton
     }
 
     internal bool Pressed { get; private set; }
+    internal CraftingTileStatus Status => selection?.Evaluation.IsSupported != true ? CraftingTileStatus.Unsupported
+        : selection.Evaluation.CanCraft ? CraftingTileStatus.Available : CraftingTileStatus.MissingIngredients;
+    internal bool IsInViewport => Visible && (InsideClipBounds is not { } clip ||
+        (Bounds.absX < clip.absX + clip.OuterWidth && Bounds.absX + Bounds.OuterWidth > clip.absX
+            && Bounds.absY < clip.absY + clip.OuterHeight && Bounds.absY + Bounds.OuterHeight > clip.absY));
     public override bool Focusable => Visible && base.Focusable;
     // Image-only buttons keep their tile dimensions instead of autosizing to text.
     public override void BeforeCalcBounds() { }
 
     public override void RenderInteractiveElements(float deltaTime)
     {
-        if (!Visible || (InsideClipBounds is { } clip &&
-            (Bounds.absX >= clip.absX + clip.OuterWidth || Bounds.absX + Bounds.OuterWidth <= clip.absX
-                || Bounds.absY >= clip.absY + clip.OuterHeight || Bounds.absY + Bounds.OuterHeight <= clip.absY))) return;
+        if (!IsInViewport) return;
         base.RenderInteractiveElements(deltaTime);
-        api.Render.PushScissor(Bounds, true);
-        try
-        {
-            double itemSize = Math.Min(Bounds.InnerWidth, Bounds.InnerHeight)
-                * GuiElementPassiveItemSlot.unscaledItemSize / GuiElementPassiveItemSlot.unscaledSlotSize;
-            if (icon != null)
-                api.Render.RenderItemstackToGui(icon, Bounds.renderX + Bounds.InnerWidth / 2,
-                    Bounds.renderY + Bounds.InnerHeight / 2, 220, (float)itemSize,
-                    selection!.Evaluation.CanCraft ? ColorUtil.WhiteArgb : unchecked((int)0xff777777),
-                    showStackSize: true);
-            if (!selection!.Evaluation.CanCraft) Badge(selection.Evaluation.IsSupported ? "!" : "?", Bounds.renderX);
-            if (selection.Output.Alternatives.Length > 1) Badge("+", Bounds.renderX + Bounds.InnerWidth - scaled(14));
-        }
-        finally
-        {
-            api.Render.PopScissor();
-        }
-    }
-
-    private void Badge(string text, double x)
-    {
-        var texture = badges[text];
-        api.Render.Render2DTexture(texture.TextureId, (float)x, (float)Bounds.renderY,
-            texture.Width, texture.Height, 250);
     }
 
     public override void OnMouseDownOnElement(ICoreClientAPI api, MouseEvent args)

@@ -219,9 +219,10 @@ public sealed class CraftingMenuInteractionTests
         CraftingRecipeSelection? inspected = null;
         var bounds = ElementBounds.Fixed(0, 0, 96, 96).WithEmptyParent();
         bounds.CalcWorldBounds();
+        using var icons = new CraftingIconCache(api.Object);
         using var tiles = new GuiElementCraftingTiles(api.Object, ElementBounds.Fixed(0, 0, 96, 96).WithParent(bounds),
             bounds, session,
-            row => inspected = row, (id, shift) => actions.Add((id, shift)));
+            row => inspected = row, (id, shift) => actions.Add((id, shift)), icons);
         PrepareTiles(tiles);
         tiles.OnFocusGained();
         Assert.NotNull(inspected);
@@ -272,9 +273,10 @@ public sealed class CraftingMenuInteractionTests
         var bounds = ElementBounds.Fixed(0, 0, 96, 96).WithEmptyParent();
         bounds.CalcWorldBounds();
         CraftingRecipeSelection? inspected = null;
+        using var icons = new CraftingIconCache(api.Object);
         using var tiles = new GuiElementCraftingTiles(api.Object, ElementBounds.Fixed(0, 0, 96, 96).WithParent(bounds),
             bounds, session,
-            row => inspected = row, (_, _) => { });
+            row => inspected = row, (_, _) => { }, icons);
         PrepareTiles(tiles);
         var scrollbarBounds = ElementBounds.Fixed(100, 0, 12, 96).WithEmptyParent();
         scrollbarBounds.CalcWorldBounds();
@@ -362,9 +364,10 @@ public sealed class CraftingMenuInteractionTests
         var api = new Mock<ICoreClientAPI>();
         var viewport = Calculated(ElementBounds.Fixed(0, 0, 96, 72).WithEmptyParent());
         CraftingRecipeSelection? inspected = null;
+        using var icons = new CraftingIconCache(api.Object);
         using var tiles = new GuiElementCraftingTiles(api.Object,
             ElementBounds.Fixed(0, 0, 96, 72).WithParent(viewport), viewport, session,
-            row => inspected = row, (_, _) => { });
+            row => inspected = row, (_, _) => { }, icons);
         PrepareTiles(tiles);
         var pool = tiles.Elements.ToArray();
         Assert.Equal(6, pool.Length);
@@ -429,9 +432,10 @@ public sealed class CraftingMenuInteractionTests
         input.SetupGet(value => value.KeyboardKeyStateRaw).Returns(new bool[256]);
         var viewport = Calculated(ElementBounds.Fixed(0, 0, 96, 72).WithEmptyParent());
         var actions = new List<int>();
+        using var icons = new CraftingIconCache(api.Object);
         using var tiles = new GuiElementCraftingTiles(api.Object,
             ElementBounds.Fixed(0, 0, 96, 72).WithParent(viewport), viewport, session,
-            _ => { }, (id, _) => actions.Add(id));
+            _ => { }, (id, _) => actions.Add(id), icons);
         PrepareTiles(tiles);
         var outside = new MouseEvent(10, 100, EnumMouseButton.Left, 0);
         tiles.OnMouseDown(api.Object, outside);

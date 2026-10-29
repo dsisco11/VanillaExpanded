@@ -127,26 +127,27 @@ public class CraftingCandidateTests
         var cold = fixture.Stack(1, "game:stick"); cold.TempAttributes.SetString("state", "cold");
         var ready = fixture.Stack(1, "game:stick"); ready.TempAttributes.SetString("state", "ready");
 
-        Assert.Single(catalogue.FindCandidates(new[] { cold, ready }));
+        Assert.Single(catalogue.FindCandidates(new[] { ready }));
+        Assert.Empty(catalogue.FindCandidates(new[] { cold }));
         Assert.Equal("cold", cold.TempAttributes.GetString("state"));
         Assert.Equal("ready", ready.TempAttributes.GetString("state"));
     }
 
     [Fact]
-    public void TemporaryAttributeDeduplicationPreservesNativeAttributeTypes()
+    public void TemporaryAttributesDoNotOverrideNativeStackEquality()
     {
         var fixture = new CatalogueFixture();
         var recipe = fixture.Recipe("typed");
         var predicate = new Mock<IRecipeIngredientBase>();
-        predicate.Setup(value => value.SatisfiesAsIngredient(It.IsAny<ItemStack>(), false))
-            .Returns((ItemStack stack, bool _) => stack.TempAttributes["typed"] is LongAttribute);
+        predicate.Setup(value => value.SatisfiesAsIngredient(It.IsAny<ItemStack>(), false)).Returns(true);
         fixture.Index.Add(predicate.Object, new List<IRecipeBase> { recipe });
         var catalogue = fixture.Build(recipe);
         var integer = fixture.Stack(1, "game:stick"); integer.TempAttributes.SetInt("typed", 1);
         var longInteger = fixture.Stack(1, "game:stick"); longInteger.TempAttributes.SetLong("typed", 1);
 
-        Assert.Equal(integer.TempAttributes.ToJsonToken(), longInteger.TempAttributes.ToJsonToken());
+        Assert.True(integer.Equals(fixture.World.Object, longInteger));
         Assert.Single(catalogue.FindCandidates(new[] { integer, longInteger }));
+        predicate.Verify(value => value.SatisfiesAsIngredient(It.IsAny<ItemStack>(), false), Times.Once);
     }
 
     [Fact]

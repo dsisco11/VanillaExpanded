@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -12,7 +11,7 @@ internal sealed class GuiElementCraftingTiles : GuiElementContainer
     private readonly CraftingMenuSession session;
     private readonly ElementBounds viewport;
     private readonly Action<CraftingRecipeSelection?> inspect;
-    private readonly Dictionary<string, LoadedTexture> badges = new();
+    private readonly CraftingIconRenderer icons;
     private GuiElementScrollbar? scrollbar;
     private GuiElementCraftingTile? hovered;
     private float scroll;
@@ -26,12 +25,15 @@ internal sealed class GuiElementCraftingTiles : GuiElementContainer
     private double previousContentHeight = -1;
 
     internal GuiElementCraftingTiles(ICoreClientAPI api, ElementBounds bounds, ElementBounds viewport,
-        CraftingMenuSession session, Action<CraftingRecipeSelection?> inspect, Action<int, bool> activate)
+        CraftingMenuSession session, Action<CraftingRecipeSelection?> inspect, Action<int, bool> activate,
+        CraftingIconCache cache,
+        Func<ICraftingIconShaderProgram>? createShader = null)
         : base(api, bounds)
     {
         this.session = session;
         this.viewport = viewport;
         this.inspect = inspect;
+        icons = new(api, cache, createShader);
         Tabbable = true;
         unscaledCellSpacing = 0;
         int rows = (int)Math.Ceiling(viewport.fixedHeight / TileSize) + 1;
@@ -39,7 +41,7 @@ internal sealed class GuiElementCraftingTiles : GuiElementContainer
         {
             var tile = new GuiElementCraftingTile(api,
                 ElementBounds.Fixed(i % Columns * TileSize, i / Columns * TileSize, TileSize - 2, TileSize - 2),
-                badges, activate, Focused, ShowInspection);
+                activate, Focused, ShowInspection);
             Add(tile);
         }
         InsideClipBounds = viewport;
@@ -106,12 +108,11 @@ internal sealed class GuiElementCraftingTiles : GuiElementContainer
         }
     }
 
-    public override void ComposeElements(Cairo.Context ctxStatic, Cairo.ImageSurface surface)
+    public override void RenderInteractiveElements(float deltaTime)
     {
-        foreach (string text in new[] { "!", "?", "+" })
-            if (!badges.ContainsKey(text))
-                badges.Add(text, api.Gui.TextTexture.GenTextTexture(text, CairoFont.WhiteSmallText()));
-        base.ComposeElements(ctxStatic, surface);
+        icons.Prepare(Elements);
+        base.RenderInteractiveElements(deltaTime);
+        icons.Render(Elements);
     }
 
     internal void UpdateHover(int x, int y)
@@ -251,7 +252,7 @@ internal sealed class GuiElementCraftingTiles : GuiElementContainer
         if (disposed) return;
         disposed = true;
         session.Changed -= Changed;
+        icons.Dispose();
         base.Dispose();
-        foreach (var texture in badges.Values) texture.Dispose();
     }
 }

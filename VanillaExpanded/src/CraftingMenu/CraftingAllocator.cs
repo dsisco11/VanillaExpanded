@@ -32,7 +32,7 @@ internal sealed class CraftingAllocator
     internal CraftingAllocation Evaluate(CraftingRecipeEntry entry, CraftingInventorySnapshot snapshot)
     {
         CraftingInventorySnapshot.EnsureThread(snapshot.OwnerThreadId);
-        return Evaluate(entry, snapshot, true, new(world.FastSearchRecipesByIngredient.ToArray()));
+        return Evaluate(entry, snapshot, true, new(world, world.FastSearchRecipesByIngredient.ToArray()));
     }
 
     private CraftingAllocation Evaluate(CraftingRecipeEntry entry, CraftingInventorySnapshot snapshot, bool candidate,
@@ -75,7 +75,7 @@ internal sealed class CraftingAllocator
         {
             var stack = source.GetStack();
             if (!ingredients.Any(ingredient => ingredient.SatisfiesAsIngredient(stack, false))) continue;
-            var group = groups.FirstOrDefault(group => SameStack(group.Stack, stack));
+            var group = groups.FirstOrDefault(group => group.Stack.Equals(world, stack));
             if (group == null)
             {
                 group = new StackGroup(stack);
@@ -360,10 +360,6 @@ internal sealed class CraftingAllocator
         }
         return result.ToImmutable();
     }
-
-    private bool SameStack(ItemStack left, ItemStack right) =>
-        left.Class == right.Class && left.Id == right.Id && left.Attributes.Equals(world, right.Attributes)
-        && left.TempAttributes.Equals(world, right.TempAttributes);
 
     private static bool CanMerge(ItemStack left, ItemStack right)
     {

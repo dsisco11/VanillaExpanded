@@ -112,54 +112,16 @@ public sealed class CraftingMenuLifecycleTests
             return CraftingInventorySnapshot.Capture(f.Player, 3, 3, RuntimeEnv.MainThreadId, true);
         }, (_, _) => throw new InvalidOperationException("No placement expected."));
         session.Refresh();
-        var api = new Mock<ICoreClientAPI>();
-        var gui = new Mock<IGuiAPI>();
-        var render = new Mock<IRenderAPI>();
-        api.SetupGet(value => value.Gui).Returns(gui.Object);
-        api.SetupGet(value => value.Render).Returns(render.Object);
-        api.SetupGet(value => value.Input).Returns(Mock.Of<IInputAPI>());
-        var clips = new Stack<ElementBounds>();
-        render.Setup(value => value.PushScissor(It.IsAny<ElementBounds>(), It.IsAny<bool>()))
-            .Callback<ElementBounds, bool>((bounds, stacking) =>
-            {
-                Assert.True(stacking);
-                Assert.Equal(46 * scale, bounds.InnerWidth, 4);
-                Assert.Equal(46 * scale, bounds.InnerHeight, 4);
-                clips.Push(bounds);
-            });
-        render.Setup(value => value.PopScissor()).Callback(() =>
+        using var graphics = new CraftingRenderFixture(scale);
+        var render = graphics.Render;
+        var liveTextures = graphics.Textures;
+        render.Setup(value => value.RenderMesh(It.IsAny<MeshRef>())).Callback(() =>
         {
-            Assert.Single(clips);
-            clips.Pop();
+            var bounds = Assert.Single(graphics.Clips);
+            Assert.Equal(46 * scale, bounds.InnerWidth, 4);
+            Assert.Equal(46 * scale, bounds.InnerHeight, 4);
+            Assert.Same(graphics.Programs[^1].Object, graphics.Active);
         });
-        render.Setup(value => value.RenderItemstackToGui(It.IsAny<ItemSlot>(), It.IsAny<double>(),
-            It.IsAny<double>(), It.IsAny<double>(), It.IsAny<float>(), It.IsAny<int>(),
-            It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
-            .Callback<ItemSlot, double, double, double, float, int, bool, bool, bool>(
-                (slot, x, y, z, size, color, shading, rotate, showStackSize) =>
-                {
-                    var bounds = Assert.Single(clips);
-                    Assert.Equal(bounds.renderX + bounds.InnerWidth / 2, x, 4);
-                    Assert.Equal(bounds.renderY + bounds.InnerHeight / 2, y, 4);
-                    Assert.Equal(46 * scale * GuiElementPassiveItemSlot.unscaledItemSize
-                        / GuiElementPassiveItemSlot.unscaledSlotSize, size, 4);
-                    Assert.True(showStackSize);
-                });
-        gui.SetupGet(value => value.TextTexture).Returns(new TextTextureUtil(api.Object));
-        int nextTexture = 1;
-        var liveTextures = new HashSet<int>();
-        gui.Setup(value => value.LoadOrUpdateCairoTexture(It.IsAny<ImageSurface>(), It.IsAny<bool>(),
-            ref It.Ref<LoadedTexture>.IsAny)).Callback(new Upload((ImageSurface image, bool linear, ref LoadedTexture texture) =>
-        {
-            if (texture.TextureId == 0)
-            {
-                texture.TextureId = nextTexture++;
-                liveTextures.Add(texture.TextureId);
-            }
-            texture.Width = image.Width;
-            texture.Height = image.Height;
-        }));
-        gui.Setup(value => value.DeleteTexture(It.IsAny<int>())).Callback<int>(id => Assert.True(liveTextures.Remove(id)));
         var viewport = ElementBounds.Fixed(0, 0, 96, 96).WithEmptyParent();
         viewport.CalcWorldBounds();
         using var surface = new ImageSurface(Format.Argb32, 96, 144);
@@ -167,35 +129,84 @@ public sealed class CraftingMenuLifecycleTests
         for (int cycle = 0; cycle < 5; cycle++)
         {
             int inspected = 0;
-            using var tiles = new GuiElementCraftingTiles(api.Object,
+            using var tiles = new GuiElementCraftingTiles(graphics.Api.Object,
                 ElementBounds.Fixed(0, 0, 96, 144).WithParent(viewport), viewport, session,
-                _ => inspected++, (_, _) => { });
+                _ => inspected++, (_, _) => { }, graphics.Cache, graphics.CreateShader);
             tiles.BeforeCalcBounds();
             tiles.Bounds.CalcWorldBounds();
             tiles.ComposeElements(ctx, surface);
-            Assert.Equal(28, liveTextures.Count);
-            for (int frame = 0; frame < 3; frame++)
+            Assert.Equal(25, liveTextures.Count);
+            int beforeBakes = graphics.Bakes.Count;
+            for (int frame = 0; frame < 6; frame++)
+            {
+                render.Invocations.Clear();
+                foreach (var program in graphics.Programs) program.Invocations.Clear();
+                tiles.RenderInteractiveElements(0);
+                Assert.Equal(4, render.Invocations.Count(call => call.Method.Name == nameof(IRenderAPI.RenderMesh)));
+                Assert.Equal(cycle == 0 ? 4 : beforeBakes, graphics.Bakes.Count);
+                Assert.Equal(cycle == 0 ? 4 : 6, graphics.Allocations.Count);
+                graphics.Programs[^1].Verify(value => value.Use(), Times.Once);
+                Assert.Empty(graphics.Clips);
+            }
+            tiles.Scroll(24 * scale);
+            for (int frame = 0; frame < 2; frame++)
             {
                 render.Invocations.Clear();
                 tiles.RenderInteractiveElements(0);
-                Assert.Equal(4, render.Invocations.Count(call => call.Method.Name == nameof(IRenderAPI.RenderItemstackToGui)));
-                Assert.Empty(clips);
+                Assert.Equal(6, render.Invocations.Count(call => call.Method.Name == nameof(IRenderAPI.RenderMesh)));
+                Assert.Equal(cycle == 0 ? 6 : beforeBakes, graphics.Bakes.Count);
             }
-            tiles.Scroll(24 * scale);
-            render.Invocations.Clear();
-            tiles.RenderInteractiveElements(0);
-            Assert.Equal(6, render.Invocations.Count(call => call.Method.Name == nameof(IRenderAPI.RenderItemstackToGui)));
-            Assert.Empty(clips);
+            Assert.Equal(6, graphics.Allocations.Count);
+            Assert.All(graphics.Bakes, bake =>
+            {
+                Assert.Equal((int)Math.Ceiling(46 * scale / 2) * 2, bake.Size);
+                Assert.Equal(2 * GuiElementPassiveItemSlot.unscaledItemSize / GuiElementPassiveItemSlot.unscaledSlotSize,
+                    bake.Scale, 5);
+            });
+            Assert.Empty(graphics.Clips);
             Assert.Equal(1, captures);
             tiles.Dispose();
             Assert.Empty(liveTextures);
+            Assert.Equal(6, graphics.Allocations.Count);
+            Assert.True(graphics.Meshes[^1].Object.Disposed);
             int afterClose = inspected;
             session.Search("");
             Assert.Equal(afterClose, inspected);
         }
+        graphics.Cache.Dispose();
+        Assert.Empty(graphics.Allocations);
     }
 
-    private delegate void Upload(ImageSurface image, bool linear, ref LoadedTexture texture);
+    [Theory]
+    [InlineData(0, true)]
+    [InlineData(0, false)]
+    [InlineData(1, true)]
+    [InlineData(1, false)]
+    [InlineData(2, true)]
+    [InlineData(2, false)]
+    public void WorldLifecycleOwnsReadyAndDeferredIconAllocations(int cleanup, bool immediate)
+    {
+        using var scope = new NativeScope();
+        using var graphics = new CraftingRenderFixture { CompleteImmediately = immediate };
+        using var f = new LifecycleFixture();
+        f.Api.SetupGet(value => value.Render).Returns(graphics.Render.Object);
+        f.Api.SetupGet(value => value.ItemTextureAtlas).Returns(graphics.Api.Object.ItemTextureAtlas);
+        f.FinalizeWorld();
+        var cache = Assert.IsType<CraftingIconCache>(f.System.IconCache);
+        var recipe = Assert.Single(f.System.Catalogue!.Recipes);
+        var position = cache.Get(recipe, 46, true, out bool baked);
+        Assert.True(baked);
+        Assert.Equal(immediate, position != null);
+        Assert.Single(graphics.Bakes);
+        if (cleanup == 0) f.Events.Raise(value => value.LeaveWorld += null);
+        else if (cleanup == 1) f.System.Dispose();
+        else f.FinalizeWorld();
+        if (!immediate) graphics.Complete(graphics.Bakes[0]);
+        Assert.Empty(graphics.Allocations);
+        Assert.NotSame(cache, f.System.IconCache);
+        Assert.Throws<ObjectDisposedException>(() => cache.Get(recipe, 46, true, out _));
+        f.Events.VerifyRemove(value => value.ReloadTextures -= It.IsAny<Action>(), Times.Once);
+    }
 
     [Theory]
     [InlineData(0)]
@@ -226,7 +237,7 @@ public sealed class CraftingMenuLifecycleTests
             if (f.System.Catalogue == null) f.FinalizeWorld();
             Assert.True(parent.TryOpen());
             using var dialog = new GuiDialogCraftingMenu(f.Api.Object, parent, composer,
-                f.System.Catalogue!, f.F.Allocator);
+                f.System.Catalogue!, f.F.Allocator, f.System.IconCache!);
             f.Api.Object.Gui.RegisterDialog(dialog);
             int disposed = 0;
             dialog.Disposed += () => disposed++;
