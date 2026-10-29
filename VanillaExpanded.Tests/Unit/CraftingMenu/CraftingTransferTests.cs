@@ -368,7 +368,7 @@ public class CraftingTransferTests
     [InlineData("set-temperature", false, true)]
     [InlineData("set-temperature", true, false)]
     [InlineData("set-temperature", true, true)]
-    public void UnknownMovementCallbacksRefuseUnchangedWithoutInvokingThem(string callback, bool displaced, bool shift)
+    public void MovementCallbackOverridesDoNotBlanketRejectNativeTransfers(string callback, bool displaced, bool shift)
     {
         using var f = new TransferFixture(2, 2);
         int id = displaced ? 2 : 1;
@@ -386,50 +386,47 @@ public class CraftingTransferTests
         var stack = new ItemStack(item, displaced ? 1 : 2);
         if (displaced) f.F.Grid[1].Itemstack = stack;
         else f.F.Hotbar[0].Itemstack = stack;
-        var before = f.CopyAll();
         var result = f.Coordinator.Execute(f.Entry, shift);
-        Assert.Equal(CraftingDispatchStatus.Rejected, result.Status);
-        Assert.Equal(displaced ? CraftingTransferPlanner.Unsafe : "vanillaexpanded:craftingmenu-unsupported-semantics",
-            result.Reason);
-        f.AssertSame(before);
-        Assert.Empty(f.Packets);
-        Assert.Single(f.Notifications);
+        Assert.Equal(CraftingDispatchStatus.Dispatched, result.Status);
+        Assert.NotEmpty(f.Packets);
+        Assert.Equal(2, f.F.Grid[0].StackSize);
+        Assert.Empty(f.Notifications);
     }
 
     private sealed class ModificationCallbackItem(int id) : MockItem(id)
     {
         public override void OnModifiedInInventorySlot(IWorldAccessor world, ItemSlot slot, ItemStack extractedStack = null!) =>
-            throw new InvalidOperationException("Unverified modification callback must not execute.");
+            base.OnModifiedInInventorySlot(world, slot, extractedStack);
     }
 
     private sealed class TransitionCallbackItem(int id) : MockItem(id)
     {
         public override TransitionState[] UpdateAndGetTransitionStates(IWorldAccessor world, ItemSlot slot) =>
-            throw new InvalidOperationException("Unverified transition callback must not execute.");
+            base.UpdateAndGetTransitionStates(world, slot);
     }
 
     private sealed class NativeTransitionCallbackItem(int id) : MockItem(id)
     {
         protected override TransitionState[] UpdateAndGetTransitionStatesNative(IWorldAccessor world, ItemSlot slot) =>
-            throw new InvalidOperationException("Unverified protected transition callback must not execute.");
+            base.UpdateAndGetTransitionStatesNative(world, slot);
     }
 
     private sealed class BehaviorCallbackItem(int id) : MockItem(id)
     {
         protected override CollectibleBehavior GetBehavior(CollectibleBehavior[] behaviors, Type type, bool withInheritance) =>
-            throw new InvalidOperationException("Unverified protected behavior-discovery callback must not execute.");
+            base.GetBehavior(behaviors, type, withInheritance);
     }
 
     private sealed class SetTemperatureCallbackItem(int id) : MockItem(id)
     {
         public override void SetTemperature(IWorldAccessor world, ItemStack stack, float temperature, bool delayCooldown = true) =>
-            throw new InvalidOperationException("Unverified thermal mutation callback must not execute.");
+            base.SetTemperature(world, stack, temperature, delayCooldown);
     }
 
     private sealed class HasTemperatureCallbackItem(int id) : MockItem(id)
     {
         public override bool HasTemperature(IItemStack stack) =>
-            throw new InvalidOperationException("Unverified thermal merge callback must not execute.");
+            base.HasTemperature(stack);
     }
 }
 

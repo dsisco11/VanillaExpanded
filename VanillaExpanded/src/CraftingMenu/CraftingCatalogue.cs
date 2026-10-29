@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.IO;
 using System.Linq;
 
 using Vintagestory.API.Common;
@@ -58,16 +57,20 @@ internal sealed record CraftingOutputGroup(int Id, ImmutableArray<CraftingRecipe
 
 internal sealed class CraftingCatalogue
 {
-    private readonly IWorldAccessor world;
     private readonly Dictionary<GridRecipe, CraftingRecipeEntry> byRecipe;
+    private readonly KeyValuePair<IRecipeIngredientBase, List<IRecipeBase>>[] ingredientIndex;
+    private readonly ImmutableArray<CraftingRecipeEntry> unindexed;
 
     private CraftingCatalogue(IWorldAccessor world, ImmutableArray<CraftingOutputGroup> groups)
     {
-        this.world = world;
         Groups = groups;
         Recipes = groups.SelectMany(group => group.Alternatives).OrderBy(entry => entry.Id).ToImmutableArray();
         byRecipe = new Dictionary<GridRecipe, CraftingRecipeEntry>(ReferenceEqualityComparer.Instance);
         foreach (var entry in Recipes) byRecipe.Add(entry.Recipe, entry);
+        ingredientIndex = world.FastSearchRecipesByIngredient.ToArray();
+        var indexed = ingredientIndex.SelectMany(pair => pair.Value).OfType<GridRecipe>()
+            .ToHashSet(ReferenceEqualityComparer.Instance);
+        unindexed = Recipes.Where(entry => !indexed.Contains(entry.Recipe)).ToImmutableArray();
     }
 
     internal ImmutableArray<CraftingOutputGroup> Groups { get; }
@@ -140,40 +143,21 @@ internal sealed class CraftingCatalogue
                 .ToImmutableArray())).ToImmutableArray());
     }
 
-    internal ImmutableArray<CraftingRecipeEntry> FindCandidates(IEnumerable<ItemStack> eligibleStacks)
+    internal CraftingIngredientLookup CreateLookup() => new(ingredientIndex);
+
+    internal ImmutableArray<CraftingRecipeEntry> FindCandidates(IEnumerable<ItemStack> eligibleStacks) =>
+        FindCandidates(eligibleStacks, CreateLookup());
+
+    internal ImmutableArray<CraftingRecipeEntry> FindCandidates(IEnumerable<ItemStack> eligibleStacks,
+        CraftingIngredientLookup lookup)
     {
         ArgumentNullException.ThrowIfNull(eligibleStacks);
-        var stacks = new List<ItemStack>();
-        var unique = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var source in eligibleStacks)
-        {
-            if (source.StackSize <= 0) continue;
-            var snapshot = source.Clone();
-            snapshot.TempAttributes = source.TempAttributes.Clone();
-            using var buffer = new MemoryStream();
-            using var writer = new BinaryWriter(buffer);
-            snapshot.ToBytes(writer);
-            snapshot.TempAttributes.ToBytes(writer);
-            string identity = Convert.ToBase64String(buffer.ToArray());
-            if (unique.Add(identity)) stacks.Add(snapshot);
-        }
-
+        var stacks = eligibleStacks.Where(stack => stack.StackSize > 0).Select(CraftingStackSnapshot.Copy).ToArray();
         var candidates = new HashSet<int>();
-        var indexed = new HashSet<int>();
-        foreach (var pair in world.FastSearchRecipesByIngredient)
-        {
-            var entries = new List<CraftingRecipeEntry>();
-            foreach (var recipe in pair.Value)
-            {
+        foreach (var stack in stacks)
+            foreach (var recipe in lookup.Match(stack))
                 if (recipe is GridRecipe grid && byRecipe.TryGetValue(grid, out var entry))
-                {
-                    indexed.Add(entry.Id);
-                    entries.Add(entry);
-                }
-            }
-            if (entries.Count == 0 || !stacks.Any(stack => pair.Key.SatisfiesAsIngredient(stack, false))) continue;
-            foreach (var entry in entries) candidates.Add(entry.Id);
-        }
+                    candidates.Add(entry.Id);
 
         foreach (var entry in Recipes)
         {
@@ -184,12 +168,11 @@ internal sealed class CraftingCatalogue
             {
                 candidates.Add(entry.Id);
             }
-            else if (!indexed.Contains(entry.Id) && entry.Ingredients.Any(ingredient =>
-                ingredient != null && stacks.Any(stack => ingredient.SatisfiesAsIngredient(stack, false))))
-            {
-                candidates.Add(entry.Id);
-            }
         }
+        foreach (var entry in unindexed)
+            if (entry.Ingredients.Any(ingredient =>
+                ingredient != null && stacks.Any(stack => ingredient.SatisfiesAsIngredient(stack, false))))
+                candidates.Add(entry.Id);
         return Recipes.Where(entry => candidates.Contains(entry.Id)).ToImmutableArray();
     }
 }

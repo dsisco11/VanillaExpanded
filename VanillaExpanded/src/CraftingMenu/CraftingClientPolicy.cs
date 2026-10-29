@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using Vintagestory.API.Common;
 using Vintagestory.GameContent;
 
@@ -9,10 +8,8 @@ namespace VanillaExpanded.CraftingMenu;
 
 internal sealed class CraftingClientPolicy
 {
-    internal const string UnknownEvents = "vanillaexpanded:craftingmenu-unknown-events";
     internal const string Ambiguous = "vanillaexpanded:craftingmenu-ambiguous-output";
     private readonly HashSet<GridRecipe> ambiguous = new(ReferenceEqualityComparer.Instance);
-    private readonly bool knownEvents;
     private readonly CharacterSystem characters;
     private readonly IPlayer player;
 
@@ -20,8 +17,6 @@ internal sealed class CraftingClientPolicy
     {
         this.player = player;
         characters = api.ModLoader.GetModSystem<CharacterSystem>();
-        knownEvents = VerifiedEvents(api.Event, "MatchesRecipe", "Event_MatchesRecipe")
-            && VerifiedEvents(api.Event, "MatchesGridRecipe", "Event_MatchesGridRecipe");
         var all = api.World.GridRecipes.Where(recipe => recipe.Enabled).ToArray();
         if (all.Any(recipe => recipe.GetType() != typeof(GridRecipe)))
         {
@@ -56,17 +51,7 @@ internal sealed class CraftingClientPolicy
         recipe.RequiresTrait == null || characters.HasTrait(player, recipe.RequiresTrait);
 
     internal string? UnsupportedReason(GridRecipe recipe) =>
-        !knownEvents ? UnknownEvents : ambiguous.Contains(recipe) ? Ambiguous : null;
-
-    internal static bool VerifiedEvents(object events, string fieldName, string methodName)
-    {
-        var field = events.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
-        if (field == null || !typeof(Delegate).IsAssignableFrom(field.FieldType)) return false;
-        var callbacks = ((Delegate?)field.GetValue(events))?.GetInvocationList() ?? Array.Empty<Delegate>();
-        var expected = typeof(CharacterSystem).GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
-        return callbacks.All(callback => callback.Target?.GetType() == typeof(CharacterSystem)
-            && callback.Method == expected);
-    }
+        ambiguous.Contains(recipe) ? Ambiguous : null;
 
     internal static bool CouldOverlap(GridRecipe left, GridRecipe right)
     {

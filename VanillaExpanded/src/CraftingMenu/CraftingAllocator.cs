@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using System.Reflection;
 using Vintagestory.API.Common;
 
 namespace VanillaExpanded.CraftingMenu;
@@ -14,9 +13,7 @@ internal sealed class CraftingAllocator
     private readonly IWorldAccessor world;
     private readonly IPlayer player;
     private readonly System.Func<GridRecipe, string?> independentPolicy;
-
-    // The caller must certify inventory-independent event/access rules and unambiguous output
-    // semantics, including incomplete layouts. A missing policy is never a permissive default.
+    // The policy handles recipe-output ambiguity; native matching invokes recipe events.
     internal CraftingAllocator(IWorldAccessor world, IPlayer player,
         System.Func<GridRecipe, string?> independentPolicy)
     {
@@ -29,16 +26,21 @@ internal sealed class CraftingAllocator
         CraftingCatalogue catalogue, CraftingInventorySnapshot snapshot)
     {
         CraftingInventorySnapshot.EnsureThread(snapshot.OwnerThreadId);
-        var candidates = catalogue.FindCandidates(snapshot.Stacks.Select(stack => stack.GetStack()))
+        var lookup = catalogue.CreateLookup();
+        var candidates = catalogue.FindCandidates(snapshot.Stacks.Select(stack => stack.GetStack()), lookup)
             .Select(entry => entry.Id).ToHashSet();
         return catalogue.Recipes.ToImmutableDictionary(entry => entry.Id,
-            entry => Evaluate(entry, snapshot, candidates.Contains(entry.Id)));
+            entry => Evaluate(entry, snapshot, candidates.Contains(entry.Id), lookup));
     }
 
-    internal CraftingAllocation Evaluate(CraftingRecipeEntry entry, CraftingInventorySnapshot snapshot) =>
-        Evaluate(entry, snapshot, true);
+    internal CraftingAllocation Evaluate(CraftingRecipeEntry entry, CraftingInventorySnapshot snapshot)
+    {
+        CraftingInventorySnapshot.EnsureThread(snapshot.OwnerThreadId);
+        return Evaluate(entry, snapshot, true, new(world.FastSearchRecipesByIngredient.ToArray()));
+    }
 
-    private CraftingAllocation Evaluate(CraftingRecipeEntry entry, CraftingInventorySnapshot snapshot, bool candidate)
+    private CraftingAllocation Evaluate(CraftingRecipeEntry entry, CraftingInventorySnapshot snapshot, bool candidate,
+        CraftingIngredientLookup lookup)
     {
         CraftingInventorySnapshot.EnsureThread(snapshot.OwnerThreadId);
         if (entry.UnresolvedReason != null) return CraftingAllocation.Unsupported(entry.UnresolvedReason);
@@ -49,8 +51,7 @@ internal sealed class CraftingAllocator
             || recipe.CopyAttributesFrom != null || recipe.MergeAttributesFrom.Length > 0
             || recipe.ResolvedIngredients == null || recipe.ResolvedIngredients.Length != recipe.Width * recipe.Height
             || recipe.Width > snapshot.Width || recipe.Height > snapshot.Height
-            || !PlainCollectible(recipe.Output!.ResolvedItemStack!.Collectible)
-            || (recipe.Output.ResolvedItemStack.Collectible.TransitionableProps?.Length ?? 0) > 0)
+            || (recipe.Output!.ResolvedItemStack!.Collectible.TransitionableProps?.Length ?? 0) > 0)
             return CraftingAllocation.Unsupported(Exceptional);
 
         var requirements = ImmutableArray.CreateBuilder<CraftingRequirement>();
@@ -62,7 +63,7 @@ internal sealed class CraftingAllocator
             if (ingredient.Quantity <= 0 || ingredient.RecipeAttributes != null || consume.DurabilityCost < 0
                 || (!consume.Consume && (ingredient.Quantity != 1 || consume.DurabilityChange > 0))
                 || (ingredient.MatchingType == EnumRecipeMatchType.Exact
-                    && (ingredient.ResolvedItemStack == null || !PlainCollectible(ingredient.ResolvedItemStack.Collectible))))
+                    && ingredient.ResolvedItemStack == null))
                 return CraftingAllocation.Unsupported(Exceptional);
             int position = recipe.Shapeless ? requirements.Count : i / recipe.Width * snapshot.Width + i % recipe.Width;
             requirements.Add(new CraftingRequirement(position, $"{ingredient.Id ?? "ingredient"}@{i}", ingredient));
@@ -70,12 +71,16 @@ internal sealed class CraftingAllocator
         var needs = requirements.ToImmutable();
         if (needs.Sum(need => (long)need.Quantity) > int.MaxValue)
             return CraftingAllocation.Unsupported(Exceptional);
+        if (!candidate && needs.Length > 0)
+            return new(CraftingRecipeEvaluation.Supported(0, needs.Sum(need => need.Quantity), false,
+                    needs.Select(need => new CraftingMissingRequirement(need.Id, need.Quantity, null)).ToImmutableArray()),
+                needs, ImmutableArray<CraftingPlacement>.Empty, ImmutableArray<CraftingPlacement>.Empty, 0);
+        var ingredients = needs.Select(need => need.GetIngredient()).ToArray();
         var groups = new List<StackGroup>();
         foreach (var source in candidate ? snapshot.Stacks : ImmutableArray<CraftingStackSnapshot>.Empty)
         {
             var stack = source.GetStack();
-            if (!needs.Any(need => need.GetIngredient().SatisfiesAsIngredient(stack, false))) continue;
-            if (!PlainCollectible(stack.Collectible)) return CraftingAllocation.Unsupported(Exceptional);
+            if (!ingredients.Any(ingredient => ingredient.SatisfiesAsIngredient(stack, false))) continue;
             var group = groups.FirstOrDefault(group => SameStack(group.Stack, stack));
             if (group == null)
             {
@@ -102,7 +107,7 @@ internal sealed class CraftingAllocator
         for (int i = 0; i < needs.Length; i++)
         {
             options[i] = new List<int>();
-            var ingredient = needs[i].GetIngredient();
+            var ingredient = ingredients[i];
             for (int g = 0; g < groups.Count; g++)
             {
                 var stack = CraftingStackSnapshot.Copy(groups[g].Stack);
@@ -142,12 +147,18 @@ internal sealed class CraftingAllocator
             .Select(set => set.ToArray()).Where(set => set.Length > 1).ToArray();
         Solution? ordinary = null;
         Solution? shift = null;
+        int required = needs.Sum(need => need.Quantity);
         void Search(int index)
         {
             if (index == needs.Length)
             {
-                var one = Solve(false, needs, groups, chosen, limits, durability, equivalentSets);
-                if (ordinary == null || Better(one, ordinary, false, equivalentSets)) ordinary = one;
+                // Search visits assignments in stable order; the first complete ordinary
+                // allocation already wins its coverage and inventory-order objectives.
+                if (ordinary == null || ordinary.Coverage < required)
+                {
+                    var one = Solve(false, needs, groups, chosen, limits, durability, equivalentSets);
+                    if (ordinary == null || Better(one, ordinary, false, equivalentSets)) ordinary = one;
+                }
                 var many = Solve(true, needs, groups, chosen, limits, durability, equivalentSets);
                 if (shift == null || Better(many, shift, true, equivalentSets)) shift = many;
                 return;
@@ -163,31 +174,30 @@ internal sealed class CraftingAllocator
         Search(0);
         var first = ordinary!;
         var bulk = shift!;
-        int required = needs.Sum(need => need.Quantity);
         var onePlacements = Place(needs, groups, first);
         var shiftPlacements = Place(needs, groups, bulk);
-        if (first.Coverage == required && (!NativeAccepts(recipe, snapshot, onePlacements)
-            || !NativeAccepts(recipe, snapshot, shiftPlacements)))
+        if (first.Coverage == required && (!NativeAccepts(recipe, snapshot, onePlacements, lookup)
+            || !NativeAccepts(recipe, snapshot, shiftPlacements, lookup)))
             return CraftingAllocation.Unsupported(NativeMismatch);
 
         var missing = needs.Select((need, index) => new CraftingMissingRequirement(
                 need.Id, Math.Max(0, need.Quantity - first.Quantities[index]),
                 !need.IsConsumed && options[index][0] < 0 && groups.Any(group =>
-                    need.GetIngredient().SatisfiesAsIngredient(group.Stack, false)
+                    ingredients[index].SatisfiesAsIngredient(group.Stack, false)
                     && group.Stack.Collectible.GetRemainingDurability(group.Stack)
-                        < need.GetIngredient().GetConsumeProperties().DurabilityCost)
+                        < ingredients[index].GetConsumeProperties().DurabilityCost)
                     ? "vanillaexpanded:craftingmenu-insufficient-durability" : null))
             .Where(need => need.Quantity > 0).ToImmutableArray();
         return new(CraftingRecipeEvaluation.Supported(first.Coverage, required,
                 first.Coverage == required, missing),
             needs, onePlacements, shiftPlacements,
-            bulk.Executions == int.MaxValue && needs.All(need =>
-                !need.IsConsumed && need.GetIngredient().GetConsumeProperties().DurabilityCost <= 0)
+            bulk.Executions == int.MaxValue && ingredients.All(ingredient =>
+                !ingredient.GetConsumeProperties().Consume && ingredient.GetConsumeProperties().DurabilityCost <= 0)
                 ? null : bulk.Executions);
     }
 
     private bool NativeAccepts(GridRecipe selected, CraftingInventorySnapshot snapshot,
-        ImmutableArray<CraftingPlacement> placements)
+        ImmutableArray<CraftingPlacement> placements, CraftingIngredientLookup lookup)
     {
         var slots = Enumerable.Range(0, snapshot.Width * snapshot.Height)
             .Select(_ => new ItemSlot(null!)).ToArray();
@@ -198,9 +208,7 @@ internal sealed class CraftingAllocator
         foreach (var slot in slots)
         {
             if (slot.Itemstack == null) continue;
-            foreach (var pair in world.FastSearchRecipesByIngredient)
-                if (pair.Key.SatisfiesAsIngredient(slot.Itemstack, false))
-                    foreach (var source in pair.Value)
+            foreach (var source in lookup.Match(slot.Itemstack))
                         if (source is GridRecipe { Enabled: true } recipe && seen.Add(recipe))
                             candidates.Add(recipe);
         }
@@ -217,76 +225,96 @@ internal sealed class CraftingAllocator
         int coverage = 0;
         int executions = int.MaxValue;
         var quantities = new int[needs.Length];
+        Span<int> positions = stackalloc int[needs.Length];
+        Span<int> caps = stackalloc int[needs.Length];
+        int required = 0;
         for (int i = 0; i < needs.Length; i++)
+        {
+            required += needs[i].Quantity;
             if (chosen[i] < 0) executions = 0;
+        }
         for (int g = 0; g < groups.Count; g++)
         {
-            int group = g;
-            int[] positions = Enumerable.Range(0, needs.Length).Where(i => chosen[i] == group).ToArray();
-            if (positions.Length == 0) continue;
-            int cover = positions.Sum(i => Math.Min(needs[i].Quantity, limits[i, g]));
-            coverage += Math.Min(groups[g].Quantity, cover);
-            int tools = positions.Count(i => !needs[i].IsConsumed);
-            int consumed = positions.Where(i => needs[i].IsConsumed).Sum(i => needs[i].Quantity);
-            if (groups[g].Quantity < tools) executions = 0;
-            if (consumed > 0) executions = Math.Min(executions, Math.Max(0, groups[g].Quantity - tools) / consumed);
-            foreach (int i in positions)
+            int cover = 0, tools = 0, consumed = 0;
+            for (int i = 0; i < needs.Length; i++)
+            {
+                if (chosen[i] != g) continue;
+                cover += Math.Min(needs[i].Quantity, limits[i, g]);
+                if (needs[i].IsConsumed) consumed += needs[i].Quantity;
+                else tools++;
                 executions = Math.Min(executions, needs[i].IsConsumed
                     ? limits[i, g] / needs[i].Quantity : durability[i, g]);
+            }
+            coverage += Math.Min(groups[g].Quantity, cover);
+            if (groups[g].Quantity < tools) executions = 0;
+            if (consumed > 0) executions = Math.Min(executions, Math.Max(0, groups[g].Quantity - tools) / consumed);
         }
-        if (coverage != needs.Sum(need => need.Quantity)) executions = 0;
+        if (coverage != required) executions = 0;
         for (int g = 0; g < groups.Count; g++)
         {
-            int group = g;
-            int[] positions = Enumerable.Range(0, needs.Length).Where(i => chosen[i] == group).ToArray();
-            if (shift && executions > 0)
-                foreach (int i in positions)
+            int count = 0;
+            int available = groups[g].Quantity;
+            for (int i = 0; i < needs.Length; i++)
+            {
+                if (chosen[i] != g) continue;
+                positions[count++] = i;
+                caps[i] = Math.Min(needs[i].Quantity, limits[i, g]);
+                if (shift && executions > 0)
                     quantities[i] = needs[i].IsConsumed ? checked(needs[i].Quantity * executions) : 1;
-            int available = groups[g].Quantity - positions.Sum(i => quantities[i]);
-            Fill(positions, quantities, i => Math.Min(needs[i].Quantity, limits[i, group]), ref available);
-            if (shift) Fill(positions, quantities, i => limits[i, group], ref available);
+                available -= quantities[i];
+            }
+            Fill(positions[..count], quantities, caps, ref available);
+            if (shift)
+            {
+                foreach (int i in positions[..count]) caps[i] = limits[i, g];
+                Fill(positions[..count], quantities, caps, ref available);
+            }
         }
         var assignment = (int[])chosen.Clone();
         if (shift)
             foreach (var set in equivalentSets)
             {
-                var ordered = set.Select(i => (Group: assignment[i], Quantity: quantities[i]))
-                    .OrderByDescending(value => value.Quantity).ThenBy(value => value.Group).ToArray();
-                for (int i = 0; i < set.Length; i++)
-                {
-                    assignment[set[i]] = ordered[i].Group;
-                    quantities[set[i]] = ordered[i].Quantity;
-                }
+                for (int a = 1; a < set.Length; a++)
+                    for (int b = a; b > 0; b--)
+                    {
+                        int left = set[b - 1], right = set[b];
+                        if (quantities[left] > quantities[right]
+                            || (quantities[left] == quantities[right] && assignment[left] <= assignment[right])) break;
+                        (assignment[left], assignment[right]) = (assignment[right], assignment[left]);
+                        (quantities[left], quantities[right]) = (quantities[right], quantities[left]);
+                    }
             }
         return new(assignment, quantities, coverage, executions);
     }
 
-    private static void Fill(int[] positions, int[] quantities, System.Func<int, int> cap, ref int available)
+    private static void Fill(ReadOnlySpan<int> positions, int[] quantities, ReadOnlySpan<int> caps, ref int available)
     {
         if (available <= 0 || positions.Length == 0) return;
         int low = 0;
-        int high = positions.Max(cap);
-        long Cost(int level) => positions.Sum(i => (long)Math.Max(0, Math.Min(cap(i), level) - quantities[i]));
+        int high = 0;
+        foreach (int i in positions) high = Math.Max(high, caps[i]);
         while (low < high)
         {
             int middle = low + (int)(((long)high - low + 1) / 2);
-            if (Cost(middle) <= available) low = middle;
+            long cost = 0;
+            foreach (int i in positions) cost += Math.Max(0, Math.Min(caps[i], middle) - quantities[i]);
+            if (cost <= available) low = middle;
             else high = middle - 1;
         }
         foreach (int i in positions)
         {
-            int add = Math.Max(0, Math.Min(cap(i), low) - quantities[i]);
+            int add = Math.Max(0, Math.Min(caps[i], low) - quantities[i]);
             quantities[i] += add;
             available -= add;
         }
-        foreach (int i in positions.OrderBy(i => quantities[i]).ThenBy(i => i))
+        while (available > 0)
         {
-            if (available == 0) break;
-            if (quantities[i] < cap(i))
-            {
-                quantities[i]++;
-                available--;
-            }
+            int next = -1;
+            foreach (int i in positions)
+                if (quantities[i] < caps[i] && (next < 0 || quantities[i] < quantities[next])) next = i;
+            if (next < 0) break;
+            quantities[next]++;
+            available--;
         }
     }
 
@@ -348,29 +376,6 @@ internal sealed class CraftingAllocator
         var sink = CraftingStackSnapshot.Copy(left);
         sink.StackSize = 0;
         return sink.Collectible.GetMergableQuantity(sink, right, EnumMergePriority.AutoMerge) > 0;
-    }
-
-    internal static bool PlainCollectible(CollectibleObject collectible)
-    {
-        if ((collectible.CollectibleBehaviors?.Length ?? 0) > 0
-            || collectible.Attributes?["noConsumeOnCrafting"].AsBool(false) == true) return false;
-        string[] methods = { nameof(CollectibleObject.MatchesForCrafting),
-            nameof(CollectibleObject.Equals), nameof(CollectibleObject.Satisfies), nameof(CollectibleObject.GetTags),
-            nameof(CollectibleObject.GetRemainingDurability), nameof(CollectibleObject.GetMaxDurability),
-            nameof(CollectibleObject.SetDurability), nameof(CollectibleObject.GetTransitionableProperties),
-            nameof(CollectibleObject.DamageItem), nameof(CollectibleObject.DestroyItem),
-            nameof(CollectibleObject.GetMergableQuantity), nameof(CollectibleObject.TryMergeStacks),
-            nameof(CollectibleObject.GetStorageFlags), nameof(CollectibleObject.GetTemperature),
-            nameof(CollectibleObject.HasTemperature), nameof(CollectibleObject.SetTemperature),
-            nameof(CollectibleObject.GetCollectibleInterface), nameof(CollectibleObject.GetCollectibleBehavior),
-            "GetBehavior",
-            nameof(CollectibleObject.OnModifiedInInventorySlot),
-            nameof(CollectibleObject.UpdateAndGetTransitionStates), "UpdateAndGetTransitionStatesNative",
-            nameof(CollectibleObject.ConsumeCraftingIngredients),
-            nameof(CollectibleObject.OnConsumedByCrafting), nameof(CollectibleObject.OnCreatedByCrafting) };
-        return !collectible.GetType().GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
-            .Any(method => methods.Contains(method.Name) && method.DeclaringType != typeof(CollectibleObject)
-                && method.DeclaringType != typeof(object));
     }
 
     private sealed class StackGroup

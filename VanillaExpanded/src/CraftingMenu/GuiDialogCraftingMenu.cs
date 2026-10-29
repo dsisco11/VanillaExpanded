@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Linq;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -41,9 +42,14 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
 
     public override bool TryOpen()
     {
+        long start = Stopwatch.GetTimestamp();
         if (!Follow()) return false;
+        double composeMs = Stopwatch.GetElapsedTime(start).TotalMilliseconds;
+        start = Stopwatch.GetTimestamp();
         Refresh();
         if (disposed) return false;
+        capi.Logger.Debug("[VanillaExpanded] Crafting menu: layout/composition {0:F1} ms, inventory evaluation {1:F1} ms, {2} outputs.",
+            composeMs, Stopwatch.GetElapsedTime(start).TotalMilliseconds, session.Rows.Length);
         return base.TryOpen();
     }
 

@@ -220,7 +220,7 @@ public class CraftingAllocationTests
     }
 
     [Fact]
-    public void CustomDurabilityMutation_IsUnsupportedWithoutInvokingCallbacks()
+    public void CustomDurabilityMutation_DoesNotRejectPlacementOrInvokeConsumptionCallbacks()
     {
         var f = new AllocationFixture();
         var plain = f.Stack(1, "tool", 1, maxStack: 1);
@@ -231,11 +231,10 @@ public class CraftingAllocationTests
         ingredient.Consume = false;
         ingredient.DurabilityChange = -1;
         var result = f.Allocate(f.Recipe(ingredient), custom);
-        Assert.False(result.Evaluation.IsSupported);
-        Assert.Contains("unsupported-semantics", result.Evaluation.UnsupportedReason);
-        Assert.Null(result.CompleteExecutions);
-        Assert.Null(result.Evaluation.Relevance);
-        Assert.Empty(result.Shift);
+        Assert.True(result.Evaluation.IsSupported);
+        Assert.True(result.Evaluation.CanCraft);
+        Assert.Equal(10, result.CompleteExecutions);
+        Assert.Single(result.Shift);
         Assert.Empty(result.Evaluation.Missing);
     }
 

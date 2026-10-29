@@ -1,4 +1,3 @@
-using System.Reflection;
 using System.Runtime.CompilerServices;
 using Moq;
 using VanillaExpanded.CraftingMenu;
@@ -421,21 +420,22 @@ public sealed class CraftingMenuInteractionTests
     }
 
     [Fact]
-    public void ProductionEventAdapterAcceptsOnlyVerifiedNativeHandlers()
+    public void ProductionPolicyDoesNotInspectOrRejectCustomEventSubscriptions()
     {
+        var f = new AllocationFixture();
+        var loader = new Mock<IModLoader>();
+        loader.Setup(mods => mods.GetModSystem<CharacterSystem>(true)).Returns(new CharacterSystem());
+        f.Api.Setup(api => api.ModLoader).Returns(loader.Object);
         var events = (ClientEventAPI)RuntimeHelpers.GetUninitializedObject(typeof(ClientEventAPI));
-        Assert.True(CraftingClientPolicy.VerifiedEvents(events, "MatchesRecipe", "Event_MatchesRecipe"));
-        Assert.False(CraftingClientPolicy.VerifiedEvents(events, "missing", "Event_MatchesRecipe"));
         events.MatchesRecipe += (_, _, _) => true;
-        Assert.False(CraftingClientPolicy.VerifiedEvents(events, "MatchesRecipe", "Event_MatchesRecipe"));
-        var handler = typeof(CharacterSystem).GetMethod("Event_MatchesGridRecipe",
-            BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var character = (CharacterSystem)RuntimeHelpers.GetUninitializedObject(typeof(CharacterSystem));
-        var native = handler.CreateDelegate<MatchGridRecipeDelegate>(character);
-        events.MatchesGridRecipe += native;
-        Assert.True(CraftingClientPolicy.VerifiedEvents(events, "MatchesGridRecipe", "Event_MatchesGridRecipe"));
         events.MatchesGridRecipe += (_, _, _, _) => false;
-        Assert.False(CraftingClientPolicy.VerifiedEvents(events, "MatchesGridRecipe", "Event_MatchesGridRecipe"));
+        f.Api.Setup(api => api.Event).Returns(events);
+        var recipe = f.Recipe(f.Ingredient(f.Stack(1, "a", 1)));
+        f.Catalogue.World.Setup(world => world.GridRecipes).Returns(new List<GridRecipe> { recipe });
+        var policy = new CraftingClientPolicy(f.Api.Object, f.Player);
+        Assert.Null(policy.UnsupportedReason(recipe));
+        Assert.True(policy.CanAccess(recipe));
+        f.Api.VerifyGet(api => api.Event, Times.Never);
     }
 
     [Theory]

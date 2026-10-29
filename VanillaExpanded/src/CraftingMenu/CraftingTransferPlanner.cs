@@ -86,7 +86,7 @@ internal sealed class CraftingTransferState
     internal bool SafeStack(ItemStack? stack)
     {
         if (stack == null) return true;
-        if (stack.StackSize <= 0 || !CraftingAllocator.PlainCollectible(stack.Collectible)
+        if (stack.StackSize <= 0
             || stack.TempAttributes.Count > 0
             || stack.Collectible.GetCollectibleInterface<IHeldBag>() != null
             || stack.Collectible.GetTransitionableProperties(world, stack, player.Entity) is { Length: > 0 }) return false;
