@@ -424,6 +424,8 @@ Verification: all 193 CraftingMenu tests pass, zero failures/skips. Twelve new p
 
 ## Phase 7: Validate end-to-end behavior and deliver the feature
 
+Grid-availability verification (2026-10-29): no runtime change was needed; the snapshot already includes all nine crafting inputs. Nine added cases use the real installed InventoryCraftingGrid through the production snapshot adapter, with no carried stock, and verify candidate detection, menu availability and source allocation for each input slot. Removing that input removes availability even with 64 matching items in the excluded output slot. A further session/coordinator regression verifies combined hotbar/backpack/grid quantities, unchanged availability when moving stock into the grid, coalesced grid-change refresh and fresh deficits after removal. All 203 CraftingMenu tests pass. This automated evidence does not establish a live-client reproduction of missing grid availability.
+
 Dependencies: Phases 1 through 6.
 Outcome: source, automated, package, and user-run live evidence separately establish the proposal's acceptance contract.
 
