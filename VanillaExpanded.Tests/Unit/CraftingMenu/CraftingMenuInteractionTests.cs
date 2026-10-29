@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using Moq;
 using VanillaExpanded.CraftingMenu;
+using VanillaExpanded.Tests.Mocks;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -433,34 +434,22 @@ public sealed class CraftingMenuInteractionTests
         var recipe = f.Recipe(f.Ingredient(f.Stack(1, "a", 1)));
         f.Catalogue.World.Setup(world => world.GridRecipes).Returns(new List<GridRecipe> { recipe });
         var policy = new CraftingClientPolicy(f.Api.Object, f.Player);
-        Assert.Null(policy.UnsupportedReason(recipe));
         Assert.True(policy.CanAccess(recipe));
         f.Api.VerifyGet(api => api.Event, Times.Never);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void PolicyUsesNativeTraitsAndRejectsPotentialNativeWinnerCompetition(bool shapeless)
+    [Fact]
+    public void PolicyUsesNativeTraitsForRecipeAccess()
     {
         var f = new AllocationFixture();
         var characters = new CharacterSystem();
         var loader = new Mock<IModLoader>();
         loader.Setup(mods => mods.GetModSystem<CharacterSystem>(true)).Returns(characters);
         f.Api.Setup(api => api.ModLoader).Returns(loader.Object);
-        var events = (ClientEventAPI)RuntimeHelpers.GetUninitializedObject(typeof(ClientEventAPI));
-        f.Api.Setup(api => api.Event).Returns(events);
         var first = f.Recipe(f.Ingredient(f.Stack(1, "a", 1)));
-        var second = shapeless
-            ? f.Recipe(f.Ingredient(f.Stack(1, "a", 1)), f.Ingredient(f.Stack(1, "a", 1)))
-            : f.Recipe(f.Ingredient(f.Stack(1, "a", 1)));
-        first.Shapeless = second.Shapeless = shapeless;
-        f.Catalogue.World.Setup(world => world.GridRecipes).Returns(new List<GridRecipe> { first, second });
         var policy = new CraftingClientPolicy(f.Api.Object, f.Player);
         Assert.Null(first.RequiresTrait);
         Assert.True(policy.CanAccess(first));
-        Assert.Equal(CraftingClientPolicy.Ambiguous, policy.UnsupportedReason(first));
-        Assert.Equal(CraftingClientPolicy.Ambiguous, policy.UnsupportedReason(second));
         first.RequiresTrait = "unavailable";
         // Native CharacterSystem intentionally permits an absent character class.
         Assert.True(policy.CanAccess(first));
@@ -468,26 +457,72 @@ public sealed class CraftingMenuInteractionTests
         Assert.False(policy.CanAccess(first));
     }
 
-    [Fact]
-    public void PredicateCompetitionIsConservativeForShapelessAndAttributesButProvesDistinctExactCodes()
+    [Theory]
+    [InlineData("same-code", false, false)]
+    [InlineData("same-code", false, true)]
+    [InlineData("same-code", true, false)]
+    [InlineData("same-code", true, true)]
+    [InlineData("wildcard", false, false)]
+    [InlineData("wildcard", false, true)]
+    [InlineData("wildcard", true, false)]
+    [InlineData("wildcard", true, true)]
+    [InlineData("custom", false, false)]
+    [InlineData("custom", false, true)]
+    [InlineData("custom", true, false)]
+    [InlineData("custom", true, true)]
+    public void ProductionCatalogueAllowsNativePlacementDespitePotentialCompetition(
+        string competition, bool partial, bool shift)
     {
-        var f = new AllocationFixture();
-        var a = f.Stack(1, "a", 1);
-        var b = f.Stack(2, "b", 1);
-        var first = f.Recipe(f.Ingredient(a), f.Ingredient(b));
-        var second = f.Recipe(f.Ingredient(b), f.Ingredient(a));
-        Assert.False(CraftingClientPolicy.CouldOverlap(first, second));
-        second.Shapeless = true;
-        Assert.True(CraftingClientPolicy.CouldOverlap(first, second));
-        var distinct = f.Recipe(f.Ingredient(a));
-        var other = f.Recipe(f.Ingredient(b));
-        Assert.False(CraftingClientPolicy.CouldOverlap(distinct, other));
-        other.ResolvedIngredients = new[] { f.Wildcard("*") };
-        Assert.True(CraftingClientPolicy.CouldOverlap(distinct, other));
-        other.Shapeless = true;
-        other.Width = 2;
-        other.ResolvedIngredients = new[] { f.Ingredient(a), f.Ingredient(a) };
-        Assert.True(CraftingClientPolicy.CouldOverlap(distinct, other));
+        using var f = new TransferFixture(2, partial ? 1 : 64);
+        var selected = f.Entry.Recipe;
+        var other = f.F.Recipe(competition == "wildcard" ? f.F.Wildcard("*") : f.F.Ingredient(f.Ingredient(1)));
+        other.Shapeless = competition == "wildcard";
+        if (competition == "custom")
+            other = new CustomGridRecipe {
+                Name = other.Name, Width = 1, Height = 1, Output = other.Output,
+                ResolvedIngredients = new[] { f.F.Ingredient(f.F.Stack(999, "unrelated", 1)) }
+            };
+        foreach (var recipe in new[] { selected, other })
+        {
+            var output = recipe.Output!.ResolvedItemStack!;
+            recipe.Output.ResolvedItemStack = new ItemStack(new NamedOutputItem(output.Id) {
+                Code = output.Collectible.Code
+            });
+        }
+        f.F.Register(selected, other);
+
+        var api = new Mock<ICoreClientAPI>();
+        var world = new Mock<IClientWorldAccessor>();
+        var loader = new Mock<IModLoader>();
+        loader.Setup(mods => mods.GetModSystem<CharacterSystem>(true)).Returns(new CharacterSystem());
+        api.SetupGet(value => value.World).Returns(world.Object);
+        api.SetupGet(value => value.ModLoader).Returns(loader.Object);
+        world.SetupGet(value => value.Player).Returns(f.F.Player);
+        world.SetupGet(value => value.GridRecipes).Returns(new List<GridRecipe> { selected, other });
+        world.SetupGet(value => value.FastSearchRecipesByIngredient).Returns(f.F.Catalogue.Index);
+        world.SetupGet(value => value.Calendar).Returns(Mock.Of<IClientGameCalendar>());
+        var (catalogue, allocator) = CraftingMenuSystem.BuildCatalogue(api.Object);
+        using var coordinator = new CraftingTransferCoordinator(f.F.Player, world.Object, allocator,
+            f.Packets.Add, f.Notifications.Add, f.RefreshQueue.Enqueue, Environment.CurrentManagedThreadId, true);
+        var session = new CraftingMenuSession(catalogue, allocator, f.Snapshot, coordinator.Execute);
+        session.Refresh();
+        var row = Assert.Single(session.Rows.Where(row => ReferenceEquals(row.Recipe.Recipe, selected)));
+        Assert.True(row.Evaluation.IsSupported);
+        Assert.Equal(!partial, row.Evaluation.CanCraft);
+        Assert.True(row.CanPlace);
+        Assert.Equal(partial ? 1 : 0, row.Evaluation.MissingUnits);
+        Assert.Equal(CraftingDispatchStatus.Dispatched, session.Activate(row.Output.Id, shift).Status);
+        Assert.Equal(partial ? 1 : shift ? 64 : 2, f.F.Grid[0].StackSize);
+        Assert.True(f.F.Grid[9].Empty);
+        Assert.NotEmpty(f.Packets);
+        Assert.Empty(f.Notifications);
+    }
+
+    private sealed class CustomGridRecipe : GridRecipe { }
+
+    private sealed class NamedOutputItem(int id) : MockItem(id)
+    {
+        public override string GetHeldItemName(ItemStack stack) => Code.ToString();
     }
 
     [Theory]

@@ -298,21 +298,23 @@ public class CraftingAllocationTests
     }
 
     [Fact]
-    public void UnknownIndependentPolicy_RefusesEvenPartialPlacementWithoutInventedDeficits()
+    public void PotentialCompetition_DoesNotRefusePartialPlacementOrHideDeficits()
     {
         var f = new AllocationFixture();
         var board = f.Stack(1, "board", 1);
         var recipe = f.Recipe(f.Ingredient(board, 2));
-        f.Register(recipe);
+        var competitor = f.Recipe(f.Ingredient(board));
+        f.Register(competitor, recipe);
         var catalogue = f.Catalogue.Build(recipe);
-        var allocator = new CraftingAllocator(f.Catalogue.World.Object, f.Player, _ => "mod:unknown-event");
-        var result = allocator.Evaluate(catalogue.Recipes[0], f.Snapshot(board));
+        var result = f.Allocator.Evaluate(catalogue.Recipes[0], f.Snapshot(board));
 
-        Assert.False(result.Evaluation.IsSupported);
-        Assert.Equal("mod:unknown-event", result.Evaluation.UnsupportedReason);
-        Assert.Null(result.Evaluation.Relevance);
-        Assert.Empty(result.Evaluation.Missing);
-        Assert.Empty(result.Shift);
+        Assert.True(result.Evaluation.IsSupported);
+        Assert.False(result.Evaluation.CanCraft);
+        Assert.Null(result.Evaluation.UnsupportedReason);
+        Assert.Equal(0.5, result.Evaluation.Relevance);
+        Assert.Equal(1, Assert.Single(result.Evaluation.Missing).Quantity);
+        Assert.Equal(1, Assert.Single(result.Ordinary).Quantity);
+        Assert.Equal(1, Assert.Single(result.Shift).Quantity);
     }
 
     [Fact]
@@ -493,7 +495,7 @@ internal sealed class AllocationFixture
         foreach (var inventory in new[] { Hotbar, Backpack, Grid })
             manager.Inventories.Add(inventory.InventoryID, inventory);
         Catalogue.World.Setup(world => world.GridRecipes).Returns(new List<GridRecipe>());
-        Allocator = new CraftingAllocator(Catalogue.World.Object, Player, _ => null);
+        Allocator = new CraftingAllocator(Catalogue.World.Object, Player);
     }
 
     private static ClientPlayer CreatePlayer()

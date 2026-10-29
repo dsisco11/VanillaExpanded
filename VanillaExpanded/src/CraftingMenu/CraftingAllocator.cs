@@ -12,14 +12,10 @@ internal sealed class CraftingAllocator
     private const string NativeMismatch = "vanillaexpanded:craftingmenu-native-mismatch";
     private readonly IWorldAccessor world;
     private readonly IPlayer player;
-    private readonly System.Func<GridRecipe, string?> independentPolicy;
-    // The policy handles recipe-output ambiguity; native matching invokes recipe events.
-    internal CraftingAllocator(IWorldAccessor world, IPlayer player,
-        System.Func<GridRecipe, string?> independentPolicy)
+    internal CraftingAllocator(IWorldAccessor world, IPlayer player)
     {
         this.world = world ?? throw new ArgumentNullException(nameof(world));
         this.player = player ?? throw new ArgumentNullException(nameof(player));
-        this.independentPolicy = independentPolicy ?? throw new ArgumentNullException(nameof(independentPolicy));
     }
 
     internal ImmutableDictionary<int, CraftingAllocation> EvaluateCatalogue(
@@ -44,8 +40,6 @@ internal sealed class CraftingAllocator
     {
         CraftingInventorySnapshot.EnsureThread(snapshot.OwnerThreadId);
         if (entry.UnresolvedReason != null) return CraftingAllocation.Unsupported(entry.UnresolvedReason);
-        string? policyReason = independentPolicy(entry.Recipe);
-        if (policyReason != null) return CraftingAllocation.Unsupported(policyReason);
         var recipe = entry.Recipe;
         if (recipe.GetType() != typeof(GridRecipe) || entry.HasCustomIngredientPredicates
             || recipe.CopyAttributesFrom != null || recipe.MergeAttributesFrom.Length > 0

@@ -273,12 +273,13 @@ public class CraftingTransferTests
     public void LocalInventoryReplacementDuringPreflightIsRejectedBeforeDispatch()
     {
         using var f = new TransferFixture(2, 2);
-        var allocator = new CraftingAllocator(f.F.Catalogue.World.Object, f.F.Player, _ =>
-        {
-            f.F.Hotbar[0].Itemstack = f.Ingredient(1);
-            return null;
-        });
-        using var coordinator = new CraftingTransferCoordinator(f.F.Player, f.F.Catalogue.World.Object, allocator,
+        f.F.Events.Setup(events => events.TriggerMatchesRecipe(It.IsAny<IPlayer>(), It.IsAny<IRecipeBase>(),
+            It.IsAny<ItemSlot[]>())).Returns(() =>
+            {
+                f.F.Hotbar[0].Itemstack = f.Ingredient(1);
+                return true;
+            });
+        using var coordinator = new CraftingTransferCoordinator(f.F.Player, f.F.Catalogue.World.Object, f.F.Allocator,
             f.Packets.Add, f.Notifications.Add, f.RefreshQueue.Enqueue, Environment.CurrentManagedThreadId, true);
         var result = coordinator.Execute(f.Entry, false);
         Assert.Equal(CraftingDispatchStatus.Rejected, result.Status);

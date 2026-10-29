@@ -43,11 +43,11 @@ public sealed class CraftingMenuSystem : ModSystem
         api.Event.LeaveWorld += Clear;
     }
 
-    private static (CraftingCatalogue, CraftingAllocator) BuildCatalogue(ICoreClientAPI api)
+    internal static (CraftingCatalogue, CraftingAllocator) BuildCatalogue(ICoreClientAPI api)
     {
         var policy = new CraftingClientPolicy(api, api.World.Player);
         return (CraftingCatalogue.Build(api.World.GridRecipes, api.World, 3, 3, policy.CanAccess),
-            new CraftingAllocator(api.World, api.World.Player, policy.UnsupportedReason));
+            new CraftingAllocator(api.World, api.World.Player));
     }
 
     private void Initialize()

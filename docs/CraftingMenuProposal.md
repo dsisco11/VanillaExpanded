@@ -56,6 +56,8 @@ Use the game's existing recipe matching and item-transfer rules. Matching must p
 
 Do not inspect collectible method overrides or private recipe-event subscriptions to certify compatibility. Collectible behaviors, overrides, and custom event subscriptions are not blanket reasons to reject a recipe or transfer. Invoke native matching and transfer APIs normally; retain actual trait access, explicit recipe-semantic constraints, native winner validation, and slot/merge/heat/capacity checks. Ingredient placement does not invoke crafting consumption, durability mutation, or output-creation callbacks.
 
+Potential overlap with another recipe is not a reason to disable placement, and an unrelated custom recipe must not disable ordinary entries. Validate the actual native winner for complete planned layouts. Incomplete layouts remain placeable from available ingredients without claiming a resolved native output.
+
 Build one allocation for the complete recipe against a snapshot of eligible stacks. A physical item cannot satisfy two simultaneous requirements. Resolve overlapping alternatives globally so a flexible requirement does not take the only item that can satisfy a restricted requirement. Among equally optimal allocations, equivalent choices should use a stable inventory/slot order unless the game already defines a preferred policy. For shift-click, apply this tie-break only after satisfying the objectives in Shift-click placement.
 
 Tools and other non-consumed requirements must follow the recipe's actual semantics. Do not treat their durability or presence as ordinary consumable quantities. Ingredients from incompatible stacks must not be merged merely because both stacks separately match a recipe predicate.

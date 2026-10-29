@@ -115,7 +115,6 @@
   "craftingmenu-unknown": "Availability unknown; placement unavailable.",
   "craftingmenu-generic": "Generic preview; crafting determines final attributes.",
   "craftingmenu-hints": "Click / Enter: place one execution. Shift-click / Shift-Enter: fill available stacks. No items are crafted.",
-  "craftingmenu-ambiguous-output": "Another recipe can match this layout; the native winner cannot be guaranteed for an incomplete preview.",
   "craftingmenu-screen-space": "There is not enough screen space beside the crafting grid. Reduce the UI scale or enlarge the window.",
   "craftingmenu-unresolved-ingredients": "This recipe's ingredients could not be resolved.",
   "craftingmenu-unresolved-output": "This recipe has no resolved output preview.",
