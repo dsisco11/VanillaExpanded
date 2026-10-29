@@ -12,6 +12,8 @@ This document specifies proposed behavior. Engine integration points and reposit
 
 The initial glossary includes all enabled crafting-grid recipes available to the player in the current world, including compatible mod recipes. Recipes must fit the player's grid and satisfy the game's recipe visibility and access rules.
 
+For this design, the player's recipe visibility, access rules, and grid dimensions are assumed immutable between catalogue rebuilds. Eligibility is evaluated when the catalogue is built or rebuilt; inventory changes affect ingredient availability, not catalogue eligibility. See Catalogue lifecycle and performance for rebuild triggers.
+
 “All craftable items” means all outputs craftable through this panel. Cooking, smithing, knapping, clay forming, and other workstation or process recipes are outside this initial scope. A broader glossary could link to those systems later, but cannot fulfill their recipes by populating this grid.
 
 ## Player experience
@@ -25,9 +27,9 @@ Search filters by localized output name, with item-code matching as a secondary 
 | Interaction | Result |
 | --- | --- |
 | Hover or keyboard-focus a tile | Show the output name, recipe ingredients, availability, and interaction hints. |
-| Hover an unavailable tile | Explicitly list every missing ingredient and its missing quantity for one recipe execution. |
-| Click a tile | Arrange the ingredients available for one recipe execution in the crafting grid. Missing ingredients remain absent. |
-| Shift-click a tile | Arrange available ingredients and maximize the usable quantities placed in the grid, within inventory and slot limits. |
+| Hover an unavailable tile | Explicitly list every missing ingredient and its missing quantity for one recipe execution; for an unsupported recipe, explain what cannot be evaluated instead of inventing deficits. |
+| Click a tile | For a supported recipe, arrange the ingredients available for one recipe execution in the crafting grid. Missing ingredients remain absent. Unsupported recipes remain inspectable but cannot trigger placement. |
+| Shift-click a tile | For a supported recipe, arrange available ingredients and maximize the usable quantities placed in the grid, within inventory and slot limits. Unsupported recipes cannot trigger placement. |
 | Select an alternative recipe | Update the ingredient preview, missing list, and placement action to that recipe. |
 
 Clicks only move ingredients. They do not take the output, consume ingredients, or repeatedly craft items.
@@ -36,9 +38,11 @@ Clicks only move ingredients. They do not take the output, consume ingredients, 
 
 Show one tile per distinct resolved output, preserving attributes that materially distinguish the resulting item. Multiple recipes for the same output are grouped behind that tile, with an alternative-recipe indicator and a compact chooser or cycle control.
 
-By default, select the alternative with the highest ingredient relevance. Preserve an explicitly selected alternative while that tile remains selected; do not silently switch the recipe under the player's cursor. Tile availability, tooltip, relevance, and click behavior must all describe the same selected recipe. Releasing an explicit selection restores automatic choice.
+By default, select the supported alternative with the highest ingredient relevance. If no alternative is supported, select one by stable recipe identifier. Preserve an explicitly selected alternative while that tile remains selected; do not silently switch the recipe under the player's cursor. Tile availability, tooltip, relevance, and click behavior must all describe the same selected recipe. Releasing an explicit selection restores automatic choice.
 
 Do not enumerate arbitrary hypothetical attribute combinations. Where a mod recipe has a dynamic output that cannot be represented accurately before ingredient selection, use an honest generic preview and resolve it through the owning recipe logic when possible. Unsupported recipes must be identified explicitly rather than shown as reliably fillable.
+
+Unsupported recipes remain discoverable through browsing and search, and accessible in the alternative-recipe control. Mark their availability as unknown/unsupported, show the reason in the tooltip, and disable ingredient placement for both click modes without disabling inspection or alternative selection. Do not assign a numerical relevance or fabricate missing quantities for requirements that cannot be evaluated. See Relevance and availability for their ordering.
 
 ## Inventory and ingredient matching
 
@@ -46,7 +50,7 @@ Proposed ingredient sources are the player's normal carried storage, including t
 
 Use the game's existing recipe matching and item-transfer rules. Matching must preserve wildcard constraints, repeated ingredient requirements, stack attributes, tool requirements, durability constraints, and any relationships between ingredient choices. A generic material match must not override a more specific recipe constraint.
 
-Build one allocation for the complete recipe against a snapshot of eligible stacks. A physical item cannot satisfy two simultaneous requirements. Resolve overlapping alternatives globally so a flexible requirement does not take the only item that can satisfy a restricted requirement. Equivalent choices should use a stable inventory/slot order unless the game already defines a preferred policy.
+Build one allocation for the complete recipe against a snapshot of eligible stacks. A physical item cannot satisfy two simultaneous requirements. Resolve overlapping alternatives globally so a flexible requirement does not take the only item that can satisfy a restricted requirement. Among equally optimal allocations, equivalent choices should use a stable inventory/slot order unless the game already defines a preferred policy. For shift-click, apply this tie-break only after satisfying the objectives in Shift-click placement.
 
 Tools and other non-consumed requirements must follow the recipe's actual semantics. Do not treat their durability or presence as ordinary consumable quantities. Ingredients from incompatible stacks must not be merged merely because both stacks separately match a recipe predicate.
 
@@ -55,6 +59,8 @@ Tools and other non-consumed requirements must follow the recipe's actual semant
 For ordinary counted ingredients, let R be the total units required for one execution and A be the maximum number of those units that can be allocated simultaneously from eligible inventory. Relevance is A / R. A presence-only tool contributes one required unit, subject to its actual recipe constraints. Recipes with exceptional requirements need an explicit supported adapter rather than an invented numerical approximation.
 
 Sort fully satisfiable recipes first, then incomplete recipes by descending relevance. Break ties by fewer missing units, localized output name, and a stable output/recipe identifier. This is a proposed quantity-based definition of “how many required ingredients the player has.” It favors substantial progress toward a recipe rather than merely owning many ingredient types.
+
+Tiles whose selected recipe is unsupported sort after all supported recipes, by localized output name and stable output/recipe identifier. Their relevance remains unknown rather than zero. An explicitly selected unsupported alternative retains that state even when the tile has another, supported alternative.
 
 For example, a recipe requiring four boards and two sticks has relevance 4/6 when the player has three boards and one stick. Its missing list shows one board and one stick. Having a large surplus of boards cannot compensate for missing sticks or raise the score above 1.
 
@@ -78,11 +84,13 @@ If displaced items cannot be returned safely, leave the grid unchanged and show 
 
 Shift-click uses the same selected recipe, matching rules, and transfer safety as an ordinary click, but fills ingredient positions as far as available inventory and slot limits allow.
 
-For repeated or overlapping requirements, “maximize each stack” needs a shared allocation policy: independently filling the first slot could starve every later slot. Proposed policy:
+For repeated or overlapping requirements, “maximize each stack” needs a shared allocation policy: independently filling the first slot could starve every later slot. Optimize the complete allocation jointly under these lexicographically ordered objectives; a later objective must preserve the optimum achieved for every earlier objective:
 
 1. First allocate the best available single-execution coverage, spreading scarce shared ingredients across required positions rather than filling only the first position.
 2. Next maximize the number of complete recipe executions supported by the placed consumable quantities, accounting for each position's required quantity and stack limit.
 3. Finally distribute remaining matching items into compatible required positions up to their limits, preserving that coverage and execution count. Prefer the least-filled equivalent position, with stable grid-position tie-breaking.
+
+These are optimization priorities, not irreversible transfer steps. Reconsider preliminary ingredient and variant choices when doing so improves a later objective without reducing an earlier one. Apply stable inventory/slot ordering only among equally optimal allocations. For example, if one position accepts either oak or pine boards, one oak board earlier in inventory must not lock that position when a separate stack of 64 pine boards supports more executions with the same single-execution coverage.
 
 This also applies when a different ingredient is entirely missing: available positions are still filled. A missing ingredient must not reduce all other placements to zero. Surplus ingredients may remain in the grid after the limiting ingredient runs out during later manual crafting; this follows the requested maximum-stack behavior.
 
@@ -94,7 +102,7 @@ The allocation objective applies only to legal matching stacks. A recipe positio
 
 Derive missing quantities from the same one-execution allocation used for relevance and availability. Aggregate repeated identical requirements where doing so preserves their constraints. For alternatives, explain the accepted choice, such as “Missing 2 of: oak board or pine board,” rather than incorrectly listing every alternative as individually required.
 
-Include tools and special requirements with an accurate reason when unsupported or insufficient. Refresh the tooltip after inventory changes. Shift-click does not change the tooltip into a deficit for an arbitrary maximum batch; it continues to explain what is missing for the first execution.
+Include tools and special requirements with an accurate reason when unsupported or insufficient. For unsupported recipes, follow the unknown-state contract in Outputs and alternative recipes rather than presenting an unevaluated requirement as a known deficit. Refresh the tooltip after inventory changes. Shift-click does not change the tooltip into a deficit for an arbitrary maximum batch; it continues to explain what is missing for the first execution.
 
 ## Proposed implementation boundaries
 
@@ -110,6 +118,8 @@ In multiplayer, validate recipe identity, eligible source slots, destination slo
 
 Build the recipe/output catalogue when loaded recipes are available, and rebuild when the world or recipe registry changes. Cache normalized search text and immutable recipe metadata. Recalculate inventory-dependent allocation when eligible inventory changes, not every render frame.
 
+Recipe visibility, access rules, and grid dimensions are immutable between these rebuilds under the Scope assumption, so no independent player-eligibility refresh is required.
+
 Render only visible tiles for large catalogues, reuse the game's item-icon rendering, and release GUI/render resources when the panel or world closes. Any deferred computation must use safe snapshots and discard stale results; game-owned mutable inventory data must remain on its owning thread.
 
 Performance targets should be set after measuring representative vanilla and heavily modded catalogues. No runtime cost or compatibility claim is established by this proposal.
@@ -118,9 +128,10 @@ Performance targets should be set after measuring representative vanilla and hea
 
 - Every eligible resolved grid-crafting output is discoverable through browsing and localized-name search; alternatives remain accessible.
 - Inventory changes update relevance, missing quantities, and availability consistently, including quantities already in the grid.
-- Unavailable tiles remain selectable and expose all missing requirements for one execution.
-- Ordinary clicks populate available ingredients for one execution, respecting shaped and shapeless layouts.
-- Shift-click maximizes legal placement under the shared-allocation policy, including incomplete recipes and repeated ingredients.
+- Unavailable supported tiles remain selectable and expose all missing requirements for one execution.
+- Unsupported recipes remain discoverable and inspectable, show an explicit unknown/unsupported reason without invented scores or deficits, sort deterministically after supported recipes when selected, and cannot trigger placement.
+- Ordinary clicks on supported recipes populate available ingredients for one execution, respecting shaped and shapeless layouts.
+- Shift-click on supported recipes maximizes legal placement under the joint, lexicographic shared-allocation policy, including incomplete recipes, repeated ingredients, and reconsideration of preliminary variant choices before inventory-order tie-breaking.
 - Wildcards, restricted alternatives, attribute-sensitive stacks, tools, non-stackable items, and output variants retain native semantics.
 - A full inventory or stale request cannot lose, duplicate, drop, or incorrectly consume items; unsafe rearrangements leave the original state intact.
 - Existing output-taking and manual crafting behavior continues to work after placement.
@@ -134,5 +145,5 @@ Future implementation should use focused automated tests for allocation and tran
 - Confirm that the initial glossary should cover grid recipes only; broader crafting processes require a separate browsing and navigation design.
 - Confirm quantity-based relevance versus weighting each ingredient type equally.
 - Verify the exact carried inventories eligible for sourcing and returning items.
-- Confirm the alternative-recipe control and the handling of dynamic mod outputs after inspecting existing UI conventions.
+- Confirm the alternative-recipe control and the detailed handling of dynamic mod outputs after inspecting existing UI conventions, retaining the unsupported-recipe baseline defined above.
 - Verify authoritative transfer support before committing to an implementation mechanism.
