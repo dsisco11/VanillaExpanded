@@ -90,6 +90,10 @@
   "gui-alloycalculator-total": "Total",
   "gui-alloycalculator-nuggets": "nuggets",
 
+  "craftingmenu-unresolved-ingredients": "This recipe's ingredients could not be resolved.",
+  "craftingmenu-unresolved-output": "This recipe has no resolved output preview.",
+  "craftingmenu-evaluation-pending": "This recipe has not yet been evaluated for safe placement.",
+
   "config-section-features": "Feature Toggles",
   "config-section-timing": "Timing Settings",
   "config-section-recipes": "Recipe Toggles",

@@ -23,6 +23,7 @@ Non-goals: cooking, smithing, knapping, clay forming, other workstation/process 
 - Unsupported recipes must remain discoverable and inspectable, with unknown relevance, explicit reasons, deterministic ordering, and no placement. Detailed dynamic-output decisions cannot weaken that baseline.
 - Exceptional recipe requirements require supported adapters; otherwise use the unsupported state rather than approximate native semantics.
 - Performance thresholds are intentionally unset until representative vanilla and heavily modded measurements exist.
+- Inventory relevance uses a fresh candidate union on popout opening and full recomputation when eligible inventory changes while open, as explicitly selected by the user. Reuse native immutable ingredient indexes, but do not maintain an incremental inventory-result/dependency cache.
 
 ## Phase 1: Verify integration and settle blocking decisions
 
@@ -51,7 +52,7 @@ Outcome: verified engine boundaries and an agreed implementation mechanism permi
 
 ### Phase 1 working decisions and evidence (2026-10-28)
 
-Status: complete for the revised client-side design after second review and a fresh independent read-only completion audit (2026-10-28). The earlier server-design verdict is superseded. The new audit directly consulted inherited documents, repository sources, and installed 1.22.7.0 binaries and found no required-now issues or evidence gaps. This establishes source-backed integration feasibility, not implemented/tested transfer behavior. No later-phase implementation has begun.
+Status: complete for the revised client-side design after second review and a fresh independent read-only completion audit (2026-10-28). The earlier server-design verdict is superseded. The new audit directly consulted inherited documents, repository sources, and installed 1.22.7.0 binaries and found no required-now issues or evidence gaps. This establishes source-backed integration feasibility, not implemented/tested transfer behavior. No later-phase implementation was included in that audit.
 
 Controlling documents consulted: this phase and its inherited contract, the complete [proposal](./CraftingMenuProposal.md), [repository instructions](../.github/copilot-instructions.md), and the relevant conventions in [project.todo](./project.todo). The proposal controls scope; the older handbook suggestion in project.todo does not override the attached-popout design.
 
@@ -169,27 +170,43 @@ Completion criteria:
 Dependencies: Phase 1.
 Outcome: eligible outputs and alternatives can be enumerated, searched, and selected independently of the GUI.
 
-    ☐ Construct the catalogue when loaded recipes become available.
-        ☐ Include enabled grid recipes available to the player, compatible mod recipes, grid-fit constraints, and native visibility/access rules.
-        ☐ Group recipes behind one tile per distinct resolved output, preserving materially distinguishing attributes.
-        ☐ Preserve each alternative's output quantity, identity, ingredients, native constraints, and support status.
-        ☐ Represent dynamic outputs honestly using the Phase 1 decisions; expose unsupported alternatives rather than hiding them.
-    ☐ Implement normalized localized-name search and secondary item-code matching.
-        ☐ Ignore case, trim whitespace, require all search words to match, and preserve relevance ordering within filtered results.
-        ☐ Return the full catalogue for empty queries and an explicit empty-result state when nothing matches.
-    ☐ Model automatic and explicit alternative selection.
-        ☐ Choose the highest-relevance supported alternative once Phase 3 scores are available; use stable recipe identifiers when none are supported.
-        ☐ Preserve explicit selection while the tile remains selected, including an unsupported selection when supported alternatives exist.
-        ☐ Restore automatic choice on the agreed release interaction.
-        ☐ Expose one selected-recipe state for output quantity, availability, tooltip, relevance, and placement.
-    ☐ Add focused unit coverage for eligibility, output-attribute grouping, alternative identity/selection, dynamic previews, unsupported discoverability, and search semantics.
-        ☐ Use deterministic allocation-result fixtures for ranking consumers until Phase 3 is integrated; do not invent runtime scores for unsupported recipes.
+    ✔ Construct the catalogue when loaded recipes become available.
+        ✔ Include enabled grid recipes available to the player, compatible mod recipes, grid-fit constraints, and native visibility/access rules.
+        ✔ Group recipes behind one tile per distinct resolved output, preserving materially distinguishing attributes.
+        ✔ Preserve each alternative's output quantity, identity, ingredients, native constraints, and support status.
+        ✔ Represent dynamic outputs honestly using the Phase 1 decisions; expose unsupported alternatives rather than hiding them.
+    ✔ Expose opening-time/fresh-snapshot candidate discovery without an incremental inventory cache.
+        ✔ Union recipes accepting any unique inventory stack through the native ingredient index; retain attribute-sensitive variants and ignore sufficiency at this broad stage.
+        ✔ Restrict candidates to eligible catalogue entries, deduplicate recipes, and conservatively handle unindexed/custom/zero-ingredient recipes.
+        ✔ Retain the complete searchable catalogue separately; leave exact allocation and inventory capture to Phase 3 and event wiring to Phase 5.
+    ✔ Implement normalized localized-name search and secondary item-code matching.
+        ✔ Ignore case, trim whitespace, require all search words to match, and preserve relevance ordering within filtered results.
+        ✔ Return the full catalogue for empty queries and an explicit empty-result state when nothing matches.
+    ✔ Model automatic and explicit alternative selection.
+        ✔ Choose the highest-relevance supported alternative once Phase 3 scores are available; use stable recipe identifiers when none are supported.
+        ✔ Preserve explicit selection while the tile remains selected, including an unsupported selection when supported alternatives exist.
+        ✔ Restore automatic choice on the agreed release interaction.
+        ✔ Expose one selected-recipe state for output quantity, availability, tooltip, relevance, and placement.
+    ✔ Add focused unit coverage for eligibility, output-attribute grouping, alternative identity/selection, dynamic previews, unsupported discoverability, and search semantics.
+        ✔ Use deterministic allocation-result fixtures for ranking consumers until Phase 3 is integrated; do not invent runtime scores for unsupported recipes.
 
 Completion criteria:
 
-    ☐ Catalogue/search tests cover enabled/disabled recipes, excluded processes, grid fit, output variants, mod alternatives, and empty/multiword/localized queries.
-    ☐ Every eligible resolved output and unsupported preview is discoverable under its documented representation.
-    ☐ Selection and support states are explicit and cannot silently make an unsupported alternative fillable.
+    ✔ Catalogue/search tests cover enabled/disabled recipes, excluded processes, grid fit, output variants, mod alternatives, and empty/multiword/localized queries.
+    ✔ Every eligible resolved output and unsupported preview is discoverable under its documented representation.
+    ✔ Selection and support states are explicit and cannot silently make an unsupported alternative fillable.
+
+### Phase 2 traceability and verification
+
+Controlling sources: the complete [proposal](./CraftingMenuProposal.md), especially Scope, Outputs and alternative recipes, Relevance and availability, and Catalogue lifecycle and performance; Phase 1's native integration findings; [repository instructions](../.github/copilot-instructions.md) and [project.todo](./project.todo) conventions. The user's latest refresh-policy answer is full recomputation on inventory changes, not an opening-only frozen view.
+
+- Catalogue/filter/grouping tasks -> proposal Scope and Outputs -> `CraftingCatalogue.Build` accepts loaded native recipe objects, enforces grid-only/enabled/visible/grid-fit filters, and requires an explicit player-access predicate. No permissive default is supplied. The caller must provide verified native access policy at client integration; the current stage has no player/GUI wiring. Runtime metadata comes from ResolvedIngredients; output grouping compares native attribute trees without ignoring subtrees or quantity-dependent alternative differences.
+- Candidate tasks -> proposal Catalogue lifecycle and performance -> `FindCandidates` creates fresh local stack snapshots and a candidate union using World.FastSearchRecipesByIngredient. Native ingredient lookup code: [CraftingRecipeIngredient.cs](../../../vsapi/Common/Crafting/CraftingRecipeIngredient.cs), AddToFastSearchRecipes/SatisfiesAsIngredient/FastSearchCraftingRecipeIngredient; native usage: [CollectibleBehaviorHandbookTextAndExtraInfo.cs](../../../vssurvivalmod/Systems/Handbook/CollectibleBehaviorHandbookTextAndExtraInfo.cs), addIngredientForInfo. Persistent and temporary attributes use type-preserving binary per-call identities; custom ingredient types are detected before native Clone can erase their subclass. Broad matches ignore sufficiency, unindexed native predicates have a fallback, and exceptional/zero-ingredient cases remain candidates. No inventory results persist between calls.
+- Search/selection tasks -> proposal Outputs, Player experience and Relevance -> `CraftingCatalogueView` exposes a single selected recipe/evaluation, all-word localized-name/code search, deterministic ordering, explicit alternative pinning, and Auto/deselection release. Complete score replacement preserves explicit pins but discards old scores.
+- Support/preview tasks -> proposal unsupported/dynamic baseline -> unresolved data cannot become fillable through a supplied score. Output-generation/consumption callbacks are never invoked; previews are copied, dynamic/custom previews are marked generic, and absent Phase 3 results are explicitly unknown with localized reasons, not fabricated numeric zero. Phase 3 supplies verified support/allocation results; fixtures exist only in tests.
+- Focused evidence: `VanillaExpanded.Tests/Unit/CraftingMenu` covers filtering, variants, duplicate identity, unsupported discovery, dynamic previews, candidate recomputation, search, ranking and selection. Separate verification ran `dotnet test .\VanillaExpanded.Tests\VanillaExpanded.Tests.csproj --no-restore --filter "Category=Unit&FullyQualifiedName~CraftingMenu"` against net10.0/VSTest: 40 passed, 0 failed, 0 skipped. The command built production/test projects; 34 unrelated existing warnings were observed, with none in CraftingMenu. Staged/unstaged whitespace checks and localization JSON parsing passed.
+- Second review identified native ItemStack.Clone omitting temporary attributes; explicit temporary snapshots and regression coverage were added. The independent completion audit subsequently identified JSON attribute-type conflation and ingredient subclass loss through native Clone; both are corrected with binary identities/original-type detection and dedicated regressions. Independent affected-requirement recheck confirmed both fixes and found no remaining completion blockers. Phase 2 is complete.
+- GUI opening/change subscriptions, actual eligible-inventory capture, native access-policy wiring, and exact matching/allocation are intentionally later-phase consumers, not claimed runtime behavior here. No performance threshold, live-client behavior, placement, or package validation is inferred from this unit evidence.
 
 ## Phase 3: Implement shared allocation, relevance, and placement objectives
 
@@ -308,7 +325,7 @@ Outcome: the integrated feature has bounded rendering work and correct world/pan
 
     ☐ Rebuild the catalogue on world/recipe-registry changes and clear obsolete selections/results as appropriate.
         ☐ Apply the documented immutable visibility/access/grid assumption between rebuilds; do not add independent eligibility-refresh behavior.
-        ☐ Cache normalized search text and immutable metadata; recalculate inventory-dependent allocations on relevant changes, not each render frame.
+        ☐ Cache normalized search text and immutable metadata; recompute the fresh inventory candidate union and allocations on opening/relevant changes, without an incremental inventory cache or per-render computation.
     ☐ Render only visible tiles for large catalogues and release GUI/render resources when the panel or world closes.
         ☐ Remove event subscriptions and dispose any feature patches/network lifecycle resources according to existing patterns.
         ☐ Discard stale deferred computations and requests during inventory/catalogue changes or closure; keep mutable game data on its owning thread.

@@ -66,7 +66,7 @@ For example, a recipe requiring four boards and two sticks has relevance 4/6 whe
 
 Availability requires a complete valid allocation for one execution, including recipe constraints. Ingredient sufficiency and the ability to rearrange a full inventory are separate: a tile may have all ingredients while its placement action fails because displaced grid contents cannot be returned. Explain that failure when clicked.
 
-Recompute affected availability and ordering after relevant inventory or recipe changes. Keep a stable selection and avoid moving a hovered tile immediately before a click; defer the visible reorder until the interaction finishes while revalidating the action against current inventory.
+Recompute availability and ordering after relevant inventory or recipe changes. Keep a stable selection and avoid moving a hovered tile immediately before a click; defer the visible reorder until the interaction finishes while revalidating the action against current inventory.
 
 ## Ordinary click placement
 
@@ -124,7 +124,11 @@ Use the native inventory open/transfer/synchronize lifecycle. Reuse inventories 
 
 ## Catalogue lifecycle and performance
 
-Build the recipe/output catalogue when loaded recipes are available, and rebuild when the world or recipe registry changes. Cache normalized search text and immutable recipe metadata. Recalculate inventory-dependent allocation when eligible inventory changes, not every render frame.
+Build the recipe/output catalogue when loaded recipes are available, and rebuild when the world or recipe registry changes. Cache normalized search text and immutable recipe metadata.
+
+On opening the popout, compute inventory relevance from a fresh eligible-inventory snapshot: union the eligible recipes that accept any inventory item, deduplicate that candidate list, then perform exact allocation/availability evaluation on the candidates. Broad matching must not collapse attribute-sensitive stacks into an item-code-only identity, require full ingredient quantities, or claim craftability. Keep recipes outside that attention list in the searchable catalogue; handle zero-ingredient and exceptional recipes conservatively rather than excluding them through the ingredient union.
+
+The user selected complete recomputation from a fresh snapshot when eligible inventory changes while the popout is open. Do not maintain an incremental inventory-result/dependency cache between changes or compute every render frame. Native immutable ingredient indexes may be reused; per-computation deduplication is not a long-lived inventory cache. Later integration should coalesce notifications belonging to one inventory action and revalidate clicks against current state.
 
 Recipe visibility, access rules, and grid dimensions are immutable between these rebuilds under the Scope assumption, so no independent player-eligibility refresh is required.
 
