@@ -1,0 +1,254 @@
+# Crafting Menu Popout Implementation TODO
+
+Source proposal: [CraftingMenuProposal.md](./CraftingMenuProposal.md)
+
+## Goal and execution contract
+
+Deliver the proposal's searchable crafting-grid popout, with inventory-aware recipe previews and safe ordinary/shift-click ingredient placement. Existing output-taking remains responsible for crafting.
+
+Follow the nearby project.todo convention: every new task is an unchecked box. This file is planning-only; no implementation or runtime behavior is established by its creation.
+
+The proposal is authoritative. Phase dependencies are explicit below; do not bypass a completion gate. Record source references, decisions, test results, and live-client evidence against the relevant tasks as implementation proceeds.
+
+Non-goals: cooking, smithing, knapping, clay forming, other workstation/process recipes, automatic output-taking, repeated automatic crafting, arbitrary hypothetical output-attribute enumeration, and unrelated changes from project.todo.
+
+## Assumptions and open decisions
+
+- Player recipe visibility, access rules, and grid dimensions are immutable between world/recipe-registry catalogue rebuilds. Inventory changes affect availability, not eligibility.
+- Grid-only scope and quantity-based relevance are the current contract, although the proposal requests confirmation before implementation. Any approved change must first be reconciled with the proposal and this plan.
+- Exact carried-inventory identifiers, native recipe/matching integration, and authoritative multi-slot transfer support require source verification.
+- Alternative chooser/cycling controls, explicit-selection release behavior, and detailed dynamic-output representation require decisions after inspecting existing UI conventions.
+- Unsupported recipes must remain discoverable and inspectable, with unknown relevance, explicit reasons, deterministic ordering, and no placement. Detailed dynamic-output decisions cannot weaken that baseline.
+- Exceptional recipe requirements require supported adapters; otherwise use the unsupported state rather than approximate native semantics.
+- Performance thresholds are intentionally unset until representative vanilla and heavily modded measurements exist.
+
+## Phase 1: Verify integration and settle blocking decisions
+
+Dependencies: none.
+Outcome: verified engine boundaries and an agreed implementation mechanism permit work without speculative API assumptions.
+
+    ☐ Inspect relevant repository instructions and existing feature, test, localization, and registration patterns.
+        ☐ Identify the actual crafting-dialog/grid lifecycle, attachment points, input conventions, UI scaling, and disposal hooks.
+        ☐ Inspect loaded recipe registration, enabled/visible/access filtering, grid-fit checks, output resolution, wildcard matching, attributes, and tool/durability semantics.
+        ☐ Inspect inventory ownership, normal transfer permissions, destination acceptance, synchronization, and authoritative update mechanisms.
+        ☐ Record source locations and distinguish verified APIs from unresolved assumptions; keep game reference sources read-only.
+    ☐ Resolve the proposal's pre-implementation decisions.
+        ☐ Confirm grid-only scope and quantity-based relevance; do not silently substitute handbook navigation or ingredient-type scoring.
+        ☐ Enumerate eligible hotbar, backpack/carried-storage, and grid inventories; verify storage destinations for displaced contents.
+        ☐ Exclude crafting output, cursor-held stacks, equipment, remote containers, and inventories unavailable for normal transfers.
+        ☐ Decide alternative-selection controls and the action that releases explicit selection.
+        ☐ Decide generic previews/search identities for dynamic outputs, native resolution opportunities, and the initial supported-adapter boundary without enumerating hypothetical variants.
+    ☐ Gate authoritative placement on a verified safe transfer design.
+        ☐ Determine whether native operations can validate and safely commit the entire multi-slot plan.
+        ☐ If not, specify an authoritative operation that revalidates and safely commits without sequential optimistic client moves.
+        ☐ Identify how stale state, refusal, duplicate pending requests, and authoritative results will be represented.
+        ☐ Keep recipe semantics owned by the recipe system and movement/merging/restrictions owned by the inventory system.
+    ☐ Establish feature-based internal component boundaries for catalogue, search/order, allocation, transfer planning, and rendering.
+        ☐ Use existing registration/lifecycle patterns; register and dispose Harmony patches only if source verification shows they are needed.
+        ☐ If new packets are necessary, follow src/Network/{Feature}.packet.cs conventions and existing channel registration.
+
+Completion criteria:
+
+    ☐ Source-backed integration decisions and all blocking questions above are recorded before their consumers begin.
+    ☐ A safe authoritative transfer mechanism is identified; unsupported atomicity is not treated as an acceptable client-side fallback.
+    ☐ Intended feature/test locations and the focused validation commands are identified without implementing this plan during its creation.
+
+## Phase 2: Build the eligible catalogue and recipe-selection model
+
+Dependencies: Phase 1.
+Outcome: eligible outputs and alternatives can be enumerated, searched, and selected independently of the GUI.
+
+    ☐ Construct the catalogue when loaded recipes become available.
+        ☐ Include enabled grid recipes available to the player, compatible mod recipes, grid-fit constraints, and native visibility/access rules.
+        ☐ Group recipes behind one tile per distinct resolved output, preserving materially distinguishing attributes.
+        ☐ Preserve each alternative's output quantity, identity, ingredients, native constraints, and support status.
+        ☐ Represent dynamic outputs honestly using the Phase 1 decisions; expose unsupported alternatives rather than hiding them.
+    ☐ Implement normalized localized-name search and secondary item-code matching.
+        ☐ Ignore case, trim whitespace, require all search words to match, and preserve relevance ordering within filtered results.
+        ☐ Return the full catalogue for empty queries and an explicit empty-result state when nothing matches.
+    ☐ Model automatic and explicit alternative selection.
+        ☐ Choose the highest-relevance supported alternative once Phase 3 scores are available; use stable recipe identifiers when none are supported.
+        ☐ Preserve explicit selection while the tile remains selected, including an unsupported selection when supported alternatives exist.
+        ☐ Restore automatic choice on the agreed release interaction.
+        ☐ Expose one selected-recipe state for output quantity, availability, tooltip, relevance, and placement.
+    ☐ Add focused unit coverage for eligibility, output-attribute grouping, alternative identity/selection, dynamic previews, unsupported discoverability, and search semantics.
+        ☐ Use deterministic allocation-result fixtures for ranking consumers until Phase 3 is integrated; do not invent runtime scores for unsupported recipes.
+
+Completion criteria:
+
+    ☐ Catalogue/search tests cover enabled/disabled recipes, excluded processes, grid fit, output variants, mod alternatives, and empty/multiword/localized queries.
+    ☐ Every eligible resolved output and unsupported preview is discoverable under its documented representation.
+    ☐ Selection and support states are explicit and cannot silently make an unsupported alternative fillable.
+
+## Phase 3: Implement shared allocation, relevance, and placement objectives
+
+Dependencies: Phases 1 and 2.
+Outcome: deterministic inventory snapshots produce consistent availability, missing requirements, and placement allocations.
+
+    ☐ Build eligible inventory snapshots using the verified source list.
+        ☐ Count existing grid contents once and retain stable inventory/slot identity.
+        ☐ Read game-owned mutable data only on its owning thread; expose safe snapshots to any deferred work.
+    ☐ Allocate against the complete recipe through native matching semantics or verified supported adapters.
+        ☐ Preserve wildcards, restricted alternatives, repeated requirements, attributes, tool presence, durability, and relationships between choices.
+        ☐ Resolve overlapping alternatives globally; never let a flexible requirement consume the only item usable by a restricted requirement.
+        ☐ Prevent double allocation of physical items and incompatible-stack merging; each grid position holds one compatible stack.
+        ☐ Preserve tools/non-consumed requirements as such, rather than ordinary consumable quantities.
+        ☐ Return explicit unsupported reasons for exceptional semantics without a supported adapter.
+    ☐ Derive one-execution coverage, relevance, availability, and missing explanations from shared results.
+        ☐ Compute A/R from maximally allocatable simultaneous ordinary units; a valid presence-only tool contributes one required unit.
+        ☐ Require a complete valid allocation for availability; distinguish this from transfer feasibility.
+        ☐ Aggregate identical missing requirements only when constraints are preserved; describe alternatives as choices, not separate mandatory ingredients.
+        ☐ Keep unsupported relevance unknown and avoid fabricated deficits.
+    ☐ Implement deterministic ranking and integrate it with Phase 2 selection/search.
+        ☐ Sort satisfiable recipes first, then incomplete supported recipes by descending relevance.
+        ☐ Break ties by fewer missing units, localized output name, then stable output/recipe identifier.
+        ☐ Sort selected unsupported recipes last by localized output name and stable identifiers, even when another alternative is supported.
+    ☐ Produce ordinary-click allocations for one execution.
+        ☐ Preserve shaped layouts and choose a stable legal shapeless layout.
+        ☐ Populate partial quantities and leave wholly missing requirements empty without fabricating inventory stacks.
+    ☐ Produce shift-click allocations by joint lexicographic optimization.
+        ☐ First maximize single-execution coverage, spreading scarce shared ingredients across required positions.
+        ☐ Next maximize supported complete executions under per-position requirements and slot limits.
+        ☐ Finally place remaining compatible surplus without reducing earlier optima; prefer least-filled equivalent positions with stable grid-position ties.
+        ☐ Reconsider preliminary variants when later objectives improve without weakening earlier objectives; use inventory order only among equally optimal choices.
+        ☐ Continue filling available positions when another ingredient is entirely missing; retain permitted surplus for later manual crafting.
+        ☐ Do not auto-replace tools or claim crafting beyond their actual durability.
+    ☐ Add focused unit tests under VanillaExpanded.Tests/Unit/{Feature}, marked Category=Unit, reusing existing mocks and real InventoryGeneric where appropriate.
+        ☐ Prove four boards plus two sticks with three boards and one stick scores 4/6, missing one of each; board surplus cannot compensate for missing sticks.
+        ☐ Prove two repeated one-unit positions receive 10/10 from 20 units and 64/63 from 127 units with 64-unit limits.
+        ☐ Prove one early oak board does not lock a position when 64 pine boards improve batch size at equal first-execution coverage.
+        ☐ Cover constrained-overlap allocation, incompatible variants, non-stackable tools, insufficient durability, missing ingredients, shaped/shapeless layouts, and stable ties.
+        ☐ Check conservation, slot limits, no double counting, ranking/tooltip agreement, and maximality against exhaustive feasible allocations for small bounded fixtures.
+
+Completion criteria:
+
+    ☐ Focused allocation/ranking tests pass, including the proposal's numerical examples and constrained-variant cases.
+    ☐ Preview, missing lists, availability, and placement consume shared semantic results rather than separate matching implementations.
+    ☐ Shift-click satisfies each objective before tie-breaking, including incomplete recipes; unsupported recipes cannot produce actionable allocations.
+
+## Phase 4: Implement safe authoritative transfer planning and execution
+
+Dependencies: Phases 1 and 3.
+Outcome: supported allocations can safely rearrange the grid without crafting or losing items.
+
+    ☐ Plan reuse, repositioning, and return of existing grid contents before execution.
+        ☐ Validate destination acceptance, native restrictions, compatible merges, quantities, slot limits, and carried-storage capacity for every displaced item.
+        ☐ Keep ingredient sufficiency independent from rearrangement capacity; report the latter as a placement failure.
+        ☐ Leave the original grid unchanged when displaced items cannot be returned; never drop items automatically.
+        ☐ Reject no-usable-ingredient actions with an explicit reason rather than clearing an unrelated grid.
+    ☐ Implement the Phase 1 authoritative mechanism using native inventory operations.
+        ☐ Revalidate recipe identity, support/eligibility, eligible sources, destinations, quantities, and current inventory state on the authority.
+        ☐ Reject or recompute stale plans safely; ensure an unsafe rearrangement cannot partially commit.
+        ☐ Prevent duplication, loss, unauthorized access, output consumption, and direct client stack mutation.
+        ☐ Suppress duplicate pending requests and expose success/refusal results for UI reconciliation.
+    ☐ Apply ordinary and shift-click plans through the same transfer-safety boundary.
+        ☐ Refresh shared preview data from confirmed inventory state, not assumed client success.
+        ☐ Leave existing output-taking and manual crafting code paths intact.
+    ☐ Add focused transfer unit and integration/E2E tests, using existing network mocks and Category=Unit or Category=E2E appropriately.
+        ☐ Cover grid reuse without double counting, full storage, incompatible destinations, mid-plan refusal, and zero usable ingredients.
+        ☐ Cover stale recipes/inventories, invalid or excluded source slots, invalid quantities/destinations, duplicate requests, and competing updates.
+        ☐ Assert exact unchanged state on unsafe failure and total item conservation on successful movement; assert no automatic crafting or output-taking.
+
+Completion criteria:
+
+    ☐ Automated tests demonstrate safe complete commit or unchanged unsafe failure under the chosen authoritative mechanism.
+    ☐ Both click modes use the same validated transfer boundary with explicit error results.
+    ☐ No client-only optimistic sequence is relied upon to meet atomicity, and native crafting remains separate.
+
+## Phase 5: Integrate the popout and consistent player interactions
+
+Dependencies: Phases 2, 3, and 4.
+Outcome: the actual crafting panel exposes searchable previews and safe placement actions.
+
+    ☐ Add the crafting-menu toggle beside the grid with attachment, visibility, and event wiring kept narrow.
+        ☐ Follow and close with the parent panel; adapt attachment side to screen space.
+        ☐ Keep the grid unobscured and the popout inside the viewport at small screen sizes and supported UI scales.
+        ☐ Render a search bar and scrollable output-tile grid using native item-icon rendering.
+    ☐ Bind tiles and alternative controls to the shared selected-recipe state.
+        ☐ Display output icon/quantity, alternative indicator, and chooser/cycle control.
+        ☐ Grey unavailable supported tiles without removing hover/focus/click interactions; add a non-color unavailable marker.
+        ☐ Show unsupported state/reason and disable both placement actions without blocking inspection or alternative selection.
+        ☐ Preserve explicit selection and release it through the agreed interaction.
+    ☐ Implement search, keyboard focus, scrolling, and empty-result feedback.
+        ☐ On hover or keyboard focus show output name, ingredients, availability, and interaction hints.
+        ☐ List all one-execution deficits, accepted alternatives, and accurate tool/special-requirement reasons.
+        ☐ Keep shift-click tooltips about the first execution, not a hypothetical maximum-batch deficit.
+        ☐ Route ordinary and shift-click through authoritative placement and display concise refusal reasons.
+        ☐ Use non-interactive missing-position outlines only if supported by existing UI; never materialize preview items.
+    ☐ Update availability, deficits, and ordering after relevant inventory/recipe changes.
+        ☐ Keep selection stable and defer visible reordering of hovered/interacting tiles until the interaction finishes.
+        ☐ Revalidate clicks against current state even while visible ordering is deferred.
+        ☐ Suppress duplicate pending placement requests and reconcile with confirmed results.
+    ☐ Add focused tests for state/input behavior where automated coverage is feasible and record separate live-client cases for rendering/input that require it.
+        ☐ Use existing localization conventions for new labels, unavailable/unsupported states, hints, empty results, and refusal messages.
+        ☐ Replace any Phase 2 score fixtures in production wiring with real Phase 3 results.
+
+Completion criteria:
+
+    ☐ GUI events use real catalogue/allocation/authority paths; no mock-backed runtime behavior or parallel matching logic remains.
+    ☐ Selected recipe, icon quantity, tooltip, score, and placement agree before and after updates.
+    ☐ Automated interaction-state tests pass; live layout/input checks remain explicitly pending until Phase 7.
+
+## Phase 6: Complete catalogue/resource lifecycle and measure performance
+
+Dependencies: Phase 5.
+Outcome: the integrated feature has bounded rendering work and correct world/panel cleanup.
+
+    ☐ Rebuild the catalogue on world/recipe-registry changes and clear obsolete selections/results as appropriate.
+        ☐ Apply the documented immutable visibility/access/grid assumption between rebuilds; do not add independent eligibility-refresh behavior.
+        ☐ Cache normalized search text and immutable metadata; recalculate inventory-dependent allocations on relevant changes, not each render frame.
+    ☐ Render only visible tiles for large catalogues and release GUI/render resources when the panel or world closes.
+        ☐ Remove event subscriptions and dispose any feature patches/network lifecycle resources according to existing patterns.
+        ☐ Discard stale deferred computations and requests during inventory/catalogue changes or closure; keep mutable game data on its owning thread.
+        ☐ Verify repeated open/close and world transitions do not accumulate callbacks or render resources.
+    ☐ Measure representative vanilla and heavily modded catalogues.
+        ☐ Record catalogue sizes, test environment, search/allocation/update timings, and visible-tile rendering behavior.
+        ☐ Set explicit performance thresholds from these measurements before declaring performance acceptance; do not invent unsupported compatibility/runtime-cost claims.
+        ☐ Recheck measured thresholds after any required optimization, without changing matching or placement semantics.
+
+Completion criteria:
+
+    ☐ Lifecycle tests/evidence cover rebuild, close/reopen, stale-result rejection, and owning-thread access.
+    ☐ Offscreen tiles are not rendered and allocation does not run once per frame without relevant changes.
+    ☐ Representative measurements and resulting thresholds are recorded, with observed results meeting those thresholds.
+
+## Phase 7: Validate end-to-end behavior and deliver the feature
+
+Dependencies: Phases 1 through 6.
+Outcome: source, automated, package, and user-run live evidence separately establish the proposal's acceptance contract.
+
+    ☐ Run focused allocation, ranking, transfer, and interaction tests together using the repository's configured runner.
+        ☐ Run the smallest build/test commands covering the feature; escalate broader regression checks when failures or shared-surface changes justify them.
+        ☐ Distinguish isolated unit evidence from actual integration/E2E evidence; mocks alone do not prove multiplayer authority.
+    ☐ Build/package through .\build.ps1 and the existing Cake workflow.
+        ☐ Verify compilation, applicable JSON validation, and inclusion of required code/assets/localization in the release package.
+        ☐ Do not add migrations or compatibility scaffolding unless the verified implementation requires them; document and verify any such necessary work before closure.
+    ☐ Obtain user-run live-client evidence using the built package.
+        ☐ Verify browse/search discoverability, output variants, alternative selection/release, unknown/unsupported entries, empty results, and dynamic-output behavior.
+        ☐ Verify hotbar/carried/grid sourcing, excluded inventories, all missing quantities, and updates after inventory changes.
+        ☐ Verify ordinary partial placement and maximum-stack shift placement for shaped/shapeless, repeated, wildcard, restricted, attribute-sensitive, tool, and non-stackable cases.
+        ☐ Verify full-inventory and stale-state refusals leave unsafe rearrangements unchanged and communicate a reason.
+        ☐ Verify manual output-taking/crafting still works after placement, including permitted surplus and tool durability behavior.
+        ☐ Verify search focus, scrolling, hover/keyboard tooltips, stable hovered tiles, parent movement/closing, UI scaling, and small-screen placement.
+        ☐ Verify actual multiplayer authoritative updates, competing inventory changes, stale/duplicate requests, and UI reconciliation without loss, duplication, drops, or unauthorized transfers.
+        ☐ Recheck lifecycle and representative modded-catalogue behavior in the live client; report compatibility only for exercised cases.
+    ☐ Update directly related user documentation with controls, grid-only scope, eligible sources, unsupported states, and safe-placement limitations.
+        ☐ Remove feature-owned temporary fixtures/scaffolding from production wiring and clean up temporary test artifacts.
+        ☐ Record remaining limitations honestly; any proposed deferral of a required behavior must receive explicit approval and an authoritative proposal/plan update.
+
+Completion criteria:
+
+    ☐ Required tests and package build succeed with identifiable commands/results.
+    ☐ User-run live checks have recorded outcomes; unexecuted cases remain unchecked rather than inferred from unit tests.
+    ☐ Every proposal acceptance criterion has an explicit passing evidence reference or an approved, documented scope change.
+
+## Final acceptance
+
+    ☐ Every eligible resolved grid output is discoverable, alternatives remain accessible, and selected-recipe data stays consistent.
+    ☐ Availability/relevance/one-execution deficits use shared allocation, include existing grid quantities once, and update after relevant changes.
+    ☐ Unsupported entries remain inspectable with unknown state and deterministic ordering, without invented scores/deficits or placement.
+    ☐ Ordinary placement and joint lexicographic shift placement preserve native recipe, stack, attribute, tool, and layout semantics.
+    ☐ Full inventories, stale/duplicate requests, and competing updates cannot lose, duplicate, drop, or incorrectly consume items; unsafe transfers leave original state intact.
+    ☐ Existing manual crafting/output-taking and usable panel/search/tooltip/small-screen behavior are verified in the live client.
+    ☐ Source verification, focused tests, actual integration/multiplayer evidence, package validation, performance measurements, documentation, and cleanup are complete.
+    ☐ Every requirement is implemented or covered by an explicitly approved proposal/plan amendment; no unapproved deferral is hidden by a checked completion box.
