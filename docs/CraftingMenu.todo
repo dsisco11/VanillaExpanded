@@ -15,9 +15,11 @@ Non-goals: cooking, smithing, knapping, clay forming, other workstation/process 
 ## Assumptions and open decisions
 
 - Player recipe visibility, access rules, and grid dimensions are immutable between world/recipe-registry catalogue rebuilds. Inventory changes affect availability, not eligibility.
-- Grid-only scope and quantity-based relevance are the current contract, although the proposal requests confirmation before implementation. Any approved change must first be reconciled with the proposal and this plan.
-- Exact carried-inventory identifiers, native recipe/matching integration, and authoritative multi-slot transfer support require source verification.
-- Alternative chooser/cycling controls, explicit-selection release behavior, and detailed dynamic-output representation require decisions after inspecting existing UI conventions.
+- The user confirmed grid-only scope and quantity-based relevance. Any subsequent scope change must first be reconciled with the proposal and this plan.
+- Phase 1 records verified inventory identifiers/native integration and the user-selected client operation below. The fresh client-design completion audit passed; the earlier server-design audit is superseded.
+- The user selected a compact recipe chooser with Auto/deselection releasing explicit selection and conservative dynamic-output support; the Phase 1 decisions below govern those behaviors.
+- The user approved native failure/reconciliation semantics: local preflight refusal leaves state unchanged; on an observed native refusal, accepted moves may remain and the client stops unsent work/reconciles. Already-submitted packets resolve through the native protocol. No custom transaction or whole-arrangement rollback is required.
+- The user approved a local execution guard, not a server-settlement gate: another click is allowed after the current client burst is dispatched, while earlier operations may still be in flight. Guard release is not a success acknowledgement.
 - Unsupported recipes must remain discoverable and inspectable, with unknown relevance, explicit reasons, deterministic ordering, and no placement. Detailed dynamic-output decisions cannot weaken that baseline.
 - Exceptional recipe requirements require supported adapters; otherwise use the unsupported state rather than approximate native semantics.
 - Performance thresholds are intentionally unset until representative vanilla and heavily modded measurements exist.
@@ -27,31 +29,140 @@ Non-goals: cooking, smithing, knapping, clay forming, other workstation/process 
 Dependencies: none.
 Outcome: verified engine boundaries and an agreed implementation mechanism permit work without speculative API assumptions.
 
-    ☐ Inspect relevant repository instructions and existing feature, test, localization, and registration patterns.
-        ☐ Identify the actual crafting-dialog/grid lifecycle, attachment points, input conventions, UI scaling, and disposal hooks.
-        ☐ Inspect loaded recipe registration, enabled/visible/access filtering, grid-fit checks, output resolution, wildcard matching, attributes, and tool/durability semantics.
-        ☐ Inspect inventory ownership, normal transfer permissions, destination acceptance, synchronization, and authoritative update mechanisms.
-        ☐ Record source locations and distinguish verified APIs from unresolved assumptions; keep game reference sources read-only.
-    ☐ Resolve the proposal's pre-implementation decisions.
-        ☐ Confirm grid-only scope and quantity-based relevance; do not silently substitute handbook navigation or ingredient-type scoring.
-        ☐ Enumerate eligible hotbar, backpack/carried-storage, and grid inventories; verify storage destinations for displaced contents.
-        ☐ Exclude crafting output, cursor-held stacks, equipment, remote containers, and inventories unavailable for normal transfers.
-        ☐ Decide alternative-selection controls and the action that releases explicit selection.
-        ☐ Decide generic previews/search identities for dynamic outputs, native resolution opportunities, and the initial supported-adapter boundary without enumerating hypothetical variants.
-    ☐ Gate authoritative placement on a verified safe transfer design.
-        ☐ Determine whether native operations can validate and safely commit the entire multi-slot plan.
-        ☐ If not, specify an authoritative operation that revalidates and safely commits without sequential optimistic client moves.
-        ☐ Identify how stale state, refusal, duplicate pending requests, and authoritative results will be represented.
-        ☐ Keep recipe semantics owned by the recipe system and movement/merging/restrictions owned by the inventory system.
-    ☐ Establish feature-based internal component boundaries for catalogue, search/order, allocation, transfer planning, and rendering.
-        ☐ Use existing registration/lifecycle patterns; register and dispose Harmony patches only if source verification shows they are needed.
-        ☐ If new packets are necessary, follow src/Network/{Feature}.packet.cs conventions and existing channel registration.
+    ✔ Inspect relevant repository instructions and existing feature, test, localization, and registration patterns.
+        ✔ Identify the actual crafting-dialog/grid lifecycle, attachment points, input conventions, UI scaling, and disposal hooks.
+        ✔ Inspect loaded recipe registration, enabled/visible/access filtering, grid-fit checks, output resolution, wildcard matching, attributes, and tool/durability semantics.
+        ✔ Inspect inventory ownership, normal transfer permissions, destination acceptance, and the native client bulk operation's synchronization/update mechanisms.
+        ✔ Record source locations and distinguish verified APIs from unresolved assumptions; keep game reference sources read-only.
+    ✔ Resolve the proposal's pre-implementation decisions.
+        ✔ Confirm grid-only scope and quantity-based relevance; do not silently substitute handbook navigation or ingredient-type scoring.
+        ✔ Enumerate eligible hotbar, backpack/carried-storage, and grid inventories; verify storage destinations for displaced contents.
+        ✔ Exclude crafting output, cursor-held stacks, equipment, remote containers, and inventories unavailable for normal transfers.
+        ✔ Decide alternative-selection controls and the action that releases explicit selection.
+        ✔ Decide generic previews/search identities for dynamic outputs, native resolution opportunities, and the initial supported-adapter boundary without enumerating hypothetical variants.
+    ✔ Verify client-side bulk placement against the native inventory protocol.
+        ✔ Identify the exact native client operation sequence and whether its complete-plan validation/failure behavior meets the proposal.
+        ✔ Specify client preflight and native bulk execution without custom server placement handlers, server catalogue, or direct stack/attribute writes.
+        ✔ Identify native stale-state/refusal notifications, overlapping-action suppression, and inventory reconciliation.
+        ✔ Keep recipe semantics owned by the recipe system and movement/merging/restrictions owned by the inventory system.
+    ✔ Establish feature-based internal component boundaries for catalogue, search/order, allocation, transfer planning, and rendering.
+        ✔ Use existing registration/lifecycle patterns; register and dispose Harmony patches only if source verification shows they are needed.
+        ✔ Use the game's standard inventory messages; do not add feature-specific catalogue or placement packets.
+
+### Phase 1 working decisions and evidence (2026-10-28)
+
+Status: complete for the revised client-side design after second review and a fresh independent read-only completion audit (2026-10-28). The earlier server-design verdict is superseded. The new audit directly consulted inherited documents, repository sources, and installed 1.22.7.0 binaries and found no required-now issues or evidence gaps. This establishes source-backed integration feasibility, not implemented/tested transfer behavior. No later-phase implementation has begun.
+
+Controlling documents consulted: this phase and its inherited contract, the complete [proposal](./CraftingMenuProposal.md), [repository instructions](../.github/copilot-instructions.md), and the relevant conventions in [project.todo](./project.todo). The proposal controls scope; the older handbook suggestion in project.todo does not override the attached-popout design.
+
+Evidence baseline:
+
+- Read-only API source: D:\CODE\VintageStory\vsapi, commit 63d33f70 ("Updated to Version 1.22.7").
+- Read-only survival source: D:\CODE\VintageStory\vssurvivalmod, commit 849fa8c ("Updated to Version 1.22.7").
+- Installed engine: G:\Vintagestory\VintagestoryLib.dll, assembly version 1.22.7.0, targeting .NET 10. Concrete inventory/dialog members absent from the source checkouts were inspected in that assembly.
+- The installed VintagestoryAPI.dll assembly also reports version 1.22.7.0 in ILSpy; its Windows file-version resource reports 1.22.0. Distinguish those version sources. Later compilation/runtime checks must target the installed references in the project files.
+- Native held-bag behavior was additionally inspected in G:\Vintagestory\Mods\VSEssentials.dll. Its concrete callbacks reinforce using native inventory operations rather than bypassing bag persistence through direct slot writes.
+
+Approved behavior decisions:
+
+- The user confirmed grid-only scope and quantity-based A/R relevance.
+- Use a compact alternative-recipe chooser with an Auto option. Selecting a concrete alternative pins it; choosing Auto or deselecting its tile releases the pin. Ordinary click and Shift-click remain placement actions.
+- The user approved conservative verified support: native semantics or explicit safe adapters may support placement; unknown semantics remain browsable but unsupported, with unknown relevance, no fabricated deficits, and both placement actions disabled.
+- For dynamic outputs, use the resolved output stack's localized name/item code as the generic search identity when available, preserve the native recipe identity as the fallback, and label the preview as generic rather than claiming exact resulting attributes. Distinct resolved variants keep their distinguishing attributes; do not enumerate arbitrary combinations.
+- The initial support boundary is recipes whose matching, non-consumption/durability requirements, output identity, and inventory movement can be evaluated accurately through verified native behavior or an explicit adapter. Custom predicates, liquid/special requirements, custom output callbacks, and otherwise unknown semantics are unsupported until their adapter is verified. Never call crafting-consumption or arbitrary output callbacks merely to manufacture an exact preview.
+- Visibility, access rules, and grid dimensions retain the proposal's immutable-between-rebuilds assumption. This does not imply inventory snapshots remain valid between preview and action.
+
+Task-to-document traceability and observed evidence:
+
+1. Inspect panel integration -> proposal "Player experience", "Proposed implementation boundaries", and "Catalogue lifecycle and performance" -> narrow attachment/visibility/event wiring, native inputs/scaling, parent-close cleanup -> installed Vintagestory.Client.NoObf.GuiDialogInventory:
+   - ComposeGui(bool) obtains "craftinggrid" and "backpack"; ComposeSurvivalInvDialog() creates the native "inventory-backpack" composer with keys "craftinggrid" and "outputslot". The active composer is Composers["maininventory"], not SingleComposer.
+   - The native panel currently renders inputs 0..8 in a 3x3 grid and output slot 9. Verify the concrete inventory's GridSize/GridSizeSq rather than generalizing these indices to unknown replacements.
+   - Composition is repeated on opening and when backpack rows change. A one-time open-only injection would miss replacement composers.
+   - Integration decision: a narrow postfix on private ComposeSurvivalInvDialog() obtains the newly created private survivalInvDialog composer, attaches an idempotently keyed toggle, and calls ReCompose(); do not replace the vanilla grid or its output interaction. Do not fetch it through Composers["maininventory"] inside that postfix: both inspected callers assign that entry afterward. Inspect the active composer for the actual grid before exposing the popout, including when player mode changes.
+   - Public GuiDialogInventory.OnGuiOpened()/OnGuiClosed(), GuiDialog.OnOpened/OnClosed, and existing composers provide lifecycle boundaries. OnGuiClosed() performs native transfer-away/drop/close handling: leave that vanilla behavior intact and invalidate pending feature actions on parent close.
+   - [GuiDialog.cs](../../../vsapi/Client/UI/Dialog/GuiDialog.cs), events and TryOpen/TryClose (lines 173-180, 280-329), and Dispose (line 731), verify event and resource boundaries.
+   - [GuiComposer.cs](../../../vsapi/Client/UI/GuiComposer.cs), ReCompose (line 236), AddInteractiveElement (line 784), and scaling helper (line 775), verify composition, focusable controls, and RuntimeEnv.GUIScale use.
+   - Native ComposeCreativeInvDialog() demonstrates text input, clipping, vertical scrolling, and focus handling. Prefer native text input/scrollbar/dropdown controls; item tiles remain inspection/action controls, not synthetic transferable inventory slots.
+   - Existing [FirepitGuiPatch.cs](../VanillaExpanded/src/AlloyCalculator/FirepitGuiPatch.cs) and [AlloyCalculatorModSystem.cs](../VanillaExpanded/src/ModSystems/AlloyCalculatorModSystem.cs) establish narrow lifecycle patches and subscription/disposal prior art. A crafting composition patch is justified by the private composer-building method; no crafting-consumption/output patch is planned.
+   - [GuiDialogAlloyCalculator.cs](../VanillaExpanded/src/Gui/GuiDialogAlloyCalculator.cs), composition (lines 223-236), uses namespaced Lang.Get keys for controls/tooltips; [en.json](../VanillaExpanded/assets/vanillaexpanded/lang/en.json) contains the matching labels. Follow that localization pattern for this feature.
+   - Planned evidence: Phase 5 interaction tests and Phase 7 user-run checks for moving/resizing, UI scale, small screens, focus, parent-close behavior, and mode/composer changes. Source inspection does not prove a workable small-screen layout.
+
+2. Inspect recipe registry, eligibility, matching, and output semantics -> proposal "Scope", "Outputs and alternative recipes", "Inventory and ingredient matching", and "Relevance and availability" -> native authority, visible/access-permitted grid recipes, exact constraints and explicit unsupported states -> verified source:
+   - [RecipeLoader.cs](../../../vssurvivalmod/Systems/Recipe/RecipeLoader.cs), AssetsLoaded and LoadRecipe (lines 17-28, 113-146), loads grid recipes, skips disabled definitions, applies classExclusiveRecipes, generates native ingredient combinations, resolves, then registers them.
+   - [GridRecipe.cs](../../../vsapi/Common/Crafting/GridRecipe.cs), ResolvedIngredients (line 94), FreeRAMServer (line 179), and Matches (line 239), establish the runtime resolved ingredient array, potentially absent authoring dictionaries/pattern, dimensions, shaped/shapeless matching, and both native MatchesRecipe event gates.
+   - [RecipeBase.cs](../../../vsapi/Common/Crafting/RecipeBase.cs), ShowInCreatedBy/RecipeId (lines 83-90), GenerateOutputStack (line 288), and MatchStackToIngredient (line 707), establish discovery metadata, the declaration of a RecipeId property, attribute-copy/merge and output callbacks, and collectible-level matching. The property declaration does not prove assignment, uniqueness, or cross-side identity.
+   - [Character.cs](../../../vssurvivalmod/Systems/Character/Character.cs), Event_MatchesGridRecipe/Event_MatchesRecipe (lines 529-563), establishes native RequiresTrait behavior including character traits, extraTraits, and absent-class handling. Do not substitute a simple string comparison for these semantics.
+   - [CollectibleBehaviorHandbookTextAndExtraInfo.cs](../../../vssurvivalmod/Systems/Handbook/CollectibleBehaviorHandbookTextAndExtraInfo.cs), grid recipe discovery (line 1388), respects ShowInCreatedBy. Use that visibility metadata for discovery, with native access semantics and grid fit.
+   - [CraftingRecipeIngredient.cs](../../../vsapi/Common/Crafting/CraftingRecipeIngredient.cs), SatisfiesAsIngredient (line 314) and GetConsumeProperties (line 347), covers stack quantities, wildcard/allowed/skipped variants, tag/attribute semantics, and legacy/current tool definitions.
+   - [Collectible.cs](../../../vsapi/Common/Collectible/Collectible.cs), MatchesForCrafting (line 1022), additionally checks non-consumed ingredient durability; OnConsumedByCrafting is not a placement API.
+   - Integration decision: build the catalogue from client World.GridRecipes and ResolvedIngredients and use stable client-local identities for selection/order; Name alone need not be unique. Checked-source RecipeBase/GridRecipe serialization does not establish synchronized RecipeId or Enabled values. Do not invent a server-owned manifest to address that limitation; preserve native recipe synchronization and document any actual client/server eligibility limitation uncovered by verification.
+   - Build one-execution semantics through native ingredient and collectible predicates, then native full-recipe validation where evaluable; unknown event-dependent semantics require an adapter or unsupported status rather than guessed partial coverage.
+   - GenerateOutputStack invokes OnCreatedByCrafting and is not assumed to be a pure preview function. Native output generation remains with the owning crafting grid; adapters must establish safe preview resolution before claiming a dynamic output is exact.
+   - Installed InventoryCraftingGrid.FindMatchingRecipe searches shaped matches before shapeless matches and takes the first match; FoundMatch generates that winner's output. A selected alternative passing Matches does not prove native output selection agrees. Treat overlapping selections as unsupported unless a verified adapter establishes native resolution and the promised output quantity/attributes agree; do not override the native winner or output-taking behavior. Incomplete placement cannot claim exact output resolution merely because the selected recipe could match after filling missing inputs.
+   - Planned evidence: Phase 2 catalogue/identity tests and Phase 3 constraint/coverage tests against installed references, followed by live mod compatibility cases. Source/installed binary semantic parity remains a later validation obligation.
+
+3. Inspect ownership/transfers and decide sources -> proposal "Inventory and ingredient matching", "Ordinary click placement", and "Proposed implementation boundaries" -> eligible personal storage, output exclusion, no loss, preflight and native reconciliation -> verified identifiers and concrete inventory behavior:
+   - [GlobalConstants.cs](../../../vsapi/Config/GlobalConstants.cs), inventory names (lines 223-229): "hotbar", "backpack", "craftinggrid"; exclude "mouse" and "character".
+   - [IPlayerInventoryManager.cs](../../../vsapi/Common/Entity/Player/IPlayerInventoryManager.cs), GetOwnInventory and OpenedInventories, exposes ownership/access lookups. Do not enumerate remote or other open inventories as ingredient sources.
+   - Installed Vintagestory.Common.InventoryPlayerBackpacks consists of four bag-equipment slots followed by BagInventory storage. Only backpack indices >= 4 are eligible, bounded by its current Count and native permissions. Never source or return into the four equipped-bag slots.
+   - Installed InventoryPlayerHotbar has 12 slots, but only ordinary hotbar indices 0..9 are eligible. NewSlot(10) creates ItemSlotSkill and NewSlot(11) creates ItemSlotOffhand; both are excluded from sourcing and displaced-item destinations, despite belonging to "hotbar". EntityPlayer.LeftHandItemSlot independently uses index 11. Do not generalize Count to normal carried slots; reject unknown replacement layouts/slot semantics until verified.
+   - InventoryCraftingGrid.Count is GridSizeSq + 1; input indices are [0, GridSizeSq), with output at GridSizeSq. Existing input stacks are eligible once; output is never a source/destination.
+   - Returns of displaced inputs go only to hotbar/backpack content storage that accepts them. Locks, ownership, access, storage tags/flags, merge compatibility, and per-slot capacity remain native constraints even for these allowlisted inventories.
+   - [ItemSlot.cs](../../../vsapi/Common/Inventory/ItemSlot.cs), CanHold/CanTakeFrom/CanTake, TryPutInto, Itemstack, and MarkDirty, establishes per-slot acceptance and movement primitives. [ItemSlotOutput.cs](../../../vsapi/Common/Inventory/ItemSlotOutput.cs) disallows insertion.
+   - [AlloyDepositService.cs](../VanillaExpanded/src/AlloyCalculator/AlloyDepositService.cs), Execute and snapshot/restore helpers, is existing server-side validation/transfer prior art, not proof of atomic multi-slot safety.
+   - Planned evidence: Phase 3 eligibility/allocation tests and Phase 4 unchanged-state/conservation tests. No runtime transfers were performed during this phase.
+
+4. Verify client-side bulk placement and establish component boundaries -> proposal "Proposed implementation boundaries" and preflight/native-refusal acceptance -> client planning with native execution/synchronization -> findings and intended interfaces:
+   - Native TryPutInto emits modification callbacks during individual moves. No inspected API establishes a complete multi-slot transaction.
+   - Snapshot-and-restore is not accepted as proof: installed InventoryPlayerBackpacks.OnItemSlotModified saves a modified ItemSlotBagContent into its bag and returns; the separate equipped-bag-slot branch reloads bag storage and broadcasts player data. InventoryPlayerHotbar.OnItemSlotModified updates stats. InventoryCraftingGrid.OnItemSlotModified can recalculate output and invoke DropSlotIfHot; InventoryBase.DropSlotIfHot can damage the player and drop a stack. Safe placement must account for or reject hot-item handling before any mutation, not discover it through a post-transfer callback.
+   - The user requires a client-side bulk operation through native inventory APIs, not a custom server transaction. The native manager APIs and their packet/lifecycle behavior are source-verified below; do not equate grouped client actions with atomic acceptance.
+   - Preflight all eligible source/destination quantities, displaced-content capacity, stack compatibility, locks, and heat restrictions on the client, then revalidate immediately before native execution. Leave normal native authority/synchronization intact.
+   - Suppress reentrant/overlapping local placement execution, invalidate pending UI state on panel/world close, and reconcile with native inventory updates. The user approved allowing a new click after local dispatch rather than waiting for server settlement. Do not add a feature-specific request/result or deduplication protocol.
+   - Current [AlloyDepositSystem.cs](../VanillaExpanded/src/ModSystems/AlloyDepositSystem.cs), RequestDeposit and OnDepositRequest, sends a custom request then executes AlloyDepositService on the server. This checkout is not evidence that Alloy deposit already uses a client-only bulk API, and that server handler is not the selected crafting architecture.
+   - Intended internal modules under VanillaExpanded/src/CraftingMenu: client catalogue/output identity, search/order and selection state, ingredient allocator with ordinary/shift objectives, transfer planner, native client inventory-operation coordinator, panel integration, and popout renderer. This is a responsibility map, not a requirement for one file per responsibility.
+   - Intended test locations: VanillaExpanded.Tests/Unit/CraftingMenu and, for actual integration cases, VanillaExpanded.Tests/E2E/CraftingMenu; the E2E folder does not yet exist. Use Category=Unit/Category=E2E and existing mocks/real InventoryGeneric patterns. Existing [AlloyDepositSystemTests.cs](../VanillaExpanded.Tests/Unit/AlloyCalculator/AlloyDepositSystemTests.cs) provides network-fixture conventions.
+   - No custom catalogue/placement packets or server-side handlers are selected. [VanillaExpandedModSystem.cs](../VanillaExpanded/src/VanillaExpandedModSystem.cs) remains registration/Harmony lifecycle prior art; remove client feature subscriptions/resources on Dispose/LeaveWorld.
+   - Catalogue initialization can use IClientEventAPI.LevelFinalize once player/client recipes are ready; LeaveWorld provides teardown. Rebuild on actual client registry changes, keeping local catalogue identity separate from inventory snapshots. A dedicated registry-change event remains unverified; do not invent a server manifest or treat every inventory event as a recipe change.
+   - Planned focused commands after code exists: dotnet build .\VanillaExpanded\VanillaExpanded.csproj --no-restore; dotnet test .\VanillaExpanded.Tests\VanillaExpanded.Tests.csproj --no-restore --filter "Category=Unit&FullyQualifiedName~CraftingMenu"; corresponding Category=E2E feature filter when actual integration tests exist. Use the existing Cake build in Phase 7. Missing dependencies may be restored only after a command reports that requirement.
+   - Observed validation: read-only source/decompilation inspection only. No build/test execution is needed to validate these documentation-only findings; any later execution must use the required separate verification subagent. These notes do not satisfy Phase 4 transfer tests or Phase 7 live evidence.
+
+### Selected client-side operation and later verification
+
+The user rejected the custom server-side batch and server-owned catalogue. Neither is part of the selected architecture. Catalogue construction and transfer planning run on the client; execution uses native inventory APIs and their existing synchronization rather than feature-specific server messages.
+
+Source verification of the available client operations:
+
+- [IPlayerInventoryManager.cs](../../../vsapi/Common/Entity/Player/IPlayerInventoryManager.cs), lines 155-178, exposes TryTransferTo(sourceSlot, targetSlot, ref op) and TryTransferAway(sourceSlot, ref op, onlyPlayerInventory, ...). TryTransferAway returns an object[] of generated native packets; that alone does not establish a single atomic arrangement.
+- [IInventoryNetworkUtil.cs](../../../vsapi/Common/Inventory/IInventoryNetworkUtil.cs) exposes GetActivateSlotPacket, GetFlipSlotsPacket, HandleClientPacket, SendInventoryRollback, and PauseInventoryUpdates. The rollback interface identifies one client packet, not an entire multi-move plan. No verified contract makes PauseInventoryUpdates a mutation queue, flush, acknowledgement barrier, or transaction; the selected mechanism does not depend on it.
+- Use the native operations to enforce transfers, merges, bag persistence, output recalculation, and normal synchronization. Do not assign live Itemstack/Attributes references, replace slot objects, manually construct crafting output, or suppress native callbacks to simulate a transaction.
+- A bulk client action orchestrates native moves after complete local preflight. The user approved normal native partial progress: on an observed native refusal, stop issuing new moves, retain accepted transfers, let already-submitted packets resolve natively, reconcile, and explain the interruption. There is no accepted-prefix or cancellation guarantee for already-in-flight packets. Do not restore an old snapshot or automatically replay accepted moves. Local preflight refusals remain unchanged-state operations.
+- The client-loaded World.GridRecipes and ResolvedIngredients are the catalogue source. Local recipe identity supports stable selection/order only; it is not a new server token. Existing native recipe loading/synchronization and crafting output matching remain responsible for actual craftability.
+- Planned evidence: focused native-operation tests for preflight, excluded slots, planned destination acceptance, heat restrictions, partial/stale refusal, overlap suppression, and reconciliation; live multiplayer checks remain required later.
+
+Selected native lifecycle/execution sequence:
+
+1. Reuse the already-open player crafting inventory and carried inventories. [IInventory.cs](../../../vsapi/Common/Inventory/IInventory.cs), Open/Close contract (lines 64-79), and InventoryBase.Open/Close (lines 845-870) return lifecycle packet objects through InvNetworkUtil.DidOpen/DidClose. The caller sends those packets; they do not commit a list of arbitrary dirty-slot edits.
+2. Plan the full arrangement locally, including return capacity, native acceptance/merge constraints, eligible slots, and heat restrictions. If local preflight fails, perform no mutations and send no transfer packets.
+3. On the client owning thread, revalidate the plan and use player.InventoryManager.TryTransferTo(source, target, ref moveOperation) for each explicit planned move. It applies the normal native operation and returns its native packet. TryTransferAway can supply native shift-style destinations only where that behavior matches the eligible-destination contract; an unrestricted transfer-away must not route into excluded slots/containers.
+4. Send every non-null returned packet through capi.Network.SendPacketClient(object), declared in [IClientNetworkAPI.cs](../../../vsapi/Client/API/IClientNetworkAPI.cs), line 197. A TryTransferAway result may contain multiple packets: send each through the same normal API. Do not wrap them in a custom feature message or imply that the group is atomically accepted.
+5. Hold a local execution guard during preflight/revalidation and dispatch, releasing it when that local action ends; the user explicitly approved allowing another click while native reconciliation remains pending. Observe native inventory updates and refresh shared previews from the resulting state. Never invent a positive batch acknowledgement or blindly resubmit on mismatch. On detected interruption, stop unsent work and reconcile the native result, including any in-flight operations.
+6. Leave parent-owned inventories open. Their existing GUI lifecycle sends the normal Close packet when the panel actually closes; do not force that close to synchronize placement. Direct client Itemstack assignment plus MarkDirty only dirties local display/model state: IInventory.MarkSlotDirty (lines 125-132) documents that server dirtying sends contents, while client dirtying updates local rendering. It is not a client-to-server mutation/flush protocol.
+
+Native observation and guard boundaries:
+
+- Installed Vintagestory.Common.InventoryNetworkUtil.UpdateFromPacket overloads accept IWorldAccessor plus Packet_InventoryContents, Packet_InventoryUpdate, or Packet_InventoryDoubleUpdate; UpdateSlotStack applies the native slot replacement. PlayerInventoryNetworkUtil and CraftingInventoryNetworkUtil also have update paths. These are concrete authoritative-update observation points, not feature handlers or batch results.
+- Use narrowly scoped read-only prefix/postfix observation of the applicable native update entry points for owned/eligible inventories if ordinary slot-modified notifications cannot distinguish native reconciliation from the feature's own local mutations. Observe the relevant subclass paths too; coalesce nested notifications rather than reporting the same update repeatedly. Keep native processing and output recalculation intact, then invalidate/recompute the inventory snapshot and shared preview. Existing Harmony registration/disposal patterns apply.
+- A local transfer refusal stops further dispatch and reports interruption. An authoritative correction invalidating the projected arrangement invalidates stale feature state and reports that placement may be incomplete/inventory changed, without inventing a refusal cause or a final batch result. Already-sent operations still resolve normally. Do not compare every intermediate server update to the final target and call it a proven batch rejection.
+- No public batch acknowledgement, pending-transfer idle state, cancellation API, or native completion event was found on the inspected manager/network utility types. The local execution guard therefore ends with local execution, not with a timeout, inferred acknowledgement, or presumed server acceptance. This matches the user's explicit guard choice. Later updates remain observable after release; panel/world close removes feature state/subscriptions without undoing native moves.
+- Later Phase 4 tests must distinguish local operation failure, intermediate authoritative updates, corrective updates, a second click while reconciliation remains pending, and lifecycle teardown. No final arrangement is promised merely because all packets were sent.
+
+The client operation and amended failure/guard contract are source-backed, not runtime-tested. The second review and fresh independent completion audit passed for this revised mechanism; all Phase 1 gates are satisfied. Native update observation and confirmed-state behavior still require focused implementation tests in Phase 4 and live multiplayer checks in Phase 7. Documentation whitespace validation passed with git diff --check. No builds/tests or runtime transfers have been executed for this revision.
 
 Completion criteria:
 
-    ☐ Source-backed integration decisions and all blocking questions above are recorded before their consumers begin.
-    ☐ A safe authoritative transfer mechanism is identified; unsupported atomicity is not treated as an acceptable client-side fallback.
-    ☐ Intended feature/test locations and the focused validation commands are identified without implementing this plan during its creation.
+    ✔ Source-backed integration decisions and all blocking questions above are recorded before their consumers begin.
+    ✔ The native client bulk mechanism and its safety/reconciliation contract are verified; no custom server transaction or unproved atomicity is substituted.
+    ✔ Intended feature/test locations and the focused validation commands are identified without implementing this plan during its creation.
 
 ## Phase 2: Build the eligible catalogue and recipe-selection model
 
@@ -126,7 +237,7 @@ Completion criteria:
     ☐ Preview, missing lists, availability, and placement consume shared semantic results rather than separate matching implementations.
     ☐ Shift-click satisfies each objective before tie-breaking, including incomplete recipes; unsupported recipes cannot produce actionable allocations.
 
-## Phase 4: Implement safe authoritative transfer planning and execution
+## Phase 4: Implement native client bulk transfer planning and execution
 
 Dependencies: Phases 1 and 3.
 Outcome: supported allocations can safely rearrange the grid without crafting or losing items.
@@ -134,26 +245,27 @@ Outcome: supported allocations can safely rearrange the grid without crafting or
     ☐ Plan reuse, repositioning, and return of existing grid contents before execution.
         ☐ Validate destination acceptance, native restrictions, compatible merges, quantities, slot limits, and carried-storage capacity for every displaced item.
         ☐ Keep ingredient sufficiency independent from rearrangement capacity; report the latter as a placement failure.
-        ☐ Leave the original grid unchanged when displaced items cannot be returned; never drop items automatically.
+        ☐ Leave the original grid unchanged when preflight finds that displaced items cannot be returned; never drop items automatically.
         ☐ Reject no-usable-ingredient actions with an explicit reason rather than clearing an unrelated grid.
-    ☐ Implement the Phase 1 authoritative mechanism using native inventory operations.
-        ☐ Revalidate recipe identity, support/eligibility, eligible sources, destinations, quantities, and current inventory state on the authority.
-        ☐ Reject or recompute stale plans safely; ensure an unsafe rearrangement cannot partially commit.
-        ☐ Prevent duplication, loss, unauthorized access, output consumption, and direct client stack mutation.
-        ☐ Suppress duplicate pending requests and expose success/refusal results for UI reconciliation.
+    ☐ Implement the Phase 1 client-side bulk mechanism using native inventory operations and standard synchronization.
+        ☐ Revalidate selected recipe, support/eligibility, eligible sources, destinations, quantities, and current client inventory state before submission.
+        ☐ Reject or recompute locally stale/unsafe plans before execution; on observed native refusal stop unsent work, retain accepted transfers, let in-flight operations resolve natively, and reconcile without snapshot restoration or blind replay.
+        ☐ Prevent duplication, loss, unauthorized access, output consumption, and stack/attribute writes bypassing native inventory APIs.
+        ☐ Guard overlapping local execution, allow another click after dispatch as approved, and expose native failure/correction state without pretending to have a batch acknowledgement or adding custom mod server handlers/packets.
     ☐ Apply ordinary and shift-click plans through the same transfer-safety boundary.
         ☐ Refresh shared preview data from confirmed inventory state, not assumed client success.
         ☐ Leave existing output-taking and manual crafting code paths intact.
     ☐ Add focused transfer unit and integration/E2E tests, using existing network mocks and Category=Unit or Category=E2E appropriately.
         ☐ Cover grid reuse without double counting, full storage, incompatible destinations, mid-plan refusal, and zero usable ingredients.
-        ☐ Cover stale recipes/inventories, invalid or excluded source slots, invalid quantities/destinations, duplicate requests, and competing updates.
-        ☐ Assert exact unchanged state on unsafe failure and total item conservation on successful movement; assert no automatic crafting or output-taking.
+        ☐ Cover stale recipes/inventories, invalid or excluded source slots, invalid quantities/destinations, duplicate/reentrant local actions, competing updates, and another click during native reconciliation.
+        ☐ Distinguish intermediate server updates from actual corrective changes; observe applicable native update paths without duplicate notifications, invented refusal causes, or premature authoritative-success claims.
+        ☐ Assert exact unchanged state on local preflight refusal, and accepted-transfer preservation plus native reconciliation on later refusal, including already-in-flight packets; assert conservation and no automatic crafting/output-taking.
 
 Completion criteria:
 
-    ☐ Automated tests demonstrate safe complete commit or unchanged unsafe failure under the chosen authoritative mechanism.
+    ☐ Automated tests demonstrate the agreed preflight, native execution, and failure/reconciliation contract; no unverified all-or-nothing claim is inferred from packet batching.
     ☐ Both click modes use the same validated transfer boundary with explicit error results.
-    ☐ No client-only optimistic sequence is relied upon to meet atomicity, and native crafting remains separate.
+    ☐ Client placement uses standard native operations/synchronization without custom server transactions or direct stack edits, and native crafting remains separate.
 
 ## Phase 5: Integrate the popout and consistent player interactions
 
@@ -173,19 +285,19 @@ Outcome: the actual crafting panel exposes searchable previews and safe placemen
         ☐ On hover or keyboard focus show output name, ingredients, availability, and interaction hints.
         ☐ List all one-execution deficits, accepted alternatives, and accurate tool/special-requirement reasons.
         ☐ Keep shift-click tooltips about the first execution, not a hypothetical maximum-batch deficit.
-        ☐ Route ordinary and shift-click through authoritative placement and display concise refusal reasons.
+        ☐ Route ordinary and shift-click through the client native-operation coordinator and display concise refusal reasons.
         ☐ Use non-interactive missing-position outlines only if supported by existing UI; never materialize preview items.
     ☐ Update availability, deficits, and ordering after relevant inventory/recipe changes.
         ☐ Keep selection stable and defer visible reordering of hovered/interacting tiles until the interaction finishes.
         ☐ Revalidate clicks against current state even while visible ordering is deferred.
-        ☐ Suppress duplicate pending placement requests and reconcile with confirmed results.
+        ☐ Suppress overlapping placement actions and reconcile with native confirmed inventory state, without custom request/result messages.
     ☐ Add focused tests for state/input behavior where automated coverage is feasible and record separate live-client cases for rendering/input that require it.
         ☐ Use existing localization conventions for new labels, unavailable/unsupported states, hints, empty results, and refusal messages.
         ☐ Replace any Phase 2 score fixtures in production wiring with real Phase 3 results.
 
 Completion criteria:
 
-    ☐ GUI events use real catalogue/allocation/authority paths; no mock-backed runtime behavior or parallel matching logic remains.
+    ☐ GUI events use real client catalogue/allocation/native inventory paths; no mock-backed runtime behavior or parallel matching logic remains.
     ☐ Selected recipe, icon quantity, tooltip, score, and placement agree before and after updates.
     ☐ Automated interaction-state tests pass; live layout/input checks remain explicitly pending until Phase 7.
 
@@ -227,7 +339,7 @@ Outcome: source, automated, package, and user-run live evidence separately estab
         ☐ Verify browse/search discoverability, output variants, alternative selection/release, unknown/unsupported entries, empty results, and dynamic-output behavior.
         ☐ Verify hotbar/carried/grid sourcing, excluded inventories, all missing quantities, and updates after inventory changes.
         ☐ Verify ordinary partial placement and maximum-stack shift placement for shaped/shapeless, repeated, wildcard, restricted, attribute-sensitive, tool, and non-stackable cases.
-        ☐ Verify full-inventory and stale-state refusals leave unsafe rearrangements unchanged and communicate a reason.
+        ☐ Verify full-inventory/local preflight refusals leave state unchanged; observed native refusals retain accepted moves, stop unsent work, let in-flight operations resolve, reconcile, and communicate interruption/correction honestly.
         ☐ Verify manual output-taking/crafting still works after placement, including permitted surplus and tool durability behavior.
         ☐ Verify search focus, scrolling, hover/keyboard tooltips, stable hovered tiles, parent movement/closing, UI scaling, and small-screen placement.
         ☐ Verify actual multiplayer authoritative updates, competing inventory changes, stale/duplicate requests, and UI reconciliation without loss, duplication, drops, or unauthorized transfers.
@@ -248,7 +360,7 @@ Completion criteria:
     ☐ Availability/relevance/one-execution deficits use shared allocation, include existing grid quantities once, and update after relevant changes.
     ☐ Unsupported entries remain inspectable with unknown state and deterministic ordering, without invented scores/deficits or placement.
     ☐ Ordinary placement and joint lexicographic shift placement preserve native recipe, stack, attribute, tool, and layout semantics.
-    ☐ Full inventories, stale/duplicate requests, and competing updates cannot lose, duplicate, drop, or incorrectly consume items; unsafe transfers leave original state intact.
+    ☐ Local preflight refusals leave original state intact. Native partial refusals/competing updates cannot lose, duplicate, automatically drop, or incorrectly consume items; accepted moves are retained and explicitly reconciled without unsafe replay.
     ☐ Existing manual crafting/output-taking and usable panel/search/tooltip/small-screen behavior are verified in the live client.
     ☐ Source verification, focused tests, actual integration/multiplayer evidence, package validation, performance measurements, documentation, and cleanup are complete.
     ☐ Every requirement is implemented or covered by an explicitly approved proposal/plan amendment; no unapproved deferral is hidden by a checked completion box.

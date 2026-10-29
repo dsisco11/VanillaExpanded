@@ -6,7 +6,7 @@ Status: proposed; no implementation is implied by this document.
 
 Add a searchable crafting glossary as a popout attached to the player's crafting grid panel. Players can browse outputs, see which recipes their inventory supports, and place available ingredients into the grid with one click. The existing crafting output interaction remains responsible for actually crafting items.
 
-This document specifies proposed behavior. Engine integration points and repository conventions have not yet been verified because local workspace reads were unavailable when drafting it.
+This document specifies proposed behavior, not implemented functionality. Source-backed engine integration decisions, repository conventions, and remaining validation obligations are recorded in [CraftingMenu.todo](./CraftingMenu.todo), Phase 1.
 
 ## Scope
 
@@ -73,12 +73,14 @@ Recompute affected availability and ordering after relevant inventory or recipe 
 1. Resolve the selected recipe and a valid layout for the current grid. Preserve shaped arrangements; use a stable legal layout for shapeless recipes.
 2. Plan how existing grid contents will be reused, repositioned, or returned to eligible carried storage. Count existing grid ingredients only once.
 3. Allocate up to the required quantity for one execution in each recipe position. Populate available requirements even if other requirements remain missing.
-4. Validate the complete transfer plan, including destination acceptance, stack compatibility, and capacity for displaced items.
-5. Execute through the game's authoritative inventory mechanisms and refresh the preview from the resulting state.
+4. Preflight the complete transfer plan, including destination acceptance, stack compatibility, and capacity for displaced items, against the current client snapshot.
+5. Execute through the native client inventory operations and standard synchronization, then refresh the preview from the resulting state.
 
 If a requirement needs several units and only some are available, place those units. A requirement with no available ingredient remains empty. Missing positions may have non-interactive preview outlines if the existing UI supports them; preview content must never become real inventory stacks.
 
-If displaced items cannot be returned safely, leave the grid unchanged and show a concise reason. Do not drop items automatically. Clicking with no usable ingredients should not clear an unrelated grid merely to produce an empty layout; report that no matching ingredients are available.
+If preflight finds that displaced items cannot be returned safely, leave the grid unchanged and show a concise reason. Do not drop items automatically. Clicking with no usable ingredients should not clear an unrelated grid merely to produce an empty layout; report that no matching ingredients are available.
+
+Preflight refusal and native execution refusal are different states. If inventory changes after submission and a later native transfer is refused, accepted moves may remain. Stop issuing further placement moves when the refusal is observed, let already-submitted operations resolve through native synchronization, explain that placement was interrupted, and refresh from the confirmed state. Do not restore an old snapshot, blindly replay the whole placement, or claim that a client bulk action is an all-or-nothing transaction.
 
 ## Shift-click placement
 
@@ -110,9 +112,15 @@ Keep panel integration limited to attachment, visibility, and event wiring. Sepa
 
 The existing recipe system remains the authority for recipe semantics. The existing inventory system remains the authority for movement, merging, restrictions, and synchronization. The menu must not introduce a parallel crafting engine or mutate client inventory stacks directly.
 
-Before implementation, inspect the actual crafting-dialog lifecycle, loaded recipe registry, recipe matching APIs, inventory ownership, and transfer protocol. Determine whether existing transfers support a validated multi-slot operation. If they do not, the design needs an authoritative operation that revalidates and safely commits the plan; sequential optimistic client moves are insufficient to guarantee the unchanged-on-failure behavior above.
+Ingredient placement is a client-side bulk inventory operation built on the game's existing inventory APIs and normal synchronization. Catalogue construction, recipe selection, allocation, and transfer planning stay on the client. Do not introduce a custom server-side placement operation, server-owned catalogue, or feature-specific request/result protocol.
 
-In multiplayer, validate recipe identity, eligible source slots, destination slots, quantities, and current inventory state on the authority responsible for inventory changes. Treat stale previews as expected: reject or recompute stale requests without duplication, loss, or unauthorized inventory access. Suppress duplicate pending requests and reconcile the UI with the confirmed result.
+Before implementation, inspect the actual crafting-dialog lifecycle, client-loaded recipe registry, recipe matching APIs, inventory ownership, and native bulk-transfer protocol. Identify the exact native API and its validation, partial-failure, and synchronization behavior. Preflight the complete rearrangement and revalidate the client snapshot before invoking it; never replace normal inventory operations with direct stack/attribute writes.
+
+In multiplayer, the game remains responsible for accepting inventory transfers and synchronizing authoritative state through its existing protocol. Treat stale previews as expected, suppress overlapping local placement execution, and reconcile with native inventory updates. The user approved a local execution guard: another click is allowed after the current client placement burst has been dispatched, without waiting for a whole-batch acknowledgement. Server reconciliation may still be pending and can affect an earlier placement. Do not equate release of the guard with authoritative success.
+
+The user-approved failure contract is unchanged state on local preflight refusal, and ordinary native partial progress plus reconciliation on a later transfer refusal; there is no whole-arrangement rollback guarantee. Notify interruption when native execution refuses a move or authoritative correction invalidates the projected arrangement. When only a state correction is observable, explain that placement may be incomplete rather than inventing a refusal reason or claiming a confirmed batch outcome.
+
+Use the native inventory open/transfer/synchronize lifecycle. Reuse inventories already opened by the parent panel and do not close the crafting grid merely to flush changes; its normal closing behavior may return or drop contents. Native manager transfer calls return operation packets, which the client sends through the normal inventory network API. Closing an inventory is a lifecycle operation, not a commit of arbitrary direct stack edits; no unsupported flush or update-pausing semantics are required.
 
 ## Catalogue lifecycle and performance
 
@@ -133,17 +141,16 @@ Performance targets should be set after measuring representative vanilla and hea
 - Ordinary clicks on supported recipes populate available ingredients for one execution, respecting shaped and shapeless layouts.
 - Shift-click on supported recipes maximizes legal placement under the joint, lexicographic shared-allocation policy, including incomplete recipes, repeated ingredients, and reconsideration of preliminary variant choices before inventory-order tie-breaking.
 - Wildcards, restricted alternatives, attribute-sensitive stacks, tools, non-stackable items, and output variants retain native semantics.
-- A full inventory or stale request cannot lose, duplicate, drop, or incorrectly consume items; unsafe rearrangements leave the original state intact.
+- A failed local preflight, including insufficient space for displaced contents, leaves the original state intact. Native execution cannot lose, duplicate, automatically drop, or incorrectly consume items; if later transfers are refused, earlier accepted moves may remain and the UI reconciles explicitly with native authoritative state.
 - Existing output-taking and manual crafting behavior continues to work after placement.
 - Search focus, scrolling, tooltip display, panel closing, UI scale, and small-screen placement are usable in the live client.
 - Multiplayer behavior is checked with authoritative inventory updates and competing inventory changes.
 
 Future implementation should use focused automated tests for allocation and transfer invariants, followed by user-run live-client checks for layout, interaction, and synchronization. This proposal itself changes no code and establishes no tested runtime behavior.
 
-## Decisions to revisit before implementation
+## Pre-implementation decisions
 
-- Confirm that the initial glossary should cover grid recipes only; broader crafting processes require a separate browsing and navigation design.
-- Confirm quantity-based relevance versus weighting each ingredient type equally.
-- Verify the exact carried inventories eligible for sourcing and returning items.
-- Confirm the alternative-recipe control and the detailed handling of dynamic mod outputs after inspecting existing UI conventions, retaining the unsupported-recipe baseline defined above.
-- Verify authoritative transfer support before committing to an implementation mechanism.
+- The user confirmed grid-only scope and quantity-based relevance.
+- Eligible carried slots and exclusions are recorded against native sources in [CraftingMenu.todo](./CraftingMenu.todo), Phase 1; runtime permissions and capacity still require action-time validation.
+- The user selected a compact alternative chooser with Auto or tile deselection releasing an explicit choice. Dynamic outputs use honest generic identities/previews, with placement unsupported unless native semantics or a verified adapter establish safe support.
+- Placement uses native client inventory manager operations and sends their returned standard packets. The user approved partial-progress reconciliation and a local execution guard, not a custom server transaction or whole-batch acknowledgement. Phase 1 records the integration mechanism; later phases must implement and test it.
