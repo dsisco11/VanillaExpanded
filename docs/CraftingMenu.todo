@@ -300,7 +300,7 @@ Completion criteria:
 
 ### Phase 4 working evidence and traceability (2026-10-28)
 
-Status: the original implementation passed second review and independent full/affected-requirement audits. The user subsequently approved removal of immutable-recipe defenses and packet-level reconciliation tracking. The current native-event design supersedes those parts of the audited baseline; current verification is recorded below. Full-contents refresh coverage remains explicitly pending Phase 5 integration.
+Status: the original implementation passed second review and independent full/affected-requirement audits. The user subsequently approved removal of immutable-recipe defenses and packet-level reconciliation tracking. The native-event design supersedes those parts of the audited baseline; its verification is recorded below. The full-contents refresh gap left by this phase is now resolved by the Phase 5 GUI lifecycle bridge and installed-native regression.
 
 Controlling sources consulted: this phase and its inherited proposal, Phase 1's selected native operation/failure contract and source baseline, Phase 3's source-backed allocation boundary, repository instructions, and project.todo conventions. Native inventory source is the read-only 1.22.7 checkout identified in Phase 1; concrete manager/network methods were rechecked in installed VintagestoryLib.dll 1.22.7.0. No native sources were modified.
 
@@ -318,35 +318,53 @@ Controlling sources consulted: this phase and its inherited proposal, Phase 1's 
 Dependencies: Phases 2, 3, and 4.
 Outcome: the actual crafting panel exposes searchable previews and safe placement actions.
 
-    ☐ Add the crafting-menu toggle beside the grid with attachment, visibility, and event wiring kept narrow.
-        ☐ Follow and close with the parent panel; adapt attachment side to screen space.
-        ☐ Keep the grid unobscured and the popout inside the viewport at small screen sizes and supported UI scales.
-        ☐ Render a search bar and scrollable output-tile grid using native item-icon rendering.
-    ☐ Bind tiles and alternative controls to the shared selected-recipe state.
-        ☐ Display output icon/quantity, alternative indicator, and chooser/cycle control.
-        ☐ Grey unavailable supported tiles without removing hover/focus/click interactions; add a non-color unavailable marker.
-        ☐ Show unsupported state/reason and disable both placement actions without blocking inspection or alternative selection.
-        ☐ Preserve explicit selection and release it through the agreed interaction.
-    ☐ Implement search, keyboard focus, scrolling, and empty-result feedback.
-        ☐ On hover or keyboard focus show output name, ingredients, availability, and interaction hints.
-        ☐ List all one-execution deficits, accepted alternatives, and accurate tool/special-requirement reasons.
-        ☐ Keep shift-click tooltips about the first execution, not a hypothetical maximum-batch deficit.
-        ☐ Route ordinary and shift-click through the client native-operation coordinator and display concise refusal reasons.
-        ☐ Use non-interactive missing-position outlines only if supported by existing UI; never materialize preview items.
-    ☐ Update availability, deficits, and ordering after relevant inventory/recipe changes.
-        ☐ Resolve and validate native crafting-grid full-contents refresh coverage without packet interception; that path bypasses SlotModified/MarkedDirty and currently exposes only native rendering dirty-slot state. Do not claim complete event coverage until this is proven.
-        ☐ Keep selection stable and defer visible reordering of hovered/interacting tiles until the interaction finishes.
-        ☐ Revalidate clicks against current state even while visible ordering is deferred.
-        ☐ Suppress overlapping local placement dispatch, refresh from current inventory via native notifications, and leave authoritative reconciliation to the game without custom request/result messages.
-    ☐ Add focused tests for state/input behavior where automated coverage is feasible and record separate live-client cases for rendering/input that require it.
-        ☐ Use existing localization conventions for new labels, unavailable/unsupported states, hints, empty results, and refusal messages.
-        ☐ Replace any Phase 2 score fixtures in production wiring with real Phase 3 results.
+    ✔ Add the crafting-menu toggle beside the grid with attachment, visibility, and event wiring kept narrow.
+        ✔ Follow and close with the parent panel; adapt attachment side to screen space.
+        ✔ Keep the grid unobscured and the popout inside the viewport at small screen sizes and supported UI scales.
+        ✔ Render a search bar and scrollable output-tile grid using native item-icon rendering.
+    ✔ Bind tiles and alternative controls to the shared selected-recipe state.
+        ✔ Display output icon/quantity, alternative indicator, and chooser/cycle control.
+        ✔ Grey unavailable supported tiles without removing hover/focus/click interactions; add a non-color unavailable marker.
+        ✔ Show unsupported state/reason and disable both placement actions without blocking inspection or alternative selection.
+        ✔ Preserve explicit selection and release it through the agreed interaction.
+    ✔ Implement search, keyboard focus, scrolling, and empty-result feedback.
+        ✔ On hover or keyboard focus show output name, ingredients, availability, and interaction hints.
+        ✔ List all one-execution deficits, accepted alternatives, and accurate tool/special-requirement reasons.
+        ✔ Keep shift-click tooltips about the first execution, not a hypothetical maximum-batch deficit.
+        ✔ Route ordinary and shift-click through the client native-operation coordinator and display concise refusal reasons.
+        ✔ Use non-interactive missing-position outlines only if supported by existing UI; never materialize preview items.
+    ✔ Update availability, deficits, and ordering after relevant inventory/recipe changes.
+        ✔ Resolve and validate native crafting-grid full-contents refresh coverage without packet interception; that path bypasses SlotModified/MarkedDirty and currently exposes only native rendering dirty-slot state. Do not claim complete event coverage until this is proven.
+        ✔ Keep selection stable and defer visible reordering of hovered/interacting tiles until the interaction finishes.
+        ✔ Revalidate clicks against current state even while visible ordering is deferred.
+        ✔ Suppress overlapping local placement dispatch, refresh from current inventory via native notifications, and leave authoritative reconciliation to the game without custom request/result messages.
+    ✔ Add focused tests for state/input behavior where automated coverage is feasible and record separate live-client cases for rendering/input that require it.
+        ✔ Use existing localization conventions for new labels, unavailable/unsupported states, hints, empty results, and refusal messages.
+        ✔ Replace any Phase 2 score fixtures in production wiring with real Phase 3 results.
 
 Completion criteria:
 
-    ☐ GUI events use real client catalogue/allocation/native inventory paths; no mock-backed runtime behavior or parallel matching logic remains.
-    ☐ Selected recipe, icon quantity, tooltip, score, and placement agree before and after updates.
-    ☐ Automated interaction-state tests pass; live layout/input checks remain explicitly pending until Phase 7.
+    ✔ GUI events use real client catalogue/allocation/native inventory paths; no mock-backed runtime behavior or parallel matching logic remains.
+    ✔ Selected recipe, icon quantity, tooltip, score, and placement agree before and after updates.
+    ✔ Automated interaction-state tests pass; live layout/input checks remain explicitly pending until Phase 7.
+
+### Phase 5 working evidence and traceability (2026-10-28)
+
+Status: the original Phase 5 implementation completed second review, delegated verification and independent full/affected-requirement completion audits. The full audit found a misplaced shapeless-competition loop and omitted tag explanations; both were fixed, covered by regressions, and independently rechecked as resolved. The subsequent user-requested native-GUI abstraction refactor and its separate verification are recorded below; the earlier audits do not cover that refactor. This is not a live-client, performance or packaging acceptance claim.
+
+Controlling sources consulted: inherited proposal (Scope, Player experience, Outputs and alternative recipes, Relevance and availability, Missing-ingredient tooltip, both placement modes, implementation boundaries and catalogue lifecycle), Phase 1 native integration decisions, Phase 2 catalogue/selection, Phase 3 allocation/support policy, Phase 4 native transfer/event contract, repository instructions and project.todo conventions. Native sources remain read-only at the Phase 1 revisions; installed concrete GUI/event/inventory methods were inspected in 1.22.7.0.
+
+- Toggle/attachment/rendering tasks -> proposal Player experience and Phase 1 GUI traceability -> CraftingMenuDialogPatch observes only ComposeSurvivalInvDialog and receives its actual newly built composer. CraftingMenuSystem adds an idempotently keyed native button directly to the already-composed GUI, recomposes, and leaves native inputs/output untouched. GuiDialogCraftingMenu uses parent-relative ElementBounds, composer child scopes and native clipping, closes/disposes on parent/world closure or composer replacement, and recomposes on size/scale changes. CraftingMenuLayout retains only attachment policy: first try the parent's right/left side, then free space outside the entire input/output bounding rectangle. There is no parallel rectangle model. Native-bounds tests cover parent movement/padding, representative 800x600, 1280x720 and 1920x1080 viewports and scales 1, 1.5 and 2. A physically impossible viewport produces an explicit resize/reduce-scale refusal rather than covering the grid. Actual visual usability is not inferred from geometry.
+- Shared selection/inspection/input tasks -> proposal Outputs, Relevance, Missing tooltip and both placement modes -> CraftingMenuSession wires real catalogue candidate discovery and Phase 3 allocations, not score fixtures. Hover/pressed/keyboard interaction freezes visible order and automatic recipe identity while replacing that recipe's current allocation/deficits. Leaving the interaction commits ordering. Alternative arrows pin a recipe, Auto releases it, and selecting another tile releases the old pin. Native search input/scrollbar, GuiElementContainer and image-only GuiElementTextButton subclasses own mouse capture, hit testing, button visuals, focus and Tab traversal. The grid adapter retains bounded row recycling, virtual-row focus navigation, arrows, Space/Shift activation and session binding. Native composer clips and owns the tooltip; there is no custom scissor or render-loop pointer polling. Only visible tiles use native RenderItemstackToGui. Markers !/?/+ supplement greying. Tooltip ingredients, first-execution deficits, allowed/skipped choices, tool durability reasons, generic-preview disclaimer and action hints all use the same selected recipe. Unsupported entries remain inspectable and selectable without dispatch.
+- Production eligibility/support binding -> proposal Scope and Phase 1 recipe source evidence -> CraftingClientPolicy uses CharacterSystem.HasTrait, the native access rule, when building the catalogue. It certifies only absent or exact native CharacterSystem recipe-event handlers; unverified handlers produce an explicit unsupported state. Native-winner ambiguity is conservatively unsupported, including padded layouts and native shapeless merging across different declared ingredient counts. This disjointness check does not choose a winner or override native Matches; the allocator retains complete-layout native validation. Unknown custom recipe classes cannot certify ordinary recipes they might override. No new permissive policy default or hypothetical output callbacks are introduced.
+- Refresh/placement tasks -> proposal Catalogue lifecycle and Phase 4 notifications/native synchronization -> native SlotModified and the new GuiElementCraftingRefresh coalesce through the existing coordinator queue. The custom element's earlier DrawOrder observes output DirtySlots[9] in PostRenderInteractiveElements before the native output element consumes it. It does not patch rendering/packets, consume flags or run allocation per frame. An installed-native contents/update/finalization regression proves this previously documented gap is covered. Clicks still capture fresh inventory through the Phase 4 coordinator even with frozen previews; standard packets, local guard, partial progress and native output-taking remain unchanged. Actual registry rebuild wiring and longer-lived catalogue caching remain the explicitly assigned Phase 6 work.
+- Automated interaction tasks -> proposal acceptance criteria -> CraftingMenuInteractionTests covers real allocation/dispatch for both inputs, fresh-state refusal while ordering is frozen, automatic/explicit alternative stability, unknown-state refusal, every first-execution deficit and wildcard choices, empty search, keyboard/mouse routing, native scrollbar behavior, access/event policy and representative geometry. The installed-native GUI refresh regression remains Category=E2E, not live multiplayer evidence. Tests reference the installed cairo-sharp assembly and copy the installed Windows native Cairo library into test output for native button/font construction; no PATH workaround is required. Headless scrollbar tests bypass only texture generation, not input/state logic. GUI-scale changes are isolated in a nonparallel test collection and restored.
+
+Observed delegated verification: dotnet test .\VanillaExpanded.Tests\VanillaExpanded.Tests.csproj --no-restore --filter "FullyQualifiedName~CraftingMenu" passed 163 tests, 0 failed, 0 skipped; production/test compilation succeeded with 34 unrelated existing warnings and no CraftingMenu warnings. git diff --check and localization JSON parsing passed. Second review checked the source requirements and production wiring, including already-composed native button insertion, disposal/scale/minimize handling, native shapeless merging, scrollbar/focus state and stationary-pointer keyboard precedence. Affected review additionally verified the shapeless-only registry scan and localized tag explanations against ComplexTagCondition.Matches and ITagRegistry.SlowEnumerateTagNames: outer AND/OR, inner any/all, forbidden tags and empty-required choices are explicit in both ingredients and deficits. Tag-name lookup uses the native client registry; tests check native positive/negative matching examples. Independent audit and affected recheck concluded Phase 5 fully satisfied. Missing-position outlines are optional and omitted; no preview item is installed in any inventory. No separate audit report file is required.
+
+Separate live-client cases, intentionally pending Phase 7: toggle/recompose after changing backpack rows or game mode; follow a moved parent and resize/minimize/restore; inspect both attachment sides at supported UI scales and the smallest practical viewport; browse/scroll a long catalogue; Tab/arrow/search focus and mouse/keyboard tooltips; alternatives including unsupported entries and Auto release; concurrent native single/double/full-contents updates with a stationary pointer; ordinary/Shift placement followed by manual output-taking; parent/world closure during queued refresh. Live multiplayer, packaging, representative timings/thresholds and broad compatibility are not claimed here.
+
+Native-GUI follow-up verification: the focused CraftingMenu command above passed 165 tests, 0 failed, 0 skipped, with normal inherited PATH, successful production/test compilation and no CraftingMenu warnings (34 unrelated existing warnings). Added regressions prove a 256-recipe list uses six recycled native buttons in a 96x72 viewport; forward/reverse Tab traverses virtual rows and enters/exits both ends correctly; native clipping rejects overscan clicks; mouse press/release remains bound to one recipe during refresh, attempted scrolling and partially visible-row focus; keyboard activation restores focused-tile inspection without stationary-pointer polling. Existing allocation, native transfer and full-contents refresh coverage still passes. No new independent completion audit or live-client rendering run was performed for this refactor. Phase 6 lifecycle/performance work and Phase 7 live acceptance remain pending.
 
 ## Phase 6: Complete catalogue/resource lifecycle and measure performance
 

@@ -124,7 +124,7 @@ internal sealed class CraftingTransferCoordinator : IDisposable
         subscriptions.Add((inventory, Changed));
     }
 
-    private void QueueRefresh()
+    internal void QueueRefresh()
     {
         if (disposed || refreshQueued) return;
         CraftingInventorySnapshot.EnsureThread(thread);

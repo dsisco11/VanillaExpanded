@@ -20,6 +20,8 @@ For this design, the player's recipe visibility, access rules, and grid dimensio
 
 A crafting-menu button beside the crafting grid toggles the attached popout. It contains a search bar and a scrollable tile grid of output item icons. The popout follows the parent panel, closes with it, and adapts its attachment side to available screen space. On small screens it must remain usable without covering the crafting grid or extending beyond the viewport.
 
+Use the game's composer, native bounds hierarchy, clipping, containers and controls for layout, focus and input. Custom GUI behavior should be limited to attachment-side policy, bounded tile virtualization and recipe-specific presentation/actions. Recipe previews are non-transferable controls, not synthetic inventory slots.
+
 Each tile shows an output icon and the recipe's output quantity. Fully available recipes appear normally. Unavailable recipes are greyed out but retain hover, focus, and click interactions. An additional unavailable marker avoids relying on color alone.
 
 Search filters by localized output name, with item-code matching as a secondary convenience. Matching ignores case and trims whitespace; multiple words must all match. Search filters the catalogue without replacing inventory relevance ordering. Empty searches show the full catalogue, and an empty result set displays a clear message.
@@ -132,7 +134,7 @@ The user selected complete recomputation from a fresh snapshot when eligible inv
 
 Recipe visibility, access rules, and grid dimensions are immutable between these rebuilds under the Scope assumption, so no independent player-eligibility refresh is required.
 
-Native slot notifications should schedule a coalesced refresh from current inventory while the popout is open, including notifications caused by placement itself. They are invalidation signals, not server acknowledgements. The installed crafting-grid full-contents synchronization path bypasses both SlotModified and MarkedDirty notifications; this is a known GUI-integration coverage gap to resolve and validate explicitly, not permission to reintroduce packet interception or claim complete notification coverage.
+Native slot notifications schedule a coalesced refresh from current inventory while the popout is open, including notifications caused by placement itself. They are invalidation signals, not server acknowledgements. The installed crafting-grid full-contents synchronization path bypasses both SlotModified and MarkedDirty notifications. A feature-owned GUI element observes the native output dirty-slot flag before native slot-grid finalization consumes it and schedules the same refresh. This is native GUI lifecycle integration, not packet or rendering-method interception; it neither clears native flags nor evaluates recipes every frame. Controlled installed-native tests cover contents replacement and the native output element clearing the flag; live-client coverage remains a separate validation obligation.
 
 Render only visible tiles for large catalogues, reuse the game's item-icon rendering, and release GUI/render resources when the panel or world closes. Any deferred computation must use safe snapshots and discard stale results; game-owned mutable inventory data must remain on its owning thread.
 

@@ -137,6 +137,47 @@ public sealed class CraftingNativeTransferTests
     }
 
     [Fact]
+    public void NativeCraftingContentsIsObservedBeforeNativeGuiClearsOutputDirtyState()
+    {
+        using var f = new TransferFixture(2, 2);
+        f.F.Catalogue.Index.Clear();
+        var grid = new InventoryCraftingGrid("craftinggrid-native", null!) { Api = f.F.Api.Object };
+        grid.InvNetworkUtil.Api = f.F.Api.Object;
+        var world = Resolver(f.Ingredient(1));
+        var api = new Mock<ICoreClientAPI>();
+        var gui = new Mock<IGuiAPI>();
+        gui.SetupGet(value => value.Icons).Returns(new IconUtil(api.Object));
+        api.SetupGet(value => value.Gui).Returns(gui.Object);
+        var bridge = new GuiElementCraftingRefresh(api.Object, ElementBounds.Fixed(0, 0, 0, 0),
+            grid, f.Coordinator.QueueRefresh);
+        var output = new GuiElementItemSlotGrid(api.Object, grid, _ => { }, 1,
+            new[] { 9 }, ElementBounds.Fixed(0, 0, 48, 48));
+        // This is the flag set by native composer construction for the final grid element.
+        typeof(GuiElementItemSlotGridBase).GetField("isLastSlotGridInComposite",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .SetValue(output, true);
+        var contents = new Packet_InventoryContents();
+        contents.SetItemstacks(new[] { StackConverter.ToPacket(f.Ingredient(1)) });
+        ((CraftingInventoryNetworkUtil)grid.InvNetworkUtil).UpdateFromPacket(world, contents);
+        Assert.Contains(9, grid.DirtySlots);
+        Assert.True(bridge.DrawOrder < output.DrawOrder);
+        bridge.PostRenderInteractiveElements(0);
+        bridge.PostRenderInteractiveElements(0);
+        Assert.Single(f.RefreshQueue);
+        // No composition or graphics context is needed for an empty native output.
+        output.PostRenderInteractiveElements(0);
+        Assert.DoesNotContain(9, grid.DirtySlots);
+        f.Refresh();
+        Assert.Equal(1, f.Refreshes);
+        bridge.PostRenderInteractiveElements(0);
+        Assert.Empty(f.RefreshQueue);
+        f.Coordinator.Dispose();
+        ((CraftingInventoryNetworkUtil)grid.InvNetworkUtil).UpdateFromPacket(world, contents);
+        bridge.PostRenderInteractiveElements(0);
+        Assert.Empty(f.RefreshQueue);
+    }
+
+    [Fact]
     public void ConcurrentInventoryChangeStopsDispatchWithoutCancellingInFlightPackets()
     {
         using var f = new TransferFixture(2, 4, positions: 2);
