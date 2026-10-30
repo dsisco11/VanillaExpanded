@@ -52,6 +52,7 @@ The menu is enabled by default. With ConfigLib installed, use **Pause menu > Mod
 - **Shift-click a recipe:** fill its ingredient positions as far as available stock and stack limits allow, even if another ingredient is missing.
 - **Craft normally afterward:** click the vanilla crafting result slot. The menu only moves ingredients; it never takes the result or crafts automatically.
 - **Colors:** full color means ingredients are available, grey means ingredients are missing, and near-black means placement is unsupported. Unsupported entries remain searchable and inspectable; their tooltips explain the limitation.
+- **Alternatives:** `+` marks outputs with multiple recipes. The counter below the list shows the selected recipe; `*` means it is pinned until you choose **Auto**.
 
 Ingredients come from your ordinary hotbar, backpack storage and the nine crafting-grid inputs. The result slot, cursor-held stack, off-hand/equipment, bag-equipping slots and remote containers are excluded. This menu handles the native 3x3 crafting grid, not cooking, smithing, knapping, clay forming or other workstations.
 

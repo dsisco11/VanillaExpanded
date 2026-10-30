@@ -314,7 +314,7 @@ public sealed class CraftingMenuInteractionTests
             width * .6 / scale, height * .8 / scale).WithParent(window));
         var grid = Calculated(ElementBounds.Fixed(width * .4 / scale, height * .1 / scale,
             width * .18 / scale, height * .5 / scale).WithParent(parent));
-        var rect = CraftingMenuLayout.Place(parent, grid, grid, window);
+        var rect = CraftingMenuLayout.Place(parent, grid, grid, window, 200, 164);
         Assert.NotNull(rect);
         rect.CalcWorldBounds();
         Assert.Same(parent, rect.ParentBounds);
@@ -322,7 +322,7 @@ public sealed class CraftingMenuInteractionTests
         Assert.InRange(rect.absY, 0, height - rect.OuterHeight);
         Assert.True(rect.absX + rect.OuterWidth <= grid.absX || rect.absX >= grid.absX + grid.OuterWidth
             || rect.absY + rect.OuterHeight <= grid.absY || rect.absY >= grid.absY + grid.OuterHeight);
-        Assert.True(rect.OuterWidth >= 120 * scale);
+        Assert.True(rect.OuterWidth >= 200 * scale);
         Assert.True(rect.OuterHeight >= 164 * scale);
     }
 
@@ -333,7 +333,7 @@ public sealed class CraftingMenuInteractionTests
         var window = Calculated(ElementBounds.Fixed(0, 0, 1200, 700).WithEmptyParent());
         var parent = Calculated(ElementBounds.Fixed(200, 30, 500, 500).WithFixedPadding(4).WithParent(window));
         var grid = Calculated(ElementBounds.Fixed(300, 70, 150, 200).WithParent(parent));
-        var right = CraftingMenuLayout.Place(parent, grid, grid, window)!;
+        var right = CraftingMenuLayout.Place(parent, grid, grid, window, 200, 164)!;
         right.CalcWorldBounds();
         Assert.True(right.absX >= parent.absX + parent.OuterWidth);
         double before = right.absX;
@@ -344,11 +344,11 @@ public sealed class CraftingMenuInteractionTests
         parent.fixedX = 650;
         parent.MarkDirtyRecursive();
         parent.CalcWorldBounds();
-        var left = CraftingMenuLayout.Place(parent, grid, grid, window)!;
+        var left = CraftingMenuLayout.Place(parent, grid, grid, window, 200, 164)!;
         left.CalcWorldBounds();
         Assert.True(left.absX + left.OuterWidth <= parent.absX);
         var tiny = Calculated(ElementBounds.Fixed(0, 0, 100, 100).WithEmptyParent());
-        Assert.Null(CraftingMenuLayout.Place(tiny, tiny, tiny, tiny));
+        Assert.Null(CraftingMenuLayout.Place(tiny, tiny, tiny, tiny, 200, 164));
     }
 
     [Fact]

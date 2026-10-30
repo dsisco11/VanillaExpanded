@@ -16,6 +16,88 @@ namespace VanillaExpanded.Tests.Unit.CraftingMenu;
 public sealed class CraftingMenuLifecycleTests
 {
     [Theory]
+    [InlineData(1, false)]
+    [InlineData(1.5, false)]
+    [InlineData(2, false)]
+    [InlineData(1, true)]
+    [InlineData(1.5, true)]
+    [InlineData(2, true)]
+    public void ComposedControlsStaySeparatedAtMinimumSizeAndAfterResize(float scale, bool longLabels)
+    {
+        using var f = new MenuFixture(scale: scale, longLabels: longLabels);
+        f.Parent.TryOpen();
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        AssertLayout(menu);
+        var originalComposer = menu.SingleComposer;
+        var title = originalComposer.GetTitleBar("titlebar");
+        var search = originalComposer.GetTextInput("search");
+        double counterWidth = Math.Ceiling(CairoFont.WhiteSmallText().GetTextExtents("1/1*").Width / scale + 1);
+        double footerWidth = new[] { "previous", "auto", "next" }
+            .Sum(key => originalComposer.GetElement(key).Bounds.OuterWidth / scale) + 6 + 4 + counterWidth + 16;
+        double titleWidth = GuiStyle.ElementToDialogPadding + title.Font.GetTextExtents(title.GetText()).Width / scale
+            + 8 + 2 * GuiElementDialogTitleBar.unscaledCloseIconSize + 2 + 20;
+        double minimumWidth = Math.Ceiling(Math.Max(footerWidth, titleWidth));
+        double minimumHeight = Math.Ceiling(GuiStyle.TitleBarHeight + 8 + search.Bounds.OuterHeight / scale
+            + 8 + GuiElementCraftingTiles.TileSize + 10
+            + originalComposer.GetElement("auto").Bounds.OuterHeight / scale + 8);
+        search.SetValue("preserved search");
+        f.ResizePanelSpace(minimumWidth, minimumHeight);
+        menu.TryOpen();
+        Assert.NotSame(originalComposer, menu.SingleComposer);
+        Assert.Equal(minimumWidth, menu.SingleComposer.Bounds.fixedWidth, 4);
+        Assert.Equal(minimumHeight, menu.SingleComposer.Bounds.fixedHeight, 4);
+        Assert.Equal("preserved search", menu.SingleComposer.GetTextInput("search").GetText());
+        AssertLayout(menu);
+        foreach (string key in new[] { "previous", "auto", "next" }) f.Click(menu.SingleComposer.GetElement(key));
+        f.ResizePanelSpace(Math.Max(320, minimumWidth), 420);
+        menu.TryOpen();
+        Assert.Equal("preserved search", menu.SingleComposer.GetTextInput("search").GetText());
+        AssertLayout(menu);
+
+        static void AssertLayout(GuiDialogCraftingMenu menu)
+        {
+            var composer = menu.SingleComposer;
+            var panel = composer.Bounds;
+            var title = composer.GetTitleBar("titlebar");
+            var search = composer.GetTextInput("search").Bounds;
+            var viewport = composer.GetElement("tiles").InsideClipBounds;
+            var scroll = composer.GetScrollbar("scroll").Bounds;
+            var empty = composer.GetDynamicText("empty").Bounds;
+            var previous = composer.GetElement("previous").Bounds;
+            var auto = composer.GetElement("auto").Bounds;
+            var next = composer.GetElement("next").Bounds;
+            var counter = composer.GetDynamicText("alternative").Bounds;
+            double scale = GuiElement.scaled(1);
+            Assert.True(title.Bounds.absY + title.Bounds.OuterHeight + 8 * scale <= search.absY + .001);
+            Assert.True(search.absY + search.OuterHeight + 8 * scale <= viewport.absY + .001);
+            Assert.True(viewport.InnerHeight + .001 >= GuiElementCraftingTiles.TileSize * scale);
+            Assert.True(viewport.absX + viewport.OuterWidth + 4 * scale <= scroll.absX + .001);
+            Assert.Equal(viewport.absY, scroll.absY, 4);
+            Assert.Equal(viewport.OuterHeight, scroll.OuterHeight, 4);
+            Assert.True(viewport.absY + viewport.OuterHeight + 10 * scale <= previous.absY + .001);
+            Assert.True(previous.absX + previous.OuterWidth + 3 * scale <= auto.absX + .001);
+            Assert.True(auto.absX + auto.OuterWidth + 3 * scale <= next.absX + .001);
+            Assert.True(next.absX + next.OuterWidth + 4 * scale <= counter.absX + .001);
+            double titleTextRight = title.Bounds.absX + GuiElement.scaled(GuiStyle.ElementToDialogPadding)
+                + title.Font.GetTextExtents(title.GetText()).Width;
+            double titleMenuLeft = title.Bounds.absX + title.Bounds.OuterWidth
+                - GuiElement.scaled(2 * GuiElementDialogTitleBar.unscaledCloseIconSize + 2 + 20);
+            Assert.True(titleTextRight + 8 * scale <= titleMenuLeft + .001);
+            foreach (var bounds in new[] { search, viewport, scroll, previous, auto, next, counter })
+            {
+                Assert.True(bounds.absX >= panel.absX + 8 * scale - .001);
+                Assert.True(bounds.absX + bounds.OuterWidth <= panel.absX + panel.InnerWidth - 8 * scale + .001);
+                Assert.True(bounds.absY + bounds.OuterHeight <= panel.absY + panel.InnerHeight - 8 * scale + .001);
+            }
+            Assert.True(empty.absX >= viewport.absX);
+            Assert.True(empty.absY >= viewport.absY);
+            Assert.True(empty.absX + empty.OuterWidth <= viewport.absX + viewport.InnerWidth + .001);
+            Assert.True(empty.absY + empty.OuterHeight <= viewport.absY + viewport.InnerHeight + .001);
+        }
+    }
+
+    [Theory]
     [InlineData(true, EnumAppSide.Client, true)]
     [InlineData(false, EnumAppSide.Client, false)]
     [InlineData(true, EnumAppSide.Server, false)]
@@ -486,7 +568,7 @@ public sealed class CraftingMenuLifecycleTests
 
     private sealed class MenuFixture : IDisposable
     {
-        private readonly CraftingRenderFixture graphics = new();
+        private readonly CraftingRenderFixture graphics;
         internal readonly LifecycleFixture Lifecycle;
         internal readonly ParentDialog Parent;
         private readonly List<GuiDialog> loaded = new();
@@ -497,12 +579,19 @@ public sealed class CraftingMenuLifecycleTests
         internal GuiElementTextButton ToggleButton =>
             (GuiElementTextButton)Parent.Composers["maininventory"].GetElement("vanillaexpanded-crafting-toggle");
 
-        internal MenuFixture(bool enabled = true)
+        internal MenuFixture(bool enabled = true, float scale = 1, bool longLabels = false)
         {
+            graphics = new CraftingRenderFixture(scale);
             Lifecycle = new LifecycleFixture(enabled);
             var translations = new Mock<ITranslationService>();
             translations.Setup(value => value.Get(It.IsAny<string>(), It.IsAny<object[]>()))
-                .Returns((string key, object[] _) => key);
+                .Returns((string key, object[] _) => key switch
+                {
+                    "vanillaexpanded:craftingmenu-title" => longLabels ? "Available crafting recipes" : "Crafting recipes",
+                    "vanillaexpanded:craftingmenu-auto" => longLabels ? "Automatic selection" : "Auto",
+                    "vanillaexpanded:craftingmenu-empty" => "No matching recipes.",
+                    _ => key
+                });
             Lang.AvailableLanguages["en"] = translations.Object;
             Lang.ChangeLanguage("en");
             var api = Lifecycle.Api;
@@ -558,12 +647,30 @@ public sealed class CraftingMenuLifecycleTests
 
         internal void Toggle()
         {
-            var button = Parent.Composers["maininventory"].GetElement("vanillaexpanded-crafting-toggle");
+            Click(Parent.Composers["maininventory"].GetElement("vanillaexpanded-crafting-toggle"));
+        }
+
+        internal void Click(GuiElement button)
+        {
             var args = new MouseEvent((int)(button.Bounds.absX + 5), (int)(button.Bounds.absY + 5),
                 EnumMouseButton.Left, 0);
             button.OnMouseDownOnElement(Lifecycle.Api.Object, args);
             button.OnMouseUpOnElement(Lifecycle.Api.Object, args);
             Assert.True(args.Handled);
+        }
+
+        internal void ResizePanelSpace(double width, double height)
+        {
+            var window = graphics.Gui.Object.WindowBounds;
+            window.fixedWidth = 906 + width;
+            window.fixedHeight = height;
+            window.MarkDirtyRecursive();
+            window.CalcWorldBounds();
+            var parent = Parent.Composers["maininventory"].Bounds;
+            parent.fixedY = 0;
+            parent.fixedHeight = height;
+            parent.MarkDirtyRecursive();
+            parent.CalcWorldBounds();
         }
 
         internal void SetEnabled(bool enabled)

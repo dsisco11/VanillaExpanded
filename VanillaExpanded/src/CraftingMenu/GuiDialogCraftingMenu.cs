@@ -15,6 +15,13 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
     private readonly CraftingTransferCoordinator coordinator;
     private readonly CraftingIconCache icons;
     private double composedScale;
+    private double minimumWidth;
+    private double minimumHeight;
+    private double searchHeight;
+    private double footerHeight;
+    private double previousWidth;
+    private double autoWidth;
+    private double nextWidth;
     private GuiElementHoverText? tooltip;
     private string? tooltipText;
     private string search = "";
@@ -81,15 +88,18 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
     {
         double width = bounds.fixedWidth;
         double height = bounds.fixedHeight;
-        var content = ElementBounds.Fixed(8, 30, width - 16, height - 38);
-        var searchBounds = ElementBounds.Fixed(0, 0, content.fixedWidth, 26);
-        var viewport = ElementBounds.Fixed(0, 0, content.fixedWidth - 16, height - 108).FixedUnder(searchBounds, 8);
+        double contentTop = GuiStyle.TitleBarHeight + 8;
+        var content = ElementBounds.Fixed(8, contentTop, width - 16, height - contentTop - 8);
+        var searchBounds = ElementBounds.Fixed(0, 0, content.fixedWidth, searchHeight);
+        var footer = ElementBounds.Fixed(0, content.fixedHeight - footerHeight, content.fixedWidth, footerHeight);
+        var viewport = ElementBounds.Fixed(0, searchHeight + 8, content.fixedWidth - 16,
+            footer.fixedY - 10 - searchHeight - 8);
         var scrollBounds = ElementBounds.Fixed(0, viewport.fixedY, 12, viewport.fixedHeight).FixedRightOf(viewport, 4);
-        var footer = ElementBounds.Fixed(0, 0, content.fixedWidth, 24).FixedUnder(viewport, 10);
-        var previous = ElementBounds.Fixed(0, 0, 24, 24);
-        var auto = ElementBounds.Fixed(0, 0, 46, 24).RightOf(previous, 3);
-        var next = ElementBounds.Fixed(0, 0, 24, 24).RightOf(auto, 3);
-        var label = ElementBounds.Fixed(0, 2, Math.Max(1, content.fixedWidth - 104), 24).RightOf(next, 4);
+        var previous = ElementBounds.Fixed(0, 0, previousWidth, footerHeight);
+        var auto = ElementBounds.Fixed(0, 0, autoWidth, footerHeight).FixedRightOf(previous, 3);
+        var next = ElementBounds.Fixed(0, 0, nextWidth, footerHeight).FixedRightOf(auto, 3);
+        double labelLeft = next.fixedX + next.fixedWidth + 4;
+        var label = ElementBounds.Fixed(labelLeft, 0, content.fixedWidth - labelLeft, footerHeight);
         var tiles = new GuiElementCraftingTiles(capi, ElementBounds.Fixed(0, 0, viewport.fixedWidth, viewport.fixedHeight),
             viewport, session, Inspect, Activate, icons);
         var newTooltip = new GuiElementHoverText(capi, "", CairoFont.WhiteSmallText(), 420,
@@ -109,14 +119,14 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
             .EndClip()
             .AddVerticalScrollbar(tiles.Scroll, scrollBounds, "scroll")
             .AddDynamicText("", CairoFont.WhiteSmallText(),
-                ElementBounds.Fixed(0, viewport.fixedY, viewport.fixedWidth, 40), "empty")
+                ElementBounds.Fixed(0, viewport.fixedY, viewport.fixedWidth, Math.Min(40, viewport.fixedHeight)), "empty")
             .BeginChildElements(footer)
-            .AddSmallButton("<", () => Cycle(-1), previous)
+            .AddSmallButton("<", () => Cycle(-1), previous, key: "previous")
             .AddSmallButton(Lang.Get("vanillaexpanded:craftingmenu-auto"), () => { session.Auto(); return true; },
-                auto)
-            .AddSmallButton(">", () => Cycle(1), next)
+                auto, key: "auto")
+            .AddSmallButton(">", () => Cycle(1), next, key: "next")
             .AddHoverText(Lang.Get("vanillaexpanded:craftingmenu-alternative-hint"), CairoFont.WhiteSmallText(),
-                300, ElementBounds.Fixed(0, 0, 100, 24))
+                300, ElementBounds.Fixed(0, 0, next.fixedX + next.fixedWidth, footerHeight))
             .AddDynamicText("", CairoFont.WhiteSmallText(), label, "alternative")
             .EndChildElements()
             .AddInteractiveElement(newTooltip, "tooltip")
@@ -132,6 +142,29 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         UpdateLabels();
     }
 
+    private void MeasureLayout()
+    {
+        double scale = GuiElement.scaled(1);
+        var buttonFont = CairoFont.SmallButtonText();
+        var textFont = CairoFont.WhiteSmallText();
+        previousWidth = Math.Max(24, Math.Ceiling(buttonFont.GetTextExtents("<").Width / scale + 1));
+        autoWidth = Math.Max(46, Math.Ceiling(buttonFont.GetTextExtents(
+            Lang.Get("vanillaexpanded:craftingmenu-auto")).Width / scale + 1));
+        nextWidth = Math.Max(24, Math.Ceiling(buttonFont.GetTextExtents(">").Width / scale + 1));
+        footerHeight = Math.Max(24, Math.Ceiling(Math.Max(buttonFont.GetFontExtents().Height,
+            textFont.GetFontExtents().Height) / scale));
+        searchHeight = Math.Max(26, Math.Ceiling(textFont.GetFontExtents().Height / scale + 6));
+        double counterWidth = Math.Ceiling(textFont.GetTextExtents("1/1*").Width / scale + 1);
+        double titleWidth = textFont.GetTextExtents(Lang.Get("vanillaexpanded:craftingmenu-title")).Width / scale;
+        // The native title bar reserves space for its menu and close icons.
+        double titleControlsWidth = 2 * GuiElementDialogTitleBar.unscaledCloseIconSize + 2 + 20;
+        minimumWidth = Math.Ceiling(Math.Max(
+            GuiStyle.ElementToDialogPadding + titleWidth + 8 + titleControlsWidth,
+            16 + previousWidth + 3 + autoWidth + 3 + nextWidth + 4 + counterWidth));
+        minimumHeight = Math.Ceiling(GuiStyle.TitleBarHeight + 8 + searchHeight + 8
+            + GuiElementCraftingTiles.TileSize + 10 + footerHeight + 8);
+    }
+
     private bool Follow()
     {
         if (!parent.IsOpened() || !parent.Composers.ContainsKey("maininventory")
@@ -143,7 +176,9 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         var grid = parentComposer.GetElement("craftinggrid")?.Bounds;
         if (grid == null) { CloseWithParent(); return false; }
         var output = parentComposer.GetElement("outputslot").Bounds;
-        var next = CraftingMenuLayout.Place(parentComposer.Bounds, grid, output, capi.Gui.WindowBounds);
+        if (SingleComposer == null || composedScale != RuntimeEnv.GUIScale) MeasureLayout();
+        var next = CraftingMenuLayout.Place(parentComposer.Bounds, grid, output, capi.Gui.WindowBounds,
+            minimumWidth, minimumHeight);
         if (next == null)
         {
             Error("vanillaexpanded:craftingmenu-screen-space");
@@ -204,8 +239,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         SingleComposer.GetDynamicText("empty").SetNewText(session.Rows.IsEmpty
             ? Lang.Get("vanillaexpanded:craftingmenu-empty") : "");
         var selected = session.Rows.FirstOrDefault(row => row.Output.Id == session.SelectedOutput);
-        SingleComposer.GetDynamicText("alternative").SetNewText(selected == null
-            || SingleComposer.Bounds.fixedWidth < 180 ? "" :
+        SingleComposer.GetDynamicText("alternative").SetNewText(selected == null ? "" :
             $"{selected.Output.Alternatives.IndexOf(selected.Recipe) + 1}/{selected.Output.Alternatives.Length}"
                 + (selected.IsExplicit ? "*" : ""));
     }

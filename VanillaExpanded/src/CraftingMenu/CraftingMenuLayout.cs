@@ -7,7 +7,7 @@ namespace VanillaExpanded.CraftingMenu;
 internal static class CraftingMenuLayout
 {
     internal static ElementBounds? Place(ElementBounds parent, ElementBounds inputs,
-        ElementBounds output, ElementBounds window)
+        ElementBounds output, ElementBounds window, double minimumWidth, double minimumHeight)
     {
         double scale = GuiElement.scaled(1);
         double width = window.InnerWidth / scale;
@@ -29,10 +29,10 @@ internal static class CraftingMenuLayout
             ElementBounds.Fixed(0, 0, width, gridTop - gap),
             ElementBounds.Fixed(0, gridBottom + gap, width, height - gridBottom - gap)
         };
-        foreach (var space in spaces.Where(space => space.fixedWidth >= 120 && space.fixedHeight >= 164))
+        foreach (var space in spaces.Where(space => space.fixedWidth >= minimumWidth && space.fixedHeight >= minimumHeight))
         {
-            double w = Math.Min(320, space.fixedWidth);
-            double h = Math.Min(420, space.fixedHeight);
+            double w = Math.Min(Math.Max(320, minimumWidth), space.fixedWidth);
+            double h = Math.Min(Math.Max(420, minimumHeight), space.fixedHeight);
             double x = Math.Clamp(px < space.fixedX ? space.fixedX : space.fixedX + space.fixedWidth - w, 0, width - w);
             double y = Math.Clamp(py, space.fixedY, space.fixedY + space.fixedHeight - h);
             return ElementBounds.Fixed(x - px - parent.absPaddingX / scale,
