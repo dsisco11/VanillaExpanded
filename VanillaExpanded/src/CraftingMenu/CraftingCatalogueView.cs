@@ -91,11 +91,13 @@ internal sealed class CraftingCatalogueView
         return new(group, automatic, GetEvaluation(automatic), false, allocations.GetValueOrDefault(automatic.Id));
     }
 
-    internal ImmutableArray<CraftingRecipeSelection> Search(string? query)
+    internal ImmutableArray<CraftingRecipeSelection> Search(string? query, string? category = null)
     {
         var words = (query ?? "").Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
             .Select(word => word.ToUpperInvariant()).ToArray();
         return catalogue.Groups.Select(group => GetSelection(group.Id))
+            .Where(selection => category == null || (category == CraftingCatalogue.OtherCategory
+                ? selection.Recipe.CategoryCodes.IsEmpty : selection.Recipe.CategoryCodes.Contains(category)))
             .Where(selection => words.All(word => selection.Recipe.SearchText.Contains(word, StringComparison.Ordinal)))
             .OrderByDescending(selection => selection.Evaluation.IsSupported)
             .ThenByDescending(selection => selection.Evaluation.CanCraft)

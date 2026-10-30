@@ -11,7 +11,8 @@ internal sealed class CraftingRecipeEntry
 {
     private readonly ItemStack? preview;
 
-    internal CraftingRecipeEntry(int id, GridRecipe recipe, string displayName, int? previewId = null)
+    internal CraftingRecipeEntry(int id, GridRecipe recipe, string displayName, int? previewId = null,
+        IEnumerable<string>? categoryCodes = null)
     {
         Id = id;
         Recipe = recipe;
@@ -23,6 +24,9 @@ internal sealed class CraftingRecipeEntry
         preview = recipe.Output?.ResolvedItemStack is { } output ? CraftingStackSnapshot.Copy(output) : null;
         preview?.StackSize = OutputQuantity;
         PreviewId = preview == null ? null : previewId ?? id;
+        CategoryCodes = (categoryCodes ?? preview?.Collectible.CreativeInventoryTabs ?? Array.Empty<string>())
+            .Where(code => !string.IsNullOrWhiteSpace(code) && code != "general")
+            .Distinct(StringComparer.Ordinal).OrderBy(code => code, StringComparer.Ordinal).ToImmutableArray();
         HasCustomIngredientPredicates = recipe.ResolvedIngredients?.Any(ingredient =>
             ingredient != null && ingredient.GetType() != typeof(CraftingRecipeIngredient)) ?? false;
         Ingredients = recipe.ResolvedIngredients?.Select(ingredient => ingredient?.Clone()).ToImmutableArray()
@@ -44,6 +48,7 @@ internal sealed class CraftingRecipeEntry
     internal string OutputCode { get; }
     internal int OutputQuantity { get; }
     internal int? PreviewId { get; }
+    internal ImmutableArray<string> CategoryCodes { get; }
     internal bool IsGenericPreview { get; }
     internal bool HasCustomIngredientPredicates { get; }
     internal string? UnresolvedReason { get; }
@@ -59,6 +64,7 @@ internal sealed record CraftingOutputGroup(int Id, ImmutableArray<CraftingRecipe
 
 internal sealed class CraftingCatalogue
 {
+    internal const string OtherCategory = "";
     private readonly Dictionary<GridRecipe, CraftingRecipeEntry> byRecipe;
     private readonly IWorldAccessor world;
     private readonly KeyValuePair<IRecipeIngredientBase, List<IRecipeBase>>[] ingredientIndex;
@@ -69,6 +75,8 @@ internal sealed class CraftingCatalogue
         this.world = world;
         Groups = groups;
         Recipes = groups.SelectMany(group => group.Alternatives).OrderBy(entry => entry.Id).ToImmutableArray();
+        CategoryCodes = Recipes.SelectMany(entry => entry.CategoryCodes.DefaultIfEmpty(OtherCategory))
+            .Distinct(StringComparer.Ordinal).OrderBy(code => code, StringComparer.Ordinal).ToImmutableArray();
         byRecipe = new Dictionary<GridRecipe, CraftingRecipeEntry>(ReferenceEqualityComparer.Instance);
         foreach (var entry in Recipes) byRecipe.Add(entry.Recipe, entry);
         ingredientIndex = world.FastSearchRecipesByIngredient.ToArray();
@@ -79,6 +87,7 @@ internal sealed class CraftingCatalogue
 
     internal ImmutableArray<CraftingOutputGroup> Groups { get; }
     internal ImmutableArray<CraftingRecipeEntry> Recipes { get; }
+    internal ImmutableArray<string> CategoryCodes { get; }
 
     internal static CraftingCatalogue Build(
         IEnumerable<IRecipeBase> recipes,
@@ -125,7 +134,7 @@ internal sealed class CraftingCatalogue
                 }
                 if (!shared) variants.Add((output, previewId));
             }
-            var entry = new CraftingRecipeEntry(entryId, recipe, name, previewId);
+            var entry = new CraftingRecipeEntry(entryId, recipe, name, previewId, GetCategoryCodes(output, world));
             int groupId = -1;
             if (output != null)
             {
@@ -161,6 +170,19 @@ internal sealed class CraftingCatalogue
         return new CraftingCatalogue(world, groups.Select((entries, index) =>
             new CraftingOutputGroup(index, entries.OrderBy(entry => entry.StableId, StringComparer.Ordinal)
                 .ToImmutableArray())).ToImmutableArray());
+    }
+
+    private static IEnumerable<string> GetCategoryCodes(ItemStack? output, IWorldAccessor world)
+    {
+        if (output == null) yield break;
+        foreach (string code in output.Collectible.CreativeInventoryTabs ?? Array.Empty<string>())
+            yield return code;
+        foreach (var group in output.Collectible.CreativeInventoryStacks ?? Array.Empty<CreativeTabAndStackList>())
+        {
+            if (!group.Stacks.Any(stack => stack.ResolvedItemstack is { } creative && output.Equals(world, creative)))
+                continue;
+            foreach (string code in group.Tabs) yield return code;
+        }
     }
 
     internal CraftingIngredientLookup CreateLookup() => new(world, ingredientIndex);

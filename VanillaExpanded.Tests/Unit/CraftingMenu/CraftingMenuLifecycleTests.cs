@@ -499,6 +499,123 @@ public sealed class CraftingMenuLifecycleTests
     }
 
     [Theory]
+    [InlineData("flora")]
+    [InlineData("clutter")]
+    [InlineData("aquatic")]
+    [InlineData("liquids")]
+    [InlineData("creatures")]
+    [InlineData("meta")]
+    public void ExcludedCategoryTabsKeepRecipesInAllAndRemainingCategories(string excluded)
+    {
+        using var f = new MenuFixture(includeRecipes: true);
+        var excludedOnly = Assert.Single(f.Lifecycle.Recipes);
+        excludedOnly.Output!.ResolvedItemStack!.Collectible.CreativeInventoryTabs = [excluded];
+        var overlapping = f.Lifecycle.F.Catalogue.Recipe("overlapping");
+        overlapping.Output!.ResolvedItemStack!.Collectible.CreativeInventoryTabs = [excluded, "tools"];
+        var custom = f.Lifecycle.F.Catalogue.Recipe("custom");
+        custom.Output!.ResolvedItemStack!.Collectible.CreativeInventoryTabs = ["mod:" + excluded];
+        f.Lifecycle.Recipes.AddRange([overlapping, custom]);
+        f.Lifecycle.F.Register(f.Lifecycle.Recipes.ToArray());
+        f.Lifecycle.FinalizeWorld();
+        f.Recompose();
+        f.Parent.TryOpen();
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        var session = (CraftingMenuSession)typeof(GuiDialogCraftingMenu).GetField("session",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
+        var tabs = menu.SingleComposer.GetHorizontalTabs("categories");
+        Assert.Equal(new[] { "All", "mod:" + excluded, "tools" }, tabs.tabs.Select(tab => tab.Name));
+        Assert.Equal(3, session.Rows.Length);
+        Assert.Contains(session.Rows, row => row.Recipe.Recipe == excludedOnly);
+        tabs.SetValue(2);
+        Assert.Same(overlapping, Assert.Single(session.Rows).Recipe.Recipe);
+        tabs.SetValue(1);
+        Assert.Same(custom, Assert.Single(session.Rows).Recipe.Recipe);
+        tabs.SetValue(0);
+        menu.SingleComposer.GetTextInput("search").SetValue(excludedOnly.Output.Code!.ToString());
+        Assert.Same(excludedOnly, Assert.Single(session.Rows).Recipe.Recipe);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(1.5)]
+    [InlineData(2)]
+    public void NativeCategoryTabsFilterSearchResetScrollingAndSurviveResize(float scale)
+    {
+        using var f = new MenuFixture(scale: scale, includeRecipes: true);
+        var tool = Assert.Single(f.Lifecycle.Recipes);
+        tool.Output!.ResolvedItemStack!.Collectible.CreativeInventoryTabs =
+            ["general", "items", "tools", .. Enumerable.Range(0, 8).Select(index => "mod:long-category-" + index)];
+        for (int i = 0; i < 40; i++)
+        {
+            var recipe = f.Lifecycle.F.Catalogue.Recipe("construction-" + i);
+            recipe.Output!.ResolvedItemStack!.Collectible.CreativeInventoryTabs = ["general", "construction"];
+            f.Lifecycle.Recipes.Add(recipe);
+        }
+        f.Lifecycle.Recipes.Add(f.Lifecycle.F.Catalogue.Recipe("uncategorized"));
+        f.Lifecycle.F.Register(f.Lifecycle.Recipes.ToArray());
+        f.Lifecycle.FinalizeWorld();
+        f.Recompose();
+        f.Parent.TryOpen();
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        var session = (CraftingMenuSession)typeof(GuiDialogCraftingMenu).GetField("session",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
+        var tabs = menu.SingleComposer.GetHorizontalTabs("categories");
+        Assert.Equal("All", tabs.tabs[0].Name);
+        Assert.Equal("Other", tabs.tabs[^1].Name);
+        Assert.DoesNotContain(tabs.tabs, tab => tab.Name is "general" or "flora");
+        Assert.Equal(42, session.Rows.Length);
+        menu.SingleComposer.GetTextInput("search").SetValue("output");
+        var tiles = Assert.IsType<GuiElementCraftingTiles>(menu.SingleComposer.GetElement("tiles"));
+        tiles.Scroll(48 * scale);
+        Assert.True(menu.SingleComposer.GetScrollbar("scroll").CurrentYPosition > 0);
+
+        int toolIndex = Array.FindIndex(tabs.tabs, tab => tab.Name == "tools");
+        tabs.SetValue(toolIndex);
+        Assert.Equal("tools", session.Category);
+        Assert.Single(session.Rows);
+        Assert.Equal(0, menu.SingleComposer.GetScrollbar("scroll").CurrentYPosition);
+        Assert.NotNull(Assert.IsType<GuiElementCraftingTile>(tiles.Elements[0]).Selection);
+        Assert.Equal("output", menu.SingleComposer.GetTextInput("search").GetText());
+
+        var previousComposer = menu.SingleComposer;
+        f.ResizePanelSpace(previousComposer.Bounds.fixedWidth + 50, previousComposer.Bounds.fixedHeight - 20);
+        menu.TryOpen();
+        Assert.NotSame(previousComposer, menu.SingleComposer);
+        tabs = menu.SingleComposer.GetHorizontalTabs("categories");
+        Assert.Equal(toolIndex, tabs.activeElement);
+        Assert.Equal("tools", session.Category);
+        Assert.Single(session.Rows);
+        Assert.Equal("output", menu.SingleComposer.GetTextInput("search").GetText());
+        tabs.SetValue(tabs.tabs.Length - 1);
+        Assert.Equal(CraftingCatalogue.OtherCategory, session.Category);
+        Assert.Single(session.Rows);
+        menu.SingleComposer.GetTextInput("search").SetValue("no matching output");
+        Assert.Empty(session.Rows);
+        Assert.Equal("No matching recipes.", menu.SingleComposer.GetDynamicText("empty").GetText());
+        Assert.Equal(toolIndex, Array.FindIndex(tabs.tabs, tab => tab.Name == "tools"));
+
+        tabs.SetValue(0);
+        tabs.OnFocusGained();
+        var right = new KeyEvent { KeyCode = (int)GlKeys.Right };
+        tabs.OnKeyDown(f.Lifecycle.Api.Object, right);
+        Assert.True(right.Handled);
+        Assert.Equal("construction", session.Category);
+        Assert.Empty(session.Rows);
+        menu.SingleComposer.GetTextInput("search").SetValue("output");
+        Assert.Equal(40, session.Rows.Length);
+        tabs.SetValue(0, false);
+        int x = (int)(tabs.Bounds.absX + GuiElement.scaled(12));
+        int y = (int)(tabs.Bounds.absY + tabs.Bounds.InnerHeight / 2);
+        f.SetMouse(x, y);
+        tabs.OnMouseDownOnElement(f.Lifecycle.Api.Object, new MouseEvent(x, y, EnumMouseButton.Left, 0));
+        Assert.Null(session.Category);
+        Assert.Equal(42, session.Rows.Length);
+        Assert.Equal("output", menu.SingleComposer.GetTextInput("search").GetText());
+    }
+
+    [Theory]
     [InlineData(1, false)]
     [InlineData(1.5, false)]
     [InlineData(2, false)]
@@ -522,6 +639,7 @@ public sealed class CraftingMenuLifecycleTests
             + 8 + 2 * GuiElementDialogTitleBar.unscaledCloseIconSize + 2 + 20;
         double minimumWidth = Math.Ceiling(Math.Max(footerWidth, titleWidth));
         double minimumHeight = Math.Ceiling(GuiStyle.TitleBarHeight + 8 + search.Bounds.OuterHeight / scale
+            + 8 + originalComposer.GetHorizontalTabs("categories").Bounds.OuterHeight / scale
             + 8 + GuiElementCraftingTiles.TileSize + 10
             + originalComposer.GetElement("auto").Bounds.OuterHeight / scale + 8);
         search.SetValue("preserved search");
@@ -544,6 +662,7 @@ public sealed class CraftingMenuLifecycleTests
             var panel = composer.Bounds;
             var title = composer.GetTitleBar("titlebar");
             var search = composer.GetTextInput("search").Bounds;
+            var tabs = composer.GetHorizontalTabs("categories").Bounds;
             var viewport = composer.GetElement("tiles").InsideClipBounds;
             var scroll = composer.GetScrollbar("scroll").Bounds;
             var empty = composer.GetDynamicText("empty").Bounds;
@@ -552,7 +671,8 @@ public sealed class CraftingMenuLifecycleTests
             var next = composer.GetElement("next").Bounds;
             var counter = composer.GetDynamicText("alternative").Bounds;
             double scale = GuiElement.scaled(1);
-            Assert.True(title.Bounds.absY + title.Bounds.OuterHeight + 8 * scale <= search.absY + .001);
+            Assert.True(title.Bounds.absY + title.Bounds.OuterHeight + 8 * scale <= tabs.absY + .001);
+            Assert.True(tabs.absY + tabs.OuterHeight + 8 * scale <= search.absY + .001);
             Assert.True(search.absY + search.OuterHeight + 8 * scale <= viewport.absY + .001);
             Assert.True(viewport.InnerHeight + .001 >= GuiElementCraftingTiles.TileSize * scale);
             Assert.True(viewport.absX + viewport.OuterWidth + 4 * scale <= scroll.absX + .001);
@@ -567,7 +687,7 @@ public sealed class CraftingMenuLifecycleTests
             double titleMenuLeft = title.Bounds.absX + title.Bounds.OuterWidth
                 - GuiElement.scaled(2 * GuiElementDialogTitleBar.unscaledCloseIconSize + 2 + 20);
             Assert.True(titleTextRight + 8 * scale <= titleMenuLeft + .001);
-            foreach (var bounds in new[] { search, viewport, scroll, previous, auto, next, counter })
+            foreach (var bounds in new[] { tabs, search, viewport, scroll, previous, auto, next, counter })
             {
                 Assert.True(bounds.absX >= panel.absX + 8 * scale - .001);
                 Assert.True(bounds.absX + bounds.OuterWidth <= panel.absX + panel.InnerWidth - 8 * scale + .001);
@@ -1150,6 +1270,8 @@ public sealed class CraftingMenuLifecycleTests
                     "vanillaexpanded:craftingmenu-auto" => longLabels ? "Automatic selection" : "Auto",
                     "vanillaexpanded:craftingmenu-empty" => "No matching recipes.",
                     "vanillaexpanded:craftingmenu-toggle" => "Recipes",
+                    "vanillaexpanded:craftingmenu-category-all" => "All",
+                    "vanillaexpanded:craftingmenu-category-other" => "Other",
                     _ => key
                 });
             Lang.AvailableLanguages["en"] = translations.Object;

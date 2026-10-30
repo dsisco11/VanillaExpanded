@@ -19,6 +19,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
     private double minimumWidth;
     private double minimumHeight;
     private double searchHeight;
+    private double tabsHeight;
     private double footerHeight;
     private double previousWidth;
     private double autoWidth;
@@ -27,6 +28,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
     private string search = "";
     private bool disposed;
     private readonly HashSet<EnumMouseButton> pressedMouseButtons = [];
+    private readonly string?[] categories;
     internal event Action? Disposed;
     internal event Action? CloseRequestedByUser;
 
@@ -36,6 +38,11 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         this.parent = parent;
         this.parentComposer = parentComposer;
         this.icons = icons;
+        categories = [null,
+            .. catalogue.CategoryCodes.Where(code => code is not (CraftingCatalogue.OtherCategory
+                or "flora" or "clutter" or "aquatic" or "liquids" or "creatures" or "meta"))
+                .OrderBy(CategoryName, StringComparer.CurrentCultureIgnoreCase),
+            .. catalogue.CategoryCodes.Where(code => code == CraftingCatalogue.OtherCategory)];
         coordinator = new(api, allocator, result => Error(result.Reason!));
         session = new(catalogue, allocator,
             () => CraftingInventorySnapshot.Capture(api.World.Player, 3, 3, RuntimeEnv.MainThreadId, false),
@@ -91,10 +98,11 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         double height = bounds.fixedHeight;
         double contentTop = GuiStyle.TitleBarHeight + 8;
         var content = ElementBounds.Fixed(8, contentTop, width - 16, height - contentTop - 8);
-        var searchBounds = ElementBounds.Fixed(0, 0, content.fixedWidth, searchHeight);
+        var tabsBounds = ElementBounds.Fixed(0, 0, content.fixedWidth, tabsHeight);
+        var searchBounds = ElementBounds.Fixed(0, tabsHeight + 8, content.fixedWidth, searchHeight);
         var footer = ElementBounds.Fixed(0, content.fixedHeight - footerHeight, content.fixedWidth, footerHeight);
-        var viewport = ElementBounds.Fixed(0, searchHeight + 8, content.fixedWidth - 16,
-            footer.fixedY - 10 - searchHeight - 8);
+        double listTop = searchBounds.fixedY + searchHeight + 8;
+        var viewport = ElementBounds.Fixed(0, listTop, content.fixedWidth - 16, footer.fixedY - 10 - listTop);
         var scrollBounds = ElementBounds.Fixed(0, viewport.fixedY, 12, viewport.fixedHeight).FixedRightOf(viewport, 4);
         var previous = ElementBounds.Fixed(0, 0, previousWidth, footerHeight);
         var auto = ElementBounds.Fixed(0, 0, autoWidth, footerHeight).FixedRightOf(previous, 3);
@@ -108,6 +116,13 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
             .AddShadedDialogBG(ElementBounds.Fill)
             .AddDialogTitleBar(Lang.Get("vanillaexpanded:craftingmenu-title"), () => CloseByUser(), key: "titlebar")
             .BeginChildElements(content)
+            .AddHorizontalTabs(categories.Select((code, index) => new GuiTab { DataInt = index, Name = CategoryName(code) })
+                .ToArray(), tabsBounds, index =>
+                {
+                    if (session.Category == categories[index]) return;
+                    tiles.Scroll(0);
+                    session.SelectCategory(categories[index]);
+                }, CairoFont.WhiteSmallText(), CairoFont.WhiteSmallText().WithWeight(Cairo.FontWeight.Bold), "categories")
             .AddTextInput(searchBounds, text =>
             {
                 search = text;
@@ -134,11 +149,19 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         SingleComposer?.Dispose();
         SingleComposer = composer;
         tooltip = newTooltip;
+        composer.GetHorizontalTabs("categories").SetValue(Array.IndexOf(categories, session.Category), false);
         composer.GetTextInput("search").SetPlaceHolderText(Lang.Get("vanillaexpanded:craftingmenu-search"));
         composer.GetTextInput("search").SetValue(search);
         tiles.Bind(composer.GetScrollbar("scroll"));
         UpdateLabels();
     }
+
+    private static string CategoryName(string? code) => code switch
+    {
+        null => Lang.Get("vanillaexpanded:craftingmenu-category-all"),
+        CraftingCatalogue.OtherCategory => Lang.Get("vanillaexpanded:craftingmenu-category-other"),
+        _ => Lang.GetIfExists("tabname-" + code) ?? code
+    };
 
     private void MeasureLayout()
     {
@@ -152,6 +175,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         footerHeight = Math.Max(24, Math.Ceiling(Math.Max(buttonFont.GetFontExtents().Height,
             textFont.GetFontExtents().Height) / scale));
         searchHeight = Math.Max(26, Math.Ceiling(textFont.GetFontExtents().Height / scale + 6));
+        tabsHeight = Math.Max(26, Math.Ceiling(textFont.GetFontExtents().Height / scale + 6));
         double counterWidth = Math.Ceiling(textFont.GetTextExtents("1/1").Width / scale + 1);
         double titleWidth = textFont.GetTextExtents(Lang.Get("vanillaexpanded:craftingmenu-title")).Width / scale;
         // The native title bar reserves space for its menu and close icons.
@@ -159,7 +183,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         minimumWidth = Math.Ceiling(Math.Max(
             GuiStyle.ElementToDialogPadding + titleWidth + 8 + titleControlsWidth,
             16 + previousWidth + 3 + autoWidth + 3 + nextWidth + 4 + counterWidth));
-        minimumHeight = Math.Ceiling(GuiStyle.TitleBarHeight + 8 + searchHeight + 8
+        minimumHeight = Math.Ceiling(GuiStyle.TitleBarHeight + 8 + tabsHeight + 8 + searchHeight + 8
             + GuiElementCraftingTiles.TileSize + 10 + footerHeight + 8);
     }
 

@@ -15,6 +15,43 @@ namespace VanillaExpanded.Tests.Unit.CraftingMenu;
 [Collection("Crafting native GUI")]
 public sealed class CraftingMenuInteractionTests
 {
+    [Fact]
+    public void CategoryChangesKeepSearchAndClearInteractionAndHiddenSelectionAcrossRefresh()
+    {
+        var f = new AllocationFixture();
+        var tool = f.Recipe(f.Ingredient(f.Stack(1, "a", 1)));
+        tool.Output!.ResolvedItemStack!.Collectible.CreativeInventoryTabs = ["tools"];
+        var block = f.Recipe(f.Ingredient(f.Stack(2, "b", 1)));
+        block.Output!.ResolvedItemStack!.Collectible.CreativeInventoryTabs = ["construction"];
+        f.Register(tool, block);
+        var session = Session(f, tool, block);
+        session.Refresh();
+        var toolRow = session.Rows.Single(row => row.Recipe.Recipe == tool);
+        session.Select(toolRow.Output.Id);
+        session.ChooseAlternative(toolRow.Recipe.Id);
+        session.Interact(toolRow.Output.Id);
+        session.SelectCategory("construction");
+
+        Assert.Null(session.SelectedOutput);
+        Assert.Same(block, Assert.Single(session.Rows).Recipe.Recipe);
+        session.Refresh();
+        Assert.Same(block, Assert.Single(session.Rows).Recipe.Recipe);
+        session.Search(tool.Output.Code!.ToString());
+        Assert.Empty(session.Rows);
+        session.SelectCategory("tools");
+        Assert.Same(tool, Assert.Single(session.Rows).Recipe.Recipe);
+        Assert.False(Assert.Single(session.Rows).IsExplicit);
+        session.Refresh();
+        Assert.Single(session.Rows);
+        Assert.Equal("tools", session.Category);
+        Assert.Throws<ArgumentException>(() => session.SelectCategory("missing"));
+        Assert.Equal("tools", session.Category);
+        session.SelectCategory(null);
+        Assert.Single(session.Rows);
+        session.Search("");
+        Assert.Equal(2, session.Rows.Length);
+    }
+
     [Theory]
     [InlineData(false, 2)]
     [InlineData(true, 20)]

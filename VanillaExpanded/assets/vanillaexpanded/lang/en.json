@@ -93,6 +93,8 @@
   "craftingmenu-title": "Crafting recipes",
   "craftingmenu-toggle": "Recipes",
   "craftingmenu-search": "Search outputs...",
+  "craftingmenu-category-all": "All",
+  "craftingmenu-category-other": "Other",
   "craftingmenu-auto": "Auto",
   "craftingmenu-alternative-hint": "Click a tile to select it. Arrows select a recipe variant; Auto restores automatic selection. Tile colors indicate ingredient availability.",
   "craftingmenu-empty": "No matching recipes.",

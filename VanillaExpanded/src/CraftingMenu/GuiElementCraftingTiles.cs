@@ -65,6 +65,7 @@ internal sealed class GuiElementCraftingTiles : GuiElementContainer
             return;
         }
         scroll = (float)Math.Clamp(value, 0, Math.Max(0, ContentHeight - viewport.InnerHeight));
+        if (scrollbar != null) scrollbar.CurrentYPosition = scroll;
         if (updatingScrollbar) return;
         hovered = null;
         UnfocusOwnElements();

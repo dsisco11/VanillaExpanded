@@ -29,6 +29,7 @@ internal sealed class CraftingMenuSession
 
     internal ImmutableArray<CraftingRecipeSelection> Rows { get; private set; } = ImmutableArray<CraftingRecipeSelection>.Empty;
     internal int? SelectedOutput { get; private set; }
+    internal string? Category { get; private set; }
     internal event Action? Changed;
 
     internal void Refresh()
@@ -50,6 +51,18 @@ internal sealed class CraftingMenuSession
         if (interaction == output) return;
         interaction = output;
         if (output == null) UpdateRows();
+    }
+
+    internal void SelectCategory(string? category)
+    {
+        if (category != null && !catalogue.CategoryCodes.Contains(category))
+            throw new ArgumentException("Unknown crafting category.", nameof(category));
+        if (Category == category) return;
+        Category = category;
+        interaction = null;
+        if (SelectedOutput is int output) view.Deselect(output);
+        SelectedOutput = null;
+        UpdateRows();
     }
 
     internal void Select(int output)
@@ -92,7 +105,7 @@ internal sealed class CraftingMenuSession
                 : row with { Evaluation = allocations[row.Recipe.Id].Evaluation, Allocation = allocations[row.Recipe.Id] })
                 .ToImmutableArray();
         }
-        else Rows = view.Search(query);
+        else Rows = view.Search(query, Category);
         Changed?.Invoke();
     }
 }
