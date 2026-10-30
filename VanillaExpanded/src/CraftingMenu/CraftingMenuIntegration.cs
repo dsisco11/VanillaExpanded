@@ -79,9 +79,7 @@ public sealed class CraftingMenuSystem : ModSystem, ILiveConfigurable
         foreach (var attachment in attachments.Values)
         {
             attachment.Composer.GetToggleButton("vanillaexpanded-crafting-toggle").Enabled = false;
-            var hint = attachment.Composer.GetHoverText("vanillaexpanded-crafting-toggle-hint");
-            hint.SetAutoDisplay(false);
-            hint.SetVisible(false);
+            SetOpenerVisible(attachment.Composer, false);
         }
         Dispose();
     }
@@ -97,30 +95,22 @@ public sealed class CraftingMenuSystem : ModSystem, ILiveConfigurable
             api.Logger.Warning("[VanillaExpanded] Crafting menu requires the native 3x3 crafting grid.");
             return;
         }
-        var bounds = composer.GetElement("craftinggrid").Bounds;
         if (bookIcon == null)
         {
             bookIcon = api.Gui.Icons.SvgIconSource(api.Assets.Get(
                 new AssetLocation("vanillaexpanded:textures/gui/crafting-book.svg")));
             api.Gui.Icons.CustomIcons[BookIcon] = bookIcon;
         }
-        var buttonBounds = ElementBounds.Fixed(bounds.fixedX, bounds.fixedY - 34, 28, 28);
+        var buttonBounds = ElementBounds.Fixed(0, 0, 28, 28);
         composer.AddInteractiveElement(new GuiElementCraftingMenuButton(api, BookIcon, _ =>
         {
             if (!VanillaExpandedModSystem.Config.EnableCraftingMenu) return;
-            if (dialogs.TryGetValue(parent, out var open) && open.IsOpened())
-            {
-                rememberOpen = false;
-                Close(parent);
-            }
-            else Open(parent, composer);
+            Open(parent, composer);
         }, buttonBounds)
         {
             Enabled = VanillaExpandedModSystem.Config.EnableCraftingMenu
         },
             "vanillaexpanded-crafting-toggle");
-        composer.AddHoverText(Lang.Get("vanillaexpanded:craftingmenu-toggle"), CairoFont.WhiteSmallText(),
-            160, buttonBounds.FlatCopy(), "vanillaexpanded-crafting-toggle-hint");
         composer.AddInteractiveElement(new GuiElementCraftingRefresh(api, ElementBounds.Fixed(0, 0, 0, 0),
             grid, () =>
             {
@@ -165,14 +155,26 @@ public sealed class CraftingMenuSystem : ModSystem, ILiveConfigurable
         {
             if (!dialogs.TryGetValue(parent, out var active) || !ReferenceEquals(active, dialog)) return;
             dialogs.Remove(parent);
+            if (attachments.TryGetValue(parent, out var attachment) && ReferenceEquals(attachment.Composer, composer))
+                SetOpenerVisible(composer, true);
         };
-        if (dialog.TryOpen()) rememberOpen = true;
+        if (dialog.TryOpen())
+        {
+            rememberOpen = true;
+            SetOpenerVisible(composer, false);
+        }
         else Close(parent);
+    }
+
+    private static void SetOpenerVisible(GuiComposer composer, bool visible)
+    {
+        var button = (GuiElementCraftingMenuButton)composer.GetToggleButton("vanillaexpanded-crafting-toggle");
+        button.Visible = visible && button.Enabled;
     }
 
     private void Close(GuiDialog parent)
     {
-        if (!dialogs.Remove(parent, out var dialog)) return;
+        if (!dialogs.TryGetValue(parent, out var dialog)) return;
         dialog.CloseWithParent();
     }
 

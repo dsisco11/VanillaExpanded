@@ -44,7 +44,7 @@ Compatibility evidence currently covers inspection of the Vintage Story **1.22.7
 
 ### Crafting Menu
 
-Open your inventory's crafting grid and use the **book icon** button (hover: **Recipes**) to browse and search crafting-grid outputs. Search by item name or item code; hover or keyboard-focus a tile to see its ingredients and missing quantities. Use the arrow buttons below the list to cycle alternative recipes for the selected output, or **Auto** to restore automatic selection.
+Open your inventory's crafting grid and use the **book tab** beside the dialog's left edge near the top, with a small gap to keep the border clear (hover: **Recipes**). It opens a searchable list of crafting-grid outputs. The tab hides while the crafting menu is open and reappears when it closes. Search by item name or item code; hover or keyboard-focus a tile to see its ingredients and missing quantities. Use the arrow buttons below the list to cycle alternative recipes for the selected output, or **Auto** to restore automatic selection.
 
 The menu is enabled by default. With ConfigLib installed, use **Pause menu > Mod Settings > VanillaExpanded > Crafting Menu** to toggle it, or set `EnableCraftingMenu` in `ModConfig/VanillaExpanded.json`. Disabling through ConfigLib immediately closes the menu, hides the book button and deactivates the system. Enabling requires re-entering the world or restarting, including after live deactivation. When disabled at world load, the crafting-menu mod system and its GUI patch are not loaded.
 
@@ -56,7 +56,7 @@ The menu is enabled by default. With ConfigLib installed, use **Pause menu > Mod
 
 Ingredients come from your ordinary hotbar, backpack storage and the nine crafting-grid inputs. The result slot, cursor-held stack, off-hand/equipment, bag-equipping slots and remote containers are excluded. This menu handles the native 3x3 crafting grid, not cooking, smithing, knapping, clay forming or other workstations.
 
-Closing the inventory hides the menu without forgetting that it was enabled. It reopens with the crafting grid during the current client session; use the book button, the menu's close button or Escape to keep it closed.
+Closing the inventory hides the menu without forgetting that it was enabled. It reopens with the crafting grid during the current client session; use the menu's close button or Escape to keep it closed.
 
 Placement uses native inventory transfers and server synchronization. Having all ingredients does not guarantee room to rearrange the grid: if displaced contents cannot be safely returned to carried storage, placement is refused without changing the inventory. If a native transfer is interrupted after some moves, those moves may remain; the game reconciles inventory normally. The menu does not roll back or automatically retry the arrangement, drop items to make room, or report server-confirmed batch success.
 

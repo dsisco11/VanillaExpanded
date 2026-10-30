@@ -28,11 +28,8 @@ public sealed class CraftingMenuLifecycleTests
         Assert.False(button.Toggleable);
         Assert.Equal(28 * scale, button.Bounds.InnerWidth, 4);
         Assert.Equal(button.Bounds.InnerWidth, button.Bounds.InnerHeight, 4);
-        var grid = f.Parent.Composers["maininventory"].GetElement("craftinggrid").Bounds;
-        Assert.Equal(grid.absX, button.Bounds.absX, 4);
-        Assert.Equal(grid.absY - 6 * scale, button.Bounds.absY + button.Bounds.OuterHeight, 4);
-        Assert.Equal("Recipes", f.Parent.Composers["maininventory"]
-            .GetHoverText("vanillaexpanded-crafting-toggle-hint").GetText());
+        AssertBookTabPosition(f);
+        Assert.Equal("Recipes", button.Hint.GetText());
         var svg = System.Xml.Linq.XDocument.Parse(System.Text.Encoding.UTF8.GetString(f.BookAsset.Data));
         Assert.Equal("http://www.w3.org/2000/svg", svg.Root!.Name.NamespaceName);
         Assert.Equal("0 0 24 24", svg.Root.Attribute("viewBox")!.Value);
@@ -47,15 +44,83 @@ public sealed class CraftingMenuLifecycleTests
         f.Parent.TryOpen();
         f.Toggle();
         Assert.True(Assert.Single(f.Menus).IsOpened());
-        f.Toggle();
+        f.AssertOpenerInvisible();
+        Assert.True(Assert.Single(f.Menus).IsOpened());
+        f.ClickCloseButton(Assert.Single(f.Menus));
         Assert.Empty(f.Menus);
+        Assert.True(button.Visible);
         button.OnFocusGained();
         var enter = new KeyEvent { KeyCode = (int)GlKeys.Enter };
         button.OnKeyDown(f.Lifecycle.Api.Object, enter);
         Assert.True(enter.Handled);
         Assert.True(Assert.Single(f.Menus).IsOpened());
+        Assert.False(button.HasFocus);
+        f.AssertOpenerInvisible();
         f.ClickCloseButton(Assert.Single(f.Menus));
         Assert.Empty(f.Menus);
+        Assert.True(button.Visible);
+        Assert.False(button.On);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(1.5)]
+    [InlineData(2)]
+    public void BookTabStaysAttachedToLeftEdgeNearTopWhenParentMovesResizesAndRecomposes(float scale)
+    {
+        using var f = new MenuFixture(scale: scale);
+        AssertBookTabPosition(f);
+        var composer = f.Parent.Composers["maininventory"];
+        double before = f.ToggleButton.Bounds.absY;
+        composer.Bounds.fixedHeight += 120;
+        composer.Bounds.MarkDirtyRecursive();
+        composer.ReCompose();
+        Assert.Equal(before, f.ToggleButton.Bounds.absY, 4);
+        AssertBookTabPosition(f);
+        composer.Bounds.WithFixedPadding(20, 30);
+        composer.Bounds.MarkDirtyRecursive();
+        composer.ReCompose();
+        AssertBookTabPosition(f);
+        composer.Bounds.fixedX += 60;
+        composer.Bounds.fixedY += 40;
+        composer.Bounds.MarkDirtyRecursive();
+        composer.Bounds.CalcWorldBounds();
+        AssertBookTabPosition(f);
+        f.Recompose();
+        AssertBookTabPosition(f);
+        f.Parent.TryOpen();
+        f.Toggle();
+        Assert.True(Assert.Single(f.Menus).IsOpened());
+    }
+
+    private static void AssertBookTabPosition(MenuFixture f)
+    {
+        var composer = f.Parent.Composers["maininventory"];
+        var button = f.ToggleButton.Bounds;
+        var hint = f.ToggleButton.Hint.Bounds;
+        Assert.Equal(composer.Bounds.absX - GuiElement.scaled(1), button.absX + button.OuterWidth, 4);
+        Assert.Equal(composer.Bounds.absY + GuiElement.scaled(8), button.absY, 4);
+        Assert.True(button.absX < composer.Bounds.absX);
+        Assert.Equal(button.absX, hint.absX, 4);
+        Assert.Equal(button.absY, hint.absY, 4);
+        Assert.Equal(button.OuterWidth, hint.OuterWidth, 4);
+        Assert.Equal(button.OuterHeight, hint.OuterHeight, 4);
+    }
+
+    [Fact]
+    public void FailedMenuOpeningLeavesBookTabVisibleAndUsable()
+    {
+        using var f = new MenuFixture();
+        f.Parent.TryOpen();
+        f.ResizePanelSpace(320, 120);
+        f.Toggle();
+        Assert.Empty(f.Menus);
+        Assert.True(f.ToggleButton.Visible);
+        Assert.True(f.ToggleButton.Focusable);
+        f.ResizePanelSpace(320, 420);
+        f.Toggle();
+        Assert.True(Assert.Single(f.Menus).IsOpened());
+        f.AssertOpenerInvisible();
     }
 
     [Theory]
@@ -280,6 +345,7 @@ public sealed class CraftingMenuLifecycleTests
             var restored = Assert.Single(f.Menus);
             Assert.NotSame(first, restored);
             Assert.True(restored.IsOpened());
+            f.AssertOpenerInvisible();
             f.Lifecycle.Drain();
             Assert.Same(restored, Assert.Single(f.Menus));
             first = restored;
@@ -300,13 +366,14 @@ public sealed class CraftingMenuLifecycleTests
         else if (closeMode == 1) menu.TryClose();
         else menu.Dispose();
         Assert.Empty(f.Menus);
+        Assert.True(f.ToggleButton.Visible);
         f.Parent.TryClose();
         f.Parent.TryOpen();
         Assert.True(Assert.Single(f.Menus).IsOpened());
+        f.AssertOpenerInvisible();
     }
 
     [Theory]
-    [InlineData("toggle")]
     [InlineData("escape")]
     [InlineData("titlebar")]
     public void ExplicitlyClosingTheMenuKeepsItClosedWhenTheParentReopens(string action)
@@ -315,10 +382,10 @@ public sealed class CraftingMenuLifecycleTests
         f.Parent.TryOpen();
         f.Toggle();
         var menu = Assert.Single(f.Menus);
-        if (action == "toggle") f.Toggle();
-        else if (action == "escape") Assert.True(menu.OnEscapePressed());
+        if (action == "escape") Assert.True(menu.OnEscapePressed());
         else f.ClickCloseButton(menu);
         Assert.Empty(f.Menus);
+        Assert.True(f.ToggleButton.Visible);
         f.Parent.TryClose();
         f.Parent.TryOpen();
         Assert.Empty(f.Menus);
@@ -336,9 +403,11 @@ public sealed class CraftingMenuLifecycleTests
         f.Recompose();
         f.Recompose();
         Assert.Empty(f.Menus);
+        Assert.True(f.ToggleButton.Visible);
         f.Lifecycle.Drain();
         var restored = Assert.Single(f.Menus);
         Assert.NotSame(first, restored);
+        f.AssertOpenerInvisible();
         f.Parent.TryClose();
         f.Parent.TryOpen();
         Assert.True(Assert.Single(f.Menus).IsOpened());
@@ -617,8 +686,8 @@ public sealed class CraftingMenuLifecycleTests
         private readonly string originalLocale = Lang.CurrentLocale;
         private readonly ITranslationService? originalEnglish = Lang.AvailableLanguages.GetValueOrDefault("en");
         internal IEnumerable<GuiDialogCraftingMenu> Menus => loaded.OfType<GuiDialogCraftingMenu>();
-        internal GuiElementToggleButton ToggleButton =>
-            Parent.Composers["maininventory"].GetToggleButton("vanillaexpanded-crafting-toggle");
+        internal GuiElementCraftingMenuButton ToggleButton =>
+            (GuiElementCraftingMenuButton)Parent.Composers["maininventory"].GetToggleButton("vanillaexpanded-crafting-toggle");
         internal readonly IAsset BookAsset;
         internal readonly List<(IAsset Asset, int Width, int Height, int? Color)> BookDraws = new();
 
@@ -700,7 +769,13 @@ public sealed class CraftingMenuLifecycleTests
 
         internal void Toggle()
         {
-            Click(Parent.Composers["maininventory"].GetElement("vanillaexpanded-crafting-toggle"));
+            var button = ToggleButton.Bounds;
+            int x = (int)(button.absX + 5);
+            int y = (int)(button.absY + 5);
+            var down = new MouseEvent(x, y, EnumMouseButton.Left, 0);
+            Parent.OnMouseDown(down);
+            Assert.True(down.Handled);
+            Parent.OnMouseUp(new MouseEvent(x, y, EnumMouseButton.Left, 0));
         }
 
         internal void Click(GuiElement button)
@@ -715,6 +790,13 @@ public sealed class CraftingMenuLifecycleTests
         internal void AssertToggleHidden()
         {
             Assert.False(ToggleButton.Enabled);
+            AssertOpenerInvisible();
+            Assert.Empty(Menus);
+        }
+
+        internal void AssertOpenerInvisible()
+        {
+            Assert.False(ToggleButton.Visible);
             Assert.False(ToggleButton.Focusable);
             graphics.Render.Invocations.Clear();
             ToggleButton.RenderInteractiveElements(0);
@@ -723,13 +805,19 @@ public sealed class CraftingMenuLifecycleTests
                 EnumMouseButton.Left, 0);
             ToggleButton.OnMouseDownOnElement(Lifecycle.Api.Object, mouse);
             Assert.False(mouse.Handled);
+            Parent.OnMouseDown(mouse);
+            Assert.False(mouse.Handled);
             ToggleButton.OnFocusGained();
             var enter = new KeyEvent { KeyCode = (int)GlKeys.Enter };
             ToggleButton.OnKeyDown(Lifecycle.Api.Object, enter);
             Assert.False(enter.Handled);
-            Assert.Empty(Menus);
-            Assert.False(Parent.Composers["maininventory"]
-                .GetHoverText("vanillaexpanded-crafting-toggle-hint").IsVisible);
+            var hint = ToggleButton.Hint;
+            var input = Mock.Get(Lifecycle.Api.Object.Input);
+            input.SetupGet(value => value.MouseX).Returns(mouse.X);
+            input.SetupGet(value => value.MouseY).Returns(mouse.Y);
+            hint.RenderInteractiveElements(0);
+            Assert.False(hint.IsVisible);
+            Assert.False(hint.IsNowShown);
         }
 
         internal void ResizePanelSpace(double width, double height)
