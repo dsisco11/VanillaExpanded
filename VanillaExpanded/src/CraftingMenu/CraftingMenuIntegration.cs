@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using HarmonyLib;
+using VanillaExpanded.ModSystems;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -19,7 +20,7 @@ internal static class CraftingMenuDialogPatch
         Composed?.Invoke(__instance, ___survivalInvDialog);
 }
 
-public sealed class CraftingMenuSystem : ModSystem
+public sealed class CraftingMenuSystem : ModSystem, ILiveConfigurable
 {
     private ICoreClientAPI? api;
     private readonly Dictionary<GuiDialog, GuiDialogCraftingMenu> dialogs = new();
@@ -36,7 +37,14 @@ public sealed class CraftingMenuSystem : ModSystem
     internal CraftingCatalogue? Catalogue => context?.Catalogue;
     internal CraftingIconCache? IconCache => context?.Icons;
 
-    public override bool ShouldLoad(EnumAppSide forSide) => forSide == EnumAppSide.Client;
+    public override bool ShouldLoad(ICoreAPI api)
+    {
+        VanillaExpandedModSystem.EnsureConfigLoaded(api);
+        return ShouldLoad(api.Side);
+    }
+
+    public override bool ShouldLoad(EnumAppSide forSide) =>
+        forSide == EnumAppSide.Client && VanillaExpandedModSystem.Config.EnableCraftingMenu;
 
     public override void StartClientSide(ICoreClientAPI api)
     {
@@ -57,8 +65,21 @@ public sealed class CraftingMenuSystem : ModSystem
     {
         CraftingInventorySnapshot.EnsureThread(RuntimeEnv.MainThreadId);
         Clear();
+        if (!VanillaExpandedModSystem.Config.EnableCraftingMenu) return;
         var current = build(api!);
         context = (current.Catalogue, current.Allocator, new CraftingIconCache(api!));
+    }
+
+    public void OnConfigReloaded(ICoreAPI api)
+    {
+        if (this.api == null || VanillaExpandedModSystem.Config.EnableCraftingMenu) return;
+        CraftingInventorySnapshot.EnsureThread(RuntimeEnv.MainThreadId);
+        foreach (var attachment in attachments.Values)
+        {
+            var toggle = (GuiElementTextButton)attachment.Composer.GetElement("vanillaexpanded-crafting-toggle");
+            toggle.Visible = toggle.Enabled = false;
+        }
+        Dispose();
     }
 
     internal void Attach(GuiDialog parent, GuiComposer composer)
@@ -78,6 +99,7 @@ public sealed class CraftingMenuSystem : ModSystem
             Lang.Get("vanillaexpanded:craftingmenu-toggle"), font,
             font.Clone().WithColor(GuiStyle.ActiveButtonTextColor), () =>
         {
+            if (!VanillaExpandedModSystem.Config.EnableCraftingMenu) return true;
             if (dialogs.TryGetValue(parent, out var open) && open.IsOpened())
             {
                 rememberOpen = false;
@@ -85,17 +107,22 @@ public sealed class CraftingMenuSystem : ModSystem
             }
             else Open(parent, composer);
             return true;
-        }, ElementBounds.Fixed(bounds.fixedX, bounds.fixedY - 30, bounds.fixedWidth, 24)),
+        }, ElementBounds.Fixed(bounds.fixedX, bounds.fixedY - 30, bounds.fixedWidth, 24))
+        {
+            Visible = VanillaExpandedModSystem.Config.EnableCraftingMenu,
+            Enabled = VanillaExpandedModSystem.Config.EnableCraftingMenu
+        },
             "vanillaexpanded-crafting-toggle");
         composer.AddInteractiveElement(new GuiElementCraftingRefresh(api, ElementBounds.Fixed(0, 0, 0, 0),
             grid, () =>
             {
-                if (dialogs.TryGetValue(parent, out var dialog)) dialog.NativeGridDirty();
+                if (VanillaExpandedModSystem.Config.EnableCraftingMenu
+                    && dialogs.TryGetValue(parent, out var dialog)) dialog.NativeGridDirty();
             }), "vanillaexpanded-crafting-refresh");
         composer.ReCompose();
         void Restore()
         {
-            if (rememberOpen && parent.IsOpened()
+            if (VanillaExpandedModSystem.Config.EnableCraftingMenu && rememberOpen && parent.IsOpened()
                 && attachments.TryGetValue(parent, out var current) && ReferenceEquals(current.Composer, composer)
                 && parent.Composers.ContainsKey("maininventory")
                 && ReferenceEquals(parent.Composers["maininventory"], composer))
@@ -109,7 +136,8 @@ public sealed class CraftingMenuSystem : ModSystem
 
     private void Open(GuiDialog parent, GuiComposer composer)
     {
-        if (api == null || dialogs.TryGetValue(parent, out var open) && open.IsOpened()) return;
+        if (api == null || !VanillaExpandedModSystem.Config.EnableCraftingMenu
+            || dialogs.TryGetValue(parent, out var open) && open.IsOpened()) return;
         if (context is not { } current)
         {
             api.TriggerIngameError(this, "craftingmenu", Lang.Get("vanillaexpanded:craftingmenu-loading"));

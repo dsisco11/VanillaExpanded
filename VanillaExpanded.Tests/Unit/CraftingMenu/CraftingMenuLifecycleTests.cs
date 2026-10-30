@@ -1,6 +1,7 @@
 using System.Reflection;
 using Cairo;
 using Moq;
+using VanillaExpanded.ModSystems;
 using VanillaExpanded.CraftingMenu;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -14,6 +15,131 @@ namespace VanillaExpanded.Tests.Unit.CraftingMenu;
 [Collection("Crafting native GUI")]
 public sealed class CraftingMenuLifecycleTests
 {
+    [Theory]
+    [InlineData(true, EnumAppSide.Client, true)]
+    [InlineData(false, EnumAppSide.Client, false)]
+    [InlineData(true, EnumAppSide.Server, false)]
+    [InlineData(false, EnumAppSide.Server, false)]
+    public void ShouldLoadReadsPersistedEnablementBeforeStartup(bool enabled, EnumAppSide side, bool expected)
+    {
+        var original = VanillaExpandedModSystem.Config;
+        var loadedField = typeof(VanillaExpandedModSystem).GetField("configLoaded",
+            BindingFlags.Static | BindingFlags.NonPublic)!;
+        bool loaded = (bool)loadedField.GetValue(null)!;
+        var api = new Mock<ICoreAPI>();
+        api.SetupGet(value => value.Side).Returns(side);
+        api.Setup(value => value.LoadModConfig<VanillaExpandedConfig>(Constants.ConfigFileName))
+            .Returns(new VanillaExpandedConfig { EnableCraftingMenu = enabled });
+        try
+        {
+            loadedField.SetValue(null, false);
+            var system = new CraftingMenuSystem();
+            Assert.Equal(expected, system.ShouldLoad(api.Object));
+            Assert.Equal(expected, system.ShouldLoad(side));
+            api.Verify(value => value.LoadModConfig<VanillaExpandedConfig>(Constants.ConfigFileName), Times.Once);
+        }
+        finally
+        {
+            typeof(VanillaExpandedModSystem).GetProperty(nameof(VanillaExpandedModSystem.Config))!
+                .SetValue(null, original);
+            loadedField.SetValue(null, loaded);
+        }
+    }
+
+    [Fact]
+    public void DisabledAtWorldLoadDoesNotLoadSystemAndEnablingWaitsForReload()
+    {
+        using var f = new MenuFixture(false);
+        Assert.False(f.Lifecycle.Loaded);
+        Assert.False(f.Lifecycle.System.ShouldLoad(EnumAppSide.Server));
+        Assert.Null(f.Lifecycle.System.Catalogue);
+        Assert.Null(f.Lifecycle.System.IconCache);
+        Assert.Equal(0, f.Lifecycle.Builds);
+        Assert.Null(f.Parent.Composers["maininventory"].GetElement("vanillaexpanded-crafting-toggle"));
+        f.Lifecycle.Events.VerifyAdd(value => value.LevelFinalize += It.IsAny<Action>(), Times.Never);
+        f.Lifecycle.Events.VerifyAdd(value => value.LeaveWorld += It.IsAny<Action>(), Times.Never);
+        f.Parent.TryOpen();
+        f.SetEnabled(true);
+        f.Lifecycle.FinalizeWorld();
+        f.Recompose();
+        Assert.Equal(0, f.Lifecycle.Builds);
+        Assert.Null(f.Lifecycle.System.Catalogue);
+        Assert.Null(f.Parent.Composers["maininventory"].GetElement("vanillaexpanded-crafting-toggle"));
+        Assert.Empty(f.Menus);
+        using var reloaded = new LifecycleFixture();
+        Assert.True(reloaded.Loaded);
+        Assert.False(reloaded.System.ShouldLoad(EnumAppSide.Server));
+        reloaded.FinalizeWorld();
+        Assert.Equal(1, reloaded.Builds);
+        Assert.NotNull(reloaded.System.Catalogue);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DisablingLiveDisposesSystemAndBlocksReactivationUntilReload(bool queuedRestore)
+    {
+        using var f = new MenuFixture();
+        f.Parent.TryOpen();
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        if (queuedRestore) f.Recompose();
+        f.SetEnabled(false);
+        f.Lifecycle.Drain();
+        Assert.False(menu.IsOpened());
+        Assert.Empty(f.Menus);
+        Assert.Null(f.Lifecycle.System.Catalogue);
+        Assert.Null(f.Lifecycle.System.IconCache);
+        Assert.False(f.ToggleButton.Visible);
+        Assert.False(f.ToggleButton.Enabled);
+        f.SetEnabled(true);
+        f.Lifecycle.FinalizeWorld();
+        f.Parent.TryClose();
+        f.Parent.TryOpen();
+        Assert.False(f.ToggleButton.Visible);
+        Assert.False(f.ToggleButton.Enabled);
+        Assert.Equal(1, f.Lifecycle.Builds);
+        Assert.Empty(f.Menus);
+        Assert.Null(f.Lifecycle.System.Catalogue);
+        f.Recompose();
+        Assert.Null(f.Parent.Composers["maininventory"].GetElement("vanillaexpanded-crafting-toggle"));
+        using var reloaded = new LifecycleFixture();
+        reloaded.FinalizeWorld();
+        Assert.Equal(1, reloaded.Builds);
+        Assert.NotNull(reloaded.System.Catalogue);
+    }
+
+    [Fact]
+    public void UnrelatedConfigReloadKeepsEnabledSystemAndExistingMenu()
+    {
+        using var f = new MenuFixture();
+        f.Parent.TryOpen();
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        var catalogue = f.Lifecycle.System.Catalogue;
+        var cache = f.Lifecycle.System.IconCache;
+        f.SetEnabled(true);
+        Assert.Same(menu, Assert.Single(f.Menus));
+        Assert.Same(catalogue, f.Lifecycle.System.Catalogue);
+        Assert.Same(cache, f.Lifecycle.System.IconCache);
+        Assert.Equal(1, f.Lifecycle.Builds);
+    }
+
+    [Fact]
+    public void ConfigReloadBeforeWorldFinalizeDoesNotReadRecipesEarly()
+    {
+        using var scope = new NativeScope();
+        using var f = new LifecycleFixture();
+        f.System.OnConfigReloaded(f.Api.Object);
+        Assert.Equal(0, f.Builds);
+        f.FinalizeWorld();
+        Assert.Equal(1, f.Builds);
+        f.System.Dispose();
+        f.System.OnConfigReloaded(f.Api.Object);
+        Assert.Null(f.System.Catalogue);
+        Assert.Equal(1, f.Builds);
+    }
+
     [Fact]
     public void ParentReopeningRestoresTheOpenMenuWithoutDuplicateDialogs()
     {
@@ -361,16 +487,19 @@ public sealed class CraftingMenuLifecycleTests
     private sealed class MenuFixture : IDisposable
     {
         private readonly CraftingRenderFixture graphics = new();
-        internal readonly LifecycleFixture Lifecycle = new();
+        internal readonly LifecycleFixture Lifecycle;
         internal readonly ParentDialog Parent;
         private readonly List<GuiDialog> loaded = new();
         private readonly List<GuiComposer> composers = new();
         private readonly string originalLocale = Lang.CurrentLocale;
         private readonly ITranslationService? originalEnglish = Lang.AvailableLanguages.GetValueOrDefault("en");
         internal IEnumerable<GuiDialogCraftingMenu> Menus => loaded.OfType<GuiDialogCraftingMenu>();
+        internal GuiElementTextButton ToggleButton =>
+            (GuiElementTextButton)Parent.Composers["maininventory"].GetElement("vanillaexpanded-crafting-toggle");
 
-        internal MenuFixture()
+        internal MenuFixture(bool enabled = true)
         {
+            Lifecycle = new LifecycleFixture(enabled);
             var translations = new Mock<ITranslationService>();
             translations.Setup(value => value.Get(It.IsAny<string>(), It.IsAny<object[]>()))
                 .Returns((string key, object[] _) => key);
@@ -437,6 +566,18 @@ public sealed class CraftingMenuLifecycleTests
             Assert.True(args.Handled);
         }
 
+        internal void SetEnabled(bool enabled)
+        {
+            Assert.Equal(1, ConfigLibIntegrationModSystem.ApplyConfigLibSettings(VanillaExpandedModSystem.Config,
+                new Vintagestory.API.Datastructures.StringAttribute(
+                    "{\"EnableCraftingMenu\":\"" + (enabled ? "true" : "false") + "\"}")));
+            var loader = new Mock<IModLoader>();
+            loader.Setup(value => value.Systems).Returns(Lifecycle.Loaded
+                ? new ModSystem[] { Lifecycle.System } : Array.Empty<ModSystem>());
+            Lifecycle.Api.SetupGet(value => value.ModLoader).Returns(loader.Object);
+            LiveConfigReload.NotifyAll(Lifecycle.Api.Object);
+        }
+
         internal void ClickCloseButton(GuiDialogCraftingMenu menu)
         {
             var titlebar = menu.SingleComposer.GetTitleBar("titlebar");
@@ -495,10 +636,13 @@ public sealed class CraftingMenuLifecycleTests
         internal readonly Queue<Action> Queue = new();
         internal readonly List<GridRecipe> Recipes = new();
         internal readonly CraftingMenuSystem System;
+        internal readonly bool Loaded;
         internal int Builds;
+        private readonly bool originalEnabled = VanillaExpandedModSystem.Config.EnableCraftingMenu;
 
-        internal LifecycleFixture()
+        internal LifecycleFixture(bool enabled = true)
         {
+            VanillaExpandedModSystem.Config.EnableCraftingMenu = enabled;
             Recipes.Add(F.Recipe(F.Ingredient(F.Stack(1, "a", 1))));
             F.Register(Recipes.ToArray());
             Api.SetupGet(value => value.World).Returns(World.Object);
@@ -512,12 +656,17 @@ public sealed class CraftingMenuLifecycleTests
                 Builds++;
                 return (F.Catalogue.Build(Recipes.ToArray()), F.Allocator);
             });
-            System.StartClientSide(Api.Object);
+            Loaded = System.ShouldLoad(EnumAppSide.Client);
+            if (Loaded) System.StartClientSide(Api.Object);
         }
 
         internal void FinalizeWorld() => Events.Raise(value => value.LevelFinalize += null);
         internal void Drain() { while (Queue.TryDequeue(out var action)) action(); }
 
-        public void Dispose() => System.Dispose();
+        public void Dispose()
+        {
+            System.Dispose();
+            VanillaExpandedModSystem.Config.EnableCraftingMenu = originalEnabled;
+        }
     }
 }

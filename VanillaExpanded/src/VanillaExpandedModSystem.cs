@@ -102,7 +102,10 @@ public class VanillaExpandedModSystem : ModSystem
     private static void ApplySelectivePatches(Harmony harmony)
     {
         new PatchClassProcessor(harmony, typeof(FishingBiteSoundPatch)).Patch();
-        new PatchClassProcessor(harmony, typeof(CraftingMenuDialogPatch)).Patch();
+        if (Config.EnableCraftingMenu)
+        {
+            new PatchClassProcessor(harmony, typeof(CraftingMenuDialogPatch)).Patch();
+        }
 
         // Patch the firepit GUI open/close hooks unless explicitly disabled.
         // Users can disable this as a safety valve if it ever breaks or conflicts.

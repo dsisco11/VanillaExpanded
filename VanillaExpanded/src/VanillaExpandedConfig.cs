@@ -37,6 +37,9 @@ public class VanillaExpandedConfig
     /// </summary>
     public bool EnableAlloyCalculator { get; set; } = true;
 
+    /// <summary>Enables the client-side crafting-grid recipe menu.</summary>
+    public bool EnableCraftingMenu { get; set; } = true;
+
     /// <summary>
     /// Explicitly disables the Harmony patch used to detect firepit GUI open/close events for the alloy calculator.
     /// Enable this only if it conflicts with other mods or breaks after a game update.

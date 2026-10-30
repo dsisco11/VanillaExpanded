@@ -61,6 +61,15 @@
         "default": true,
         "weight": 4.1
       },
+      "EnableCraftingMenu": {
+        "code": "EnableCraftingMenu",
+        "name": "EnableCraftingMenu",
+        "ingui": "vanillaexpanded:config-enable-crafting-menu",
+        "comment": "vanillaexpanded:config-enable-crafting-menu-tooltip",
+        "default": true,
+        "weight": 4.6,
+        "clientSide": true
+      },
       "DisableAlloyCalculatorPatch": {
         "code": "DisableAlloyCalculatorPatch",
         "name": "DisableAlloyCalculatorPatch",
@@ -472,6 +481,11 @@
       "type": "separator",
       "title": "vanillaexpanded:config-section-alloy-calculator",
       "weight": 4
+    },
+    {
+      "type": "separator",
+      "title": "vanillaexpanded:config-section-crafting-menu",
+      "weight": 4.5
     },
     {
       "type": "separator",

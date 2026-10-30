@@ -46,6 +46,8 @@ Compatibility evidence currently covers inspection of the Vintage Story **1.22.7
 
 Open your inventory's crafting grid and use the **Recipes** button to browse and search crafting-grid outputs. Search by item name or item code; hover or keyboard-focus a tile to see its ingredients and missing quantities. Use the arrow buttons below the list to cycle alternative recipes for the selected output, or **Auto** to restore automatic selection.
 
+The menu is enabled by default. With ConfigLib installed, use **Pause menu > Mod Settings > VanillaExpanded > Crafting Menu** to toggle it, or set `EnableCraftingMenu` in `ModConfig/VanillaExpanded.json`. Disabling through ConfigLib immediately closes the menu, hides **Recipes** and deactivates the system. Enabling requires re-entering the world or restarting, including after live deactivation. When disabled at world load, the crafting-menu mod system and its GUI patch are not loaded.
+
 - **Click a recipe:** place available ingredients for one craft. Missing ingredients remain absent.
 - **Shift-click a recipe:** fill its ingredient positions as far as available stock and stack limits allow, even if another ingredient is missing.
 - **Craft normally afterward:** click the vanilla crafting result slot. The menu only moves ingredients; it never takes the result or crafts automatically.
@@ -154,6 +156,12 @@ There is no AutoLoot layering option: its progress always renders above dialogs,
 | ----------------------------- | ------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | `EnableAlloyCalculator`       | `true`  | `true`, `false` | Enable the alloy calculator GUI for crucibles.                                                                                         |
 | `DisableAlloyCalculatorPatch` | `false` | `true`, `false` | Disable firepit GUI detection for the alloy calculator. Requires a world reload or restart; prevents automatic opening while disabled. |
+
+#### Crafting Menu
+
+| Setting              | Default | Range / choices | Description |
+| -------------------- | ------- | --------------- | ----------- |
+| `EnableCraftingMenu` | `true` | `true`, `false` | Enable the client-side crafting recipe menu. Disabling applies immediately; enabling requires a world reload or restart. |
 
 #### Gameplay
 
