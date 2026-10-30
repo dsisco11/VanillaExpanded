@@ -50,7 +50,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
     public override double DrawOrder => 0.21;
     public override bool PrefersUngrabbedMouse => true;
     public override bool CaptureAllInputs() => IsOpened() && (SingleComposer?.GetTextInput("search")?.HasFocus ?? false);
-    public override bool OnEscapePressed() => CloseByUser();
+    public override bool OnEscapePressed() => parent.OnEscapePressed();
 
     public override bool TryOpen()
     {
@@ -224,6 +224,16 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         // The opener's release can land on this dialog's newly positioned close button.
         if (!pressedMouseButtons.Remove(args.Button)) return;
         base.OnMouseUp(args);
+    }
+
+    public override void OnKeyDown(KeyEvent args)
+    {
+        if (args.Handled) return;
+        base.OnKeyDown(args);
+        if (args.Handled || !IsOpened()) return;
+        var hotkey = capi.Input.GetHotKeyByCode(parent.ToggleKeyCombinationCode);
+        if (hotkey != null && hotkey.DidPress(args, capi.World, capi.World.Player, true))
+            args.Handled = parent.TryClose();
     }
 
     private void Activate(int output, bool shift)

@@ -56,7 +56,7 @@ The menu is enabled by default. With ConfigLib installed, use **Pause menu > Mod
 
 Ingredients come from your ordinary hotbar, backpack storage and the nine crafting-grid inputs. The result slot, cursor-held stack, off-hand/equipment, bag-equipping slots and remote containers are excluded. This menu handles the native 3x3 crafting grid, not cooking, smithing, knapping, clay forming or other workstations.
 
-Closing the inventory hides the menu without forgetting that it was enabled. It reopens with the crafting grid during the current client session; use the menu's close button or Escape to keep it closed.
+Closing the inventory hides the menu without forgetting that it was enabled. Escape closes the inventory and its attached menu together; the inventory hotkey does the same unless you are typing in the menu's search field. The menu reopens with the crafting grid during the current client session; use the menu's close button to keep it closed.
 
 Placement uses native inventory transfers and server synchronization. Having all ingredients does not guarantee room to rearrange the grid: if displaced contents cannot be safely returned to carried storage, placement is refused without changing the inventory. If a native transfer is interrupted after some moves, those moves may remain; the game reconciles inventory normally. The menu does not roll back or automatically retry the arrangement, drop items to make room, or report server-confirmed batch success.
 

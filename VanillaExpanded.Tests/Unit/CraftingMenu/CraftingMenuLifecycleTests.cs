@@ -749,16 +749,87 @@ public sealed class CraftingMenuLifecycleTests
     }
 
     [Theory]
-    [InlineData("escape")]
-    [InlineData("titlebar")]
-    public void ExplicitlyClosingTheMenuKeepsItClosedWhenTheParentReopens(string action)
+    [InlineData(GlKeys.E)]
+    [InlineData(GlKeys.I)]
+    public void InventoryHotkeyFromFocusedMenuClosesParentAndRestoresMenu(GlKeys key)
+    {
+        using var f = new MenuFixture();
+        f.Parent.Opening = f.Recompose;
+        var hotkey = new HotKey { CurrentMapping = new KeyCombination { KeyCode = (int)key } };
+        Mock.Get(f.Lifecycle.Api.Object.Input).Setup(value => value.GetHotKeyByCode("inventory")).Returns(hotkey);
+        f.Parent.TryOpen();
+        f.Toggle();
+        for (int cycle = 0; cycle < 3; cycle++)
+        {
+            var menu = Assert.Single(f.Menus);
+            menu.Focus();
+            menu.SingleComposer.GetTextInput("search").OnFocusLost();
+            var args = new KeyEvent { KeyCode = (int)key };
+            menu.OnKeyDown(args);
+            Assert.True(args.Handled);
+            Assert.False(f.Parent.IsOpened());
+            Assert.Empty(f.Menus);
+            f.Parent.TryOpen();
+            var restored = Assert.Single(f.Menus);
+            Assert.NotSame(menu, restored);
+            Assert.True(restored.IsOpened());
+            f.Lifecycle.Drain();
+            Assert.Same(restored, Assert.Single(f.Menus));
+            f.AssertOpenerInvisible();
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void EscapePreservesOpenPreferenceRegardlessOfDialogDispatchOrder(bool parentFirst)
+    {
+        using var f = new MenuFixture();
+        f.Parent.Opening = f.Recompose;
+        f.Parent.TryOpen();
+        f.Toggle();
+        for (int cycle = 0; cycle < 3; cycle++)
+        {
+            var menu = Assert.Single(f.Menus);
+            if (parentFirst) Assert.True(f.Parent.OnEscapePressed());
+            else Assert.True(menu.OnEscapePressed());
+            Assert.False(f.Parent.IsOpened());
+            Assert.Empty(f.Menus);
+            f.Parent.TryOpen();
+            Assert.NotSame(menu, Assert.Single(f.Menus));
+            f.Lifecycle.Drain();
+            Assert.True(Assert.Single(f.Menus).IsOpened());
+            f.AssertOpenerInvisible();
+        }
+    }
+
+    [Fact]
+    public void InventoryHotkeyRemainsSearchInputWhileSearchIsFocused()
+    {
+        using var f = new MenuFixture();
+        var hotkey = new HotKey { CurrentMapping = new KeyCombination { KeyCode = (int)GlKeys.E } };
+        Mock.Get(f.Lifecycle.Api.Object.Input).Setup(value => value.GetHotKeyByCode("inventory")).Returns(hotkey);
+        f.Parent.TryOpen();
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        menu.Focus();
+        menu.SingleComposer.GetTextInput("search").OnFocusGained();
+        var args = new KeyEvent { KeyCode = (int)GlKeys.E };
+        menu.OnKeyDown(args);
+        Assert.True(args.Handled);
+        Assert.True(f.Parent.IsOpened());
+        Assert.Same(menu, Assert.Single(f.Menus));
+        Assert.True(menu.CaptureAllInputs());
+    }
+
+    [Fact]
+    public void ExplicitlyClosingTheMenuKeepsItClosedWhenTheParentReopens()
     {
         using var f = new MenuFixture();
         f.Parent.TryOpen();
         f.Toggle();
         var menu = Assert.Single(f.Menus);
-        if (action == "escape") Assert.True(menu.OnEscapePressed());
-        else f.ClickCloseButton(menu);
+        f.ClickCloseButton(menu);
         Assert.Empty(f.Menus);
         Assert.True(f.ToggleButton.Visible);
         f.Parent.TryClose();
@@ -1262,7 +1333,7 @@ public sealed class CraftingMenuLifecycleTests
     private sealed class ParentDialog(ICoreClientAPI api) : GuiDialog(api)
     {
         internal Action? Opening;
-        public override string ToggleKeyCombinationCode => "";
+        public override string ToggleKeyCombinationCode => "inventory";
         public override void OnGuiOpened()
         {
             base.OnGuiOpened();
