@@ -13,7 +13,7 @@ internal sealed class ThermometerView : NativeView
     private readonly BodyTemperatureThermometerPresentation content;
     private readonly ElementBounds root = ElementBounds.Fixed(0, 0, 0, 0).WithAlignment(EnumDialogArea.CenterMiddle);
     private readonly ElementBounds column = ElementBounds.Fixed(0, 0, 0, 0).WithAlignment(EnumDialogArea.CenterTop);
-    private readonly ElementBounds icon = ElementBounds.Fixed(0, 0, HudOverlaySizes.Standard, HudOverlaySizes.Standard).WithAlignment(EnumDialogArea.CenterTop);
+    private readonly ElementBounds icon = ElementBounds.Fixed(0, 0, HudOverlaySizes.Small, HudOverlaySizes.Small).WithAlignment(EnumDialogArea.CenterTop);
     private readonly ElementBounds trend = ElementBounds.Fixed(0, 0, 0, 0).WithAlignment(EnumDialogArea.CenterTop);
     private readonly ElementBounds readingRow = ElementBounds.Fixed(0, 0, 0, 0).WithAlignment(EnumDialogArea.LeftMiddle);
     private readonly TextElement reading;
@@ -35,9 +35,9 @@ internal sealed class ThermometerView : NativeView
             .WithAlignment(EnumDialogArea.CenterMiddle), _ => { }, createText, 1.5));
         try
         {
-            fill = Own(new TextureElement(api, ElementBounds.Fixed(0, 0, HudOverlaySizes.ThermometerWidth, HudOverlaySizes.Standard)
+            fill = Own(new TextureElement(api, ElementBounds.Fixed(0, 0, HudOverlaySizes.ThermometerWidth, HudOverlaySizes.Small)
                 .WithAlignment(EnumDialogArea.CenterMiddle), _ => { }, load));
-            outline = Own(new TextureElement(api, ElementBounds.Fixed(0, 0, HudOverlaySizes.ThermometerWidth, HudOverlaySizes.Standard)
+            outline = Own(new TextureElement(api, ElementBounds.Fixed(0, 0, HudOverlaySizes.ThermometerWidth, HudOverlaySizes.Small)
                 .WithAlignment(EnumDialogArea.CenterMiddle), _ => { }, load));
             for (int index = 0; index < chevrons.Length; index++)
                 chevrons[index] = Own(new TextureElement(api, ElementBounds.Fixed(0, 0, 0, 0)
@@ -80,7 +80,7 @@ internal sealed class ThermometerView : NativeView
         foreach (var chevron in chevrons) chevron.LayoutCompleted(clip);
         var bounds = fill.Bounds;
         // Reveal the full-size mask upward, retaining its bulb and native sprite target at every fill level.
-        float top = (float)(bounds.renderY + 23.25 * (1 - (content.Sample?.Fill ?? 0)) * scale);
+        float top = (float)(bounds.renderY + 15.5 * (1 - (content.Sample?.Fill ?? 0)) * scale);
         var reveal = new RectangleF((float)bounds.renderX, top, (float)bounds.OuterWidth, (float)(bounds.renderY + bounds.OuterHeight - top));
         var intersection = RectangleF.Intersect(reveal, clip);
         if (intersection.Width <= 0 || intersection.Height <= 0) intersection = RectangleF.Empty;
@@ -99,7 +99,7 @@ internal sealed class ThermometerView : NativeView
     public override void CollectBackdrops(IRenderAPI renderer)
     {
         if (opacity <= 0) return;
-        using var scope = new DrawOpacity(opacity); content.Backdrop?.Queue(renderer, x, y, scale);
+        using var scope = new DrawOpacity(opacity); content.Backdrop?.Queue(renderer, x, y, scale * HudOverlaySizes.Small / HudOverlaySizes.Standard);
     }
     /// <summary>Connects all independently drawn components to the owning feature's failure boundary.</summary>
     public override void SetFailureHandler(Action<Exception> failure)

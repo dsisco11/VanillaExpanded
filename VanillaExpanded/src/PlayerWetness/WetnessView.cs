@@ -13,7 +13,7 @@ internal sealed class WetnessView : NativeView
     private readonly PlayerWetnessPresentation content;
     private readonly ElementBounds root = ElementBounds.Fixed(0, 0, 0, 0).WithAlignment(EnumDialogArea.CenterMiddle);
     private readonly ElementBounds artwork = ElementBounds.Fixed(0, HudOverlaySizes.WetnessReadingHeight,
-        HudOverlaySizes.Standard, HudOverlaySizes.Standard - HudOverlaySizes.WetnessReadingHeight).WithAlignment(EnumDialogArea.CenterTop);
+        HudOverlaySizes.Small, HudOverlaySizes.Small).WithAlignment(EnumDialogArea.CenterTop);
     private readonly TextElement reading;
     private readonly TextureElement[] drops = new TextureElement[4];
     private float opacity;
@@ -35,7 +35,7 @@ internal sealed class WetnessView : NativeView
             {
                 // Each authored drop has independent fill/outline elements sharing the same local rectangle.
                 bool first = index < 2;
-                var bounds = first ? ElementBounds.Fixed(2.25, 1.5, 22.5, 22.5) : ElementBounds.Fixed(17.25, 0, 13.5, 13.5);
+                var bounds = first ? ElementBounds.Fixed(1.5, 5, 15, 15) : ElementBounds.Fixed(11.5, 4, 9, 9);
                 drops[index] = Own(new TextureElement(api, bounds, _ => { }, load, guiTexture: true));
                 if (index % 2 == 0) drops[index].State.SetColor(.25f, .65f, 1);
             }
@@ -62,7 +62,7 @@ internal sealed class WetnessView : NativeView
     {
         ThrowIfDisposed(); reading.LayoutCompleted(clip);
         foreach (var drop in drops) drop.LayoutCompleted(clip);
-        x = artwork.renderX; y = reading.Bounds.renderY;
+        x = artwork.renderX; y = artwork.renderY;
     }
     #endregion
     #region Rendering state
@@ -76,7 +76,7 @@ internal sealed class WetnessView : NativeView
     public override void CollectBackdrops(IRenderAPI renderer)
     {
         if (opacity <= 0) return;
-        using var scope = new DrawOpacity(opacity); content.Backdrop?.Queue(renderer, x, y, scale);
+        using var scope = new DrawOpacity(opacity); content.Backdrop?.Queue(renderer, x, y, scale * HudOverlaySizes.Small / HudOverlaySizes.Standard);
     }
     /// <summary>Connects independently rendered layers to the feature failure boundary.</summary>
     public override void SetFailureHandler(Action<Exception> failure)

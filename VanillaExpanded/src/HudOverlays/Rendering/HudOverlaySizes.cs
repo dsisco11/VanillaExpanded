@@ -20,7 +20,7 @@ public static class HudOverlaySizes
     /// <summary>Compact hover titlebar with normal HUD lettering.</summary>
     public const float TitleBarHeight = 22;
     /// <summary>Thermometer width.</summary>
-    public const float ThermometerWidth = 21;
+    public const float ThermometerWidth = 14;
     /// <summary>Gap between thermometer and reading.</summary>
     public const float ReadingGap = 4.5f;
     /// <summary>Trend chevron width.</summary>
