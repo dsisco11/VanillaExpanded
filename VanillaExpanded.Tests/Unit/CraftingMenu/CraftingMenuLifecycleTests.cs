@@ -1,6 +1,8 @@
 using System.Reflection;
+using System.Text;
 using Cairo;
 using Moq;
+using VanillaExpanded.Tests.Mocks;
 using VanillaExpanded.ModSystems;
 using VanillaExpanded.CraftingMenu;
 using Vintagestory.API.Client;
@@ -15,6 +17,300 @@ namespace VanillaExpanded.Tests.Unit.CraftingMenu;
 [Collection("Crafting native GUI")]
 public sealed class CraftingMenuLifecycleTests
 {
+    [Theory]
+    [InlineData(1)]
+    [InlineData(1.5)]
+    [InlineData(2)]
+    public void RecipeTooltipUsesNativeSelectedGridWithTitleAndReleasesReplacedPreviews(float scale)
+    {
+        using var f = new MenuFixture(scale: scale, includeRecipes: true);
+        var first = Assert.Single(f.Lifecycle.Recipes);
+        first.Output!.Quantity = 4;
+        var second = f.Lifecycle.F.Recipe(f.Lifecycle.F.Ingredient(f.Lifecycle.F.Stack(2, "stone", 1)));
+        second.Output = first.Output.Clone();
+        f.Lifecycle.Recipes.Add(second);
+        f.Lifecycle.F.Register(first, second);
+        f.Lifecycle.FinalizeWorld();
+        f.Recompose();
+        f.Parent.TryOpen();
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        var tooltip = Assert.IsType<GuiElementCraftingRecipeTooltip>(menu.SingleComposer.GetElement("tooltip"));
+        var session = (CraftingMenuSession)typeof(GuiDialogCraftingMenu).GetField("session",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
+        var row = Assert.Single(session.Rows);
+        int texturesBefore = f.TextureCount;
+        tooltip.Inspect(row);
+        var popup = tooltip.Popup!;
+        var content = popup.GetRichtext("recipe");
+        var titleElement = popup.GetRichtext("title");
+        var title = Assert.IsType<RichTextComponent>(Assert.Single(titleElement.Components));
+        Assert.Equal(row.Recipe.DisplayName + " (x4)", title.DisplayText);
+        Assert.Equal(FontWeight.Bold, title.Font.FontWeight);
+        Assert.Equal(EnumTextOrientation.Center, title.Font.Orientation);
+        Assert.All(title.Lines, line => Assert.Equal(content.Bounds.InnerWidth / 2,
+            line.Bounds.X + (line.LeftSpace + line.RightSpace + line.Bounds.Width) / 2, precision: 6));
+        var grid = Assert.Single(content.Components.OfType<SlideshowGridRecipeTextComponent>());
+        Assert.Equal(content.Bounds.InnerWidth / 2, grid.BoundsPerLine[0].X + 126 * scale / 2, precision: 6);
+        var preview = Assert.Single(grid.GridRecipesAndUnnamedIngredients).Recipe!;
+        Assert.NotSame(row.Recipe.Recipe, preview);
+        Assert.Equal(row.Recipe.Recipe.Name, preview.Name);
+        Assert.NotSame(row.Recipe.Recipe.ResolvedIngredients![0], preview.ResolvedIngredients![0]);
+        Assert.True(titleElement.Bounds.absY + title.BoundsPerLine.Max(bounds => bounds.Y + bounds.Height) <=
+            content.Bounds.absY + grid.BoundsPerLine[0].Y);
+        Assert.IsType<GuiElementInset>(popup.GetElement("divider"));
+        int texturesShown = f.TextureCount;
+        tooltip.Inspect(row);
+        Assert.Same(popup, tooltip.Popup);
+        Assert.Equal(texturesShown, f.TextureCount);
+        tooltip.Inspect(row with { Evaluation = CatalogueFixture.Full() });
+        Assert.Same(popup, tooltip.Popup);
+        var window = f.Lifecycle.Api.Object.Gui.WindowBounds;
+        f.SetMouse((int)(window.absX + window.InnerWidth - 2), (int)(window.absY + window.InnerHeight - 2));
+        var render = Mock.Get(f.Lifecycle.Api.Object.Render);
+        render.Invocations.Clear();
+        tooltip.RenderInteractiveElements(.1f);
+        render.Verify(value => value.GlPushMatrix(), Times.Once);
+        render.Verify(value => value.GlTranslate(0, 0, 1000), Times.Once);
+        render.Verify(value => value.GlPopMatrix(), Times.Once);
+        Assert.True(popup.Bounds.absX >= window.absX);
+        Assert.True(popup.Bounds.absY >= window.absY);
+        Assert.True(popup.Bounds.absX + popup.Bounds.OuterWidth <= window.absX + window.InnerWidth + .001);
+        Assert.True(popup.Bounds.absY + popup.Bounds.OuterHeight <= window.absY + window.InnerHeight + .001);
+        Assert.Empty(f.Lifecycle.Api.Object.Render.ScissorStack);
+        session.Select(row.Output.Id);
+        f.Click(menu.SingleComposer.GetElement("next"));
+        var selected = Assert.Single(session.Rows);
+        Assert.NotSame(row.Recipe, selected.Recipe);
+        tooltip.Inspect(selected);
+        Assert.NotSame(popup, tooltip.Popup);
+        Assert.Equal(texturesShown, f.TextureCount);
+        var selectedGrid = Assert.Single(tooltip.Popup!.GetRichtext("recipe").Components
+            .OfType<SlideshowGridRecipeTextComponent>());
+        Assert.Equal(selected.Recipe.Recipe.Name, Assert.Single(selectedGrid.GridRecipesAndUnnamedIngredients).Recipe!.Name);
+        tooltip.Inspect(null);
+        render.Invocations.Clear();
+        tooltip.RenderInteractiveElements(.1f);
+        Assert.Empty(render.Invocations);
+        tooltip.Inspect(selected);
+        render.Setup(value => value.GlTranslate(0, 0, 1000)).Throws<InvalidOperationException>();
+        Assert.Throws<InvalidOperationException>(() => tooltip.RenderInteractiveElements(.1f));
+        render.Verify(value => value.GlPopMatrix(), Times.Once);
+        tooltip.Dispose();
+        Assert.Equal(texturesBefore, f.TextureCount);
+    }
+
+    [Fact]
+    public void UnresolvedRecipeTooltipShowsItsWarningWithoutConstructingAnInvalidNativeGrid()
+    {
+        using var f = new MenuFixture(includeRecipes: true);
+        f.Parent.TryOpen();
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        var session = (CraftingMenuSession)typeof(GuiDialogCraftingMenu).GetField("session",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
+        var row = Assert.Single(session.Rows);
+        var unresolved = row.Recipe.Recipe.Clone();
+        unresolved.ResolvedIngredients = null;
+        var entry = new CraftingRecipeEntry(1000, unresolved, row.Recipe.DisplayName);
+        var tooltip = Assert.IsType<GuiElementCraftingRecipeTooltip>(menu.SingleComposer.GetElement("tooltip"));
+        tooltip.Inspect(row with
+        {
+            Recipe = entry,
+            Evaluation = CraftingRecipeEvaluation.Unsupported(entry.UnresolvedReason!)
+        });
+        var components = tooltip.Popup!.GetRichtext("recipe").Components;
+        Assert.Empty(components.OfType<SlideshowGridRecipeTextComponent>());
+        Assert.Contains(entry.UnresolvedReason!, string.Join("\n",
+            components.OfType<RichTextComponent>().Select(component => component.DisplayText)));
+    }
+
+    [Theory]
+    [InlineData(1, 220)]
+    [InlineData(1.5, 330)]
+    [InlineData(2, 440)]
+    public void RecipeTooltipCentersWrappedTitlesAndVisibleGridCellsInNarrowWindows(float scale, double windowWidth)
+    {
+        using var f = new MenuFixture(scale: scale, includeRecipes: true);
+        f.Parent.TryOpen();
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        var session = (CraftingMenuSession)typeof(GuiDialogCraftingMenu).GetField("session",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
+        var row = Assert.Single(session.Rows);
+        var entry = new CraftingRecipeEntry(1000, row.Recipe.Recipe,
+            "A long localized crafting output name that must wrap across several centered title lines");
+        f.Lifecycle.Api.Object.Gui.WindowBounds.fixedWidth = windowWidth / scale;
+        f.Lifecycle.Api.Object.Gui.WindowBounds.CalcWorldBounds();
+        var tooltip = Assert.IsType<GuiElementCraftingRecipeTooltip>(menu.SingleComposer.GetElement("tooltip"));
+        tooltip.Inspect(row with { Recipe = entry });
+        var popup = tooltip.Popup!;
+        var content = popup.GetRichtext("recipe");
+        var titleElement = popup.GetRichtext("title");
+        var title = Assert.IsType<RichTextComponent>(Assert.Single(titleElement.Components));
+        Assert.True(title.Lines.Length > 1);
+        Assert.Equal(EnumTextOrientation.Center, title.Font.Orientation);
+        Assert.All(title.Lines, line => Assert.Equal(content.Bounds.InnerWidth / 2,
+            line.Bounds.X + (line.LeftSpace + line.RightSpace + line.Bounds.Width) / 2, precision: 6));
+        var grid = Assert.Single(content.Components.OfType<SlideshowGridRecipeTextComponent>());
+        Assert.Equal(content.Bounds.InnerWidth / 2, grid.BoundsPerLine[0].X + 126 * scale / 2, precision: 6);
+        Assert.True(titleElement.Bounds.absY + title.BoundsPerLine.Max(bounds => bounds.Y + bounds.Height) <=
+            content.Bounds.absY + grid.BoundsPerLine[0].Y);
+    }
+
+    [Theory]
+    [InlineData(1, 300)]
+    [InlineData(1.5, 300)]
+    [InlineData(2, 300)]
+    [InlineData(1, 204)]
+    [InlineData(1.5, 204)]
+    [InlineData(2, 204)]
+    public void RecipeTooltipShowsNativeStatsAndFormattedBehaviorDetailsAboveDividerAndGrid(float scale, double width)
+    {
+        using var f = new MenuFixture(scale: scale, includeRecipes: true);
+        var recipe = Assert.Single(f.Lifecycle.Recipes);
+        var output = recipe.Output!.ResolvedItemStack!;
+        output.Collectible.Durability = 50;
+        output.Attributes.SetInt("durability", 35);
+        ItemSlot? describedSlot = null;
+        var behavior = new Mock<CollectibleBehavior>(output.Collectible);
+        behavior.Setup(value => value.GetHeldItemInfo(It.IsAny<ItemSlot>(), It.IsAny<StringBuilder>(),
+                f.Lifecycle.World.Object, false))
+            .Callback<ItemSlot, StringBuilder, IWorldAccessor, bool>((slot, text, _, _) =>
+            {
+                describedSlot = slot;
+                text.AppendLine("<font color=\"#ff0000\">Custom stat: 12</font>");
+                text.AppendLine("These native item details wrap across multiple lines inside the padded description panel.");
+                Assert.IsType<ItemStack>(slot.Itemstack).Attributes.SetBool("tooltip-mutated", true);
+            });
+        output.Collectible.CollectibleBehaviors = [behavior.Object];
+        f.Lifecycle.FinalizeWorld();
+        f.Recompose();
+        f.Parent.TryOpen();
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        var session = (CraftingMenuSession)typeof(GuiDialogCraftingMenu).GetField("session",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
+        var row = Assert.Single(session.Rows);
+        var tooltip = Assert.IsType<GuiElementCraftingRecipeTooltip>(menu.SingleComposer.GetElement("tooltip"));
+        int texturesBefore = f.TextureCount;
+        var window = f.Lifecycle.Api.Object.Gui.WindowBounds;
+        window.fixedWidth = width + 16;
+        window.MarkDirtyRecursive();
+        window.CalcWorldBounds();
+        tooltip.Inspect(row);
+        var popup = tooltip.Popup!;
+        var content = popup.GetRichtext("recipe");
+        var titleElement = popup.GetRichtext("title");
+        var title = Assert.IsType<RichTextComponent>(Assert.Single(titleElement.Components));
+        var description = popup.GetRichtext("description");
+        var panel = description.Bounds.ParentBounds;
+        Assert.NotSame(popup.Bounds, panel);
+        Assert.Same(popup.Bounds, panel.ParentBounds);
+        Assert.Equal(3 * scale, description.Bounds.absX - panel.absX, precision: 6);
+        Assert.Equal(3 * scale, description.Bounds.absY - panel.absY, precision: 6);
+        Assert.Equal(3 * scale, panel.absX + panel.OuterWidth -
+            description.Bounds.absX - description.Bounds.OuterWidth, precision: 6);
+        Assert.Equal(3 * scale, panel.absY + panel.OuterHeight -
+            description.Bounds.absY - description.Bounds.OuterHeight, precision: 6);
+        Assert.Equal(content.Bounds.InnerWidth, panel.OuterWidth, precision: 6);
+        var text = description.Components.OfType<RichTextComponent>()
+            .Where(component => component is not ClearFloatTextComponent).ToArray();
+        Assert.Contains(text, component => component.Lines.Length > 1);
+        Assert.Contains(text, component => component.DisplayText.Contains("Durability:"));
+        var custom = Assert.Single(text, component => component.DisplayText.Contains("Custom stat: 12"));
+        Assert.Equal(new double[] { 1, 0, 0 }, custom.Font.Color.Take(3));
+        Assert.DoesNotContain(text, component => component.DisplayText.Contains("<font"));
+        Assert.All(text, component => Assert.Equal(EnumTextOrientation.Left, component.Font.Orientation));
+        var divider = Assert.IsType<GuiElementInset>(popup.GetElement("divider"));
+        var grid = Assert.Single(content.Components.OfType<SlideshowGridRecipeTextComponent>());
+        Assert.True(titleElement.Bounds.absY + title.BoundsPerLine.Max(bounds => bounds.Y + bounds.Height) <= panel.absY);
+        Assert.True(description.Bounds.absY + text.SelectMany(component => component.BoundsPerLine)
+            .Max(bounds => bounds.Y + bounds.Height) < divider.Bounds.absY);
+        Assert.True(divider.Bounds.absY + divider.Bounds.OuterHeight <
+            content.Bounds.absY + grid.BoundsPerLine[0].Y);
+        Assert.Equal(content.Bounds.absX, divider.Bounds.absX, precision: 6);
+        Assert.Equal(content.Bounds.InnerWidth, divider.Bounds.OuterWidth, precision: 6);
+        Assert.NotNull(describedSlot);
+        var describedStack = Assert.IsType<ItemStack>(describedSlot.Itemstack);
+        Assert.NotSame(output, describedStack);
+        Assert.IsType<DummyInventory>(describedSlot.Inventory);
+        Assert.Equal(0, describedSlot.Inventory.GetTransitionSpeedMul(EnumTransitionType.Perish, describedStack));
+        Assert.Equal(35, describedStack.Collectible.GetRemainingDurability(describedStack));
+        Assert.False(output.Attributes.HasAttribute("tooltip-mutated"));
+        Assert.False(row.Recipe.GetPreview()!.Attributes.HasAttribute("tooltip-mutated"));
+        tooltip.Inspect(row);
+        behavior.Verify(value => value.GetHeldItemInfo(It.IsAny<ItemSlot>(), It.IsAny<StringBuilder>(),
+            f.Lifecycle.World.Object, false), Times.Once);
+        tooltip.Dispose();
+        Assert.Equal(texturesBefore, f.TextureCount);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void RecipeTooltipOmitsEmptyDescriptionAndDividerWithoutLosingPreview(bool hasOutput)
+    {
+        using var f = new MenuFixture(includeRecipes: true);
+        f.Parent.TryOpen();
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        var session = (CraftingMenuSession)typeof(GuiDialogCraftingMenu).GetField("session",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
+        var row = Assert.Single(session.Rows);
+        var recipe = row.Recipe.Recipe.Clone();
+        var item = new Mock<MockItem>(555, (byte)0, f.Lifecycle.Api.Object) { CallBase = true };
+        item.Object.Code = new AssetLocation("game:empty-description");
+        item.Setup(value => value.GetHeldItemInfo(It.IsAny<ItemSlot>(), It.IsAny<StringBuilder>(),
+                It.IsAny<IWorldAccessor>(), false))
+            .Callback<ItemSlot, StringBuilder, IWorldAccessor, bool>((_, text, _, _) => text.Append(" \r\n"));
+        recipe.Output!.ResolvedItemStack = hasOutput ? new ItemStack(item.Object) : null;
+        var tooltip = Assert.IsType<GuiElementCraftingRecipeTooltip>(menu.SingleComposer.GetElement("tooltip"));
+        tooltip.Inspect(row with { Recipe = new CraftingRecipeEntry(1000, recipe, row.Recipe.DisplayName) });
+        var popup = Assert.IsType<GuiComposer>(tooltip.Popup);
+        var content = popup.GetRichtext("recipe");
+        Assert.Single(popup.GetRichtext("title").Components);
+        Assert.Null(popup.GetElement("description"));
+        Assert.Single(content.Components.OfType<SlideshowGridRecipeTextComponent>());
+        Assert.Null(popup.GetElement("divider"));
+        item.Verify(value => value.GetHeldItemInfo(It.IsAny<ItemSlot>(), It.IsAny<StringBuilder>(),
+            It.IsAny<IWorldAccessor>(), false), hasOutput ? Times.Once() : Times.Never());
+    }
+
+    [Fact]
+    public void NativeTooltipGridResolvesAllowedWildcardIngredientChoices()
+    {
+        using var f = new MenuFixture(includeRecipes: true);
+        var ingredient = f.Lifecycle.F.Wildcard("board-*", 2);
+        ingredient.AllowedVariants = ["oak", "pine"];
+        ingredient.SkipVariants = ["rotten"];
+        var recipe = f.Lifecycle.F.Recipe(ingredient);
+        f.Lifecycle.Recipes.Clear();
+        f.Lifecycle.Recipes.Add(recipe);
+        f.Lifecycle.F.Register(recipe);
+        var stacks = new[] { "oak", "pine", "rotten", "birch" }
+            .Select((wood, index) => f.Lifecycle.F.Stack(20 + index, "board-" + wood, 1)).ToArray();
+        f.Lifecycle.World.SetupGet(value => value.Collectibles).Returns(stacks.Select(stack => stack.Collectible).ToList());
+        f.Lifecycle.FinalizeWorld();
+        f.Recompose();
+        f.Parent.TryOpen();
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        var session = (CraftingMenuSession)typeof(GuiDialogCraftingMenu).GetField("session",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
+        var tooltip = Assert.IsType<GuiElementCraftingRecipeTooltip>(menu.SingleComposer.GetElement("tooltip"));
+        tooltip.Inspect(Assert.Single(session.Rows));
+        var grid = Assert.Single(tooltip.Popup!.GetRichtext("recipe").Components
+            .OfType<SlideshowGridRecipeTextComponent>());
+        var choices = grid.GridRecipesAndUnnamedIngredients.SelectMany(entry =>
+            entry.UnnamedIngredients != null ? entry.UnnamedIngredients.Values.SelectMany(value => value)
+                : entry.Recipe!.ResolvedIngredients!.Where(value => value != null)
+                    .Select(value => value!.ResolvedItemStack!)).Select(stack => stack.Collectible.Code.Path).ToHashSet();
+        Assert.Equal(new[] { "board-oak", "board-pine" }, choices.Order().ToArray());
+        Assert.Equal(EnumRecipeMatchType.Wildcard, ingredient.MatchingType);
+        Assert.Equal("board-*", ingredient.Code!.Path);
+    }
+
     [Fact]
     public void AlternativeCounterHasNoMarkerWhenRecipeIsManuallySelected()
     {
@@ -710,6 +1006,7 @@ public sealed class CraftingMenuLifecycleTests
             (GuiElementCraftingMenuButton)Parent.Composers["maininventory"].GetToggleButton("vanillaexpanded-crafting-toggle");
         internal readonly IAsset BookAsset;
         internal readonly List<(IAsset Asset, int Width, int Height, int? Color)> BookDraws = new();
+        internal int TextureCount => graphics.Textures.Count;
 
         internal MenuFixture(bool enabled = true, float scale = 1, bool longLabels = false, bool includeRecipes = false)
         {
@@ -733,6 +1030,10 @@ public sealed class CraftingMenuLifecycleTests
             api.SetupGet(value => value.Input).Returns(graphics.Api.Object.Input);
             api.SetupGet(value => value.Logger).Returns(Mock.Of<ILogger>());
             api.SetupGet(value => value.Network).Returns(Mock.Of<IClientNetworkAPI>());
+            var registry = new Mock<IClassRegistryAPI>();
+            registry.Setup(value => value.CreateInvNetworkUtil(It.IsAny<InventoryBase>(), api.Object))
+                .Returns(Mock.Of<IInventoryNetworkUtil>());
+            api.SetupGet(value => value.ClassRegistry).Returns(registry.Object);
             var assets = new Mock<IAssetManager>();
             assets.Setup(value => value.Get(It.IsAny<AssetLocation>()))
                 .Returns(Mock.Of<IAsset>(value => value.Data == Array.Empty<byte>()));
@@ -758,6 +1059,7 @@ public sealed class CraftingMenuLifecycleTests
             graphics.Gui.Setup(value => value.CreateCompo(It.IsAny<string>(), It.IsAny<ElementBounds>()))
                 .Returns((string name, ElementBounds bounds) => CreateComposer(name, bounds));
             Lifecycle.World.SetupGet(value => value.Player).Returns(Lifecycle.F.Player);
+            Lifecycle.World.SetupGet(value => value.Rand).Returns(new Random(123));
             var manager = (ClientPlayerInventoryManager)Lifecycle.F.Player.InventoryManager;
             manager.Inventories.Clear();
             var grid = new InventoryCraftingGrid("craftinggrid-test", null!) { Api = Lifecycle.F.Api.Object };
@@ -777,6 +1079,9 @@ public sealed class CraftingMenuLifecycleTests
 
         internal void Recompose()
         {
+            foreach (var recipe in Lifecycle.Recipes)
+                if (recipe.Output?.ResolvedItemStack?.Collectible is MockItem item)
+                    item.SetApi(Lifecycle.Api.Object);
             var composer = CreateComposer("inventory", ElementBounds.Fixed(500, 100, 400, 500).WithEmptyParent());
             composers.Add(composer);
             composer.AddStaticElement(new GuiElementParent(Lifecycle.Api.Object,
@@ -805,6 +1110,13 @@ public sealed class CraftingMenuLifecycleTests
             button.OnMouseDownOnElement(Lifecycle.Api.Object, args);
             button.OnMouseUpOnElement(Lifecycle.Api.Object, args);
             Assert.True(args.Handled);
+        }
+
+        internal void SetMouse(int x, int y)
+        {
+            var input = Mock.Get(Lifecycle.Api.Object.Input);
+            input.SetupGet(value => value.MouseX).Returns(x);
+            input.SetupGet(value => value.MouseY).Returns(y);
         }
 
         internal void AssertToggleHidden()
@@ -934,6 +1246,7 @@ public sealed class CraftingMenuLifecycleTests
             Recipes.Add(F.Recipe(F.Ingredient(F.Stack(1, "a", 1))));
             F.Register(Recipes.ToArray());
             Api.SetupGet(value => value.World).Returns(World.Object);
+            Api.SetupGet(value => value.ModLoader).Returns(Mock.Of<IModLoader>());
             Api.SetupGet(value => value.Event).Returns(Events.Object);
             World.SetupGet(value => value.GridRecipes).Returns(Recipes);
             World.SetupGet(value => value.FastSearchRecipesByIngredient).Returns(F.Catalogue.Index);

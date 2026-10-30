@@ -153,14 +153,13 @@ public sealed class CraftingMenuInteractionTests
         Assert.Empty(row.Evaluation.Missing);
         Assert.Equal(CraftingDispatchStatus.Rejected, session.Activate(row.Output.Id, false).Status);
         Assert.Equal(CraftingDispatchStatus.Rejected, session.Activate(row.Output.Id, true).Status);
-        string text = CraftingMenuTooltip.Describe(row, key => key, stack => stack.Collectible.Code.ToString());
-        Assert.Contains("craftingmenu-unknown", text);
+        string text = CraftingMenuTooltip.Warnings(row, key => key);
         Assert.Contains(row.Evaluation.UnsupportedReason!, text);
         Assert.DoesNotContain("craftingmenu-missing", text);
     }
 
     [Fact]
-    public void TooltipListsAllOneExecutionDeficitsAndAllowedChoicesWithoutMaximumBatchDeficits()
+    public void TooltipWarningsDoNotRepeatIngredientsDeficitsOrControls()
     {
         var f = new AllocationFixture();
         var wildcard = f.Wildcard("board-*", 4);
@@ -173,13 +172,10 @@ public sealed class CraftingMenuInteractionTests
         var session = Session(f, recipe);
         session.Refresh();
         var row = Assert.Single(session.Rows);
-        string text = CraftingMenuTooltip.Describe(row, key => key, stack => stack.Collectible.Code.ToString());
+        string text = CraftingMenuTooltip.Warnings(row, key => key);
         Assert.Equal(2, row.Evaluation.Missing.Length);
-        Assert.Equal(2, text.Split("craftingmenu-missing").Length - 1);
-        Assert.Contains("oak, pine", text);
-        Assert.Contains("rotten", text);
-        Assert.Contains("craftingmenu-tool", CraftingMenuTooltip.Describe(
-            WithTool(f), key => key, stack => stack.Collectible.Code.ToString()));
+        Assert.Empty(text);
+        Assert.DoesNotContain("craftingmenu-tool", CraftingMenuTooltip.Warnings(WithTool(f), key => key));
     }
 
     [Fact]
@@ -571,7 +567,7 @@ public sealed class CraftingMenuInteractionTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void TagChoicesDescribeNativeInnerAndOuterJunctionsAndForbiddenTags(bool disjunctive)
+    public void TaggedIngredientsKeepNativeMatchingWithoutDumpingTagExpressionsIntoTooltip(bool disjunctive)
     {
         var f = new AllocationFixture();
         var first = Tag(1, 2);
@@ -595,22 +591,15 @@ public sealed class CraftingMenuInteractionTests
         var session = Session(f, recipe);
         session.Refresh();
         var row = Assert.Single(session.Rows);
-        string text = CraftingMenuTooltip.Describe(row, key => key, stack => stack.Collectible.Code.ToString(),
-            tags => tags.Equals(first) ? new[] { "game:wood", "game:board" }
-                : tags.Equals(second) ? new[] { "game:metal" } : new[] { "game:rotten" });
-        Assert.Contains(disjunctive ? "craftingmenu-tags-all" : "craftingmenu-tags-any", text);
-        Assert.Contains(disjunctive ? "craftingmenu-or" : "craftingmenu-and", text);
-        Assert.Contains("craftingmenu-tags-none game:rotten", text);
-        Assert.Contains("game:board, game:wood", text);
-        Assert.Contains("game:metal", text);
-        Assert.Equal(2, text.Split("craftingmenu-tags-none").Length - 1);
+        string text = CraftingMenuTooltip.Warnings(row, key => key);
+        Assert.Empty(text);
         Assert.Equal(2, Assert.Single(row.Evaluation.Missing).Quantity);
     }
 
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void EmptyRequiredTagChoiceExplainsNativeMeaningInsteadOfInventingAcceptedTags(bool disjunctive)
+    public void EmptyRequiredTagChoiceDoesNotAddTagDiagnosticsToTooltip(bool disjunctive)
     {
         var f = new AllocationFixture();
         var ingredient = f.Wildcard("*");
@@ -623,10 +612,8 @@ public sealed class CraftingMenuInteractionTests
         f.Register(recipe);
         var session = Session(f, recipe);
         session.Refresh();
-        string text = CraftingMenuTooltip.Describe(Assert.Single(session.Rows), key => key,
-            stack => stack.Collectible.Code.ToString(), _ => new[] { "game:rotten" });
-        Assert.Contains(disjunctive ? "craftingmenu-tags-unrestricted" : "craftingmenu-tags-impossible", text);
-        Assert.Contains("craftingmenu-tags-none game:rotten", text);
+        string text = CraftingMenuTooltip.Warnings(Assert.Single(session.Rows), key => key);
+        Assert.Empty(text);
     }
 
     private static TagSet Tag(params ushort[] handles)

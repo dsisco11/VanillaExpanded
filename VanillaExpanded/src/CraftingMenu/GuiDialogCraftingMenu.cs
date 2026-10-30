@@ -22,8 +22,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
     private double previousWidth;
     private double autoWidth;
     private double nextWidth;
-    private GuiElementHoverText? tooltip;
-    private string? tooltipText;
+    private GuiElementCraftingRecipeTooltip? tooltip;
     private string search = "";
     private bool disposed;
     internal event Action? Disposed;
@@ -102,9 +101,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         var label = ElementBounds.Fixed(labelLeft, 0, content.fixedWidth - labelLeft, footerHeight);
         var tiles = new GuiElementCraftingTiles(capi, ElementBounds.Fixed(0, 0, viewport.fixedWidth, viewport.fixedHeight),
             viewport, session, Inspect, Activate, icons);
-        var newTooltip = new GuiElementHoverText(capi, "", CairoFont.WhiteSmallText(), 420,
-            ElementBounds.Fixed(0, 0, 1, 1));
-        newTooltip.SetAutoDisplay(false);
+        var newTooltip = new GuiElementCraftingRecipeTooltip(capi);
         var composer = capi.Gui.CreateCompo("vanillaexpanded-craftingmenu", bounds)
             .AddShadedDialogBG(ElementBounds.Fill)
             .AddDialogTitleBar(Lang.Get("vanillaexpanded:craftingmenu-title"), () => CloseByUser(), key: "titlebar")
@@ -135,7 +132,6 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         SingleComposer?.Dispose();
         SingleComposer = composer;
         tooltip = newTooltip;
-        tooltipText = null;
         composer.GetTextInput("search").SetPlaceHolderText(Lang.Get("vanillaexpanded:craftingmenu-search"));
         composer.GetTextInput("search").SetValue(search);
         tiles.Bind(composer.GetScrollbar("scroll"));
@@ -243,14 +239,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
             $"{selected.Output.Alternatives.IndexOf(selected.Recipe) + 1}/{selected.Output.Alternatives.Length}");
     }
 
-    private void Inspect(CraftingRecipeSelection? row)
-    {
-        if (tooltip == null) return;
-        string text = row == null ? "" : CraftingMenuTooltip.Describe(row,
-            getTagNames: capi.CollectibleTagRegistry.SlowEnumerateTagNames);
-        if (text != tooltipText) { tooltip.SetNewText(text); tooltipText = text; }
-        tooltip.SetVisible(row != null);
-    }
+    private void Inspect(CraftingRecipeSelection? row) => tooltip?.Inspect(row);
 
     private void Error(string reason) => capi.TriggerIngameError(this, "craftingmenu", Lang.Get(reason));
     private bool CloseByUser()
