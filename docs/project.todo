@@ -1,5 +1,7 @@
 # Vanilla: Expanded TODO List:
     ## Issues:
+        ☐ UI: change the open-button for the crafting menu into an SVG icon button.
+        ☐ UI: give crafting menu a set of category tabs for easier navigation between different types of recipes.
         ☐ Design a better separation of alloy calculator inventory ownership/liveness validation, transfer permissions, and storage-versus-machine access policy. Reconsider the storage-class whitelist without weakening ownership or withdrawal checks, and define coverage for vanilla and modded containers.
 
     ## New Features:
