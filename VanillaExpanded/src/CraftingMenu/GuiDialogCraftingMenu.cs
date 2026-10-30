@@ -154,7 +154,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         footerHeight = Math.Max(24, Math.Ceiling(Math.Max(buttonFont.GetFontExtents().Height,
             textFont.GetFontExtents().Height) / scale));
         searchHeight = Math.Max(26, Math.Ceiling(textFont.GetFontExtents().Height / scale + 6));
-        double counterWidth = Math.Ceiling(textFont.GetTextExtents("1/1*").Width / scale + 1);
+        double counterWidth = Math.Ceiling(textFont.GetTextExtents("1/1").Width / scale + 1);
         double titleWidth = textFont.GetTextExtents(Lang.Get("vanillaexpanded:craftingmenu-title")).Width / scale;
         // The native title bar reserves space for its menu and close icons.
         double titleControlsWidth = 2 * GuiElementDialogTitleBar.unscaledCloseIconSize + 2 + 20;
@@ -240,8 +240,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
             ? Lang.Get("vanillaexpanded:craftingmenu-empty") : "");
         var selected = session.Rows.FirstOrDefault(row => row.Output.Id == session.SelectedOutput);
         SingleComposer.GetDynamicText("alternative").SetNewText(selected == null ? "" :
-            $"{selected.Output.Alternatives.IndexOf(selected.Recipe) + 1}/{selected.Output.Alternatives.Length}"
-                + (selected.IsExplicit ? "*" : ""));
+            $"{selected.Output.Alternatives.IndexOf(selected.Recipe) + 1}/{selected.Output.Alternatives.Length}");
     }
 
     private void Inspect(CraftingRecipeSelection? row)

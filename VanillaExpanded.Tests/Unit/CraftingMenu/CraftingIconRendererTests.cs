@@ -298,7 +298,7 @@ public sealed class CraftingIconRendererTests
         Assert.Equal(8, Assert.Single(session.Rows).Recipe.OutputQuantity);
         Assert.Single(graphics.Bakes);
         Assert.Single(graphics.Allocations);
-        Assert.Equal(2, graphics.Textures.Count);
+        Assert.Single(graphics.Textures);
         Assert.Single(oldLabels.Except(graphics.Textures));
         Assert.Equal(6, originalOutput.StackSize);
         Assert.Equal(catalogue.Recipes[0].PreviewId, catalogue.Recipes[1].PreviewId);
@@ -357,25 +357,28 @@ public sealed class CraftingIconRendererTests
         Assert.Empty(graphics.Allocations);
     }
 
-    [Fact]
-    public void QuantitiesAndAlternativeIndicatorsSurviveWithoutStatusAnnotations()
+    [Theory]
+    [InlineData(1, 0)]
+    [InlineData(4, 1)]
+    public void OnlyOutputQuantitiesAreDrawnForRecipesWithMultipleAlternatives(int quantity, int expectedOverlays)
     {
         using var graphics = new CraftingRenderFixture();
         var f = new AllocationFixture();
         var first = f.Recipe(f.Ingredient(f.Stack(1, "board", 1)));
-        first.Output!.Quantity = 4;
+        first.Output!.Quantity = quantity;
         var second = f.Recipe(f.Ingredient(f.Stack(2, "stone", 1)));
         second.Output = first.Output;
         f.Register(first, second);
         var session = new CraftingMenuSession(f.Catalogue.Build(first, second), f.Allocator,
             () => f.Snapshot(), (_, _) => throw new InvalidOperationException());
         session.Refresh();
+        Assert.Equal(2, Assert.Single(session.Rows).Output.Alternatives.Length);
         using var tiles = CreateTiles(graphics, session);
         tiles.RenderInteractiveElements(0);
-        Assert.Equal(2, graphics.Textures.Count);
+        Assert.Equal(expectedOverlays, graphics.Textures.Count);
         graphics.Render.Verify(value => value.Render2DTexturePremultipliedAlpha(It.IsAny<int>(),
             It.IsAny<double>(), It.IsAny<double>(), It.IsAny<double>(), It.IsAny<double>(),
-            320, It.IsAny<Vec4f>()), Times.Exactly(2));
+            320, It.IsAny<Vec4f>()), Times.Exactly(expectedOverlays));
         tiles.Dispose();
         Assert.Empty(graphics.Textures);
     }

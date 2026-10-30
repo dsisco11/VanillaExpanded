@@ -15,6 +15,26 @@ namespace VanillaExpanded.Tests.Unit.CraftingMenu;
 [Collection("Crafting native GUI")]
 public sealed class CraftingMenuLifecycleTests
 {
+    [Fact]
+    public void AlternativeCounterHasNoMarkerWhenRecipeIsManuallySelected()
+    {
+        using var f = new MenuFixture(includeRecipes: true);
+        f.Parent.TryOpen();
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        var session = (CraftingMenuSession)typeof(GuiDialogCraftingMenu).GetField("session",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
+        var row = Assert.Single(session.Rows);
+        session.Select(row.Output.Id);
+        Assert.Equal("1/1", menu.SingleComposer.GetDynamicText("alternative").GetText());
+        f.Click(menu.SingleComposer.GetElement("next"));
+        Assert.True(Assert.Single(session.Rows).IsExplicit);
+        Assert.Equal("1/1", menu.SingleComposer.GetDynamicText("alternative").GetText());
+        f.Click(menu.SingleComposer.GetElement("auto"));
+        Assert.False(Assert.Single(session.Rows).IsExplicit);
+        Assert.Equal("1/1", menu.SingleComposer.GetDynamicText("alternative").GetText());
+    }
+
     [Theory]
     [InlineData(1)]
     [InlineData(1.5)]
@@ -140,7 +160,7 @@ public sealed class CraftingMenuLifecycleTests
         var originalComposer = menu.SingleComposer;
         var title = originalComposer.GetTitleBar("titlebar");
         var search = originalComposer.GetTextInput("search");
-        double counterWidth = Math.Ceiling(CairoFont.WhiteSmallText().GetTextExtents("1/1*").Width / scale + 1);
+        double counterWidth = Math.Ceiling(CairoFont.WhiteSmallText().GetTextExtents("1/1").Width / scale + 1);
         double footerWidth = new[] { "previous", "auto", "next" }
             .Sum(key => originalComposer.GetElement(key).Bounds.OuterWidth / scale) + 6 + 4 + counterWidth + 16;
         double titleWidth = GuiStyle.ElementToDialogPadding + title.Font.GetTextExtents(title.GetText()).Width / scale
@@ -691,7 +711,7 @@ public sealed class CraftingMenuLifecycleTests
         internal readonly IAsset BookAsset;
         internal readonly List<(IAsset Asset, int Width, int Height, int? Color)> BookDraws = new();
 
-        internal MenuFixture(bool enabled = true, float scale = 1, bool longLabels = false)
+        internal MenuFixture(bool enabled = true, float scale = 1, bool longLabels = false, bool includeRecipes = false)
         {
             graphics = new CraftingRenderFixture(scale);
             Lifecycle = new LifecycleFixture(enabled);
@@ -744,7 +764,7 @@ public sealed class CraftingMenuLifecycleTests
             grid.InvNetworkUtil.Api = Lifecycle.F.Api.Object;
             grid.Open(Lifecycle.F.Player);
             manager.Inventories.Add(grid.InventoryID, grid);
-            Lifecycle.Recipes.Clear();
+            if (!includeRecipes) Lifecycle.Recipes.Clear();
             Lifecycle.FinalizeWorld();
             Parent = new ParentDialog(api.Object);
             Recompose();

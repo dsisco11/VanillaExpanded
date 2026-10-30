@@ -1,5 +1,6 @@
 # Vanilla: Expanded TODO List:
     ## Issues:
+        ☐ UI: fix crafting recipe tooltip. needs proper title line, and it shouldnt display so much irrelevant information. it should also use the base-games standard crafting-grid variants display element.
         ☐ UI: give crafting menu a set of category tabs for easier navigation between different types of recipes.
         ☐ Design a better separation of alloy calculator inventory ownership/liveness validation, transfer permissions, and storage-versus-machine access policy. Reconsider the storage-class whitelist without weakening ownership or withdrawal checks, and define coverage for vanilla and modded containers.
 

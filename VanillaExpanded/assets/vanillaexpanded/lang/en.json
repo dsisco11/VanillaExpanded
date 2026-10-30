@@ -94,7 +94,7 @@
   "craftingmenu-toggle": "Recipes",
   "craftingmenu-search": "Search outputs...",
   "craftingmenu-auto": "Auto",
-  "craftingmenu-alternative-hint": "Click a tile to select it. Arrows pin an alternative; Auto releases it. + marks multiple alternatives; * marks a pinned alternative. Tile colors indicate ingredient availability.",
+  "craftingmenu-alternative-hint": "Click a tile to select it. Arrows select a recipe variant; Auto restores automatic selection. Tile colors indicate ingredient availability.",
   "craftingmenu-empty": "No matching recipes.",
   "craftingmenu-loading": "Crafting recipes are not ready yet.",
   "craftingmenu-ingredients": "Ingredients for one execution:",

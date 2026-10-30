@@ -15,7 +15,6 @@ internal sealed class CraftingIconRenderer(ICoreClientAPI api, CraftingIconCache
     private readonly List<(int Quantity, double Scale)> expiredQuantities = new();
     private ICraftingIconShaderProgram? shader;
     private MeshRef? quad;
-    private LoadedTexture? alternatives;
     private bool subscribed;
     private bool disposed;
 
@@ -52,8 +51,6 @@ internal sealed class CraftingIconRenderer(ICoreClientAPI api, CraftingIconCache
         {
             if (!tile.IsInViewport) continue;
             var selection = tile.Selection!;
-            if (selection.Output.Alternatives.Length > 1 && alternatives == null)
-                alternatives = api.Gui.TextTexture.GenTextTexture("+", CairoFont.WhiteSmallText());
             int size = Math.Max(2, (int)Math.Ceiling(Math.Min(tile.Bounds.InnerWidth, tile.Bounds.InnerHeight) / 2) * 2);
             var position = cache.Get(selection.Recipe, size, bakes < CraftingIconCache.BakesPerFrame, out bool baked);
             if (baked) bakes++;
@@ -113,10 +110,6 @@ internal sealed class CraftingIconRenderer(ICoreClientAPI api, CraftingIconCache
                         bounds.renderX + bounds.InnerWidth - quantity.Width - GuiElement.scaled(2),
                         bounds.renderY + bounds.InnerHeight - quantity.Height - GuiElement.scaled(2),
                         quantity.Width, quantity.Height, 320);
-                if (tile.Selection.Output.Alternatives.Length > 1 && alternatives != null)
-                    render.Render2DTexturePremultipliedAlpha(alternatives.TextureId,
-                        bounds.renderX + bounds.InnerWidth - alternatives.Width - GuiElement.scaled(2),
-                        bounds.renderY, alternatives.Width, alternatives.Height, 320);
             }
             finally { render.PopScissor(); }
         }
@@ -164,8 +157,6 @@ internal sealed class CraftingIconRenderer(ICoreClientAPI api, CraftingIconCache
         visiblePreviews.Clear();
         foreach (var quantity in quantities.Values) quantity.Dispose();
         quantities.Clear();
-        alternatives?.Dispose();
-        alternatives = null;
     }
 
     public void Dispose()
