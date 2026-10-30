@@ -1,4 +1,5 @@
 using System;
+using Cairo;
 using Vintagestory.API.Client;
 
 namespace VanillaExpanded.CraftingMenu;
@@ -52,8 +53,10 @@ internal sealed class GuiElementCraftingRecipeTooltip(ICoreClientAPI capi)
         text.BeforeCalcBounds();
         popupBounds.fixedHeight = y + text.Bounds.fixedHeight;
         popupBounds.MarkDirtyRecursive();
+        var backgroundBounds = ElementBounds.Fill
+            .WithFixedAlignmentOffset(-popupBounds.fixedPaddingX, -popupBounds.fixedPaddingY);
         Popup = api.Gui.CreateCompo("vanillaexpanded-crafting-tooltip", popupBounds)
-            .AddShadedDialogBG(ElementBounds.Fill, false, 2, 1);
+            .AddStaticElement(new GuiElementCustomDraw(api, backgroundBounds, DrawItemTooltipBackground), "background");
         Popup.AddInteractiveElement(title, "title");
         if (description != null)
             Popup.BeginChildElements(description.Bounds.ParentBounds)
@@ -66,6 +69,21 @@ internal sealed class GuiElementCraftingRecipeTooltip(ICoreClientAPI capi)
         Popup.AddInteractiveElement(text, "recipe").Compose();
         recipe = selection.Recipe;
         unsupportedReason = reason;
+    }
+
+    private static void DrawItemTooltipBackground(Context ctx, ImageSurface surface, ElementBounds bounds)
+    {
+        // GuiElementItemstackInfo has no reusable background renderer; retain its native frame styling here.
+        var color = GuiStyle.DialogStrongBgColor;
+        ctx.SetSourceRGBA(color);
+        RoundRectangle(ctx, bounds.bgDrawX, bounds.bgDrawY, bounds.OuterWidth, bounds.OuterHeight, GuiStyle.DialogBGRadius);
+        ctx.FillPreserve();
+        ctx.SetSourceRGBA(GuiStyle.DialogLightBgColor[0] * 1.4, color[1] * 1.4, color[2] * 1.4, 1);
+        ctx.LineWidth = 3 * 1.75;
+        ctx.StrokePreserve();
+        surface.BlurFull(8.2);
+        ctx.SetSourceRGBA(color[0] / 2, color[1] / 2, color[2] / 2, color[3]);
+        ctx.Stroke();
     }
 
     public override bool IsPositionInside(int posX, int posY) => false;

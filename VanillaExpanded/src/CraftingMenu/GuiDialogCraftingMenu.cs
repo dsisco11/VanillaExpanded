@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using Vintagestory.API.Client;
@@ -25,6 +26,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
     private GuiElementCraftingRecipeTooltip? tooltip;
     private string search = "";
     private bool disposed;
+    private readonly HashSet<EnumMouseButton> pressedMouseButtons = [];
     internal event Action? Disposed;
     internal event Action? CloseRequestedByUser;
 
@@ -208,6 +210,20 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
     {
         (SingleComposer?.GetElement("tiles") as GuiElementCraftingTiles)?.UpdateHover(args.X, args.Y);
         base.OnMouseMove(args);
+    }
+
+    public override void OnMouseDown(MouseEvent args)
+    {
+        if (args.Handled) return;
+        base.OnMouseDown(args);
+        if (args.Handled) pressedMouseButtons.Add(args.Button);
+    }
+
+    public override void OnMouseUp(MouseEvent args)
+    {
+        // The opener's release can land on this dialog's newly positioned close button.
+        if (!pressedMouseButtons.Remove(args.Button)) return;
+        base.OnMouseUp(args);
     }
 
     private void Activate(int output, bool shift)

@@ -47,6 +47,7 @@ public sealed class CraftingMenuLifecycleTests
         var title = Assert.IsType<RichTextComponent>(Assert.Single(titleElement.Components));
         Assert.Equal(row.Recipe.DisplayName + " (x4)", title.DisplayText);
         Assert.Equal(FontWeight.Bold, title.Font.FontWeight);
+        Assert.Equal(CairoFont.WhiteSmallText().UnscaledFontsize, title.Font.UnscaledFontsize);
         Assert.Equal(EnumTextOrientation.Center, title.Font.Orientation);
         Assert.All(title.Lines, line => Assert.Equal(content.Bounds.InnerWidth / 2,
             line.Bounds.X + (line.LeftSpace + line.RightSpace + line.Bounds.Width) / 2, precision: 6));
@@ -59,6 +60,32 @@ public sealed class CraftingMenuLifecycleTests
         Assert.True(titleElement.Bounds.absY + title.BoundsPerLine.Max(bounds => bounds.Y + bounds.Height) <=
             content.Bounds.absY + grid.BoundsPerLine[0].Y);
         Assert.IsType<GuiElementInset>(popup.GetElement("divider"));
+        var background = Assert.IsType<GuiElementCustomDraw>(popup.GetElement("background"));
+        Assert.Equal(popup.Bounds.absX, background.Bounds.absX, precision: 6);
+        Assert.Equal(popup.Bounds.absY, background.Bounds.absY, precision: 6);
+        Assert.Equal(popup.Bounds.OuterWidth, background.Bounds.OuterWidth, precision: 6);
+        Assert.Equal(popup.Bounds.OuterHeight, background.Bounds.OuterHeight, precision: 6);
+        using (var surface = new ImageSurface(Format.Argb32, popup.Bounds.OuterWidthInt, popup.Bounds.OuterHeightInt))
+        using (var ctx = new Context(surface))
+        using (var expected = new ImageSurface(Format.Argb32, 1, 1))
+        using (var expectedCtx = new Context(expected))
+        {
+            background.ComposeElements(ctx, surface);
+            expectedCtx.SetSourceRGBA(GuiStyle.DialogStrongBgColor);
+            expectedCtx.Paint();
+            surface.Flush();
+            expected.Flush();
+            var pixels = surface.Data;
+            var expectedPixel = expected.Data;
+            foreach (int x in new[] { surface.Width / 3, surface.Width * 2 / 3 })
+            {
+                int offset = surface.Height / 2 * surface.Stride + x * 4;
+                for (int channel = 0; channel < 4; channel++)
+                    Assert.InRange((int)pixels[offset + channel], expectedPixel[channel] - 1, expectedPixel[channel] + 1);
+            }
+            int border = surface.Height / 2 * surface.Stride;
+            Assert.False(pixels.Skip(border).Take(4).SequenceEqual(expectedPixel));
+        }
         int texturesShown = f.TextureCount;
         tooltip.Inspect(row);
         Assert.Same(popup, tooltip.Popup);
@@ -437,6 +464,38 @@ public sealed class CraftingMenuLifecycleTests
         f.Toggle();
         Assert.True(Assert.Single(f.Menus).IsOpened());
         f.AssertOpenerInvisible();
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(1.5)]
+    [InlineData(2)]
+    public void OpeningReleaseOverNewCloseButtonDoesNotImmediatelyCloseMenu(float scale)
+    {
+        using var f = new MenuFixture(scale: scale);
+        f.Parent.TryOpen();
+        f.ResizePanelSpace(150, 1080);
+        int x = (int)(f.ToggleButton.Bounds.absX + GuiElement.scaled(5));
+        int y = (int)(f.ToggleButton.Bounds.absY + GuiElement.scaled(5));
+        var down = new MouseEvent(x, y, EnumMouseButton.Left, 0);
+        f.Parent.OnMouseDown(down);
+        Assert.True(down.Handled);
+        var menu = Assert.Single(f.Menus);
+        var titlebar = menu.SingleComposer.GetTitleBar("titlebar");
+        Assert.InRange(x - titlebar.Bounds.absX,
+            titlebar.Bounds.OuterWidth - GuiElement.scaled(GuiElementDialogTitleBar.unscaledCloseIconSize + 12),
+            titlebar.Bounds.OuterWidth - GuiElement.scaled(10));
+        Assert.InRange(y - titlebar.Bounds.absY, GuiElement.scaled(5), GuiElement.scaled(22));
+        var up = new MouseEvent(x, y, EnumMouseButton.Left, 0);
+        menu.OnMouseUp(up);
+        f.Parent.OnMouseUp(up);
+        Assert.Same(menu, Assert.Single(f.Menus));
+        Assert.True(menu.IsOpened());
+        f.AssertOpenerInvisible();
+        menu.OnMouseDown(new MouseEvent(x, y, EnumMouseButton.Left, 0));
+        menu.OnMouseUp(new MouseEvent(x, y, EnumMouseButton.Left, 0));
+        Assert.Empty(f.Menus);
+        Assert.True(f.ToggleButton.Visible);
     }
 
     [Theory]

@@ -13,7 +13,7 @@ internal static class CraftingMenuTooltip
     {
         string title = selection.Recipe.DisplayName;
         if (selection.Recipe.OutputQuantity > 1) title += $" (x{selection.Recipe.OutputQuantity})";
-        return new RichTextComponent(api, title, CairoFont.WhiteSmallishText().WithWeight(FontWeight.Bold)
+        return new RichTextComponent(api, title, CairoFont.WhiteSmallText().WithWeight(FontWeight.Bold)
             .WithOrientation(EnumTextOrientation.Center));
     }
 
