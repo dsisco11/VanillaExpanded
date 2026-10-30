@@ -40,7 +40,7 @@ internal sealed class PlayerWetnessPresentation : IndicatorPresentation
         if (Style == HudIndicatorStyle.Text) { PrepareText(context, "wetness", Reading); return; }
         var text = MeasureText(context, Reading, 1.5);
         ReadingWidth = text.Width * Math.Min(1, HudOverlaySizes.WetnessReadingHeight / Math.Max(1, text.Height));
-        Size = new(Math.Max(HudOverlaySizes.Standard, ReadingWidth), HudOverlaySizes.Standard);
+        Size = new(Math.Max(HudOverlaySizes.Small, ReadingWidth), HudOverlaySizes.WetnessReadingHeight + HudOverlaySizes.Small);
         Backdrop = loadBackdrop(context); Visibility.Show();
     }
     /// <summary>Creates unique native glyph and drop components for one composer.</summary>

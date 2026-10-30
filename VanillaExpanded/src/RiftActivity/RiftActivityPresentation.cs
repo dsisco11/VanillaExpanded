@@ -43,7 +43,7 @@ internal sealed class RiftActivityPresentation : IndicatorPresentation
         string reading = Lang.GetL(context.Locale, "vanillaexpanded:rift-activity-short-" + value.Value.ToString().ToLowerInvariant());
         SizeF text = MeasureText(context, reading, 1.5);
         content = new("textures/hud/rift-activity/" + names[(int)value.Value] + ".png",
-            new(HudOverlaySizes.Standard, HudOverlaySizes.Standard), reading, HudOverlaySizes.ReadingGap, ReadingSize: text);
+            new(HudOverlaySizes.Small, HudOverlaySizes.Small), reading, HudOverlaySizes.ReadingGap, ReadingSize: text);
         Size = new(Math.Max(text.Width, content.IconSize.Width), text.Height + content.Gap + content.IconSize.Height);
         backdrop = loadBackdrop(context);
         Visibility.Show();

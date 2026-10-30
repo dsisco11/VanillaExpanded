@@ -48,7 +48,7 @@ internal sealed class IconReadingView : NativeView
         Validate(next);
         reading.Prepare(context, next.Reading);
         icon.Prepare(context, next.IconPath);
-        scale = context.GuiScale;
+        scale = context.GuiScale * next.IconSize.Width / HudOverlaySizes.Standard;
         var textSize = next.ReadingSize ?? reading.Size;
         float readingFit = textSize.Height > 0 ? Math.Min(1, next.MaximumReadingHeight / textSize.Height) : 1;
         textSize = new(textSize.Width * readingFit, textSize.Height * readingFit);

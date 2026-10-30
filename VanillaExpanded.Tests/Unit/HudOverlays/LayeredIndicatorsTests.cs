@@ -190,6 +190,15 @@ public sealed class LayeredIndicatorsTests
         var reading = Assert.IsType<TextElement>(composition.Composer.GetElement("test:reading"));
         var drops = Enumerable.Range(0, 4).Select(index => Assert.IsType<TextureElement>(composition.Composer.GetElement("test:drop-" + index))).ToArray();
         Assert.Equal(drops[0].State.Target, drops[1].State.Target); Assert.Equal(drops[2].State.Target, drops[3].State.Target);
+        Assert.Equal(24 * 2, drops[0].Bounds.ParentBounds.OuterWidth);
+        Assert.Equal(24 * 2, drops[0].Bounds.ParentBounds.OuterHeight);
+        Assert.Equal(15 * 2, drops[0].State.Target.Width);
+        Assert.Equal(9 * 2, drops[2].State.Target.Width);
+        composition.View.CollectBackdrops(fixture.Context.Api.Render);
+        var backdrop = Assert.Single(fixture.Resources.Backdrop.Invocations);
+        Assert.Equal(drops[0].Bounds.ParentBounds.renderX, Assert.IsType<double>(backdrop.Arguments[1]), 4);
+        Assert.Equal(drops[0].Bounds.ParentBounds.renderY, Assert.IsType<double>(backdrop.Arguments[2]), 4);
+        Assert.Equal(2d * 24 / 36, Assert.IsType<double>(backdrop.Arguments[3]), 6);
         Assert.True(reading.State.Target.Bottom <= drops.Min(drop => drop.State.Target.Top) + .001);
         Assert.Equal(reading.Bounds.renderX + reading.Bounds.OuterWidth / 2,
             drops[0].Bounds.ParentBounds.renderX + drops[0].Bounds.ParentBounds.OuterWidth / 2, 4);
@@ -217,6 +226,15 @@ public sealed class LayeredIndicatorsTests
         var outline = Assert.IsType<TextureElement>(composition.Composer.GetElement("test:outline"));
         var fill = Assert.IsType<TextureElement>(composition.Composer.GetElement("test:fill"));
         Assert.Equal(outline.State.Target, fill.State.Target);
+        Assert.Equal(24 * scale, outline.Bounds.ParentBounds.OuterWidth);
+        Assert.Equal(24 * scale, outline.Bounds.ParentBounds.OuterHeight);
+        Assert.Equal(14 * scale, outline.State.Target.Width);
+        Assert.Equal(24 * scale, outline.State.Target.Height);
+        composition.View.CollectBackdrops(fixture.Context.Api.Render);
+        var backdrop = Assert.Single(fixture.Resources.Backdrop.Invocations);
+        Assert.Equal(outline.Bounds.ParentBounds.renderX, Assert.IsType<double>(backdrop.Arguments[1]), 4);
+        Assert.Equal(outline.Bounds.ParentBounds.renderY, Assert.IsType<double>(backdrop.Arguments[2]), 4);
+        Assert.Equal((double)scale * 24 / 36, Assert.IsType<double>(backdrop.Arguments[3]), 6);
         Assert.True(outline.Bounds.OuterWidth < outline.Bounds.ParentBounds.OuterWidth);
         Assert.Equal(outline.Bounds.renderX + outline.Bounds.OuterWidth / 2, outline.Bounds.ParentBounds.renderX + outline.Bounds.ParentBounds.OuterWidth / 2, 4);
         if (showReading) Assert.True(reading.State.Target.Bottom <= outline.State.Target.Top + .001);

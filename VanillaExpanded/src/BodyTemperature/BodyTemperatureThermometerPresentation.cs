@@ -53,8 +53,8 @@ internal sealed class BodyTemperatureThermometerPresentation : IndicatorPresenta
         ReadingWidth = text.Width * Math.Min(1, HudOverlaySizes.BodyReadingHeight / Math.Max(1, text.Height));
         // The column reserves both marker strengths; changing direction or fill does not move the icon slot.
         ColumnWidth = Math.Max(ReadingWidth, Sample.Trend == 0 ? 0 : HudOverlaySizes.ChevronWidth);
-        Size = new(Math.Max(HudOverlaySizes.Standard, ColumnWidth),
-            HudOverlaySizes.Standard + (ColumnWidth > 0 ? HudOverlaySizes.Standard + HudOverlaySizes.ReadingGap : 0));
+        Size = new(Math.Max(HudOverlaySizes.Small, ColumnWidth),
+            HudOverlaySizes.Small + (ColumnWidth > 0 ? HudOverlaySizes.Standard + HudOverlaySizes.ReadingGap : 0));
         Backdrop = loadBackdrop(context); Visibility.Show();
     }
     /// <summary>Creates independent native text, trend, mask and outline components.</summary>

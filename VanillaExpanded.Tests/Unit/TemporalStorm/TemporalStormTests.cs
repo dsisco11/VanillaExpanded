@@ -89,7 +89,7 @@ public sealed class TemporalStormTests
             storms.StormData.nowStormActive = index == 2;
             Assert.NotEqual(HudOverlayChange.None, overlay.Refresh());
             overlay.Prepare(preparation);
-            Assert.NotEqual(SizeF.Empty, overlay.Measure());
+            Assert.Equal(new SizeF(24, 24), overlay.Measure());
             Assert.Equal(HudOverlayChange.None, overlay.Refresh());
         }
         storms.StormData.nowStormActive = false;

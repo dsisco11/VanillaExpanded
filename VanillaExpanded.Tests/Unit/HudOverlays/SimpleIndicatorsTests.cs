@@ -50,6 +50,8 @@ public sealed class SimpleIndicatorsTests
             {
                 GuiElement artwork = kind == "bow" ? composition.Composer.GetElement("test:arrow") : composition.Composer.GetElement("test:icon");
                 Assert.IsType(kind == "bow" ? typeof(ArrowElement) : typeof(TextureElement), artwork);
+                Assert.Equal(24 * scale, artwork.Bounds.OuterWidth);
+                Assert.Equal(24 * scale, artwork.Bounds.OuterHeight);
                 Assert.Same(reading.Bounds.ParentBounds, artwork.Bounds.ParentBounds);
                 Assert.True(reading.State.Target.Bottom <= artwork.Bounds.renderY + .001);
                 Assert.Equal(reading.Bounds.renderX + reading.Bounds.OuterWidth / 2,
@@ -207,6 +209,7 @@ public sealed class SimpleIndicatorsTests
         composition.View.CollectBackdrops(fixture.Native.Render.Object);
         var queued = Assert.Single(fixture.Backdrop.Invocations);
         Assert.Equal((double)icon.State.Target.X, queued.Arguments[1]); Assert.Equal((double)icon.State.Target.Y, queued.Arguments[2]);
+        Assert.Equal(2d * 24 / 36, Assert.IsType<double>(queued.Arguments[3]), 6);
     }
     /// <summary>Wind retains whole percentages above one hundred in both native styles.</summary>
     [Theory]
