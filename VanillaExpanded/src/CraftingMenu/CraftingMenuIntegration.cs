@@ -22,7 +22,9 @@ internal static class CraftingMenuDialogPatch
 
 public sealed class CraftingMenuSystem : ModSystem, ILiveConfigurable
 {
+    private const string BookIcon = "vanillaexpanded-crafting-book";
     private ICoreClientAPI? api;
+    private IconRendererDelegate? bookIcon;
     private readonly Dictionary<GuiDialog, GuiDialogCraftingMenu> dialogs = new();
     private readonly Dictionary<GuiDialog, (GuiComposer Composer, Action Opened)> attachments = new();
     private readonly System.Func<ICoreClientAPI, (CraftingCatalogue Catalogue, CraftingAllocator Allocator)> build;
@@ -76,8 +78,10 @@ public sealed class CraftingMenuSystem : ModSystem, ILiveConfigurable
         CraftingInventorySnapshot.EnsureThread(RuntimeEnv.MainThreadId);
         foreach (var attachment in attachments.Values)
         {
-            var toggle = (GuiElementTextButton)attachment.Composer.GetElement("vanillaexpanded-crafting-toggle");
-            toggle.Visible = toggle.Enabled = false;
+            attachment.Composer.GetToggleButton("vanillaexpanded-crafting-toggle").Enabled = false;
+            var hint = attachment.Composer.GetHoverText("vanillaexpanded-crafting-toggle-hint");
+            hint.SetAutoDisplay(false);
+            hint.SetVisible(false);
         }
         Dispose();
     }
@@ -94,25 +98,29 @@ public sealed class CraftingMenuSystem : ModSystem, ILiveConfigurable
             return;
         }
         var bounds = composer.GetElement("craftinggrid").Bounds;
-        var font = CairoFont.SmallButtonText(EnumButtonStyle.Normal);
-        composer.AddInteractiveElement(new GuiElementTextButton(api,
-            Lang.Get("vanillaexpanded:craftingmenu-toggle"), font,
-            font.Clone().WithColor(GuiStyle.ActiveButtonTextColor), () =>
+        if (bookIcon == null)
         {
-            if (!VanillaExpandedModSystem.Config.EnableCraftingMenu) return true;
+            bookIcon = api.Gui.Icons.SvgIconSource(api.Assets.Get(
+                new AssetLocation("vanillaexpanded:textures/gui/crafting-book.svg")));
+            api.Gui.Icons.CustomIcons[BookIcon] = bookIcon;
+        }
+        var buttonBounds = ElementBounds.Fixed(bounds.fixedX, bounds.fixedY - 34, 28, 28);
+        composer.AddInteractiveElement(new GuiElementCraftingMenuButton(api, BookIcon, _ =>
+        {
+            if (!VanillaExpandedModSystem.Config.EnableCraftingMenu) return;
             if (dialogs.TryGetValue(parent, out var open) && open.IsOpened())
             {
                 rememberOpen = false;
                 Close(parent);
             }
             else Open(parent, composer);
-            return true;
-        }, ElementBounds.Fixed(bounds.fixedX, bounds.fixedY - 30, bounds.fixedWidth, 24))
+        }, buttonBounds)
         {
-            Visible = VanillaExpandedModSystem.Config.EnableCraftingMenu,
             Enabled = VanillaExpandedModSystem.Config.EnableCraftingMenu
         },
             "vanillaexpanded-crafting-toggle");
+        composer.AddHoverText(Lang.Get("vanillaexpanded:craftingmenu-toggle"), CairoFont.WhiteSmallText(),
+            160, buttonBounds.FlatCopy(), "vanillaexpanded-crafting-toggle-hint");
         composer.AddInteractiveElement(new GuiElementCraftingRefresh(api, ElementBounds.Fixed(0, 0, 0, 0),
             grid, () =>
             {
@@ -183,6 +191,8 @@ public sealed class CraftingMenuSystem : ModSystem, ILiveConfigurable
         CraftingMenuDialogPatch.Composed -= Attach;
         if (api != null)
         {
+            if (bookIcon != null) api.Gui.Icons.CustomIcons.Remove(BookIcon);
+            bookIcon = null;
             api.Event.LevelFinalize -= Initialize;
             api.Event.LeaveWorld -= Clear;
             Clear();

@@ -16,6 +16,49 @@ namespace VanillaExpanded.Tests.Unit.CraftingMenu;
 public sealed class CraftingMenuLifecycleTests
 {
     [Theory]
+    [InlineData(1)]
+    [InlineData(1.5)]
+    [InlineData(2)]
+    public void BookButtonUsesSvgAndNativeMouseAndKeyboardActivation(float scale)
+    {
+        using var f = new MenuFixture(scale: scale);
+        var button = f.ToggleButton;
+        Assert.Empty(button.GetText());
+        Assert.Equal("vanillaexpanded-crafting-book", button.icon);
+        Assert.False(button.Toggleable);
+        Assert.Equal(28 * scale, button.Bounds.InnerWidth, 4);
+        Assert.Equal(button.Bounds.InnerWidth, button.Bounds.InnerHeight, 4);
+        var grid = f.Parent.Composers["maininventory"].GetElement("craftinggrid").Bounds;
+        Assert.Equal(grid.absX, button.Bounds.absX, 4);
+        Assert.Equal(grid.absY - 6 * scale, button.Bounds.absY + button.Bounds.OuterHeight, 4);
+        Assert.Equal("Recipes", f.Parent.Composers["maininventory"]
+            .GetHoverText("vanillaexpanded-crafting-toggle-hint").GetText());
+        var svg = System.Xml.Linq.XDocument.Parse(System.Text.Encoding.UTF8.GetString(f.BookAsset.Data));
+        Assert.Equal("http://www.w3.org/2000/svg", svg.Root!.Name.NamespaceName);
+        Assert.Equal("0 0 24 24", svg.Root.Attribute("viewBox")!.Value);
+        Assert.Equal(3, f.BookDraws.Count);
+        Assert.All(f.BookDraws, draw =>
+        {
+            Assert.Same(f.BookAsset, draw.Asset);
+            Assert.InRange(draw.Width, 18 * scale, 21 * scale);
+            Assert.InRange(draw.Height, 18 * scale, 21 * scale);
+            Assert.NotNull(draw.Color);
+        });
+        f.Parent.TryOpen();
+        f.Toggle();
+        Assert.True(Assert.Single(f.Menus).IsOpened());
+        f.Toggle();
+        Assert.Empty(f.Menus);
+        button.OnFocusGained();
+        var enter = new KeyEvent { KeyCode = (int)GlKeys.Enter };
+        button.OnKeyDown(f.Lifecycle.Api.Object, enter);
+        Assert.True(enter.Handled);
+        Assert.True(Assert.Single(f.Menus).IsOpened());
+        f.ClickCloseButton(Assert.Single(f.Menus));
+        Assert.Empty(f.Menus);
+    }
+
+    [Theory]
     [InlineData(1, false)]
     [InlineData(1.5, false)]
     [InlineData(2, false)]
@@ -172,14 +215,12 @@ public sealed class CraftingMenuLifecycleTests
         Assert.Empty(f.Menus);
         Assert.Null(f.Lifecycle.System.Catalogue);
         Assert.Null(f.Lifecycle.System.IconCache);
-        Assert.False(f.ToggleButton.Visible);
-        Assert.False(f.ToggleButton.Enabled);
+        f.AssertToggleHidden();
         f.SetEnabled(true);
         f.Lifecycle.FinalizeWorld();
         f.Parent.TryClose();
         f.Parent.TryOpen();
-        Assert.False(f.ToggleButton.Visible);
-        Assert.False(f.ToggleButton.Enabled);
+        f.AssertToggleHidden();
         Assert.Equal(1, f.Lifecycle.Builds);
         Assert.Empty(f.Menus);
         Assert.Null(f.Lifecycle.System.Catalogue);
@@ -576,8 +617,10 @@ public sealed class CraftingMenuLifecycleTests
         private readonly string originalLocale = Lang.CurrentLocale;
         private readonly ITranslationService? originalEnglish = Lang.AvailableLanguages.GetValueOrDefault("en");
         internal IEnumerable<GuiDialogCraftingMenu> Menus => loaded.OfType<GuiDialogCraftingMenu>();
-        internal GuiElementTextButton ToggleButton =>
-            (GuiElementTextButton)Parent.Composers["maininventory"].GetElement("vanillaexpanded-crafting-toggle");
+        internal GuiElementToggleButton ToggleButton =>
+            Parent.Composers["maininventory"].GetToggleButton("vanillaexpanded-crafting-toggle");
+        internal readonly IAsset BookAsset;
+        internal readonly List<(IAsset Asset, int Width, int Height, int? Color)> BookDraws = new();
 
         internal MenuFixture(bool enabled = true, float scale = 1, bool longLabels = false)
         {
@@ -590,6 +633,7 @@ public sealed class CraftingMenuLifecycleTests
                     "vanillaexpanded:craftingmenu-title" => longLabels ? "Available crafting recipes" : "Crafting recipes",
                     "vanillaexpanded:craftingmenu-auto" => longLabels ? "Automatic selection" : "Auto",
                     "vanillaexpanded:craftingmenu-empty" => "No matching recipes.",
+                    "vanillaexpanded:craftingmenu-toggle" => "Recipes",
                     _ => key
                 });
             Lang.AvailableLanguages["en"] = translations.Object;
@@ -603,7 +647,16 @@ public sealed class CraftingMenuLifecycleTests
             var assets = new Mock<IAssetManager>();
             assets.Setup(value => value.Get(It.IsAny<AssetLocation>()))
                 .Returns(Mock.Of<IAsset>(value => value.Data == Array.Empty<byte>()));
+            byte[] svg = File.ReadAllBytes(System.IO.Path.GetFullPath(System.IO.Path.Combine(AppContext.BaseDirectory,
+                @"..\..\..\..\VanillaExpanded\assets\vanillaexpanded\textures\gui\crafting-book.svg")));
+            BookAsset = Mock.Of<IAsset>(value => value.Data == svg);
+            assets.Setup(value => value.Get(new AssetLocation("vanillaexpanded:textures/gui/crafting-book.svg")))
+                .Returns(BookAsset);
             api.SetupGet(value => value.Assets).Returns(assets.Object);
+            graphics.Gui.Setup(value => value.DrawSvg(It.IsAny<IAsset>(), It.IsAny<ImageSurface>(),
+                    It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int?>()))
+                .Callback<IAsset, ImageSurface, int, int, int, int, int?>((asset, _, _, _, width, height, color) =>
+                    BookDraws.Add((asset, width, height, color)));
             graphics.Render.Setup(value => value.BitmapCreateFromPng(It.IsAny<byte[]>()))
                 .Returns(() => new BitmapExternal(2, 2));
             graphics.Gui.SetupGet(value => value.Icons).Returns(new IconUtil(api.Object));
@@ -657,6 +710,26 @@ public sealed class CraftingMenuLifecycleTests
             button.OnMouseDownOnElement(Lifecycle.Api.Object, args);
             button.OnMouseUpOnElement(Lifecycle.Api.Object, args);
             Assert.True(args.Handled);
+        }
+
+        internal void AssertToggleHidden()
+        {
+            Assert.False(ToggleButton.Enabled);
+            Assert.False(ToggleButton.Focusable);
+            graphics.Render.Invocations.Clear();
+            ToggleButton.RenderInteractiveElements(0);
+            Assert.Empty(graphics.Render.Invocations);
+            var mouse = new MouseEvent((int)ToggleButton.Bounds.absX + 5, (int)ToggleButton.Bounds.absY + 5,
+                EnumMouseButton.Left, 0);
+            ToggleButton.OnMouseDownOnElement(Lifecycle.Api.Object, mouse);
+            Assert.False(mouse.Handled);
+            ToggleButton.OnFocusGained();
+            var enter = new KeyEvent { KeyCode = (int)GlKeys.Enter };
+            ToggleButton.OnKeyDown(Lifecycle.Api.Object, enter);
+            Assert.False(enter.Handled);
+            Assert.Empty(Menus);
+            Assert.False(Parent.Composers["maininventory"]
+                .GetHoverText("vanillaexpanded-crafting-toggle-hint").IsVisible);
         }
 
         internal void ResizePanelSpace(double width, double height)
