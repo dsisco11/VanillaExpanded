@@ -69,6 +69,7 @@ internal sealed class CraftingIconRenderer(ICoreClientAPI api, CraftingIconCache
             shader!.Use();
             shader.ProjectionMatrix = render.CurrentProjectionMatrix;
             shader.ModelViewMatrix = render.CurrentModelviewMatrix;
+            shader.GuiScale = (float)GuiElement.scaled(1);
             render.GlToggleBlend(true, EnumBlendMode.PremultipliedAlpha);
             int texture = -1;
             foreach (GuiElementCraftingTile tile in elements)

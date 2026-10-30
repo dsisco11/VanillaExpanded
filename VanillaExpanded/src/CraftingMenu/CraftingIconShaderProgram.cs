@@ -12,6 +12,7 @@ internal interface ICraftingIconShaderProgram : IShaderProgram
     Vector4 TextureBounds { set; }
     CraftingTileStatus RecipeState { set; }
     bool HasIcon { set; }
+    float GuiScale { set; }
     int IconTexture { set; }
 }
 
@@ -45,6 +46,11 @@ internal sealed class CraftingIconShaderProgram : ShaderProgram, ICraftingIconSh
     public bool HasIcon
     {
         set => Uniform("hasIcon", value ? 1 : 0);
+    }
+
+    public float GuiScale
+    {
+        set => Uniform("guiScale", value);
     }
 
     public int IconTexture

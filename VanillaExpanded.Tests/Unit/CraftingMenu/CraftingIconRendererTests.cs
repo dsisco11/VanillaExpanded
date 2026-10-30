@@ -33,10 +33,13 @@ public sealed class CraftingIconRendererTests
         shaders.Verify(value => value.NewShaderProgram(), Times.Never);
     }
 
-    [Fact]
-    public void MixedStatesShareOneShaderActivationAndDoNotRebakeOnStatusChanges()
+    [Theory]
+    [InlineData(1)]
+    [InlineData(1.5)]
+    [InlineData(2)]
+    public void MixedStatesShareOneShaderActivationAndDoNotRebakeOnStatusChanges(float scale)
     {
-        using var graphics = new CraftingRenderFixture();
+        using var graphics = new CraftingRenderFixture(scale);
         var f = new AllocationFixture();
         var board = f.Stack(1, "board", 2);
         var complete = f.Recipe(f.Ingredient(board));
@@ -60,6 +63,7 @@ public sealed class CraftingIconRendererTests
         program.VerifySet(value => value.IconTexture = 77, Times.Once);
         program.VerifySet(value => value.ProjectionMatrix = It.IsAny<float[]>(), Times.Once);
         program.VerifySet(value => value.ModelViewMatrix = It.IsAny<float[]>(), Times.Once);
+        program.VerifySet(value => value.GuiScale = scale, Times.Once);
         program.VerifySet(value => value.TileBounds = It.IsAny<System.Numerics.Vector4>(), Times.Exactly(3));
         program.VerifySet(value => value.TextureBounds = new System.Numerics.Vector4(.1f, .2f, .3f, .4f),
             Times.Exactly(3));

@@ -53,7 +53,7 @@ Category tabs above search use the outputs' native creative-inventory categories
 - **Click a recipe:** place available ingredients for one craft. Missing ingredients remain absent.
 - **Shift-click a recipe:** fill its ingredient positions as far as available stock and stack limits allow, even if another ingredient is missing.
 - **Craft normally afterward:** click the vanilla crafting result slot. The menu only moves ingredients; it never takes the result or crafts automatically.
-- **Colors:** full color means ingredients are available, grey means ingredients are missing, and near-black means placement is unsupported. Unsupported entries remain searchable and inspectable; their tooltips explain the limitation.
+- **Availability:** recipes with missing ingredients keep their full-color icons and show a red inner button border. Recipes with all ingredients available have no red border. Near-black icons mean placement is unsupported; these entries remain searchable and inspectable, and their tooltips explain the limitation.
 - **Alternatives:** The counter below the list shows the selected recipe.
 
 Ingredients come from your ordinary hotbar, backpack storage and the nine crafting-grid inputs. The result slot, cursor-held stack, off-hand/equipment, bag-equipping slots and remote containers are excluded. This menu handles the native 3x3 crafting grid, not cooking, smithing, knapping, clay forming or other workstations.
