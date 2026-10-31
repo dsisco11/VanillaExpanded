@@ -50,13 +50,17 @@ The menu is enabled by default. With ConfigLib installed, use **Pause menu > Mod
 
 Category tabs above search use the outputs' native creative-inventory categories. **All** replaces General, empty categories are omitted, and **Other** contains outputs without a specific category. Flora, Clutter, Aquatic, Liquids, Creatures, and Meta tabs are excluded; their recipes remain available under All and any other categories they belong to. Outputs can appear in more than one category, including categories added by mods. Search applies within the selected category; switching tabs keeps the search text and returns the list to the top. The native tab row scrolls when the categories do not fit. New menu sessions start on All.
 
-Keyboard tab order starts with the search box, followed by the category tabs.
+**Craftable only** shows recipes whose required ingredients are fully available for one craft. It combines independently with category and search: toggling it keeps both unchanged, and clearing one filter leaves the others active. Partial, missing, unsupported, and not-yet-evaluated recipes are hidden while it is on. Changing search, category, or this toggle returns the list to the top. Resizing keeps the current filters; a newly created menu session starts with empty search, All selected, and Craftable only off.
+
+Inventory changes update results live, including while a tile is hovered, focused, or pressed. Eligible rows stay in place during interaction, but rows that no longer match disappear immediately. If a pressed tile is removed or replaced, release cannot activate its replacement; press again to choose the new row.
+
+Keyboard tab order starts with the search box, followed by the category tabs and Craftable only. Use the category row's arrow keys to navigate categories, **Enter** to toggle Craftable only when focused, and arrow keys to navigate focused recipe tiles. **Enter**, **Space**, or **keypad Enter** activates a focused recipe; hold **Shift** for the shift-placement action.
 
 - **Click a recipe:** place available ingredients for one craft. Missing ingredients remain absent.
 - **Shift-click a recipe:** fill its ingredient positions as far as available stock and stack limits allow, even if another ingredient is missing.
 - **Craft normally afterward:** click the vanilla crafting result slot. The menu only moves ingredients; it never takes the result or crafts automatically.
-- **Availability:** recipes keep their full-color icons, with a red inner button border when no required ingredients are available and a yellow inner border when some but not all required ingredients are available. Recipes with all ingredients available have no availability border. Near-black icons mean placement is unsupported; these entries remain searchable and inspectable, and their tooltips explain the limitation.
-- **Alternatives:** The counter below the list shows the selected recipe.
+- **Availability:** recipes keep their full-color icons, with a red inner button border when no required ingredients are available and a yellow inner border when some but not all required ingredients are available. Recipes with all ingredients available have no availability border. Near-black icons mean placement is unsupported; with Craftable only off, these entries remain searchable and inspectable, and their tooltips explain the limitation.
+- **Alternatives:** the counter below the list shows the selected recipe. Choosing an alternative pins it: Craftable only hides an unavailable pinned recipe even if another alternative for the same output is craftable. Turning the toggle off reveals the pin again; use **Auto** on the visible selection to restore automatic choice. Selecting another output or changing category clears the previous pin. Hidden selections have no active footer actions or tooltip.
 
 Ingredients come from your ordinary hotbar, backpack storage and the nine crafting-grid inputs. The result slot, cursor-held stack, off-hand/equipment, bag-equipping slots and remote containers are excluded. This menu handles the native 3x3 crafting grid, not cooking, smithing, knapping, clay forming or other workstations.
 
@@ -65,6 +69,8 @@ Closing the inventory hides the menu without forgetting that it was enabled. Esc
 Placement uses native inventory transfers and server synchronization. Having all ingredients does not guarantee room to rearrange the grid: if displaced contents cannot be safely returned to carried storage, placement is refused without changing the inventory. If a native transfer is interrupted after some moves, those moves may remain; the game reconciles inventory normally. The menu does not roll back or automatically retry the arrangement, drop items to make room, or report server-confirmed batch success.
 
 Dynamic-output recipes use generic previews when the exact result cannot be known beforehand; unsupported semantics and unverified inventory replacements may prevent placement. The catalogue is fixed for the loaded world, while availability updates with inventory changes. Icons are static previews, not animated items. Recipe-family coverage is automated; live acceptance was a representative wooden-planks smoke test, not an exhaustive recipe/modpack or dedicated multiplayer certification.
+
+The provider-based filtering and Craftable only control have automated unit/native-GUI fixture coverage; live-game validation of these additions remains pending. The earlier wooden-planks smoke test does not certify the new filtering controls or inventory-transition behavior. See the [crafting-menu implementation guide](docs/CraftingMenu.md) for filter ownership and extension boundaries.
 
 ### Quick Tools
 

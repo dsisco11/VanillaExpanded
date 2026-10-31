@@ -15,6 +15,37 @@ namespace VanillaExpanded.Tests.Unit.CraftingMenu;
 [Collection("Crafting native GUI")]
 public sealed class CraftingMenuInteractionTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DisablingCraftableOnlyRestoresPartialPlacementThroughNativeCoordinator(bool shift)
+    {
+        using var f = new TransferFixture(2, 1);
+        var output = f.F.Stack(99, "output", 7);
+        f.F.Grid[9].Itemstack = output;
+        using var session = new CraftingMenuSession(f.F.Catalogue.Build(f.Entry.Recipe),
+            f.F.Allocator, f.Snapshot, f.Coordinator.Execute);
+        session.Refresh();
+        var partial = Assert.Single(session.Rows);
+        Assert.False(session.CraftableOnly.Enabled);
+        Assert.True(partial.CanPlace);
+        Assert.False(partial.Evaluation.CanCraft);
+        Assert.Equal(1, partial.Evaluation.Allocated);
+        session.CraftableOnly.SetEnabled(true);
+        Assert.Empty(session.Rows);
+        session.CraftableOnly.SetEnabled(false);
+        Assert.Same(partial.Allocation, Assert.Single(session.Rows).Allocation);
+        var result = session.Activate(partial.Output.Id, shift);
+        Assert.Equal(CraftingDispatchStatus.Dispatched, result.Status);
+        Assert.Equal(1, f.F.Grid[0].StackSize);
+        Assert.Null(f.F.Hotbar[0].Itemstack);
+        var packet = Assert.IsType<Packet_Client>(Assert.Single(f.Packets));
+        Assert.Equal(1, packet.MoveItemstack.Quantity);
+        Assert.Same(output, f.F.Grid[9].Itemstack);
+        Assert.Equal(7, output.StackSize);
+        Assert.Empty(f.Notifications);
+    }
+
     [Fact]
     public void CriteriaChangesReuseAllocationsAndInventoryRefreshEvaluatesExactlyOnce()
     {

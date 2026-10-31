@@ -2,7 +2,7 @@
 
 Source proposal: [CraftingMenuProvidersProposal.md](CraftingMenuProvidersProposal.md)
 Authority: Proposal approved by the user on 2026-10-30. Its requirements govern this plan.
-Status: Phases 1-4 complete; Phases 5-6 remain pending.
+Status: Phases 1-5 complete; Phase 6 remains pending.
 
 ## Goal and execution boundary
 
@@ -180,33 +180,42 @@ Verification: 392 CraftingMenu tests passed. Localization JSON parsing and white
 
 Outcome: The first delivery has automated evidence and accurate user-facing documentation.
 
-    ☐ Run the smallest relevant provider, catalogue-view, interaction, and lifecycle test selections using the repository's detected .NET runner.
-        ☐ Resolve failures caused by this work without fixing unrelated pre-existing issues.
-        ☐ Run the CraftingMenu regression group after focused coverage passes.
-        ☐ Preserve applicable test categories and reuse existing fixture/mocking infrastructure.
-    ☐ Verify behavior outside filtering has not drifted.
-        ☐ Confirm native placement/coordinator rejection and revalidation behavior remain unchanged.
-        ☐ Confirm supported partial placement remains possible when craftable-only is disabled.
-        ☐ Confirm availability presentation, tile-status/shader mapping, icon cache, and render batching are unchanged.
-        ☐ Confirm category exclusions, menu opening/restoration, search-first keyboard behavior, and session reset defaults remain intact.
-    ☐ Review implementation boundaries against the proposal.
-        ☐ Verify providers do not capture inventory, allocate, dispatch, inspect GUI state, or mutate authoritative data.
-        ☐ Verify the session does not discriminate by provider identity and the catalogue query API does not accumulate feature flags.
-        ☐ Verify no broad catches, silently dropped providers, success-shaped fallback queries, or duplicate legacy paths remain.
-        ☐ Verify one coherent projection is published rather than intermediate criteria/registration states.
-    ☐ Update README and directly related permanent documentation.
-        ☐ Describe independent filters, live refresh, explicit pinned-alternative behavior, toggle defaults, resize retention, and keyboard operation.
-        ☐ Document internal provider registration, lifetime, authority boundaries, and feature insertion only to the extent needed to maintain the delivered system.
-        ☐ Validate modified localization JSON and whitespace; do not add tooling or package dependencies just for this work.
-    ☐ Record automated and live-runtime evidence separately.
-        ☐ Record actual commands/results and distinguish newly introduced failures from pre-existing warnings.
-        ☐ Record whether live-game control/layout/inventory-transition smoke testing was performed; if available, verify the delivered native UX.
-        ☐ If live validation is unavailable, state that it remains pending rather than treating unit/native-fixture evidence as live-game acceptance.
+    ☑ Run the smallest relevant provider, catalogue-view, interaction, and lifecycle test selections using the repository's detected .NET runner.
+        ☑ Resolve failures caused by this work without fixing unrelated pre-existing issues.
+        ☑ Run the CraftingMenu regression group after focused coverage passes.
+        ☑ Preserve applicable test categories and reuse existing fixture/mocking infrastructure.
+    ☑ Verify behavior outside filtering has not drifted.
+        ☑ Confirm native placement/coordinator rejection and revalidation behavior remain unchanged.
+        ☑ Confirm supported partial placement remains possible when craftable-only is disabled.
+        ☑ Confirm availability presentation, tile-status/shader mapping, icon cache, and render batching are unchanged.
+        ☑ Confirm category exclusions, menu opening/restoration, search-first keyboard behavior, and session reset defaults remain intact.
+    ☑ Review implementation boundaries against the proposal.
+        ☑ Verify providers do not capture inventory, allocate, dispatch, inspect GUI state, or mutate authoritative data.
+        ☑ Verify the session does not discriminate by provider identity and the catalogue query API does not accumulate feature flags.
+        ☑ Verify no broad catches, silently dropped providers, success-shaped fallback queries, or duplicate legacy paths remain.
+        ☑ Verify one coherent projection is published rather than intermediate criteria/registration states.
+    ☑ Update README and directly related permanent documentation.
+        ☑ Describe independent filters, live refresh, explicit pinned-alternative behavior, toggle defaults, resize retention, and keyboard operation.
+        ☑ Document internal provider registration, lifetime, authority boundaries, and feature insertion only to the extent needed to maintain the delivered system.
+        ☑ Validate modified localization JSON and whitespace; do not add tooling or package dependencies just for this work.
+    ☑ Record automated and live-runtime evidence separately.
+        ☑ Record actual commands/results and distinguish newly introduced failures from pre-existing warnings.
+        ☑ Record whether live-game control/layout/inventory-transition smoke testing was performed; if available, verify the delivered native UX.
+        ☑ If live validation is unavailable, state that it remains pending rather than treating unit/native-fixture evidence as live-game acceptance.
 
 Completion gate:
-    ☐ Focused and CraftingMenu regression checks pass, and documentation describes the delivered behavior rather than deferred systems.
-    ☐ Modified localization and whitespace checks pass.
-    ☐ Automated, source-review, and live-runtime evidence boundaries are explicit; no broader release or gameplay certification is implied.
+    ☑ Focused and CraftingMenu regression checks pass, and documentation describes the delivered behavior rather than deferred systems.
+    ☑ Modified localization and whitespace checks pass.
+    ☑ Automated, source-review, and live-runtime evidence boundaries are explicit; no broader release or gameplay certification is implied.
+
+Verification evidence (automated, not live gameplay):
+- VSTest/xUnit v2 on .NET SDK 10.0.401: `dotnet test .\VanillaExpanded.Tests\VanillaExpanded.Tests.csproj --no-restore --filter "FullyQualifiedName~RecipeFilterSetTests|FullyQualifiedName~RecipeFilterFeatureTests|FullyQualifiedName~CraftingCatalogueViewTests|FullyQualifiedName~CraftingMenuInteractionTests|FullyQualifiedName~CraftingMenuLifecycleTests" --verbosity minimal` passed 224 tests before the additional partial-placement regression.
+- `dotnet test .\VanillaExpanded.Tests\VanillaExpanded.Tests.csproj --no-restore --filter "FullyQualifiedName~DisablingCraftableOnlyRestoresPartialPlacementThroughNativeCoordinator" --verbosity minimal` passed both new ordinary/shift-placement cases.
+- Final `dotnet test .\VanillaExpanded.Tests\VanillaExpanded.Tests.csproj --no-restore --filter "FullyQualifiedName~CraftingMenu" --verbosity minimal` passed 394 tests, with zero failures or skips. Initial compilation reported existing nullable/unused-field warnings in unrelated source and existing test files; no new provider warnings or test failures were introduced.
+- Source localization `VanillaExpanded/assets/vanillaexpanded/lang/en.json` parsed successfully with `ConvertFrom-Json`; `git diff HEAD --check` and all local links in the new [implementation guide](CraftingMenu.md) passed.
+- Source review confirms pure provider composition, coherent publication, and unchanged allocation/transfer/icon-cache/rendering implementations since the pre-provider baseline. README and the implementation guide document delivered behavior and extension boundaries.
+- No live-game control/layout/inventory-transition smoke test was performed for this delivery. Live acceptance remains pending; native GUI fixtures and the earlier wooden-planks placement smoke test are not certification of the new filtering controls, multiplayer, or modpack compatibility.
+- Second implementation/documentation review and independent audit-stage-completion review found no outstanding issues. Phase 6 final acceptance and cleanup remain pending.
 
 ## Deferred delivery contracts: Ordering and classification
 
