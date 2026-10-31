@@ -17,6 +17,8 @@ public static class HudOverlaySizes
     public const float Wide = 54;
     /// <summary>Normal HUD font size.</summary>
     public const float Text = 14;
+    /// <summary>Compact context-menu lettering.</summary>
+    public const float MenuText = 12;
     /// <summary>Compact hover titlebar with normal HUD lettering.</summary>
     public const float TitleBarHeight = 22;
     /// <summary>Thermometer width.</summary>

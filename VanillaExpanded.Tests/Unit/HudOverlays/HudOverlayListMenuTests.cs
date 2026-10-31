@@ -64,6 +64,8 @@ public sealed class HudOverlayListMenuTests
                 new[] { "A deliberately long localized label", "Another long label", "Final label" }, 0, (code, _) => selected = code);
             var viewport = new RectangleF(x, y, width, height);
             Assert.True(list.Prepare(new PointF(px, py), viewport));
+            Assert.Equal(12, list.Font.UnscaledFontsize);
+            Assert.Equal(26, list.Bounds.fixedHeight);
             Assert.True(viewport.Contains(list.VisibleBounds));
             render.Invocations.Clear(); list.Draw(0);
             var active = new Stack<RectangleF>(); int draws = 0;
@@ -136,12 +138,14 @@ public sealed class HudOverlayListMenuTests
             var sizeEdits = new List<string>();
             using var sizing = new HudOverlayTogglePopup(api.Object,
                 new[] { new HudMenuEntry("enabled", "Enabled", true),
+                    new HudMenuEntry("lock", "Lock movement", false),
                     new HudMenuEntry("style:0", "Icon", true, HudMenuEntryKind.StyleChoice),
                     new HudMenuEntry("style:1", "Text", false, HudMenuEntryKind.StyleChoice),
                     new HudMenuEntry("size", "Size", false, HudMenuEntryKind.Number, 24),
                     new HudMenuEntry("reset", "Reset layout", false, HudMenuEntryKind.Action) },
                 (code, _) => sizeEdits.Add(code), PointF.Empty,
                 new HudMenuEnvironment(new object(), new RectangleF(0, 0, 800, 600), scale, "en", true));
+            AssertCompactLayout(sizing, sizeEdits, scale);
             var number = (HudOverlaySizeInput)typeof(HudOverlayTogglePopup).GetField("sizeInput",
                 System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(sizing)!;
             input.SetupGet(value => value.KeyboardKeyStateRaw).Returns(new bool[1024]);
@@ -155,9 +159,88 @@ public sealed class HudOverlayListMenuTests
             Assert.Equal("size:42", sizeEdits.Last()); Assert.True(sizing.IsOpened);
             number.SetValue("66"); sizing.CommitPendingInput();
             Assert.Equal("size:66", sizeEdits.Last());
+
+            var sizingComposer = (GuiComposer)typeof(HudOverlayTogglePopup).GetField("composer",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(sizing)!;
+            var style = Assert.IsType<HudOverlayStyleDropDown>(sizingComposer.GetElement("style"));
+            var openStyle = new MouseEvent((int)(style.Bounds.renderX + style.Bounds.OuterWidth / 2),
+                (int)(style.Bounds.renderY + style.Bounds.OuterHeight / 2), EnumMouseButton.Left, 0);
+            sizing.MouseDown(openStyle);
+            Assert.True(openStyle.Handled);
+            Assert.True(style.listMenu.IsOpened);
+            var chooseText = new MouseEvent((int)(style.ExpandedBounds.Left + 8 * scale),
+                (int)(style.ExpandedBounds.Top + 39 * scale), EnumMouseButton.Left, 0);
+            input.SetupGet(value => value.MouseX).Returns(chooseText.X);
+            input.SetupGet(value => value.MouseY).Returns(chooseText.Y);
+            sizing.MouseDown(chooseText);
+            Assert.True(chooseText.Handled);
+            Assert.Equal("style:1", sizeEdits.Last());
+            Assert.False(style.listMenu.IsOpened);
         }
         finally { RuntimeEnv.GUIScale = previous; typeof(Lang).GetProperty(nameof(Lang.CurrentLocale))!.SetValue(null, previousLocale);
             if (previousLanguage == null) Lang.AvailableLanguages.Remove("en"); else Lang.AvailableLanguages["en"] = previousLanguage; }
+    }
+
+    private static void AssertCompactLayout(HudOverlayTogglePopup popup, List<string> selections, float scale)
+    {
+        var composer = (GuiComposer)typeof(HudOverlayTogglePopup).GetField("composer",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(popup)!;
+        var controls = new[] { "toggle:0", "toggle:1", "style", "size", "action:0" }
+            .Select(composer.GetElement).ToArray();
+        var rows = controls.Select(control => control.Bounds.ParentBounds).ToArray();
+        var content = rows[0].ParentBounds;
+        Assert.All(rows, row =>
+        {
+            Assert.Same(content, row.ParentBounds);
+            Assert.Equal(24 * scale, row.OuterHeight, 3);
+            Assert.Contains(row, content.ChildBounds);
+        });
+        Assert.Equal(8 * scale, rows[0].renderY - popup.VisibleBounds.Top, 3);
+        Assert.Equal(8 * scale, popup.VisibleBounds.Bottom - rows[^1].renderY - rows[^1].OuterHeight, 3);
+        Assert.Equal(8 * scale, rows[0].renderX - popup.VisibleBounds.Left, 3);
+        Assert.Equal(8 * scale, popup.VisibleBounds.Right - rows[0].renderX - rows[0].OuterWidth, 3);
+        for (int index = 1; index < rows.Length; index++)
+            Assert.Equal(8 * scale, rows[index].renderY - rows[index - 1].renderY - rows[index - 1].OuterHeight, 3);
+        foreach (var control in controls)
+        {
+            var bounds = control.Bounds;
+            var row = bounds.ParentBounds;
+            Assert.Contains(bounds, row.ChildBounds);
+            Assert.True(bounds.renderX >= row.renderX && bounds.renderX + bounds.OuterWidth <= row.renderX + row.OuterWidth + .01);
+            Assert.True(bounds.renderY >= row.renderY && bounds.renderY + bounds.OuterHeight <= row.renderY + row.OuterHeight + .01);
+        }
+        Assert.Equal(16 * scale, controls[0].Bounds.OuterWidth, 3);
+        Assert.Equal(controls[2].Bounds.renderX, controls[3].Bounds.renderX, 3);
+        Assert.Equal(controls[2].Bounds.OuterWidth, controls[3].Bounds.OuterWidth, 3);
+        foreach (string key in new[] { "toggle-label:0", "toggle-label:1", "style-label", "size-label" })
+        {
+            var label = Assert.IsType<GuiElementStaticText>(composer.GetElement(key));
+            Assert.Equal(12, label.Font.UnscaledFontsize);
+            var row = label.Bounds.ParentBounds;
+            Assert.Contains(row, rows);
+            Assert.InRange(label.Bounds.renderY, row.renderY, row.renderY + row.OuterHeight - label.Bounds.OuterHeight + .01);
+            Assert.True(label.Bounds.renderX + label.Bounds.OuterWidth <= row.renderX + row.OuterWidth + .01);
+        }
+        Assert.Equal(10 * scale, controls[2].Bounds.renderX - composer.GetElement("style-label").Bounds.renderX
+            - composer.GetElement("style-label").Bounds.OuterWidth, 3);
+        Assert.Equal(10 * scale, controls[3].Bounds.renderX - composer.GetElement("size-label").Bounds.renderX
+            - composer.GetElement("size-label").Bounds.OuterWidth, 3);
+        foreach (double y in new[] { popup.VisibleBounds.Top + 2 * scale,
+            rows[0].renderY + rows[0].OuterHeight + 4 * scale })
+        {
+            var gap = new MouseEvent((int)(rows[0].renderX + 30 * scale), (int)y, EnumMouseButton.Left, 0);
+            popup.MouseDown(gap);
+            Assert.False(gap.Handled);
+            Assert.Empty(selections);
+        }
+        var labelBounds = composer.GetElement("toggle-label:0").Bounds;
+        var click = new MouseEvent((int)(labelBounds.renderX + labelBounds.OuterWidth / 2),
+            (int)(labelBounds.renderY + labelBounds.OuterHeight / 2), EnumMouseButton.Left, 0);
+        popup.MouseDown(click);
+        Assert.True(click.Handled);
+        Assert.Equal(new[] { "enabled" }, selections);
+        Assert.False(((GuiElementSwitch)controls[0]).On);
+        selections.Clear();
     }
 
     /// <summary>Describes the native ref texture upload boundary.</summary>
