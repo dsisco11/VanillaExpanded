@@ -14,6 +14,7 @@
         ☑ Add an Availability/Name sort selector, retaining current availability ordering as an option and providing stable alphabetical browsing.
         ☑ Improve empty-state feedback to distinguish no search matches from no craftable recipes in the selected category, with a quick action to clear the relevant filter.
         ☑ Add "clear" button (as a typical 'x' within a filled circle) to inner right side of search box.
+        ☐ Create icons for each of the recipe categories to improve visual navigation within the crafting menu.
 
     ## New Features:
         ☐ Add HUD indicator to show current arrow type and quantity when player is holding a bow.

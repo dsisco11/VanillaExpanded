@@ -19,6 +19,78 @@ namespace VanillaExpanded.Tests.Unit.CraftingMenu;
 public sealed class CraftingMenuLifecycleTests
 {
     [Theory]
+    [InlineData(1, false)]
+    [InlineData(1, true)]
+    [InlineData(1.5, false)]
+    [InlineData(1.5, true)]
+    [InlineData(2, false)]
+    [InlineData(2, true)]
+    public void PointerLeavingRecipeHidesTooltipDespiteClickFocusAndKeyboardCanRestoreIt(float scale, bool gap)
+    {
+        using var f = new MenuFixture(scale: scale, includeRecipes: true);
+        Mock.Get(f.Lifecycle.Api.Object.Input).SetupGet(value => value.KeyboardKeyStateRaw).Returns(new bool[256]);
+        f.Parent.TryOpen();
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        var tiles = Assert.IsType<GuiElementCraftingTiles>(menu.SingleComposer.GetElement("tiles"));
+        var tooltip = Assert.IsType<GuiElementCraftingRecipeTooltip>(menu.SingleComposer.GetElement("tooltip"));
+        var tile = Assert.IsType<GuiElementCraftingTile>(tiles.Elements[0]);
+        var render = Mock.Get(f.Lifecycle.Api.Object.Render);
+        menu.SingleComposer.FocusElement(tiles.TabIndex);
+        int x = (int)(tile.Bounds.absX + 5);
+        int y = (int)(tile.Bounds.absY + 5);
+        int outsideX = gap ? (int)(tile.Bounds.absX + 47 * scale) : -1;
+        int outsideY = gap ? y : -1;
+        Move(x, y);
+        AssertShown();
+        menu.OnMouseDown(new MouseEvent(x, y, EnumMouseButton.Left, 0));
+        Assert.True(tile.Pressed);
+        Move(outsideX, outsideY);
+        AssertHidden();
+        menu.OnMouseUp(new MouseEvent(outsideX, outsideY, EnumMouseButton.Left, 0));
+        Assert.False(tile.Pressed);
+        AssertHidden();
+        Move(x, y);
+        AssertShown();
+        menu.OnMouseDown(new MouseEvent(x, y, EnumMouseButton.Left, 0));
+        menu.OnMouseUp(new MouseEvent(x, y, EnumMouseButton.Left, 0));
+        Assert.True(tiles.HasFocus);
+        Move(outsideX, outsideY);
+        AssertHidden();
+        menu.NativeGridDirty();
+        f.Lifecycle.Drain();
+        AssertHidden();
+        var key = new KeyEvent { KeyCode = (int)GlKeys.Right };
+        menu.OnKeyDown(key);
+        Assert.True(key.Handled);
+        AssertShown();
+        Move(outsideX, outsideY);
+        AssertHidden();
+        Move(x, y);
+        AssertShown();
+
+        void Move(int mouseX, int mouseY)
+        {
+            f.SetMouse(mouseX, mouseY);
+            menu.OnMouseMove(new MouseEvent(mouseX, mouseY, EnumMouseButton.None, 0));
+        }
+
+        void AssertShown()
+        {
+            render.Invocations.Clear();
+            tooltip.RenderInteractiveElements(.1f);
+            render.Verify(value => value.GlPushMatrix(), Times.Once);
+        }
+
+        void AssertHidden()
+        {
+            render.Invocations.Clear();
+            tooltip.RenderInteractiveElements(.1f);
+            Assert.Empty(render.Invocations);
+        }
+    }
+
+    [Theory]
     [InlineData(1)]
     [InlineData(1.5)]
     [InlineData(2)]
@@ -745,10 +817,15 @@ public sealed class CraftingMenuLifecycleTests
         var grid = Assert.Single(content.Components.OfType<SlideshowGridRecipeTextComponent>());
         var text = content.Components.OfType<RichTextComponent>()
             .Where(component => component is not ClearFloatTextComponent).ToArray();
-        Assert.Equal(new[] { name, "3/4", stick.GetName(), "2/2" }, text.Select(component => component.DisplayText));
-        Assert.Equal(GuiStyle.ErrorTextColor, text[1].Font.Color);
-        Assert.Equal(CairoFont.WhiteSmallText().Color, text[3].Font.Color);
-        Assert.True(text[0].Lines.Length > 1);
+        Assert.Equal(new[] { "3/4", name, "2/2", stick.GetName() }, text.Select(component => component.DisplayText));
+        Assert.Equal(GuiStyle.ErrorTextColor, text[0].Font.Color);
+        Assert.Equal(CairoFont.WhiteSmallText().Color, text[2].Font.Color);
+        Assert.All(text, component =>
+        {
+            Assert.Equal(CairoFont.WhiteDetailText().UnscaledFontsize, component.Font.UnscaledFontsize);
+            Assert.True(component.Font.UnscaledFontsize < CairoFont.WhiteSmallText().UnscaledFontsize);
+        });
+        Assert.True(text[1].Lines.Length > 1);
         Assert.True(text[0].BoundsPerLine.Min(bounds => bounds.Y) >=
             grid.BoundsPerLine.Max(bounds => bounds.Y + bounds.Height));
         Assert.True(text[2].BoundsPerLine.Min(bounds => bounds.Y) >=

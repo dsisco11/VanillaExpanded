@@ -81,11 +81,13 @@ Availability consumes each resolved alternative's own score; it never ranks usin
 
 ## Tooltip ingredient coverage
 
-[CraftingMenuTooltip](../VanillaExpanded/src/CraftingMenu/CraftingMenuTooltip.cs) adds one compact ingredient-name and have/need row per requirement beneath the native recipe grid. Exact ingredient names come from cloned resolved stacks and are rendered as literal richtext components, not parsed markup. Wildcard/tag alternatives use the localized "Matching ingredient" label rather than a misleading single-variant name or raw matching expression; the native grid still cycles acceptable choices. Names wrap to the measured tooltip width. Short count pairs use the native error-text red; satisfied pairs retain the normal text color.
+[CraftingMenuTooltip](../VanillaExpanded/src/CraftingMenu/CraftingMenuTooltip.cs) adds one compact `have/need name` row per requirement beneath the native recipe grid, using the native detail font, smaller than normal tooltip text. Exact ingredient names come from cloned resolved stacks and are rendered as literal richtext components, not parsed markup. Wildcard/tag alternatives use the localized "Matching ingredient" label rather than a misleading single-variant name or raw matching expression; the native grid still cycles acceptable choices. Names wrap to the measured tooltip width. Short count pairs use the native error-text red; satisfied pairs retain the normal text color.
 
 Counts describe coverage for **one craft**, not total stock or Shift-placement quantities. Each requirement's have count is its required quantity minus the matching deficit in the selection's authoritative evaluation. Shared/repeated requirements therefore cannot double-count stock, and reusable tools contribute one only when usable under the allocator's durability rules. Unsupported or unevaluated selections omit counts and retain their existing warning; no separate inventory scan or diagnostic prose is added.
 
 [GuiElementCraftingRecipeTooltip](../VanillaExpanded/src/CraftingMenu/GuiElementCraftingRecipeTooltip.cs) caches the semantic summary with the selected recipe identity and unsupported reason. Inventory refresh republishes the inspected selection through the existing tile callback. Changed counts rebuild and dispose the old popup; equivalent summaries retain the popup and native description resources even when allocations are newly captured or surplus stock changes.
+
+Pointer movement takes precedence over retained tile focus: leaving a recipe tile, including entering a gap or leaving the viewport, hides its tooltip even after clicking or while holding a press. A held press still freezes session ordering until release. Keyboard navigation restores focused-tile inspection until the next pointer movement; inventory refresh cannot resurrect a tooltip while the pointer remains off the tiles.
 
 ## Verification scope
 

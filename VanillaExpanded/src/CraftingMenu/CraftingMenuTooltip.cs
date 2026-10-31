@@ -63,10 +63,10 @@ internal static class CraftingMenuTooltip
         }
         foreach (var ingredient in ingredients)
         {
-            components.Add(new RichTextComponent(api, ingredient.Name + " ", CairoFont.WhiteSmallText()));
-            var font = CairoFont.WhiteSmallText();
+            var font = CairoFont.WhiteDetailText();
             if (ingredient.Have < ingredient.Need) font.WithColor((double[])GuiStyle.ErrorTextColor.Clone());
-            components.Add(new RichTextComponent(api, $"{ingredient.Have}/{ingredient.Need}", font));
+            components.Add(new RichTextComponent(api, $"{ingredient.Have}/{ingredient.Need} ", font));
+            components.Add(new RichTextComponent(api, ingredient.Name, CairoFont.WhiteDetailText()));
             components.Add(new ClearFloatTextComponent(api, 2));
         }
         string warnings = Warnings(selection);

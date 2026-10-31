@@ -265,7 +265,9 @@ internal sealed class GuiElementCraftingTiles : GuiElementContainer
 
     private void ShowInspection()
     {
-        session.Interact(InspectedRow()?.Output.Id);
+        // A held press freezes ordering even when the pointer leaves its tile.
+        var pressed = Elements.Cast<GuiElementCraftingTile>().FirstOrDefault(tile => tile.Pressed);
+        session.Interact(pressed?.Selection?.Output.Id ?? InspectedRow()?.Output.Id);
         inspect(InspectedRow());
     }
 
@@ -275,7 +277,7 @@ internal sealed class GuiElementCraftingTiles : GuiElementContainer
         var hovered = hoverPosition is { } position ? Elements.Cast<GuiElementCraftingTile>()
             .FirstOrDefault(tile => tile.Visible && tile.IsPositionInside(position.X, position.Y)) : null;
         var focused = CurrentTabIndexElement as GuiElementCraftingTile;
-        var tile = pressed ?? hovered ?? (HasFocus ? focused : null);
+        var tile = hoverPosition != null ? hovered : pressed ?? (HasFocus ? focused : null);
         return tile?.IsInViewport == true ? tile.Selection : null;
     }
 
