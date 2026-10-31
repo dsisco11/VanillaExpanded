@@ -1,6 +1,6 @@
 # Crafting menu provider systems proposal
 
-Status: Draft for review. This document proposes architecture and migration work; it does not claim that the systems described below are implemented.
+Status: Approved by the user on 2026-10-30. Filtering and craftable-only are implemented and covered by automated unit/native-GUI fixture verification. Ordering and classification provider systems remain deferred under section 10; live-game validation of the filtering delivery remains pending. See the [implementation guide](CraftingMenu.md) and [implementation plan](CraftingMenuProviders.todo) for delivered behavior and verification evidence.
 
 ## 1. Purpose
 
@@ -20,14 +20,14 @@ The design covers three distinct responsibilities:
 
 These are separate contracts, not implementations of a universal provider interface.
 
-## 2. Current baseline and motivation
+## 2. Pre-implementation baseline and motivation
 
-At the time of writing:
+At the time of writing, before the provider implementation:
 
 - [CraftingMenuSession](../VanillaExpanded/src/CraftingMenu/CraftingMenuSession.cs) owns the search string, selected category, allocations, output selection, and interaction freeze.
 - [CraftingCatalogueView](../VanillaExpanded/src/CraftingMenu/CraftingCatalogueView.cs) resolves automatic or pinned alternatives, applies category and search predicates, and hard-codes result ordering.
 - [GuiElementCraftingTile](../VanillaExpanded/src/CraftingMenu/GuiElementCraftingTile.cs) maps recipe evaluation directly to availability presentation.
-- The current source does not contain the earlier craftable-only implementation. Its previous feature-specific boolean parameter and interaction-freeze branch motivate this proposal, but are not an assumed implementation baseline.
+- The source at that baseline did not contain the earlier craftable-only implementation. Its previous feature-specific boolean parameter and interaction-freeze branch motivate this proposal, but are not an assumed implementation baseline.
 
 Adding a parameter and session branch for each future feature would make the orchestration layer responsible for every feature's rules. Favorites, Recent, alternative sort modes, and future recipe relevance rules would compound that coupling.
 

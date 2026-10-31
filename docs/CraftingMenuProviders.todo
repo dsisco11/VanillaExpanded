@@ -2,7 +2,7 @@
 
 Source proposal: [CraftingMenuProvidersProposal.md](CraftingMenuProvidersProposal.md)
 Authority: Proposal approved by the user on 2026-10-30. Its requirements govern this plan.
-Status: Phases 1-5 complete; Phase 6 remains pending.
+Status: Phases 1-6 complete for the filtering/craftable-only delivery. Live-game validation remains pending; ordering and classification provider systems remain deferred.
 
 ## Goal and execution boundary
 
@@ -215,7 +215,7 @@ Verification evidence (automated, not live gameplay):
 - Source localization `VanillaExpanded/assets/vanillaexpanded/lang/en.json` parsed successfully with `ConvertFrom-Json`; `git diff HEAD --check` and all local links in the new [implementation guide](CraftingMenu.md) passed.
 - Source review confirms pure provider composition, coherent publication, and unchanged allocation/transfer/icon-cache/rendering implementations since the pre-provider baseline. README and the implementation guide document delivered behavior and extension boundaries.
 - No live-game control/layout/inventory-transition smoke test was performed for this delivery. Live acceptance remains pending; native GUI fixtures and the earlier wooden-planks placement smoke test are not certification of the new filtering controls, multiplayer, or modpack compatibility.
-- Second implementation/documentation review and independent audit-stage-completion review found no outstanding issues. Phase 6 final acceptance and cleanup remain pending.
+- Second implementation/documentation review and independent audit-stage-completion review found no outstanding issues. Final acceptance and cleanup are recorded under Phase 6.
 
 ## Deferred delivery contracts: Ordering and classification
 
@@ -251,24 +251,31 @@ These are explicit deferrals under proposal sections 6, 7, and 10, not unfinishe
 
 Outcome: The filtering delivery is reviewable and complete, with future systems explicitly deferred and temporary support material removed.
 
-    ☐ Reconcile the implementation and evidence against every first-delivery requirement in proposal sections 3-5 and 8-11.
-        ☐ Demonstrate that another filtering feature can register its own isolated provider without changing session filtering/interaction branches, the catalogue query signature, or an existing provider.
-        ☐ Confirm deferred ordering/classification contracts remain recorded and are not represented as implemented.
-        ☐ Confirm separate features and non-goals have not been pulled into this delivery.
-    ☐ Inventory temporary intermediate documents created solely to support execution of Phases 1-5.
-        ☐ No such documents are known when this plan is created; inspect for any working notes, interim analyses, handoff drafts, or equivalent material created during execution.
-        ☐ Preserve still-required decisions and evidence in permanent documentation, this plan's execution record, or the appropriate retained acceptance evidence.
-        ☐ Remove only the identified temporary implementation-support documents and update references.
-        ☐ Retain the authoritative proposal, this plan, permanent project documentation, and required acceptance evidence; creation during implementation alone does not make a document temporary.
-    ☐ Remove any temporary implementation scaffolding, compatibility branches, or test helpers that are no longer required, after their replacement is verified.
-        ☐ Retain reusable production/test infrastructure needed by the delivered design.
-        ☐ Rerun affected checks after cleanup that changes executable code.
-    ☐ Update only the corresponding craftable-only entry in docs/project.todo after its implementation and verification gates pass.
-        ☐ Preserve unrelated task edits and leave future sorting, classification consumers, Favorites, Recent, persistence, relevance, and empty-state work pending.
-    ☐ Present the first-delivery result for review with concrete test results, runtime validation status, and explicit deferrals.
+    ☑ Reconcile the implementation and evidence against every first-delivery requirement in proposal sections 3-5 and 8-11.
+        ☑ Demonstrate that another filtering feature can register its own isolated provider without changing session filtering/interaction branches, the catalogue query signature, or an existing provider.
+        ☑ Confirm deferred ordering/classification contracts remain recorded and are not represented as implemented.
+        ☑ Confirm separate features and non-goals have not been pulled into this delivery.
+    ☑ Inventory temporary intermediate documents created solely to support execution of Phases 1-5.
+        ☑ No such documents are known when this plan is created; inspect for any working notes, interim analyses, handoff drafts, or equivalent material created during execution.
+        ☑ Preserve still-required decisions and evidence in permanent documentation, this plan's execution record, or the appropriate retained acceptance evidence.
+        ☑ Remove only the identified temporary implementation-support documents and update references.
+        ☑ Retain the authoritative proposal, this plan, permanent project documentation, and required acceptance evidence; creation during implementation alone does not make a document temporary.
+    ☑ Remove any temporary implementation scaffolding, compatibility branches, or test helpers that are no longer required, after their replacement is verified.
+        ☑ Retain reusable production/test infrastructure needed by the delivered design.
+        ☑ Rerun affected checks after cleanup that changes executable code.
+    ☑ Update only the corresponding craftable-only entry in docs/project.todo after its implementation and verification gates pass.
+        ☑ Preserve unrelated task edits and leave future sorting, classification consumers, Favorites, Recent, persistence, relevance, and empty-state work pending.
+    ☑ Present the first-delivery result for review with concrete test results, runtime validation status, and explicit deferrals.
 
 Completion gate:
-    ☐ Every proposal requirement is implemented for the first delivery or explicitly deferred above under the proposal's own sequencing.
-    ☐ All mandatory implementation/test/documentation gates pass and no cleanup remains outstanding.
-    ☐ Temporary implementation-support documents are removed only after required content and references are preserved.
-    ☐ Acceptance claims distinguish working code and automated/native-fixture evidence from live-game validation and deferred future delivery.
+    ☑ Every proposal requirement is implemented for the first delivery or explicitly deferred above under the proposal's own sequencing.
+    ☑ All mandatory implementation/test/documentation gates pass and no cleanup remains outstanding.
+    ☑ Temporary implementation-support documents are removed only after required content and references are preserved.
+    ☑ Acceptance claims distinguish working code and automated/native-fixture evidence from live-game validation and deferred future delivery.
+
+Final-review evidence:
+- Proposal sections 3-5 and 8-11 are covered by the completed first-delivery phases and their retained verification records. The independent `test:membership` provider in `ReconciliationRetainsEligibleRowsAndAppendsNewGroupsOnceInCanonicalOrder` demonstrates insertion, criteria replacement, and generic interaction reconciliation through the existing registration API without changing production filtering branches, the catalogue query signature, or built-in providers.
+- The delivery file inventory from the pre-provider baseline, untracked-file check, documentation directory, and session artifact directory contain no obsolete temporary implementation-support documents. The proposal, this plan, README, implementation guide, verification evidence, and reusable native/test-filter helpers are retained intentionally. No deletion or executable cleanup was required.
+- Phase 5's final 394-test CraftingMenu pass remains applicable: Phase 6 changes documentation/task records only. No tests were rerun for these documentation-only changes. Existing automated/native-fixture results do not constitute live-game validation; that acceptance remains pending.
+- Ordering/classification managers, their future consumers, Favorites, Recent, browsing persistence, ingredient relevance, sort selection, and enhanced empty-state actions remain deferred. No unrelated project tasks are completed by this delivery.
+- Second implementation/documentation review and independent audit-stage-completion review found no confirmed issues or required evidence gaps. Only the matching craftable-only project task was marked complete after those gates passed.
