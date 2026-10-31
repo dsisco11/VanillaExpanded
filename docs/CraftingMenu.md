@@ -56,6 +56,14 @@ Recomposition keeps the session, criteria, checked state, registrations, and scr
 
 The first menu in a world starts with All, empty search, and zero scroll. Closing/reopening the inventory, parent-composer replacement, and explicit menu close/book-tab reopen retain browsing state. World exit, catalogue reinitialization, and system disposal clear it; nothing is written to disk. Craftable-only still starts off in each new dialog. The existing preference to reopen the menu with the inventory remains independent of browsing state. Failed opens do not replace the last successfully captured state.
 
+## Tooltip ingredient coverage
+
+[CraftingMenuTooltip](../VanillaExpanded/src/CraftingMenu/CraftingMenuTooltip.cs) adds one compact ingredient-name and have/need row per requirement beneath the native recipe grid. Exact ingredient names come from cloned resolved stacks and are rendered as literal richtext components, not parsed markup. Wildcard/tag alternatives use the localized "Matching ingredient" label rather than a misleading single-variant name or raw matching expression; the native grid still cycles acceptable choices. Names wrap to the measured tooltip width. Short count pairs use the native error-text red; satisfied pairs retain the normal text color.
+
+Counts describe coverage for **one craft**, not total stock or Shift-placement quantities. Each requirement's have count is its required quantity minus the matching deficit in the selection's authoritative evaluation. Shared/repeated requirements therefore cannot double-count stock, and reusable tools contribute one only when usable under the allocator's durability rules. Unsupported or unevaluated selections omit counts and retain their existing warning; no separate inventory scan or diagnostic prose is added.
+
+[GuiElementCraftingRecipeTooltip](../VanillaExpanded/src/CraftingMenu/GuiElementCraftingRecipeTooltip.cs) caches the semantic summary with the selected recipe identity and unsupported reason. Inventory refresh republishes the inspected selection through the existing tile callback. Changed counts rebuild and dispose the old popup; equivalent summaries retain the popup and native description resources even when allocations are newly captured or surplus stock changes.
+
 ## Verification scope
 
 Provider, catalogue-view, interaction, transfer, lifecycle, and rendering regressions live in [the CraftingMenu unit tests](../VanillaExpanded.Tests/Unit/CraftingMenu/). Run the regression group from the repository root:

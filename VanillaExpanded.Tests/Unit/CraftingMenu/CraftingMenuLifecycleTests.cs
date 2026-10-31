@@ -639,7 +639,7 @@ public sealed class CraftingMenuLifecycleTests
         tooltip.Inspect(row);
         Assert.Same(popup, tooltip.Popup);
         Assert.Equal(texturesShown, f.TextureCount);
-        tooltip.Inspect(row with { Evaluation = CatalogueFixture.Full() });
+        tooltip.Inspect(row with { Evaluation = row.Evaluation with { }, Allocation = row.Allocation! with { } });
         Assert.Same(popup, tooltip.Popup);
         var window = f.Lifecycle.Api.Object.Gui.WindowBounds;
         f.SetMouse((int)(window.absX + window.InnerWidth - 2), (int)(window.absY + window.InnerHeight - 2));
@@ -674,6 +674,99 @@ public sealed class CraftingMenuLifecycleTests
         render.Verify(value => value.GlPopMatrix(), Times.Once);
         tooltip.Dispose();
         Assert.Equal(texturesBefore, f.TextureCount);
+    }
+
+    [Theory]
+    [InlineData(1, 300)]
+    [InlineData(1, 204)]
+    [InlineData(1.5, 300)]
+    [InlineData(1.5, 204)]
+    [InlineData(2, 300)]
+    [InlineData(2, 204)]
+    public void IngredientSummaryWrapsBelowNativeGridAndRefreshesOnlyWhenCoverageChanges(float scale, double width)
+    {
+        using var f = new MenuFixture(scale: scale, includeRecipes: true);
+        var board = f.Lifecycle.F.Stack(1, "board", 3);
+        var stick = f.Lifecycle.F.Stack(2, "stick", 2);
+        const string name = "Oak planks with a long localized name <font color=\"red\">literal</font>";
+        var item = new Mock<MockItem>(board.Id, (byte)0, f.Lifecycle.Api.Object) { CallBase = true };
+        item.Object.Code = board.Item.Code;
+        item.Setup(value => value.GetHeldItemName(It.IsAny<ItemStack>())).Returns(name);
+        board = new ItemStack(item.Object, board.StackSize);
+        var stickItem = new Mock<MockItem>(stick.Id, (byte)0, f.Lifecycle.Api.Object) { CallBase = true };
+        stickItem.Object.Code = stick.Item.Code;
+        stickItem.Setup(value => value.GetHeldItemName(It.IsAny<ItemStack>())).Returns("Sticks");
+        stick = new ItemStack(stickItem.Object, stick.StackSize);
+        var recipe = Assert.Single(f.Lifecycle.Recipes);
+        recipe.Width = 2;
+        recipe.Height = 1;
+        recipe.ResolvedIngredients = [f.Lifecycle.F.Ingredient(board, 4), f.Lifecycle.F.Ingredient(stick, 2)];
+        var inventory = Assert.Single(((ClientPlayerInventoryManager)f.Lifecycle.F.Player.InventoryManager)
+            .Inventories.Values.OfType<InventoryCraftingGrid>());
+        inventory[0].Itemstack = board;
+        inventory[1].Itemstack = stick;
+        f.Lifecycle.F.Register(recipe);
+        f.Lifecycle.FinalizeWorld();
+        f.Recompose();
+        f.Parent.TryOpen();
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        var session = (CraftingMenuSession)typeof(GuiDialogCraftingMenu).GetField("session",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
+        var tooltip = Assert.IsType<GuiElementCraftingRecipeTooltip>(menu.SingleComposer.GetElement("tooltip"));
+        var window = f.Lifecycle.Api.Object.Gui.WindowBounds;
+        window.fixedWidth = width + 16;
+        window.MarkDirtyRecursive();
+        window.CalcWorldBounds();
+        int baseline = f.TextureCount;
+        var tiles = Assert.IsType<GuiElementCraftingTiles>(menu.SingleComposer.GetElement("tiles"));
+        var tileBounds = tiles.Elements[0].Bounds;
+        tiles.UpdateHover((int)(tileBounds.absX + 5), (int)(tileBounds.absY + 5));
+        var popup = tooltip.Popup!;
+        int shown = f.TextureCount;
+        var content = popup.GetRichtext("recipe");
+        var grid = Assert.Single(content.Components.OfType<SlideshowGridRecipeTextComponent>());
+        var text = content.Components.OfType<RichTextComponent>()
+            .Where(component => component is not ClearFloatTextComponent).ToArray();
+        Assert.Equal(new[] { name, "3/4", stick.GetName(), "2/2" }, text.Select(component => component.DisplayText));
+        Assert.Equal(GuiStyle.ErrorTextColor, text[1].Font.Color);
+        Assert.Equal(CairoFont.WhiteSmallText().Color, text[3].Font.Color);
+        Assert.True(text[0].Lines.Length > 1);
+        Assert.True(text[0].BoundsPerLine.Min(bounds => bounds.Y) >=
+            grid.BoundsPerLine.Max(bounds => bounds.Y + bounds.Height));
+        Assert.True(text[2].BoundsPerLine.Min(bounds => bounds.Y) >=
+            text.Take(2).SelectMany(component => component.BoundsPerLine).Max(bounds => bounds.Y + bounds.Height));
+        Assert.All(text.SelectMany(component => component.BoundsPerLine), bounds =>
+        {
+            Assert.True(bounds.X >= 0);
+            Assert.True(bounds.X + bounds.Width <= content.Bounds.InnerWidth + .001);
+            Assert.True(content.Bounds.absY + bounds.Y + bounds.Height <=
+                popup.Bounds.absY + popup.Bounds.InnerHeight + popup.Bounds.fixedPaddingY * scale + .001);
+        });
+
+        board.StackSize = 4;
+        session.Refresh();
+        Assert.NotSame(popup, tooltip.Popup);
+        Assert.Equal(shown, f.TextureCount);
+        popup = tooltip.Popup!;
+        var fullCount = Assert.Single(popup.GetRichtext("recipe").Components.OfType<RichTextComponent>(),
+            component => component.DisplayText == "4/4");
+        Assert.Equal(CairoFont.WhiteSmallText().Color, fullCount.Font.Color);
+
+        board.StackSize = 64;
+        session.Refresh();
+        Assert.Same(popup, tooltip.Popup);
+        Assert.Equal(shown, f.TextureCount);
+
+        inventory[0].Itemstack = null;
+        session.Refresh();
+        Assert.NotSame(popup, tooltip.Popup);
+        var emptyCount = Assert.Single(tooltip.Popup!.GetRichtext("recipe").Components.OfType<RichTextComponent>(),
+            component => component.DisplayText == "0/4");
+        Assert.Equal(GuiStyle.ErrorTextColor, emptyCount.Font.Color);
+        Assert.Equal(shown, f.TextureCount);
+        tooltip.Dispose();
+        Assert.Equal(baseline, f.TextureCount);
     }
 
     [Fact]

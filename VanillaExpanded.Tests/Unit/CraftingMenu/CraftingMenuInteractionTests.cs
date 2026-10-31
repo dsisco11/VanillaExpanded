@@ -1303,6 +1303,8 @@ public sealed class CraftingMenuInteractionTests
         string text = CraftingMenuTooltip.Warnings(row, key => key);
         Assert.Empty(text);
         Assert.Equal(2, Assert.Single(row.Evaluation.Missing).Quantity);
+        Assert.Equal(new CraftingIngredientSummary("Matching ingredient", 0, 2),
+            Assert.Single(CraftingMenuTooltip.IngredientSummary(row, _ => "Matching ingredient")));
     }
 
     [Theory]

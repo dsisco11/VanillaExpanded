@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Immutable;
+using System.Linq;
 using Cairo;
 using Vintagestory.API.Client;
 
@@ -9,6 +11,7 @@ internal sealed class GuiElementCraftingRecipeTooltip(ICoreClientAPI capi)
 {
     private CraftingRecipeEntry? recipe;
     private string? unsupportedReason;
+    private ImmutableArray<CraftingIngredientSummary> ingredients = [];
     private bool visible;
     private bool disposed;
     internal GuiComposer? Popup { get; private set; }
@@ -19,7 +22,9 @@ internal sealed class GuiElementCraftingRecipeTooltip(ICoreClientAPI capi)
         visible = selection != null;
         if (selection == null) return;
         string? reason = selection.Evaluation.UnsupportedReason;
-        if (ReferenceEquals(recipe, selection.Recipe) && unsupportedReason == reason && Popup != null) return;
+        var summary = CraftingMenuTooltip.IngredientSummary(selection);
+        if (ReferenceEquals(recipe, selection.Recipe) && unsupportedReason == reason
+            && ingredients.SequenceEqual(summary) && Popup != null) return;
         Popup?.Dispose();
         Popup = null;
         double width = Math.Min(300, api.Gui.WindowBounds.InnerWidth / scaled(1) - 16);
@@ -48,7 +53,7 @@ internal sealed class GuiElementCraftingRecipeTooltip(ICoreClientAPI capi)
                 y += 7;
             }
         }
-        var text = new GuiElementRichtext(api, CraftingMenuTooltip.CreateRecipe(api, selection, width),
+        var text = new GuiElementRichtext(api, CraftingMenuTooltip.CreateRecipe(api, selection, width, summary),
             ElementBounds.Fixed(0, y, width, 1).WithParent(popupBounds));
         text.BeforeCalcBounds();
         popupBounds.fixedHeight = y + text.Bounds.fixedHeight;
@@ -69,6 +74,7 @@ internal sealed class GuiElementCraftingRecipeTooltip(ICoreClientAPI capi)
         Popup.AddInteractiveElement(text, "recipe").Compose();
         recipe = selection.Recipe;
         unsupportedReason = reason;
+        ingredients = summary;
     }
 
     private static void DrawItemTooltipBackground(Context ctx, ImageSurface surface, ElementBounds bounds)

@@ -1,11 +1,15 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Linq;
 using Cairo;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 
 namespace VanillaExpanded.CraftingMenu;
+
+internal sealed record CraftingIngredientSummary(string Name, int Have, int Need);
 
 internal static class CraftingMenuTooltip
 {
@@ -28,7 +32,24 @@ internal static class CraftingMenuTooltip
             ? [] : VtmlUtil.Richtextify(api, description, CairoFont.WhiteSmallText());
     }
 
-    internal static RichTextComponentBase[] CreateRecipe(ICoreClientAPI api, CraftingRecipeSelection selection, double width)
+    internal static ImmutableArray<CraftingIngredientSummary> IngredientSummary(CraftingRecipeSelection selection,
+        System.Func<string, string>? translate = null)
+    {
+        if (!selection.Evaluation.IsSupported || selection.Allocation == null) return [];
+        translate ??= key => Lang.Get(key);
+        var missing = selection.Evaluation.Missing.ToDictionary(requirement => requirement.IngredientId);
+        return selection.Allocation.Requirements.Select(requirement =>
+        {
+            var ingredient = requirement.GetIngredient();
+            string name = ingredient.MatchingType == EnumRecipeMatchType.Exact && ingredient.ResolvedItemStack is { } stack
+                ? stack.GetName() : translate("vanillaexpanded:craftingmenu-ingredient-choice");
+            int have = requirement.Quantity - (missing.GetValueOrDefault(requirement.Id)?.Quantity ?? 0);
+            return new CraftingIngredientSummary(name, have, requirement.Quantity);
+        }).ToImmutableArray();
+    }
+
+    internal static RichTextComponentBase[] CreateRecipe(ICoreClientAPI api, CraftingRecipeSelection selection, double width,
+        ImmutableArray<CraftingIngredientSummary> ingredients)
     {
         var components = new List<RichTextComponentBase>();
         if (selection.Recipe.Recipe.ResolvedIngredients != null)
@@ -39,6 +60,14 @@ internal static class CraftingMenuTooltip
             grid.PaddingLeft = Math.Max(0, (width - grid.BoundsPerLine[0].Width / GuiElement.scaled(1)) / 2);
             components.Add(grid);
             components.Add(new ClearFloatTextComponent(api, 6));
+        }
+        foreach (var ingredient in ingredients)
+        {
+            components.Add(new RichTextComponent(api, ingredient.Name + " ", CairoFont.WhiteSmallText()));
+            var font = CairoFont.WhiteSmallText();
+            if (ingredient.Have < ingredient.Need) font.WithColor((double[])GuiStyle.ErrorTextColor.Clone());
+            components.Add(new RichTextComponent(api, $"{ingredient.Have}/{ingredient.Need}", font));
+            components.Add(new ClearFloatTextComponent(api, 2));
         }
         string warnings = Warnings(selection);
         if (warnings.Length > 0)
