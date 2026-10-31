@@ -25,6 +25,8 @@ Construct immutable criteria before registering or replacing them. Update the co
 
 The set enforces its owning client thread and rejects registry mutations or reentrant filtering during an eager projection pass. Predicates and criteria remain read-only during that pass. Registration errors and predicate exceptions propagate; never catch them to publish unfiltered or empty success-shaped results.
 
+An active registration can call `FilterOthers(selections)` to evaluate every other registered predicate without removing or replacing itself. This eager diagnostic pass has the same thread, mutation, reentrancy, lifetime, and error guarantees as normal filtering; a stale handle cannot exclude a newer registration using the same identity.
+
 To insert a feature:
 
 1. Implement its pure selection predicate and a controller that owns its criteria and registration handle.
@@ -39,6 +41,10 @@ The view filters resolved selections and retains the default order: supported fi
 During interaction, the session refreshes evaluations for the exact displayed recipes and keeps still-eligible rows in relative order. Ineligible automatic alternatives use the current automatic candidate only if it passes every filter. Explicit pins are never substituted to satisfy a filter. Newly eligible groups append in canonical order without duplicates; explicit variant/Auto actions take effect immediately. Ending interaction restores canonical order and automatic selection. Only a completed projection replaces the published row snapshot.
 
 A hidden pin survives search and craftable-only changes, subject to normal deselection/category behavior. Turning craftable-only off can expose it again; Auto is available only through a visible selected row. Hidden selections have disabled footer controls and no displayed tooltip.
+
+The session publishes an empty-state diagnosis with its row snapshot. For empty results, the craftable-only controller evaluates the resolved selections through every other registered filter, including search and category. Surviving selections mean craftability is the blocker; otherwise an active search gets the search-specific message. A truly empty catalogue gets the general unavailable message without a misleading clear action. This pass reuses current evaluations and allocations and respects pinned alternatives; it neither captures inventory nor changes registrations. Diagnostic failures leave the prior rows and diagnosis published and propagate normally.
+
+The localized empty-state message and its one relevant action are centered horizontally and vertically as a group in the recipe viewport, with centered text, measured wrapping, and sufficient minimum space for translated labels. Without an action, the message alone is centered. Clear search uses the existing search input path, returns keyboard focus to search, and keeps craftable-only/category unchanged. Show uncraftable removes only the craftable restriction through its controller and synchronizes the toggle without firing a second handler. Both actions reset scroll through the existing safe reset path. Hidden actions are disabled, unfocused, and not rendered; live refresh, recomposition, and reopening update the message and action from session state.
 
 [GuiDialogCraftingMenu](../VanillaExpanded/src/CraftingMenu/GuiDialogCraftingMenu.cs) uses native controls with measured localized layout. Search stays first in tab order. The native craftable-only toggle uses Enter; recipe tiles also accept Space and keypad Enter. Mouse activation requires the same output and recipe identities as the left-button press. Removal/rebinding cancels the press, including remove/reintroduce before release. Scroll and scrollbar positions clamp together after membership shrinks, even during a press; ordinary live refresh does not reset scroll unconditionally.
 

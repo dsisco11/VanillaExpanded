@@ -24,10 +24,17 @@ internal sealed class RecipeFilterSet : IDisposable
     }
 
     /// <summary>Eagerly filters one complete pass, preventing registration changes until enumeration finishes.</summary>
-    internal ImmutableArray<CraftingRecipeSelection> Filter(IEnumerable<CraftingRecipeSelection> selections)
+    internal ImmutableArray<CraftingRecipeSelection> Filter(IEnumerable<CraftingRecipeSelection> selections) =>
+        Filter(selections, null);
+
+    private ImmutableArray<CraftingRecipeSelection> Filter(IEnumerable<CraftingRecipeSelection> selections,
+        Registration? excluded)
     {
         EnsureMutable();
         ArgumentNullException.ThrowIfNull(selections);
+        if (excluded != null && (!filters.TryGetValue(excluded.Id, out var current)
+            || current.Registration != excluded))
+            throw new InvalidOperationException("The crafting filter registration is no longer active.");
         projecting = true;
         try
         {
@@ -38,6 +45,7 @@ internal sealed class RecipeFilterSet : IDisposable
                 bool matches = true;
                 foreach (var registered in filters.Values)
                 {
+                    if (registered.Registration == excluded) continue;
                     if (registered.Filter.Matches(selection)) continue;
                     matches = false;
                     break;
@@ -103,6 +111,8 @@ internal sealed class RecipeFilterSet : IDisposable
         }
 
         internal void Replace(IRecipeFilter filter) => owner.Replace(this, filter);
+        internal ImmutableArray<CraftingRecipeSelection> FilterOthers(IEnumerable<CraftingRecipeSelection> selections) =>
+            owner.Filter(selections, this);
         public void Dispose() => owner.Remove(this);
     }
 }

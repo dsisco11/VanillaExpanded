@@ -52,6 +52,8 @@ Category tabs above search use the outputs' native creative-inventory categories
 
 **Craftable only** shows recipes whose required ingredients are fully available for one craft. It combines independently with category and search: toggling it keeps both unchanged, and clearing one filter leaves the others active. Partial, missing, unsupported, and not-yet-evaluated recipes are hidden while it is on. Changing search, category, or this toggle returns the list to the top. Resizing keeps the current filters and scroll position; Craftable only resets to off when the menu is closed and reopened.
 
+Empty results explain which restriction to relax. If no recipes in the selected category match your search, **Clear search** removes only the search text. If recipes match but none are currently craftable, **Show uncraftable** turns off only Craftable only, keeping category and search unchanged. With both filters active, search is checked first without the craftable restriction. The message updates as ingredients become available; no clear action is shown for an empty catalogue.
+
 Inventory changes update results live, including while a tile is hovered, focused, or pressed. Eligible rows stay in place during interaction, but rows that no longer match disappear immediately. If a pressed tile is removed or replaced, release cannot activate its replacement; press again to choose the new row.
 
 Keyboard tab order starts with the search box, followed by the category tabs and Craftable only. Use the category row's arrow keys to navigate categories, **Enter** to toggle Craftable only when focused, and arrow keys to navigate focused recipe tiles. **Enter**, **Space**, or **keypad Enter** activates a focused recipe; hold **Shift** for the shift-placement action.

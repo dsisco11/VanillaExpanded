@@ -27,6 +27,9 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
     private double autoWidth;
     private double nextWidth;
     private double handbookWidth;
+    private double emptyTextHeight;
+    private double clearSearchWidth;
+    private double showUncraftableWidth;
     private GuiElementCraftingRecipeTooltip? tooltip;
     private string search = "";
     private float? restoreScroll;
@@ -161,8 +164,14 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
                 .AddInteractiveElement(tiles, "tiles")
             .EndClip()
             .AddVerticalScrollbar(tiles.Scroll, scrollBounds, "scroll")
-            .AddDynamicText("", CairoFont.WhiteSmallText(),
-                ElementBounds.Fixed(0, viewport.fixedY, viewport.fixedWidth, Math.Min(40, viewport.fixedHeight)), "empty")
+            .AddDynamicText("", CairoFont.WhiteSmallText().WithOrientation(EnumTextOrientation.Center),
+                ElementBounds.Fixed(0, viewport.fixedY, viewport.fixedWidth, emptyTextHeight), "empty")
+            .AddSmallButton(Lang.Get("vanillaexpanded:craftingmenu-clear-search"), ClearSearch,
+                ElementBounds.Fixed(0, viewport.fixedY + emptyTextHeight + 8, clearSearchWidth, footerHeight),
+                key: "clear-search")
+            .AddSmallButton(Lang.Get("vanillaexpanded:craftingmenu-show-uncraftable"), ShowUncraftable,
+                ElementBounds.Fixed(0, viewport.fixedY + emptyTextHeight + 8, showUncraftableWidth, footerHeight),
+                key: "show-uncraftable")
             .BeginChildElements(footer)
             .AddSmallButton("<", () => Cycle(-1), previous, key: "previous")
             .AddSmallButton(Lang.Get("vanillaexpanded:craftingmenu-auto"), () => { session.Auto(); return true; },
@@ -206,6 +215,10 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         nextWidth = Math.Max(24, Math.Ceiling(buttonFont.GetTextExtents(">").Width / scale + 1));
         handbookWidth = Math.Max(70, Math.Ceiling(buttonFont.GetTextExtents(
             Lang.Get("vanillaexpanded:craftingmenu-handbook")).Width / scale + 1));
+        clearSearchWidth = Math.Ceiling(buttonFont.GetTextExtents(
+            Lang.Get("vanillaexpanded:craftingmenu-clear-search")).Width / scale + 1);
+        showUncraftableWidth = Math.Ceiling(buttonFont.GetTextExtents(
+            Lang.Get("vanillaexpanded:craftingmenu-show-uncraftable")).Width / scale + 1);
         footerHeight = Math.Max(24, Math.Ceiling(Math.Max(buttonFont.GetFontExtents().Height,
             textFont.GetFontExtents().Height) / scale));
         searchHeight = Math.Max(26, Math.Ceiling(textFont.GetFontExtents().Height / scale + 6));
@@ -217,11 +230,17 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         double titleControlsWidth = 2 * GuiElementDialogTitleBar.unscaledCloseIconSize + 2 + 20;
         double craftableWidth = 32 + textFont.GetTextExtents(
             Lang.Get("vanillaexpanded:craftingmenu-craftable-only")).Width / scale;
-        minimumWidth = Math.Ceiling(Math.Max(craftableWidth, Math.Max(
+        minimumWidth = Math.Ceiling(Math.Max(32 + Math.Max(clearSearchWidth, showUncraftableWidth),
+            Math.Max(craftableWidth, Math.Max(
             GuiStyle.ElementToDialogPadding + titleWidth + 8 + titleControlsWidth,
-            16 + previousWidth + 3 + autoWidth + 3 + nextWidth + 4 + counterWidth + 4 + handbookWidth)));
+            16 + previousWidth + 3 + autoWidth + 3 + nextWidth + 4 + counterWidth + 4 + handbookWidth))));
+        var textUtil = new TextDrawUtil();
+        emptyTextHeight = Math.Ceiling(Enum.GetValues<CraftingMenuEmptyState>()
+            .Where(state => state != CraftingMenuEmptyState.None)
+            .Max(state => textUtil.GetMultilineTextHeight(textFont, Lang.Get(EmptyMessageKey(state)),
+                (minimumWidth - 32) * scale)) / scale);
         minimumHeight = Math.Ceiling(GuiStyle.TitleBarHeight + 8 + tabsHeight + 8 + searchHeight + 8 + craftableHeight + 8
-            + GuiElementCraftingTiles.TileSize + 10 + footerHeight + 8);
+            + Math.Max(GuiElementCraftingTiles.TileSize, emptyTextHeight + 8 + footerHeight) + 10 + footerHeight + 8);
     }
 
     private bool Follow()
@@ -334,11 +353,68 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         return true;
     }
 
+    private bool ClearSearch()
+    {
+        if (session.EmptyState != CraftingMenuEmptyState.NoSearchMatches) return true;
+        var input = SingleComposer.GetTextInput("search");
+        input.SetValue("");
+        SingleComposer.FocusElement(input.TabIndex);
+        return true;
+    }
+
+    private bool ShowUncraftable()
+    {
+        if (session.EmptyState is not (CraftingMenuEmptyState.NoCraftableRecipes or CraftingMenuEmptyState.NoCraftableSearchMatches))
+            return true;
+        ((GuiElementCraftingTiles)SingleComposer.GetElement("tiles")).ResetScroll();
+        SingleComposer.GetToggleButton("craftable-only").SetValue(false);
+        session.CraftableOnly.SetEnabled(false);
+        return true;
+    }
+
+    private static string EmptyMessageKey(CraftingMenuEmptyState state) => state switch
+    {
+        CraftingMenuEmptyState.NoRecipes => "vanillaexpanded:craftingmenu-empty",
+        CraftingMenuEmptyState.NoSearchMatches => "vanillaexpanded:craftingmenu-empty-search",
+        CraftingMenuEmptyState.NoCraftableRecipes => "vanillaexpanded:craftingmenu-empty-craftable",
+        CraftingMenuEmptyState.NoCraftableSearchMatches => "vanillaexpanded:craftingmenu-empty-craftable-search",
+        _ => throw new ArgumentOutOfRangeException(nameof(state))
+    };
+
     private void UpdateLabels()
     {
         if (SingleComposer == null) return;
-        SingleComposer.GetDynamicText("empty").SetNewText(session.Rows.IsEmpty
-            ? Lang.Get("vanillaexpanded:craftingmenu-empty") : "");
+        (string Key, bool Visible)[] actions =
+        {
+            ("clear-search", session.EmptyState == CraftingMenuEmptyState.NoSearchMatches),
+            ("show-uncraftable", session.EmptyState is CraftingMenuEmptyState.NoCraftableRecipes
+                or CraftingMenuEmptyState.NoCraftableSearchMatches)
+        };
+        var viewport = SingleComposer.GetElement("tiles").InsideClipBounds;
+        var empty = SingleComposer.GetDynamicText("empty");
+        string message = session.EmptyState == CraftingMenuEmptyState.None ? "" : Lang.Get(EmptyMessageKey(session.EmptyState));
+        double scale = GuiElement.scaled(1);
+        double textHeight = Math.Max(1, Math.Ceiling(new TextDrawUtil()
+            .GetMultilineTextHeight(empty.Font, message, viewport.InnerWidth) / scale));
+        double actionHeight = actions.Where(action => action.Visible)
+            .Select(action => SingleComposer.GetButton(action.Key).Bounds.fixedHeight + 8).DefaultIfEmpty(0).Max();
+        bool resized = empty.Bounds.fixedHeight != textHeight;
+        empty.Bounds.fixedHeight = textHeight;
+        empty.Bounds.fixedY = viewport.fixedY + (viewport.fixedHeight - textHeight - actionHeight) / 2;
+        empty.Bounds.MarkDirtyRecursive();
+        empty.Bounds.CalcWorldBounds();
+        empty.SetNewText(message, forceRedraw: resized);
+        foreach (var (key, visible) in actions)
+        {
+            var button = SingleComposer.GetButton(key);
+            if (!visible && button.HasFocus) button.OnFocusLost();
+            button.Enabled = button.Visible = visible;
+            if (!visible) continue;
+            button.Bounds.fixedX = viewport.fixedX + (viewport.fixedWidth - button.Bounds.fixedWidth) / 2;
+            button.Bounds.fixedY = empty.Bounds.fixedY + textHeight + 8;
+            button.Bounds.MarkDirtyRecursive();
+            button.Bounds.CalcWorldBounds();
+        }
         var selected = session.Rows.FirstOrDefault(row => row.Output.Id == session.SelectedOutput);
         foreach (string key in new[] { "previous", "auto", "next", "handbook" })
         {

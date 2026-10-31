@@ -7,6 +7,41 @@ namespace VanillaExpanded.Tests.Unit.CraftingMenu;
 public sealed class RecipeFilterSetTests
 {
     [Fact]
+    public void ExcludingAnOwnedRegistrationPreservesEveryOtherFilterAndDoesNotMutateTheSet()
+    {
+        using var manager = new RecipeFilterSet();
+        var rows = Rows();
+        using var first = manager.Register("first", new Provider(row => row.Output.Id == 0));
+        using var second = manager.Register("second", new Provider(row => row.Output.Id == 1));
+        Assert.Empty(manager.Filter(rows));
+        Assert.Same(rows[1], Assert.Single(first.FilterOthers(rows)));
+        Assert.Same(rows[0], Assert.Single(second.FilterOthers(rows)));
+        Assert.Empty(manager.Filter(rows));
+        Assert.Throws<ArgumentException>(() => manager.Register("first", new Provider(_ => true)));
+        first.Replace(new Provider(row => row.Output.Id == 1));
+        Assert.Same(rows[1], Assert.Single(manager.Filter(rows)));
+        Assert.Same(rows[1], Assert.Single(second.FilterOthers(rows)));
+        first.Dispose();
+        using var replacement = manager.Register("first", new Provider(_ => false));
+        Assert.Throws<InvalidOperationException>(() => first.FilterOthers(rows));
+        Assert.Same(rows[1], Assert.Single(replacement.FilterOthers(rows)));
+    }
+
+    [Fact]
+    public void ExcludedProviderIsNotEvaluatedAndOtherProviderFailuresStillPropagate()
+    {
+        using var manager = new RecipeFilterSet();
+        var rows = Rows();
+        var failure = new InvalidOperationException("Provider failure.");
+        using var first = manager.Register("first", new Provider(_ => throw failure));
+        Assert.Equal(rows.ToArray(), first.FilterOthers(rows).ToArray());
+        using var second = manager.Register("second", new Provider(_ => throw failure));
+        Assert.Same(failure, Assert.Throws<InvalidOperationException>(() => first.FilterOthers(rows)));
+        second.Dispose();
+        Assert.Equal(rows.ToArray(), first.FilterOthers(rows).ToArray());
+    }
+
+    [Fact]
     public void NoFiltersPreserveSelectionsAndInputOrder()
     {
         using var manager = new RecipeFilterSet();
@@ -122,6 +157,7 @@ public sealed class RecipeFilterSetTests
     [InlineData("replace")]
     [InlineData("dispose")]
     [InlineData("reenter")]
+    [InlineData("filter-others")]
     public void ProviderCannotChangeTheRegistryDuringAProjection(string operation)
     {
         using var manager = new RecipeFilterSet();
@@ -136,6 +172,7 @@ public sealed class RecipeFilterSetTests
                 case "replace": criterion.Replace(new Provider(_ => false)); break;
                 case "dispose": manager.Dispose(); break;
                 case "reenter": manager.Filter(rows); break;
+                case "filter-others": criterion.FilterOthers(rows); break;
                 default: throw new ArgumentOutOfRangeException(nameof(operation));
             }
             return true;
@@ -190,6 +227,7 @@ public sealed class RecipeFilterSetTests
     [InlineData("replace")]
     [InlineData("dispose")]
     [InlineData("filter")]
+    [InlineData("filter-others")]
     public void RegistryAndProjectionRejectNonOwningThreadsWithoutMutation(string operation)
     {
         using var manager = new RecipeFilterSet();
@@ -205,6 +243,7 @@ public sealed class RecipeFilterSetTests
                 case "replace": registration.Replace(new Provider(_ => false)); break;
                 case "dispose": manager.Dispose(); break;
                 case "filter": manager.Filter(rows); break;
+                case "filter-others": registration.FilterOthers(rows); break;
                 default: throw new ArgumentOutOfRangeException(nameof(operation));
             }
         }));
@@ -230,6 +269,7 @@ public sealed class RecipeFilterSetTests
         Assert.Throws<ObjectDisposedException>(() => manager.Filter(rows));
         Assert.Throws<ObjectDisposedException>(() => manager.Register("feature", new Provider(_ => true)));
         Assert.Throws<ObjectDisposedException>(() => registration.Replace(new Provider(_ => true)));
+        Assert.Throws<ObjectDisposedException>(() => registration.FilterOthers(rows));
     }
 
     [Fact]

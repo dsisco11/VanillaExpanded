@@ -5,6 +5,8 @@ using System.Linq;
 
 namespace VanillaExpanded.CraftingMenu;
 
+internal enum CraftingMenuEmptyState { None, NoRecipes, NoSearchMatches, NoCraftableRecipes, NoCraftableSearchMatches }
+
 internal sealed class CraftingMenuSession : IDisposable
 {
     private readonly CraftingCatalogueView view;
@@ -35,6 +37,7 @@ internal sealed class CraftingMenuSession : IDisposable
     internal string? Category => category.Selected;
     internal RecipeFilterSet Filters { get; } = new();
     internal CraftableOnly CraftableOnly { get; }
+    internal CraftingMenuEmptyState EmptyState { get; private set; }
     internal event Action? Changed;
 
     internal void Refresh()
@@ -124,8 +127,20 @@ internal sealed class CraftingMenuSession : IDisposable
                 if (emitted.Add(row.Output.Id)) stable.Add(row);
             replacement = stable.ToImmutable();
         }
+        var emptyState = DiagnoseEmptyState(replacement);
         Rows = replacement;
+        EmptyState = emptyState;
         Changed?.Invoke();
+    }
+
+    private CraftingMenuEmptyState DiagnoseEmptyState(ImmutableArray<CraftingRecipeSelection> rows)
+    {
+        if (!rows.IsEmpty) return CraftingMenuEmptyState.None;
+        if (catalogue.Groups.IsEmpty) return CraftingMenuEmptyState.NoRecipes;
+        if (CraftableOnly.Enabled
+            && !CraftableOnly.FilterOthers(catalogue.Groups.Select(group => view.GetSelection(group.Id))).IsEmpty)
+            return search.HasTerms ? CraftingMenuEmptyState.NoCraftableSearchMatches : CraftingMenuEmptyState.NoCraftableRecipes;
+        return search.HasTerms ? CraftingMenuEmptyState.NoSearchMatches : CraftingMenuEmptyState.NoRecipes;
     }
 
     public void Dispose()

@@ -7,6 +7,7 @@ namespace VanillaExpanded.CraftingMenu;
 internal sealed class RecipeSearch(RecipeFilterSet filters, Action changed)
 {
     private RecipeFilterSet.Registration? registration;
+    internal bool HasTerms => registration != null;
 
     internal void SetText(string? text)
     {

@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
 
 namespace VanillaExpanded.CraftingMenu;
 
@@ -8,6 +10,9 @@ internal sealed class CraftableOnly(RecipeFilterSet filters, Action changed)
     private RecipeFilterSet.Registration? registration;
 
     internal bool Enabled => registration != null;
+
+    internal ImmutableArray<CraftingRecipeSelection> FilterOthers(IEnumerable<CraftingRecipeSelection> selections) =>
+        registration == null ? filters.Filter(selections) : registration.FilterOthers(selections);
 
     internal void SetEnabled(bool enabled)
     {

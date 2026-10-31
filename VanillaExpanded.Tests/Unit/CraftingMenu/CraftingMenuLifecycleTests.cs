@@ -18,6 +18,135 @@ namespace VanillaExpanded.Tests.Unit.CraftingMenu;
 [Collection("Crafting native GUI")]
 public sealed class CraftingMenuLifecycleTests
 {
+    private static void AssertEmptyStateCentered(GuiDialogCraftingMenu menu)
+    {
+        var composer = menu.SingleComposer;
+        var empty = composer.GetDynamicText("empty");
+        Assert.Equal(EnumTextOrientation.Center, empty.Font.Orientation);
+        if (empty.GetText().Length == 0) return;
+        var viewport = composer.GetElement("tiles").InsideClipBounds;
+        double centerX = viewport.absX + viewport.InnerWidth / 2;
+        Assert.Equal(centerX, empty.Bounds.absX + empty.Bounds.InnerWidth / 2, 4);
+        double bottom = empty.Bounds.absY + empty.Bounds.OuterHeight;
+        foreach (string key in new[] { "clear-search", "show-uncraftable" })
+        {
+            var button = composer.GetButton(key);
+            if (!button.Visible) continue;
+            Assert.Equal(centerX, button.Bounds.absX + button.Bounds.OuterWidth / 2, 4);
+            Assert.Equal(bottom + GuiElement.scaled(8), button.Bounds.absY, 4);
+            bottom = button.Bounds.absY + button.Bounds.OuterHeight;
+        }
+        Assert.Equal(viewport.absY + viewport.InnerHeight / 2, (empty.Bounds.absY + bottom) / 2, 4);
+    }
+
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(1.5, false)]
+    [InlineData(2, false)]
+    [InlineData(1, true)]
+    [InlineData(1.5, true)]
+    [InlineData(2, true)]
+    public void EmptyFeedbackClearsOnlyTheRelevantFilterAndTracksLiveInventory(float scale, bool keyboard)
+    {
+        using var f = new MenuFixture(scale: scale, includeRecipes: true);
+        var recipe = Assert.Single(f.Lifecycle.Recipes);
+        recipe.Output!.ResolvedItemStack!.Collectible.CreativeInventoryTabs = ["tools"];
+        f.Lifecycle.FinalizeWorld();
+        f.Recompose();
+        f.Parent.TryOpen();
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        var session = (CraftingMenuSession)typeof(GuiDialogCraftingMenu).GetField("session",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
+        var tabs = menu.SingleComposer.GetHorizontalTabs("categories");
+        tabs.SetValue(Array.FindIndex(tabs.tabs, tab => tab.Name == "tools"));
+        var input = menu.SingleComposer.GetTextInput("search");
+        input.SetValue("output");
+        AssertState("", null);
+        f.ToggleCraftable(menu);
+        AssertState("Recipes match your search, but none are currently craftable.", "show-uncraftable");
+        input.SetValue("no matching recipe");
+        AssertState("No recipes match your search in this category.", "clear-search");
+        Invoke("clear-search");
+        Assert.Equal("", input.GetText());
+        Assert.True(input.HasFocus);
+        Assert.True(session.CraftableOnly.Enabled);
+        Assert.True(menu.SingleComposer.GetToggleButton("craftable-only").On);
+        AssertState("No recipes in this category are currently craftable.", "show-uncraftable");
+        Invoke("show-uncraftable");
+        Assert.False(session.CraftableOnly.Enabled);
+        Assert.False(menu.SingleComposer.GetToggleButton("craftable-only").On);
+        Assert.Single(session.Rows);
+        Assert.Equal("tools", session.Category);
+        Assert.Equal(0, menu.SingleComposer.GetScrollbar("scroll").CurrentYPosition);
+        AssertState("", null);
+        input.SetValue(" output ");
+        f.ToggleCraftable(menu);
+        Invoke("show-uncraftable");
+        Assert.Equal(" output ", input.GetText());
+        Assert.Single(session.Rows);
+        AssertState("", null);
+        f.ToggleCraftable(menu);
+        var show = menu.SingleComposer.GetButton("show-uncraftable");
+        Assert.True(menu.SingleComposer.FocusElement(show.TabIndex));
+        var grid = Assert.Single(((ClientPlayerInventoryManager)f.Lifecycle.F.Player.InventoryManager)
+            .Inventories.Values.OfType<InventoryCraftingGrid>());
+        grid[0].Itemstack = recipe.ResolvedIngredients![0]!.ResolvedItemStack!.Clone();
+        session.Refresh();
+        Assert.Single(session.Rows);
+        Assert.False(show.HasFocus);
+        AssertState("", null);
+        grid[0].Itemstack = null;
+        session.Refresh();
+        AssertState("Recipes match your search, but none are currently craftable.", "show-uncraftable");
+        var composer = menu.SingleComposer;
+        f.ResizePanelSpace(composer.Bounds.fixedWidth, composer.Bounds.fixedHeight - 10);
+        menu.TryOpen();
+        Assert.NotSame(composer, menu.SingleComposer);
+        AssertState("Recipes match your search, but none are currently craftable.", "show-uncraftable");
+        f.Parent.TryClose();
+        f.Parent.TryOpen();
+        menu = Assert.Single(f.Menus);
+        AssertState("", null);
+        menu.SingleComposer.GetTextInput("search").SetValue("no matching recipe");
+        AssertState("No recipes match your search in this category.", "clear-search");
+        Assert.Equal("tools", ((CraftingMenuSession)typeof(GuiDialogCraftingMenu).GetField("session",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!).Category);
+
+        void Invoke(string key)
+        {
+            var button = menu.SingleComposer.GetButton(key);
+            if (!keyboard) f.Click(button);
+            else
+            {
+                Assert.True(menu.SingleComposer.FocusElement(button.TabIndex));
+                var enter = new KeyEvent { KeyCode = (int)GlKeys.Enter };
+                menu.OnKeyDown(enter);
+                Assert.True(enter.Handled);
+            }
+        }
+
+        void AssertState(string message, string? action)
+        {
+            Assert.Equal(message, menu.SingleComposer.GetDynamicText("empty").GetText());
+            AssertEmptyStateCentered(menu);
+            foreach (string key in new[] { "clear-search", "show-uncraftable" })
+            {
+                var button = menu.SingleComposer.GetButton(key);
+                Assert.Equal(key == action, button.Visible);
+                Assert.Equal(key == action, button.Enabled);
+                Assert.Equal(key == action, button.Focusable);
+                if (key == action) continue;
+                Assert.False(button.HasFocus);
+                var render = Mock.Get(f.Lifecycle.Api.Object.Render);
+                render.Invocations.Clear();
+                button.RenderInteractiveElements(.1f);
+                Assert.Empty(render.Invocations);
+                f.Click(button, handled: false);
+            }
+        }
+    }
+
     [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]
@@ -926,7 +1055,7 @@ public sealed class CraftingMenuLifecycleTests
         Assert.Single(session.Rows);
         menu.SingleComposer.GetTextInput("search").SetValue("no matching output");
         Assert.Empty(session.Rows);
-        Assert.Equal("No matching recipes.", menu.SingleComposer.GetDynamicText("empty").GetText());
+        Assert.Equal("No recipes match your search in this category.", menu.SingleComposer.GetDynamicText("empty").GetText());
         Assert.Equal(toolIndex, Array.FindIndex(tabs.tabs, tab => tab.Name == "tools"));
 
         tabs.SetValue(0);
@@ -973,11 +1102,18 @@ public sealed class CraftingMenuLifecycleTests
             + 8 + 2 * GuiElementDialogTitleBar.unscaledCloseIconSize + 2 + 20;
         var craftable = originalComposer.GetToggleButton("craftable-only");
         double craftableWidth = 32 + craftable.Font.GetTextExtents(craftable.GetText()).Width / scale;
-        double minimumWidth = Math.Ceiling(Math.Max(craftableWidth, Math.Max(footerWidth, titleWidth)));
+        double actionWidth = 32 + new[] { "clear-search", "show-uncraftable" }
+            .Max(key => originalComposer.GetButton(key).Bounds.OuterWidth / scale);
+        double minimumWidth = Math.Ceiling(Math.Max(actionWidth, Math.Max(craftableWidth, Math.Max(footerWidth, titleWidth))));
+        double textHeight = Math.Ceiling(new[] { "empty", "empty-search", "empty-craftable", "empty-craftable-search" }
+            .Max(key => new TextDrawUtil().GetMultilineTextHeight(CairoFont.WhiteSmallText(),
+                Lang.Get("vanillaexpanded:craftingmenu-" + key), (minimumWidth - 32) * scale)) / scale);
+        double emptyHeight = textHeight + 8
+            + originalComposer.GetElement("auto").Bounds.OuterHeight / scale;
         double minimumHeight = Math.Ceiling(GuiStyle.TitleBarHeight + 8 + search.Bounds.OuterHeight / scale
             + 8 + originalComposer.GetHorizontalTabs("categories").Bounds.OuterHeight / scale
             + 8 + craftable.Bounds.OuterHeight / scale
-            + 8 + GuiElementCraftingTiles.TileSize + 10
+            + 8 + Math.Max(GuiElementCraftingTiles.TileSize, emptyHeight) + 10
             + originalComposer.GetElement("auto").Bounds.OuterHeight / scale + 8);
         search.SetValue("preserved search");
         f.ResizePanelSpace(minimumWidth, minimumHeight);
@@ -999,6 +1135,7 @@ public sealed class CraftingMenuLifecycleTests
 
         static void AssertLayout(GuiDialogCraftingMenu menu)
         {
+            AssertEmptyStateCentered(menu);
             var composer = menu.SingleComposer;
             var panel = composer.Bounds;
             var title = composer.GetTitleBar("titlebar");
@@ -1047,6 +1184,21 @@ public sealed class CraftingMenuLifecycleTests
             Assert.True(empty.absY >= viewport.absY);
             Assert.True(empty.absX + empty.OuterWidth <= viewport.absX + viewport.InnerWidth + .001);
             Assert.True(empty.absY + empty.OuterHeight <= viewport.absY + viewport.InnerHeight + .001);
+            foreach (string key in new[] { "clear-search", "show-uncraftable" })
+            {
+                var button = composer.GetButton(key);
+                if (button.Visible)
+                    Assert.True(empty.absY + empty.OuterHeight + 8 * scale <= button.Bounds.absY + .001);
+                Assert.True(button.Bounds.absX >= viewport.absX);
+                Assert.True(button.Bounds.absX + button.Bounds.OuterWidth <= viewport.absX + viewport.InnerWidth + .001);
+                Assert.True(button.Bounds.absY + button.Bounds.OuterHeight <= viewport.absY + viewport.InnerHeight + .001);
+                Assert.True(CairoFont.SmallButtonText().GetTextExtents(button.Text).Width <= button.Bounds.InnerWidth + .001);
+            }
+            var textUtil = new TextDrawUtil();
+            foreach (string key in new[] { "empty", "empty-search", "empty-craftable", "empty-craftable-search" })
+                Assert.True(textUtil.GetMultilineTextHeight(CairoFont.WhiteSmallText(),
+                    Lang.Get("vanillaexpanded:craftingmenu-" + key), empty.InnerWidth)
+                    + 8 * scale + auto.OuterHeight <= viewport.InnerHeight + .001);
         }
     }
 
@@ -1268,7 +1420,7 @@ public sealed class CraftingMenuLifecycleTests
         menu = Assert.Single(f.Menus);
         Assert.Equal("no matching recipe", menu.SingleComposer.GetTextInput("search").GetText());
         Assert.Equal(category, menu.SingleComposer.GetHorizontalTabs("categories").activeElement);
-        Assert.Equal("No matching recipes.", menu.SingleComposer.GetDynamicText("empty").GetText());
+        Assert.Equal("No recipes match your search in this category.", menu.SingleComposer.GetDynamicText("empty").GetText());
         Assert.Equal(0, menu.SingleComposer.GetScrollbar("scroll").CurrentYPosition);
 
         void AssertBrowsingState(GuiDialogCraftingMenu current)
@@ -1834,7 +1986,15 @@ public sealed class CraftingMenuLifecycleTests
                     "vanillaexpanded:craftingmenu-handbook" => longLabels ? "Open survival handbook" : "Handbook",
                     "vanillaexpanded:craftingmenu-craftable-only" => longLabels
                         ? "Only recipes with all ingredients available" : "Craftable only",
-                    "vanillaexpanded:craftingmenu-empty" => "No matching recipes.",
+                    "vanillaexpanded:craftingmenu-empty" => "No recipes are available in this category.",
+                    "vanillaexpanded:craftingmenu-empty-search" => "No recipes match your search in this category.",
+                    "vanillaexpanded:craftingmenu-empty-craftable" => "No recipes in this category are currently craftable.",
+                    "vanillaexpanded:craftingmenu-empty-craftable-search" => longLabels
+                        ? "Recipes match the current search in the selected category, but none can currently be crafted with the available ingredients."
+                        : "Recipes match your search, but none are currently craftable.",
+                    "vanillaexpanded:craftingmenu-clear-search" => longLabels ? "Clear the current search text" : "Clear search",
+                    "vanillaexpanded:craftingmenu-show-uncraftable" => longLabels
+                        ? "Show recipes with unavailable ingredients" : "Show uncraftable",
                     "vanillaexpanded:craftingmenu-toggle" => "Recipes",
                     "vanillaexpanded:craftingmenu-category-all" => "All",
                     "vanillaexpanded:craftingmenu-category-other" => "Other",
