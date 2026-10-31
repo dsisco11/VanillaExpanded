@@ -27,14 +27,17 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
     private double nextWidth;
     private GuiElementCraftingRecipeTooltip? tooltip;
     private string search = "";
+    private float? restoreScroll;
     private bool disposed;
     private readonly HashSet<EnumMouseButton> pressedMouseButtons = [];
     private readonly string?[] categories;
     internal event Action? Disposed;
     internal event Action? CloseRequestedByUser;
+    internal CraftingMenuBrowsingState BrowsingState { get; private set; }
 
     internal GuiDialogCraftingMenu(ICoreClientAPI api, GuiDialog parent, GuiComposer parentComposer,
-        CraftingCatalogue catalogue, CraftingAllocator allocator, CraftingIconCache icons) : base(api)
+        CraftingCatalogue catalogue, CraftingAllocator allocator, CraftingIconCache icons,
+        CraftingMenuBrowsingState? browsingState = null) : base(api)
     {
         this.parent = parent;
         this.parentComposer = parentComposer;
@@ -48,6 +51,9 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         session = new(catalogue, allocator,
             () => CraftingInventorySnapshot.Capture(api.World.Player, 3, 3, RuntimeEnv.MainThreadId, false),
             coordinator.Execute);
+        BrowsingState = browsingState ?? new();
+        search = BrowsingState.Search;
+        restoreScroll = BrowsingState.Scroll;
         coordinator.InventoryChanged += Refresh;
         session.Changed += UpdateLabels;
         parent.OnClosed += CloseWithParent;
@@ -63,11 +69,21 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
     public override bool TryOpen()
     {
         long start = Stopwatch.GetTimestamp();
+        if (restoreScroll != null)
+        {
+            session.Search(search);
+            session.SelectCategory(BrowsingState.Category);
+        }
         if (!Follow()) return false;
         double composeMs = Stopwatch.GetElapsedTime(start).TotalMilliseconds;
         start = Stopwatch.GetTimestamp();
         Refresh();
         if (disposed) return false;
+        if (restoreScroll is float position)
+        {
+            ((GuiElementCraftingTiles)SingleComposer.GetElement("tiles")).Scroll(position * (float)GuiElement.scaled(1));
+            restoreScroll = null;
+        }
         capi.Logger.Debug("[VanillaExpanded] Crafting menu: layout/composition {0:F1} ms, inventory evaluation {1:F1} ms, {2} outputs.",
             composeMs, Stopwatch.GetElapsedTime(start).TotalMilliseconds, session.Rows.Length);
         return base.TryOpen();
@@ -95,6 +111,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
 
     private void Compose(ElementBounds bounds)
     {
+        float scroll = (SingleComposer?.GetElement("tiles") as GuiElementCraftingTiles)?.ScrollPosition ?? 0;
         double width = bounds.fixedWidth;
         double height = bounds.fixedHeight;
         double contentTop = GuiStyle.TitleBarHeight + 8;
@@ -163,6 +180,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         composer.GetTextInput("search").SetPlaceHolderText(Lang.Get("vanillaexpanded:craftingmenu-search"));
         composer.GetTextInput("search").SetValue(search);
         tiles.Bind(composer.GetScrollbar("scroll"));
+        tiles.Scroll(scroll * (float)GuiElement.scaled(1));
         UpdateLabels();
     }
 
@@ -329,6 +347,8 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
     {
         if (disposed) return;
         disposed = true;
+        if (SingleComposer?.GetElement("tiles") is GuiElementCraftingTiles tiles)
+            BrowsingState = new(session.Category, search, tiles.ScrollPosition);
         parent.OnClosed -= CloseWithParent;
         capi.Event.LeaveWorld -= CloseWithParent;
         coordinator.InventoryChanged -= Refresh;

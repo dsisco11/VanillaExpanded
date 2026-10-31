@@ -30,6 +30,7 @@ public sealed class CraftingMenuSystem : ModSystem, ILiveConfigurable
     private readonly System.Func<ICoreClientAPI, (CraftingCatalogue Catalogue, CraftingAllocator Allocator)> build;
     private (CraftingCatalogue Catalogue, CraftingAllocator Allocator, CraftingIconCache Icons)? context;
     private bool rememberOpen;
+    private CraftingMenuBrowsingState browsingState = new();
 
     public CraftingMenuSystem() : this(BuildCatalogue) { }
 
@@ -142,7 +143,7 @@ public sealed class CraftingMenuSystem : ModSystem, ILiveConfigurable
             return;
         }
         GuiDialogCraftingMenu dialog;
-        try { dialog = new(api, parent, composer, current.Catalogue, current.Allocator, current.Icons); }
+        try { dialog = new(api, parent, composer, current.Catalogue, current.Allocator, current.Icons, browsingState); }
         catch (NotSupportedException ex)
         {
             api.Logger.Warning("[VanillaExpanded] Crafting menu inventory is unsupported: {0}", ex.Message);
@@ -150,16 +151,19 @@ public sealed class CraftingMenuSystem : ModSystem, ILiveConfigurable
             return;
         }
         dialogs[parent] = dialog;
+        bool opened = false;
         dialog.CloseRequestedByUser += () => rememberOpen = false;
         dialog.Disposed += () =>
         {
             if (!dialogs.TryGetValue(parent, out var active) || !ReferenceEquals(active, dialog)) return;
+            if (opened) browsingState = dialog.BrowsingState;
             dialogs.Remove(parent);
             if (attachments.TryGetValue(parent, out var attachment) && ReferenceEquals(attachment.Composer, composer))
                 SetOpenerVisible(composer, true);
         };
         if (dialog.TryOpen())
         {
+            opened = true;
             rememberOpen = true;
             SetOpenerVisible(composer, false);
         }
@@ -184,6 +188,7 @@ public sealed class CraftingMenuSystem : ModSystem, ILiveConfigurable
         foreach (var parent in new List<GuiDialog>(dialogs.Keys)) Close(parent);
         foreach (var attachment in attachments) attachment.Key.OnOpened -= attachment.Value.Opened;
         attachments.Clear();
+        browsingState = new();
         context?.Icons.Dispose();
         context = null;
     }

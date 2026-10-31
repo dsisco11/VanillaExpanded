@@ -54,6 +54,7 @@ internal sealed class GuiElementCraftingTiles : GuiElementContainer
     private double ContentHeight => Math.Max(viewport.InnerHeight,
         Math.Ceiling((double)session.Rows.Length / Columns) * scaled(TileSize));
     public override bool Focusable => !session.Rows.IsEmpty;
+    internal float ScrollPosition => scroll / (float)scaled(1);
 
     internal void Bind(GuiElementScrollbar value) { scrollbar = value; Changed(); }
 

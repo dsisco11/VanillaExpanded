@@ -150,9 +150,9 @@ public sealed class CraftingMenuLifecycleTests
             Assert.NotSame(session, newSession);
             Assert.False(newSession.CraftableOnly.Enabled);
             Assert.False(reopened.SingleComposer.GetToggleButton("craftable-only").On);
-            Assert.Equal("", reopened.SingleComposer.GetTextInput("search").GetText());
-            Assert.Null(newSession.Category);
-            Assert.Equal(42, newSession.Rows.Length);
+            Assert.Equal("output", reopened.SingleComposer.GetTextInput("search").GetText());
+            Assert.Equal("tools", newSession.Category);
+            Assert.Equal(41, newSession.Rows.Length);
             session = newSession;
             if (i < 2)
             {
@@ -1058,6 +1058,159 @@ public sealed class CraftingMenuLifecycleTests
             Assert.Same(restored, Assert.Single(f.Menus));
             first = restored;
         }
+    }
+
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(1.5, false)]
+    [InlineData(2, false)]
+    [InlineData(1, true)]
+    [InlineData(1.5, true)]
+    [InlineData(2, true)]
+    public void BrowsingStateSurvivesInventoryReopeningAndComposerReplacement(float scale, bool recomposeParent)
+    {
+        using var f = new MenuFixture(scale: scale, includeRecipes: true);
+        foreach (var recipe in f.Lifecycle.Recipes)
+            recipe.Output!.ResolvedItemStack!.Collectible.CreativeInventoryTabs = ["tools"];
+        for (int i = 0; i < 80; i++)
+        {
+            var recipe = f.Lifecycle.F.Catalogue.Recipe("other-" + i);
+            recipe.Output!.ResolvedItemStack!.Collectible.CreativeInventoryTabs = ["tools"];
+            f.Lifecycle.Recipes.Add(recipe);
+        }
+        f.Lifecycle.F.Register(f.Lifecycle.Recipes.ToArray());
+        f.Lifecycle.FinalizeWorld();
+        f.Recompose();
+        if (recomposeParent) f.Parent.Opening = f.Recompose;
+        f.Parent.TryOpen();
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        Assert.Equal("", menu.SingleComposer.GetTextInput("search").GetText());
+        Assert.Equal(0, menu.SingleComposer.GetHorizontalTabs("categories").activeElement);
+        Assert.Equal(0, menu.SingleComposer.GetScrollbar("scroll").CurrentYPosition);
+        menu.SingleComposer.GetTextInput("search").SetValue(" output ");
+        var tabs = menu.SingleComposer.GetHorizontalTabs("categories");
+        int category = Array.FindIndex(tabs.tabs, tab => tab.Name == "tools");
+        tabs.SetValue(category);
+        var tiles = Assert.IsType<GuiElementCraftingTiles>(menu.SingleComposer.GetElement("tiles"));
+        tiles.Scroll(73 * scale);
+        Assert.Equal(73, tiles.ScrollPosition);
+        int? firstOutput = Assert.IsType<GuiElementCraftingTile>(tiles.Elements[0]).Selection?.Output.Id;
+        Assert.NotNull(firstOutput);
+
+        var composer = menu.SingleComposer;
+        f.ResizePanelSpace(composer.Bounds.fixedWidth, composer.Bounds.fixedHeight - 10);
+        menu.TryOpen();
+        Assert.NotSame(composer, menu.SingleComposer);
+        AssertBrowsingState(menu);
+        for (int i = 0; i < 3; i++)
+        {
+            f.Parent.TryClose();
+            Assert.Empty(f.Menus);
+            f.Parent.TryOpen();
+            var reopened = Assert.Single(f.Menus);
+            Assert.NotSame(menu, reopened);
+            AssertBrowsingState(reopened);
+            f.Lifecycle.Drain();
+            Assert.Same(reopened, Assert.Single(f.Menus));
+            menu = reopened;
+        }
+
+        f.ClickCloseButton(menu);
+        f.Parent.TryClose();
+        f.Parent.TryOpen();
+        f.Lifecycle.Drain();
+        Assert.Empty(f.Menus);
+        f.Toggle();
+        menu = Assert.Single(f.Menus);
+        AssertBrowsingState(menu);
+        menu.SingleComposer.GetTextInput("search").SetValue("no matching recipe");
+        Assert.Equal(0, menu.SingleComposer.GetScrollbar("scroll").CurrentYPosition);
+        f.Parent.TryClose();
+        f.Parent.TryOpen();
+        menu = Assert.Single(f.Menus);
+        Assert.Equal("no matching recipe", menu.SingleComposer.GetTextInput("search").GetText());
+        Assert.Equal(category, menu.SingleComposer.GetHorizontalTabs("categories").activeElement);
+        Assert.Equal("No matching recipes.", menu.SingleComposer.GetDynamicText("empty").GetText());
+        Assert.Equal(0, menu.SingleComposer.GetScrollbar("scroll").CurrentYPosition);
+
+        void AssertBrowsingState(GuiDialogCraftingMenu current)
+        {
+            Assert.Equal(" output ", current.SingleComposer.GetTextInput("search").GetText());
+            Assert.Equal(category, current.SingleComposer.GetHorizontalTabs("categories").activeElement);
+            var currentTiles = Assert.IsType<GuiElementCraftingTiles>(current.SingleComposer.GetElement("tiles"));
+            Assert.Equal(73, currentTiles.ScrollPosition);
+            Assert.Equal(73 * scale, current.SingleComposer.GetScrollbar("scroll").CurrentYPosition);
+            Assert.Equal(firstOutput, Assert.IsType<GuiElementCraftingTile>(currentTiles.Elements[0]).Selection?.Output.Id);
+        }
+    }
+
+    [Fact]
+    public void RestoredScrollClampsToEvaluatedResultsAndWorldExitClearsBrowsingState()
+    {
+        using var f = new MenuFixture(includeRecipes: true);
+        f.Parent.TryOpen();
+        using (var menu = new GuiDialogCraftingMenu(f.Lifecycle.Api.Object, f.Parent,
+            f.Parent.Composers["maininventory"], f.Lifecycle.System.Catalogue!, f.Lifecycle.F.Allocator,
+            f.Lifecycle.System.IconCache!, new(null, "output", 500)))
+        {
+            Assert.True(menu.TryOpen());
+            Assert.Equal("output", menu.SingleComposer.GetTextInput("search").GetText());
+            Assert.Equal(0, menu.SingleComposer.GetScrollbar("scroll").CurrentYPosition);
+            Assert.NotNull(Assert.IsType<GuiElementCraftingTile>(
+                Assert.IsType<GuiElementCraftingTiles>(menu.SingleComposer.GetElement("tiles")).Elements[0]).Selection);
+            menu.TryClose();
+        }
+        f.Toggle();
+        var current = Assert.Single(f.Menus);
+        current.SingleComposer.GetTextInput("search").SetValue("not found");
+        f.Lifecycle.Events.Raise(value => value.LeaveWorld += null);
+        Assert.Empty(f.Menus);
+        f.Parent.TryClose();
+        f.Lifecycle.FinalizeWorld();
+        f.Recompose();
+        f.Parent.TryOpen();
+        if (!f.Menus.Any()) f.Toggle();
+        current = Assert.Single(f.Menus);
+        Assert.Equal("", current.SingleComposer.GetTextInput("search").GetText());
+        Assert.Equal(0, current.SingleComposer.GetHorizontalTabs("categories").activeElement);
+        Assert.Equal(0, current.SingleComposer.GetScrollbar("scroll").CurrentYPosition);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(CraftingCatalogue.OtherCategory)]
+    public void FailedReopenDoesNotReplaceBrowsingStateAndClearedSearchIsRemembered(string? category)
+    {
+        using var f = new MenuFixture(includeRecipes: true);
+        f.Parent.TryOpen();
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        var tabs = menu.SingleComposer.GetHorizontalTabs("categories");
+        int index = category == null ? 0 : tabs.tabs.Length - 1;
+        tabs.SetValue(index);
+        menu.SingleComposer.GetTextInput("search").SetValue("not found");
+        f.Parent.TryClose();
+        f.ResizePanelSpace(0, 0);
+        f.Parent.TryOpen();
+        Assert.Empty(f.Menus);
+        f.Parent.TryClose();
+        f.ResizePanelSpace(320, 420);
+        f.Parent.TryOpen();
+        menu = Assert.Single(f.Menus);
+        Assert.Equal("not found", menu.SingleComposer.GetTextInput("search").GetText());
+        Assert.Equal(index, menu.SingleComposer.GetHorizontalTabs("categories").activeElement);
+        menu.SingleComposer.GetTextInput("search").SetValue("");
+        f.Parent.TryClose();
+        var grid = Assert.Single(((ClientPlayerInventoryManager)f.Lifecycle.F.Player.InventoryManager)
+            .Inventories.Values.OfType<InventoryCraftingGrid>());
+        grid[0].Itemstack = Assert.Single(f.Lifecycle.Recipes).ResolvedIngredients![0]!.ResolvedItemStack!.Clone();
+        f.Parent.TryOpen();
+        menu = Assert.Single(f.Menus);
+        Assert.Equal("", menu.SingleComposer.GetTextInput("search").GetText());
+        Assert.Equal(index, menu.SingleComposer.GetHorizontalTabs("categories").activeElement);
+        var tiles = Assert.IsType<GuiElementCraftingTiles>(menu.SingleComposer.GetElement("tiles"));
+        Assert.True(Assert.IsType<GuiElementCraftingTile>(tiles.Elements[0]).Selection!.Evaluation.CanCraft);
     }
 
     [Theory]
