@@ -43,7 +43,9 @@ internal sealed class BowAmmunitionSystem : ModSystem, ILiveConfigurable
                     new HudOverlaySetting<bool>(() => VanillaExpandedModSystem.Config.EnableBowAmmunitionOverlay,
                         value => VanillaExpandedModSystem.Config.EnableBowAmmunitionOverlay = value, () => HudMenuConfiguration.Commit(api)),
                     new HudOverlayStyleSetting<HudIndicatorStyle>(() => VanillaExpandedModSystem.Config.BowAmmunitionIndicatorStyle,
-                        value => VanillaExpandedModSystem.Config.BowAmmunitionIndicatorStyle = value, () => HudMenuConfiguration.Commit(api)))));
+                        value => VanillaExpandedModSystem.Config.BowAmmunitionIndicatorStyle = value, () => HudMenuConfiguration.Commit(api)),
+                    new HudOverlaySizeSetting(24, () => VanillaExpandedModSystem.Config.BowAmmunitionIndicatorSize,
+                        value => VanillaExpandedModSystem.Config.BowAmmunitionIndicatorSize = value, () => HudMenuConfiguration.Commit(api)))));
         }
         catch { overlay.Dispose(); throw; }
     }

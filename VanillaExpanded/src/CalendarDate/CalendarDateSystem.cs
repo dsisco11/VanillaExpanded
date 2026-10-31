@@ -43,7 +43,9 @@ internal sealed class CalendarDateSystem : ModSystem, ILiveConfigurable
                     new HudOverlaySetting<bool>(() => VanillaExpandedModSystem.Config.EnableCalendarDateOverlay,
                         value => VanillaExpandedModSystem.Config.EnableCalendarDateOverlay = value, () => HudMenuConfiguration.Commit(api)),
                     new HudOverlayStyleSetting<EnvironmentalGaugeStyle>(() => VanillaExpandedModSystem.Config.CalendarDateGaugeStyle,
-                        value => VanillaExpandedModSystem.Config.CalendarDateGaugeStyle = value, () => HudMenuConfiguration.Commit(api)))));
+                        value => VanillaExpandedModSystem.Config.CalendarDateGaugeStyle = value, () => HudMenuConfiguration.Commit(api)),
+                    new HudOverlaySizeSetting(96, () => VanillaExpandedModSystem.Config.CalendarDateIndicatorSize,
+                        value => VanillaExpandedModSystem.Config.CalendarDateIndicatorSize = value, () => HudMenuConfiguration.Commit(api)))));
         }
         catch { overlay.Dispose(); throw; }
     }

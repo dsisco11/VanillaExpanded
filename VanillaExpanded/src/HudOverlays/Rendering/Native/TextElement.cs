@@ -43,7 +43,9 @@ internal sealed class TextElement : GuiElementTextBase
         if (!ReferenceEquals(api, preparation.Api)) throw new ArgumentException("A native element cannot change API ownership.", nameof(preparation));
         value ??= string.Empty;
         if (context == preparation && text == value) return;
-        CairoFont nextFont = context == preparation ? Font : TextMetrics.Font(strokeWidth);
+        CairoFont nextFont = context == preparation ? Font : TextMetrics.Font(strokeWidth)
+            .WithFontSize((float)(HudOverlaySizes.Text * preparation.IndicatorScale))
+            .WithStroke(new double[] { 0, 0, 0, .85 }, strokeWidth * preparation.IndicatorScale);
         // Allocate before replacing the surviving resource so generation failure preserves cleanup ownership.
         LoadedTexture? replacement = value.Length == 0 ? null : create(preparation, value, nextFont)
             ?? throw new InvalidOperationException("Native glyph preparation returned no texture.");

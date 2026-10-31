@@ -5,6 +5,7 @@ using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering.Native;
 using VanillaExpanded.RiftActivity;
+using VanillaExpanded.Shelter;
 using VanillaExpanded.TemporalStorm;
 using VanillaExpanded.WindSpeed;
 using Vintagestory.API.Client;
@@ -58,6 +59,11 @@ internal sealed class SimpleIndicatorsFixture : IDisposable
         Action prepare, change;
         switch (kind)
         {
+            case "shelter":
+                var shelter = new ShelterPresentation(Measure, CreateText, Load, _ => Backdrop.Object);
+                presentation = shelter; overlay = new ShelterOverlay(shelter);
+                prepare = () => shelter.Prepare(Native.Context); change = () => { };
+                break;
             case "wind":
                 var wind = new WindSpeedPresentation(Measure, CreateText, Load);
                 wind.SetContent(125); presentation = wind; overlay = new WindSpeedOverlay(wind);

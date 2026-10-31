@@ -200,8 +200,8 @@ internal sealed class HudOverlayScheduler
                 && (state.Registration.ReservedSize.HasValue || Drawable(state)))
             .OrderBy(state => state.Registration.Order).ThenBy(state => state.Registration.Id, StringComparer.Ordinal)
             .Select(state => new KeyValuePair<HudOverlayRegistration, SizeF>(state.Registration,
-                state.Registration.ReservedSize is SizeF reserved
-                    ? reserved : state.Size)).ToArray();
+                state.Registration.MenuSettings?.Size?.Apply(state.Registration.ReservedSize ?? state.Size)
+                    ?? state.Registration.ReservedSize ?? state.Size)).ToArray();
     }
 
     /// <summary>Rejects stale, unprepared or empty content; a reserved layout slot alone is never drawable or hoverable.</summary>

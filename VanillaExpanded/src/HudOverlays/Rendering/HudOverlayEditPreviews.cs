@@ -75,7 +75,11 @@ internal sealed class HudOverlayEditPreviews : IDisposable
         if (!Active) return result;
         registry.RunPass(registration =>
         {
-            if (IsDrawable(registration)) result.Add(new(registration, entries[registration.Id].Size));
+            if (IsDrawable(registration))
+            {
+                var size = entries[registration.Id].Size;
+                result.Add(new(registration, registration.MenuSettings?.Size?.Apply(size) ?? size));
+            }
         }, failure => Report("edit preview membership", failure));
         return result;
     }

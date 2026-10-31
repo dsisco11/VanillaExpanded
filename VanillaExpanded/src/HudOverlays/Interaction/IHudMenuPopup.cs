@@ -31,6 +31,8 @@ internal interface IHudMenuPopup : IDisposable
     void KeyDown(KeyEvent args);
     /// <summary>Delegates native type-to-select behavior.</summary>
     void KeyPress(KeyEvent args);
+    /// <summary>Commits completed numeric editing before an outside click dismisses the surface.</summary>
+    void CommitPendingInput() { }
     #endregion
     #endregion
 }

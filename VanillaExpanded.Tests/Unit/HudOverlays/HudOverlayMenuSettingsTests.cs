@@ -45,12 +45,15 @@ public sealed class HudOverlayMenuSettingsTests : IDisposable
     [InlineData("TemporalStorm", "EnableTemporalStormOverlay", "TemporalStormIndicatorStyle")]
     [InlineData("RiftActivity", "EnableRiftActivityOverlay", "RiftActivityIndicatorStyle")]
     [InlineData("BowAmmunition", "EnableBowAmmunitionOverlay", "BowAmmunitionIndicatorStyle")]
+    [InlineData("Shelter", "EnableShelterOverlay", "ShelterIndicatorStyle")]
     public void ActualFeatureBindingsUseAuthoritativeSettings(string featureName, string enableName, string styleName)
     {
         var config = VanillaExpandedModSystem.Config;
         var enabled = config.GetType().GetProperty(enableName)!;
         var style = config.GetType().GetProperty(styleName)!;
+        var size = config.GetType().GetProperty(featureName + "IndicatorSize")!;
         var previousEnabled = enabled.GetValue(config); var previousStyle = style.GetValue(config);
+        var previousSize = size.GetValue(config);
         bool previousGlobal = config.EnableHudOverlays; VanillaExpandedConfig? persisted = null;
         var api = new Mock<ICoreClientAPI> { DefaultValue = DefaultValue.Mock }; var loader = new Mock<IModLoader>();
         api.SetupGet(value => value.Event).Returns(Mock.Of<IClientEventAPI>());
@@ -67,6 +70,9 @@ public sealed class HudOverlayMenuSettingsTests : IDisposable
             HudOverlayMenuSettings? menu = null;
             hud.Registry.RunPass(registration => menu = registration.MenuSettings);
             Assert.NotNull(menu); Assert.NotNull(menu.Enabled); Assert.NotNull(menu.Style);
+            Assert.NotNull(menu.Size);
+            int defaultSize = (int)size.GetValue(new VanillaExpandedConfig())!;
+            Assert.Equal(defaultSize, menu.Size.DefaultSize);
             // Direct edits must remain authoritative even without invoking a menu callback.
             enabled.SetValue(config, false); Assert.False(menu.Enabled.Value);
             enabled.SetValue(config, true); config.EnableHudOverlays = false; Assert.True(menu.Enabled.Value);
@@ -84,10 +90,17 @@ public sealed class HudOverlayMenuSettingsTests : IDisposable
             Assert.Equal(Enum.GetValues(style.PropertyType).Cast<Enum>(), menu.Style.Choices);
             Assert.Throws<ArgumentOutOfRangeException>(() => menu.Style.Set(DayOfWeek.Monday));
             Assert.Throws<ArgumentOutOfRangeException>(() => menu.Style.Set((Enum)Enum.ToObject(style.PropertyType, int.MaxValue)));
+            size.SetValue(config, defaultSize); Assert.Equal(1, menu.Size.Scale);
+            menu.Size.Set(defaultSize + 6);
+            Assert.Equal(defaultSize + 6, size.GetValue(config));
+            Assert.Equal(defaultSize + 6, size.GetValue(persisted));
+            int saved = saves; menu.Size.Set(defaultSize + 6); Assert.Equal(saved, saves);
+            size.SetValue(config, defaultSize + 12); Assert.Equal(defaultSize + 12, menu.Size.Value);
         }
         finally
         {
             enabled.SetValue(config, previousEnabled); style.SetValue(config, previousStyle); config.EnableHudOverlays = previousGlobal;
+            size.SetValue(config, previousSize);
             feature.Dispose(); hud.Dispose();
         }
     }
@@ -99,6 +112,9 @@ public sealed class HudOverlayMenuSettingsTests : IDisposable
         using var fixture = new HudLayoutFixture();
         Assert.Null(fixture.Add("test:legacy").MenuSettings);
         var menu = new HudOverlayMenuSettings(); Assert.Null(menu.Enabled); Assert.Null(menu.Style);
+        Assert.Null(menu.Size);
+        Assert.Contains(typeof(HudOverlayMenuSettings).GetConstructors(), constructor => constructor.GetParameters().Length == 2);
+        var (enabled, style) = menu; Assert.Null(enabled); Assert.Null(style);
         Assert.Contains(typeof(HudOverlayRegistration).GetConstructors(), constructor => constructor.GetParameters().Length == 8 && constructor.GetParameters().All(parameter => parameter.ParameterType != typeof(HudOverlayMenuSettings)));
     }
 
@@ -146,6 +162,4 @@ public sealed class HudOverlayMenuSettingsTests : IDisposable
     }
     #endregion
 }
-
-
 

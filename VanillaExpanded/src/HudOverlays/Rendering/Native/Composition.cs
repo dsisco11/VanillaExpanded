@@ -36,6 +36,7 @@ internal sealed class Composition : IDisposable
     /// <summary>Mounts one independent visual under owned bounds, retaining cleanup after partial failure.</summary>
     public void Add(HudOverlayMemberLayout member, INativeView view, bool proxy, long structure)
     {
+        if (member.Registration.MenuSettings?.Size is { } size) view = new SizedNativeView(view, size);
         var bounds = ElementBounds.Fixed(0, 0, 0, 0);
         var binding = new Binding(member, view, bounds, proxy, structure);
         bindings.Add(binding);
@@ -52,14 +53,15 @@ internal sealed class Composition : IDisposable
             try
             {
                 long next = revision(binding.Member.Registration);
-                bool contentChanged = binding.Context != context || binding.Revision != next;
+                double sizeScale = binding.Member.Registration.MenuSettings?.Size?.Scale ?? 1;
+                bool contentChanged = binding.Context != context || binding.Revision != next || binding.SizeScale != sizeScale;
                 // A failed geometry finalization must remain pending even when resources and bounds
                 // are unchanged on the retry (notably for failures owned by the edit-proxy boundary).
                 binding.Changed = contentChanged || !binding.Ready;
                 if (contentChanged)
                 {
                     binding.View.Prepare(context);
-                    binding.Context = context; binding.Revision = next;
+                    binding.Context = context; binding.Revision = next; binding.SizeScale = sizeScale;
                 }
                 var member = binding.Member;
                 var rectangle = new RectangleF((float)member.Bounds.renderX, (float)member.Bounds.renderY,
@@ -166,7 +168,7 @@ internal sealed class Composition : IDisposable
         public HudOverlayPreparationContext? Context;
         public RectangleF Rectangle, Clip;
         public (double X, double Y) Origin;
-        public double Scale;
+        public double Scale, SizeScale;
         public bool Changed, Ready;
         public float Opacity;
     }

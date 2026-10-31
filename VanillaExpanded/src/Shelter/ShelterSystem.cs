@@ -39,7 +39,9 @@ internal sealed class ShelterSystem : ModSystem, ILiveConfigurable
                     new HudOverlaySetting<bool>(() => VanillaExpandedModSystem.Config.EnableShelterOverlay,
                         value => VanillaExpandedModSystem.Config.EnableShelterOverlay = value, () => HudMenuConfiguration.Commit(api)),
                     new HudOverlayStyleSetting<HudIndicatorStyle>(() => VanillaExpandedModSystem.Config.ShelterIndicatorStyle,
-                        value => VanillaExpandedModSystem.Config.ShelterIndicatorStyle = value, () => HudMenuConfiguration.Commit(api)))));
+                        value => VanillaExpandedModSystem.Config.ShelterIndicatorStyle = value, () => HudMenuConfiguration.Commit(api)),
+                    new HudOverlaySizeSetting(24, () => VanillaExpandedModSystem.Config.ShelterIndicatorSize,
+                        value => VanillaExpandedModSystem.Config.ShelterIndicatorSize = value, () => HudMenuConfiguration.Commit(api)))));
         }
         catch { overlay.Dispose(); throw; }
     }

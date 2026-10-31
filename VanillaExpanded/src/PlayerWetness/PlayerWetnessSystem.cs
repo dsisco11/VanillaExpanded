@@ -43,7 +43,9 @@ internal sealed class PlayerWetnessSystem : ModSystem, ILiveConfigurable
                     new HudOverlaySetting<bool>(() => VanillaExpandedModSystem.Config.EnablePlayerWetnessOverlay,
                         value => VanillaExpandedModSystem.Config.EnablePlayerWetnessOverlay = value, () => HudMenuConfiguration.Commit(api)),
                     new HudOverlayStyleSetting<HudIndicatorStyle>(() => VanillaExpandedModSystem.Config.PlayerWetnessIndicatorStyle,
-                        value => VanillaExpandedModSystem.Config.PlayerWetnessIndicatorStyle = value, () => HudMenuConfiguration.Commit(api)))));
+                        value => VanillaExpandedModSystem.Config.PlayerWetnessIndicatorStyle = value, () => HudMenuConfiguration.Commit(api)),
+                    new HudOverlaySizeSetting(24, () => VanillaExpandedModSystem.Config.PlayerWetnessIndicatorSize,
+                        value => VanillaExpandedModSystem.Config.PlayerWetnessIndicatorSize = value, () => HudMenuConfiguration.Commit(api)))));
         }
         catch { overlay.Dispose(); throw; }
     }

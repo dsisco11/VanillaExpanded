@@ -2,6 +2,7 @@ using System.Drawing;
 using System.Reflection;
 using Moq;
 using VanillaExpanded.HudOverlays.Anchoring;
+using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Layout;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering;
@@ -33,7 +34,7 @@ internal sealed class HudNativeHostFixture : IDisposable
 
     #region Public API
     /// <summary>Connects real native composition while retaining observable controller and resource lifetimes.</summary>
-    public HudNativeHostFixture()
+    public HudNativeHostFixture(HudOverlayMenuSettings? settings = null)
     {
         Components.Gui.SetupGet(gui => gui.LoadedGuis).Returns(new List<GuiDialog>());
         Components.Gui.Setup(gui => gui.CreateCompo(It.IsAny<string>(), It.IsAny<ElementBounds>()))
@@ -53,7 +54,7 @@ internal sealed class HudNativeHostFixture : IDisposable
             });
         Native.Setup(native => native.BeginFrame(It.IsAny<float>())).Callback(() => Calls.Add("frame"));
         Registry.RegisterGroup(Group);
-        Registration = new("example:native", Overlay.Object, () => true, Group.Id);
+        Registration = new("example:native", Overlay.Object, () => true, Group.Id, settings);
         Handle = Registry.Register(Registration);
         Registry.BeginSession(Components.Api.Object);
         var window = ElementBounds.Fixed(0, 0, 700, 500).WithEmptyParent(); window.CalcWorldBounds();

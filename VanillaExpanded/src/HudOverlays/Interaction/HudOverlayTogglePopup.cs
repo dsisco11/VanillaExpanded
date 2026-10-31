@@ -15,6 +15,7 @@ internal sealed class HudOverlayTogglePopup : IHudMenuPopup
     private readonly GuiComposer composer;
     private readonly List<GuiElementSwitch> switches = new();
     private readonly HudOverlayStyleDropDown? style;
+    private readonly HudOverlaySizeInput? sizeInput;
     private readonly List<GuiElementTextButton> actions = new();
     private readonly RectangleF panelBounds;
     private bool disposed;
@@ -29,13 +30,16 @@ internal sealed class HudOverlayTogglePopup : IHudMenuPopup
         var toggles = entries.Where(entry => entry.Kind == HudMenuEntryKind.Toggle).ToArray();
         var choices = entries.Where(entry => entry.Kind == HudMenuEntryKind.StyleChoice).ToArray();
         var commands = entries.Where(entry => entry.Kind == HudMenuEntryKind.Action).ToArray();
+        var sizeEntry = entries.SingleOrDefault(entry => entry.Kind == HudMenuEntryKind.Number);
         string styleLabel = Lang.GetL(environment.Locale, "vanillaexpanded:hud-menu-style");
         double scale = environment.GuiScale;
         double row = Math.Max(30, font.GetFontExtents().Height / scale + 8);
         double width = entries.Max(entry => font.GetTextExtents(entry.Label).Width / scale) + row + 16;
         double styleLabelWidth = font.GetTextExtents(styleLabel).Width / scale + 12;
         if (choices.Length > 0) width += styleLabelWidth;
-        double height = row * (toggles.Length + (choices.Length > 0 ? 1 : 0) + commands.Length);
+        double sizeLabelWidth = sizeEntry == null ? 0 : font.GetTextExtents(sizeEntry.Label).Width / scale + 12;
+        if (sizeEntry != null) width = Math.Max(width, sizeLabelWidth + 100);
+        double height = row * (toggles.Length + (choices.Length > 0 ? 1 : 0) + (sizeEntry == null ? 0 : 1) + commands.Length);
         // Fit the compact panel uniformly only when required. The expanded dropdown scrolls independently.
         double fit = Math.Min(1, Math.Min(environment.Viewport.Width / (width * scale), environment.Viewport.Height / (height * scale)));
         if (!double.IsFinite(fit) || fit <= 0) throw new ArgumentOutOfRangeException(nameof(environment));
@@ -67,12 +71,21 @@ internal sealed class HudOverlayTogglePopup : IHudMenuPopup
                     ElementBounds.Fixed(labelWidth, toggles.Length * row, width - labelWidth, row), font, environment.Viewport);
                 composer.AddInteractiveElement(style);
             }
+            if (sizeEntry?.Number is int value)
+            {
+                double labelWidth = sizeLabelWidth * fit;
+                double top = (toggles.Length + (choices.Length > 0 ? 1 : 0)) * row;
+                composer.AddStaticText(sizeEntry.Label, font, ElementBounds.Fixed(row * .15, top + row * .2, labelWidth, row));
+                sizeInput = new HudOverlaySizeInput(api, ElementBounds.Fixed(labelWidth, top, width - labelWidth, row), font, value,
+                    next => select("size:" + next.ToString(System.Globalization.CultureInfo.InvariantCulture), true));
+                composer.AddInteractiveElement(sizeInput);
+            }
             for (int index = 0; index < commands.Length; index++)
             {
                 var command = commands[index];
                 string key = "action:" + index;
                 composer.AddButton(command.Label, () => { select(command.Code, true); return true; },
-                    ElementBounds.Fixed(0, (toggles.Length + (choices.Length > 0 ? 1 : 0) + index) * row, width, row),
+                    ElementBounds.Fixed(0, (toggles.Length + (choices.Length > 0 ? 1 : 0) + (sizeInput == null ? 0 : 1) + index) * row, width, row),
                     font, key: key);
                 actions.Add(composer.GetButton(key));
             }
@@ -85,7 +98,7 @@ internal sealed class HudOverlayTogglePopup : IHudMenuPopup
     public RectangleF VisibleBounds => style?.ExpandedBounds is { IsEmpty: false } expanded ? RectangleF.Union(panelBounds, expanded) : panelBounds;
     /// <inheritdoc />
     public bool IsOpened => !disposed && (switches.Any(control => control.HasFocus) || style?.HasFocus == true
-        || actions.Any(control => control.HasFocus));
+        || sizeInput?.HasFocus == true || actions.Any(control => control.HasFocus));
     #endregion
     #region Rendering and pointer delegation
     /// <inheritdoc />
@@ -112,15 +125,22 @@ internal sealed class HudOverlayTogglePopup : IHudMenuPopup
             style.OnMouseDown(api, args);
             return;
         }
+        if (sizeInput != null && sizeInput.IsPositionInside(args.X, args.Y))
+        {
+            composer.FocusElement(switches.Count + (style == null ? 0 : 1));
+            sizeInput.OnMouseDownOnElement(api, args);
+            args.Handled = true;
+            return;
+        }
         for (int index = 0; index < actions.Count; index++)
         {
             if (!actions[index].IsPositionInside(args.X, args.Y)) continue;
-            composer.FocusElement(switches.Count + (style == null ? 0 : 1) + index);
+            composer.FocusElement(switches.Count + (style == null ? 0 : 1) + (sizeInput == null ? 0 : 1) + index);
             actions[index].OnMouseDownOnElement(api, args);
             args.Handled = true;
             return;
         }
-        int row = (int)((args.Y - panelBounds.Top) * (switches.Count + (style == null ? 0 : 1) + actions.Count) / panelBounds.Height);
+        int row = (int)((args.Y - panelBounds.Top) * (switches.Count + (style == null ? 0 : 1) + (sizeInput == null ? 0 : 1) + actions.Count) / panelBounds.Height);
         if (row < 0 || row >= switches.Count) return;
         composer.FocusElement(row);
         switches[row].OnMouseDownOnElement(api, args);
@@ -138,9 +158,9 @@ internal sealed class HudOverlayTogglePopup : IHudMenuPopup
     public void KeyDown(KeyEvent args) { if (!disposed) composer.OnKeyDown(args, true); }
     /// <inheritdoc />
     public void KeyPress(KeyEvent args) { if (!disposed) composer.OnKeyPress(args); }
+    public void CommitPendingInput() { if (!disposed && sizeInput?.HasFocus == true) sizeInput.OnFocusLost(); }
     /// <summary>Releases owned native controls and composer textures once.</summary>
     public void Dispose() { if (disposed) return; disposed = true; composer.Dispose(); }
     #endregion
     #endregion
 }
-
