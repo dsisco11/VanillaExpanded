@@ -57,6 +57,22 @@ public sealed class HudOverlayContextMenuTests
         Assert.Equal(1, fixture.Popup.Moves); Assert.Equal(1, fixture.Popup.Draws);
     }
 
+    [Fact]
+    public void SizeStepsPersistWithoutClosingOrRecomposingTheMenu()
+    {
+        using var fixture = new Fixture(withSize: true);
+        fixture.Open(HudMenuPage.Toggles);
+        Assert.Equal(24, fixture.Rows.Single(row => row.Kind == HudMenuEntryKind.Number).Number);
+        foreach (int value in new[] { 30, 36, 24 })
+        {
+            fixture.Popup.Press = () => fixture.Select!("size:" + value, true);
+            fixture.Menu.OnMouseDown(new MouseEvent(1, 1, EnumMouseButton.Left, 0));
+            fixture.Menu.Synchronize(fixture.Environment);
+            Assert.True(fixture.Menu.IsOpened); Assert.Equal(value, fixture.Size);
+            Assert.Equal(0, fixture.Popup.Disposals); Assert.Equal(1, fixture.Creates);
+        }
+    }
+
     /// <summary>Every environment invalidator retires resources rather than silently recomposing stale controls.</summary>
     [Theory]
     [InlineData("editing")]
@@ -149,6 +165,7 @@ public sealed class HudOverlayContextMenuTests
         public bool Enabled = true, Locked, Available = true, Fail, Throw;
         public TestStyle Style;
         public int Creates;
+        public int Size = 24;
         public IReadOnlyList<HudMenuEntry> Rows = Array.Empty<HudMenuEntry>();
         public Action<string, bool>? Select;
         public readonly Popup Popup = new();
@@ -157,10 +174,11 @@ public sealed class HudOverlayContextMenuTests
         public readonly HudMenuEnvironment Environment = new(new object(), new RectangleF(PointF.Empty, new SizeF(100, 100)), 1, "en", true);
         #region Public API
         /// <summary>Connects live settings and a disposable fake surface.</summary>
-        public Fixture()
+        public Fixture(bool withSize = false)
         {
             var settings = new HudOverlayMenuSettings(new HudOverlaySetting<bool>(() => Enabled, value => Enabled = value, () => { }),
-                new HudOverlayStyleSetting<TestStyle>(() => Style, value => Style = value, () => { }));
+                new HudOverlayStyleSetting<TestStyle>(() => Style, value => Style = value, () => { }),
+                withSize ? new HudOverlaySizeSetting(24, () => Size, value => Size = value, () => { }) : null);
             var registration = new HudOverlayRegistration("test:menu", Mock.Of<IHudOverlay>(), () => true, "test", settings);
             Target = new(registration, () => Available, () => Locked, value => Locked = value);
             Menu = new(Mock.Of<ICoreClientAPI>(), (_, rows, select, _, _) =>

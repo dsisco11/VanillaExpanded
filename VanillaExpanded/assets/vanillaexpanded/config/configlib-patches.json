@@ -333,6 +333,116 @@
       }
     },
     "integer": {
+      "BowAmmunitionIndicatorSize": {
+        "code": "BowAmmunitionIndicatorSize",
+        "name": "BowAmmunitionIndicatorSize",
+        "ingui": "vanillaexpanded:config-bow-ammunition-indicator-size",
+        "comment": "vanillaexpanded:config-hud-indicator-size-tooltip",
+        "default": 24,
+        "weight": 10.202,
+        "clientSide": true,
+        "range": { "min": 6, "max": 300, "step": 2 }
+      },
+      "BodyTemperatureIndicatorSize": {
+        "code": "BodyTemperatureIndicatorSize",
+        "name": "BodyTemperatureIndicatorSize",
+        "ingui": "vanillaexpanded:config-body-temperature-indicator-size",
+        "comment": "vanillaexpanded:config-hud-indicator-size-tooltip",
+        "default": 24,
+        "weight": 10.302,
+        "clientSide": true,
+        "range": { "min": 6, "max": 300, "step": 2 }
+      },
+      "ShelterIndicatorSize": {
+        "code": "ShelterIndicatorSize",
+        "name": "ShelterIndicatorSize",
+        "ingui": "vanillaexpanded:config-shelter-indicator-size",
+        "comment": "vanillaexpanded:config-hud-indicator-size-tooltip",
+        "default": 24,
+        "weight": 10.462,
+        "clientSide": true,
+        "range": { "min": 6, "max": 300, "step": 2 }
+      },
+      "PlayerWetnessIndicatorSize": {
+        "code": "PlayerWetnessIndicatorSize",
+        "name": "PlayerWetnessIndicatorSize",
+        "ingui": "vanillaexpanded:config-player-wetness-indicator-size",
+        "comment": "vanillaexpanded:config-hud-indicator-size-tooltip",
+        "default": 24,
+        "weight": 10.452,
+        "clientSide": true,
+        "range": { "min": 6, "max": 300, "step": 2 }
+      },
+      "WeatherConditionsIndicatorSize": {
+        "code": "WeatherConditionsIndicatorSize",
+        "name": "WeatherConditionsIndicatorSize",
+        "ingui": "vanillaexpanded:config-weather-conditions-indicator-size",
+        "comment": "vanillaexpanded:config-hud-indicator-size-tooltip",
+        "default": 36,
+        "weight": 10.802,
+        "clientSide": true,
+        "range": { "min": 6, "max": 300, "step": 2 }
+      },
+      "WindSpeedIndicatorSize": {
+        "code": "WindSpeedIndicatorSize",
+        "name": "WindSpeedIndicatorSize",
+        "ingui": "vanillaexpanded:config-wind-speed-indicator-size",
+        "comment": "vanillaexpanded:config-hud-indicator-size-tooltip",
+        "default": 24,
+        "weight": 10.812,
+        "clientSide": true,
+        "range": { "min": 6, "max": 300, "step": 2 }
+      },
+      "RiftActivityIndicatorSize": {
+        "code": "RiftActivityIndicatorSize",
+        "name": "RiftActivityIndicatorSize",
+        "ingui": "vanillaexpanded:config-rift-activity-indicator-size",
+        "comment": "vanillaexpanded:config-hud-indicator-size-tooltip",
+        "default": 24,
+        "weight": 10.852,
+        "clientSide": true,
+        "range": { "min": 6, "max": 300, "step": 2 }
+      },
+      "TemporalStormIndicatorSize": {
+        "code": "TemporalStormIndicatorSize",
+        "name": "TemporalStormIndicatorSize",
+        "ingui": "vanillaexpanded:config-temporal-storm-indicator-size",
+        "comment": "vanillaexpanded:config-hud-indicator-size-tooltip",
+        "default": 24,
+        "weight": 10.872,
+        "clientSide": true,
+        "range": { "min": 6, "max": 300, "step": 2 }
+      },
+      "ApproximateTimeIndicatorSize": {
+        "code": "ApproximateTimeIndicatorSize",
+        "name": "ApproximateTimeIndicatorSize",
+        "ingui": "vanillaexpanded:config-approximate-time-indicator-size",
+        "comment": "vanillaexpanded:config-hud-indicator-size-tooltip",
+        "default": 90,
+        "weight": 10.902,
+        "clientSide": true,
+        "range": { "min": 6, "max": 300, "step": 2 }
+      },
+      "EnvironmentalTemperatureIndicatorSize": {
+        "code": "EnvironmentalTemperatureIndicatorSize",
+        "name": "EnvironmentalTemperatureIndicatorSize",
+        "ingui": "vanillaexpanded:config-environmental-temperature-indicator-size",
+        "comment": "vanillaexpanded:config-hud-indicator-size-tooltip",
+        "default": 90,
+        "weight": 10.792,
+        "clientSide": true,
+        "range": { "min": 6, "max": 300, "step": 2 }
+      },
+      "CalendarDateIndicatorSize": {
+        "code": "CalendarDateIndicatorSize",
+        "name": "CalendarDateIndicatorSize",
+        "ingui": "vanillaexpanded:config-calendar-date-indicator-size",
+        "comment": "vanillaexpanded:config-hud-indicator-size-tooltip",
+        "default": 96,
+        "weight": 10.797,
+        "clientSide": true,
+        "range": { "min": 6, "max": 300, "step": 2 }
+      },
       "BowAmmunitionIndicatorStyle": {
         "code": "BowAmmunitionIndicatorStyle",
         "name": "BowAmmunitionIndicatorStyle",

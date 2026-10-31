@@ -8,5 +8,6 @@ internal enum HudMenuEntryKind
     /// <summary>An enum-backed choice belonging to the Style dropdown.</summary>
     StyleChoice,
     /// <summary>A native button invoking a target-owned action.</summary>
-    Action
+    Action,
+    Number
 }

@@ -1,5 +1,6 @@
 # Vanilla: Expanded TODO List:
     ## Issues:
+        ☐ Make game start paused by default.
         ☐ BUG: Quern auto stash not working for items which the base game prefers not to merge (e.g. perishable foods which have a large difference in freshness). FIX: the quern should force merge items when auto stashing.
         ☐ Design a better separation of alloy calculator inventory ownership/liveness validation, transfer permissions, and storage-versus-machine access policy. Reconsider the storage-class whitelist without weakening ownership or withdrawal checks, and define coverage for vanilla and modded containers.
         ☐ Prevent "Equip light source" hotkey from triggering when the player is holding a hammer and has tongs equipped in offhand.

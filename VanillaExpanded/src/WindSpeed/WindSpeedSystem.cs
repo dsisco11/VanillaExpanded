@@ -43,7 +43,9 @@ internal sealed class WindSpeedSystem : ModSystem, ILiveConfigurable
                     new HudOverlaySetting<bool>(() => VanillaExpandedModSystem.Config.EnableWindSpeedOverlay,
                         value => VanillaExpandedModSystem.Config.EnableWindSpeedOverlay = value, () => HudMenuConfiguration.Commit(api)),
                     new HudOverlayStyleSetting<HudIndicatorStyle>(() => VanillaExpandedModSystem.Config.WindSpeedIndicatorStyle,
-                        value => VanillaExpandedModSystem.Config.WindSpeedIndicatorStyle = value, () => HudMenuConfiguration.Commit(api)))));
+                        value => VanillaExpandedModSystem.Config.WindSpeedIndicatorStyle = value, () => HudMenuConfiguration.Commit(api)),
+                    new HudOverlaySizeSetting(24, () => VanillaExpandedModSystem.Config.WindSpeedIndicatorSize,
+                        value => VanillaExpandedModSystem.Config.WindSpeedIndicatorSize = value, () => HudMenuConfiguration.Commit(api)))));
         }
         catch { overlay.Dispose(); throw; }
     }

@@ -44,7 +44,9 @@ internal sealed class BodyTemperatureSystem : ModSystem, ILiveConfigurable
                     new HudOverlaySetting<bool>(() => VanillaExpandedModSystem.Config.EnableBodyTemperatureOverlay,
                         value => VanillaExpandedModSystem.Config.EnableBodyTemperatureOverlay = value, () => HudMenuConfiguration.Commit(api)),
                     new HudOverlayStyleSetting<HudIndicatorStyle>(() => VanillaExpandedModSystem.Config.BodyTemperatureIndicatorStyle,
-                        value => VanillaExpandedModSystem.Config.BodyTemperatureIndicatorStyle = value, () => HudMenuConfiguration.Commit(api)))));
+                        value => VanillaExpandedModSystem.Config.BodyTemperatureIndicatorStyle = value, () => HudMenuConfiguration.Commit(api)),
+                    new HudOverlaySizeSetting(24, () => VanillaExpandedModSystem.Config.BodyTemperatureIndicatorSize,
+                        value => VanillaExpandedModSystem.Config.BodyTemperatureIndicatorSize = value, () => HudMenuConfiguration.Commit(api)))));
         }
         catch { overlay.Dispose(); throw; }
     }

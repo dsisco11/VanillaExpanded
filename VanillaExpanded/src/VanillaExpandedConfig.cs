@@ -89,6 +89,29 @@ public class VanillaExpandedConfig
     #endregion
 
     #region HUD Overlays (Client-Side)
+    private int bowAmmunitionIndicatorSize = 24;
+    public int BowAmmunitionIndicatorSize { get => bowAmmunitionIndicatorSize; set => bowAmmunitionIndicatorSize = HudOverlaySizeSetting.Normalize(value); }
+    private int bodyTemperatureIndicatorSize = 24;
+    public int BodyTemperatureIndicatorSize { get => bodyTemperatureIndicatorSize; set => bodyTemperatureIndicatorSize = HudOverlaySizeSetting.Normalize(value); }
+    private int shelterIndicatorSize = 24;
+    public int ShelterIndicatorSize { get => shelterIndicatorSize; set => shelterIndicatorSize = HudOverlaySizeSetting.Normalize(value); }
+    private int playerWetnessIndicatorSize = 24;
+    public int PlayerWetnessIndicatorSize { get => playerWetnessIndicatorSize; set => playerWetnessIndicatorSize = HudOverlaySizeSetting.Normalize(value); }
+    private int weatherConditionsIndicatorSize = 36;
+    public int WeatherConditionsIndicatorSize { get => weatherConditionsIndicatorSize; set => weatherConditionsIndicatorSize = HudOverlaySizeSetting.Normalize(value); }
+    private int windSpeedIndicatorSize = 24;
+    public int WindSpeedIndicatorSize { get => windSpeedIndicatorSize; set => windSpeedIndicatorSize = HudOverlaySizeSetting.Normalize(value); }
+    private int riftActivityIndicatorSize = 24;
+    public int RiftActivityIndicatorSize { get => riftActivityIndicatorSize; set => riftActivityIndicatorSize = HudOverlaySizeSetting.Normalize(value); }
+    private int temporalStormIndicatorSize = 24;
+    public int TemporalStormIndicatorSize { get => temporalStormIndicatorSize; set => temporalStormIndicatorSize = HudOverlaySizeSetting.Normalize(value); }
+    private int approximateTimeIndicatorSize = 90;
+    public int ApproximateTimeIndicatorSize { get => approximateTimeIndicatorSize; set => approximateTimeIndicatorSize = HudOverlaySizeSetting.Normalize(value); }
+    private int environmentalTemperatureIndicatorSize = 90;
+    public int EnvironmentalTemperatureIndicatorSize { get => environmentalTemperatureIndicatorSize; set => environmentalTemperatureIndicatorSize = HudOverlaySizeSetting.Normalize(value); }
+    private int calendarDateIndicatorSize = 96;
+    public int CalendarDateIndicatorSize { get => calendarDateIndicatorSize; set => calendarDateIndicatorSize = HudOverlaySizeSetting.Normalize(value); }
+
     private HudIndicatorStyle bowAmmunitionIndicatorStyle = HudIndicatorStyle.Icon;
     /// <summary>Selects icon artwork or a short text name for bow ammunition.</summary>
     public HudIndicatorStyle BowAmmunitionIndicatorStyle

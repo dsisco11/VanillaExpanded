@@ -43,7 +43,9 @@ internal sealed class WeatherConditionsSystem : ModSystem, ILiveConfigurable
                     new HudOverlaySetting<bool>(() => VanillaExpandedModSystem.Config.EnableWeatherConditionsOverlay,
                         value => VanillaExpandedModSystem.Config.EnableWeatherConditionsOverlay = value, () => HudMenuConfiguration.Commit(api)),
                     new HudOverlayStyleSetting<HudIndicatorStyle>(() => VanillaExpandedModSystem.Config.WeatherConditionsIndicatorStyle,
-                        value => VanillaExpandedModSystem.Config.WeatherConditionsIndicatorStyle = value, () => HudMenuConfiguration.Commit(api)))));
+                        value => VanillaExpandedModSystem.Config.WeatherConditionsIndicatorStyle = value, () => HudMenuConfiguration.Commit(api)),
+                    new HudOverlaySizeSetting(36, () => VanillaExpandedModSystem.Config.WeatherConditionsIndicatorSize,
+                        value => VanillaExpandedModSystem.Config.WeatherConditionsIndicatorSize = value, () => HudMenuConfiguration.Commit(api)))));
         }
         catch { overlay.Dispose(); throw; }
     }

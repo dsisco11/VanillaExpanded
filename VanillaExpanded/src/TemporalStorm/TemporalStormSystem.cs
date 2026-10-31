@@ -42,7 +42,9 @@ internal sealed class TemporalStormSystem : ModSystem, ILiveConfigurable
                     new HudOverlaySetting<bool>(() => VanillaExpandedModSystem.Config.EnableTemporalStormOverlay,
                         value => VanillaExpandedModSystem.Config.EnableTemporalStormOverlay = value, () => HudMenuConfiguration.Commit(api)),
                     new HudOverlayStyleSetting<HudIndicatorStyle>(() => VanillaExpandedModSystem.Config.TemporalStormIndicatorStyle,
-                        value => VanillaExpandedModSystem.Config.TemporalStormIndicatorStyle = value, () => HudMenuConfiguration.Commit(api)))));
+                        value => VanillaExpandedModSystem.Config.TemporalStormIndicatorStyle = value, () => HudMenuConfiguration.Commit(api)),
+                    new HudOverlaySizeSetting(24, () => VanillaExpandedModSystem.Config.TemporalStormIndicatorSize,
+                        value => VanillaExpandedModSystem.Config.TemporalStormIndicatorSize = value, () => HudMenuConfiguration.Commit(api)))));
         }
         catch { overlay.Dispose(); throw; }
     }

@@ -60,7 +60,7 @@ internal sealed class HudOverlayContextMenu : IDisposable
         {
             if (!context.EditingAvailable || environment == null || !ReferenceEquals(context.Session, environment.Session)
                 || context.Viewport != environment.Viewport || context.GuiScale != environment.GuiScale || context.Locale != environment.Locale
-                || target?.IsAvailable() != true || !popup.IsOpened || !entries.SequenceEqual(ReadEntries())) Close();
+                || target?.IsAvailable() != true || !popup.IsOpened || (!dispatching && !entries.SequenceEqual(ReadEntries()))) Close();
         }
         catch { Close(); throw; }
     }
@@ -87,7 +87,11 @@ internal sealed class HudOverlayContextMenu : IDisposable
     public void OnMouseDown(MouseEvent args)
     {
         if (popup == null) return;
-        if (!popup.VisibleBounds.Contains(args.X, args.Y)) Close();
+        if (!popup.VisibleBounds.Contains(args.X, args.Y))
+        {
+            Dispatch(() => popup?.CommitPendingInput());
+            Close();
+        }
         else Dispatch(() => popup?.MouseDown(args));
         args.Handled = true;
     }
@@ -130,6 +134,7 @@ internal sealed class HudOverlayContextMenu : IDisposable
             if (settings?.Enabled is { } enabled) rows.Add(new("enabled", Label("enabled"), enabled.Value));
             if (target.CanChangeLock) rows.Add(new("lock", Label("lock"), target.IsLocked()));
             rows.AddRange(ReadStyleEntries());
+            if (settings?.Size is { } size) rows.Add(new("size", Label("size"), false, HudMenuEntryKind.Number, size.Value));
             if (target.ResetLayout != null) rows.Add(new("reset", Label("reset"), false, HudMenuEntryKind.Action));
             return rows.ToArray();
         }
@@ -148,9 +153,19 @@ internal sealed class HudOverlayContextMenu : IDisposable
     private void Select(string code, bool selected)
     {
         if (target == null || target.IsAvailable() != true || !entries.SequenceEqual(ReadEntries())) { Close(); return; }
+        bool resizing = false;
         try
         {
-            if (selected && code.StartsWith("style:", StringComparison.Ordinal)
+            if (page == HudMenuPage.Toggles && selected && code.StartsWith("size:", StringComparison.Ordinal)
+                && int.TryParse(code.AsSpan(5), System.Globalization.NumberStyles.Integer,
+                    System.Globalization.CultureInfo.InvariantCulture, out int width)
+                && target.Registration.MenuSettings?.Size is { } size)
+            {
+                size.Set(width);
+                entries = ReadEntries();
+                resizing = true;
+            }
+            else if (selected && code.StartsWith("style:", StringComparison.Ordinal)
                 && int.TryParse(code.AsSpan(6), out int index) && target.Registration.MenuSettings?.Style is { } style
                 && index >= 0 && index < style.Choices.Count) style.Set(style.Choices[index]);
             else if (page == HudMenuPage.Toggles)
@@ -160,7 +175,7 @@ internal sealed class HudOverlayContextMenu : IDisposable
                 else if (code == "reset" && selected) target.ResetLayout?.Invoke();
             }
         }
-        finally { Close(); }
+        finally { if (!resizing) Close(); }
     }
 
     /// <summary>Protects native call stacks from synchronous settings notifications disposing their active controls.</summary>

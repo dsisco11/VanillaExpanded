@@ -42,7 +42,9 @@ internal sealed class ApproximateTimeSystem : ModSystem, ILiveConfigurable
                     new HudOverlaySetting<bool>(() => VanillaExpandedModSystem.Config.EnableApproximateTimeOverlay,
                         value => VanillaExpandedModSystem.Config.EnableApproximateTimeOverlay = value, () => HudMenuConfiguration.Commit(api)),
                     new HudOverlayStyleSetting<EnvironmentalGaugeStyle>(() => VanillaExpandedModSystem.Config.ApproximateTimeGaugeStyle,
-                        value => VanillaExpandedModSystem.Config.ApproximateTimeGaugeStyle = value, () => HudMenuConfiguration.Commit(api)))));
+                        value => VanillaExpandedModSystem.Config.ApproximateTimeGaugeStyle = value, () => HudMenuConfiguration.Commit(api)),
+                    new HudOverlaySizeSetting(90, () => VanillaExpandedModSystem.Config.ApproximateTimeIndicatorSize,
+                        value => VanillaExpandedModSystem.Config.ApproximateTimeIndicatorSize = value, () => HudMenuConfiguration.Commit(api)))));
         }
         catch { overlay.Dispose(); throw; }
     }
@@ -70,4 +72,3 @@ internal sealed class ApproximateTimeSystem : ModSystem, ILiveConfigurable
     }
     #endregion
 }
-

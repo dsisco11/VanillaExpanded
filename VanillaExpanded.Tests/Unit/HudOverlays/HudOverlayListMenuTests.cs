@@ -132,6 +132,29 @@ public sealed class HudOverlayListMenuTests
             popup.MouseUp(new MouseEvent(click.X, click.Y, click.Button, 0)); Assert.Equal(1, resets);
             var enter = new KeyEvent { KeyCode = (int)GlKeys.Enter }; popup.KeyDown(enter);
             Assert.True(enter.Handled); Assert.Equal(2, resets);
+
+            var sizeEdits = new List<string>();
+            using var sizing = new HudOverlayTogglePopup(api.Object,
+                new[] { new HudMenuEntry("enabled", "Enabled", true),
+                    new HudMenuEntry("style:0", "Icon", true, HudMenuEntryKind.StyleChoice),
+                    new HudMenuEntry("style:1", "Text", false, HudMenuEntryKind.StyleChoice),
+                    new HudMenuEntry("size", "Size", false, HudMenuEntryKind.Number, 24),
+                    new HudMenuEntry("reset", "Reset layout", false, HudMenuEntryKind.Action) },
+                (code, _) => sizeEdits.Add(code), PointF.Empty,
+                new HudMenuEnvironment(new object(), new RectangleF(0, 0, 800, 600), scale, "en", true));
+            var number = (HudOverlaySizeInput)typeof(HudOverlayTogglePopup).GetField("sizeInput",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(sizing)!;
+            input.SetupGet(value => value.KeyboardKeyStateRaw).Returns(new bool[1024]);
+            var step = new MouseEvent((int)(number.Bounds.renderX + number.Bounds.OuterWidth - 2),
+                (int)(number.Bounds.renderY + number.Bounds.OuterHeight * .2), EnumMouseButton.Left, 0);
+            sizing.MouseDown(step); sizing.MouseUp(step);
+            Assert.Equal(new[] { "size:26" }, sizeEdits); Assert.True(sizing.IsOpened);
+            sizing.MouseDown(step); sizing.MouseUp(step);
+            Assert.Equal("size:28", sizeEdits.Last()); Assert.True(sizing.IsOpened);
+            number.SetValue("42"); sizing.KeyDown(new KeyEvent { KeyCode = (int)GlKeys.Enter });
+            Assert.Equal("size:42", sizeEdits.Last()); Assert.True(sizing.IsOpened);
+            number.SetValue("66"); sizing.CommitPendingInput();
+            Assert.Equal("size:66", sizeEdits.Last());
         }
         finally { RuntimeEnv.GUIScale = previous; typeof(Lang).GetProperty(nameof(Lang.CurrentLocale))!.SetValue(null, previousLocale);
             if (previousLanguage == null) Lang.AvailableLanguages.Remove("en"); else Lang.AvailableLanguages["en"] = previousLanguage; }

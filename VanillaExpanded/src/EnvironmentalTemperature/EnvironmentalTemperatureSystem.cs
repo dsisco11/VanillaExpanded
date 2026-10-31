@@ -43,7 +43,9 @@ internal sealed class EnvironmentalTemperatureSystem : ModSystem, ILiveConfigura
                     new HudOverlaySetting<bool>(() => VanillaExpandedModSystem.Config.EnableEnvironmentalTemperatureOverlay,
                         value => VanillaExpandedModSystem.Config.EnableEnvironmentalTemperatureOverlay = value, () => HudMenuConfiguration.Commit(api)),
                     new HudOverlayStyleSetting<EnvironmentalGaugeStyle>(() => VanillaExpandedModSystem.Config.EnvironmentalTemperatureGaugeStyle,
-                        value => VanillaExpandedModSystem.Config.EnvironmentalTemperatureGaugeStyle = value, () => HudMenuConfiguration.Commit(api)))));
+                        value => VanillaExpandedModSystem.Config.EnvironmentalTemperatureGaugeStyle = value, () => HudMenuConfiguration.Commit(api)),
+                    new HudOverlaySizeSetting(90, () => VanillaExpandedModSystem.Config.EnvironmentalTemperatureIndicatorSize,
+                        value => VanillaExpandedModSystem.Config.EnvironmentalTemperatureIndicatorSize = value, () => HudMenuConfiguration.Commit(api)))));
         }
         catch { overlay.Dispose(); throw; }
     }

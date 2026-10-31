@@ -42,7 +42,9 @@ internal sealed class RiftActivitySystem : ModSystem, ILiveConfigurable
                     new HudOverlaySetting<bool>(() => VanillaExpandedModSystem.Config.EnableRiftActivityOverlay,
                         value => VanillaExpandedModSystem.Config.EnableRiftActivityOverlay = value, () => HudMenuConfiguration.Commit(api)),
                     new HudOverlayStyleSetting<HudIndicatorStyle>(() => VanillaExpandedModSystem.Config.RiftActivityIndicatorStyle,
-                        value => VanillaExpandedModSystem.Config.RiftActivityIndicatorStyle = value, () => HudMenuConfiguration.Commit(api)))));
+                        value => VanillaExpandedModSystem.Config.RiftActivityIndicatorStyle = value, () => HudMenuConfiguration.Commit(api)),
+                    new HudOverlaySizeSetting(24, () => VanillaExpandedModSystem.Config.RiftActivityIndicatorSize,
+                        value => VanillaExpandedModSystem.Config.RiftActivityIndicatorSize = value, () => HudMenuConfiguration.Commit(api)))));
         }
         catch { overlay.Dispose(); throw; }
     }
