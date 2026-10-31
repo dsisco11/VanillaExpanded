@@ -91,15 +91,11 @@ internal sealed class CraftingCatalogueView
         return new(group, automatic, GetEvaluation(automatic), false, allocations.GetValueOrDefault(automatic.Id));
     }
 
-    internal ImmutableArray<CraftingRecipeSelection> GetRows(RecipeFilterSet filters)
+    internal ImmutableArray<CraftingRecipeSelection> GetRows(RecipeFilterSet filters, IRecipeOrder? order = null)
     {
         ArgumentNullException.ThrowIfNull(filters);
-        return filters.Filter(catalogue.Groups.Select(group => GetSelection(group.Id)))
-            .OrderByDescending(selection => selection.Evaluation.IsSupported)
-            .ThenByDescending(selection => selection.Evaluation.CanCraft)
-            .ThenByDescending(selection => selection.Evaluation.Relevance)
-            .ThenBy(selection => selection.Evaluation.MissingUnits)
-            .ThenBy(selection => selection.Recipe.DisplayName, StringComparer.CurrentCultureIgnoreCase)
+        order ??= new AvailabilityOrder();
+        return order.Order(filters.Filter(catalogue.Groups.Select(group => GetSelection(group.Id))))
             .ThenBy(selection => selection.Recipe.StableId, StringComparer.Ordinal)
             .ToImmutableArray();
     }

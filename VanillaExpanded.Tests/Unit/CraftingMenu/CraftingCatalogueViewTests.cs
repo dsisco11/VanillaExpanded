@@ -36,6 +36,9 @@ public class CraftingCatalogueViewTests
 
         Assert.Equal(new[] { "full", "not-craftable-full", "name-a", "stable-a", "stable-z", "name-z", "missing-two", "low", "unsupported" },
             Query(view).Select(row => row.Recipe.Recipe.Name!.Path));
+        using var filters = new RecipeFilterSet();
+        Assert.Equal(new[] { "low", "missing-two", "name-a", "not-craftable-full", "unsupported", "stable-a", "stable-z", "name-z", "full" },
+            view.GetRows(filters, new NameOrder()).Select(row => row.Recipe.Recipe.Name!.Path));
     }
 
     [Fact]

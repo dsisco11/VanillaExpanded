@@ -21,6 +21,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
     private double minimumHeight;
     private double searchHeight;
     private double craftableHeight;
+    private double sortLabelWidth;
     private double tabsHeight;
     private double footerHeight;
     private double previousWidth;
@@ -78,6 +79,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         {
             session.Search(search);
             session.SelectCategory(BrowsingState.Category);
+            session.Sort.Select(BrowsingState.Sort);
         }
         if (!Follow()) return false;
         double composeMs = Stopwatch.GetElapsedTime(start).TotalMilliseconds;
@@ -125,8 +127,12 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         var searchBounds = ElementBounds.Fixed(0, tabsHeight + 8, content.fixedWidth, searchHeight);
         var craftableBounds = ElementBounds.Fixed(0, searchBounds.fixedY + searchHeight + 8,
             content.fixedWidth, craftableHeight);
+        double sortTop = craftableBounds.fixedY + craftableHeight + 8;
+        var sortLabel = ElementBounds.Fixed(0, sortTop, sortLabelWidth, craftableHeight);
+        var sortBounds = ElementBounds.Fixed(sortLabelWidth + 8, sortTop,
+            content.fixedWidth - sortLabelWidth - 8, craftableHeight);
         var footer = ElementBounds.Fixed(0, content.fixedHeight - footerHeight, content.fixedWidth, footerHeight);
-        double listTop = craftableBounds.fixedY + craftableHeight + 8;
+        double listTop = sortTop + craftableHeight + 8;
         var viewport = ElementBounds.Fixed(0, listTop, content.fixedWidth - 16, footer.fixedY - 10 - listTop);
         var scrollBounds = ElementBounds.Fixed(0, viewport.fixedY, 12, viewport.fixedHeight).FixedRightOf(viewport, 4);
         var previous = ElementBounds.Fixed(0, 0, previousWidth, footerHeight);
@@ -160,6 +166,16 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
                 tiles.ResetScroll();
                 session.CraftableOnly.SetEnabled(enabled);
             }, craftableBounds, "craftable-only")
+            .AddStaticText(Lang.Get("vanillaexpanded:craftingmenu-sort"), CairoFont.WhiteSmallText(),
+                sortLabel, "sort-label")
+            .AddDropDown(session.Sort.Orders.Select(order => order.Id).ToArray(),
+                session.Sort.Orders.Select(order => Lang.Get(order.NameKey)).ToArray(),
+                session.Sort.Orders.IndexOf(session.Sort.Selected), (id, _) =>
+                {
+                    if (session.Sort.Selected.Id == id) return;
+                    tiles.ResetScroll();
+                    session.Sort.Select(id);
+                }, sortBounds, "sort")
             .BeginClip(viewport)
                 .AddInteractiveElement(tiles, "tiles")
             .EndClip()
@@ -230,16 +246,20 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         double titleControlsWidth = 2 * GuiElementDialogTitleBar.unscaledCloseIconSize + 2 + 20;
         double craftableWidth = 32 + textFont.GetTextExtents(
             Lang.Get("vanillaexpanded:craftingmenu-craftable-only")).Width / scale;
-        minimumWidth = Math.Ceiling(Math.Max(32 + Math.Max(clearSearchWidth, showUncraftableWidth),
+        sortLabelWidth = Math.Ceiling(textFont.GetTextExtents(Lang.Get("vanillaexpanded:craftingmenu-sort")).Width / scale + 1);
+        double sortWidth = 16 + sortLabelWidth + 8 + 40 + session.Sort.Orders
+            .Max(order => textFont.GetTextExtents(Lang.Get(order.NameKey)).Width / scale);
+        minimumWidth = Math.Ceiling(Math.Max(sortWidth, Math.Max(32 + Math.Max(clearSearchWidth, showUncraftableWidth),
             Math.Max(craftableWidth, Math.Max(
             GuiStyle.ElementToDialogPadding + titleWidth + 8 + titleControlsWidth,
-            16 + previousWidth + 3 + autoWidth + 3 + nextWidth + 4 + counterWidth + 4 + handbookWidth))));
+            16 + previousWidth + 3 + autoWidth + 3 + nextWidth + 4 + counterWidth + 4 + handbookWidth)))));
         var textUtil = new TextDrawUtil();
         emptyTextHeight = Math.Ceiling(Enum.GetValues<CraftingMenuEmptyState>()
             .Where(state => state != CraftingMenuEmptyState.None)
             .Max(state => textUtil.GetMultilineTextHeight(textFont, Lang.Get(EmptyMessageKey(state)),
                 (minimumWidth - 32) * scale)) / scale);
         minimumHeight = Math.Ceiling(GuiStyle.TitleBarHeight + 8 + tabsHeight + 8 + searchHeight + 8 + craftableHeight + 8
+            + craftableHeight + 8
             + Math.Max(GuiElementCraftingTiles.TileSize, emptyTextHeight + 8 + footerHeight) + 10 + footerHeight + 8);
     }
 
@@ -449,7 +469,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         if (disposed) return;
         disposed = true;
         if (SingleComposer?.GetElement("tiles") is GuiElementCraftingTiles tiles)
-            BrowsingState = new(session.Category, search, tiles.ScrollPosition);
+            BrowsingState = new(session.Category, search, tiles.ScrollPosition, session.Sort.Selected.Id);
         parent.OnClosed -= CloseWithParent;
         capi.Event.LeaveWorld -= CloseWithParent;
         coordinator.InventoryChanged -= Refresh;

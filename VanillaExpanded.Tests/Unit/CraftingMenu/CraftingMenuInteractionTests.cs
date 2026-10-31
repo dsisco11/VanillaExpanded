@@ -212,6 +212,7 @@ public sealed class CraftingMenuInteractionTests
         // One evaluation validates ordinary and shift placements separately.
         Assert.Equal(2, NativeChecks());
         session.CraftableOnly.SetEnabled(true);
+        session.Sort.Select("name");
         session.Search(recipe.Output.Code!.ToString());
         session.SelectCategory("tools");
         Assert.Same(allocation, Assert.Single(session.Rows).Allocation);
@@ -222,6 +223,7 @@ public sealed class CraftingMenuInteractionTests
         session.CraftableOnly.SetEnabled(true);
         session.Search("");
         session.SelectCategory(null);
+        session.Sort.Select("availability");
         Assert.Same(allocation, Assert.Single(session.Rows).Allocation);
         Assert.Equal(1, captures);
         Assert.Equal(2, NativeChecks());
@@ -685,6 +687,53 @@ public sealed class CraftingMenuInteractionTests
         tiles.OnMouseUp(api.Object, new MouseEvent(10, 10, EnumMouseButton.Left, 0));
         if (retainPressed) Assert.Equal(retained, Assert.Single(actions));
         else Assert.Empty(actions);
+    }
+
+    [Fact]
+    public void SortChangesEndInteractionWithoutChangingSelectionPinsOrAllocations()
+    {
+        var f = new AllocationFixture();
+        var wood = f.Stack(1, "wood", 1);
+        var stone = f.Stack(2, "stone", 1);
+        var alpha = f.Recipe(f.Ingredient(wood));
+        alpha.Output!.ResolvedItemStack!.Attributes.SetString("displayName", "Alpha");
+        var alternate = f.Recipe(f.Ingredient(wood, 2));
+        alternate.Output = alpha.Output.Clone();
+        var zulu = f.Recipe(f.Ingredient(stone));
+        zulu.Output!.ResolvedItemStack!.Attributes.SetString("displayName", "Zulu");
+        f.Register(alpha, alternate, zulu);
+        f.Snapshot(stone);
+        using var session = Session(f, alpha, alternate, zulu);
+        session.Refresh();
+        Assert.Equal(new[] { "Zulu", "Alpha" }, session.Rows.Select(row => row.Recipe.DisplayName));
+        var row = session.Rows.Single(row => row.Recipe.Recipe == alpha);
+        session.Select(row.Output.Id);
+        session.ChooseAlternative(row.Output.Alternatives.Single(entry => entry.Recipe == alternate).Id);
+        session.Interact(row.Output.Id);
+        var allocations = session.Rows.ToDictionary(selection => selection.Output.Id, selection => selection.Allocation);
+        session.Sort.Select("name");
+        Assert.Equal(new[] { "Alpha", "Zulu" }, session.Rows.Select(selection => selection.Recipe.DisplayName));
+        Assert.Equal(row.Output.Id, session.SelectedOutput);
+        Assert.True(session.Rows[0].IsExplicit);
+        Assert.Same(alternate, session.Rows[0].Recipe.Recipe);
+        Assert.All(session.Rows, selection => Assert.Same(allocations[selection.Output.Id], selection.Allocation));
+        session.Sort.Select("availability");
+        Assert.Equal(new[] { "Zulu", "Alpha" }, session.Rows.Select(selection => selection.Recipe.DisplayName));
+        session.Sort.Select("name");
+        f.Snapshot(wood);
+        session.Refresh();
+        Assert.Equal(new[] { "Alpha", "Zulu" }, session.Rows.Select(selection => selection.Recipe.DisplayName));
+        Assert.True(session.Rows[0].IsExplicit);
+        Assert.Same(alternate, session.Rows[0].Recipe.Recipe);
+        session.Search(alpha.Output.Code!.ToString());
+        Assert.Equal("Alpha", Assert.Single(session.Rows).Recipe.DisplayName);
+        Assert.Equal("name", session.Sort.Selected.Id);
+        session.CraftableOnly.SetEnabled(true);
+        Assert.Empty(session.Rows);
+        session.Sort.Select("availability");
+        Assert.Empty(session.Rows);
+        session.CraftableOnly.SetEnabled(false);
+        Assert.True(Assert.Single(session.Rows).IsExplicit);
     }
 
     [Fact]

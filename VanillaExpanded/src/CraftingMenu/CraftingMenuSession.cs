@@ -27,9 +27,10 @@ internal sealed class CraftingMenuSession : IDisposable
         this.allocator = allocator;
         this.capture = capture;
         this.execute = execute;
-        search = new(Filters, FiltersChanged);
+        search = new(Filters, ProjectionChanged);
         category = new(catalogue, Filters, CategoryChanged);
-        CraftableOnly = new(Filters, FiltersChanged);
+        CraftableOnly = new(Filters, ProjectionChanged);
+        Sort = new(ProjectionChanged);
     }
 
     internal ImmutableArray<CraftingRecipeSelection> Rows { get; private set; } = ImmutableArray<CraftingRecipeSelection>.Empty;
@@ -37,6 +38,7 @@ internal sealed class CraftingMenuSession : IDisposable
     internal string? Category => category.Selected;
     internal RecipeFilterSet Filters { get; } = new();
     internal CraftableOnly CraftableOnly { get; }
+    internal RecipeSort Sort { get; }
     internal CraftingMenuEmptyState EmptyState { get; private set; }
     internal event Action? Changed;
 
@@ -48,7 +50,7 @@ internal sealed class CraftingMenuSession : IDisposable
 
     internal void Search(string text) => search.SetText(text);
 
-    private void FiltersChanged()
+    private void ProjectionChanged()
     {
         interaction = null;
         UpdateRows();
@@ -67,7 +69,7 @@ internal sealed class CraftingMenuSession : IDisposable
     {
         if (SelectedOutput is int output) view.Deselect(output);
         SelectedOutput = null;
-        FiltersChanged();
+        ProjectionChanged();
     }
 
     internal void Select(int output)
@@ -104,7 +106,7 @@ internal sealed class CraftingMenuSession : IDisposable
 
     private void UpdateRows(int? changedOutput = null)
     {
-        var canonical = view.GetRows(Filters);
+        var canonical = view.GetRows(Filters, Sort.Selected);
         var replacement = canonical;
         if (interaction != null && !Rows.IsEmpty)
         {

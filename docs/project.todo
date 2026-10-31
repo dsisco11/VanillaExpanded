@@ -11,7 +11,7 @@
         ☑ Remember the crafting menu's selected category, search text, and scroll position when closing and reopening the inventory.
         ☑ Add a shortcut to open the selected output's native handbook page.
         ☐ Add a Recent section for recipes whose ingredients were recently placed through the menu; track ingredient placement, not assumed completion of crafting.
-        ☐ Add an Availability/Name sort selector, retaining current availability ordering as an option and providing stable alphabetical browsing.
+        ☑ Add an Availability/Name sort selector, retaining current availability ordering as an option and providing stable alphabetical browsing.
         ☑ Improve empty-state feedback to distinguish no search matches from no craftable recipes in the selected category, with a quick action to clear the relevant filter.
         ☑ Add "clear" button (as a typical 'x' within a filled circle) to inner right side of search box.
 

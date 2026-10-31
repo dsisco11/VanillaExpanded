@@ -79,6 +79,14 @@ public sealed class CraftingMenuLifecycleTests
             menu.TryOpen();
             input = Assert.IsType<GuiElementCraftingSearch>(menu.SingleComposer.GetTextInput("search"));
             Assert.NotSame(composer, menu.SingleComposer);
+            Assert.InRange(f.TextureCount, 1, textures);
+            Assert.Equal("output", input.GetText());
+            Assert.True(input.ClearVisible);
+            AssertIcon(true);
+            // A smaller viewport can remove pooled tiles; compare resource counts again at the original size.
+            f.ResizePanelSpace(composer.Bounds.fixedWidth, composer.Bounds.fixedHeight);
+            menu.TryOpen();
+            input = Assert.IsType<GuiElementCraftingSearch>(menu.SingleComposer.GetTextInput("search"));
             Assert.Equal(textures, f.TextureCount);
             Assert.Equal("output", input.GetText());
             Assert.True(input.ClearVisible);
@@ -1333,7 +1341,11 @@ public sealed class CraftingMenuLifecycleTests
         double craftableWidth = 32 + craftable.Font.GetTextExtents(craftable.GetText()).Width / scale;
         double actionWidth = 32 + new[] { "clear-search", "show-uncraftable" }
             .Max(key => originalComposer.GetButton(key).Bounds.OuterWidth / scale);
-        double minimumWidth = Math.Ceiling(Math.Max(actionWidth, Math.Max(craftableWidth, Math.Max(footerWidth, titleWidth))));
+        double sortWidth = 16 + originalComposer.GetElement("sort-label").Bounds.OuterWidth / scale + 8 + 40
+            + originalComposer.GetDropDown("sort").listMenu.Names
+                .Max(name => CairoFont.WhiteSmallText().GetTextExtents(name).Width / scale);
+        double minimumWidth = Math.Ceiling(Math.Max(sortWidth,
+            Math.Max(actionWidth, Math.Max(craftableWidth, Math.Max(footerWidth, titleWidth)))));
         double textHeight = Math.Ceiling(new[] { "empty", "empty-search", "empty-craftable", "empty-craftable-search" }
             .Max(key => new TextDrawUtil().GetMultilineTextHeight(CairoFont.WhiteSmallText(),
                 Lang.Get("vanillaexpanded:craftingmenu-" + key), (minimumWidth - 32) * scale)) / scale);
@@ -1342,6 +1354,7 @@ public sealed class CraftingMenuLifecycleTests
         double minimumHeight = Math.Ceiling(GuiStyle.TitleBarHeight + 8 + search.Bounds.OuterHeight / scale
             + 8 + originalComposer.GetHorizontalTabs("categories").Bounds.OuterHeight / scale
             + 8 + craftable.Bounds.OuterHeight / scale
+            + 8 + originalComposer.GetDropDown("sort").Bounds.OuterHeight / scale
             + 8 + Math.Max(GuiElementCraftingTiles.TileSize, emptyHeight) + 10
             + originalComposer.GetElement("auto").Bounds.OuterHeight / scale + 8);
         search.SetValue("preserved search");
@@ -1371,6 +1384,8 @@ public sealed class CraftingMenuLifecycleTests
             var search = composer.GetTextInput("search").Bounds;
             var tabs = composer.GetHorizontalTabs("categories").Bounds;
             var craftable = composer.GetToggleButton("craftable-only");
+            var sort = composer.GetDropDown("sort");
+            var sortLabel = composer.GetElement("sort-label").Bounds;
             var viewport = composer.GetElement("tiles").InsideClipBounds;
             var scroll = composer.GetScrollbar("scroll").Bounds;
             var empty = composer.GetDynamicText("empty").Bounds;
@@ -1383,7 +1398,11 @@ public sealed class CraftingMenuLifecycleTests
             Assert.True(title.Bounds.absY + title.Bounds.OuterHeight + 8 * scale <= tabs.absY + .001);
             Assert.True(tabs.absY + tabs.OuterHeight + 8 * scale <= search.absY + .001);
             Assert.True(search.absY + search.OuterHeight + 8 * scale <= craftable.Bounds.absY + .001);
-            Assert.True(craftable.Bounds.absY + craftable.Bounds.OuterHeight + 8 * scale <= viewport.absY + .001);
+            Assert.True(craftable.Bounds.absY + craftable.Bounds.OuterHeight + 8 * scale <= sort.Bounds.absY + .001);
+            Assert.True(sortLabel.absX + sortLabel.OuterWidth + 8 * scale <= sort.Bounds.absX + .001);
+            Assert.True(sort.Bounds.absY + sort.Bounds.OuterHeight + 8 * scale <= viewport.absY + .001);
+            Assert.All(sort.listMenu.Names, name =>
+                Assert.True(sort.Font.GetTextExtents(name).Width + 40 * scale <= sort.Bounds.InnerWidth + .001));
             Assert.True(craftable.Font.GetTextExtents(craftable.GetText()).Width + 16 * scale <=
                 craftable.Bounds.InnerWidth + .001);
             Assert.True(viewport.InnerHeight + .001 >= GuiElementCraftingTiles.TileSize * scale);
@@ -1402,7 +1421,7 @@ public sealed class CraftingMenuLifecycleTests
             double titleMenuLeft = title.Bounds.absX + title.Bounds.OuterWidth
                 - GuiElement.scaled(2 * GuiElementDialogTitleBar.unscaledCloseIconSize + 2 + 20);
             Assert.True(titleTextRight + 8 * scale <= titleMenuLeft + .001);
-            foreach (var bounds in new[] { tabs, search, craftable.Bounds, viewport, scroll, previous, auto, next, counter,
+            foreach (var bounds in new[] { tabs, search, craftable.Bounds, sortLabel, sort.Bounds, viewport, scroll, previous, auto, next, counter,
                 handbook.Bounds })
             {
                 Assert.True(bounds.absX >= panel.absX + 8 * scale - .001);
@@ -1585,6 +1604,80 @@ public sealed class CraftingMenuLifecycleTests
     [InlineData(1, true)]
     [InlineData(1.5, true)]
     [InlineData(2, true)]
+    public void NativeSortSelectorUsesMouseOrKeyboardAndResetsScrollWithoutLeakingTextures(float scale, bool keyboard)
+    {
+        using var f = new MenuFixture(scale: scale, includeRecipes: true);
+        var available = Assert.Single(f.Lifecycle.Recipes);
+        available.Output!.ResolvedItemStack!.Attributes.SetString("displayName", "ZZZZ");
+        for (int i = 0; i < 40; i++)
+        {
+            var recipe = f.Lifecycle.F.Recipe(f.Lifecycle.F.Ingredient(
+                f.Lifecycle.F.Stack(i + 2, "ingredient-" + i, 1)));
+            recipe.Output!.ResolvedItemStack!.Attributes.SetString("displayName", $"Recipe {i:D2}");
+            f.Lifecycle.Recipes.Add(recipe);
+        }
+        var inventory = Assert.Single(((ClientPlayerInventoryManager)f.Lifecycle.F.Player.InventoryManager)
+            .Inventories.Values.OfType<InventoryCraftingGrid>());
+        inventory[0].Itemstack = available.ResolvedIngredients![0]!.ResolvedItemStack!.Clone();
+        f.Lifecycle.F.Register(f.Lifecycle.Recipes.ToArray());
+        f.Lifecycle.FinalizeWorld();
+        f.Recompose();
+        f.Parent.TryOpen();
+        int baseline = f.TextureCount;
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        var session = (CraftingMenuSession)typeof(GuiDialogCraftingMenu).GetField("session",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
+        Assert.Equal("ZZZZ", session.Rows[0].Recipe.DisplayName);
+        var tiles = Assert.IsType<GuiElementCraftingTiles>(menu.SingleComposer.GetElement("tiles"));
+        tiles.Scroll(72 * scale);
+        Assert.Equal(72, tiles.ScrollPosition);
+        var pressed = Assert.IsType<GuiElementCraftingTile>(tiles.Elements[0]);
+        pressed.OnMouseDownOnElement(f.Lifecycle.Api.Object, new MouseEvent(
+            (int)(pressed.Bounds.absX + 5), (int)(pressed.Bounds.absY + 5), EnumMouseButton.Left, 0));
+        Assert.True(pressed.Pressed);
+        var sort = menu.SingleComposer.GetDropDown("sort");
+        int shown = f.TextureCount;
+        if (keyboard)
+        {
+            menu.SingleComposer.FocusElement(sort.TabIndex);
+            var args = new KeyEvent { KeyCode = (int)GlKeys.End };
+            menu.OnKeyDown(args);
+            Assert.True(args.Handled);
+        }
+        else
+        {
+            int x = (int)(sort.Bounds.absX + 5);
+            int y = (int)(sort.Bounds.absY + 5);
+            f.SetMouse(x, y);
+            menu.OnMouseDown(new MouseEvent(x, y, EnumMouseButton.Left, 0));
+            menu.OnMouseUp(new MouseEvent(x, y, EnumMouseButton.Left, 0));
+            Assert.True(sort.listMenu.IsOpened);
+            y = (int)(sort.listMenu.Bounds.renderY + sort.listMenu.Bounds.InnerHeight + 45 * scale);
+            f.SetMouse(x, y);
+            menu.OnMouseDown(new MouseEvent(x, y, EnumMouseButton.Left, 0));
+            menu.OnMouseUp(new MouseEvent(x, y, EnumMouseButton.Left, 0));
+            Assert.False(sort.listMenu.IsOpened);
+        }
+        Assert.Equal("name", sort.SelectedValue);
+        Assert.Equal("name", session.Sort.Selected.Id);
+        Assert.Equal("Recipe 00", session.Rows[0].Recipe.DisplayName);
+        Assert.Equal("ZZZZ", session.Rows[^1].Recipe.DisplayName);
+        Assert.False(pressed.Pressed);
+        Assert.Equal(0, tiles.ScrollPosition);
+        Assert.Equal(0, menu.SingleComposer.GetScrollbar("scroll").CurrentYPosition);
+        Assert.Equal(shown, f.TextureCount);
+        f.Parent.TryClose();
+        Assert.Equal(baseline, f.TextureCount);
+    }
+
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(1.5, false)]
+    [InlineData(2, false)]
+    [InlineData(1, true)]
+    [InlineData(1.5, true)]
+    [InlineData(2, true)]
     public void BrowsingStateSurvivesInventoryReopeningAndComposerReplacement(float scale, bool recomposeParent)
     {
         using var f = new MenuFixture(scale: scale, includeRecipes: true);
@@ -1606,6 +1699,11 @@ public sealed class CraftingMenuLifecycleTests
         Assert.Equal("", menu.SingleComposer.GetTextInput("search").GetText());
         Assert.Equal(0, menu.SingleComposer.GetHorizontalTabs("categories").activeElement);
         Assert.Equal(0, menu.SingleComposer.GetScrollbar("scroll").CurrentYPosition);
+        Assert.Equal("availability", menu.SingleComposer.GetDropDown("sort").SelectedValue);
+        var sort = menu.SingleComposer.GetDropDown("sort");
+        sort.OnFocusGained();
+        sort.OnKeyDown(f.Lifecycle.Api.Object, new KeyEvent { KeyCode = (int)GlKeys.End });
+        sort.OnFocusLost();
         menu.SingleComposer.GetTextInput("search").SetValue(" output ");
         var tabs = menu.SingleComposer.GetHorizontalTabs("categories");
         int category = Array.FindIndex(tabs.tabs, tab => tab.Name == "tools");
@@ -1655,6 +1753,7 @@ public sealed class CraftingMenuLifecycleTests
         void AssertBrowsingState(GuiDialogCraftingMenu current)
         {
             Assert.Equal(" output ", current.SingleComposer.GetTextInput("search").GetText());
+            Assert.Equal("name", current.SingleComposer.GetDropDown("sort").SelectedValue);
             Assert.Equal(category, current.SingleComposer.GetHorizontalTabs("categories").activeElement);
             var currentTiles = Assert.IsType<GuiElementCraftingTiles>(current.SingleComposer.GetElement("tiles"));
             Assert.Equal(73, currentTiles.ScrollPosition);
@@ -1682,6 +1781,9 @@ public sealed class CraftingMenuLifecycleTests
         f.Toggle();
         var current = Assert.Single(f.Menus);
         current.SingleComposer.GetTextInput("search").SetValue("not found");
+        current.SingleComposer.GetDropDown("sort").OnFocusGained();
+        current.SingleComposer.GetDropDown("sort").OnKeyDown(f.Lifecycle.Api.Object,
+            new KeyEvent { KeyCode = (int)GlKeys.End });
         f.Lifecycle.Events.Raise(value => value.LeaveWorld += null);
         Assert.Empty(f.Menus);
         f.Parent.TryClose();
@@ -1691,6 +1793,7 @@ public sealed class CraftingMenuLifecycleTests
         if (!f.Menus.Any()) f.Toggle();
         current = Assert.Single(f.Menus);
         Assert.Equal("", current.SingleComposer.GetTextInput("search").GetText());
+        Assert.Equal("availability", current.SingleComposer.GetDropDown("sort").SelectedValue);
         Assert.Equal(0, current.SingleComposer.GetHorizontalTabs("categories").activeElement);
         Assert.Equal(0, current.SingleComposer.GetScrollbar("scroll").CurrentYPosition);
     }
@@ -1707,6 +1810,9 @@ public sealed class CraftingMenuLifecycleTests
         var tabs = menu.SingleComposer.GetHorizontalTabs("categories");
         int index = category == null ? 0 : tabs.tabs.Length - 1;
         tabs.SetValue(index);
+        menu.SingleComposer.GetDropDown("sort").OnFocusGained();
+        menu.SingleComposer.GetDropDown("sort").OnKeyDown(f.Lifecycle.Api.Object,
+            new KeyEvent { KeyCode = (int)GlKeys.End });
         menu.SingleComposer.GetTextInput("search").SetValue("not found");
         f.Parent.TryClose();
         f.ResizePanelSpace(0, 0);
@@ -1718,6 +1824,7 @@ public sealed class CraftingMenuLifecycleTests
         menu = Assert.Single(f.Menus);
         Assert.Equal("not found", menu.SingleComposer.GetTextInput("search").GetText());
         Assert.Equal(index, menu.SingleComposer.GetHorizontalTabs("categories").activeElement);
+        Assert.Equal("name", menu.SingleComposer.GetDropDown("sort").SelectedValue);
         menu.SingleComposer.GetTextInput("search").SetValue("");
         f.Parent.TryClose();
         var grid = Assert.Single(((ClientPlayerInventoryManager)f.Lifecycle.F.Player.InventoryManager)
@@ -2215,6 +2322,9 @@ public sealed class CraftingMenuLifecycleTests
                     "vanillaexpanded:craftingmenu-handbook" => longLabels ? "Open survival handbook" : "Handbook",
                     "vanillaexpanded:craftingmenu-craftable-only" => longLabels
                         ? "Only recipes with all ingredients available" : "Craftable only",
+                    "vanillaexpanded:craftingmenu-sort" => longLabels ? "Recipe sorting preference" : "Sort by",
+                    "vanillaexpanded:craftingmenu-sort-availability" => longLabels ? "Current ingredient availability" : "Availability",
+                    "vanillaexpanded:craftingmenu-sort-name" => longLabels ? "Alphabetical output name" : "Name",
                     "vanillaexpanded:craftingmenu-empty" => "No recipes are available in this category.",
                     "vanillaexpanded:craftingmenu-empty-search" => "No recipes match your search in this category.",
                     "vanillaexpanded:craftingmenu-empty-craftable" => "No recipes in this category are currently craftable.",
@@ -2263,6 +2373,8 @@ public sealed class CraftingMenuLifecycleTests
             var window = ElementBounds.Fixed(0, 0, 1920, 1080).WithEmptyParent();
             window.CalcWorldBounds();
             graphics.Gui.SetupGet(value => value.WindowBounds).Returns(window);
+            graphics.Render.SetupGet(value => value.FrameWidth).Returns(() => window.OuterWidthInt);
+            graphics.Render.SetupGet(value => value.FrameHeight).Returns(() => window.OuterHeightInt);
             graphics.Gui.Setup(value => value.CreateCompo(It.IsAny<string>(), It.IsAny<ElementBounds>()))
                 .Returns((string name, ElementBounds bounds) => CreateComposer(name, bounds));
             Lifecycle.World.SetupGet(value => value.Player).Returns(Lifecycle.F.Player);
