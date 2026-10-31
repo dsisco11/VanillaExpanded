@@ -5,6 +5,7 @@ using System.Linq;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
+using Vintagestory.GameContent;
 
 namespace VanillaExpanded.CraftingMenu;
 
@@ -25,6 +26,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
     private double previousWidth;
     private double autoWidth;
     private double nextWidth;
+    private double handbookWidth;
     private GuiElementCraftingRecipeTooltip? tooltip;
     private string search = "";
     private float? restoreScroll;
@@ -61,7 +63,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
     }
 
     public override string ToggleKeyCombinationCode => "";
-    public override double DrawOrder => 0.21;
+    public override double DrawOrder => 0.2;
     public override bool PrefersUngrabbedMouse => true;
     public override bool CaptureAllInputs() => IsOpened() && (SingleComposer?.GetTextInput("search")?.HasFocus ?? false);
     public override bool OnEscapePressed() => parent.OnEscapePressed();
@@ -128,7 +130,8 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         var auto = ElementBounds.Fixed(0, 0, autoWidth, footerHeight).FixedRightOf(previous, 3);
         var next = ElementBounds.Fixed(0, 0, nextWidth, footerHeight).FixedRightOf(auto, 3);
         double labelLeft = next.fixedX + next.fixedWidth + 4;
-        var label = ElementBounds.Fixed(labelLeft, 0, content.fixedWidth - labelLeft, footerHeight);
+        var handbook = ElementBounds.Fixed(content.fixedWidth - handbookWidth, 0, handbookWidth, footerHeight);
+        var label = ElementBounds.Fixed(labelLeft, 0, handbook.fixedX - 4 - labelLeft, footerHeight);
         var tiles = new GuiElementCraftingTiles(capi, ElementBounds.Fixed(0, 0, viewport.fixedWidth, viewport.fixedHeight),
             viewport, session, Inspect, Activate, icons);
         var newTooltip = new GuiElementCraftingRecipeTooltip(capi);
@@ -168,6 +171,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
             .AddHoverText(Lang.Get("vanillaexpanded:craftingmenu-alternative-hint"), CairoFont.WhiteSmallText(),
                 300, ElementBounds.Fixed(0, 0, next.fixedX + next.fixedWidth, footerHeight))
             .AddDynamicText("", CairoFont.WhiteSmallText(), label, "alternative")
+            .AddSmallButton(Lang.Get("vanillaexpanded:craftingmenu-handbook"), OpenHandbook, handbook, key: "handbook")
             .EndChildElements()
             .AddInteractiveElement(newTooltip, "tooltip")
             .EndChildElements()
@@ -200,6 +204,8 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         autoWidth = Math.Max(46, Math.Ceiling(buttonFont.GetTextExtents(
             Lang.Get("vanillaexpanded:craftingmenu-auto")).Width / scale + 1));
         nextWidth = Math.Max(24, Math.Ceiling(buttonFont.GetTextExtents(">").Width / scale + 1));
+        handbookWidth = Math.Max(70, Math.Ceiling(buttonFont.GetTextExtents(
+            Lang.Get("vanillaexpanded:craftingmenu-handbook")).Width / scale + 1));
         footerHeight = Math.Max(24, Math.Ceiling(Math.Max(buttonFont.GetFontExtents().Height,
             textFont.GetFontExtents().Height) / scale));
         searchHeight = Math.Max(26, Math.Ceiling(textFont.GetFontExtents().Height / scale + 6));
@@ -213,7 +219,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
             Lang.Get("vanillaexpanded:craftingmenu-craftable-only")).Width / scale;
         minimumWidth = Math.Ceiling(Math.Max(craftableWidth, Math.Max(
             GuiStyle.ElementToDialogPadding + titleWidth + 8 + titleControlsWidth,
-            16 + previousWidth + 3 + autoWidth + 3 + nextWidth + 4 + counterWidth)));
+            16 + previousWidth + 3 + autoWidth + 3 + nextWidth + 4 + counterWidth + 4 + handbookWidth)));
         minimumHeight = Math.Ceiling(GuiStyle.TitleBarHeight + 8 + tabsHeight + 8 + searchHeight + 8 + craftableHeight + 8
             + GuiElementCraftingTiles.TileSize + 10 + footerHeight + 8);
     }
@@ -310,17 +316,36 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         return true;
     }
 
+    private bool OpenHandbook()
+    {
+        var stack = session.Rows.FirstOrDefault(row => row.Output.Id == session.SelectedOutput)?.Recipe.GetPreview();
+        if (stack == null) return true;
+        if (capi.LinkProtocols == null || !capi.LinkProtocols.TryGetValue("handbook", out var open))
+        {
+            Error("vanillaexpanded:craftingmenu-handbook-unavailable");
+            return true;
+        }
+        string pageCode = stack.Collectible.GetCollectibleInterface<IHandBookPageCodeProvider>()
+            ?.HandbookPageCodeForStack(capi.World, stack) ?? GuiHandbookItemStackPage.PageCodeForStack(stack);
+        open(new LinkTextComponent("handbook://" + pageCode));
+        var handbook = capi.Gui.LoadedGuis.FirstOrDefault(dialog =>
+            dialog.IsOpened() && dialog.ToggleKeyCombinationCode == "handbook");
+        if (handbook != null) capi.Gui.RequestFocus(handbook);
+        return true;
+    }
+
     private void UpdateLabels()
     {
         if (SingleComposer == null) return;
         SingleComposer.GetDynamicText("empty").SetNewText(session.Rows.IsEmpty
             ? Lang.Get("vanillaexpanded:craftingmenu-empty") : "");
         var selected = session.Rows.FirstOrDefault(row => row.Output.Id == session.SelectedOutput);
-        foreach (string key in new[] { "previous", "auto", "next" })
+        foreach (string key in new[] { "previous", "auto", "next", "handbook" })
         {
             var button = SingleComposer.GetButton(key);
-            if (selected == null && button.HasFocus) button.OnFocusLost();
-            button.Enabled = selected != null;
+            bool enabled = selected != null && (key != "handbook" || selected.Recipe.PreviewId != null);
+            if (!enabled && button.HasFocus) button.OnFocusLost();
+            button.Enabled = enabled;
         }
         SingleComposer.GetDynamicText("alternative").SetNewText(selected == null ? "" :
             $"{selected.Output.Alternatives.IndexOf(selected.Recipe) + 1}/{selected.Output.Alternatives.Length}");

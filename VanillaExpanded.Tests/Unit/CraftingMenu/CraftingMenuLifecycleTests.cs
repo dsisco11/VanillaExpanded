@@ -10,6 +10,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.Client.NoObf;
 using Vintagestory.Common;
+using Vintagestory.GameContent;
 
 namespace VanillaExpanded.Tests.Unit.CraftingMenu;
 
@@ -17,6 +18,134 @@ namespace VanillaExpanded.Tests.Unit.CraftingMenu;
 [Collection("Crafting native GUI")]
 public sealed class CraftingMenuLifecycleTests
 {
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void HandbookButtonOpensSelectedOutputUsingNativePageCodesWithoutPlacing(bool customPage, bool keyboard)
+    {
+        using var f = new MenuFixture(includeRecipes: true);
+        var recipe = Assert.Single(f.Lifecycle.Recipes);
+        var output = recipe.Output!.ResolvedItemStack!;
+        output.Attributes.SetString("wood", "oak");
+        var provider = new HandbookPageBehavior(output.Collectible);
+        if (customPage) output.Collectible.CollectibleBehaviors = [provider];
+        f.Lifecycle.Recipes.Add(f.Lifecycle.F.Catalogue.Recipe("other-output"));
+        f.Lifecycle.F.Register(f.Lifecycle.Recipes.ToArray());
+        f.Lifecycle.FinalizeWorld();
+        f.Recompose();
+        var links = new List<string>();
+        using var handbook = new HandbookDialog(f.Lifecycle.Api.Object);
+        f.Lifecycle.Api.SetupGet(api => api.LinkProtocols).Returns(
+            new Dictionary<string, Action<LinkTextComponent>> { ["handbook"] = link =>
+            {
+                links.Add(link.Href);
+                if (!handbook.IsOpened()) handbook.TryOpen();
+            } });
+        f.Parent.TryOpen();
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        var session = (CraftingMenuSession)typeof(GuiDialogCraftingMenu).GetField("session",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
+        var button = menu.SingleComposer.GetButton("handbook");
+        Assert.False(button.Enabled);
+        f.Click(button, handled: false);
+        Assert.Empty(links);
+        var row = Assert.Single(session.Rows, row => row.Recipe.Recipe == recipe);
+        session.Select(row.Output.Id);
+        Assert.True(button.Enabled);
+        var network = Mock.Get(f.Lifecycle.Api.Object.Network);
+        network.Invocations.Clear();
+        if (keyboard)
+        {
+            Assert.True(menu.SingleComposer.FocusElement(button.TabIndex));
+            var enter = new KeyEvent { KeyCode = (int)GlKeys.Enter };
+            menu.OnKeyDown(enter);
+            Assert.True(enter.Handled);
+        }
+        else f.Click(button);
+        Assert.Equal(customPage ? "handbook://custom-output-oak"
+            : "handbook://" + GuiHandbookItemStackPage.PageCodeForStack(row.Recipe.GetPreview()!), Assert.Single(links));
+        Assert.Equal(handbook.DrawOrder, menu.DrawOrder);
+        Assert.True(handbook.IsOpened());
+        var gui = Mock.Get(f.Lifecycle.Api.Object.Gui);
+        gui.Verify(api => api.RequestFocus(handbook), Times.Exactly(2));
+        Assert.True(f.Parent.IsOpened());
+        Assert.True(menu.IsOpened());
+        Assert.Equal(row.Output.Id, session.SelectedOutput);
+        Assert.Equal("oak", row.Recipe.GetPreview()!.Attributes.GetString("wood"));
+        Assert.False(row.Recipe.GetPreview()!.Attributes.HasAttribute("provider-mutation"));
+        Assert.False(output.Attributes.HasAttribute("provider-mutation"));
+        Assert.Empty(network.Invocations);
+        if (customPage) Assert.NotSame(output, provider.Stack);
+        var composer = menu.SingleComposer;
+        f.ResizePanelSpace(composer.Bounds.fixedWidth, composer.Bounds.fixedHeight - 10);
+        menu.TryOpen();
+        Assert.NotSame(composer, menu.SingleComposer);
+        button = menu.SingleComposer.GetButton("handbook");
+        Assert.True(button.Enabled);
+        f.Click(button);
+        Assert.Equal(2, links.Count);
+        gui.Verify(api => api.RequestFocus(handbook), Times.Exactly(3));
+        session.Select(session.Rows.Single(row => row.Recipe.Recipe != recipe).Output.Id);
+        f.Click(button);
+        Assert.Equal("handbook://" + GuiHandbookItemStackPage.PageCodeForStack(
+            session.Rows.Single(row => row.Output.Id == session.SelectedOutput).Recipe.GetPreview()!), links[^1]);
+    }
+
+    private sealed class HandbookDialog(ICoreClientAPI api) : GuiDialog(api)
+    {
+        public override string ToggleKeyCombinationCode => "handbook";
+        public override double DrawOrder => 0.2;
+    }
+
+    private sealed class HandbookPageBehavior(CollectibleObject collectible)
+        : CollectibleBehavior(collectible), IHandBookPageCodeProvider
+    {
+        internal ItemStack? Stack;
+        public string HandbookPageCodeForStack(IWorldAccessor world, ItemStack stack)
+        {
+            Stack = stack;
+            stack.Attributes.SetBool("provider-mutation", true);
+            return "custom-output-" + stack.Attributes.GetString("wood");
+        }
+    }
+
+    [Fact]
+    public void HandbookButtonReportsUnavailableNativeHandler()
+    {
+        using var f = new MenuFixture(includeRecipes: true);
+        f.Parent.TryOpen();
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        var session = (CraftingMenuSession)typeof(GuiDialogCraftingMenu).GetField("session",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
+        session.Select(Assert.Single(session.Rows).Output.Id);
+        f.Lifecycle.Api.SetupGet(api => api.LinkProtocols).Returns(new Dictionary<string, Action<LinkTextComponent>>());
+        f.Click(menu.SingleComposer.GetButton("handbook"));
+        f.Lifecycle.Api.Verify(api => api.TriggerIngameError(menu, "craftingmenu",
+            "vanillaexpanded:craftingmenu-handbook-unavailable"), Times.Once);
+    }
+
+    [Fact]
+    public void HandbookButtonIsDisabledForSelectedOutputWithoutResolvedPreview()
+    {
+        using var f = new MenuFixture(includeRecipes: true);
+        Assert.Single(f.Lifecycle.Recipes).Output!.ResolvedItemStack = null;
+        f.Lifecycle.FinalizeWorld();
+        f.Recompose();
+        f.Parent.TryOpen();
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        var session = (CraftingMenuSession)typeof(GuiDialogCraftingMenu).GetField("session",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
+        session.Select(Assert.Single(session.Rows).Output.Id);
+        Assert.False(menu.SingleComposer.GetButton("handbook").Enabled);
+        Assert.False(menu.SingleComposer.GetButton("handbook").Focusable);
+        f.Click(menu.SingleComposer.GetButton("handbook"), handled: false);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -36,6 +165,7 @@ public sealed class CraftingMenuLifecycleTests
         tiles.UpdateHover((int)tile.Bounds.absX + 10, (int)tile.Bounds.absY + 10);
         var tooltip = Assert.IsType<GuiElementCraftingRecipeTooltip>(menu.SingleComposer.GetElement("tooltip"));
         Assert.NotNull(tooltip.Popup);
+        Assert.True(menu.SingleComposer.FocusElement(menu.SingleComposer.GetButton("handbook").TabIndex));
         using var filter = craftable ? null : session.Filters.Register("test:hidden", new HiddenFilter());
         if (craftable) f.ToggleCraftable(menu);
         else session.Refresh();
@@ -45,10 +175,11 @@ public sealed class CraftingMenuLifecycleTests
         tooltip.RenderInteractiveElements(.1f);
         Assert.Empty(render.Invocations);
         Assert.Equal("", menu.SingleComposer.GetDynamicText("alternative").GetText());
-        foreach (string key in new[] { "previous", "auto", "next" })
+        foreach (string key in new[] { "previous", "auto", "next", "handbook" })
         {
             Assert.False(menu.SingleComposer.GetButton(key).Enabled);
             Assert.False(menu.SingleComposer.GetButton(key).Focusable);
+            Assert.False(menu.SingleComposer.GetButton(key).HasFocus);
             f.Click(menu.SingleComposer.GetButton(key), handled: false);
         }
         if (craftable) f.ToggleCraftable(menu);
@@ -60,7 +191,7 @@ public sealed class CraftingMenuLifecycleTests
         Assert.True(Assert.Single(session.Rows).IsExplicit);
         Assert.Equal(row.Recipe.Id, Assert.Single(session.Rows).Recipe.Id);
         Assert.NotNull(tooltip.Popup);
-        foreach (string key in new[] { "previous", "auto", "next" })
+        foreach (string key in new[] { "previous", "auto", "next", "handbook" })
             Assert.True(menu.SingleComposer.GetButton(key).Enabled);
         f.Click(menu.SingleComposer.GetButton("auto"));
         Assert.False(Assert.Single(session.Rows).IsExplicit);
@@ -836,7 +967,8 @@ public sealed class CraftingMenuLifecycleTests
         var search = originalComposer.GetTextInput("search");
         double counterWidth = Math.Ceiling(CairoFont.WhiteSmallText().GetTextExtents("1/1").Width / scale + 1);
         double footerWidth = new[] { "previous", "auto", "next" }
-            .Sum(key => originalComposer.GetElement(key).Bounds.OuterWidth / scale) + 6 + 4 + counterWidth + 16;
+            .Sum(key => originalComposer.GetElement(key).Bounds.OuterWidth / scale) + 6 + 4 + counterWidth
+            + 4 + originalComposer.GetElement("handbook").Bounds.OuterWidth / scale + 16;
         double titleWidth = GuiStyle.ElementToDialogPadding + title.Font.GetTextExtents(title.GetText()).Width / scale
             + 8 + 2 * GuiElementDialogTitleBar.unscaledCloseIconSize + 2 + 20;
         var craftable = originalComposer.GetToggleButton("craftable-only");
@@ -855,7 +987,7 @@ public sealed class CraftingMenuLifecycleTests
         Assert.Equal(minimumHeight, menu.SingleComposer.Bounds.fixedHeight, 4);
         Assert.Equal("preserved search", menu.SingleComposer.GetTextInput("search").GetText());
         AssertLayout(menu);
-        foreach (string key in new[] { "previous", "auto", "next" })
+        foreach (string key in new[] { "previous", "auto", "next", "handbook" })
         {
             Assert.False(menu.SingleComposer.GetButton(key).Enabled);
             f.Click(menu.SingleComposer.GetElement(key), handled: false);
@@ -880,6 +1012,7 @@ public sealed class CraftingMenuLifecycleTests
             var auto = composer.GetElement("auto").Bounds;
             var next = composer.GetElement("next").Bounds;
             var counter = composer.GetDynamicText("alternative").Bounds;
+            var handbook = composer.GetButton("handbook");
             double scale = GuiElement.scaled(1);
             Assert.True(title.Bounds.absY + title.Bounds.OuterHeight + 8 * scale <= tabs.absY + .001);
             Assert.True(tabs.absY + tabs.OuterHeight + 8 * scale <= search.absY + .001);
@@ -895,12 +1028,16 @@ public sealed class CraftingMenuLifecycleTests
             Assert.True(previous.absX + previous.OuterWidth + 3 * scale <= auto.absX + .001);
             Assert.True(auto.absX + auto.OuterWidth + 3 * scale <= next.absX + .001);
             Assert.True(next.absX + next.OuterWidth + 4 * scale <= counter.absX + .001);
+            Assert.True(counter.absX + counter.OuterWidth + 4 * scale <= handbook.Bounds.absX + .001);
+            Assert.True(CairoFont.SmallButtonText().GetTextExtents(Lang.Get("vanillaexpanded:craftingmenu-handbook")).Width
+                <= handbook.Bounds.InnerWidth + .001);
             double titleTextRight = title.Bounds.absX + GuiElement.scaled(GuiStyle.ElementToDialogPadding)
                 + title.Font.GetTextExtents(title.GetText()).Width;
             double titleMenuLeft = title.Bounds.absX + title.Bounds.OuterWidth
                 - GuiElement.scaled(2 * GuiElementDialogTitleBar.unscaledCloseIconSize + 2 + 20);
             Assert.True(titleTextRight + 8 * scale <= titleMenuLeft + .001);
-            foreach (var bounds in new[] { tabs, search, craftable.Bounds, viewport, scroll, previous, auto, next, counter })
+            foreach (var bounds in new[] { tabs, search, craftable.Bounds, viewport, scroll, previous, auto, next, counter,
+                handbook.Bounds })
             {
                 Assert.True(bounds.absX >= panel.absX + 8 * scale - .001);
                 Assert.True(bounds.absX + bounds.OuterWidth <= panel.absX + panel.InnerWidth - 8 * scale + .001);
@@ -1694,6 +1831,7 @@ public sealed class CraftingMenuLifecycleTests
                 {
                     "vanillaexpanded:craftingmenu-title" => longLabels ? "Available crafting recipes" : "Crafting recipes",
                     "vanillaexpanded:craftingmenu-auto" => longLabels ? "Automatic selection" : "Auto",
+                    "vanillaexpanded:craftingmenu-handbook" => longLabels ? "Open survival handbook" : "Handbook",
                     "vanillaexpanded:craftingmenu-craftable-only" => longLabels
                         ? "Only recipes with all ingredients available" : "Craftable only",
                     "vanillaexpanded:craftingmenu-empty" => "No matching recipes.",

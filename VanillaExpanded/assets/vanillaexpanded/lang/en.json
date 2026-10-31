@@ -97,6 +97,8 @@
   "craftingmenu-category-all": "All",
   "craftingmenu-category-other": "Other",
   "craftingmenu-auto": "Auto",
+  "craftingmenu-handbook": "Handbook",
+  "craftingmenu-handbook-unavailable": "The survival handbook is not available.",
   "craftingmenu-alternative-hint": "Click a tile to select it. Arrows select a recipe variant; Auto restores automatic selection. Tile colors indicate ingredient availability.",
   "craftingmenu-empty": "No matching recipes.",
   "craftingmenu-loading": "Crafting recipes are not ready yet.",
