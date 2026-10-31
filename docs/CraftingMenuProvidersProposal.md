@@ -72,7 +72,7 @@ Selection of an alternative remains the catalogue view's responsibility. In this
 
 ### Contract and composition
 
-Introduce an internal `CraftingFilterManager` wrapping a collection of `ICraftingFilterProvider` instances. The essential provider operation is:
+Introduce an internal `RecipeFilterSet` wrapping a collection of `IRecipeFilter` instances. The essential filter operation is:
 
 ```csharp
 bool Matches(CraftingRecipeSelection selection);

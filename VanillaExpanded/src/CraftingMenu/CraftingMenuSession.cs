@@ -5,7 +5,7 @@ using System.Linq;
 
 namespace VanillaExpanded.CraftingMenu;
 
-internal sealed class CraftingMenuSession
+internal sealed class CraftingMenuSession : IDisposable
 {
     private readonly CraftingCatalogueView view;
     private readonly CraftingAllocator allocator;
@@ -30,6 +30,7 @@ internal sealed class CraftingMenuSession
     internal ImmutableArray<CraftingRecipeSelection> Rows { get; private set; } = ImmutableArray<CraftingRecipeSelection>.Empty;
     internal int? SelectedOutput { get; private set; }
     internal string? Category { get; private set; }
+    internal RecipeFilterSet Filters { get; } = new();
     internal event Action? Changed;
 
     internal void Refresh()
@@ -107,5 +108,11 @@ internal sealed class CraftingMenuSession
         }
         else Rows = view.Search(query, Category);
         Changed?.Invoke();
+    }
+
+    public void Dispose()
+    {
+        Filters.Dispose();
+        Changed = null;
     }
 }

@@ -317,6 +317,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         session.Changed -= UpdateLabels;
         capi.Gui.LoadedGuis.Remove(this);
         base.Dispose();
+        session.Dispose();
         Disposed?.Invoke();
         Disposed = null;
         CloseRequestedByUser = null;

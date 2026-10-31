@@ -2,7 +2,7 @@
 
 Source proposal: [CraftingMenuProvidersProposal.md](CraftingMenuProvidersProposal.md)
 Authority: Proposal approved by the user on 2026-10-30. Its requirements govern this plan.
-Status: Planning only; all implementation and acceptance tasks start unchecked.
+Status: Phase 1 complete; Phases 2-6 remain pending.
 
 ## Goal and execution boundary
 
@@ -45,29 +45,31 @@ Primary implementation surfaces:
 
 Outcome: Independently testable provider collections exist without changing current menu behavior.
 
-    ☐ Inspect the current CraftingMenu source, existing feature-provider prior art, test infrastructure, and applicable repository instructions before editing.
-        ☐ Confirm the actual baseline and identify any changes since proposal approval; integrate rather than restore earlier source.
-        ☐ Reuse suitable repository patterns without importing item-slot sampling, GPU ownership, or unrelated priority machinery.
-    ☐ Introduce internal ICraftingFilterProvider and CraftingFilterManager.
-        ☐ Define Matches(CraftingRecipeSelection) over an already evaluated selection.
-        ☐ Implement AND composition, no-filter acceptance, and registration-order-independent membership.
-        ☐ Permit short-circuiting without depending on provider invocation count or side effects.
-        ☐ Keep providers unable to reorder or manufacture rows; keep alternative resolution outside the manager.
-    ☐ Implement explicit registration ownership and replacement.
-        ☐ Assign stable feature-owned registration identities and reject duplicates before mutating the collection.
-        ☐ Return independently owned removal handles; removal is idempotent and cannot unregister another feature.
-        ☐ Replace criteria/registrations atomically so no partially updated collection can be projected or published.
-        ☐ Confine changes to the owning client thread and prevent mutation of an in-progress enumeration.
-        ☐ Reject invalid registrations and surface provider exceptions explicitly through the existing error boundary; never turn failures into successful empty or unfiltered results.
-    ☐ Establish the session lifetime boundary.
-        ☐ Wire built-in contributions explicitly; use no static or world-global registry.
-        ☐ Ensure teardown releases registrations and subscriptions without requiring GUI recomposition to recreate the session.
-    ☐ Add focused manager tests for composition, duplicate rejection, atomic replacement, independent/idempotent removal, owning-thread enforcement, mid-pass mutation protection, failures, and teardown.
+    ☑ Inspect the current CraftingMenu source, existing feature-provider prior art, test infrastructure, and applicable repository instructions before editing.
+        ☑ Confirm the actual baseline and identify any changes since proposal approval; integrate rather than restore earlier source.
+        ☑ Reuse suitable repository patterns without importing item-slot sampling, GPU ownership, or unrelated priority machinery.
+    ☑ Introduce internal IRecipeFilter and RecipeFilterSet.
+        ☑ Define Matches(CraftingRecipeSelection) over an already evaluated selection.
+        ☑ Implement AND composition, no-filter acceptance, and registration-order-independent membership.
+        ☑ Permit short-circuiting without depending on provider invocation count or side effects.
+        ☑ Keep providers unable to reorder or manufacture rows; keep alternative resolution outside the manager.
+    ☑ Implement explicit registration ownership and replacement.
+        ☑ Assign stable feature-owned registration identities and reject duplicates before mutating the collection.
+        ☑ Return independently owned removal handles; removal is idempotent and cannot unregister another feature.
+        ☑ Replace criteria/registrations atomically so no partially updated collection can be projected or published.
+        ☑ Confine changes to the owning client thread and prevent mutation of an in-progress enumeration.
+        ☑ Reject invalid registrations and surface provider exceptions explicitly through the existing error boundary; never turn failures into successful empty or unfiltered results.
+    ☑ Establish the session lifetime boundary.
+        ☑ Wire built-in contributions explicitly; use no static or world-global registry.
+        ☑ Ensure teardown releases registrations and subscriptions without requiring GUI recomposition to recreate the session.
+    ☑ Add focused manager tests for composition, duplicate rejection, atomic replacement, independent/idempotent removal, owning-thread enforcement, mid-pass mutation protection, failures, and teardown.
 
 Completion gate:
-    ☐ Manager tests pass and demonstrate deterministic membership regardless of registration order.
-    ☐ Provider execution uses evaluated inputs only and does not capture inventory, allocate, dispatch, inspect GUI/input state, or mutate shared recipe/selection data.
-    ☐ Existing menu behavior is unchanged; no speculative ordering/classification framework has been introduced.
+    ☑ Manager tests pass and demonstrate deterministic membership regardless of registration order.
+    ☑ Provider execution uses evaluated inputs only and does not capture inventory, allocate, dispatch, inspect GUI/input state, or mutate shared recipe/selection data.
+    ☑ Existing menu behavior is unchanged; no speculative ordering/classification framework has been introduced.
+
+Verification: 169 focused manager, lifecycle, interaction, and catalogue-view tests passed. Second implementation review and independent audit-stage-completion review found no outstanding issues. Session ownership is established here; built-in search/category provider extraction and registration remain Phase 2 work. Live-game validation was not performed.
 
 ## Phase 2: Search and category through the filter pipeline
 
@@ -79,7 +81,7 @@ Outcome: Existing filters are feature-owned contributions, and projection accept
     ☐ Extract category matching into an isolated provider.
         ☐ Preserve native category codes, selected-recipe category behavior, overlapping categories, and the existing Other sentinel.
         ☐ All imposes no category restriction; do not change visible-category exclusions or catalogue metadata.
-    ☐ Route catalogue candidate eligibility through CraftingFilterManager.
+    ☐ Route catalogue candidate eligibility through RecipeFilterSet.
         ☐ Resolve automatic or pinned alternatives before matching, so all providers inspect the same selected recipe for an output.
         ☐ Preserve catalogue immutability and the current supported/craftable/relevance/missing/name/stable-identity ordering.
         ☐ Preserve alternative resolution, explicit pinning, deselection, Auto, and category-change selection behavior.

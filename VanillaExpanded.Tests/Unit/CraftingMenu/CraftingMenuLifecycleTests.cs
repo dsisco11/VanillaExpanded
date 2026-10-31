@@ -498,6 +498,43 @@ public sealed class CraftingMenuLifecycleTests
         Assert.True(f.ToggleButton.Visible);
     }
 
+    [Fact]
+    public void SessionFilterRegistrationsSurviveRecompositionAndAreReleasedWithTheDialog()
+    {
+        using var f = new MenuFixture(includeRecipes: true);
+        f.Parent.TryOpen();
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        var session = (CraftingMenuSession)typeof(GuiDialogCraftingMenu).GetField("session",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
+        var manager = session.Filters;
+        using var registration = manager.Register("test:lifetime", new LifecycleFilterProvider());
+        var previousComposer = menu.SingleComposer;
+        f.ResizePanelSpace(previousComposer.Bounds.fixedWidth, previousComposer.Bounds.fixedHeight - 20);
+        menu.TryOpen();
+        Assert.NotSame(previousComposer, menu.SingleComposer);
+        Assert.Same(manager, session.Filters);
+        Assert.Single(manager.Filter(session.Rows));
+        Assert.Throws<ArgumentException>(() => manager.Register("test:lifetime", new LifecycleFilterProvider()));
+
+        f.Parent.TryClose();
+        Assert.Empty(f.Menus);
+        Assert.Throws<ObjectDisposedException>(() => manager.Filter(session.Rows));
+        registration.Dispose();
+        f.Parent.TryOpen();
+        var reopened = Assert.Single(f.Menus);
+        var newSession = (CraftingMenuSession)typeof(GuiDialogCraftingMenu).GetField("session",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(reopened)!;
+        Assert.NotSame(manager, newSession.Filters);
+        using var newRegistration = newSession.Filters.Register("test:lifetime", new LifecycleFilterProvider());
+        Assert.Single(newSession.Filters.Filter(newSession.Rows));
+    }
+
+    private sealed class LifecycleFilterProvider : IRecipeFilter
+    {
+        public bool Matches(CraftingRecipeSelection selection) => true;
+    }
+
     [Theory]
     [InlineData("flora")]
     [InlineData("clutter")]
