@@ -38,11 +38,15 @@ public sealed class CraftingMenuInteractionTests
             call.Method.Name == nameof(IEventAPI.TriggerMatchesRecipe) && call.Arguments.Count == 4);
         // One evaluation validates ordinary and shift placements separately.
         Assert.Equal(2, NativeChecks());
+        session.CraftableOnly.SetEnabled(true);
         session.Search(recipe.Output.Code!.ToString());
         session.SelectCategory("tools");
         Assert.Same(allocation, Assert.Single(session.Rows).Allocation);
         session.Search("missing");
         Assert.Empty(session.Rows);
+        session.CraftableOnly.SetEnabled(false);
+        Assert.Empty(session.Rows);
+        session.CraftableOnly.SetEnabled(true);
         session.Search("");
         session.SelectCategory(null);
         Assert.Same(allocation, Assert.Single(session.Rows).Allocation);
@@ -52,6 +56,116 @@ public sealed class CraftingMenuInteractionTests
         Assert.Equal(2, captures);
         Assert.Equal(4, NativeChecks());
         Assert.NotSame(allocation, Assert.Single(session.Rows).Allocation);
+    }
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    public void CraftableSearchAndCategoryComposeIndependently(bool searching, bool categorized, bool craftable)
+    {
+        var f = new AllocationFixture();
+        var stock = Enumerable.Range(0, 8).Select(i => f.Stack(i + 1, "ingredient-" + i, (i & 4) != 0 ? 2 : 1)).ToArray();
+        var recipes = stock.Select((stack, i) =>
+        {
+            var recipe = f.Recipe(f.Ingredient(stack, 2));
+            var output = f.Stack(100 + i, ((i & 2) != 0 ? "shared-" : "other-") + i, 1);
+            output.Collectible.CreativeInventoryTabs = [(i & 1) != 0 ? "tools" : "construction"];
+            recipe.Output = f.Ingredient(output);
+            return recipe;
+        }).ToArray();
+        f.Register(recipes);
+        f.Snapshot(stock);
+        using var session = Session(f, recipes);
+        session.Refresh();
+        session.Search(searching ? "shared" : "");
+        session.SelectCategory(categorized ? "tools" : null);
+        session.CraftableOnly.SetEnabled(craftable);
+        AssertRows(searching, categorized, craftable);
+        session.Search("");
+        AssertRows(false, categorized, craftable);
+        session.Search(searching ? "shared" : "");
+        session.SelectCategory(null);
+        AssertRows(searching, false, craftable);
+        session.SelectCategory(categorized ? "tools" : null);
+        session.CraftableOnly.SetEnabled(false);
+        AssertRows(searching, categorized, false);
+
+        void AssertRows(bool search, bool category, bool available)
+        {
+            var expected = recipes.Where((_, i) => (!search || (i & 2) != 0)
+                && (!category || (i & 1) != 0) && (!available || (i & 4) != 0));
+            Assert.Equal(expected.OrderBy(recipe => recipe.Name!.ToString()),
+                session.Rows.Select(row => row.Recipe.Recipe).OrderBy(recipe => recipe.Name!.ToString()));
+        }
+    }
+
+    [Fact]
+    public void CraftableMembershipTracksActualIngredientThresholdsWithoutCriteriaReallocation()
+    {
+        var f = new AllocationFixture();
+        var ingredient = f.Stack(1, "a", 1);
+        var recipe = f.Recipe(f.Ingredient(ingredient, 2));
+        f.Register(recipe);
+        using var session = Session(f, recipe);
+        session.CraftableOnly.SetEnabled(true);
+        foreach (int quantity in new[] { 0, 1, 2, 1, 0, 3 })
+        {
+            var stack = ingredient.Clone();
+            stack.StackSize = quantity;
+            f.Snapshot(quantity == 0 ? [] : [stack]);
+            session.Refresh();
+            Assert.Equal(quantity >= 2 ? 1 : 0, session.Rows.Length);
+            session.CraftableOnly.SetEnabled(false);
+            var row = Assert.Single(session.Rows);
+            Assert.Equal(Math.Min(quantity, 2), row.Evaluation.Allocated);
+            Assert.Equal(quantity >= 2, row.Evaluation.CanCraft);
+            session.CraftableOnly.SetEnabled(true);
+            if (quantity >= 2) Assert.Same(row.Allocation, Assert.Single(session.Rows).Allocation);
+        }
+    }
+
+    [Fact]
+    public void CraftableOnlyHidesUnavailablePinUntilDisabledAndAutoRestoresAvailableVariant()
+    {
+        var f = new AllocationFixture();
+        var a = f.Stack(1, "a", 1);
+        var b = f.Stack(2, "b", 1);
+        var first = f.Recipe(f.Ingredient(a));
+        first.Output!.ResolvedItemStack!.Collectible.CreativeInventoryTabs = ["tools"];
+        var second = f.Recipe(f.Ingredient(b));
+        second.Output = first.Output;
+        f.Register(first, second);
+        f.Snapshot(a);
+        using var session = Session(f, first, second);
+        session.Refresh();
+        var original = Assert.Single(session.Rows);
+        var unavailable = original.Output.Alternatives.Single(row => row.Id != original.Recipe.Id);
+        session.Select(original.Output.Id);
+        session.ChooseAlternative(unavailable.Id);
+        session.CraftableOnly.SetEnabled(true);
+        Assert.Empty(session.Rows);
+        session.Auto();
+        session.Refresh();
+        Assert.Empty(session.Rows);
+        session.CraftableOnly.SetEnabled(false);
+        Assert.Equal(unavailable.Id, Assert.Single(session.Rows).Recipe.Id);
+        Assert.True(Assert.Single(session.Rows).IsExplicit);
+        session.Auto();
+        Assert.Equal(original.Recipe.Id, Assert.Single(session.Rows).Recipe.Id);
+        session.CraftableOnly.SetEnabled(true);
+        Assert.Single(session.Rows);
+        session.ChooseAlternative(unavailable.Id);
+        Assert.Empty(session.Rows);
+        session.SelectCategory("tools");
+        Assert.Null(session.SelectedOutput);
+        Assert.Equal(original.Recipe.Id, Assert.Single(session.Rows).Recipe.Id);
+        Assert.False(Assert.Single(session.Rows).IsExplicit);
     }
 
     [Theory]
@@ -230,10 +344,13 @@ public sealed class CraftingMenuInteractionTests
     }
 
     [Theory]
-    [InlineData("output")]
-    [InlineData("alternative")]
-    [InlineData("reintroduced")]
-    public void HeldReleaseCannotActivateReboundTileAndRequiresNewPress(string change)
+    [InlineData("output", false)]
+    [InlineData("alternative", false)]
+    [InlineData("reintroduced", false)]
+    [InlineData("output", true)]
+    [InlineData("alternative", true)]
+    [InlineData("reintroduced", true)]
+    public void HeldReleaseCannotActivateReboundTileAndRequiresNewPress(string change, bool craftable)
     {
         using var scale = new GuiScaleScope();
         var f = new AllocationFixture();
@@ -245,7 +362,9 @@ public sealed class CraftingMenuInteractionTests
         f.Register(first, second);
         f.Snapshot(a);
         using var session = Session(f, first, second);
-        using var filter = session.Filters.Register("test:inventory", new PredicateFilter(row => row.Evaluation.CanCraft));
+        using var filter = craftable ? null
+            : session.Filters.Register("test:inventory", new PredicateFilter(row => row.Evaluation.CanCraft));
+        session.CraftableOnly.SetEnabled(craftable);
         session.Refresh();
         var api = new Mock<ICoreClientAPI>();
         var input = new Mock<IInputAPI>();
@@ -264,11 +383,13 @@ public sealed class CraftingMenuInteractionTests
         Assert.True(tile.Pressed);
         if (change == "reintroduced")
         {
-            filter.Replace(new PredicateFilter(_ => false));
+            if (craftable) f.Snapshot();
+            else filter!.Replace(new PredicateFilter(_ => false));
             session.Refresh();
             Assert.Empty(session.Rows);
             Assert.False(tile.Pressed);
-            filter.Replace(new PredicateFilter(row => row.Evaluation.CanCraft));
+            if (craftable) f.Snapshot(a);
+            else filter!.Replace(new PredicateFilter(row => row.Evaluation.CanCraft));
         }
         else f.Snapshot(b);
         session.Refresh();
@@ -291,11 +412,13 @@ public sealed class CraftingMenuInteractionTests
     }
 
     [Theory]
-    [InlineData(false, false)]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    [InlineData(true, true)]
-    public void LiveMembershipRebindsHoverAndFocusAndRecoversFromEmpty(bool focus, bool inventory)
+    [InlineData(false, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, false)]
+    [InlineData(true, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, true, true)]
+    public void LiveMembershipRebindsHoverAndFocusAndRecoversFromEmpty(bool focus, bool inventory, bool craftable)
     {
         using var scale = new GuiScaleScope();
         var f = new AllocationFixture();
@@ -306,8 +429,9 @@ public sealed class CraftingMenuInteractionTests
         f.Register(first, second);
         f.Snapshot(a);
         using var session = Session(f, first, second);
-        using var filter = session.Filters.Register("test:membership", new PredicateFilter(row => inventory
+        using var filter = craftable ? null : session.Filters.Register("test:membership", new PredicateFilter(row => inventory
             ? row.Evaluation.CanCraft : row.Recipe.Recipe == first));
+        session.CraftableOnly.SetEnabled(craftable);
         session.Refresh();
         var api = new Mock<ICoreClientAPI>();
         var viewport = Calculated(ElementBounds.Fixed(0, 0, 96, 72).WithEmptyParent());
@@ -321,7 +445,7 @@ public sealed class CraftingMenuInteractionTests
         else tiles.UpdateHover(10, 10);
         Assert.Same(first, inspected!.Recipe.Recipe);
         if (inventory) f.Snapshot(b);
-        else filter.Replace(new PredicateFilter(row => row.Recipe.Recipe == second));
+        else filter!.Replace(new PredicateFilter(row => row.Recipe.Recipe == second));
         session.Refresh();
         Assert.Same(second, inspected!.Recipe.Recipe);
         if (focus)
@@ -329,13 +453,15 @@ public sealed class CraftingMenuInteractionTests
             Assert.True(tiles.HasFocus);
             Assert.Equal(inspected, Assert.IsType<GuiElementCraftingTile>(tiles.CurrentTabIndexElement).Selection);
         }
-        filter.Replace(new PredicateFilter(_ => false));
+        if (craftable) f.Snapshot();
+        else filter!.Replace(new PredicateFilter(_ => false));
         session.Refresh();
         Assert.Null(inspected);
         Assert.False(tiles.HasFocus);
         Assert.Null(tiles.CurrentTabIndexElement);
         Assert.All(tiles.Elements, tile => Assert.False(tile.Focusable));
-        filter.Replace(new PredicateFilter(row => row.Recipe.Recipe == second));
+        if (craftable) f.Snapshot(b);
+        else filter!.Replace(new PredicateFilter(row => row.Recipe.Recipe == second));
         session.Refresh();
         if (focus) tiles.OnFocusGained();
         Assert.Same(second, inspected!.Recipe.Recipe);

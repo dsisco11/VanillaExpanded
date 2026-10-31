@@ -2,7 +2,7 @@
 
 Source proposal: [CraftingMenuProvidersProposal.md](CraftingMenuProvidersProposal.md)
 Authority: Proposal approved by the user on 2026-10-30. Its requirements govern this plan.
-Status: Phases 1-3 complete; Phases 4-6 remain pending.
+Status: Phases 1-4 complete; Phases 5-6 remain pending.
 
 ## Goal and execution boundary
 
@@ -147,32 +147,34 @@ Verification: 364 CraftingMenu tests passed. Second implementation review and in
 
 Outcome: Craftable-only is delivered by provider registration rather than new query flags or session branches.
 
-    ☐ Implement a feature-owned craftable-only provider whose predicate reads Evaluation.CanCraft.
-        ☐ Exclude partial, missing, unsupported, and pending evaluations without reallocation or interpreting colors, relevance, or CanPlace.
-        ☐ Own one provider instance per feature/session and register it only while enabled; disablement releases its registration.
-        ☐ Allow checked-state storage in the feature/UI without passing the state through catalogue query signatures.
-    ☐ Connect the native control in GuiDialogCraftingMenu.
-        ☐ Use a native localized toggle with measured layout that fits supported minimum sizes and long translations.
-        ☐ Keep search first in keyboard tab order and preserve category navigation and existing native input conventions.
-        ☐ Keep category and search text unchanged when toggling; return the list to the top on explicit changes.
-        ☐ Preserve checked state and existing registrations during resize/recomposition; default to off for a new session.
-        ☐ Keep the existing generic empty state; do not implement separate pending empty-state actions.
-    ☐ Preserve unavailable explicit alternatives.
-        ☐ Hide an output when its pinned recipe is unavailable even if a different alternative is craftable.
-        ☐ Preserve its pin while hidden, subject to existing deselection/category rules.
-        ☐ Turning the filter off exposes the pinned alternative again; Auto restores automatic selection when invoked through valid selection controls.
-        ☐ Do not leave hidden rows actionable through stale footer or tooltip state.
-    ☐ Add focused provider, session, and native GUI tests.
-        ☐ Cover full/partial/missing/unsupported/pending evaluations and actual allocation transitions across ingredient thresholds.
-        ☐ Cover all category/search/toggle combinations and removal of each restriction without clearing the others.
-        ☐ Cover live inventory membership and shown-alternative changes while hovered, focused, pressed, or empty.
-        ☐ Cover mouse/keyboard operation, search-first focus order, localized minimum sizing, and scales 1, 1.5, and 2.
-        ☐ Cover repeated resize and close/reopen without duplicate registrations, stale subscriptions, or unintended persistence.
+    ☑ Implement a feature-owned craftable-only provider whose predicate reads Evaluation.CanCraft.
+        ☑ Exclude partial, missing, unsupported, and pending evaluations without reallocation or interpreting colors, relevance, or CanPlace.
+        ☑ Own one provider instance per feature/session and register it only while enabled; disablement releases its registration.
+        ☑ Allow checked-state storage in the feature/UI without passing the state through catalogue query signatures.
+    ☑ Connect the native control in GuiDialogCraftingMenu.
+        ☑ Use a native localized toggle with measured layout that fits supported minimum sizes and long translations.
+        ☑ Keep search first in keyboard tab order and preserve category navigation and existing native input conventions.
+        ☑ Keep category and search text unchanged when toggling; return the list to the top on explicit changes.
+        ☑ Preserve checked state and existing registrations during resize/recomposition; default to off for a new session.
+        ☑ Keep the existing generic empty state; do not implement separate pending empty-state actions.
+    ☑ Preserve unavailable explicit alternatives.
+        ☑ Hide an output when its pinned recipe is unavailable even if a different alternative is craftable.
+        ☑ Preserve its pin while hidden, subject to existing deselection/category rules.
+        ☑ Turning the filter off exposes the pinned alternative again; Auto restores automatic selection when invoked through valid selection controls.
+        ☑ Do not leave hidden rows actionable through stale footer or tooltip state.
+    ☑ Add focused provider, session, and native GUI tests.
+        ☑ Cover full/partial/missing/unsupported/pending evaluations and actual allocation transitions across ingredient thresholds.
+        ☑ Cover all category/search/toggle combinations and removal of each restriction without clearing the others.
+        ☑ Cover live inventory membership and shown-alternative changes while hovered, focused, pressed, or empty.
+        ☑ Cover mouse/keyboard operation, search-first focus order, localized minimum sizing, and scales 1, 1.5, and 2.
+        ☑ Cover repeated resize and close/reopen without duplicate registrations, stale subscriptions, or unintended persistence.
 
 Completion gate:
-    ☐ Craftable-only inserts/removes only its own registration and has no special filtering or interaction branch in the session.
-    ☐ Pinned semantics, live updates, independent filters, and native control regressions pass.
-    ☐ Toggling or typing reuses evaluations; inventory updates still capture and allocate only once per refresh.
+    ☑ Craftable-only inserts/removes only its own registration and has no special filtering or interaction branch in the session.
+    ☑ Pinned semantics, live updates, independent filters, and native control regressions pass.
+    ☑ Toggling or typing reuses evaluations; inventory updates still capture and allocate only once per refresh.
+
+Verification: 392 CraftingMenu tests passed. Localization JSON parsing and whitespace checks passed. Second implementation review and independent audit-stage-completion review found no outstanding issues. Coverage includes provider ownership and failure atomicity, ingredient thresholds, independent filter combinations, live native input safety, unavailable pins, measured localized layout at scales 1/1.5/2, and repeated resize/reopen lifetime. Live-game validation was not performed. Integrated documentation and final acceptance remain Phases 5-6 work.
 
 ## Phase 5: Integrated verification and permanent documentation
 

@@ -19,6 +19,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
     private double minimumWidth;
     private double minimumHeight;
     private double searchHeight;
+    private double craftableHeight;
     private double tabsHeight;
     private double footerHeight;
     private double previousWidth;
@@ -100,8 +101,10 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         var content = ElementBounds.Fixed(8, contentTop, width - 16, height - contentTop - 8);
         var tabsBounds = ElementBounds.Fixed(0, 0, content.fixedWidth, tabsHeight);
         var searchBounds = ElementBounds.Fixed(0, tabsHeight + 8, content.fixedWidth, searchHeight);
+        var craftableBounds = ElementBounds.Fixed(0, searchBounds.fixedY + searchHeight + 8,
+            content.fixedWidth, craftableHeight);
         var footer = ElementBounds.Fixed(0, content.fixedHeight - footerHeight, content.fixedWidth, footerHeight);
-        double listTop = searchBounds.fixedY + searchHeight + 8;
+        double listTop = craftableBounds.fixedY + craftableHeight + 8;
         var viewport = ElementBounds.Fixed(0, listTop, content.fixedWidth - 16, footer.fixedY - 10 - listTop);
         var scrollBounds = ElementBounds.Fixed(0, viewport.fixedY, 12, viewport.fixedHeight).FixedRightOf(viewport, 4);
         var previous = ElementBounds.Fixed(0, 0, previousWidth, footerHeight);
@@ -129,6 +132,11 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
                     tiles.ResetScroll();
                     session.SelectCategory(categories[index]);
                 }, CairoFont.WhiteSmallText(), CairoFont.WhiteSmallText().WithWeight(Cairo.FontWeight.Bold), "categories")
+            .AddToggleButton(Lang.Get("vanillaexpanded:craftingmenu-craftable-only"), CairoFont.WhiteSmallText(), enabled =>
+            {
+                tiles.ResetScroll();
+                session.CraftableOnly.SetEnabled(enabled);
+            }, craftableBounds, "craftable-only")
             .BeginClip(viewport)
                 .AddInteractiveElement(tiles, "tiles")
             .EndClip()
@@ -150,6 +158,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         SingleComposer?.Dispose();
         SingleComposer = composer;
         tooltip = newTooltip;
+        composer.GetToggleButton("craftable-only").SetValue(session.CraftableOnly.Enabled);
         composer.GetHorizontalTabs("categories").SetValue(Array.IndexOf(categories, session.Category), false);
         composer.GetTextInput("search").SetPlaceHolderText(Lang.Get("vanillaexpanded:craftingmenu-search"));
         composer.GetTextInput("search").SetValue(search);
@@ -176,15 +185,18 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         footerHeight = Math.Max(24, Math.Ceiling(Math.Max(buttonFont.GetFontExtents().Height,
             textFont.GetFontExtents().Height) / scale));
         searchHeight = Math.Max(26, Math.Ceiling(textFont.GetFontExtents().Height / scale + 6));
+        craftableHeight = Math.Max(26, Math.Ceiling(textFont.GetFontExtents().Height / scale + 8));
         tabsHeight = Math.Max(26, Math.Ceiling(textFont.GetFontExtents().Height / scale + 6));
         double counterWidth = Math.Ceiling(textFont.GetTextExtents("1/1").Width / scale + 1);
         double titleWidth = textFont.GetTextExtents(Lang.Get("vanillaexpanded:craftingmenu-title")).Width / scale;
         // The native title bar reserves space for its menu and close icons.
         double titleControlsWidth = 2 * GuiElementDialogTitleBar.unscaledCloseIconSize + 2 + 20;
-        minimumWidth = Math.Ceiling(Math.Max(
+        double craftableWidth = 32 + textFont.GetTextExtents(
+            Lang.Get("vanillaexpanded:craftingmenu-craftable-only")).Width / scale;
+        minimumWidth = Math.Ceiling(Math.Max(craftableWidth, Math.Max(
             GuiStyle.ElementToDialogPadding + titleWidth + 8 + titleControlsWidth,
-            16 + previousWidth + 3 + autoWidth + 3 + nextWidth + 4 + counterWidth));
-        minimumHeight = Math.Ceiling(GuiStyle.TitleBarHeight + 8 + tabsHeight + 8 + searchHeight + 8
+            16 + previousWidth + 3 + autoWidth + 3 + nextWidth + 4 + counterWidth)));
+        minimumHeight = Math.Ceiling(GuiStyle.TitleBarHeight + 8 + tabsHeight + 8 + searchHeight + 8 + craftableHeight + 8
             + GuiElementCraftingTiles.TileSize + 10 + footerHeight + 8);
     }
 

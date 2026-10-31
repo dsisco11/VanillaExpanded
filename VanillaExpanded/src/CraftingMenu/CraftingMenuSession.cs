@@ -27,12 +27,14 @@ internal sealed class CraftingMenuSession : IDisposable
         this.execute = execute;
         search = new(Filters, FiltersChanged);
         category = new(catalogue, Filters, CategoryChanged);
+        CraftableOnly = new(Filters, FiltersChanged);
     }
 
     internal ImmutableArray<CraftingRecipeSelection> Rows { get; private set; } = ImmutableArray<CraftingRecipeSelection>.Empty;
     internal int? SelectedOutput { get; private set; }
     internal string? Category => category.Selected;
     internal RecipeFilterSet Filters { get; } = new();
+    internal CraftableOnly CraftableOnly { get; }
     internal event Action? Changed;
 
     internal void Refresh()

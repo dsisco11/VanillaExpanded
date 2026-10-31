@@ -17,8 +17,10 @@ namespace VanillaExpanded.Tests.Unit.CraftingMenu;
 [Collection("Crafting native GUI")]
 public sealed class CraftingMenuLifecycleTests
 {
-    [Fact]
-    public void HiddenPinnedSelectionDisablesFooterAndClearsTooltipWithoutLosingPin()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HiddenPinnedSelectionDisablesFooterAndClearsTooltipWithoutLosingPin(bool craftable)
     {
         using var f = new MenuFixture(includeRecipes: true);
         f.Parent.TryOpen();
@@ -34,8 +36,9 @@ public sealed class CraftingMenuLifecycleTests
         tiles.UpdateHover((int)tile.Bounds.absX + 10, (int)tile.Bounds.absY + 10);
         var tooltip = Assert.IsType<GuiElementCraftingRecipeTooltip>(menu.SingleComposer.GetElement("tooltip"));
         Assert.NotNull(tooltip.Popup);
-        using var filter = session.Filters.Register("test:hidden", new HiddenFilter());
-        session.Refresh();
+        using var filter = craftable ? null : session.Filters.Register("test:hidden", new HiddenFilter());
+        if (craftable) f.ToggleCraftable(menu);
+        else session.Refresh();
         Assert.Empty(session.Rows);
         var render = Mock.Get(f.Lifecycle.Api.Object.Render);
         render.Invocations.Clear();
@@ -48,8 +51,12 @@ public sealed class CraftingMenuLifecycleTests
             Assert.False(menu.SingleComposer.GetButton(key).Focusable);
             f.Click(menu.SingleComposer.GetButton(key), handled: false);
         }
-        filter.Dispose();
-        session.Refresh();
+        if (craftable) f.ToggleCraftable(menu);
+        else
+        {
+            filter!.Dispose();
+            session.Refresh();
+        }
         Assert.True(Assert.Single(session.Rows).IsExplicit);
         Assert.Equal(row.Recipe.Id, Assert.Single(session.Rows).Recipe.Id);
         Assert.NotNull(tooltip.Popup);
@@ -62,6 +69,105 @@ public sealed class CraftingMenuLifecycleTests
     private sealed class HiddenFilter : IRecipeFilter
     {
         public bool Matches(CraftingRecipeSelection selection) => false;
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(1.5)]
+    [InlineData(2)]
+    public void NativeCraftableTogglePreservesIndependentCriteriaAcrossInputResizeAndSessionReset(float scale)
+    {
+        using var f = new MenuFixture(scale: scale, includeRecipes: true);
+        var first = Assert.Single(f.Lifecycle.Recipes);
+        first.Output!.ResolvedItemStack!.Collectible.CreativeInventoryTabs = ["tools"];
+        for (int i = 0; i < 41; i++)
+        {
+            var recipe = f.Lifecycle.F.Catalogue.Recipe("other-" + i);
+            recipe.Output!.ResolvedItemStack!.Collectible.CreativeInventoryTabs = [i == 40 ? "construction" : "tools"];
+            f.Lifecycle.Recipes.Add(recipe);
+        }
+        f.Lifecycle.F.Register(f.Lifecycle.Recipes.ToArray());
+        var inventories = ((ClientPlayerInventoryManager)f.Lifecycle.F.Player.InventoryManager).Inventories;
+        var grid = Assert.Single(inventories.Values.OfType<InventoryCraftingGrid>());
+        grid[0].Itemstack = first.ResolvedIngredients![0]!.ResolvedItemStack!.Clone();
+        f.Lifecycle.FinalizeWorld();
+        f.Recompose();
+        f.Parent.TryOpen();
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        var session = (CraftingMenuSession)typeof(GuiDialogCraftingMenu).GetField("session",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
+        var toggle = menu.SingleComposer.GetToggleButton("craftable-only");
+        Assert.False(toggle.On);
+        Assert.False(session.CraftableOnly.Enabled);
+        menu.SingleComposer.GetTextInput("search").SetValue("output");
+        var tabs = menu.SingleComposer.GetHorizontalTabs("categories");
+        tabs.SetValue(Array.FindIndex(tabs.tabs, tab => tab.Name == "tools"));
+        Assert.Equal(41, session.Rows.Length);
+        var tiles = Assert.IsType<GuiElementCraftingTiles>(menu.SingleComposer.GetElement("tiles"));
+        tiles.Scroll(48 * scale);
+        Assert.True(menu.SingleComposer.GetScrollbar("scroll").CurrentYPosition > 0);
+        f.ToggleCraftable(menu);
+        Assert.True(toggle.On);
+        Assert.True(session.CraftableOnly.Enabled);
+        Assert.Single(session.Rows);
+        Assert.Equal(0, menu.SingleComposer.GetScrollbar("scroll").CurrentYPosition);
+        AssertCriteria();
+        Assert.True(menu.SingleComposer.FocusElement(toggle.TabIndex));
+        var enter = new KeyEvent { KeyCode = (int)GlKeys.Enter };
+        menu.OnKeyDown(enter);
+        Assert.True(enter.Handled);
+        Assert.False(toggle.On);
+        Assert.Equal(41, session.Rows.Length);
+        AssertCriteria();
+        enter = new KeyEvent { KeyCode = (int)GlKeys.Enter };
+        menu.OnKeyDown(enter);
+        Assert.True(enter.Handled);
+        Assert.True(toggle.On);
+        Assert.Single(session.Rows);
+        for (int i = 0; i < 3; i++)
+        {
+            var composer = menu.SingleComposer;
+            f.ResizePanelSpace(composer.Bounds.fixedWidth + 20, composer.Bounds.fixedHeight - 10);
+            menu.TryOpen();
+            Assert.NotSame(composer, menu.SingleComposer);
+            Assert.True(menu.SingleComposer.GetToggleButton("craftable-only").On);
+            Assert.True(session.CraftableOnly.Enabled);
+            Assert.Single(session.Rows);
+            AssertCriteria();
+            Assert.Throws<ArgumentException>(() =>
+                session.Filters.Register("vanillaexpanded:craftable-only", new CraftableFilter()));
+        }
+        for (int i = 0; i < 3; i++)
+        {
+            f.Parent.TryClose();
+            Assert.Empty(f.Menus);
+            Assert.Throws<ObjectDisposedException>(() => session.Filters.Filter([]));
+            f.Parent.TryOpen();
+            var reopened = Assert.Single(f.Menus);
+            var newSession = (CraftingMenuSession)typeof(GuiDialogCraftingMenu).GetField("session",
+                BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(reopened)!;
+            Assert.NotSame(session, newSession);
+            Assert.False(newSession.CraftableOnly.Enabled);
+            Assert.False(reopened.SingleComposer.GetToggleButton("craftable-only").On);
+            Assert.Equal("", reopened.SingleComposer.GetTextInput("search").GetText());
+            Assert.Null(newSession.Category);
+            Assert.Equal(42, newSession.Rows.Length);
+            session = newSession;
+            if (i < 2)
+            {
+                f.ToggleCraftable(reopened);
+                Assert.True(session.CraftableOnly.Enabled);
+                Assert.Single(session.Rows);
+            }
+        }
+        using var identity = session.Filters.Register("vanillaexpanded:craftable-only", new CraftableFilter());
+
+        void AssertCriteria()
+        {
+            Assert.Equal("tools", session.Category);
+            Assert.Equal("output", menu.SingleComposer.GetTextInput("search").GetText());
+        }
     }
 
     [Theory]
@@ -733,9 +839,12 @@ public sealed class CraftingMenuLifecycleTests
             .Sum(key => originalComposer.GetElement(key).Bounds.OuterWidth / scale) + 6 + 4 + counterWidth + 16;
         double titleWidth = GuiStyle.ElementToDialogPadding + title.Font.GetTextExtents(title.GetText()).Width / scale
             + 8 + 2 * GuiElementDialogTitleBar.unscaledCloseIconSize + 2 + 20;
-        double minimumWidth = Math.Ceiling(Math.Max(footerWidth, titleWidth));
+        var craftable = originalComposer.GetToggleButton("craftable-only");
+        double craftableWidth = 32 + craftable.Font.GetTextExtents(craftable.GetText()).Width / scale;
+        double minimumWidth = Math.Ceiling(Math.Max(craftableWidth, Math.Max(footerWidth, titleWidth)));
         double minimumHeight = Math.Ceiling(GuiStyle.TitleBarHeight + 8 + search.Bounds.OuterHeight / scale
             + 8 + originalComposer.GetHorizontalTabs("categories").Bounds.OuterHeight / scale
+            + 8 + craftable.Bounds.OuterHeight / scale
             + 8 + GuiElementCraftingTiles.TileSize + 10
             + originalComposer.GetElement("auto").Bounds.OuterHeight / scale + 8);
         search.SetValue("preserved search");
@@ -763,6 +872,7 @@ public sealed class CraftingMenuLifecycleTests
             var title = composer.GetTitleBar("titlebar");
             var search = composer.GetTextInput("search").Bounds;
             var tabs = composer.GetHorizontalTabs("categories").Bounds;
+            var craftable = composer.GetToggleButton("craftable-only");
             var viewport = composer.GetElement("tiles").InsideClipBounds;
             var scroll = composer.GetScrollbar("scroll").Bounds;
             var empty = composer.GetDynamicText("empty").Bounds;
@@ -773,7 +883,10 @@ public sealed class CraftingMenuLifecycleTests
             double scale = GuiElement.scaled(1);
             Assert.True(title.Bounds.absY + title.Bounds.OuterHeight + 8 * scale <= tabs.absY + .001);
             Assert.True(tabs.absY + tabs.OuterHeight + 8 * scale <= search.absY + .001);
-            Assert.True(search.absY + search.OuterHeight + 8 * scale <= viewport.absY + .001);
+            Assert.True(search.absY + search.OuterHeight + 8 * scale <= craftable.Bounds.absY + .001);
+            Assert.True(craftable.Bounds.absY + craftable.Bounds.OuterHeight + 8 * scale <= viewport.absY + .001);
+            Assert.True(craftable.Font.GetTextExtents(craftable.GetText()).Width + 16 * scale <=
+                craftable.Bounds.InnerWidth + .001);
             Assert.True(viewport.InnerHeight + .001 >= GuiElementCraftingTiles.TileSize * scale);
             Assert.True(viewport.absX + viewport.OuterWidth + 4 * scale <= scroll.absX + .001);
             Assert.Equal(viewport.absY, scroll.absY, 4);
@@ -787,7 +900,7 @@ public sealed class CraftingMenuLifecycleTests
             double titleMenuLeft = title.Bounds.absX + title.Bounds.OuterWidth
                 - GuiElement.scaled(2 * GuiElementDialogTitleBar.unscaledCloseIconSize + 2 + 20);
             Assert.True(titleTextRight + 8 * scale <= titleMenuLeft + .001);
-            foreach (var bounds in new[] { tabs, search, viewport, scroll, previous, auto, next, counter })
+            foreach (var bounds in new[] { tabs, search, craftable.Bounds, viewport, scroll, previous, auto, next, counter })
             {
                 Assert.True(bounds.absX >= panel.absX + 8 * scale - .001);
                 Assert.True(bounds.absX + bounds.OuterWidth <= panel.absX + panel.InnerWidth - 8 * scale + .001);
@@ -1063,6 +1176,10 @@ public sealed class CraftingMenuLifecycleTests
             PressTab();
             Assert.Same(search, composer.CurrentTabIndexElement);
             PressTab();
+            Assert.Same(categories, composer.CurrentTabIndexElement);
+            PressTab();
+            Assert.Same(composer.GetToggleButton("craftable-only"), composer.CurrentTabIndexElement);
+            PressTab(shift: true);
             Assert.Same(categories, composer.CurrentTabIndexElement);
             PressTab(shift: true);
             Assert.Same(search, composer.CurrentTabIndexElement);
@@ -1424,6 +1541,8 @@ public sealed class CraftingMenuLifecycleTests
                 {
                     "vanillaexpanded:craftingmenu-title" => longLabels ? "Available crafting recipes" : "Crafting recipes",
                     "vanillaexpanded:craftingmenu-auto" => longLabels ? "Automatic selection" : "Auto",
+                    "vanillaexpanded:craftingmenu-craftable-only" => longLabels
+                        ? "Only recipes with all ingredients available" : "Craftable only",
                     "vanillaexpanded:craftingmenu-empty" => "No matching recipes.",
                     "vanillaexpanded:craftingmenu-toggle" => "Recipes",
                     "vanillaexpanded:craftingmenu-category-all" => "All",
@@ -1509,6 +1628,17 @@ public sealed class CraftingMenuLifecycleTests
             Parent.OnMouseDown(down);
             Assert.True(down.Handled);
             Parent.OnMouseUp(new MouseEvent(x, y, EnumMouseButton.Left, 0));
+        }
+
+        internal void ToggleCraftable(GuiDialogCraftingMenu menu)
+        {
+            var bounds = menu.SingleComposer.GetToggleButton("craftable-only").Bounds;
+            int x = (int)(bounds.absX + 5);
+            int y = (int)(bounds.absY + 5);
+            var down = new MouseEvent(x, y, EnumMouseButton.Left, 0);
+            menu.OnMouseDown(down);
+            Assert.True(down.Handled);
+            menu.OnMouseUp(new MouseEvent(x, y, EnumMouseButton.Left, 0));
         }
 
         internal void Click(GuiElement button, bool handled = true)
