@@ -16,9 +16,10 @@ internal sealed class HudOverlayListMenu : GuiElementListMenu, IHudMenuPopup
     /// <summary>Creates the native list; preparation remains explicit so ownership is established before graphics allocation.</summary>
     public HudOverlayListMenu(ICoreClientAPI api, string[] codes, string[] names, int selected,
         SelectionChangedDelegate select)
-        : base(api, codes, names, selected, select, ElementBounds.Fixed(0, 0, 1, 30).WithParent(api.Gui.WindowBounds),
-            CairoFont.WhiteSmallText().WithFontSize(HudOverlaySizes.Text), false)
+        : base(api, codes, names, selected, select, ElementBounds.Fixed(0, 0, 1, 26).WithParent(api.Gui.WindowBounds),
+            CairoFont.WhiteSmallText().WithFontSize(HudOverlaySizes.MenuText), false)
     {
+        unscaledLineHeight = Bounds.fixedHeight;
         // The default callback rounds offsets to whole rows, leaving the final row partially hidden in a
         // short viewport. Retain the native scrollbar, but use its continuous offset for complete access.
         scrollbar.Dispose();

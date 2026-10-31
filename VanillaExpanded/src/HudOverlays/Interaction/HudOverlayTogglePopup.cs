@@ -14,6 +14,7 @@ internal sealed class HudOverlayTogglePopup : IHudMenuPopup
     private readonly ICoreClientAPI api;
     private readonly GuiComposer composer;
     private readonly List<GuiElementSwitch> switches = new();
+    private readonly List<ElementBounds> switchRows = new();
     private readonly HudOverlayStyleDropDown? style;
     private readonly HudOverlaySizeInput? sizeInput;
     private readonly List<GuiElementTextButton> actions = new();
@@ -21,74 +22,101 @@ internal sealed class HudOverlayTogglePopup : IHudMenuPopup
     private bool disposed;
     #region Public API
     #region Construction and state
-    /// <summary>Composes normal HUD lettering and native switches, shrinking only when the entire viewport cannot fit the compact panel.</summary>
+    /// <summary>Composes compact native controls in padded, separated rows, shrinking only when the viewport cannot fit the panel.</summary>
     public HudOverlayTogglePopup(ICoreClientAPI api, IReadOnlyList<HudMenuEntry> entries, Action<string, bool> select,
         PointF pointer, HudMenuEnvironment environment)
     {
         this.api = api;
-        var font = CairoFont.WhiteSmallText().WithFontSize(HudOverlaySizes.Text);
+        var font = CairoFont.WhiteSmallText().WithFontSize(HudOverlaySizes.MenuText);
         var toggles = entries.Where(entry => entry.Kind == HudMenuEntryKind.Toggle).ToArray();
         var choices = entries.Where(entry => entry.Kind == HudMenuEntryKind.StyleChoice).ToArray();
         var commands = entries.Where(entry => entry.Kind == HudMenuEntryKind.Action).ToArray();
         var sizeEntry = entries.SingleOrDefault(entry => entry.Kind == HudMenuEntryKind.Number);
         string styleLabel = Lang.GetL(environment.Locale, "vanillaexpanded:hud-menu-style");
         double scale = environment.GuiScale;
-        double row = Math.Max(30, font.GetFontExtents().Height / scale + 8);
-        double width = entries.Max(entry => font.GetTextExtents(entry.Label).Width / scale) + row + 16;
-        double styleLabelWidth = font.GetTextExtents(styleLabel).Width / scale + 12;
-        if (choices.Length > 0) width += styleLabelWidth;
-        double sizeLabelWidth = sizeEntry == null ? 0 : font.GetTextExtents(sizeEntry.Label).Width / scale + 12;
-        if (sizeEntry != null) width = Math.Max(width, sizeLabelWidth + 100);
-        double height = row * (toggles.Length + (choices.Length > 0 ? 1 : 0) + (sizeEntry == null ? 0 : 1) + commands.Length);
+        double textHeight = font.GetFontExtents().Height / scale;
+        double row = Math.Max(24, Math.Ceiling(textHeight) + 8);
+        double padding = 8, gap = 8, columnGap = 10, switchSize = 16;
+        double Measure(string text)
+        {
+            var extents = font.GetTextExtents(text);
+            return Math.Ceiling(Math.Max(extents.Width, extents.XAdvance) / scale) + 2;
+        }
+        double labelWidth = Math.Max(choices.Length > 0 ? Measure(styleLabel) : 0, sizeEntry == null ? 0 : Measure(sizeEntry.Label));
+        double fieldWidth = Math.Max(80, choices.Select(entry => Measure(entry.Label) + 30).DefaultIfEmpty(0).Max());
+        double contentWidth = Math.Max(80, toggles.Select(entry => Measure(entry.Label) + switchSize + columnGap).DefaultIfEmpty(0).Max());
+        if (choices.Length > 0 || sizeEntry != null) contentWidth = Math.Max(contentWidth, labelWidth + columnGap + fieldWidth);
+        contentWidth = Math.Max(contentWidth, commands.Select(entry => Measure(entry.Label) + 16).DefaultIfEmpty(0).Max());
+        int rowCount = toggles.Length + (choices.Length > 0 ? 1 : 0) + (sizeEntry == null ? 0 : 1) + commands.Length;
+        double contentHeight = row * rowCount + gap * Math.Max(0, rowCount - 1);
+        double width = contentWidth + 2 * padding, height = contentHeight + 2 * padding;
         // Fit the compact panel uniformly only when required. The expanded dropdown scrolls independently.
         double fit = Math.Min(1, Math.Min(environment.Viewport.Width / (width * scale), environment.Viewport.Height / (height * scale)));
         if (!double.IsFinite(fit) || fit <= 0) throw new ArgumentOutOfRangeException(nameof(environment));
         row *= fit; width *= fit; height *= fit;
-        font.WithFontSize((float)(HudOverlaySizes.Text * fit));
+        contentWidth *= fit; contentHeight *= fit; padding *= fit; gap *= fit;
+        columnGap *= fit; switchSize *= fit; labelWidth *= fit; textHeight *= fit;
+        font.WithFontSize((float)(HudOverlaySizes.MenuText * fit));
         panelBounds = HudPopupPlacement.Fit(pointer, new((float)(width * scale), (float)(height * scale)), environment.Viewport);
         var bounds = ElementBounds.Fixed(panelBounds.X / scale, panelBounds.Y / scale, width, height).WithParent(api.Gui.WindowBounds);
         composer = api.Gui.CreateCompo("vanillaexpanded:hud-context-toggles", bounds);
         try
         {
-            composer.AddDialogBG(ElementBounds.Fixed(0, 0, width, height), false);
+            var content = ElementBounds.Fixed(0, 0, contentWidth, contentHeight).WithFixedPadding(padding);
+            composer.AddDialogBG(content, false).BeginChildElements(content);
+            ElementBounds? previousRow = null;
+            ElementBounds BeginRow()
+            {
+                var next = previousRow == null ? ElementBounds.Fixed(0, 0, contentWidth, row) : previousRow.BelowCopy(0, gap);
+                composer.BeginChildElements(next);
+                previousRow = next;
+                return next;
+            }
+            ElementBounds LabelBounds(double left, double labelSpace) =>
+                ElementBounds.Fixed(left, 0, labelSpace, textHeight).WithAlignment(EnumDialogArea.LeftMiddle);
             for (int index = 0; index < toggles.Length; index++)
             {
                 var entry = toggles[index];
-                double size = row * .65;
+                switchRows.Add(BeginRow());
                 var control = new GuiElementSwitch(api, value => select(entry.Code, value),
-                    ElementBounds.Fixed(row * .15, index * row + (row - size) / 2, size, size), size, size * .15)
+                    ElementBounds.Fixed(0, 0, switchSize, switchSize).WithAlignment(EnumDialogArea.LeftMiddle), switchSize, switchSize * .15)
                 { On = entry.Selected };
                 switches.Add(control);
-                composer.AddInteractiveElement(control);
-                composer.AddStaticText(entry.Label, font, ElementBounds.Fixed(row, index * row + row * .2, width - row, row));
+                composer.AddInteractiveElement(control, "toggle:" + index);
+                composer.AddStaticText(entry.Label, font, LabelBounds(switchSize + columnGap, contentWidth - switchSize - columnGap), "toggle-label:" + index);
+                composer.EndChildElements();
             }
             if (choices.Length > 0)
             {
-                double labelWidth = styleLabelWidth * fit;
-                composer.AddStaticText(styleLabel, font, ElementBounds.Fixed(row * .15, toggles.Length * row + row * .2, labelWidth, row));
+                BeginRow();
+                composer.AddStaticText(styleLabel, font, LabelBounds(0, labelWidth), "style-label");
                 style = new HudOverlayStyleDropDown(api, choices.Select(entry => entry.Code).ToArray(), choices.Select(entry => entry.Label).ToArray(),
                     Math.Max(0, Array.FindIndex(choices, entry => entry.Selected)), (code, on) => select(code, on),
-                    ElementBounds.Fixed(labelWidth, toggles.Length * row, width - labelWidth, row), font, environment.Viewport);
-                composer.AddInteractiveElement(style);
+                    ElementBounds.Fixed(labelWidth + columnGap, 0, contentWidth - labelWidth - columnGap, row), font, environment.Viewport);
+                composer.AddInteractiveElement(style, "style");
+                composer.EndChildElements();
             }
             if (sizeEntry?.Number is int value)
             {
-                double labelWidth = sizeLabelWidth * fit;
-                double top = (toggles.Length + (choices.Length > 0 ? 1 : 0)) * row;
-                composer.AddStaticText(sizeEntry.Label, font, ElementBounds.Fixed(row * .15, top + row * .2, labelWidth, row));
-                sizeInput = new HudOverlaySizeInput(api, ElementBounds.Fixed(labelWidth, top, width - labelWidth, row), font, value,
+                BeginRow();
+                composer.AddStaticText(sizeEntry.Label, font, LabelBounds(0, labelWidth), "size-label");
+                sizeInput = new HudOverlaySizeInput(api, ElementBounds.Fixed(labelWidth + columnGap, 0, contentWidth - labelWidth - columnGap, row), font, value,
                     next => select("size:" + next.ToString(System.Globalization.CultureInfo.InvariantCulture), true));
-                composer.AddInteractiveElement(sizeInput);
+                composer.AddInteractiveElement(sizeInput, "size");
+                composer.EndChildElements();
             }
             for (int index = 0; index < commands.Length; index++)
             {
                 var command = commands[index];
                 string key = "action:" + index;
+                BeginRow();
                 composer.AddButton(command.Label, () => { select(command.Code, true); return true; },
-                    ElementBounds.Fixed(0, (toggles.Length + (choices.Length > 0 ? 1 : 0) + (sizeInput == null ? 0 : 1) + index) * row, width, row),
+                    ElementBounds.Fixed(0, 0, contentWidth, row),
                     font, key: key);
                 actions.Add(composer.GetButton(key));
+                composer.EndChildElements();
             }
+            composer.EndChildElements();
             composer.Compose();
             composer.FocusElement(0);
         }
@@ -140,11 +168,14 @@ internal sealed class HudOverlayTogglePopup : IHudMenuPopup
             args.Handled = true;
             return;
         }
-        int row = (int)((args.Y - panelBounds.Top) * (switches.Count + (style == null ? 0 : 1) + (sizeInput == null ? 0 : 1) + actions.Count) / panelBounds.Height);
-        if (row < 0 || row >= switches.Count) return;
-        composer.FocusElement(row);
-        switches[row].OnMouseDownOnElement(api, args);
-        args.Handled = true;
+        for (int index = 0; index < switchRows.Count; index++)
+        {
+            if (!switchRows[index].PointInside(args.X, args.Y)) continue;
+            composer.FocusElement(index);
+            switches[index].OnMouseDownOnElement(api, args);
+            args.Handled = true;
+            return;
+        }
     }
     /// <inheritdoc />
     public void MouseUp(MouseEvent args) { if (!disposed) composer.OnMouseUp(args); }
