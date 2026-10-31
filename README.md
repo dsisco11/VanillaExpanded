@@ -50,6 +50,8 @@ The menu is enabled by default. With ConfigLib installed, use **Pause menu > Mod
 
 Category tabs above search use the outputs' native creative-inventory categories. **All** replaces General, empty categories are omitted, and **Other** contains outputs without a specific category. Flora, Clutter, Aquatic, Liquids, Creatures, and Meta tabs are excluded; their recipes remain available under All and any other categories they belong to. Outputs can appear in more than one category, including categories added by mods. Search applies within the selected category; switching tabs keeps the search text and returns the list to the top. The native tab row scrolls when the categories do not fit. New menu sessions start on All.
 
+Keyboard tab order starts with the search box, followed by the category tabs.
+
 - **Click a recipe:** place available ingredients for one craft. Missing ingredients remain absent.
 - **Shift-click a recipe:** fill its ingredient positions as far as available stock and stack limits allow, even if another ingredient is missing.
 - **Craft normally afterward:** click the vanilla crafting result slot. The menu only moves ingredients; it never takes the result or crafts automatically.

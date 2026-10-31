@@ -923,6 +923,62 @@ public sealed class CraftingMenuLifecycleTests
         }
     }
 
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(1.5, false)]
+    [InlineData(2, false)]
+    [InlineData(1, true)]
+    [InlineData(1.5, true)]
+    [InlineData(2, true)]
+    public void SearchIsFirstInNativeTabOrderAfterOpeningResizingAndReopening(float scale, bool includeRecipes)
+    {
+        using var f = new MenuFixture(scale: scale, includeRecipes: includeRecipes);
+        Mock.Get(f.Lifecycle.Api.Object.Gui).Setup(value => value.RequestFocus(It.IsAny<GuiDialog>()))
+            .Callback<GuiDialog>(dialog => dialog.Focus());
+        f.Parent.Opening = f.Recompose;
+        f.Parent.TryOpen();
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        AssertTabOrder(menu);
+        var previousComposer = menu.SingleComposer;
+        f.ResizePanelSpace(previousComposer.Bounds.fixedWidth + 50, previousComposer.Bounds.fixedHeight - 20);
+        menu.TryOpen();
+        Assert.NotSame(previousComposer, menu.SingleComposer);
+        AssertTabOrder(menu);
+        f.Parent.TryClose();
+        f.Parent.TryOpen();
+        AssertTabOrder(Assert.Single(f.Menus));
+
+        static void AssertTabOrder(GuiDialogCraftingMenu menu)
+        {
+            var composer = menu.SingleComposer;
+            var search = composer.GetTextInput("search");
+            var categories = composer.GetHorizontalTabs("categories");
+            Assert.Same(search, composer.FirstTabbableElement);
+            Assert.Equal(0, search.TabIndex);
+            Assert.True(composer.FocusElement(0));
+            search.OnFocusLost();
+            Assert.Null(composer.CurrentTabIndexElement);
+            menu.Focus();
+            PressTab();
+            Assert.Same(search, composer.CurrentTabIndexElement);
+            PressTab();
+            Assert.Same(categories, composer.CurrentTabIndexElement);
+            PressTab(shift: true);
+            Assert.Same(search, composer.CurrentTabIndexElement);
+            Assert.True(composer.FocusElement(composer.MaxTabIndex));
+            PressTab();
+            Assert.Same(search, composer.CurrentTabIndexElement);
+
+            void PressTab(bool shift = false)
+            {
+                var args = new KeyEvent { KeyCode = (int)GlKeys.Tab, ShiftPressed = shift };
+                menu.OnKeyDown(args);
+                Assert.True(args.Handled);
+            }
+        }
+    }
+
     [Fact]
     public void InventoryHotkeyRemainsSearchInputWhileSearchIsFocused()
     {

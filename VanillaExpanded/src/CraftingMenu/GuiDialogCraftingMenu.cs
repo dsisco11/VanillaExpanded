@@ -116,6 +116,11 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
             .AddShadedDialogBG(ElementBounds.Fill)
             .AddDialogTitleBar(Lang.Get("vanillaexpanded:craftingmenu-title"), () => CloseByUser(), key: "titlebar")
             .BeginChildElements(content)
+            .AddTextInput(searchBounds, text =>
+            {
+                search = text;
+                session.Search(text);
+            }, CairoFont.WhiteSmallText(), "search")
             .AddHorizontalTabs(categories.Select((code, index) => new GuiTab { DataInt = index, Name = CategoryName(code) })
                 .ToArray(), tabsBounds, index =>
                 {
@@ -123,11 +128,6 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
                     tiles.Scroll(0);
                     session.SelectCategory(categories[index]);
                 }, CairoFont.WhiteSmallText(), CairoFont.WhiteSmallText().WithWeight(Cairo.FontWeight.Bold), "categories")
-            .AddTextInput(searchBounds, text =>
-            {
-                search = text;
-                session.Search(text);
-            }, CairoFont.WhiteSmallText(), "search")
             .BeginClip(viewport)
                 .AddInteractiveElement(tiles, "tiles")
             .EndClip()
