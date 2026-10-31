@@ -12,9 +12,10 @@ internal sealed class CraftingMenuSession : IDisposable
     private readonly System.Func<CraftingInventorySnapshot> capture;
     private readonly System.Func<CraftingRecipeEntry, bool, CraftingDispatchResult> execute;
     private readonly CraftingCatalogue catalogue;
+    private readonly RecipeSearch search;
+    private readonly RecipeCategory category;
     private ImmutableDictionary<int, CraftingAllocation> allocations = ImmutableDictionary<int, CraftingAllocation>.Empty;
     private int? interaction;
-    private string query = "";
 
     internal CraftingMenuSession(CraftingCatalogue catalogue, CraftingAllocator allocator,
         System.Func<CraftingInventorySnapshot> capture,
@@ -25,11 +26,13 @@ internal sealed class CraftingMenuSession : IDisposable
         this.allocator = allocator;
         this.capture = capture;
         this.execute = execute;
+        search = new(Filters, FiltersChanged);
+        category = new(catalogue, Filters, CategoryChanged);
     }
 
     internal ImmutableArray<CraftingRecipeSelection> Rows { get; private set; } = ImmutableArray<CraftingRecipeSelection>.Empty;
     internal int? SelectedOutput { get; private set; }
-    internal string? Category { get; private set; }
+    internal string? Category => category.Selected;
     internal RecipeFilterSet Filters { get; } = new();
     internal event Action? Changed;
 
@@ -40,9 +43,10 @@ internal sealed class CraftingMenuSession : IDisposable
         UpdateRows();
     }
 
-    internal void Search(string text)
+    internal void Search(string text) => search.SetText(text);
+
+    private void FiltersChanged()
     {
-        query = text;
         interaction = null;
         UpdateRows();
     }
@@ -54,16 +58,13 @@ internal sealed class CraftingMenuSession : IDisposable
         if (output == null) UpdateRows();
     }
 
-    internal void SelectCategory(string? category)
+    internal void SelectCategory(string? selected) => category.Select(selected);
+
+    private void CategoryChanged()
     {
-        if (category != null && !catalogue.CategoryCodes.Contains(category))
-            throw new ArgumentException("Unknown crafting category.", nameof(category));
-        if (Category == category) return;
-        Category = category;
-        interaction = null;
         if (SelectedOutput is int output) view.Deselect(output);
         SelectedOutput = null;
-        UpdateRows();
+        FiltersChanged();
     }
 
     internal void Select(int output)
@@ -106,7 +107,7 @@ internal sealed class CraftingMenuSession : IDisposable
                 : row with { Evaluation = allocations[row.Recipe.Id].Evaluation, Allocation = allocations[row.Recipe.Id] })
                 .ToImmutableArray();
         }
-        else Rows = view.Search(query, Category);
+        else Rows = view.GetRows(Filters);
         Changed?.Invoke();
     }
 

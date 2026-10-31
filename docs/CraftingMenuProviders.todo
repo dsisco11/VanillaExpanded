@@ -2,7 +2,7 @@
 
 Source proposal: [CraftingMenuProvidersProposal.md](CraftingMenuProvidersProposal.md)
 Authority: Proposal approved by the user on 2026-10-30. Its requirements govern this plan.
-Status: Phase 1 complete; Phases 2-6 remain pending.
+Status: Phases 1-2 complete; Phases 3-6 remain pending.
 
 ## Goal and execution boundary
 
@@ -75,32 +75,34 @@ Verification: 169 focused manager, lifecycle, interaction, and catalogue-view te
 
 Outcome: Existing filters are feature-owned contributions, and projection accepts composition rather than accumulating feature flags.
 
-    ☐ Extract search matching into an isolated provider.
-        ☐ Normalize terms once when the text changes; preserve existing whitespace, case, localized-name, item-code, and all-terms matching behavior.
-        ☐ Represent empty search without imposing a restriction; criteria replacement remains one logical update.
-    ☐ Extract category matching into an isolated provider.
-        ☐ Preserve native category codes, selected-recipe category behavior, overlapping categories, and the existing Other sentinel.
-        ☐ All imposes no category restriction; do not change visible-category exclusions or catalogue metadata.
-    ☐ Route catalogue candidate eligibility through RecipeFilterSet.
-        ☐ Resolve automatic or pinned alternatives before matching, so all providers inspect the same selected recipe for an output.
-        ☐ Preserve catalogue immutability and the current supported/craftable/relevance/missing/name/stable-identity ordering.
-        ☐ Preserve alternative resolution, explicit pinning, deselection, Auto, and category-change selection behavior.
-        ☐ Do not add a craftableOnly or other feature-specific query parameter.
-    ☐ Wire search/category feature state to the common session projection refresh path.
-        ☐ Criteria-only updates reuse current allocations and evaluations; inventory refresh captures once and performs one catalogue allocation pass.
-        ☐ Keep feature identities and concrete provider types out of session filtering decisions.
-        ☐ Recomposition binds current criteria without duplicate registration; new sessions retain current default browsing state.
-    ☐ Migrate directly affected tests and add projection/provider parity regressions.
-        ☐ Verify search/category combinations, removing one restriction without clearing the other, Other, All, and empty results.
-        ☐ Verify pinned and automatic selections and exact default-order parity.
-        ☐ Count captures/allocation passes for criteria-only versus inventory-driven refresh.
-        ☐ Verify failed criteria replacement does not publish an intermediate or success-shaped fallback result.
-    ☐ Remove the superseded search/category predicate path after parity is verified; do not leave dual implementations or temporary compatibility switches.
+    ☑ Extract search matching into an isolated provider.
+        ☑ Normalize terms once when the text changes; preserve existing whitespace, case, localized-name, item-code, and all-terms matching behavior.
+        ☑ Represent empty search without imposing a restriction; criteria replacement remains one logical update.
+    ☑ Extract category matching into an isolated provider.
+        ☑ Preserve native category codes, selected-recipe category behavior, overlapping categories, and the existing Other sentinel.
+        ☑ All imposes no category restriction; do not change visible-category exclusions or catalogue metadata.
+    ☑ Route catalogue candidate eligibility through RecipeFilterSet.
+        ☑ Resolve automatic or pinned alternatives before matching, so all providers inspect the same selected recipe for an output.
+        ☑ Preserve catalogue immutability and the current supported/craftable/relevance/missing/name/stable-identity ordering.
+        ☑ Preserve alternative resolution, explicit pinning, deselection, Auto, and category-change selection behavior.
+        ☑ Do not add a craftableOnly or other feature-specific query parameter.
+    ☑ Wire search/category feature state to the common session projection refresh path.
+        ☑ Criteria-only updates reuse current allocations and evaluations; inventory refresh captures once and performs one catalogue allocation pass.
+        ☑ Keep feature identities and concrete provider types out of session filtering decisions.
+        ☑ Recomposition binds current criteria without duplicate registration; new sessions retain current default browsing state.
+    ☑ Migrate directly affected tests and add projection/provider parity regressions.
+        ☑ Verify search/category combinations, removing one restriction without clearing the other, Other, All, and empty results.
+        ☑ Verify pinned and automatic selections and exact default-order parity.
+        ☑ Count captures/allocation passes for criteria-only versus inventory-driven refresh.
+        ☑ Verify failed criteria replacement does not publish an intermediate or success-shaped fallback result.
+    ☑ Remove the superseded search/category predicate path after parity is verified; do not leave dual implementations or temporary compatibility switches.
 
 Completion gate:
-    ☐ Existing search, category, alternative-selection, and ordering regressions pass through the manager-based path.
-    ☐ Eligibility logic lives in isolated providers rather than duplicate catalogue/session predicates.
-    ☐ Recomposition and teardown ownership tests pass without provider leaks or extra inventory evaluation.
+    ☑ Existing search, category, alternative-selection, and ordering regressions pass through the manager-based path.
+    ☑ Eligibility logic lives in isolated providers rather than duplicate catalogue/session predicates.
+    ☑ Recomposition and teardown ownership tests pass without provider leaks or extra inventory evaluation.
+
+Verification: 350 CraftingMenu tests passed, followed by a passing strengthened ordering regression. Second implementation review and independent audit-stage-completion review found no outstanding issues. Generic live interaction reconciliation remains Phase 3 work; craftable-only remains Phase 4 work. Live-game validation was not performed.
 
 ## Phase 3: Feature-neutral reconciliation and safe input
 

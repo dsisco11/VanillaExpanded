@@ -115,7 +115,9 @@ public class CraftingCatalogueTests
             [catalogue.Recipes[0].Id] = CatalogueFixture.Full()
         });
 
-        var selection = Assert.Single(view.Search("unresolved"));
+        using var filters = new RecipeFilterSet();
+        filters.Register("test:search", new SearchFilter("unresolved"));
+        var selection = Assert.Single(view.GetRows(filters));
         Assert.Null(selection.Recipe.GetPreview());
         Assert.False(selection.CanPlace);
         Assert.Null(selection.Evaluation.Relevance);

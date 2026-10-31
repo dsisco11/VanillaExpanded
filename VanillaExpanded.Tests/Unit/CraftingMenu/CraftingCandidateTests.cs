@@ -20,7 +20,8 @@ public class CraftingCandidateTests
         var candidates = catalogue.FindCandidates(new[] { oneStick, oneStick.Clone() });
 
         Assert.Equal(2, candidates.Length);
-        Assert.All(new CraftingCatalogueView(catalogue).Search(""), selection => {
+        using var filters = new RecipeFilterSet();
+        Assert.All(new CraftingCatalogueView(catalogue).GetRows(filters), selection => {
             Assert.False(selection.CanPlace);
             Assert.Null(selection.Evaluation.Relevance);
         });
@@ -39,7 +40,8 @@ public class CraftingCandidateTests
         Assert.Single(catalogue.FindCandidates(new[] { fixture.Stack(1, "game:stick") }));
         Assert.Empty(catalogue.FindCandidates(new[] { fixture.Stack(2, "game:stone") }));
         Assert.Empty(catalogue.FindCandidates(Array.Empty<ItemStack>()));
-        Assert.Single(new CraftingCatalogueView(catalogue).Search(""));
+        using var filters = new RecipeFilterSet();
+        Assert.Single(new CraftingCatalogueView(catalogue).GetRows(filters));
     }
 
     [Fact]

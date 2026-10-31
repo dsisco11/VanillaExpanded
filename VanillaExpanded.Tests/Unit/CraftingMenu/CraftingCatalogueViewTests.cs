@@ -8,6 +8,65 @@ namespace VanillaExpanded.Tests.Unit.CraftingMenu;
 public class CraftingCatalogueViewTests
 {
     [Fact]
+    public void DefaultOrderingRetainsEveryCriterionAndTheStableIdentityTieBreaker()
+    {
+        var fixture = new CatalogueFixture();
+        var data = new[] {
+            (Name: "unsupported", Label: "A", Evaluation: CraftingRecipeEvaluation.Unsupported("mod:unsupported")),
+            (Name: "low", Label: "A", Evaluation: Partial(1, 4)),
+            (Name: "missing-two", Label: "A", Evaluation: Partial(2, 4)),
+            (Name: "name-z", Label: "Z", Evaluation: Partial(1, 2)),
+            (Name: "name-a", Label: "A", Evaluation: Partial(1, 2)),
+            (Name: "stable-z", Label: "SAME", Evaluation: Partial(1, 2)),
+            (Name: "stable-a", Label: "same", Evaluation: Partial(1, 2)),
+            (Name: "not-craftable-full", Label: "A", Evaluation:
+                CraftingRecipeEvaluation.Supported(2, 2, false, ImmutableArray<CraftingMissingRequirement>.Empty)),
+            (Name: "full", Label: "ZZZ", Evaluation: CatalogueFixture.Full())
+        };
+        var recipes = data.Select(item =>
+        {
+            var recipe = fixture.Recipe(item.Name);
+            recipe.Output!.ResolvedItemStack!.Attributes.SetString("displayName", item.Label);
+            return recipe;
+        }).ToArray();
+        var catalogue = fixture.Build(recipes);
+        var view = new CraftingCatalogueView(catalogue);
+        view.ReplaceEvaluations(catalogue.Recipes.ToDictionary(entry => entry.Id,
+            entry => data.Single(item => item.Name == entry.Recipe.Name!.Path).Evaluation));
+
+        Assert.Equal(new[] { "full", "not-craftable-full", "name-a", "stable-a", "stable-z", "name-z", "missing-two", "low", "unsupported" },
+            Query(view).Select(row => row.Recipe.Recipe.Name!.Path));
+    }
+
+    [Fact]
+    public void FiltersObserveTheResolvedPinnedOrAutomaticAlternative()
+    {
+        var fixture = new CatalogueFixture();
+        var output = fixture.Stack(10, "mod:board");
+        var catalogue = fixture.Build(fixture.Recipe("a", output), fixture.Recipe("b", output));
+        var view = new CraftingCatalogueView(catalogue);
+        view.ReplaceEvaluations(new Dictionary<int, CraftingRecipeEvaluation> {
+            [catalogue.Recipes[0].Id] = CatalogueFixture.Full(),
+            [catalogue.Recipes[1].Id] = Partial(1, 2)
+        });
+        using var filters = new RecipeFilterSet();
+        var observed = new List<CraftingRecipeSelection>();
+        filters.Register("test:selected", new ObservingFilter(observed));
+        view.SelectAlternative(0, catalogue.Recipes[1].Id);
+        var pinned = Assert.Single(view.GetRows(filters));
+        Assert.Equal(catalogue.Recipes[1].Id, pinned.Recipe.Id);
+        Assert.True(pinned.IsExplicit);
+        Assert.Same(pinned, Assert.Single(observed));
+        observed.Clear();
+        view.SelectAuto(0);
+        var automatic = Assert.Single(view.GetRows(filters));
+        Assert.Equal(catalogue.Recipes[0].Id, automatic.Recipe.Id);
+        Assert.False(automatic.IsExplicit);
+        Assert.Same(automatic, Assert.Single(observed));
+        Assert.Throws<ArgumentNullException>(() => view.GetRows(null!));
+    }
+
+    [Fact]
     public void CategoriesUseImmutableNativeTagsAndSearchWithinOverlappingGroups()
     {
         var fixture = new CatalogueFixture();
@@ -24,13 +83,13 @@ public class CraftingCatalogueViewTests
 
         Assert.Equal(new[] { "", "items", "mod:workshop", "tools" }, catalogue.CategoryCodes);
         Assert.Equal(new[] { "items", "tools" }, catalogue.Recipes[0].CategoryCodes);
-        Assert.Equal(4, view.Search("").Length);
-        Assert.Equal("hammer", Assert.Single(view.Search("", "tools")).Recipe.Recipe.Name!.Path);
-        Assert.Single(view.Search("HAMMER", "items"));
-        Assert.Empty(view.Search("bench", "tools"));
-        Assert.Single(view.Search("bench", "mod:workshop"));
-        Assert.Equal(2, view.Search("", CraftingCatalogue.OtherCategory).Length);
-        Assert.Empty(view.Search("", "general"));
+        Assert.Equal(4, Query(view).Length);
+        Assert.Equal("hammer", Assert.Single(Query(view, "", "tools")).Recipe.Recipe.Name!.Path);
+        Assert.Single(Query(view, "HAMMER", "items"));
+        Assert.Empty(Query(view, "bench", "tools"));
+        Assert.Single(Query(view, "bench", "mod:workshop"));
+        Assert.Equal(2, Query(view, "", CraftingCatalogue.OtherCategory).Length);
+        Assert.Empty(Query(view, "", "general"));
     }
 
     [Fact]
@@ -50,7 +109,7 @@ public class CraftingCatalogueViewTests
 
         Assert.Equal(new[] { "tools" }, catalogue.CategoryCodes);
         Assert.Equal(new[] { "tools" }, Assert.Single(catalogue.Recipes).CategoryCodes);
-        Assert.Empty(new CraftingCatalogueView(catalogue).Search("", "decorative"));
+        Assert.Empty(Query(new CraftingCatalogueView(catalogue), "", "decorative"));
     }
 
     [Fact]
@@ -65,7 +124,7 @@ public class CraftingCatalogueViewTests
         var catalogue = fixture.Build(hidden, unresolved);
 
         Assert.Equal(new[] { CraftingCatalogue.OtherCategory }, catalogue.CategoryCodes);
-        Assert.Single(new CraftingCatalogueView(catalogue).Search("", CraftingCatalogue.OtherCategory));
+        Assert.Single(Query(new CraftingCatalogueView(catalogue), "", CraftingCatalogue.OtherCategory));
         Assert.Empty(fixture.Build().CategoryCodes);
     }
 
@@ -83,8 +142,8 @@ public class CraftingCatalogueViewTests
         output.Attributes.SetString("displayName", "Planche d'érable");
         var view = new CraftingCatalogueView(fixture.Build(fixture.Recipe("localized", output)));
 
-        Assert.Single(view.Search(query));
-        Assert.Empty(view.Search("érable iron"));
+        Assert.Single(Query(view, query));
+        Assert.Empty(Query(view, "érable iron"));
     }
 
     [Fact]
@@ -98,8 +157,8 @@ public class CraftingCatalogueViewTests
             [catalogue.Recipes[1].Id] = Partial(3, 4)
         });
 
-        Assert.Equal(new[] { "high", "low" }, view.Search("output").Select(selection => selection.Recipe.Recipe.Name!.Path));
-        Assert.Empty(view.Search("no-such-output"));
+        Assert.Equal(new[] { "high", "low" }, Query(view, "output").Select(selection => selection.Recipe.Recipe.Name!.Path));
+        Assert.Empty(Query(view, "no-such-output"));
     }
 
     [Fact]
@@ -160,7 +219,7 @@ public class CraftingCatalogueViewTests
         var view = new CraftingCatalogueView(catalogue);
 
         Assert.Equal("a", view.GetSelection(0).Recipe.Recipe.Name!.Path);
-        Assert.Equal(2, Assert.Single(view.Search("board")).Output.Alternatives.Length);
+        Assert.Equal(2, Assert.Single(Query(view, "board")).Output.Alternatives.Length);
         Assert.False(view.GetSelection(0).CanPlace);
         Assert.Null(view.GetSelection(0).Evaluation.MissingUnits);
     }
@@ -175,7 +234,7 @@ public class CraftingCatalogueViewTests
             [catalogue.Recipes[1].Id] = Partial(1, 4),
             [catalogue.Recipes[2].Id] = CatalogueFixture.Full()
         });
-        var selections = view.Search("");
+        var selections = Query(view);
         Assert.Equal(new[] { "c", "b", "a" }, selections.Select(selection => selection.Recipe.Recipe.Name!.Path));
     }
 
@@ -239,4 +298,23 @@ public class CraftingCatalogueViewTests
     private static CraftingRecipeEvaluation Partial(int allocated, int required) =>
         CraftingRecipeEvaluation.Supported(allocated, required, false,
             ImmutableArray.Create(new CraftingMissingRequirement("A", required - allocated)));
+
+    private static ImmutableArray<CraftingRecipeSelection> Query(CraftingCatalogueView view,
+        string? text = null, string? category = null)
+    {
+        using var filters = new RecipeFilterSet();
+        var search = new SearchFilter(text);
+        if (!search.IsEmpty) filters.Register("test:search", search);
+        if (category != null) filters.Register("test:category", new CategoryFilter(category));
+        return view.GetRows(filters);
+    }
+
+    private sealed class ObservingFilter(List<CraftingRecipeSelection> observed) : IRecipeFilter
+    {
+        public bool Matches(CraftingRecipeSelection selection)
+        {
+            observed.Add(selection);
+            return true;
+        }
+    }
 }

@@ -16,6 +16,95 @@ namespace VanillaExpanded.Tests.Unit.CraftingMenu;
 public sealed class CraftingMenuInteractionTests
 {
     [Fact]
+    public void CriteriaChangesReuseAllocationsAndInventoryRefreshEvaluatesExactlyOnce()
+    {
+        var f = new AllocationFixture();
+        var ingredient = f.Stack(1, "a", 1);
+        var recipe = f.Recipe(f.Ingredient(ingredient));
+        recipe.Output!.ResolvedItemStack!.Collectible.CreativeInventoryTabs = ["tools"];
+        f.Register(recipe);
+        f.Snapshot(ingredient);
+        int captures = 0;
+        using var session = new CraftingMenuSession(f.Catalogue.Build(recipe), f.Allocator, () =>
+        {
+            captures++;
+            return CraftingInventorySnapshot.Capture(f.Player, 3, 3, Environment.CurrentManagedThreadId, true);
+        }, (_, _) => throw new InvalidOperationException("No dispatch is expected."));
+        session.Refresh();
+        var allocation = Assert.Single(session.Rows).Allocation;
+        Assert.NotNull(allocation);
+        Assert.True(allocation.Evaluation.CanCraft);
+        int NativeChecks() => f.Events.Invocations.Count(call =>
+            call.Method.Name == nameof(IEventAPI.TriggerMatchesRecipe) && call.Arguments.Count == 4);
+        // One evaluation validates ordinary and shift placements separately.
+        Assert.Equal(2, NativeChecks());
+        session.Search(recipe.Output.Code!.ToString());
+        session.SelectCategory("tools");
+        Assert.Same(allocation, Assert.Single(session.Rows).Allocation);
+        session.Search("missing");
+        Assert.Empty(session.Rows);
+        session.Search("");
+        session.SelectCategory(null);
+        Assert.Same(allocation, Assert.Single(session.Rows).Allocation);
+        Assert.Equal(1, captures);
+        Assert.Equal(2, NativeChecks());
+        session.Refresh();
+        Assert.Equal(2, captures);
+        Assert.Equal(4, NativeChecks());
+        Assert.NotSame(allocation, Assert.Single(session.Rows).Allocation);
+    }
+
+    [Theory]
+    [InlineData("replace-search")]
+    [InlineData("clear-search")]
+    [InlineData("replace-category")]
+    [InlineData("clear-category")]
+    public void FailedCriteriaMutationDoesNotPublishOrChangeExistingCriteria(string operation)
+    {
+        var f = new AllocationFixture();
+        var tool = f.Recipe(f.Ingredient(f.Stack(1, "a", 1)));
+        tool.Output!.ResolvedItemStack!.Collectible.CreativeInventoryTabs = ["tools"];
+        var block = f.Recipe(f.Ingredient(f.Stack(2, "b", 1)));
+        block.Output!.ResolvedItemStack!.Collectible.CreativeInventoryTabs = ["construction"];
+        f.Register(tool, block);
+        using var session = Session(f, tool, block);
+        session.Refresh();
+        session.Search(tool.Output.Code!.ToString());
+        session.SelectCategory("tools");
+        var previous = session.Rows;
+        int notifications = 0;
+        session.Changed += () => notifications++;
+        using var mutation = session.Filters.Register("test:mutation", new CallbackFilter(() =>
+        {
+            switch (operation)
+            {
+                case "replace-search": session.Search(block.Output.Code!.ToString()); break;
+                case "clear-search": session.Search(""); break;
+                case "replace-category": session.SelectCategory("construction"); break;
+                case "clear-category": session.SelectCategory(null); break;
+                default: throw new ArgumentOutOfRangeException(nameof(operation));
+            }
+        }));
+        Assert.Throws<InvalidOperationException>(session.Refresh);
+        Assert.True(previous == session.Rows);
+        Assert.Equal(0, notifications);
+        Assert.Equal("tools", session.Category);
+        mutation.Dispose();
+        session.Refresh();
+        Assert.Same(tool, Assert.Single(session.Rows).Recipe.Recipe);
+        Assert.Equal(1, notifications);
+    }
+
+    private sealed class CallbackFilter(Action callback) : IRecipeFilter
+    {
+        public bool Matches(CraftingRecipeSelection selection)
+        {
+            callback();
+            return true;
+        }
+    }
+
+    [Fact]
     public void CategoryChangesKeepSearchAndClearInteractionAndHiddenSelectionAcrossRefresh()
     {
         var f = new AllocationFixture();

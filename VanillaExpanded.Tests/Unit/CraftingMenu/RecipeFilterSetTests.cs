@@ -259,7 +259,8 @@ public sealed class RecipeFilterSetTests
         var fixture = new CatalogueFixture();
         var view = new CraftingCatalogueView(fixture.Build(
             fixture.Recipe("a"), fixture.Recipe("b"), fixture.Recipe("c")));
-        return view.Search("");
+        using var filters = new RecipeFilterSet();
+        return view.GetRows(filters);
     }
 
     private sealed class Provider(Func<CraftingRecipeSelection, bool> matches) : IRecipeFilter

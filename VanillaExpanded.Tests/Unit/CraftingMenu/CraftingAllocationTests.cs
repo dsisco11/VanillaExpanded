@@ -347,7 +347,8 @@ public class CraftingAllocationTests
         var view = new CraftingCatalogueView(catalogue);
         var results = f.Allocator.EvaluateCatalogue(catalogue, f.Snapshot(board, stick));
         view.ReplaceAllocations(results);
-        var selections = view.Search(null);
+        using var filters = new RecipeFilterSet();
+        var selections = view.GetRows(filters);
 
         Assert.Same(full, selections[0].Recipe.Recipe);
         Assert.Same(partial, selections[1].Recipe.Recipe);
@@ -359,7 +360,7 @@ public class CraftingAllocationTests
         Assert.Equal(1, Assert.Single(selections[1].Allocation!.Ordinary).Quantity);
 
         view.ReplaceAllocations(f.Allocator.EvaluateCatalogue(catalogue, f.Snapshot()));
-        Assert.All(view.Search(null).Where(selection => selection.CanPlace), selection =>
+        Assert.All(view.GetRows(filters).Where(selection => selection.CanPlace), selection =>
         {
             Assert.Equal(0, selection.Evaluation.Allocated);
             Assert.Empty(selection.Allocation!.Ordinary);
