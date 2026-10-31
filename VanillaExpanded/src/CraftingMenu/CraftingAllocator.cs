@@ -25,18 +25,20 @@ internal sealed class CraftingAllocator
         var lookup = catalogue.CreateLookup();
         var candidates = catalogue.FindCandidates(snapshot.Stacks.Select(stack => stack.GetStack()), lookup)
             .Select(entry => entry.Id).ToHashSet();
+        var grid = new GridRelevance(world, snapshot.GridStacks);
         return catalogue.Recipes.ToImmutableDictionary(entry => entry.Id,
-            entry => Evaluate(entry, snapshot, candidates.Contains(entry.Id), lookup));
+            entry => Evaluate(entry, snapshot, candidates.Contains(entry.Id), lookup, grid));
     }
 
     internal CraftingAllocation Evaluate(CraftingRecipeEntry entry, CraftingInventorySnapshot snapshot)
     {
         CraftingInventorySnapshot.EnsureThread(snapshot.OwnerThreadId);
-        return Evaluate(entry, snapshot, true, new(world, world.FastSearchRecipesByIngredient.ToArray()));
+        return Evaluate(entry, snapshot, true, new(world, world.FastSearchRecipesByIngredient.ToArray()),
+            new(world, snapshot.GridStacks));
     }
 
     private CraftingAllocation Evaluate(CraftingRecipeEntry entry, CraftingInventorySnapshot snapshot, bool candidate,
-        CraftingIngredientLookup lookup)
+        CraftingIngredientLookup lookup, GridRelevance grid)
     {
         CraftingInventorySnapshot.EnsureThread(snapshot.OwnerThreadId);
         if (entry.UnresolvedReason != null) return CraftingAllocation.Unsupported(entry.UnresolvedReason);
@@ -104,10 +106,8 @@ internal sealed class CraftingAllocator
             var ingredient = ingredients[i];
             for (int g = 0; g < groups.Count; g++)
             {
-                var stack = CraftingStackSnapshot.Copy(groups[g].Stack);
-                stack.StackSize = needs[i].Quantity;
-                if (!ingredient.SatisfiesAsIngredient(stack, false)
-                    || !stack.Collectible.MatchesForCrafting(stack, recipe, ingredient)) continue;
+                if (!CraftingIngredientMatch.Matches(groups[g].Stack, recipe, ingredient, needs[i].Quantity,
+                    out var stack)) continue;
                 int cap = Math.Min(stack.Collectible.MaxStackSize, snapshot.GridLimits[needs[i].GridPosition]);
                 if (!needs[i].IsConsumed) cap = Math.Min(cap, 1);
                 if (cap <= 0) continue;
@@ -187,7 +187,7 @@ internal sealed class CraftingAllocator
             needs, onePlacements, shiftPlacements,
             bulk.Executions == int.MaxValue && ingredients.All(ingredient =>
                 !ingredient.GetConsumeProperties().Consume && ingredient.GetConsumeProperties().DurabilityCost <= 0)
-                ? null : bulk.Executions);
+                ? null : bulk.Executions, grid.Count(recipe, needs));
     }
 
     private bool NativeAccepts(GridRecipe selected, CraftingInventorySnapshot snapshot,

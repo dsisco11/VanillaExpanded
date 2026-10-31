@@ -25,6 +25,10 @@ public class CraftingInventorySnapshotTests
             .Select(stack => stack.Slot.Index));
         Assert.Equal(Enumerable.Range(0, 9), snapshot.Stacks.Where(stack => stack.Slot.InventoryId == f.Grid.InventoryID)
             .Select(stack => stack.Slot.Index));
+        Assert.Equal(9, snapshot.GridStacks.Length);
+        Assert.Equal(Enumerable.Range(0, 9), snapshot.GridStacks.Select(stack => stack.Slot.Index));
+        Assert.All(snapshot.GridStacks, input =>
+            Assert.Same(input, snapshot.Stacks.Single(stack => stack.Slot == input.Slot)));
     }
 
     [Fact]
@@ -45,6 +49,32 @@ public class CraftingInventorySnapshotTests
         copy.TempAttributes.SetString("state", "mutated");
         Assert.Equal("old", first.Stacks[0].GetStack().TempAttributes.GetString("state"));
         Assert.Equal(1, Assert.Single(f.Snapshot(stack).Stacks).Quantity);
+    }
+
+    [Fact]
+    public void CapturedGridInputsAreIsolatedFromLaterEditsAndExcludeLockedInputsAndOutput()
+    {
+        var f = new AllocationFixture();
+        var input = f.Stack(1, "board", 3);
+        input.Attributes.SetInt("quality", 7);
+        input.TempAttributes.SetBool("ready", true);
+        f.Grid[8].Itemstack = input;
+        f.Grid[9].Itemstack = CraftingStackSnapshot.Copy(input);
+        var snapshot = f.Snapshot(input.Clone());
+        input.StackSize = 64;
+        input.Attributes.SetInt("quality", 1);
+        input.TempAttributes.SetBool("ready", false);
+        var captured = Assert.Single(snapshot.GridStacks).GetStack();
+        Assert.Equal(3, captured.StackSize);
+        Assert.Equal(7, captured.Attributes.GetInt("quality"));
+        Assert.True(captured.TempAttributes.GetBool("ready"));
+        captured.TempAttributes.SetBool("ready", false);
+        Assert.True(snapshot.GridStacks[0].GetStack().TempAttributes.GetBool("ready"));
+        f.Grid.TakeLocked = true;
+        Assert.Empty(f.Snapshot().GridStacks);
+        f.Grid.TakeLocked = false;
+        f.Grid[8].Itemstack = null;
+        Assert.Empty(f.Snapshot().GridStacks);
     }
 
     [Fact]

@@ -33,12 +33,14 @@ internal sealed class CraftingStackSnapshot
 internal sealed class CraftingInventorySnapshot
 {
     private CraftingInventorySnapshot(int ownerThreadId, int width, int height,
-        ImmutableArray<CraftingStackSnapshot> stacks, ImmutableArray<int> gridLimits)
+        ImmutableArray<CraftingStackSnapshot> stacks, ImmutableArray<CraftingStackSnapshot> gridStacks,
+        ImmutableArray<int> gridLimits)
     {
         OwnerThreadId = ownerThreadId;
         Width = width;
         Height = height;
         Stacks = stacks;
+        GridStacks = gridStacks;
         GridLimits = gridLimits;
     }
 
@@ -46,6 +48,7 @@ internal sealed class CraftingInventorySnapshot
     internal int Width { get; }
     internal int Height { get; }
     internal ImmutableArray<CraftingStackSnapshot> Stacks { get; }
+    internal ImmutableArray<CraftingStackSnapshot> GridStacks { get; }
     internal ImmutableArray<int> GridLimits { get; }
 
     internal static CraftingInventorySnapshot Capture(IPlayer player, int width, int height) =>
@@ -62,6 +65,7 @@ internal sealed class CraftingInventorySnapshot
         int gridSize = checked(width * height);
         var manager = player.InventoryManager;
         var stacks = ImmutableArray.CreateBuilder<CraftingStackSnapshot>();
+        var gridStacks = ImmutableArray.CreateBuilder<CraftingStackSnapshot>();
         var limits = ImmutableArray.CreateBuilder<int>(gridSize);
         var seen = new HashSet<ItemSlot>(ReferenceEqualityComparer.Instance);
         var addresses = new HashSet<CraftingSlotId>();
@@ -95,7 +99,9 @@ internal sealed class CraftingInventorySnapshot
                 if (accessible && slot.CanTake() && slot.Itemstack is { StackSize: > 0 } stack)
                 {
                     if (!seenStacks.Add(stack)) throw new InvalidOperationException("Aliased crafting inventory stack.");
-                    stacks.Add(new CraftingStackSnapshot(address, stack));
+                    var captured = new CraftingStackSnapshot(address, stack);
+                    stacks.Add(captured);
+                    if (grid) gridStacks.Add(captured);
                 }
             }
         }
@@ -114,7 +120,7 @@ internal sealed class CraftingInventorySnapshot
         Read(hotbar, 0, hotbar == null ? 0 : 10, false);
         Read(backpack, 4, backpack?.Count ?? 4, false);
         Read(crafting, 0, gridSize, true);
-        return new(ownerThreadId, width, height, stacks.ToImmutable(), limits.ToImmutable());
+        return new(ownerThreadId, width, height, stacks.ToImmutable(), gridStacks.ToImmutable(), limits.ToImmutable());
     }
 
     internal static void EnsureThread(int ownerThreadId)

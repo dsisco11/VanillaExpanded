@@ -4,7 +4,7 @@
         ☐ Design a better separation of alloy calculator inventory ownership/liveness validation, transfer permissions, and storage-versus-machine access policy. Reconsider the storage-class whitelist without weakening ownership or withdrawal checks, and define coverage for vanilla and modded containers.
         
     ## Crafting Menu:
-        ☐ Design the "Show recipes using this/these items" functionality. which should function by the player placing items into their grid and then the crafting menu increses the sorting priority of relevant recipes.
+        ☑ Design the "Show recipes using this/these items" functionality. which should function by the player placing items into their grid and then the crafting menu increses the sorting priority of relevant recipes.
         ☑ Add a craftable-only toggle that shows recipes whose ingredients are currently available, independently combining with category and search filters.
         ☐ Add favorites: let players star recipe outputs and browse a Favorites tab, with favorites saved between game sessions.
         ☑ Add a compact ingredient have/need summary beneath the tooltip's recipe preview, highlighting missing amounts in red without restoring verbose diagnostic text.

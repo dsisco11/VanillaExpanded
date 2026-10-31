@@ -20,6 +20,11 @@ internal sealed class RecipeSort(Action changed)
         selected = order;
         changed();
     }
+
+    internal static IOrderedEnumerable<CraftingRecipeSelection> ByCoverage(
+        IOrderedEnumerable<CraftingRecipeSelection> selections) =>
+        selections.ThenByDescending(selection => selection.Evaluation.Relevance)
+            .ThenBy(selection => selection.Evaluation.MissingUnits);
 }
 
 internal interface IRecipeOrder
@@ -27,6 +32,8 @@ internal interface IRecipeOrder
     string Id { get; }
     string NameKey { get; }
     IOrderedEnumerable<CraftingRecipeSelection> Order(IEnumerable<CraftingRecipeSelection> selections);
+    IOrderedEnumerable<CraftingRecipeSelection> OrderAlternatives(IEnumerable<CraftingRecipeSelection> selections) =>
+        RecipeSort.ByCoverage(selections.OrderByDescending(selection => selection.Evaluation.IsSupported));
 }
 
 internal sealed class AvailabilityOrder : IRecipeOrder
@@ -35,11 +42,14 @@ internal sealed class AvailabilityOrder : IRecipeOrder
     public string NameKey => "vanillaexpanded:craftingmenu-sort-availability";
 
     public IOrderedEnumerable<CraftingRecipeSelection> Order(IEnumerable<CraftingRecipeSelection> selections) =>
-        selections.OrderByDescending(selection => selection.Evaluation.IsSupported)
-            .ThenByDescending(selection => selection.Evaluation.CanCraft)
-            .ThenByDescending(selection => selection.Evaluation.Relevance)
-            .ThenBy(selection => selection.Evaluation.MissingUnits)
+        RecipeSort.ByCoverage(selections.OrderByDescending(selection => selection.Evaluation.IsSupported)
+            .ThenByDescending(selection => selection.GridMatches)
+            .ThenByDescending(selection => selection.Evaluation.CanCraft))
             .ThenBy(selection => selection.Recipe.DisplayName, StringComparer.CurrentCultureIgnoreCase);
+
+    public IOrderedEnumerable<CraftingRecipeSelection> OrderAlternatives(IEnumerable<CraftingRecipeSelection> selections) =>
+        RecipeSort.ByCoverage(selections.OrderByDescending(selection => selection.Evaluation.IsSupported)
+            .ThenByDescending(selection => selection.GridMatches));
 }
 
 internal sealed class NameOrder : IRecipeOrder

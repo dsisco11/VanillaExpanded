@@ -111,7 +111,7 @@ internal sealed class CraftingMenuSession : IDisposable
         if (interaction != null && !Rows.IsEmpty)
         {
             var eligible = Filters.Filter(Rows.Select(row => changedOutput == row.Output.Id
-                ? view.GetSelection(row.Output.Id) : view.RefreshSelection(row)))
+                ? view.GetSelection(row.Output.Id, Sort.Selected) : view.RefreshSelection(row)))
                 .ToDictionary(row => row.Output.Id);
             var candidates = canonical.ToDictionary(row => row.Output.Id);
             var emitted = new HashSet<int>();
@@ -140,7 +140,7 @@ internal sealed class CraftingMenuSession : IDisposable
         if (!rows.IsEmpty) return CraftingMenuEmptyState.None;
         if (catalogue.Groups.IsEmpty) return CraftingMenuEmptyState.NoRecipes;
         if (CraftableOnly.Enabled
-            && !CraftableOnly.FilterOthers(catalogue.Groups.Select(group => view.GetSelection(group.Id))).IsEmpty)
+            && !CraftableOnly.FilterOthers(catalogue.Groups.Select(group => view.GetSelection(group.Id, Sort.Selected))).IsEmpty)
             return search.HasTerms ? CraftingMenuEmptyState.NoCraftableSearchMatches : CraftingMenuEmptyState.NoCraftableRecipes;
         return search.HasTerms ? CraftingMenuEmptyState.NoSearchMatches : CraftingMenuEmptyState.NoRecipes;
     }

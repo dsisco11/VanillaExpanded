@@ -44,12 +44,14 @@ internal sealed class CraftingPlacement
 }
 
 // CompleteExecutions is unbounded (null) only for supported layouts with no depleting requirement.
+// GridMatches is a ranking hint, not craftability or transfer authorization.
 internal sealed record CraftingAllocation(
     CraftingRecipeEvaluation Evaluation,
     ImmutableArray<CraftingRequirement> Requirements,
     ImmutableArray<CraftingPlacement> Ordinary,
     ImmutableArray<CraftingPlacement> Shift,
-    int? CompleteExecutions)
+    int? CompleteExecutions,
+    int GridMatches = 0)
 {
     internal static CraftingAllocation Unsupported(string reason) => new(
         CraftingRecipeEvaluation.Unsupported(reason), ImmutableArray<CraftingRequirement>.Empty,

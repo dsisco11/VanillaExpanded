@@ -1598,6 +1598,88 @@ public sealed class CraftingMenuLifecycleTests
     }
 
     [Theory]
+    [InlineData(1)]
+    [InlineData(1.5)]
+    [InlineData(2)]
+    public void GridPriorityRefreshKeepsInspectedRecipeConsistentAndReopeningUsesCurrentInputs(float scale)
+    {
+        using var f = new MenuFixture(scale: scale, includeRecipes: true);
+        var one = Assert.Single(f.Lifecycle.Recipes);
+        one.Output!.ResolvedItemStack!.Attributes.SetString("displayName", "A one");
+        var wood = one.ResolvedIngredients![0]!.ResolvedItemStack!.Clone();
+        wood.StackSize = 1;
+        var stick = f.Lifecycle.F.Stack(2, "stick", 1);
+        var both = f.Lifecycle.F.Recipe(f.Lifecycle.F.Ingredient(wood, 4), f.Lifecycle.F.Ingredient(stick, 4));
+        both.Output!.ResolvedItemStack!.Attributes.SetString("displayName", "B both");
+        var unrelated = f.Lifecycle.F.Recipe(f.Lifecycle.F.Ingredient(f.Lifecycle.F.Stack(3, "stone", 1)));
+        unrelated.Output!.ResolvedItemStack!.Attributes.SetString("displayName", "C unrelated");
+        f.Lifecycle.Recipes.AddRange([both, unrelated]);
+        var inventory = Assert.Single(((ClientPlayerInventoryManager)f.Lifecycle.F.Player.InventoryManager)
+            .Inventories.Values.OfType<InventoryCraftingGrid>());
+        inventory[8].Itemstack = wood;
+        inventory[6].Itemstack = stick;
+        f.Lifecycle.F.Register(f.Lifecycle.Recipes.ToArray());
+        f.Lifecycle.FinalizeWorld();
+        f.Recompose();
+        f.Parent.TryOpen();
+        int baseline = f.TextureCount;
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        var session = (CraftingMenuSession)typeof(GuiDialogCraftingMenu).GetField("session",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
+        Assert.Equal(new[] { both, one, unrelated }, session.Rows.Select(row => row.Recipe.Recipe));
+        Assert.Equal(new[] { 2, 1, 0 }, session.Rows.Select(row => row.GridMatches));
+        Assert.False(session.Rows[0].Evaluation.CanCraft);
+        Assert.True(session.Rows[1].Evaluation.CanCraft);
+        var tiles = Assert.IsType<GuiElementCraftingTiles>(menu.SingleComposer.GetElement("tiles"));
+        var bounds = tiles.Elements[0].Bounds;
+        tiles.UpdateHover((int)(bounds.absX + 5), (int)(bounds.absY + 5));
+        var tooltip = Assert.IsType<GuiElementCraftingRecipeTooltip>(menu.SingleComposer.GetElement("tooltip"));
+        AssertPreview(both);
+        var popup = tooltip.Popup;
+        inventory[6].Itemstack = null;
+        menu.NativeGridDirty();
+        f.Lifecycle.Drain();
+        Assert.Equal(new[] { both, one, unrelated }, session.Rows.Select(row => row.Recipe.Recipe));
+        Assert.Equal(1, session.Rows[0].GridMatches);
+        AssertPreview(both);
+        Assert.NotSame(popup, tooltip.Popup);
+        Assert.Contains(tooltip.Popup!.GetRichtext("recipe").Components.OfType<RichTextComponent>(),
+            component => component.DisplayText == "0/4");
+        tiles.UpdateHover(-1, -1);
+        Assert.Equal(new[] { one, both, unrelated }, session.Rows.Select(row => row.Recipe.Recipe));
+        var sort = menu.SingleComposer.GetDropDown("sort");
+        menu.SingleComposer.FocusElement(sort.TabIndex);
+        menu.OnKeyDown(new KeyEvent { KeyCode = (int)GlKeys.End });
+        inventory[6].Itemstack = stick;
+        menu.NativeGridDirty();
+        f.Lifecycle.Drain();
+        Assert.Equal("name", sort.SelectedValue);
+        Assert.Equal(new[] { one, both, unrelated }, session.Rows.Select(row => row.Recipe.Recipe));
+        menu.OnKeyDown(new KeyEvent { KeyCode = (int)GlKeys.Home });
+        Assert.Equal(new[] { both, one, unrelated }, session.Rows.Select(row => row.Recipe.Recipe));
+        f.Parent.TryClose();
+        Assert.Equal(baseline, f.TextureCount);
+        inventory[6].Itemstack = null;
+        f.Parent.TryOpen();
+        menu = Assert.Single(f.Menus);
+        session = (CraftingMenuSession)typeof(GuiDialogCraftingMenu).GetField("session",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
+        Assert.Equal(new[] { one, both, unrelated }, session.Rows.Select(row => row.Recipe.Recipe));
+        Assert.Equal(1, session.Rows.Single(row => row.Recipe.Recipe == both).GridMatches);
+        Assert.Equal(1, wood.StackSize);
+        Assert.Equal(1, stick.StackSize);
+        f.Parent.TryClose();
+        Assert.Equal(baseline, f.TextureCount);
+
+        void AssertPreview(GridRecipe expected)
+        {
+            var grid = Assert.Single(tooltip.Popup!.GetRichtext("recipe").Components.OfType<SlideshowGridRecipeTextComponent>());
+            Assert.Equal(expected.Name, Assert.Single(grid.GridRecipesAndUnnamedIngredients).Recipe!.Name);
+        }
+    }
+
+    [Theory]
     [InlineData(1, false)]
     [InlineData(1.5, false)]
     [InlineData(2, false)]

@@ -13,6 +13,7 @@ internal sealed record CraftingRecipeSelection(
     CraftingAllocation? Allocation = null)
 {
     internal bool CanPlace => Evaluation.IsSupported;
+    internal int GridMatches => Evaluation.IsSupported ? Allocation?.GridMatches ?? 0 : 0;
 }
 
 internal sealed class CraftingCatalogueView
@@ -74,7 +75,7 @@ internal sealed class CraftingCatalogueView
 
     internal void Deselect(int outputId) => SelectAuto(outputId);
 
-    internal CraftingRecipeSelection GetSelection(int outputId)
+    internal CraftingRecipeSelection GetSelection(int outputId, IRecipeOrder? order = null)
     {
         var group = GetGroup(outputId);
         if (pinnedRecipes.TryGetValue(outputId, out int pinned))
@@ -82,20 +83,18 @@ internal sealed class CraftingCatalogueView
             var selected = group.Alternatives.First(entry => entry.Id == pinned);
             return new(group, selected, GetEvaluation(selected), true, allocations.GetValueOrDefault(selected.Id));
         }
-        var automatic = group.Alternatives
-            .OrderByDescending(entry => GetEvaluation(entry).IsSupported)
-            .ThenByDescending(entry => GetEvaluation(entry).Relevance)
-            .ThenBy(entry => GetEvaluation(entry).MissingUnits)
-            .ThenBy(entry => entry.StableId, StringComparer.Ordinal)
+        order ??= new AvailabilityOrder();
+        return order.OrderAlternatives(group.Alternatives.Select(entry =>
+                new CraftingRecipeSelection(group, entry, GetEvaluation(entry), false, allocations.GetValueOrDefault(entry.Id))))
+            .ThenBy(selection => selection.Recipe.StableId, StringComparer.Ordinal)
             .First();
-        return new(group, automatic, GetEvaluation(automatic), false, allocations.GetValueOrDefault(automatic.Id));
     }
 
     internal ImmutableArray<CraftingRecipeSelection> GetRows(RecipeFilterSet filters, IRecipeOrder? order = null)
     {
         ArgumentNullException.ThrowIfNull(filters);
         order ??= new AvailabilityOrder();
-        return order.Order(filters.Filter(catalogue.Groups.Select(group => GetSelection(group.Id))))
+        return order.Order(filters.Filter(catalogue.Groups.Select(group => GetSelection(group.Id, order))))
             .ThenBy(selection => selection.Recipe.StableId, StringComparer.Ordinal)
             .ToImmutableArray();
     }
