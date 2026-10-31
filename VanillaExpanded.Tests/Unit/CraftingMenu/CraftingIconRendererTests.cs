@@ -43,34 +43,35 @@ public sealed class CraftingIconRendererTests
         var f = new AllocationFixture();
         var board = f.Stack(1, "board", 2);
         var complete = f.Recipe(f.Ingredient(board));
+        var partial = f.Recipe(f.Ingredient(board, 4));
         var missing = f.Recipe(f.Ingredient(f.Stack(2, "stone", 1)));
         var unsupported = f.Recipe(f.Ingredient(f.Stack(3, "clay", 1)));
         unsupported.CopyAttributesFrom = "A";
-        f.Register(complete, missing, unsupported);
+        f.Register(complete, partial, missing, unsupported);
         var snapshot = f.Snapshot(board);
-        var session = new CraftingMenuSession(f.Catalogue.Build(complete, missing, unsupported),
+        var session = new CraftingMenuSession(f.Catalogue.Build(complete, partial, missing, unsupported),
             f.Allocator, () => snapshot, (_, _) => throw new InvalidOperationException());
         session.Refresh();
-        using var tiles = CreateTiles(graphics, session);
-        graphics.Warm(tiles, 3);
+        using var tiles = CreateTiles(graphics, session, rows: 2);
+        graphics.Warm(tiles, 4);
         Assert.Single(graphics.Programs).Invocations.Clear();
         graphics.GuiProgram.Invocations.Clear();
         tiles.RenderInteractiveElements(0);
         var program = Assert.Single(graphics.Programs);
-        Assert.Equal(new[] { 0, 1, 2 }, States(program));
+        Assert.Equal(new[] { 0, 3, 1, 2 }, States(program));
         program.Verify(value => value.Use(), Times.Once);
         program.Verify(value => value.Stop(), Times.Once);
         program.VerifySet(value => value.IconTexture = 77, Times.Once);
         program.VerifySet(value => value.ProjectionMatrix = It.IsAny<float[]>(), Times.Once);
         program.VerifySet(value => value.ModelViewMatrix = It.IsAny<float[]>(), Times.Once);
         program.VerifySet(value => value.GuiScale = scale, Times.Once);
-        program.VerifySet(value => value.TileBounds = It.IsAny<System.Numerics.Vector4>(), Times.Exactly(3));
+        program.VerifySet(value => value.TileBounds = It.IsAny<System.Numerics.Vector4>(), Times.Exactly(4));
         program.VerifySet(value => value.TextureBounds = new System.Numerics.Vector4(.1f, .2f, .3f, .4f),
-            Times.Exactly(3));
-        program.VerifySet(value => value.HasIcon = true, Times.Exactly(3));
+            Times.Exactly(4));
+        program.VerifySet(value => value.HasIcon = true, Times.Exactly(4));
         graphics.GuiProgram.Verify(value => value.Use(), Times.Once);
-        Assert.Equal(3, graphics.Bakes.Count);
-        Assert.Equal(3, graphics.Allocations.Count);
+        Assert.Equal(4, graphics.Bakes.Count);
+        Assert.Equal(4, graphics.Allocations.Count);
         Assert.Same(graphics.GuiProgram.Object, graphics.Active);
         graphics.Render.Verify(value => value.RenderItemstackToGui(It.IsAny<ItemSlot>(), It.IsAny<double>(),
             It.IsAny<double>(), It.IsAny<double>(), It.IsAny<float>(), It.IsAny<int>(),
@@ -81,9 +82,47 @@ public sealed class CraftingIconRendererTests
         session.Refresh();
         program.Invocations.Clear();
         tiles.RenderInteractiveElements(0);
-        Assert.Equal(new[] { 1, 1, 2 }, States(program));
-        Assert.Equal(3, graphics.Bakes.Count);
+        Assert.Equal(new[] { 1, 1, 1, 2 }, States(program));
+        Assert.Equal(4, graphics.Bakes.Count);
         program.Verify(value => value.Use(), Times.Once);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(1.5)]
+    [InlineData(2)]
+    public void IngredientAvailabilityTransitionsUpdateBordersWithoutRebaking(float scale)
+    {
+        using var graphics = new CraftingRenderFixture(scale);
+        var f = new AllocationFixture();
+        var board = f.Stack(1, "board", 4);
+        var recipe = f.Recipe(f.Ingredient(board, 4));
+        f.Register(recipe);
+        var snapshot = f.Snapshot();
+        var session = new CraftingMenuSession(f.Catalogue.Build(recipe), f.Allocator,
+            () => snapshot, (_, _) => throw new InvalidOperationException());
+        session.Refresh();
+        using var tiles = CreateTiles(graphics, session);
+        foreach (var (quantity, status) in new[] {
+            (0, CraftingTileStatus.MissingIngredients),
+            (1, CraftingTileStatus.PartiallyAvailable),
+            (3, CraftingTileStatus.PartiallyAvailable),
+            (4, CraftingTileStatus.Available),
+            (5, CraftingTileStatus.Available),
+            (0, CraftingTileStatus.MissingIngredients)
+        })
+        {
+            var available = board.Clone();
+            available.StackSize = quantity;
+            snapshot = quantity == 0 ? f.Snapshot() : f.Snapshot(available);
+            session.Refresh();
+            if (graphics.Programs.Count > 0) graphics.Programs[0].Invocations.Clear();
+            tiles.RenderInteractiveElements(0);
+            Assert.Equal(new[] { (int)status }, States(Assert.Single(graphics.Programs)));
+            Assert.Equal(Math.Min(quantity, 4), Assert.Single(session.Rows).Evaluation.Allocated);
+            Assert.Single(graphics.Bakes);
+            Assert.Single(graphics.Allocations);
+        }
     }
 
     [Fact]

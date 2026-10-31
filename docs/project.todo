@@ -5,7 +5,6 @@
         
     ## Crafting Menu:
         ☐ Design the "Show recipes using this/these items" functionality. which should function by the player placing items into their grid and then the crafting menu increses the sorting priority of relevant recipes.
-        ☐ Crafting menu should give recipes a yellow border when the player has some but not all of the items required for the recipe.
         ☐ Add a craftable-only toggle that shows recipes whose ingredients are currently available, independently combining with category and search filters.
         ☐ Add favorites: let players star recipe outputs and browse a Favorites tab, with favorites saved between game sessions.
         ☐ Add a compact ingredient have/need summary beneath the tooltip's recipe preview, highlighting missing amounts in red without restoring verbose diagnostic text.

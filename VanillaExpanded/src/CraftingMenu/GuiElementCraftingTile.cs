@@ -4,7 +4,7 @@ using Vintagestory.API.Common;
 
 namespace VanillaExpanded.CraftingMenu;
 
-internal enum CraftingTileStatus { Available, MissingIngredients, Unsupported }
+internal enum CraftingTileStatus { Available, MissingIngredients, Unsupported, PartiallyAvailable }
 
 internal sealed class GuiElementCraftingTile : GuiElementTextButton
 {
@@ -36,7 +36,9 @@ internal sealed class GuiElementCraftingTile : GuiElementTextButton
 
     internal bool Pressed { get; private set; }
     internal CraftingTileStatus Status => selection?.Evaluation.IsSupported != true ? CraftingTileStatus.Unsupported
-        : selection.Evaluation.CanCraft ? CraftingTileStatus.Available : CraftingTileStatus.MissingIngredients;
+        : selection.Evaluation.CanCraft ? CraftingTileStatus.Available
+        : selection.Evaluation.Allocated is > 0 ? CraftingTileStatus.PartiallyAvailable
+        : CraftingTileStatus.MissingIngredients;
     internal bool IsInViewport => Visible && (InsideClipBounds is not { } clip ||
         (Bounds.absX < clip.absX + clip.OuterWidth && Bounds.absX + Bounds.OuterWidth > clip.absX
             && Bounds.absY < clip.absY + clip.OuterHeight && Bounds.absY + Bounds.OuterHeight > clip.absY));

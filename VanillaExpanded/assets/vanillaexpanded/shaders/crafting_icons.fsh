@@ -27,7 +27,7 @@ void main()
     outColor = icon + background * (1.0 - icon.a);
     vec2 edgeDistances = min(uv, vec2(1.0) - uv) * tileBounds.zw;
     float edgeDistance = min(edgeDistances.x, edgeDistances.y);
-    if (recipeState == 1 && edgeDistance >= 2.0 * guiScale && edgeDistance < 4.0 * guiScale)
-        outColor = vec4(0.85, 0.12, 0.12, 1.0);
+    if ((recipeState == 1 || recipeState == 3) && edgeDistance >= 2.0 * guiScale && edgeDistance < 4.0 * guiScale)
+        outColor = recipeState == 3 ? vec4(0.95, 0.85, 0.12, 1.0) : vec4(0.85, 0.12, 0.12, 1.0);
     if (outColor.a < 0.001) discard;
 }
