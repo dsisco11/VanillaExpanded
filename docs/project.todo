@@ -2,6 +2,18 @@
     ## Issues:
         ☑ UI: give crafting menu a set of category tabs for easier navigation between different types of recipes.
         ☐ Design a better separation of alloy calculator inventory ownership/liveness validation, transfer permissions, and storage-versus-machine access policy. Reconsider the storage-class whitelist without weakening ownership or withdrawal checks, and define coverage for vanilla and modded containers.
+        
+    ## Crafting Menu:
+        ☐ Design the "Show recipes using this/these items" functionality. which should function by the player placing items into their grid and then the crafting menu increses the sorting priority of relevant recipes.
+        ☐ Crafting menu should give recipes a yellow border when the player has some but not all of the items required for the recipe.
+        ☐ Add a craftable-only toggle that shows recipes whose ingredients are currently available, independently combining with category and search filters.
+        ☐ Add favorites: let players star recipe outputs and browse a Favorites tab, with favorites saved between game sessions.
+        ☐ Add a compact ingredient have/need summary beneath the tooltip's recipe preview, highlighting missing amounts in red without restoring verbose diagnostic text.
+        ☐ Remember the crafting menu's selected category, search text, and scroll position when closing and reopening the inventory.
+        ☐ Add a shortcut to open the selected output's native handbook page.
+        ☐ Add a Recent section for recipes whose ingredients were recently placed through the menu; track ingredient placement, not assumed completion of crafting.
+        ☐ Add an Availability/Name sort selector, retaining current availability ordering as an option and providing stable alphabetical browsing.
+        ☐ Improve empty-state feedback to distinguish no search matches from no craftable recipes in the selected category, with a quick action to clear the relevant filter.
 
     ## New Features:
         ☐ Add HUD indicator to show current arrow type and quantity when player is holding a bow.
