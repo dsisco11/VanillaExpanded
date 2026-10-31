@@ -126,9 +126,13 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         var tabsBounds = ElementBounds.Fixed(0, 0, content.fixedWidth, tabsHeight);
         var searchBounds = ElementBounds.Fixed(0, tabsHeight + 8, content.fixedWidth, searchHeight);
         var craftableBounds = ElementBounds.Fixed(0, searchBounds.fixedY + searchHeight + 8,
-            content.fixedWidth, craftableHeight);
+            craftableHeight, craftableHeight);
+        double textHeight = CairoFont.WhiteSmallText().GetFontExtents().Height / GuiElement.scaled(1);
+        var craftableLabel = ElementBounds.Fixed(craftableHeight + 8,
+            craftableBounds.fixedY + (craftableHeight - textHeight) / 2,
+            content.fixedWidth - craftableHeight - 8, textHeight);
         double sortTop = craftableBounds.fixedY + craftableHeight + 8;
-        var sortLabel = ElementBounds.Fixed(0, sortTop, sortLabelWidth, craftableHeight);
+        var sortLabel = ElementBounds.Fixed(0, sortTop + (craftableHeight - textHeight) / 2, sortLabelWidth, textHeight);
         var sortBounds = ElementBounds.Fixed(sortLabelWidth + 8, sortTop,
             content.fixedWidth - sortLabelWidth - 8, craftableHeight);
         var footer = ElementBounds.Fixed(0, content.fixedHeight - footerHeight, content.fixedWidth, footerHeight);
@@ -161,11 +165,13 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
                     tiles.ResetScroll();
                     session.SelectCategory(categories[index]);
                 }, CairoFont.WhiteSmallText(), CairoFont.WhiteSmallText().WithWeight(Cairo.FontWeight.Bold), "categories")
-            .AddToggleButton(Lang.Get("vanillaexpanded:craftingmenu-craftable-only"), CairoFont.WhiteSmallText(), enabled =>
+            .AddSwitch(enabled =>
             {
                 tiles.ResetScroll();
                 session.CraftableOnly.SetEnabled(enabled);
-            }, craftableBounds, "craftable-only")
+            }, craftableBounds, "craftable-only", size: craftableHeight)
+            .AddStaticText(Lang.Get("vanillaexpanded:craftingmenu-craftable-only"), CairoFont.WhiteSmallText(),
+                craftableLabel, "craftable-label")
             .AddStaticText(Lang.Get("vanillaexpanded:craftingmenu-sort"), CairoFont.WhiteSmallText(),
                 sortLabel, "sort-label")
             .AddDropDown(session.Sort.Orders.Select(order => order.Id).ToArray(),
@@ -204,7 +210,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         SingleComposer?.Dispose();
         SingleComposer = composer;
         tooltip = newTooltip;
-        composer.GetToggleButton("craftable-only").SetValue(session.CraftableOnly.Enabled);
+        composer.GetSwitch("craftable-only").SetValue(session.CraftableOnly.Enabled);
         composer.GetHorizontalTabs("categories").SetValue(Array.IndexOf(categories, session.Category), false);
         composer.GetTextInput("search").SetPlaceHolderText(Lang.Get("vanillaexpanded:craftingmenu-search"));
         composer.GetTextInput("search").SetValue(search);
@@ -244,7 +250,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         double titleWidth = textFont.GetTextExtents(Lang.Get("vanillaexpanded:craftingmenu-title")).Width / scale;
         // The native title bar reserves space for its menu and close icons.
         double titleControlsWidth = 2 * GuiElementDialogTitleBar.unscaledCloseIconSize + 2 + 20;
-        double craftableWidth = 32 + textFont.GetTextExtents(
+        double craftableWidth = 16 + craftableHeight + 8 + textFont.GetTextExtents(
             Lang.Get("vanillaexpanded:craftingmenu-craftable-only")).Width / scale;
         sortLabelWidth = Math.Ceiling(textFont.GetTextExtents(Lang.Get("vanillaexpanded:craftingmenu-sort")).Width / scale + 1);
         double sortWidth = 16 + sortLabelWidth + 8 + 40 + session.Sort.Orders
@@ -387,7 +393,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         if (session.EmptyState is not (CraftingMenuEmptyState.NoCraftableRecipes or CraftingMenuEmptyState.NoCraftableSearchMatches))
             return true;
         ((GuiElementCraftingTiles)SingleComposer.GetElement("tiles")).ResetScroll();
-        SingleComposer.GetToggleButton("craftable-only").SetValue(false);
+        SingleComposer.GetSwitch("craftable-only").SetValue(false);
         session.CraftableOnly.SetEnabled(false);
         return true;
     }

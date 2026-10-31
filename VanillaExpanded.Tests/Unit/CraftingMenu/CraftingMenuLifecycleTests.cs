@@ -64,7 +64,7 @@ public sealed class CraftingMenuLifecycleTests
         input.SetValue("no matching recipe");
         ClickClear();
         Assert.True(session.CraftableOnly.Enabled);
-        Assert.True(menu.SingleComposer.GetToggleButton("craftable-only").On);
+        Assert.True(menu.SingleComposer.GetSwitch("craftable-only").On);
         Assert.Equal(CraftingMenuEmptyState.NoCraftableRecipes, session.EmptyState);
         input.SetValue(" \t ");
         Assert.True(input.ClearVisible);
@@ -215,11 +215,11 @@ public sealed class CraftingMenuLifecycleTests
         Assert.Equal("", input.GetText());
         Assert.True(input.HasFocus);
         Assert.True(session.CraftableOnly.Enabled);
-        Assert.True(menu.SingleComposer.GetToggleButton("craftable-only").On);
+        Assert.True(menu.SingleComposer.GetSwitch("craftable-only").On);
         AssertState("No recipes in this category are currently craftable.", "show-uncraftable");
         Invoke("show-uncraftable");
         Assert.False(session.CraftableOnly.Enabled);
-        Assert.False(menu.SingleComposer.GetToggleButton("craftable-only").On);
+        Assert.False(menu.SingleComposer.GetSwitch("craftable-only").On);
         Assert.Single(session.Rows);
         Assert.Equal("tools", session.Category);
         Assert.Equal(0, menu.SingleComposer.GetScrollbar("scroll").CurrentYPosition);
@@ -479,7 +479,7 @@ public sealed class CraftingMenuLifecycleTests
     [InlineData(1)]
     [InlineData(1.5)]
     [InlineData(2)]
-    public void NativeCraftableTogglePreservesIndependentCriteriaAcrossInputResizeAndSessionReset(float scale)
+    public void NativeCraftableCheckboxPreservesIndependentCriteriaAcrossInputResizeAndSessionReset(float scale)
     {
         using var f = new MenuFixture(scale: scale, includeRecipes: true);
         var first = Assert.Single(f.Lifecycle.Recipes);
@@ -501,7 +501,7 @@ public sealed class CraftingMenuLifecycleTests
         var menu = Assert.Single(f.Menus);
         var session = (CraftingMenuSession)typeof(GuiDialogCraftingMenu).GetField("session",
             BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
-        var toggle = menu.SingleComposer.GetToggleButton("craftable-only");
+        var toggle = menu.SingleComposer.GetSwitch("craftable-only");
         Assert.False(toggle.On);
         Assert.False(session.CraftableOnly.Enabled);
         menu.SingleComposer.GetTextInput("search").SetValue("output");
@@ -529,13 +529,22 @@ public sealed class CraftingMenuLifecycleTests
         Assert.True(enter.Handled);
         Assert.True(toggle.On);
         Assert.Single(session.Rows);
+        foreach (bool enabled in new[] { false, true })
+        {
+            var space = new KeyEvent { KeyCode = (int)GlKeys.Space };
+            menu.OnKeyDown(space);
+            Assert.True(space.Handled);
+            Assert.Equal(enabled, toggle.On);
+            Assert.Equal(enabled, session.CraftableOnly.Enabled);
+            AssertCriteria();
+        }
         for (int i = 0; i < 3; i++)
         {
             var composer = menu.SingleComposer;
             f.ResizePanelSpace(composer.Bounds.fixedWidth + 20, composer.Bounds.fixedHeight - 10);
             menu.TryOpen();
             Assert.NotSame(composer, menu.SingleComposer);
-            Assert.True(menu.SingleComposer.GetToggleButton("craftable-only").On);
+            Assert.True(menu.SingleComposer.GetSwitch("craftable-only").On);
             Assert.True(session.CraftableOnly.Enabled);
             Assert.Single(session.Rows);
             AssertCriteria();
@@ -553,7 +562,7 @@ public sealed class CraftingMenuLifecycleTests
                 BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(reopened)!;
             Assert.NotSame(session, newSession);
             Assert.False(newSession.CraftableOnly.Enabled);
-            Assert.False(reopened.SingleComposer.GetToggleButton("craftable-only").On);
+            Assert.False(reopened.SingleComposer.GetSwitch("craftable-only").On);
             Assert.Equal("output", reopened.SingleComposer.GetTextInput("search").GetText());
             Assert.Equal("tools", newSession.Category);
             Assert.Equal(41, newSession.Rows.Length);
@@ -1337,8 +1346,10 @@ public sealed class CraftingMenuLifecycleTests
             + 4 + originalComposer.GetElement("handbook").Bounds.OuterWidth / scale + 16;
         double titleWidth = GuiStyle.ElementToDialogPadding + title.Font.GetTextExtents(title.GetText()).Width / scale
             + 8 + 2 * GuiElementDialogTitleBar.unscaledCloseIconSize + 2 + 20;
-        var craftable = originalComposer.GetToggleButton("craftable-only");
-        double craftableWidth = 32 + craftable.Font.GetTextExtents(craftable.GetText()).Width / scale;
+        var craftable = originalComposer.GetSwitch("craftable-only");
+        var craftableLabel = originalComposer.GetStaticText("craftable-label");
+        double craftableWidth = 16 + craftable.Bounds.OuterWidth / scale + 8
+            + craftableLabel.Font.GetTextExtents(craftableLabel.GetText()).Width / scale;
         double actionWidth = 32 + new[] { "clear-search", "show-uncraftable" }
             .Max(key => originalComposer.GetButton(key).Bounds.OuterWidth / scale);
         double sortWidth = 16 + originalComposer.GetElement("sort-label").Bounds.OuterWidth / scale + 8 + 40
@@ -1383,7 +1394,8 @@ public sealed class CraftingMenuLifecycleTests
             var title = composer.GetTitleBar("titlebar");
             var search = composer.GetTextInput("search").Bounds;
             var tabs = composer.GetHorizontalTabs("categories").Bounds;
-            var craftable = composer.GetToggleButton("craftable-only");
+            var craftable = composer.GetSwitch("craftable-only");
+            var craftableLabel = composer.GetStaticText("craftable-label");
             var sort = composer.GetDropDown("sort");
             var sortLabel = composer.GetElement("sort-label").Bounds;
             var viewport = composer.GetElement("tiles").InsideClipBounds;
@@ -1403,8 +1415,14 @@ public sealed class CraftingMenuLifecycleTests
             Assert.True(sort.Bounds.absY + sort.Bounds.OuterHeight + 8 * scale <= viewport.absY + .001);
             Assert.All(sort.listMenu.Names, name =>
                 Assert.True(sort.Font.GetTextExtents(name).Width + 40 * scale <= sort.Bounds.InnerWidth + .001));
-            Assert.True(craftable.Font.GetTextExtents(craftable.GetText()).Width + 16 * scale <=
-                craftable.Bounds.InnerWidth + .001);
+            Assert.Equal(craftable.Bounds.InnerWidth, craftable.Bounds.InnerHeight, 4);
+            Assert.True(craftable.Bounds.absX + craftable.Bounds.OuterWidth + 8 * scale <= craftableLabel.Bounds.absX + .001);
+            Assert.True(craftableLabel.Font.GetTextExtents(craftableLabel.GetText()).Width <=
+                craftableLabel.Bounds.InnerWidth + .001);
+            Assert.Equal(craftable.Bounds.absY + craftable.Bounds.InnerHeight / 2,
+                craftableLabel.Bounds.absY + craftableLabel.Bounds.InnerHeight / 2, 4);
+            Assert.Equal(sort.Bounds.absY + sort.Bounds.InnerHeight / 2,
+                sortLabel.absY + sortLabel.InnerHeight / 2, 4);
             Assert.True(viewport.InnerHeight + .001 >= GuiElementCraftingTiles.TileSize * scale);
             Assert.True(viewport.absX + viewport.OuterWidth + 4 * scale <= scroll.absX + .001);
             Assert.Equal(viewport.absY, scroll.absY, 4);
@@ -1421,7 +1439,7 @@ public sealed class CraftingMenuLifecycleTests
             double titleMenuLeft = title.Bounds.absX + title.Bounds.OuterWidth
                 - GuiElement.scaled(2 * GuiElementDialogTitleBar.unscaledCloseIconSize + 2 + 20);
             Assert.True(titleTextRight + 8 * scale <= titleMenuLeft + .001);
-            foreach (var bounds in new[] { tabs, search, craftable.Bounds, sortLabel, sort.Bounds, viewport, scroll, previous, auto, next, counter,
+            foreach (var bounds in new[] { tabs, search, craftable.Bounds, craftableLabel.Bounds, sortLabel, sort.Bounds, viewport, scroll, previous, auto, next, counter,
                 handbook.Bounds })
             {
                 Assert.True(bounds.absX >= panel.absX + 8 * scale - .001);
@@ -2038,7 +2056,7 @@ public sealed class CraftingMenuLifecycleTests
             PressTab();
             Assert.Same(categories, composer.CurrentTabIndexElement);
             PressTab();
-            Assert.Same(composer.GetToggleButton("craftable-only"), composer.CurrentTabIndexElement);
+            Assert.Same(composer.GetSwitch("craftable-only"), composer.CurrentTabIndexElement);
             PressTab(shift: true);
             Assert.Same(categories, composer.CurrentTabIndexElement);
             PressTab(shift: true);
@@ -2231,15 +2249,17 @@ public sealed class CraftingMenuLifecycleTests
         using var graphics = new CraftingRenderFixture(scale);
         var render = graphics.Render;
         var liveTextures = graphics.Textures;
-        render.Setup(value => value.RenderMesh(It.IsAny<MeshRef>())).Callback(() =>
-        {
-            var bounds = Assert.Single(graphics.Clips);
-            Assert.Equal(46 * scale, bounds.InnerWidth, 4);
-            Assert.Equal(46 * scale, bounds.InnerHeight, 4);
-            Assert.Same(graphics.Programs[^1].Object, graphics.Active);
-        });
         var viewport = ElementBounds.Fixed(0, 0, 96, 96).WithEmptyParent();
         viewport.CalcWorldBounds();
+        render.Setup(value => value.RenderMesh(It.IsAny<MeshRef>())).Callback(() =>
+        {
+            Assert.Equal(2, graphics.Clips.Count);
+            Assert.Same(viewport, graphics.Clips.ToArray()[1]);
+            var bounds = graphics.Clips.Peek();
+            Assert.Equal((int)(46 * scale), bounds.InnerWidth, 4);
+            Assert.Equal((int)(46 * scale), bounds.InnerHeight, 4);
+            Assert.Same(graphics.Programs[^1].Object, graphics.Active);
+        });
         using var surface = new ImageSurface(Format.Argb32, 96, 144);
         using var ctx = new Context(surface);
         for (int cycle = 0; cycle < 5; cycle++)
@@ -2257,10 +2277,10 @@ public sealed class CraftingMenuLifecycleTests
             {
                 render.Invocations.Clear();
                 foreach (var program in graphics.Programs) program.Invocations.Clear();
-                tiles.RenderInteractiveElements(0);
+                graphics.Frame(tiles);
                 Assert.Equal(4, render.Invocations.Count(call => call.Method.Name == nameof(IRenderAPI.RenderMesh)));
-                Assert.Equal(cycle == 0 ? 4 : beforeBakes, graphics.Bakes.Count);
-                Assert.Equal(cycle == 0 ? 4 : 6, graphics.Allocations.Count);
+                Assert.Equal(cycle == 0 ? (frame == 0 ? 0 : 4) : beforeBakes, graphics.Bakes.Count);
+                Assert.Equal(cycle == 0 ? (frame == 0 ? 0 : 4) : 6, graphics.Allocations.Count);
                 graphics.Programs[^1].Verify(value => value.Use(), Times.Once);
                 Assert.Empty(graphics.Clips);
             }
@@ -2268,9 +2288,9 @@ public sealed class CraftingMenuLifecycleTests
             for (int frame = 0; frame < 2; frame++)
             {
                 render.Invocations.Clear();
-                tiles.RenderInteractiveElements(0);
+                graphics.Frame(tiles);
                 Assert.Equal(6, render.Invocations.Count(call => call.Method.Name == nameof(IRenderAPI.RenderMesh)));
-                Assert.Equal(cycle == 0 ? 6 : beforeBakes, graphics.Bakes.Count);
+                Assert.Equal(cycle == 0 ? (frame == 0 ? 4 : 6) : beforeBakes, graphics.Bakes.Count);
             }
             Assert.Equal(6, graphics.Allocations.Count);
             Assert.All(graphics.Bakes, bake =>
@@ -2294,34 +2314,46 @@ public sealed class CraftingMenuLifecycleTests
     }
 
     [Theory]
-    [InlineData(0, true)]
-    [InlineData(0, false)]
-    [InlineData(1, true)]
-    [InlineData(1, false)]
-    [InlineData(2, true)]
-    [InlineData(2, false)]
-    public void WorldLifecycleOwnsReadyAndDeferredIconAllocations(int cleanup, bool immediate)
+    [InlineData(0, 0)]
+    [InlineData(0, 1)]
+    [InlineData(0, 2)]
+    [InlineData(1, 0)]
+    [InlineData(1, 1)]
+    [InlineData(1, 2)]
+    [InlineData(2, 0)]
+    [InlineData(2, 1)]
+    [InlineData(2, 2)]
+    public void WorldLifecycleOwnsLocallyQueuedNativePendingAndReadyIcons(int cleanup, int phase)
     {
         using var scope = new NativeScope();
-        using var graphics = new CraftingRenderFixture { CompleteImmediately = immediate };
+        using var graphics = new CraftingRenderFixture { CompleteOnFrame = phase == 2 };
         using var f = new LifecycleFixture();
         f.Api.SetupGet(value => value.Render).Returns(graphics.Render.Object);
         f.Api.SetupGet(value => value.ItemTextureAtlas).Returns(graphics.Api.Object.ItemTextureAtlas);
         f.FinalizeWorld();
         var cache = Assert.IsType<CraftingIconCache>(f.System.IconCache);
         var recipe = Assert.Single(f.System.Catalogue!.Recipes);
-        var position = cache.Get(recipe, 46, true, out bool baked);
-        Assert.True(baked);
-        Assert.Equal(immediate, position != null);
-        Assert.Single(graphics.Bakes);
+        Assert.Null(cache.Get(recipe, 46, true, out bool queued));
+        Assert.True(queued);
+        if (phase > 0)
+        {
+            graphics.BeforeFrame(cache);
+            Assert.Single(graphics.Bakes);
+            graphics.EndFrame();
+        }
+        Assert.Equal(phase == 2, cache.Get(recipe, 46, false, out _) != null);
         if (cleanup == 0) f.Events.Raise(value => value.LeaveWorld += null);
         else if (cleanup == 1) f.System.Dispose();
         else f.FinalizeWorld();
-        if (!immediate) graphics.Complete(graphics.Bakes[0]);
+        if (phase == 1) graphics.Complete(graphics.Bakes[0]);
+        graphics.BeforeFrame(cache);
+        Assert.Equal(phase == 0 ? 0 : 1, graphics.Bakes.Count);
         Assert.Empty(graphics.Allocations);
         Assert.NotSame(cache, f.System.IconCache);
         Assert.Throws<ObjectDisposedException>(() => cache.Get(recipe, 46, true, out _));
         f.Events.VerifyRemove(value => value.ReloadTextures -= It.IsAny<Action>(), Times.Once);
+        f.Events.Verify(value => value.RegisterRenderer(cache, EnumRenderStage.Before, "crafting-icon-requests"), Times.Once);
+        f.Events.Verify(value => value.UnregisterRenderer(cache, EnumRenderStage.Before), Times.Once);
     }
 
     [Theory]
@@ -2403,7 +2435,7 @@ public sealed class CraftingMenuLifecycleTests
                     "vanillaexpanded:craftingmenu-auto" => longLabels ? "Automatic selection" : "Auto",
                     "vanillaexpanded:craftingmenu-handbook" => longLabels ? "Open survival handbook" : "Handbook",
                     "vanillaexpanded:craftingmenu-craftable-only" => longLabels
-                        ? "Only recipes with all ingredients available" : "Craftable only",
+                        ? "Hide recipes without all required ingredients" : "Hide uncraftable",
                     "vanillaexpanded:craftingmenu-sort" => longLabels ? "Recipe sorting preference" : "Sort by",
                     "vanillaexpanded:craftingmenu-sort-availability" => longLabels ? "Current ingredient availability" : "Availability",
                     "vanillaexpanded:craftingmenu-sort-name" => longLabels ? "Alphabetical output name" : "Name",
@@ -2506,7 +2538,7 @@ public sealed class CraftingMenuLifecycleTests
 
         internal void ToggleCraftable(GuiDialogCraftingMenu menu)
         {
-            var bounds = menu.SingleComposer.GetToggleButton("craftable-only").Bounds;
+            var bounds = menu.SingleComposer.GetSwitch("craftable-only").Bounds;
             int x = (int)(bounds.absX + 5);
             int y = (int)(bounds.absY + 5);
             var down = new MouseEvent(x, y, EnumMouseButton.Left, 0);

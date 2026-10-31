@@ -12,6 +12,7 @@ internal sealed class GuiElementCraftingTile : GuiElementTextButton
     private readonly Action<GuiElementCraftingTile> focus;
     private readonly Action inspect;
     private CraftingRecipeSelection? selection;
+    private readonly ElementBounds pixelBounds = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
     private (int Output, int Recipe)? pressedIdentity;
 
     internal GuiElementCraftingTile(ICoreClientAPI api, ElementBounds bounds,
@@ -38,6 +39,17 @@ internal sealed class GuiElementCraftingTile : GuiElementTextButton
     }
 
     internal bool Pressed => pressedIdentity != null;
+    internal ElementBounds PixelBounds
+    {
+        get
+        {
+            pixelBounds.absFixedX = (int)Bounds.renderX;
+            pixelBounds.absFixedY = (int)Bounds.renderY;
+            pixelBounds.absInnerWidth = Bounds.OuterWidthInt;
+            pixelBounds.absInnerHeight = Bounds.OuterHeightInt;
+            return pixelBounds;
+        }
+    }
     internal void CancelPress() => pressedIdentity = null;
     internal CraftingTileStatus Status => selection?.Evaluation.IsSupported != true ? CraftingTileStatus.Unsupported
         : selection.Evaluation.CanCraft ? CraftingTileStatus.Available

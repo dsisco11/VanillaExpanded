@@ -131,8 +131,14 @@ internal sealed class GuiElementCraftingTiles : GuiElementContainer
     public override void RenderInteractiveElements(float deltaTime)
     {
         icons.Prepare(Elements);
-        base.RenderInteractiveElements(deltaTime);
-        icons.Render(Elements);
+        // Native atlas baking can change the active GL scissor rectangle.
+        api.Render.PushScissor(viewport, true);
+        try
+        {
+            base.RenderInteractiveElements(deltaTime);
+            icons.Render(Elements);
+        }
+        finally { api.Render.PopScissor(); }
     }
 
     internal void UpdateHover(int x, int y)

@@ -5,7 +5,7 @@ using Vintagestory.API.Common;
 
 namespace VanillaExpanded.CraftingMenu;
 
-internal sealed class CraftingIconCache(ICoreClientAPI api) : IDisposable
+internal sealed class CraftingIconCache(ICoreClientAPI api) : IRenderer
 {
     internal const int BakesPerFrame = 4;
 
@@ -22,21 +22,26 @@ internal sealed class CraftingIconCache(ICoreClientAPI api) : IDisposable
 
     private readonly Dictionary<PreviewKey, Preview> previews = new();
     private readonly HashSet<Preview> inFlight = new();
+    private readonly Queue<(Preview Preview, ItemStack Stack)> pending = new();
     private ITextureAtlasAPI? atlas;
     private bool subscribed;
     private bool disposed;
 
-    internal TextureAtlasPosition? Get(CraftingRecipeEntry recipe, int size, bool allowBake, out bool baked)
+    public double RenderOrder => 0;
+    public int RenderRange => int.MaxValue;
+
+    internal TextureAtlasPosition? Get(CraftingRecipeEntry recipe, int size, bool allowQueue, out bool queued)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
-        baked = false;
+        queued = false;
         if (recipe.PreviewId is not int id) return null;
         var key = new PreviewKey(id, size);
         if (previews.TryGetValue(key, out var preview)) return preview.Position;
-        if (!allowBake || inFlight.Count >= BakesPerFrame) return null;
+        if (!allowQueue || inFlight.Count >= BakesPerFrame) return null;
         if (!subscribed)
         {
             atlas = api.ItemTextureAtlas;
+            api.Event.RegisterRenderer(this, EnumRenderStage.Before, "crafting-icon-requests");
             api.Event.ReloadTextures += Clear;
             subscribed = true;
         }
@@ -44,17 +49,24 @@ internal sealed class CraftingIconCache(ICoreClientAPI api) : IDisposable
         stack.StackSize = 1;
         preview = new Preview(key);
         previews.Add(key, preview);
-        baked = true;
-        Bake(preview, stack);
-        return preview.Position;
+        inFlight.Add(preview);
+        pending.Enqueue((preview, stack));
+        queued = true;
+        return null;
+    }
+
+    public void OnRenderFrame(float deltaTime, EnumRenderStage stage)
+    {
+        if (disposed || stage != EnumRenderStage.Before) return;
+        // Outside Ortho the native API queues atlas work instead of baking inside a GUI draw.
+        int budget = BakesPerFrame;
+        while (budget-- > 0 && pending.TryDequeue(out var request))
+            Bake(request.Preview, request.Stack);
     }
 
     private void Bake(Preview preview, ItemStack stack)
     {
         var targetAtlas = atlas!;
-        bool clipped = api.Render.ScissorStack.Count > 0;
-        api.Render.GlScissorFlag(false);
-        inFlight.Add(preview);
         try
         {
             api.Render.RenderItemStackToAtlas(stack, targetAtlas, preview.Key.Size, subId =>
@@ -75,10 +87,10 @@ internal sealed class CraftingIconCache(ICoreClientAPI api) : IDisposable
         {
             inFlight.Remove(preview);
             Release(preview);
-            previews.Remove(preview.Key);
+            if (previews.TryGetValue(preview.Key, out var current) && ReferenceEquals(current, preview))
+                previews.Remove(preview.Key);
             throw;
         }
-        finally { api.Render.GlScissorFlag(clipped); }
     }
 
     private void Release(Preview preview)
@@ -97,13 +109,18 @@ internal sealed class CraftingIconCache(ICoreClientAPI api) : IDisposable
         foreach (var preview in previews.Values) Release(preview);
         previews.Clear();
         inFlight.Clear();
+        pending.Clear();
     }
 
     public void Dispose()
     {
         if (disposed) return;
         disposed = true;
-        if (subscribed) api.Event.ReloadTextures -= Clear;
+        if (subscribed)
+        {
+            api.Event.UnregisterRenderer(this, EnumRenderStage.Before);
+            api.Event.ReloadTextures -= Clear;
+        }
         Clear();
     }
 }

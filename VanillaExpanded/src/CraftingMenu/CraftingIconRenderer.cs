@@ -46,14 +46,14 @@ internal sealed class CraftingIconRenderer(ICoreClientAPI api, CraftingIconCache
             if (!quantities.ContainsKey(key))
                 quantities.Add(key, api.Gui.TextTexture.GenTextTexture(
                     key.Quantity.ToString(CultureInfo.InvariantCulture), CairoFont.WhiteSmallText().WithFontSize(11)));
-        int bakes = 0;
+        int requests = 0;
         foreach (GuiElementCraftingTile tile in elements)
         {
             if (!tile.IsInViewport) continue;
             var selection = tile.Selection!;
             int size = Math.Max(2, (int)Math.Ceiling(Math.Min(tile.Bounds.InnerWidth, tile.Bounds.InnerHeight) / 2) * 2);
-            var position = cache.Get(selection.Recipe, size, bakes < CraftingIconCache.BakesPerFrame, out bool baked);
-            if (baked) bakes++;
+            var position = cache.Get(selection.Recipe, size, requests < CraftingIconCache.BakesPerFrame, out bool queued);
+            if (queued) requests++;
             if (position != null) visiblePreviews[selection.Recipe.Id] = position;
         }
     }
@@ -81,7 +81,7 @@ internal sealed class CraftingIconRenderer(ICoreClientAPI api, CraftingIconCache
                     texture = position.atlasTextureId;
                     shader.IconTexture = texture;
                 }
-                var bounds = tile.Bounds;
+                var bounds = tile.PixelBounds;
                 shader.TileBounds = new((float)bounds.renderX, (float)bounds.renderY,
                     (float)bounds.InnerWidth, (float)bounds.InnerHeight);
                 shader.RecipeState = tile.Status;
@@ -102,7 +102,7 @@ internal sealed class CraftingIconRenderer(ICoreClientAPI api, CraftingIconCache
         foreach (GuiElementCraftingTile tile in elements)
         {
             if (!tile.IsInViewport) continue;
-            var bounds = tile.Bounds;
+            var bounds = tile.PixelBounds;
             render.PushScissor(bounds, true);
             try
             {
@@ -110,7 +110,7 @@ internal sealed class CraftingIconRenderer(ICoreClientAPI api, CraftingIconCache
                     render.Render2DTexturePremultipliedAlpha(quantity.TextureId,
                         bounds.renderX + bounds.InnerWidth - quantity.Width - GuiElement.scaled(2),
                         bounds.renderY + bounds.InnerHeight - quantity.Height - GuiElement.scaled(2),
-                        quantity.Width, quantity.Height, 320);
+                        quantity.Width, quantity.Height, 221);
             }
             finally { render.PopScissor(); }
         }
