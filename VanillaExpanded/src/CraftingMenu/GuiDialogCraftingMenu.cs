@@ -119,13 +119,14 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
             .AddTextInput(searchBounds, text =>
             {
                 search = text;
+                tiles.ResetScroll();
                 session.Search(text);
             }, CairoFont.WhiteSmallText(), "search")
             .AddHorizontalTabs(categories.Select((code, index) => new GuiTab { DataInt = index, Name = CategoryName(code) })
                 .ToArray(), tabsBounds, index =>
                 {
                     if (session.Category == categories[index]) return;
-                    tiles.Scroll(0);
+                    tiles.ResetScroll();
                     session.SelectCategory(categories[index]);
                 }, CairoFont.WhiteSmallText(), CairoFont.WhiteSmallText().WithWeight(Cairo.FontWeight.Bold), "categories")
             .BeginClip(viewport)
@@ -285,6 +286,12 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         SingleComposer.GetDynamicText("empty").SetNewText(session.Rows.IsEmpty
             ? Lang.Get("vanillaexpanded:craftingmenu-empty") : "");
         var selected = session.Rows.FirstOrDefault(row => row.Output.Id == session.SelectedOutput);
+        foreach (string key in new[] { "previous", "auto", "next" })
+        {
+            var button = SingleComposer.GetButton(key);
+            if (selected == null && button.HasFocus) button.OnFocusLost();
+            button.Enabled = selected != null;
+        }
         SingleComposer.GetDynamicText("alternative").SetNewText(selected == null ? "" :
             $"{selected.Output.Alternatives.IndexOf(selected.Recipe) + 1}/{selected.Output.Alternatives.Length}");
     }

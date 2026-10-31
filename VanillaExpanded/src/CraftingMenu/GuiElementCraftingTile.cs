@@ -12,6 +12,7 @@ internal sealed class GuiElementCraftingTile : GuiElementTextButton
     private readonly Action<GuiElementCraftingTile> focus;
     private readonly Action inspect;
     private CraftingRecipeSelection? selection;
+    private (int Output, int Recipe)? pressedIdentity;
 
     internal GuiElementCraftingTile(ICoreClientAPI api, ElementBounds bounds,
         Action<int, bool> activate,
@@ -28,13 +29,16 @@ internal sealed class GuiElementCraftingTile : GuiElementTextButton
         get => selection;
         set
         {
+            if (value == null || pressedIdentity != (value.Output.Id, value.Recipe.Id))
+                pressedIdentity = null;
             selection = value;
             Visible = value != null;
             if (!Visible && HasFocus) OnFocusLost();
         }
     }
 
-    internal bool Pressed { get; private set; }
+    internal bool Pressed => pressedIdentity != null;
+    internal void CancelPress() => pressedIdentity = null;
     internal CraftingTileStatus Status => selection?.Evaluation.IsSupported != true ? CraftingTileStatus.Unsupported
         : selection.Evaluation.CanCraft ? CraftingTileStatus.Available
         : selection.Evaluation.Allocated is > 0 ? CraftingTileStatus.PartiallyAvailable
@@ -54,23 +58,26 @@ internal sealed class GuiElementCraftingTile : GuiElementTextButton
 
     public override void OnMouseDownOnElement(ICoreClientAPI api, MouseEvent args)
     {
-        if (args.Button != EnumMouseButton.Left) return;
+        if (args.Button != EnumMouseButton.Left || selection == null || !Visible || !Enabled) return;
+        pressedIdentity = (selection.Output.Id, selection.Recipe.Id);
         base.OnMouseDownOnElement(api, args);
-        Pressed = true;
         inspect();
     }
 
     public override void OnMouseUp(ICoreClientAPI api, MouseEvent args)
     {
         base.OnMouseUp(api, args);
-        Pressed = false;
+        pressedIdentity = null;
     }
 
     public override void OnMouseUpOnElement(ICoreClientAPI api, MouseEvent args)
     {
+        var pressed = pressedIdentity;
+        pressedIdentity = null;
         bool handled = args.Handled;
         base.OnMouseUpOnElement(api, args);
-        if (!handled && args.Handled && args.Button == EnumMouseButton.Left && selection != null)
+        if (!handled && args.Handled && args.Button == EnumMouseButton.Left && selection != null
+            && pressed == (selection.Output.Id, selection.Recipe.Id))
             activate(selection.Output.Id, api.Input.KeyboardKeyStateRaw[(int)GlKeys.ShiftLeft]
                 || api.Input.KeyboardKeyStateRaw[(int)GlKeys.ShiftRight]);
     }

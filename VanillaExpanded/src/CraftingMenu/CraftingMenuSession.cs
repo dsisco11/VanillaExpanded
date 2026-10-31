@@ -14,7 +14,6 @@ internal sealed class CraftingMenuSession : IDisposable
     private readonly CraftingCatalogue catalogue;
     private readonly RecipeSearch search;
     private readonly RecipeCategory category;
-    private ImmutableDictionary<int, CraftingAllocation> allocations = ImmutableDictionary<int, CraftingAllocation>.Empty;
     private int? interaction;
 
     internal CraftingMenuSession(CraftingCatalogue catalogue, CraftingAllocator allocator,
@@ -38,8 +37,7 @@ internal sealed class CraftingMenuSession : IDisposable
 
     internal void Refresh()
     {
-        allocations = allocator.EvaluateCatalogue(catalogue, capture());
-        view.ReplaceAllocations(allocations);
+        view.ReplaceAllocations(allocator.EvaluateCatalogue(catalogue, capture()));
         UpdateRows();
     }
 
@@ -77,14 +75,14 @@ internal sealed class CraftingMenuSession : IDisposable
 
     internal void ChooseAlternative(int recipe)
     {
-        if (SelectedOutput is not int output) return;
+        if (SelectedOutput is not int output || !Rows.Any(row => row.Output.Id == output)) return;
         view.SelectAlternative(output, recipe);
         UpdateRows(output);
     }
 
     internal void Auto()
     {
-        if (SelectedOutput is not int output) return;
+        if (SelectedOutput is not int output || !Rows.Any(row => row.Output.Id == output)) return;
         view.SelectAuto(output);
         UpdateRows(output);
     }
@@ -101,13 +99,30 @@ internal sealed class CraftingMenuSession : IDisposable
 
     private void UpdateRows(int? changedOutput = null)
     {
+        var canonical = view.GetRows(Filters);
+        var replacement = canonical;
         if (interaction != null && !Rows.IsEmpty)
         {
-            Rows = Rows.Select(row => changedOutput == row.Output.Id ? view.GetSelection(row.Output.Id)
-                : row with { Evaluation = allocations[row.Recipe.Id].Evaluation, Allocation = allocations[row.Recipe.Id] })
-                .ToImmutableArray();
+            var eligible = Filters.Filter(Rows.Select(row => changedOutput == row.Output.Id
+                ? view.GetSelection(row.Output.Id) : view.RefreshSelection(row)))
+                .ToDictionary(row => row.Output.Id);
+            var candidates = canonical.ToDictionary(row => row.Output.Id);
+            var emitted = new HashSet<int>();
+            var stable = ImmutableArray.CreateBuilder<CraftingRecipeSelection>();
+            foreach (var row in Rows)
+            {
+                if (eligible.TryGetValue(row.Output.Id, out var current)
+                    || candidates.TryGetValue(row.Output.Id, out current))
+                {
+                    stable.Add(current);
+                    emitted.Add(current.Output.Id);
+                }
+            }
+            foreach (var row in canonical)
+                if (emitted.Add(row.Output.Id)) stable.Add(row);
+            replacement = stable.ToImmutable();
         }
-        else Rows = view.GetRows(Filters);
+        Rows = replacement;
         Changed?.Invoke();
     }
 

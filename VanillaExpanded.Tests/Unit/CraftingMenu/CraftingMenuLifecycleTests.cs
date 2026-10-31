@@ -17,6 +17,53 @@ namespace VanillaExpanded.Tests.Unit.CraftingMenu;
 [Collection("Crafting native GUI")]
 public sealed class CraftingMenuLifecycleTests
 {
+    [Fact]
+    public void HiddenPinnedSelectionDisablesFooterAndClearsTooltipWithoutLosingPin()
+    {
+        using var f = new MenuFixture(includeRecipes: true);
+        f.Parent.TryOpen();
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        var session = (CraftingMenuSession)typeof(GuiDialogCraftingMenu).GetField("session",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
+        var row = Assert.Single(session.Rows);
+        session.Select(row.Output.Id);
+        session.ChooseAlternative(row.Recipe.Id);
+        var tiles = Assert.IsType<GuiElementCraftingTiles>(menu.SingleComposer.GetElement("tiles"));
+        var tile = Assert.IsType<GuiElementCraftingTile>(tiles.Elements[0]);
+        tiles.UpdateHover((int)tile.Bounds.absX + 10, (int)tile.Bounds.absY + 10);
+        var tooltip = Assert.IsType<GuiElementCraftingRecipeTooltip>(menu.SingleComposer.GetElement("tooltip"));
+        Assert.NotNull(tooltip.Popup);
+        using var filter = session.Filters.Register("test:hidden", new HiddenFilter());
+        session.Refresh();
+        Assert.Empty(session.Rows);
+        var render = Mock.Get(f.Lifecycle.Api.Object.Render);
+        render.Invocations.Clear();
+        tooltip.RenderInteractiveElements(.1f);
+        Assert.Empty(render.Invocations);
+        Assert.Equal("", menu.SingleComposer.GetDynamicText("alternative").GetText());
+        foreach (string key in new[] { "previous", "auto", "next" })
+        {
+            Assert.False(menu.SingleComposer.GetButton(key).Enabled);
+            Assert.False(menu.SingleComposer.GetButton(key).Focusable);
+            f.Click(menu.SingleComposer.GetButton(key), handled: false);
+        }
+        filter.Dispose();
+        session.Refresh();
+        Assert.True(Assert.Single(session.Rows).IsExplicit);
+        Assert.Equal(row.Recipe.Id, Assert.Single(session.Rows).Recipe.Id);
+        Assert.NotNull(tooltip.Popup);
+        foreach (string key in new[] { "previous", "auto", "next" })
+            Assert.True(menu.SingleComposer.GetButton(key).Enabled);
+        f.Click(menu.SingleComposer.GetButton("auto"));
+        Assert.False(Assert.Single(session.Rows).IsExplicit);
+    }
+
+    private sealed class HiddenFilter : IRecipeFilter
+    {
+        public bool Matches(CraftingRecipeSelection selection) => false;
+    }
+
     [Theory]
     [InlineData(1)]
     [InlineData(1.5)]
@@ -607,6 +654,18 @@ public sealed class CraftingMenuLifecycleTests
         var tiles = Assert.IsType<GuiElementCraftingTiles>(menu.SingleComposer.GetElement("tiles"));
         tiles.Scroll(48 * scale);
         Assert.True(menu.SingleComposer.GetScrollbar("scroll").CurrentYPosition > 0);
+        var pressed = Assert.IsType<GuiElementCraftingTile>(tiles.Elements[0]);
+        int pressX = (int)pressed.Bounds.absX + 10;
+        int pressY = (int)pressed.Bounds.absY + 10;
+        tiles.OnMouseDown(f.Lifecycle.Api.Object, new MouseEvent(pressX, pressY, EnumMouseButton.Left, 0));
+        Assert.True(pressed.Pressed);
+        menu.SingleComposer.GetTextInput("search").SetValue(" output ");
+        Assert.False(pressed.Pressed);
+        Assert.Equal(42, session.Rows.Length);
+        Assert.Equal(0, menu.SingleComposer.GetScrollbar("scroll").CurrentYPosition);
+        menu.SingleComposer.GetTextInput("search").SetValue("output");
+        tiles.Scroll(48 * scale);
+        Assert.True(menu.SingleComposer.GetScrollbar("scroll").CurrentYPosition > 0);
 
         int toolIndex = Array.FindIndex(tabs.tabs, tab => tab.Name == "tools");
         tabs.SetValue(toolIndex);
@@ -687,7 +746,11 @@ public sealed class CraftingMenuLifecycleTests
         Assert.Equal(minimumHeight, menu.SingleComposer.Bounds.fixedHeight, 4);
         Assert.Equal("preserved search", menu.SingleComposer.GetTextInput("search").GetText());
         AssertLayout(menu);
-        foreach (string key in new[] { "previous", "auto", "next" }) f.Click(menu.SingleComposer.GetElement(key));
+        foreach (string key in new[] { "previous", "auto", "next" })
+        {
+            Assert.False(menu.SingleComposer.GetButton(key).Enabled);
+            f.Click(menu.SingleComposer.GetElement(key), handled: false);
+        }
         f.ResizePanelSpace(Math.Max(320, minimumWidth), 420);
         menu.TryOpen();
         Assert.Equal("preserved search", menu.SingleComposer.GetTextInput("search").GetText());
@@ -1448,13 +1511,13 @@ public sealed class CraftingMenuLifecycleTests
             Parent.OnMouseUp(new MouseEvent(x, y, EnumMouseButton.Left, 0));
         }
 
-        internal void Click(GuiElement button)
+        internal void Click(GuiElement button, bool handled = true)
         {
             var args = new MouseEvent((int)(button.Bounds.absX + 5), (int)(button.Bounds.absY + 5),
                 EnumMouseButton.Left, 0);
             button.OnMouseDownOnElement(Lifecycle.Api.Object, args);
             button.OnMouseUpOnElement(Lifecycle.Api.Object, args);
-            Assert.True(args.Handled);
+            Assert.Equal(handled, args.Handled);
         }
 
         internal void SetMouse(int x, int y)

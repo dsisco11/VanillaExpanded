@@ -104,6 +104,290 @@ public sealed class CraftingMenuInteractionTests
         }
     }
 
+    private sealed class PredicateFilter(System.Func<CraftingRecipeSelection, bool> matches) : IRecipeFilter
+    {
+        public bool Matches(CraftingRecipeSelection selection) => matches(selection);
+    }
+
+    [Fact]
+    public void ReconciliationRetainsEligibleRowsAndAppendsNewGroupsOnceInCanonicalOrder()
+    {
+        var f = new AllocationFixture();
+        var ingredients = Enumerable.Range(1, 4).Select(id => f.Stack(id, "ingredient-" + id, 1)).ToArray();
+        var recipes = ingredients.Select(stack => f.Recipe(f.Ingredient(stack))).ToArray();
+        f.Register(recipes);
+        f.Snapshot(ingredients[0]);
+        using var session = Session(f, recipes);
+        session.Refresh();
+        var original = session.Rows.Take(2).ToArray();
+        using var filter = session.Filters.Register("test:membership",
+            new PredicateFilter(row => original.Any(previous => previous.Output.Id == row.Output.Id)));
+        session.Refresh();
+        session.Interact(original[0].Output.Id);
+        filter.Replace(new PredicateFilter(_ => true));
+        f.Snapshot(ingredients[1], ingredients[2], ingredients[3]);
+        session.Refresh();
+        Assert.Equal(original.Select(row => row.Output.Id), session.Rows.Take(2).Select(row => row.Output.Id));
+        Assert.False(session.Rows[0].Evaluation.CanCraft);
+        Assert.Equal(1, Assert.Single(session.Rows[0].Evaluation.Missing).Quantity);
+        Assert.All(session.Rows, row => Assert.Same(row.Evaluation, row.Allocation!.Evaluation));
+        var displayed = session.Rows;
+        session.Refresh();
+        Assert.Equal(displayed.Select(row => row.Recipe.Id), session.Rows.Select(row => row.Recipe.Id));
+        Assert.Equal(4, session.Rows.Select(row => row.Output.Id).Distinct().Count());
+        session.Interact(null);
+        Assert.NotEqual(original[0].Output.Id, session.Rows[0].Output.Id);
+        Assert.Equal(original[0].Output.Id, session.Rows[^1].Output.Id);
+        Assert.Equal(session.Rows.Take(3).Select(row => row.Output.Id),
+            displayed.Skip(1).Select(row => row.Output.Id));
+    }
+
+    [Fact]
+    public void InventoryFilterReplacesIneligibleAutomaticRecipeButNeverReplacesOrUnpinsHiddenPin()
+    {
+        var f = new AllocationFixture();
+        var a = f.Stack(1, "a", 1);
+        var b = f.Stack(2, "b", 1);
+        var first = f.Recipe(f.Ingredient(a));
+        var second = f.Recipe(f.Ingredient(b));
+        second.Output = first.Output;
+        f.Register(first, second);
+        f.Snapshot(a);
+        using var session = Session(f, first, second);
+        using var filter = session.Filters.Register("test:inventory", new PredicateFilter(row => row.Evaluation.CanCraft));
+        session.Refresh();
+        var original = Assert.Single(session.Rows);
+        session.Interact(original.Output.Id);
+        f.Snapshot(b);
+        session.Refresh();
+        var replacement = Assert.Single(session.Rows);
+        Assert.Equal(original.Output.Id, replacement.Output.Id);
+        Assert.Same(second, replacement.Recipe.Recipe);
+        session.Select(original.Output.Id);
+        session.ChooseAlternative(replacement.Recipe.Id);
+        session.Interact(original.Output.Id);
+        f.Snapshot(a);
+        session.Refresh();
+        Assert.Empty(session.Rows);
+        session.Auto();
+        session.ChooseAlternative(original.Recipe.Id);
+        session.Refresh();
+        Assert.Empty(session.Rows);
+        f.Snapshot(b);
+        session.Refresh();
+        Assert.True(Assert.Single(session.Rows).IsExplicit);
+        Assert.Same(second, Assert.Single(session.Rows).Recipe.Recipe);
+    }
+
+    [Fact]
+    public void ExplicitAlternativeAndAutoOverrideEligibleFrozenAlternativeImmediately()
+    {
+        var f = new AllocationFixture();
+        var a = f.Stack(1, "a", 1);
+        var b = f.Stack(2, "b", 1);
+        var first = f.Recipe(f.Ingredient(a));
+        var second = f.Recipe(f.Ingredient(b));
+        second.Output = first.Output;
+        f.Register(first, second);
+        f.Snapshot(a);
+        using var session = Session(f, first, second);
+        using var filter = session.Filters.Register("test:all", new PredicateFilter(_ => true));
+        session.Refresh();
+        var original = Assert.Single(session.Rows);
+        session.Select(original.Output.Id);
+        session.Interact(original.Output.Id);
+        var other = original.Output.Alternatives.Single(recipe => recipe.Id != original.Recipe.Id);
+        session.ChooseAlternative(other.Id);
+        Assert.True(Assert.Single(session.Rows).IsExplicit);
+        Assert.Equal(other.Id, Assert.Single(session.Rows).Recipe.Id);
+        session.Auto();
+        Assert.False(Assert.Single(session.Rows).IsExplicit);
+        Assert.Equal(original.Recipe.Id, Assert.Single(session.Rows).Recipe.Id);
+    }
+
+    [Fact]
+    public void FailureWhileFilteringStableRecipesDoesNotPublishPartialRows()
+    {
+        var f = new AllocationFixture();
+        var recipe = f.Recipe(f.Ingredient(f.Stack(1, "a", 1)));
+        f.Register(recipe);
+        using var session = Session(f, recipe);
+        session.Refresh();
+        var previous = session.Rows;
+        session.Interact(previous[0].Output.Id);
+        int calls = 0;
+        int notifications = 0;
+        session.Changed += () => notifications++;
+        using var filter = session.Filters.Register("test:failure", new PredicateFilter(_ =>
+            ++calls == 2 ? throw new InvalidOperationException("Stable projection failed.") : true));
+        Assert.Throws<InvalidOperationException>(session.Refresh);
+        Assert.Equal(2, calls);
+        Assert.True(previous == session.Rows);
+        Assert.Equal(0, notifications);
+        filter.Replace(new PredicateFilter(_ => true));
+        session.Refresh();
+        Assert.Equal(1, notifications);
+    }
+
+    [Theory]
+    [InlineData("output")]
+    [InlineData("alternative")]
+    [InlineData("reintroduced")]
+    public void HeldReleaseCannotActivateReboundTileAndRequiresNewPress(string change)
+    {
+        using var scale = new GuiScaleScope();
+        var f = new AllocationFixture();
+        var a = f.Stack(1, "a", 1);
+        var b = f.Stack(2, "b", 1);
+        var first = f.Recipe(f.Ingredient(a));
+        var second = f.Recipe(f.Ingredient(b));
+        if (change == "alternative") second.Output = first.Output;
+        f.Register(first, second);
+        f.Snapshot(a);
+        using var session = Session(f, first, second);
+        using var filter = session.Filters.Register("test:inventory", new PredicateFilter(row => row.Evaluation.CanCraft));
+        session.Refresh();
+        var api = new Mock<ICoreClientAPI>();
+        var input = new Mock<IInputAPI>();
+        input.SetupGet(value => value.KeyboardKeyStateRaw).Returns(new bool[256]);
+        api.SetupGet(value => value.Input).Returns(input.Object);
+        var viewport = Calculated(ElementBounds.Fixed(0, 0, 96, 72).WithEmptyParent());
+        var actions = new List<int>();
+        using var icons = new CraftingIconCache(api.Object);
+        using var tiles = new GuiElementCraftingTiles(api.Object,
+            ElementBounds.Fixed(0, 0, 96, 72).WithParent(viewport), viewport, session,
+            _ => { }, (id, _) => actions.Add(id), icons);
+        PrepareTiles(tiles);
+        var tile = Assert.IsType<GuiElementCraftingTile>(tiles.Elements[0]);
+        var original = tile.Selection!;
+        tiles.OnMouseDown(api.Object, new MouseEvent(10, 10, EnumMouseButton.Left, 0));
+        Assert.True(tile.Pressed);
+        if (change == "reintroduced")
+        {
+            filter.Replace(new PredicateFilter(_ => false));
+            session.Refresh();
+            Assert.Empty(session.Rows);
+            Assert.False(tile.Pressed);
+            filter.Replace(new PredicateFilter(row => row.Evaluation.CanCraft));
+        }
+        else f.Snapshot(b);
+        session.Refresh();
+        Assert.False(tile.Pressed);
+        Assert.NotNull(tile.Selection);
+        if (change == "output") Assert.NotEqual(original.Output.Id, tile.Selection.Output.Id);
+        if (change == "alternative")
+        {
+            Assert.Equal(original.Output.Id, tile.Selection.Output.Id);
+            Assert.NotEqual(original.Recipe.Id, tile.Selection.Recipe.Id);
+        }
+        if (change == "reintroduced") Assert.Equal(original.Recipe.Id, tile.Selection.Recipe.Id);
+        tiles.OnMouseUp(api.Object, new MouseEvent(10, 10, EnumMouseButton.Left, 0));
+        Assert.Empty(actions);
+        tiles.OnMouseDown(api.Object, new MouseEvent(10, 10, EnumMouseButton.Left, 0));
+        tiles.OnMouseUp(api.Object, new MouseEvent(10, 10, EnumMouseButton.Left, 0));
+        Assert.Equal(tile.Selection.Output.Id, Assert.Single(actions));
+        tiles.OnMouseUp(api.Object, new MouseEvent(10, 10, EnumMouseButton.Left, 0));
+        Assert.Single(actions);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void LiveMembershipRebindsHoverAndFocusAndRecoversFromEmpty(bool focus, bool inventory)
+    {
+        using var scale = new GuiScaleScope();
+        var f = new AllocationFixture();
+        var a = f.Stack(1, "a", 1);
+        var b = f.Stack(2, "b", 1);
+        var first = f.Recipe(f.Ingredient(a));
+        var second = f.Recipe(f.Ingredient(b));
+        f.Register(first, second);
+        f.Snapshot(a);
+        using var session = Session(f, first, second);
+        using var filter = session.Filters.Register("test:membership", new PredicateFilter(row => inventory
+            ? row.Evaluation.CanCraft : row.Recipe.Recipe == first));
+        session.Refresh();
+        var api = new Mock<ICoreClientAPI>();
+        var viewport = Calculated(ElementBounds.Fixed(0, 0, 96, 72).WithEmptyParent());
+        CraftingRecipeSelection? inspected = null;
+        using var icons = new CraftingIconCache(api.Object);
+        using var tiles = new GuiElementCraftingTiles(api.Object,
+            ElementBounds.Fixed(0, 0, 96, 72).WithParent(viewport), viewport, session,
+            row => inspected = row, (_, _) => { }, icons);
+        PrepareTiles(tiles);
+        if (focus) tiles.OnFocusGained();
+        else tiles.UpdateHover(10, 10);
+        Assert.Same(first, inspected!.Recipe.Recipe);
+        if (inventory) f.Snapshot(b);
+        else filter.Replace(new PredicateFilter(row => row.Recipe.Recipe == second));
+        session.Refresh();
+        Assert.Same(second, inspected!.Recipe.Recipe);
+        if (focus)
+        {
+            Assert.True(tiles.HasFocus);
+            Assert.Equal(inspected, Assert.IsType<GuiElementCraftingTile>(tiles.CurrentTabIndexElement).Selection);
+        }
+        filter.Replace(new PredicateFilter(_ => false));
+        session.Refresh();
+        Assert.Null(inspected);
+        Assert.False(tiles.HasFocus);
+        Assert.Null(tiles.CurrentTabIndexElement);
+        Assert.All(tiles.Elements, tile => Assert.False(tile.Focusable));
+        filter.Replace(new PredicateFilter(row => row.Recipe.Recipe == second));
+        session.Refresh();
+        if (focus) tiles.OnFocusGained();
+        Assert.Same(second, inspected!.Recipe.Recipe);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ShrinkingScrolledContentClampsBothOffsetsEvenDuringPress(bool retainPressed)
+    {
+        using var scale = new GuiScaleScope();
+        var f = new AllocationFixture();
+        var recipes = Enumerable.Range(1, 12).Select(id =>
+            f.Recipe(f.Ingredient(f.Stack(id, "ingredient-" + id, 1)))).ToArray();
+        f.Register(recipes);
+        using var session = Session(f, recipes);
+        session.Refresh();
+        using var filter = session.Filters.Register("test:membership", new PredicateFilter(_ => true));
+        var api = new Mock<ICoreClientAPI>();
+        var input = new Mock<IInputAPI>();
+        input.SetupGet(value => value.KeyboardKeyStateRaw).Returns(new bool[256]);
+        api.SetupGet(value => value.Input).Returns(input.Object);
+        var viewport = Calculated(ElementBounds.Fixed(0, 0, 96, 72).WithEmptyParent());
+        var actions = new List<int>();
+        CraftingRecipeSelection? inspected = null;
+        using var icons = new CraftingIconCache(api.Object);
+        using var tiles = new GuiElementCraftingTiles(api.Object,
+            ElementBounds.Fixed(0, 0, 96, 72).WithParent(viewport), viewport, session,
+            row => inspected = row, (id, _) => actions.Add(id), icons);
+        PrepareTiles(tiles);
+        using var scrollbar = new HeadlessScrollbar(api.Object, tiles.Scroll,
+            Calculated(ElementBounds.Fixed(100, 0, 12, 72).WithEmptyParent()));
+        tiles.Bind(scrollbar);
+        tiles.Scroll(192);
+        Assert.Equal(192, scrollbar.CurrentYPosition);
+        int pressed = Assert.IsType<GuiElementCraftingTile>(tiles.Elements[0]).Selection!.Output.Id;
+        int retained = retainPressed ? pressed : session.Rows[0].Output.Id;
+        tiles.OnMouseDown(api.Object, new MouseEvent(10, 10, EnumMouseButton.Left, 0));
+        tiles.OnFocusGained();
+        Assert.True(((GuiElementCraftingTile)tiles.Elements[0]).Pressed);
+        filter.Replace(new PredicateFilter(row => row.Output.Id == retained));
+        session.Refresh();
+        Assert.Equal(0, scrollbar.CurrentYPosition);
+        Assert.Equal(0, tiles.Bounds.absY);
+        Assert.Equal(retained, Assert.IsType<GuiElementCraftingTile>(tiles.Elements[0]).Selection!.Output.Id);
+        Assert.Equal(retained, inspected!.Output.Id);
+        Assert.Equal(retainPressed, ((GuiElementCraftingTile)tiles.Elements[0]).Pressed);
+        tiles.OnMouseUp(api.Object, new MouseEvent(10, 10, EnumMouseButton.Left, 0));
+        if (retainPressed) Assert.Equal(retained, Assert.Single(actions));
+        else Assert.Empty(actions);
+    }
+
     [Fact]
     public void CategoryChangesKeepSearchAndClearInteractionAndHiddenSelectionAcrossRefresh()
     {

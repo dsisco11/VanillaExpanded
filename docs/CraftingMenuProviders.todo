@@ -2,7 +2,7 @@
 
 Source proposal: [CraftingMenuProvidersProposal.md](CraftingMenuProvidersProposal.md)
 Authority: Proposal approved by the user on 2026-10-30. Its requirements govern this plan.
-Status: Phases 1-2 complete; Phases 3-6 remain pending.
+Status: Phases 1-3 complete; Phases 4-6 remain pending.
 
 ## Goal and execution boundary
 
@@ -108,38 +108,40 @@ Verification: 350 CraftingMenu tests passed, followed by a passing strengthened 
 
 Outcome: Every active filter can change membership live without stale rows or unsafe replacement activation.
 
-    ☐ Separate canonical candidate projection from interaction-stable displayed rows in CraftingMenuSession.
-        ☐ Obtain current selections, filter them, order them with the current default order, then reconcile and publish a coherent row snapshot.
-        ☐ While interaction is active, refresh the exact recipes being displayed and retain eligible shown alternatives in their previous relative order.
-        ☐ Remove ineligible shown rows immediately; never freeze eligibility merely because ordering is deferred.
-        ☐ For an ineligible automatic alternative, resolve the current automatic alternative and replace that output's row only if the replacement passes every filter.
-        ☐ Keep an explicit pin authoritative; never substitute or silently unpin it to satisfy a filter.
-        ☐ Append newly eligible output groups in canonical order without duplicating retained outputs.
-        ☐ Apply explicit alternative and Auto actions immediately for their output, overriding any stale interaction-frozen recipe.
-        ☐ Restore canonical ordering and automatic selection after interaction ends.
-        ☐ Use the same reconciliation rules for all registered filters, without provider identity checks or craftable-specific branches.
-    ☐ Make GuiElementCraftingTile activation depend on a matching left-button press.
-        ☐ Track both the output and recipe identity bound to the press.
-        ☐ Cancel the press if the row is removed or either identity changes, including same-position virtualization and same-output alternative replacement.
-        ☐ Require a new press after removal even if the original row reappears before mouse release.
-        ☐ Preserve valid ordinary clicks, shift-clicks, keyboard activation, and existing pressed-scroll safety.
-    ☐ Reconcile GuiElementCraftingTiles viewport and inspection state.
-        ☐ Clamp internal scroll and scrollbar position together when content shrinks, even while a press prevents ordinary scrolling.
-        ☐ Keep live refresh from unnecessarily resetting scroll; preserve return-to-top behavior for explicit filter changes.
-        ☐ Clear or coherently rebind removed hover/tooltip targets and keep keyboard focus valid.
-        ☐ Ensure an empty list retains no focusable tile and a hidden selection exposes no actionable footer.
-    ☐ Add session and native-input regressions using independently registered test filters before exposing craftable-only.
-        ☐ Cover eligible-row retention, automatic replacement, pinned-row removal, newly appended groups, no duplicates, and release to canonical order.
-        ☐ Cover inventory/criteria-driven changes while hovered, focused, pressed, or previously empty.
-        ☐ Cover replacement by a different output, replacement within one output, and remove/reintroduce before release.
-        ☐ Cover shrinking a scrolled list during a press and verify both viewport reachability and synchronized scrollbar position.
-        ☐ Verify explicit variant/Auto actions and hidden footer/tooltip behavior.
-    ☐ Preserve the coordinator's fresh allocation and transfer validation; no filtered result becomes transfer authority.
+    ☑ Separate canonical candidate projection from interaction-stable displayed rows in CraftingMenuSession.
+        ☑ Obtain current selections, filter them, order them with the current default order, then reconcile and publish a coherent row snapshot.
+        ☑ While interaction is active, refresh the exact recipes being displayed and retain eligible shown alternatives in their previous relative order.
+        ☑ Remove ineligible shown rows immediately; never freeze eligibility merely because ordering is deferred.
+        ☑ For an ineligible automatic alternative, resolve the current automatic alternative and replace that output's row only if the replacement passes every filter.
+        ☑ Keep an explicit pin authoritative; never substitute or silently unpin it to satisfy a filter.
+        ☑ Append newly eligible output groups in canonical order without duplicating retained outputs.
+        ☑ Apply explicit alternative and Auto actions immediately for their output, overriding any stale interaction-frozen recipe.
+        ☑ Restore canonical ordering and automatic selection after interaction ends.
+        ☑ Use the same reconciliation rules for all registered filters, without provider identity checks or craftable-specific branches.
+    ☑ Make GuiElementCraftingTile activation depend on a matching left-button press.
+        ☑ Track both the output and recipe identity bound to the press.
+        ☑ Cancel the press if the row is removed or either identity changes, including same-position virtualization and same-output alternative replacement.
+        ☑ Require a new press after removal even if the original row reappears before mouse release.
+        ☑ Preserve valid ordinary clicks, shift-clicks, keyboard activation, and existing pressed-scroll safety.
+    ☑ Reconcile GuiElementCraftingTiles viewport and inspection state.
+        ☑ Clamp internal scroll and scrollbar position together when content shrinks, even while a press prevents ordinary scrolling.
+        ☑ Keep live refresh from unnecessarily resetting scroll; preserve return-to-top behavior for explicit filter changes.
+        ☑ Clear or coherently rebind removed hover/tooltip targets and keep keyboard focus valid.
+        ☑ Ensure an empty list retains no focusable tile and a hidden selection exposes no actionable footer.
+    ☑ Add session and native-input regressions using independently registered test filters before exposing craftable-only.
+        ☑ Cover eligible-row retention, automatic replacement, pinned-row removal, newly appended groups, no duplicates, and release to canonical order.
+        ☑ Cover inventory/criteria-driven changes while hovered, focused, pressed, or previously empty.
+        ☑ Cover replacement by a different output, replacement within one output, and remove/reintroduce before release.
+        ☑ Cover shrinking a scrolled list during a press and verify both viewport reachability and synchronized scrollbar position.
+        ☑ Verify explicit variant/Auto actions and hidden footer/tooltip behavior.
+    ☑ Preserve the coordinator's fresh allocation and transfer validation; no filtered result becomes transfer authority.
 
 Completion gate:
-    ☐ Interaction stability defers ordering and eligible automatic-alternative changes, not filtered membership removal.
-    ☐ Held releases cannot activate replacement rows, and valid existing input behavior still passes.
-    ☐ Feature-neutral tests pass before adding the craftable-only consumer.
+    ☑ Interaction stability defers ordering and eligible automatic-alternative changes, not filtered membership removal.
+    ☑ Held releases cannot activate replacement rows, and valid existing input behavior still passes.
+    ☑ Feature-neutral tests pass before adding the craftable-only consumer.
+
+Verification: 364 CraftingMenu tests passed. Second implementation review and independent audit-stage-completion review found no outstanding issues. Coverage includes generic live membership reconciliation, press identity cancellation, held-scroll clamping, focus/tooltip/footer recovery, and explicit search/category reset behavior. Craftable-only remains Phase 4 work. Live-game validation was not performed.
 
 ## Phase 4: Craftable-only provider and native control
 

@@ -13,7 +13,7 @@ internal sealed class GuiElementCraftingTiles : GuiElementContainer
     private readonly Action<CraftingRecipeSelection?> inspect;
     private readonly CraftingIconRenderer icons;
     private GuiElementScrollbar? scrollbar;
-    private GuiElementCraftingTile? hovered;
+    private (int X, int Y)? hoverPosition;
     private float scroll;
     private int firstIndex;
     private int focusedIndex;
@@ -57,6 +57,12 @@ internal sealed class GuiElementCraftingTiles : GuiElementContainer
 
     internal void Bind(GuiElementScrollbar value) { scrollbar = value; Changed(); }
 
+    internal void ResetScroll()
+    {
+        foreach (GuiElementCraftingTile tile in Elements) tile.CancelPress();
+        Scroll(0);
+    }
+
     internal void Scroll(float value)
     {
         if (Elements.Cast<GuiElementCraftingTile>().Any(tile => tile.Pressed))
@@ -67,7 +73,7 @@ internal sealed class GuiElementCraftingTiles : GuiElementContainer
         scroll = (float)Math.Clamp(value, 0, Math.Max(0, ContentHeight - viewport.InnerHeight));
         if (scrollbar != null) scrollbar.CurrentYPosition = scroll;
         if (updatingScrollbar) return;
-        hovered = null;
+        hoverPosition = null;
         UnfocusOwnElements();
         session.Interact(null);
         BindRows();
@@ -77,7 +83,15 @@ internal sealed class GuiElementCraftingTiles : GuiElementContainer
     private void Changed()
     {
         if (disposed) return;
+        int? focusedOutput = (CurrentTabIndexElement as GuiElementCraftingTile)?.Selection?.Output.Id;
         focusedIndex = Math.Clamp(focusedIndex, 0, Math.Max(0, session.Rows.Length - 1));
+        if (focusedOutput != null)
+            for (int i = 0; i < session.Rows.Length; i++)
+                if (session.Rows[i].Output.Id == focusedOutput)
+                {
+                    focusedIndex = i;
+                    break;
+                }
         if (scrollbar != null && (previousHeight != viewport.InnerHeight || previousContentHeight != ContentHeight))
         {
             previousHeight = viewport.InnerHeight;
@@ -86,8 +100,12 @@ internal sealed class GuiElementCraftingTiles : GuiElementContainer
             try { scrollbar.SetHeights((float)previousHeight, (float)previousContentHeight); }
             finally { updatingScrollbar = false; }
         }
+        scroll = (float)Math.Clamp(scroll, 0, Math.Max(0, ContentHeight - viewport.InnerHeight));
+        if (scrollbar != null) scrollbar.CurrentYPosition = scroll;
         BindRows();
         if (session.Rows.IsEmpty && HasFocus) OnFocusLost();
+        else if (HasFocus && focusedOutput != null && !Elements.Cast<GuiElementCraftingTile>().Any(tile => tile.Pressed))
+            Navigate(focusedIndex);
         ShowInspection();
     }
 
@@ -118,8 +136,7 @@ internal sealed class GuiElementCraftingTiles : GuiElementContainer
 
     internal void UpdateHover(int x, int y)
     {
-        hovered = Elements.Cast<GuiElementCraftingTile>()
-            .FirstOrDefault(tile => tile.Visible && tile.IsPositionInside(x, y));
+        hoverPosition = (x, y);
         ShowInspection();
     }
 
@@ -149,7 +166,7 @@ internal sealed class GuiElementCraftingTiles : GuiElementContainer
     public override void OnFocusGained()
     {
         if (session.Rows.IsEmpty) return;
-        hovered = null;
+        hoverPosition = null;
         base.OnFocusGained();
         if (entryIndex is int index) Navigate(Math.Min(index, session.Rows.Length - 1));
         entryIndex = null;
@@ -183,14 +200,14 @@ internal sealed class GuiElementCraftingTiles : GuiElementContainer
         };
         if (offset != 0)
         {
-            hovered = null;
+            hoverPosition = null;
             Navigate(Math.Clamp(focusedIndex + offset, 0, session.Rows.Length - 1));
             args.Handled = true;
         }
         else
         {
             if (args.KeyCode is (int)GlKeys.Tab or (int)GlKeys.Enter or (int)GlKeys.KeypadEnter or (int)GlKeys.Space)
-                hovered = null;
+                hoverPosition = null;
             base.OnKeyDown(api, args);
             if (args.KeyCode == (int)GlKeys.Tab && !args.Handled && !args.CtrlPressed
                 && CurrentTabIndexElement != null)
@@ -241,11 +258,18 @@ internal sealed class GuiElementCraftingTiles : GuiElementContainer
 
     private void ShowInspection()
     {
+        session.Interact(InspectedRow()?.Output.Id);
+        inspect(InspectedRow());
+    }
+
+    private CraftingRecipeSelection? InspectedRow()
+    {
         var pressed = Elements.Cast<GuiElementCraftingTile>().FirstOrDefault(tile => tile.Pressed);
+        var hovered = hoverPosition is { } position ? Elements.Cast<GuiElementCraftingTile>()
+            .FirstOrDefault(tile => tile.Visible && tile.IsPositionInside(position.X, position.Y)) : null;
         var focused = CurrentTabIndexElement as GuiElementCraftingTile;
-        var row = (pressed ?? hovered ?? (HasFocus ? focused : null))?.Selection;
-        session.Interact(row?.Output.Id);
-        inspect(row);
+        var tile = pressed ?? hovered ?? (HasFocus ? focused : null);
+        return tile?.IsInViewport == true ? tile.Selection : null;
     }
 
     public override void Dispose()

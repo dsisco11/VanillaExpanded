@@ -104,6 +104,13 @@ internal sealed class CraftingCatalogueView
             .ToImmutableArray();
     }
 
+    internal CraftingRecipeSelection RefreshSelection(CraftingRecipeSelection selection) =>
+        selection with
+        {
+            Evaluation = GetEvaluation(selection.Recipe),
+            Allocation = allocations.GetValueOrDefault(selection.Recipe.Id)
+        };
+
     private CraftingRecipeEvaluation GetEvaluation(CraftingRecipeEntry entry) =>
         entry.UnresolvedReason != null ? CraftingRecipeEvaluation.Unsupported(entry.UnresolvedReason)
         : evaluations.TryGetValue(entry.Id, out var evaluation) ? evaluation
