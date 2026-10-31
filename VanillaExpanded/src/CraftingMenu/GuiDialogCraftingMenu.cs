@@ -142,12 +142,12 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
             .AddShadedDialogBG(ElementBounds.Fill)
             .AddDialogTitleBar(Lang.Get("vanillaexpanded:craftingmenu-title"), () => CloseByUser(), key: "titlebar")
             .BeginChildElements(content)
-            .AddTextInput(searchBounds, text =>
+            .AddInteractiveElement(new GuiElementCraftingSearch(capi, searchBounds, text =>
             {
                 search = text;
                 tiles.ResetScroll();
                 session.Search(text);
-            }, CairoFont.WhiteSmallText(), "search")
+            }), "search")
             .AddHorizontalTabs(categories.Select((code, index) => new GuiTab { DataInt = index, Name = CategoryName(code) })
                 .ToArray(), tabsBounds, index =>
                 {

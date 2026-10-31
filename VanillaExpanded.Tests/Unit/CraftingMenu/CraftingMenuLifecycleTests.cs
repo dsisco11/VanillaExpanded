@@ -18,6 +18,142 @@ namespace VanillaExpanded.Tests.Unit.CraftingMenu;
 [Collection("Crafting native GUI")]
 public sealed class CraftingMenuLifecycleTests
 {
+    [Theory]
+    [InlineData(1)]
+    [InlineData(1.5)]
+    [InlineData(2)]
+    public void InlineSearchClearUsesNativeEditingAndPreservesOtherCriteriaAcrossResizeAndReopen(float scale)
+    {
+        using var f = new MenuFixture(scale: scale, includeRecipes: true);
+        Assert.Single(f.Lifecycle.Recipes).Output!.ResolvedItemStack!.Collectible.CreativeInventoryTabs = ["tools"];
+        f.Lifecycle.FinalizeWorld();
+        f.Recompose();
+        f.Parent.TryOpen();
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        var session = (CraftingMenuSession)typeof(GuiDialogCraftingMenu).GetField("session",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
+        var input = Assert.IsType<GuiElementCraftingSearch>(menu.SingleComposer.GetTextInput("search"));
+        Assert.False(input.ClearVisible);
+        AssertIcon(false);
+        var tabs = menu.SingleComposer.GetHorizontalTabs("categories");
+        tabs.SetValue(Array.FindIndex(tabs.tabs, tab => tab.Name == "tools"));
+        var row = Assert.Single(session.Rows);
+        session.Select(row.Output.Id);
+        session.ChooseAlternative(row.Recipe.Id);
+        input.SetValue(new string('x', 400));
+        Assert.Empty(session.Rows);
+        Assert.True(input.ClearVisible);
+        AssertIcon(true);
+        Assert.True(input.Bounds.absX + input.Bounds.OuterWidth + scale <= input.ClearBounds.absX);
+        Assert.True(input.ClearBounds.absX + input.ClearBounds.OuterWidth < input.FieldBounds.absX + input.FieldBounds.OuterWidth);
+        Assert.Equal(input.FieldBounds.absY + input.FieldBounds.OuterHeight / 2,
+            input.ClearBounds.absY + input.ClearBounds.OuterHeight / 2, 4);
+        Assert.True(menu.SingleComposer.FocusElement(tabs.TabIndex));
+        ClickClear();
+        Assert.Equal("", input.GetText());
+        Assert.False(input.ClearVisible);
+        Assert.True(input.HasFocus);
+        Assert.True(menu.CaptureAllInputs());
+        Assert.Equal("tools", session.Category);
+        Assert.True(Assert.Single(session.Rows).IsExplicit);
+        Assert.Same(row.Allocation, Assert.Single(session.Rows).Allocation);
+        Assert.Equal(0, menu.SingleComposer.GetScrollbar("scroll").CurrentYPosition);
+        AssertIcon(false);
+        f.ToggleCraftable(menu);
+        input.SetValue("no matching recipe");
+        ClickClear();
+        Assert.True(session.CraftableOnly.Enabled);
+        Assert.True(menu.SingleComposer.GetToggleButton("craftable-only").On);
+        Assert.Equal(CraftingMenuEmptyState.NoCraftableRecipes, session.EmptyState);
+        input.SetValue(" \t ");
+        Assert.True(input.ClearVisible);
+        ClickClear();
+        Assert.Equal("", input.GetText());
+        input.SetValue("output");
+        for (int i = 0; i < 3; i++)
+        {
+            int textures = f.TextureCount;
+            var composer = menu.SingleComposer;
+            f.ResizePanelSpace(composer.Bounds.fixedWidth, composer.Bounds.fixedHeight - 5);
+            menu.TryOpen();
+            input = Assert.IsType<GuiElementCraftingSearch>(menu.SingleComposer.GetTextInput("search"));
+            Assert.NotSame(composer, menu.SingleComposer);
+            Assert.Equal(textures, f.TextureCount);
+            Assert.Equal("output", input.GetText());
+            Assert.True(input.ClearVisible);
+            AssertIcon(true);
+        }
+        f.Parent.TryClose();
+        f.Parent.TryOpen();
+        menu = Assert.Single(f.Menus);
+        input = Assert.IsType<GuiElementCraftingSearch>(menu.SingleComposer.GetTextInput("search"));
+        Assert.Equal("output", input.GetText());
+        Assert.True(input.ClearVisible);
+        ClickClear();
+        Assert.False(input.ClearVisible);
+        Assert.Equal("", input.GetText());
+
+        void ClickClear()
+        {
+            int x = (int)(input.ClearBounds.absX + input.ClearBounds.OuterWidth / 2);
+            int y = (int)(input.ClearBounds.absY + input.ClearBounds.OuterHeight / 2);
+            var down = new MouseEvent(x, y, EnumMouseButton.Left, 0);
+            menu.OnMouseDown(down);
+            Assert.True(down.Handled);
+            var up = new MouseEvent(x, y, EnumMouseButton.Left, 0);
+            menu.OnMouseUp(up);
+            Assert.True(up.Handled);
+        }
+
+        void AssertIcon(bool visible)
+        {
+            var render = Mock.Get(f.Lifecycle.Api.Object.Render);
+            render.Invocations.Clear();
+            input.RenderInteractiveElements(.1f);
+            Assert.Equal(visible ? 1 : 0, render.Invocations.Count(call =>
+                call.Method.Name == nameof(IRenderAPI.Render2DTexturePremultipliedAlpha)
+                && call.Arguments.Count > 1 && ReferenceEquals(call.Arguments[1], input.ClearBounds)));
+            var scissor = Assert.Single(render.Invocations, call => call.Method.Name == nameof(IRenderAPI.GlScissor));
+            Assert.True((int)scissor.Arguments[0] + (int)scissor.Arguments[2] <= input.ClearBounds.absX);
+            if (visible) return;
+            Assert.False(input.ClearHint.IsVisible);
+            Assert.False(input.ClearHint.IsNowShown);
+        }
+    }
+
+    [Theory]
+    [InlineData("release-only")]
+    [InlineData("right-button")]
+    [InlineData("outside-release")]
+    [InlineData("changed-text")]
+    [InlineData("disabled")]
+    [InlineData("focus-lost")]
+    public void InlineSearchClearRequiresAnUninterruptedLeftClick(string action)
+    {
+        using var f = new MenuFixture();
+        f.Parent.TryOpen();
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        var input = Assert.IsType<GuiElementCraftingSearch>(menu.SingleComposer.GetTextInput("search"));
+        input.SetValue("original");
+        Assert.True(menu.SingleComposer.FocusElement(input.TabIndex));
+        int x = (int)(input.ClearBounds.absX + input.ClearBounds.OuterWidth / 2);
+        int y = (int)(input.ClearBounds.absY + input.ClearBounds.OuterHeight / 2);
+        var button = action == "right-button" ? EnumMouseButton.Right : EnumMouseButton.Left;
+        if (action != "release-only")
+            input.OnMouseDown(f.Lifecycle.Api.Object, new MouseEvent(x, y, button, 0));
+        switch (action)
+        {
+            case "outside-release": x = (int)input.FieldBounds.absX - 10; break;
+            case "changed-text": input.SetValue("updated"); break;
+            case "disabled": input.Enabled = false; input.Enabled = true; break;
+            case "focus-lost": input.OnFocusLost(); break;
+        }
+        input.OnMouseUp(f.Lifecycle.Api.Object, new MouseEvent(x, y, button, 0));
+        Assert.Equal(action == "changed-text" ? "updated" : "original", input.GetText());
+    }
+
     private static void AssertEmptyStateCentered(GuiDialogCraftingMenu menu)
     {
         var composer = menu.SingleComposer;
