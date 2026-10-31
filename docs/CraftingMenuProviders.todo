@@ -1,0 +1,257 @@
+# Crafting menu providers implementation plan
+
+Source proposal: [CraftingMenuProvidersProposal.md](CraftingMenuProvidersProposal.md)
+Authority: Proposal approved by the user on 2026-10-30. Its requirements govern this plan.
+Status: Planning only; all implementation and acceptance tasks start unchecked.
+
+## Goal and execution boundary
+
+Deliver session-owned filter composition, feature-neutral interaction reconciliation, and craftable-only as an independently registered feature. Search and category must use the same filter manager without changing allocation, transfer authority, default ordering, or native GUI conventions.
+
+Ordering and classification managers are explicitly deferred until concrete consumers require them. Their contracts are recorded below; implementing those managers is not a prerequisite for completing this first delivery.
+
+Follow the repository's existing indented checkbox format. Complete each phase's verification gate before starting its consumers. Do not mark later work complete merely because interfaces or registrations exist.
+
+## Dependencies and affected surfaces
+
+- Phase 1 establishes the registry and filter contract.
+- Phase 2 depends on Phase 1 and migrates existing search/category behavior.
+- Phase 3 depends on Phase 2 and establishes safe live membership changes.
+- Phase 4 depends on Phase 3 and introduces craftable-only and its native control.
+- Phase 5 depends on Phase 4 and verifies the integrated delivery.
+- Phase 6 depends on Phase 5 and closes first-delivery acceptance and cleanup.
+- Deferred ordering and classification are independent future deliveries, not hidden dependencies of Phases 1-6 or of each other.
+
+Primary implementation surfaces:
+- `VanillaExpanded/src/CraftingMenu/CraftingMenuSession.cs`
+- `VanillaExpanded/src/CraftingMenu/CraftingCatalogueView.cs`
+- `VanillaExpanded/src/CraftingMenu/GuiDialogCraftingMenu.cs`
+- `VanillaExpanded/src/CraftingMenu/GuiElementCraftingTiles.cs`
+- `VanillaExpanded/src/CraftingMenu/GuiElementCraftingTile.cs`
+- New internal filter manager, provider, and feature-state components within the existing CraftingMenu module, only as needed.
+- `VanillaExpanded.Tests/Unit/CraftingMenu/`, existing mocks, localization assets, README, and the matching project task.
+
+## Assumptions and deferred decisions
+
+- Start from the current worktree, not the previously demonstrated flag-based implementation. The proposal's baseline has no craftable-only implementation; inspect for subsequent changes before editing.
+- Preserve unrelated or user-authored changes. This plan does not authorize resetting source, overwriting plans, or committing changes.
+- Internal provider contracts and explicit session wiring are sufficient; no public extension API, plugin discovery, reflection-based registration, DI framework, or cross-feature generic provider framework is authorized.
+- Provider criteria are read-only during a projection. The concrete handle and atomic replacement implementation can follow local patterns, but must satisfy the ownership and mutation tests below.
+- The concrete classification result types and new dimension-specific composition details remain deferred to the first additional classification consumer.
+- Favorites, Recent, browsing persistence, the sort selector, richer empty-state actions, and ingredient-based relevance remain separate features. No storage format or full UX for them is specified here.
+- No release packaging or new tooling is required for this internal architecture delivery. Existing .NET tests compile the relevant implementation; live-game evidence must be reported separately from automated evidence.
+
+## Phase 1: Filter contract and session-owned registration
+
+Outcome: Independently testable provider collections exist without changing current menu behavior.
+
+    ☐ Inspect the current CraftingMenu source, existing feature-provider prior art, test infrastructure, and applicable repository instructions before editing.
+        ☐ Confirm the actual baseline and identify any changes since proposal approval; integrate rather than restore earlier source.
+        ☐ Reuse suitable repository patterns without importing item-slot sampling, GPU ownership, or unrelated priority machinery.
+    ☐ Introduce internal ICraftingFilterProvider and CraftingFilterManager.
+        ☐ Define Matches(CraftingRecipeSelection) over an already evaluated selection.
+        ☐ Implement AND composition, no-filter acceptance, and registration-order-independent membership.
+        ☐ Permit short-circuiting without depending on provider invocation count or side effects.
+        ☐ Keep providers unable to reorder or manufacture rows; keep alternative resolution outside the manager.
+    ☐ Implement explicit registration ownership and replacement.
+        ☐ Assign stable feature-owned registration identities and reject duplicates before mutating the collection.
+        ☐ Return independently owned removal handles; removal is idempotent and cannot unregister another feature.
+        ☐ Replace criteria/registrations atomically so no partially updated collection can be projected or published.
+        ☐ Confine changes to the owning client thread and prevent mutation of an in-progress enumeration.
+        ☐ Reject invalid registrations and surface provider exceptions explicitly through the existing error boundary; never turn failures into successful empty or unfiltered results.
+    ☐ Establish the session lifetime boundary.
+        ☐ Wire built-in contributions explicitly; use no static or world-global registry.
+        ☐ Ensure teardown releases registrations and subscriptions without requiring GUI recomposition to recreate the session.
+    ☐ Add focused manager tests for composition, duplicate rejection, atomic replacement, independent/idempotent removal, owning-thread enforcement, mid-pass mutation protection, failures, and teardown.
+
+Completion gate:
+    ☐ Manager tests pass and demonstrate deterministic membership regardless of registration order.
+    ☐ Provider execution uses evaluated inputs only and does not capture inventory, allocate, dispatch, inspect GUI/input state, or mutate shared recipe/selection data.
+    ☐ Existing menu behavior is unchanged; no speculative ordering/classification framework has been introduced.
+
+## Phase 2: Search and category through the filter pipeline
+
+Outcome: Existing filters are feature-owned contributions, and projection accepts composition rather than accumulating feature flags.
+
+    ☐ Extract search matching into an isolated provider.
+        ☐ Normalize terms once when the text changes; preserve existing whitespace, case, localized-name, item-code, and all-terms matching behavior.
+        ☐ Represent empty search without imposing a restriction; criteria replacement remains one logical update.
+    ☐ Extract category matching into an isolated provider.
+        ☐ Preserve native category codes, selected-recipe category behavior, overlapping categories, and the existing Other sentinel.
+        ☐ All imposes no category restriction; do not change visible-category exclusions or catalogue metadata.
+    ☐ Route catalogue candidate eligibility through CraftingFilterManager.
+        ☐ Resolve automatic or pinned alternatives before matching, so all providers inspect the same selected recipe for an output.
+        ☐ Preserve catalogue immutability and the current supported/craftable/relevance/missing/name/stable-identity ordering.
+        ☐ Preserve alternative resolution, explicit pinning, deselection, Auto, and category-change selection behavior.
+        ☐ Do not add a craftableOnly or other feature-specific query parameter.
+    ☐ Wire search/category feature state to the common session projection refresh path.
+        ☐ Criteria-only updates reuse current allocations and evaluations; inventory refresh captures once and performs one catalogue allocation pass.
+        ☐ Keep feature identities and concrete provider types out of session filtering decisions.
+        ☐ Recomposition binds current criteria without duplicate registration; new sessions retain current default browsing state.
+    ☐ Migrate directly affected tests and add projection/provider parity regressions.
+        ☐ Verify search/category combinations, removing one restriction without clearing the other, Other, All, and empty results.
+        ☐ Verify pinned and automatic selections and exact default-order parity.
+        ☐ Count captures/allocation passes for criteria-only versus inventory-driven refresh.
+        ☐ Verify failed criteria replacement does not publish an intermediate or success-shaped fallback result.
+    ☐ Remove the superseded search/category predicate path after parity is verified; do not leave dual implementations or temporary compatibility switches.
+
+Completion gate:
+    ☐ Existing search, category, alternative-selection, and ordering regressions pass through the manager-based path.
+    ☐ Eligibility logic lives in isolated providers rather than duplicate catalogue/session predicates.
+    ☐ Recomposition and teardown ownership tests pass without provider leaks or extra inventory evaluation.
+
+## Phase 3: Feature-neutral reconciliation and safe input
+
+Outcome: Every active filter can change membership live without stale rows or unsafe replacement activation.
+
+    ☐ Separate canonical candidate projection from interaction-stable displayed rows in CraftingMenuSession.
+        ☐ Obtain current selections, filter them, order them with the current default order, then reconcile and publish a coherent row snapshot.
+        ☐ While interaction is active, refresh the exact recipes being displayed and retain eligible shown alternatives in their previous relative order.
+        ☐ Remove ineligible shown rows immediately; never freeze eligibility merely because ordering is deferred.
+        ☐ For an ineligible automatic alternative, resolve the current automatic alternative and replace that output's row only if the replacement passes every filter.
+        ☐ Keep an explicit pin authoritative; never substitute or silently unpin it to satisfy a filter.
+        ☐ Append newly eligible output groups in canonical order without duplicating retained outputs.
+        ☐ Apply explicit alternative and Auto actions immediately for their output, overriding any stale interaction-frozen recipe.
+        ☐ Restore canonical ordering and automatic selection after interaction ends.
+        ☐ Use the same reconciliation rules for all registered filters, without provider identity checks or craftable-specific branches.
+    ☐ Make GuiElementCraftingTile activation depend on a matching left-button press.
+        ☐ Track both the output and recipe identity bound to the press.
+        ☐ Cancel the press if the row is removed or either identity changes, including same-position virtualization and same-output alternative replacement.
+        ☐ Require a new press after removal even if the original row reappears before mouse release.
+        ☐ Preserve valid ordinary clicks, shift-clicks, keyboard activation, and existing pressed-scroll safety.
+    ☐ Reconcile GuiElementCraftingTiles viewport and inspection state.
+        ☐ Clamp internal scroll and scrollbar position together when content shrinks, even while a press prevents ordinary scrolling.
+        ☐ Keep live refresh from unnecessarily resetting scroll; preserve return-to-top behavior for explicit filter changes.
+        ☐ Clear or coherently rebind removed hover/tooltip targets and keep keyboard focus valid.
+        ☐ Ensure an empty list retains no focusable tile and a hidden selection exposes no actionable footer.
+    ☐ Add session and native-input regressions using independently registered test filters before exposing craftable-only.
+        ☐ Cover eligible-row retention, automatic replacement, pinned-row removal, newly appended groups, no duplicates, and release to canonical order.
+        ☐ Cover inventory/criteria-driven changes while hovered, focused, pressed, or previously empty.
+        ☐ Cover replacement by a different output, replacement within one output, and remove/reintroduce before release.
+        ☐ Cover shrinking a scrolled list during a press and verify both viewport reachability and synchronized scrollbar position.
+        ☐ Verify explicit variant/Auto actions and hidden footer/tooltip behavior.
+    ☐ Preserve the coordinator's fresh allocation and transfer validation; no filtered result becomes transfer authority.
+
+Completion gate:
+    ☐ Interaction stability defers ordering and eligible automatic-alternative changes, not filtered membership removal.
+    ☐ Held releases cannot activate replacement rows, and valid existing input behavior still passes.
+    ☐ Feature-neutral tests pass before adding the craftable-only consumer.
+
+## Phase 4: Craftable-only provider and native control
+
+Outcome: Craftable-only is delivered by provider registration rather than new query flags or session branches.
+
+    ☐ Implement a feature-owned craftable-only provider whose predicate reads Evaluation.CanCraft.
+        ☐ Exclude partial, missing, unsupported, and pending evaluations without reallocation or interpreting colors, relevance, or CanPlace.
+        ☐ Own one provider instance per feature/session and register it only while enabled; disablement releases its registration.
+        ☐ Allow checked-state storage in the feature/UI without passing the state through catalogue query signatures.
+    ☐ Connect the native control in GuiDialogCraftingMenu.
+        ☐ Use a native localized toggle with measured layout that fits supported minimum sizes and long translations.
+        ☐ Keep search first in keyboard tab order and preserve category navigation and existing native input conventions.
+        ☐ Keep category and search text unchanged when toggling; return the list to the top on explicit changes.
+        ☐ Preserve checked state and existing registrations during resize/recomposition; default to off for a new session.
+        ☐ Keep the existing generic empty state; do not implement separate pending empty-state actions.
+    ☐ Preserve unavailable explicit alternatives.
+        ☐ Hide an output when its pinned recipe is unavailable even if a different alternative is craftable.
+        ☐ Preserve its pin while hidden, subject to existing deselection/category rules.
+        ☐ Turning the filter off exposes the pinned alternative again; Auto restores automatic selection when invoked through valid selection controls.
+        ☐ Do not leave hidden rows actionable through stale footer or tooltip state.
+    ☐ Add focused provider, session, and native GUI tests.
+        ☐ Cover full/partial/missing/unsupported/pending evaluations and actual allocation transitions across ingredient thresholds.
+        ☐ Cover all category/search/toggle combinations and removal of each restriction without clearing the others.
+        ☐ Cover live inventory membership and shown-alternative changes while hovered, focused, pressed, or empty.
+        ☐ Cover mouse/keyboard operation, search-first focus order, localized minimum sizing, and scales 1, 1.5, and 2.
+        ☐ Cover repeated resize and close/reopen without duplicate registrations, stale subscriptions, or unintended persistence.
+
+Completion gate:
+    ☐ Craftable-only inserts/removes only its own registration and has no special filtering or interaction branch in the session.
+    ☐ Pinned semantics, live updates, independent filters, and native control regressions pass.
+    ☐ Toggling or typing reuses evaluations; inventory updates still capture and allocate only once per refresh.
+
+## Phase 5: Integrated verification and permanent documentation
+
+Outcome: The first delivery has automated evidence and accurate user-facing documentation.
+
+    ☐ Run the smallest relevant provider, catalogue-view, interaction, and lifecycle test selections using the repository's detected .NET runner.
+        ☐ Resolve failures caused by this work without fixing unrelated pre-existing issues.
+        ☐ Run the CraftingMenu regression group after focused coverage passes.
+        ☐ Preserve applicable test categories and reuse existing fixture/mocking infrastructure.
+    ☐ Verify behavior outside filtering has not drifted.
+        ☐ Confirm native placement/coordinator rejection and revalidation behavior remain unchanged.
+        ☐ Confirm supported partial placement remains possible when craftable-only is disabled.
+        ☐ Confirm availability presentation, tile-status/shader mapping, icon cache, and render batching are unchanged.
+        ☐ Confirm category exclusions, menu opening/restoration, search-first keyboard behavior, and session reset defaults remain intact.
+    ☐ Review implementation boundaries against the proposal.
+        ☐ Verify providers do not capture inventory, allocate, dispatch, inspect GUI state, or mutate authoritative data.
+        ☐ Verify the session does not discriminate by provider identity and the catalogue query API does not accumulate feature flags.
+        ☐ Verify no broad catches, silently dropped providers, success-shaped fallback queries, or duplicate legacy paths remain.
+        ☐ Verify one coherent projection is published rather than intermediate criteria/registration states.
+    ☐ Update README and directly related permanent documentation.
+        ☐ Describe independent filters, live refresh, explicit pinned-alternative behavior, toggle defaults, resize retention, and keyboard operation.
+        ☐ Document internal provider registration, lifetime, authority boundaries, and feature insertion only to the extent needed to maintain the delivered system.
+        ☐ Validate modified localization JSON and whitespace; do not add tooling or package dependencies just for this work.
+    ☐ Record automated and live-runtime evidence separately.
+        ☐ Record actual commands/results and distinguish newly introduced failures from pre-existing warnings.
+        ☐ Record whether live-game control/layout/inventory-transition smoke testing was performed; if available, verify the delivered native UX.
+        ☐ If live validation is unavailable, state that it remains pending rather than treating unit/native-fixture evidence as live-game acceptance.
+
+Completion gate:
+    ☐ Focused and CraftingMenu regression checks pass, and documentation describes the delivered behavior rather than deferred systems.
+    ☐ Modified localization and whitespace checks pass.
+    ☐ Automated, source-review, and live-runtime evidence boundaries are explicit; no broader release or gameplay certification is implied.
+
+## Deferred delivery contracts: Ordering and classification
+
+These are explicit deferrals under proposal sections 6, 7, and 10, not unfinished prerequisites for the filter delivery. They require a concrete consumer and a corresponding execution plan before implementation.
+
+### Ordering: Gate on the sort selector or another concrete ranking feature
+
+- Introduce internal CraftingOrderingManager and ICraftingOrderingProvider with Compare(left, right) over evaluated selections.
+- Zero contributes no distinction; comparisons must be deterministic and consistent.
+- Apply higher explicit precedence first, reject equal precedence before mutating the chain, and use the first nonzero result.
+- Always finish with manager-owned ordinal recipe stable identity.
+- Reproduce the current default sequence: supported, craftable, descending relevance, ascending missing units, culture-aware display name, ordinal stable identity.
+- Availability criteria may share one provider; name ordering is separate. Do not create a class per comparison field or a weighted aggregate score.
+- Atomically replace active chains for future modes. Name-only mode need not retain availability as its primary criterion.
+- Preserve the shared ownership/error/immutable-projection contracts, and keep comparisons from changing eligibility, alternatives, or evaluations.
+- Require default-order parity, explicit precedence, tie handling, atomic replacement, and comparer-consistency tests before enabling another chain.
+- The selector itself and ingredient-based relevance remain separately scoped feature work.
+
+### Classification: Gate on a concrete additional presentation dimension
+
+- Introduce CraftingClassificationManager with typed providers only when a consumer requires composition; retain the current availability mapping until then.
+- Keep availability, favorite markers, and recent-placement markers in separate dimensions.
+- Define each dimension as exclusive or additive. Exclusive dimensions use explicit precedence and first-applicable selection, rejecting equal precedence within the dimension.
+- Additive dimensions retain compatible contributions with defined identities and ordering; do not rely on insertion timing.
+- Distinguish no contribution from authoritative Unsupported and surface invalid/conflicting contributions as errors.
+- Keep semantic classifications separate from renderer-selected colors, textures, and geometry.
+- Preserve availability mapping: unsupported/pending -> Unsupported; CanCraft -> Available; supported noncraftable with allocated units > 0 -> PartiallyAvailable; otherwise -> MissingIngredients.
+- Never contradict allocation facts or use classification as filtering/transfer authority; cosmetic highlights belong to another dimension.
+- Choose concrete typed result shapes with the consumer, not a speculative untyped property bag or dimension registry.
+- Preserve tile-status/shader mapping, icon caching, and batching. Require dimension isolation, conflict handling, availability parity, and evaluation-authority tests.
+
+## Phase 6: Final review, acceptance, and document cleanup
+
+Outcome: The filtering delivery is reviewable and complete, with future systems explicitly deferred and temporary support material removed.
+
+    ☐ Reconcile the implementation and evidence against every first-delivery requirement in proposal sections 3-5 and 8-11.
+        ☐ Demonstrate that another filtering feature can register its own isolated provider without changing session filtering/interaction branches, the catalogue query signature, or an existing provider.
+        ☐ Confirm deferred ordering/classification contracts remain recorded and are not represented as implemented.
+        ☐ Confirm separate features and non-goals have not been pulled into this delivery.
+    ☐ Inventory temporary intermediate documents created solely to support execution of Phases 1-5.
+        ☐ No such documents are known when this plan is created; inspect for any working notes, interim analyses, handoff drafts, or equivalent material created during execution.
+        ☐ Preserve still-required decisions and evidence in permanent documentation, this plan's execution record, or the appropriate retained acceptance evidence.
+        ☐ Remove only the identified temporary implementation-support documents and update references.
+        ☐ Retain the authoritative proposal, this plan, permanent project documentation, and required acceptance evidence; creation during implementation alone does not make a document temporary.
+    ☐ Remove any temporary implementation scaffolding, compatibility branches, or test helpers that are no longer required, after their replacement is verified.
+        ☐ Retain reusable production/test infrastructure needed by the delivered design.
+        ☐ Rerun affected checks after cleanup that changes executable code.
+    ☐ Update only the corresponding craftable-only entry in docs/project.todo after its implementation and verification gates pass.
+        ☐ Preserve unrelated task edits and leave future sorting, classification consumers, Favorites, Recent, persistence, relevance, and empty-state work pending.
+    ☐ Present the first-delivery result for review with concrete test results, runtime validation status, and explicit deferrals.
+
+Completion gate:
+    ☐ Every proposal requirement is implemented for the first delivery or explicitly deferred above under the proposal's own sequencing.
+    ☐ All mandatory implementation/test/documentation gates pass and no cleanup remains outstanding.
+    ☐ Temporary implementation-support documents are removed only after required content and references are preserved.
+    ☐ Acceptance claims distinguish working code and automated/native-fixture evidence from live-game validation and deferred future delivery.
