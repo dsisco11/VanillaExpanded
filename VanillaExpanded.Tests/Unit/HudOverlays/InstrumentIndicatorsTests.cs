@@ -29,6 +29,11 @@ public sealed class InstrumentIndicatorsTests
         {
             Assert.Empty(fixture.Resources.Owned); Assert.Empty(fixture.Resources.Artwork); Assert.Empty(fixture.Faces); Assert.Empty(fixture.Ticks); Assert.Empty(fixture.Uploads);
             using var composition = fixture.Mount(overlay, presentation);
+            if (style != EnvironmentalGaugeStyle.Immersive)
+            {
+                var reading = Assert.IsType<TextElement>(composition.Composer.GetElement("test:reading"));
+                Assert.Equal(style == EnvironmentalGaugeStyle.Icon ? EnumTextOrientation.Center : EnumTextOrientation.Left, reading.Font.Orientation);
+            }
             foreach (var element in Components(composition, kind, style))
             {
                 Assert.False(element.Focusable);

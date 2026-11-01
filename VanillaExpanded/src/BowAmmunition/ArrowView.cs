@@ -23,7 +23,8 @@ internal sealed class ArrowView : NativeView
         Func<HudOverlayPreparationContext, float, LoadedTexture>? createBackground) : base(api)
     {
         this.presentation = presentation;
-        reading = Own(new TextElement(api, ElementBounds.Fixed(0, 0, 0, 0).WithAlignment(EnumDialogArea.CenterTop), _ => { }, createText));
+        reading = Own(new TextElement(api, ElementBounds.Fixed(0, 0, 0, 0).WithAlignment(EnumDialogArea.CenterTop), _ => { },
+            createText, orientation: EnumTextOrientation.Center));
         try { arrow = Own(new ArrowElement(api, ElementBounds.Fixed(0, 0, 0, 0).WithAlignment(EnumDialogArea.CenterTop), createBackground)); }
         catch { Dispose(); throw; }
     }

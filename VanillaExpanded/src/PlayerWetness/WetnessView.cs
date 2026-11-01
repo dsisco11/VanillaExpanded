@@ -28,7 +28,7 @@ internal sealed class WetnessView : NativeView
     {
         this.content = content;
         reading = Own(new TextElement(api, ElementBounds.Fixed(0, 0, 0, HudOverlaySizes.WetnessReadingHeight)
-            .WithAlignment(EnumDialogArea.CenterTop), _ => { }, createText, 1.5));
+            .WithAlignment(EnumDialogArea.CenterTop), _ => { }, createText, 1.5, orientation: EnumTextOrientation.Center));
         try
         {
             for (int index = 0; index < drops.Length; index++)

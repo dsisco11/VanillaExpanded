@@ -32,7 +32,7 @@ internal sealed class IconReadingView : NativeView
         this.content = content;
         this.backdrop = backdrop; this.effect = effect ?? (() => 1);
         reading = Own(new TextElement(api, ElementBounds.Fixed(0, 0, 0, 0)
-            .WithAlignment(EnumDialogArea.CenterTop), failure, createText, strokeWidth));
+            .WithAlignment(EnumDialogArea.CenterTop), failure, createText, strokeWidth, orientation: EnumTextOrientation.Center));
         try
         {
             icon = Own(new TextureElement(api, ElementBounds.Fixed(0, 0, 0, 0)

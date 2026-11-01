@@ -20,6 +20,7 @@ internal sealed class TextElement : GuiElementTextBase
     private bool hasLayout, disposed;
     private readonly double strokeWidth;
     private readonly float depth;
+    private readonly EnumTextOrientation orientation;
 
     #region Public API
     /// <summary>Gets pre-render clip, target, tint and failure state.</summary>
@@ -29,11 +30,12 @@ internal sealed class TextElement : GuiElementTextBase
     #region Preparation
     /// <summary>Creates a passive native text element with an optional headless glyph factory.</summary>
     public TextElement(ICoreClientAPI api, ElementBounds bounds, Action<Exception> failure,
-        Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? create = null, double strokeWidth = 1, float depth = 51)
-        : base(api, string.Empty, TextMetrics.Font(strokeWidth), bounds)
+        Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? create = null, double strokeWidth = 1, float depth = 51,
+        EnumTextOrientation orientation = EnumTextOrientation.Left)
+        : base(api, string.Empty, TextMetrics.Font(strokeWidth).WithOrientation(orientation), bounds)
     {
         this.create = create ?? CreateTexture;
-        this.strokeWidth = strokeWidth; this.depth = depth;
+        this.strokeWidth = strokeWidth; this.depth = depth; this.orientation = orientation;
         State = new(failure);
         draw = DrawTexture;
     }
@@ -46,6 +48,7 @@ internal sealed class TextElement : GuiElementTextBase
         value ??= string.Empty;
         if (context == preparation && text == value) return;
         CairoFont nextFont = TextMetrics.Font(strokeWidth)
+            .WithOrientation(orientation)
             .WithFontSize((float)(HudOverlaySizes.Text * preparation.IndicatorScale))
             .WithStroke(new double[] { 0, 0, 0, .85 }, strokeWidth * preparation.IndicatorScale);
         // Allocate before replacing the surviving resource so generation failure preserves cleanup ownership.
@@ -69,6 +72,7 @@ internal sealed class TextElement : GuiElementTextBase
                 || fittedSize != aperture.Size && Font.UnscaledFontsize < (float)(HudOverlaySizes.Text * context.IndicatorScale)))
         {
             var nextFont = TextMetrics.Font(strokeWidth)
+                .WithOrientation(orientation)
                 .WithFontSize((float)(HudOverlaySizes.Text * context.IndicatorScale))
                 .WithStroke(new double[] { 0, 0, 0, .85 }, strokeWidth * context.IndicatorScale);
             CairoTextSizing.FitRectangle(nextFont, text, aperture.Size);
@@ -123,9 +127,21 @@ internal sealed class TextElement : GuiElementTextBase
         api.Render.Render2DTexturePremultipliedAlpha(texture!.TextureId, target.X, target.Y, target.Width, target.Height, depth, State.Tint(true));
     }
     /// <summary>Generates native glyph pixels and applies the shared texture filtering policy.</summary>
-    private static LoadedTexture CreateTexture(HudOverlayPreparationContext context, string value, CairoFont font)
+    internal static LoadedTexture CreateTexture(HudOverlayPreparationContext context, string value, CairoFont font)
     {
-        var texture = context.Api.Gui.TextTexture.GenTextTexture(value, font);
+        LoadedTexture texture;
+        if (font.Orientation == EnumTextOrientation.Left)
+        {
+            texture = context.Api.Gui.TextTexture.GenTextTexture(value, font);
+        }
+        else
+        {
+            // Native auto-boxing defaults to left alignment regardless of the font's orientation.
+            var pixels = CairoTextSizing.PixelSize(value, font);
+            var background = new TextBackground { VerPadding = (int)Math.Ceiling(font.StrokeWidth) };
+            texture = context.Api.Gui.TextTexture.GenTextTexture(value, font, pixels.Width, pixels.Height,
+                background, orientation: font.Orientation);
+        }
         try { return HudOverlayTextureFiltering.Prepare(texture); }
         catch { texture.Dispose(); throw; }
     }

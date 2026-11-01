@@ -39,6 +39,7 @@ public sealed class SimpleIndicatorsTests
             using var composition = new IndicatorComposition(fixture.Native.Api.Object, view, fixture.Native.Context, presentation.Size,
                 new(19, 31, presentation.Size.Width + 40, presentation.Size.Height + 40));
             var reading = Assert.IsType<TextElement>(composition.Composer.GetElement("test:reading"));
+            Assert.Equal(style == HudIndicatorStyle.Icon ? EnumTextOrientation.Center : EnumTextOrientation.Left, reading.Font.Orientation);
             if (style == HudIndicatorStyle.Text)
             {
                 var name = Assert.IsType<TextElement>(composition.Composer.GetElement("test:name"));

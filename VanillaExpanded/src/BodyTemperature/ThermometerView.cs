@@ -32,7 +32,7 @@ internal sealed class ThermometerView : NativeView
     {
         this.content = content;
         reading = Own(new TextElement(api, ElementBounds.Fixed(0, 0, 0, 0)
-            .WithAlignment(EnumDialogArea.CenterMiddle), _ => { }, createText, 1.5));
+            .WithAlignment(EnumDialogArea.CenterMiddle), _ => { }, createText, 1.5, orientation: EnumTextOrientation.Center));
         try
         {
             fill = Own(new TextureElement(api, ElementBounds.Fixed(0, 0, HudOverlaySizes.ThermometerWidth, HudOverlaySizes.Small)

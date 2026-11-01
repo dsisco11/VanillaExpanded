@@ -65,9 +65,7 @@ internal sealed class BowAmmunitionPresentation : IndicatorPresentation
     {
         font.WithColor(Icon == null ? [ .7, .7, .7, 1 ] : [1, 1, 1, 1]);
         if (CreateText != null) return CreateText(context, text, font);
-        var texture = context.Api.Gui.TextTexture.GenTextTexture(text, font);
-        try { return HudOverlayTextureFiltering.Prepare(texture); }
-        catch { texture.Dispose(); throw; }
+        return TextElement.CreateTexture(context, text, font);
     }
     #endregion
 }

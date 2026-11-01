@@ -35,6 +35,11 @@ public sealed class LayeredIndicatorsTests
             using var view = ViewFactory.Create(overlay, fixture.Resources.Native.Api.Object, NativeViewRole.Live, fixture.Resources.Native.Failures.Add);
             using var composition = new IndicatorComposition(fixture.Resources.Native.Api.Object, view, fixture.Context, presentation.Size);
             var elements = Components(composition, kind, style);
+            if (style == HudIndicatorStyle.Text || kind != "weather")
+            {
+                var reading = Assert.IsType<TextElement>(composition.Composer.GetElement("test:reading"));
+                Assert.Equal(style == HudIndicatorStyle.Icon ? EnumTextOrientation.Center : EnumTextOrientation.Left, reading.Font.Orientation);
+            }
             Assert.All(elements, element =>
             {
                 Assert.True(element is TextElement or TextureElement);
