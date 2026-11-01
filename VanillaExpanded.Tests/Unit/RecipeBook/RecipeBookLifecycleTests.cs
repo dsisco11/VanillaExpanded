@@ -1989,33 +1989,38 @@ public sealed class RecipeBookLifecycleTests
         double counterWidth = Math.Ceiling(CairoFont.WhiteSmallText().GetTextExtents("1/1").Width / scale + 1);
         double footerWidth = new[] { "previous", "auto", "next" }
             .Sum(key => originalComposer.GetElement(key).Bounds.OuterWidth / scale) + 6 + 4 + counterWidth
-            + 4 + originalComposer.GetElement("handbook").Bounds.OuterWidth / scale + 16;
+            + 4 + originalComposer.GetElement("handbook").Bounds.OuterWidth / scale + 32;
         double titleWidth = GuiStyle.ElementToDialogPadding + title.Font.GetTextExtents(title.GetText()).Width / scale
             + 8 + 2 * GuiElementDialogTitleBar.unscaledCloseIconSize + 2 + 20;
         var craftable = originalComposer.GetSwitch("craftable-only");
         var craftableLabel = originalComposer.GetStaticText("craftable-label");
-        double craftableWidth = 16 + craftable.Bounds.OuterWidth / scale + 8
+        double craftableWidth = 32 + craftable.Bounds.OuterWidth / scale + 8
             + craftableLabel.Font.GetTextExtents(craftableLabel.GetText()).Width / scale;
-        double actionWidth = 32 + new[] { "clear-search", "show-uncraftable" }
+        double actionWidth = 48 + new[] { "clear-search", "show-uncraftable" }
             .Max(key => originalComposer.GetButton(key).Bounds.OuterWidth / scale);
-        double sortWidth = 16 + originalComposer.GetElement("sort-label").Bounds.OuterWidth / scale + 8 + 40
+        double sortWidth = 32 + originalComposer.GetElement("sort-label").Bounds.OuterWidth / scale + 8 + 40
             + originalComposer.GetDropDown("sort").listMenu.Names
                 .Max(name => originalComposer.GetDropDown("sort").Font.GetTextExtents(name).Width / scale);
         double optionsWidth = CairoFont.WhiteSmallText().GetTextExtents(
             Lang.Get("vanillaexpanded:recipebook-remember-open")).Width / scale + 120;
-        double minimumWidth = Math.Ceiling(Math.Max(optionsWidth, Math.Max(sortWidth,
-            Math.Max(actionWidth, Math.Max(craftableWidth, Math.Max(footerWidth, titleWidth))))));
+        var originalTabs = GetCategoryTabs(originalComposer);
+        var categoryTitle = originalComposer.GetDynamicText("category-title");
+        double tabsWidth = 16 + GuiElementIconTabs.MeasureWidth(originalTabs.tabs.Length);
+        double categoryWidth = 32 + originalTabs.tabs.Max(tab => categoryTitle.Font.GetTextExtents(tab.Name).Width / scale + 1);
+        double minimumWidth = Math.Ceiling(new[] { optionsWidth, sortWidth, actionWidth, craftableWidth,
+            footerWidth, titleWidth, tabsWidth, categoryWidth }.Max());
         double textHeight = Math.Ceiling(new[] { "empty", "empty-search", "empty-craftable", "empty-craftable-search" }
             .Max(key => new TextDrawUtil().GetMultilineTextHeight(CairoFont.WhiteSmallText(),
-                Lang.Get("vanillaexpanded:recipebook-" + key), (minimumWidth - 32) * scale)) / scale);
+                Lang.Get("vanillaexpanded:recipebook-" + key), (minimumWidth - 48) * scale)) / scale);
         double emptyHeight = textHeight + 8
             + originalComposer.GetElement("auto").Bounds.OuterHeight / scale;
         double minimumHeight = Math.Ceiling(GuiStyle.TitleBarHeight + 8 + search.Bounds.OuterHeight / scale
             + 8 + GetCategoryTabs(originalComposer).Bounds.OuterHeight / scale
+            + 12 + categoryTitle.Bounds.OuterHeight / scale
             + 8 + craftable.Bounds.OuterHeight / scale
             + 8 + originalComposer.GetDropDown("sort").Bounds.OuterHeight / scale
             + 8 + Math.Max(GuiElementRecipeBookTiles.TileSize, emptyHeight) + 10
-            + originalComposer.GetElement("auto").Bounds.OuterHeight / scale + 8);
+            + originalComposer.GetElement("auto").Bounds.OuterHeight / scale + 16);
         search.SetValue("preserved search");
         f.ResizePanelSpace(minimumWidth, minimumHeight);
         menu.TryOpen();
@@ -2042,6 +2047,8 @@ public sealed class RecipeBookLifecycleTests
             var title = composer.GetTitleBar("titlebar");
             var search = composer.GetTextInput("search").Bounds;
             var tabs = GetCategoryTabs(composer).Bounds;
+            var categoryPanel = composer.GetElement("category-panel").Bounds;
+            var categoryTitle = composer.GetDynamicText("category-title");
             var craftable = composer.GetSwitch("craftable-only");
             var craftableLabel = composer.GetStaticText("craftable-label");
             var sort = composer.GetDropDown("sort");
@@ -2055,8 +2062,17 @@ public sealed class RecipeBookLifecycleTests
             var counter = composer.GetDynamicText("alternative").Bounds;
             var handbook = composer.GetButton("handbook");
             double scale = GuiElement.scaled(1);
+            Assert.Equal(tabs.absX, categoryPanel.absX, 4);
+            Assert.Equal(tabs.OuterWidth, categoryPanel.OuterWidth, 4);
+            Assert.Equal(tabs.absY + tabs.OuterHeight - 1, categoryPanel.absY, 4);
+            Assert.True(categoryPanel.absX < search.absX);
+            Assert.True(categoryPanel.absX + categoryPanel.OuterWidth > search.absX + search.OuterWidth);
+            Assert.True(categoryPanel.absY + categoryPanel.OuterHeight > handbook.Bounds.absY + handbook.Bounds.OuterHeight);
             Assert.True(title.Bounds.absY + title.Bounds.OuterHeight + 8 * scale <= tabs.absY + .001);
-            Assert.True(tabs.absY + tabs.OuterHeight + 8 * scale <= craftable.Bounds.absY + .001);
+            Assert.Equal(tabs.absY + tabs.OuterHeight + 12 * scale, categoryTitle.Bounds.absY, 4);
+            Assert.Equal(categoryTitle.Bounds.absY + categoryTitle.Bounds.OuterHeight + 8 * scale, craftable.Bounds.absY, 4);
+            Assert.True(categoryTitle.Font.GetTextExtents(categoryTitle.GetText()).Width <= categoryTitle.Bounds.InnerWidth);
+            Assert.True(categoryTitle.Font.UnscaledFontsize < craftableLabel.Font.UnscaledFontsize);
             Assert.True(craftable.Bounds.absY + craftable.Bounds.OuterHeight + 8 * scale <= sort.Bounds.absY + .001);
             Assert.True(sortLabel.absX + sortLabel.OuterWidth + 8 * scale <= sort.Bounds.absX + .001);
             Assert.True(sort.Bounds.absY + sort.Bounds.OuterHeight + 8 * scale <= search.absY + .001);
@@ -2091,12 +2107,18 @@ public sealed class RecipeBookLifecycleTests
             double titleMenuLeft = title.Bounds.absX + title.Bounds.OuterWidth
                 - GuiElement.scaled(2 * GuiElementDialogTitleBar.unscaledCloseIconSize + 2 + 20);
             Assert.True(titleTextRight + 8 * scale <= titleMenuLeft + .001);
-            foreach (var bounds in new[] { tabs, search, craftable.Bounds, craftableLabel.Bounds, sortLabel, sort.Bounds, viewport, scroll, previous, auto, next, counter,
+            Assert.Equal(panel.absX + 8 * scale, tabs.absX, 4);
+            Assert.Equal(panel.InnerWidth - 16 * scale, tabs.OuterWidth, 4);
+            Assert.Equal(categoryPanel.absX + 8 * scale, categoryTitle.Bounds.absX, 4);
+            var categoryTabs = GetCategoryTabs(composer);
+            Assert.False(categoryTabs.Composer!.GetButton("left").Visible);
+            Assert.False(categoryTabs.Composer.GetButton("right").Visible);
+            foreach (var bounds in new[] { categoryTitle.Bounds, search, craftable.Bounds, craftableLabel.Bounds, sortLabel, sort.Bounds, viewport, scroll, previous, auto, next, counter,
                 handbook.Bounds })
             {
-                Assert.True(bounds.absX >= panel.absX + 8 * scale - .001);
-                Assert.True(bounds.absX + bounds.OuterWidth <= panel.absX + panel.InnerWidth - 8 * scale + .001);
-                Assert.True(bounds.absY + bounds.OuterHeight <= panel.absY + panel.InnerHeight - 8 * scale + .001);
+                Assert.True(bounds.absX >= panel.absX + 16 * scale - .001);
+                Assert.True(bounds.absX + bounds.OuterWidth <= panel.absX + panel.InnerWidth - 16 * scale + .001);
+                Assert.True(bounds.absY + bounds.OuterHeight <= panel.absY + panel.InnerHeight - 16 * scale + .001);
             }
             Assert.True(empty.absX >= viewport.absX);
             Assert.True(empty.absY >= viewport.absY);
@@ -2117,6 +2139,72 @@ public sealed class RecipeBookLifecycleTests
                 Assert.True(textUtil.GetMultilineTextHeight(CairoFont.WhiteSmallText(),
                     Lang.Get("vanillaexpanded:recipebook-" + key), empty.InnerWidth)
                     + 8 * scale + auto.OuterHeight <= viewport.InnerHeight + .001);
+        }
+    }
+
+    [Theory]
+    [InlineData(1f, 9)]
+    [InlineData(1.25f, 18)]
+    [InlineData(1.5f, 9)]
+    [InlineData(1.75f, 18)]
+    [InlineData(2f, 9)]
+    public void CategoryPanelShowsAllTabsAndCurrentHeadingAcrossSelectionResizeAndReopen(float scale, int categoryCount)
+    {
+        using var f = new MenuFixture(scale: scale, includeRecipes: true);
+        Assert.Single(f.Lifecycle.Recipes).Output!.ResolvedItemStack!.Collectible.CreativeInventoryTabs =
+            Enumerable.Range(0, categoryCount).Select(index => "category-" + index).ToArray();
+        f.Lifecycle.FinalizeWorld();
+        f.Recompose();
+        f.Parent.TryOpen();
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        var tabs = GetCategoryTabs(menu.SingleComposer);
+        Assert.Equal(categoryCount + 1, tabs.tabs.Length);
+        AssertPanel(menu);
+        Assert.Equal("All", menu.SingleComposer.GetDynamicText("category-title").GetText());
+        tabs.OnFocusGained();
+        tabs.OnKeyDown(f.Lifecycle.Api.Object, new KeyEvent { KeyCode = (int)GlKeys.Right });
+        Assert.Equal(tabs.tabs[1].Name, menu.SingleComposer.GetDynamicText("category-title").GetText());
+        var lastTab = tabs.Composer!.GetToggleButton("tab-" + (tabs.tabs.Length - 1)).Bounds;
+        int x = (int)(lastTab.absX + lastTab.OuterWidth / 2);
+        int y = (int)(lastTab.absY + lastTab.OuterHeight / 2);
+        menu.OnMouseDown(new MouseEvent(x, y, EnumMouseButton.Left, 0));
+        menu.OnMouseUp(new MouseEvent(x, y, EnumMouseButton.Left, 0));
+        string selected = tabs.tabs[^1].Name;
+        menu.SingleComposer.GetTextInput("search").SetValue("no results");
+        AssertPanel(menu);
+        Assert.Equal(selected, menu.SingleComposer.GetDynamicText("category-title").GetText());
+        f.ResizePanelSpace(menu.SingleComposer.Bounds.fixedWidth + 24, menu.SingleComposer.Bounds.fixedHeight + 20);
+        menu.TryOpen();
+        AssertPanel(menu);
+        Assert.Equal(selected, menu.SingleComposer.GetDynamicText("category-title").GetText());
+        f.SelectMovement(menu, movable: true);
+        menu.OnRenderGUI(0);
+        AssertPanel(menu);
+        f.Toggle();
+        f.Toggle();
+        menu = f.Menus.Last();
+        Assert.True(menu.SingleComposer.GetTitleBar("titlebar").Movable);
+        AssertPanel(menu);
+        Assert.Equal(selected, menu.SingleComposer.GetDynamicText("category-title").GetText());
+
+        static void AssertPanel(GuiDialogRecipeBook menu)
+        {
+            var tabs = GetCategoryTabs(menu.SingleComposer);
+            Assert.True(menu.SingleComposer.Bounds.fixedWidth >= 16 + GuiElementIconTabs.MeasureWidth(tabs.tabs.Length));
+            Assert.False(tabs.Composer!.GetButton("left").Visible);
+            Assert.False(tabs.Composer.GetButton("right").Visible);
+            for (int index = 0; index < tabs.tabs.Length; index++)
+            {
+                var bounds = tabs.Composer.GetToggleButton("tab-" + index).Bounds;
+                Assert.True(bounds.absX >= tabs.Viewport!.absX);
+                Assert.True(bounds.absX + bounds.OuterWidth <= tabs.Viewport.absX + tabs.Viewport.InnerWidth + .001);
+            }
+            var heading = menu.SingleComposer.GetDynamicText("category-title");
+            Assert.Equal(tabs.tabs[tabs.activeElement].Name, heading.GetText());
+            Assert.True(heading.Bounds.absY > tabs.Bounds.absY + tabs.Bounds.OuterHeight);
+            Assert.True(heading.Bounds.absY + heading.Bounds.OuterHeight <
+                menu.SingleComposer.GetSwitch("craftable-only").Bounds.absY);
         }
     }
 
@@ -3199,7 +3287,8 @@ public sealed class RecipeBookLifecycleTests
                     "vanillaexpanded:recipebook-toggle" => "Recipe Book",
                     "vanillaexpanded:recipebook-remember-open" => longLabels
                         ? "Automatically reopen the recipe book with the inventory" : "Reopen with inventory",
-                    "vanillaexpanded:recipebook-category-all" => "All",
+                    "vanillaexpanded:recipebook-category-all" => longLabels
+                        ? "All recipes available in the selected crafting catalogue" : "All",
                     "vanillaexpanded:recipebook-category-other" => "Other",
                     _ => key
                 });

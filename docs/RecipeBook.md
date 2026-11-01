@@ -1,116 +1,192 @@
-# Recipe-book filtering and ordering
+# Recipe Book design
 
-[GuiElementRecipeBookButton](../VanillaExpanded/src/RecipeBook/GuiElementRecipeBookButton.cs) is a native icon toggle anchored through `ElementBounds` to the crafting output slot, four GUI pixels to its left and vertically centered. It stays visible while the book is open, and its pressed state reflects the actual dialog state. A completed left click or Enter activation opens and closes the book; releasing outside cancels the click, and failed opens reset the toggle. Mouse activation completes on release so the inventory composer finishes its own mouse-down focus handling before the book requests focus. Explicit toggle-off clears the inventory-reopen preference while retaining browsing criteria. Parent closure, reopening, recomposition, and external dialog disposal synchronize the toggle through the existing lifecycle. Disabling the feature hides and disables the button.
-
-Automatic restoration uses the native `TryOpen(false)` focus policy and composes without focusing the search field. The inventory keeps keyboard focus, so the separate text-input event belonging to its opening hotkey cannot become search text. Explicit book opening still focuses search and accepts the first typed character. An unfocused book does not capture keyboard input; resizing it while unfocused does not acquire focus. No first-input suppression or key-specific filtering is used.
-
-The flat sliders icon in [GuiElementRecipeBookOptions](../VanillaExpanded/src/RecipeBook/GuiElementRecipeBookOptions.cs) uses [recipe-book-options.svg](../VanillaExpanded/assets/vanillaexpanded/textures/gui/recipe-book-options.svg) through the native `SvgIconSource` API and the titlebar's green hover treatment without a raised button frame. The asset has three horizontal tracks with offset circular knobs and transparent centers. Normal and hovered icon states use separate small textures; neither draws on the shared dialog surface, and no gear renderer is used. The dropdown uses a child `GuiComposer` with the native list background styling, a native `GuiElementSwitch`, and the concise `Reopen with inventory` label. Its checked appearance is baked into the popup texture so the entire row shares the dropdown's foreground depth. Recomposition updates that texture when the checkbox changes. An explanatory hover tooltip provides detail. The composer owns and disposes its checkbox and textures directly, without relying on the native multi-select list's private checkbox collection.
-
-The control sits to the left of the native movement-menu and close controls; minimum layout width reserves space for all three and the localized dropdown. Search remains the first keyboard stop, and the options button follows the existing book controls. Enter, keypad Enter, or Space opens the focused options control and toggles its checkbox. The dropdown stays open while changing settings; Escape dismisses it before closing the inventory. Outside clicks and focus loss dismiss it too. Popup mouse events are routed before underlying book controls. No separate settings dialog is registered.
-
-`Reopen with inventory` is stored in native client boolean settings under `vanillaexpanded-recipebook-remember-open`, defaulting to true when absent. Restoration checks it when the inventory opens, including queued recomposition callbacks. Disabling it prevents automatic reopening but does not close an already-open book or clear browsing criteria. Explicit book opening and closing retain their existing session-open-state semantics. Only this preference is persisted across client sessions, not the book's actual open state or browsing state.
-
-This guide describes the implemented filtering and ordering systems. Classification providers remain deferred until concrete consumers need them.
+This guide describes the Recipe Book's component ownership, evaluation pipeline, and client UI lifecycle. It is intended for developers maintaining the feature. Player-facing usage is covered in the [README](../README.md).
 
 ## Components and authority
 
-- [RecipeBookSession](../VanillaExpanded/src/RecipeBook/RecipeBookSession.cs) owns one [RecipeFilterSet](../VanillaExpanded/src/RecipeBook/RecipeFilterSet.cs) and explicitly constructs the feature controllers. There is no global registry, discovery, or public extension API.
-- [RecipeSort](../VanillaExpanded/src/RecipeBook/RecipeSort.cs) owns a session-local immutable collection of ordering providers and the selected provider. Availability and Name are isolated `IRecipeOrder` implementations, independent of filter registration; the current fixed choices need no additional registration framework.
-- [CraftingCatalogueView](../VanillaExpanded/src/RecipeBook/CraftingCatalogueView.cs) resolves automatic or explicitly pinned recipe alternatives before filtering. The catalogue metadata is immutable for the loaded world.
-- Providers implement [IRecipeFilter.Matches](../VanillaExpanded/src/RecipeBook/IRecipeFilter.cs) over an already evaluated selection. All registered predicates must match; no registrations means no restriction. Predicates cannot rely on registration order or invocation count, and must not manufacture or reorder rows.
-- Inventory allocation remains authoritative. Providers must not capture inventories, allocate, dispatch transfers, read GUI state or live stacks, or mutate the catalogue, evaluation, alternative, or another feature's criteria.
+- [RecipeBookSession](../VanillaExpanded/src/RecipeBook/RecipeBookSession.cs) owns filtering, sorting, selection, and the published recipe rows for one dialog.
+- [CraftingCatalogueView](../VanillaExpanded/src/RecipeBook/CraftingCatalogueView.cs) resolves recipe alternatives and projects evaluated selections. Catalogue metadata is immutable for the loaded world.
+- [CraftingAllocator](../VanillaExpanded/src/RecipeBook/CraftingAllocator.cs) evaluates ingredient coverage, craftability, placement support, and grid relevance from captured inventory.
+- [GuiDialogRecipeBook](../VanillaExpanded/src/RecipeBook/GuiDialogRecipeBook.cs) binds controls to the session and owns their composition and interaction lifecycle.
+- [CraftingTransferCoordinator](../VanillaExpanded/src/RecipeBook/CraftingTransferCoordinator.cs) independently validates and dispatches placement through native inventory transfers.
+
+```mermaid
+flowchart LR
+    Inventory[Accessible inventory] --> Snapshot[Inventory snapshot]
+    Snapshot --> Allocation[Evaluate recipe alternatives]
+    Allocation --> Resolve[Resolve automatic or pinned alternatives]
+    Resolve --> Filter[Apply all registered filters]
+    Filter --> Order[Order eligible outputs]
+    Order --> Rows[Publish rows and empty-state diagnosis]
+    Rows --> Dialog[Recipe Book UI]
+    Dialog -->|Placement request| Transfer[Recapture, allocate, and validate placement]
+    Transfer --> Native[Native inventory transfers]
+```
+
+Displayed eligibility does not authorize a transfer. `CanPlace` permits supported partial ingredient placement; `CanCraft` means the ingredients for one craft are available. Placement always recaptures inventory and validates against live state.
+
+## Filtering and ordering
+
+### Filter ownership
+
+The session explicitly constructs its feature controllers and one [RecipeFilterSet](../VanillaExpanded/src/RecipeBook/RecipeFilterSet.cs). Each controller owns its immutable criteria and registration handle. Filtering has no global registry, discovery mechanism, or public extension API.
 
 | Controller / predicate | Registration identity | Contribution |
 | --- | --- | --- |
-| [RecipeSearch / SearchFilter](../VanillaExpanded/src/RecipeBook/RecipeSearch.cs) | `vanillaexpanded:search` | Normalize terms once per update; every term must match the selected recipe's immutable search text. Empty search removes this restriction. |
-| [RecipeCategory / CategoryFilter](../VanillaExpanded/src/RecipeBook/RecipeCategory.cs) | `vanillaexpanded:category` | Match the selected recipe's category snapshot, including Other. All removes this restriction. |
-| [CraftableOnly / CraftableFilter](../VanillaExpanded/src/RecipeBook/CraftableOnly.cs) | `vanillaexpanded:craftable-only` | Read `Evaluation.CanCraft`, not `CanPlace`, border color, relevance, or ingredient counts. One predicate instance belongs to the feature/session and is registered only while enabled. |
+| [RecipeSearch / SearchFilter](../VanillaExpanded/src/RecipeBook/RecipeSearch.cs) | `vanillaexpanded:search` | Every normalized search term must match the selected recipe's immutable search text. Empty search removes the restriction. |
+| [RecipeCategory / CategoryFilter](../VanillaExpanded/src/RecipeBook/RecipeCategory.cs) | `vanillaexpanded:category` | Match the selected recipe's category snapshot, including Other. All removes the restriction. |
+| [CraftableOnly / CraftableFilter](../VanillaExpanded/src/RecipeBook/CraftableOnly.cs) | `vanillaexpanded:craftable-only` | Match `Evaluation.CanCraft`. The controller registers its predicate only while enabled. |
 
-`CanPlace` means supported placement and allows partial ingredient placement; it is not proof of full craftability. Displayed eligibility never authorizes a transfer: [CraftingTransferCoordinator](../VanillaExpanded/src/RecipeBook/CraftingTransferCoordinator.cs) captures and allocates again, validates the transfer plan and live inventory, then uses native transfers.
+All registered [IRecipeFilter](../VanillaExpanded/src/RecipeBook/IRecipeFilter.cs) predicates must match. Predicates read evaluated selections; they cannot capture inventories, allocate ingredients, dispatch transfers, read live stacks or GUI state, mutate other criteria, or reorder rows. Registration order and invocation count have no semantic meaning.
 
-## Registration and updates
+### Registration and updates
 
-`Register(id, filter)` returns an owned `RecipeFilterSet.Registration`. Duplicate identities fail before mutation. Keep the handle in its feature controller; `Replace` changes only that registration atomically, and idempotent `Dispose` releases only its own registration, not a later registration reusing the identity.
+`Register(id, filter)` returns an owned registration. Duplicate identities fail before mutation. Its `Replace` operation changes only that registration atomically; idempotent disposal cannot remove a later registration that reuses the identity.
 
-Construct immutable criteria before registering or replacing them. Update the controller's state only after the registry mutation succeeds, then invoke the session's common change callback. Criteria changes project existing allocations without capturing inventory. An inventory refresh captures once, evaluates the catalogue once, and projects the refreshed selections.
+Controller updates commit the registration before changing controller state and invoking the session's common callback. Evaluation and projection have separate responsibilities:
 
-The set enforces its owning client thread and rejects registry mutations or reentrant filtering during an eager projection pass. Predicates and criteria remain read-only during that pass. Registration errors and predicate exceptions propagate; never catch them to publish unfiltered or empty success-shaped results.
+```text
+criteria change:
+    construct immutable criteria
+    commit registration and controller state
+    project using existing evaluations
 
-An active registration can call `FilterOthers(selections)` to evaluate every other registered predicate without removing or replacing itself. This eager diagnostic pass has the same thread, mutation, reentrancy, lifetime, and error guarantees as normal filtering; a stale handle cannot exclude a newer registration using the same identity.
+inventory change:
+    capture accessible inventory once
+    evaluate recipe alternatives once
+    project using refreshed evaluations
 
-To insert a feature:
+projection succeeds:
+    publish rows and empty-state diagnosis together
+```
 
-1. Implement its pure selection predicate and a controller that owns its criteria and registration handle.
-2. Explicitly construct the controller in the session with the existing set and common change callback. Add no provider-identity checks to filtering or reconciliation and no feature flags to catalogue query methods.
-3. Bind native controls to that controller's state. Explicit filter changes reset the viewport through the existing tile reset path; recomposition restores controls without registering again.
-4. Add predicate, registration/failure, composition, allocation-reuse, interaction, and native lifetime tests using the existing fixtures.
+The filter set enforces its owning client thread and rejects registry mutation or reentrant filtering during an eager projection. Registration and predicate failures propagate without publishing a fallback result. `FilterOthers` evaluates every predicate except the calling registration under the same guarantees; stale handles cannot exclude a newer registration.
 
-## Projection, interaction, and lifetime
+To add an internal filtering feature:
 
-The view resolves alternatives through the active provider's `OrderAlternatives`, filters those selections, applies its row `Order`, and always adds ordinal recipe stable identity as the final tie-breaker to both orderings. Availability remains the default: supported first, descending distinct-grid-kind matches, then craftable, descending inventory coverage ratio, ascending missing units, and culture-aware case-insensitive display name. Its automatic-alternative policy uses supported status, grid-kind matches, inventory coverage ratio, missing units, and stable identity, preserving the old automatic fallback when grid scores tie. Name uses only the culture-aware case-insensitive display name before the common stable identity tie-breaker for rows; its default alternative policy retains the original supported/coverage/missing/stable ordering and ignores grid relevance entirely.
+1. Implement a pure selection predicate and a controller that owns its criteria and registration.
+2. Construct the controller explicitly in the session with the common change callback.
+3. Bind controls to the controller. Explicit criteria changes reset recipe scrolling; recomposition restores controls without registering again.
+4. Cover predicate behavior, registration failures, allocation reuse, interactions, and resource lifetime with the existing test fixtures.
 
-The localized native Sort by dropdown sits beneath the Hide uncraftable checkbox, before tiles in tab order. A localized native hover tooltip covers its label and dropdown, explaining Availability, Name, and the continued application of filters. Its label, both option names, and arrow/padding space contribute to minimum layout measurements. Static labels use measured font height and are vertically centered against their associated dropdown or checkbox rather than top-aligned in the full control row. Native mouse and arrow-key selection use the same controller path. An explicit sort change cancels pending tile presses, resets scroll, ends the old interaction freeze, and projects existing allocations immediately. It preserves search, category, craftable-only, selected output, and pinned alternative. Selecting the already-active mode does nothing; unknown identities fail before changing selection or publishing rows. Sort changes neither capture inventory nor authorize transfers.
+### Ordering policies
 
-Hide uncraftable uses the native `GuiElementSwitch` square checkbox with a separate localized label. A localized native hover tooltip covers both the checkbox and label, explaining ingredient availability for one craft and its combination with category and search filters. The existing `craftable-only` element/localization identities and `CraftableOnly` controller retain their meaning: checked means the craftability predicate is registered. Mouse presses and focused Enter/Space use the same reset-scroll/controller path. Recomposition synchronizes the checkbox without invoking its handler, and the empty-state Show uncraftable action unchecks it through the same controller ownership boundary. Minimum width includes the checkbox, label spacing, label text, and dialog margins.
+[RecipeSort](../VanillaExpanded/src/RecipeBook/RecipeSort.cs) owns a session-local immutable collection of ordering providers and the selected provider. Each provider defines automatic alternative selection and output-row ordering independently of filter registration. Both orderings finish with ordinal recipe stable identity as a deterministic tie-breaker.
 
-During interaction, the session refreshes evaluations for the exact displayed recipes and keeps still-eligible rows in relative order. Ineligible automatic alternatives use the current automatic candidate only if it passes every filter. Explicit pins are never substituted to satisfy a filter. Newly eligible groups append in canonical order without duplicates; explicit variant/Auto actions take effect immediately. Ending interaction restores canonical order and automatic selection. Only a completed projection replaces the published row snapshot.
+| Policy | Automatic alternative selection | Output-row ordering |
+| --- | --- | --- |
+| Availability (default) | Supported status, descending grid-kind matches, descending inventory coverage ratio, ascending missing units, stable identity. | Supported status, descending grid-kind matches, craftability, descending coverage ratio, ascending missing units, culture-aware case-insensitive display name, stable identity. |
+| Name | Supported status, descending coverage ratio, ascending missing units, stable identity. | Culture-aware case-insensitive display name, stable identity. |
 
-A hidden pin survives search and craftable-only changes, subject to normal deselection/category behavior. Turning craftable-only off can expose it again; Auto is available only through a visible selected row. Hidden selections have disabled footer controls and no displayed tooltip.
+Filtering applies to the resolved alternative, not every alternative in an output group. Availability can therefore select a grid-relevant but incomplete alternative that Hide uncraftable excludes, even when another alternative is craftable. Explicit pins are never substituted to satisfy a filter.
 
-The session publishes an empty-state diagnosis with its row snapshot. For empty results, the craftable-only controller evaluates the resolved selections through every other registered filter, including search and category. Surviving selections mean craftability is the blocker; otherwise an active search gets the search-specific message. A truly empty catalogue gets the general unavailable message without a misleading clear action. This pass reuses current evaluations and allocations and respects pinned alternatives; it neither captures inventory nor changes registrations. Ordering never filters rows directly, but its alternative policy can change the unpinned representative before filtering. The diagnostic pass and explicit variant/Auto updates must therefore resolve alternatives through the same active provider as the normal projection. Availability can prefer an incomplete grid-relevant alternative and Craftable only can hide that output even when another alternative is craftable; Name's unchanged automatic policy can expose the craftable alternative. Explicit pins are never replaced to satisfy a filter. Diagnostic failures leave the prior rows and diagnosis published and propagate normally.
+An explicit sort change cancels pending tile presses, ends the interaction freeze, resets scrolling, and reprojects existing allocations. It preserves other criteria, selected output, and pinned alternative. Selecting the active policy is a no-op; unknown identities fail before mutation.
 
-The localized empty-state message and its one relevant action are centered horizontally and vertically as a group in the recipe viewport, with centered text, measured wrapping, and sufficient minimum space for translated labels. Without an action, the message alone is centered. Clear search uses the existing search input path, returns keyboard focus to search, and keeps craftable-only/category unchanged. Show uncraftable removes only the craftable restriction through its controller and synchronizes the toggle without firing a second handler. Both actions reset scroll through the existing safe reset path. Hidden actions are disabled, unfocused, and not rendered; live refresh, recomposition, and reopening update the message and action from session state.
+### Interaction reconciliation and empty results
 
-[GuiDialogRecipeBook](../VanillaExpanded/src/RecipeBook/GuiDialogRecipeBook.cs) uses native controls with measured localized layout, with the icon-only category tabs described below. Below the categories, compact Hide uncraftable and Sort by rows sit above search. Both use the native detail-text font and smaller control heights; the sort selector reserves only the width required by its localized options and native dropdown chrome. Search stays first in tab order. The native craftable-only toggle uses Enter; recipe tiles also accept Space and keypad Enter. Mouse activation requires the same output and recipe identities as the left-button press. Removal/rebinding cancels the press, including remove/reintroduce before release. Scroll and scrollbar positions clamp together after membership shrinks, even during a press; ordinary live refresh does not reset scroll unconditionally.
+While a recipe is being interacted with, refresh updates evaluations for the displayed recipes while retaining still-eligible rows in relative order. Newly eligible groups append in canonical order. Automatic alternatives may be substituted only when the replacement passes every filter; pins remain explicit. Variant and Auto actions take effect immediately. Ending interaction restores canonical ordering and automatic selection.
 
-[GuiElementIconTabs](../VanillaExpanded/src/Gui/GuiElementIconTabs.cs) is a generic icon-only tab panel with no crafting dependencies. A native `GuiComposer` owns the icon toggle buttons, clipping, arrow buttons, and textures; native `ElementBounds` parent/child relations, sibling positioning, and vertical alignment lay out equal 28-GUI-pixel tabs without measuring label widths. [GuiElementIconToggleButton](../VanillaExpanded/src/Gui/GuiElementIconToggleButton.cs) subclasses the native toggle button with an empty native icon. The base component retains button framing, selection, focus, and mouse/keyboard behavior; the subclass draws separate released and active icon textures over it at foreground depth within the same native clip. Icon textures disable linear magnification, use matching integer raster/display dimensions, and snap placement to physical pixels. Both states use the same 20-GUI-pixel icon size and position: released icons use the font color, while selected or hovered icons use the native active-button text tint. Hover and selection never resize the icon. Recomposition replaces the icon textures, and disposal releases both alongside the native button resources. Each tab's supplied localized name appears in a native hover tooltip, rendered outside the clipped icon viewport; arrow-covered, offscreen, and disabled tabs do not show pointer tooltips. Left/Right wrap selection, reveal the selected icon, and show its name until pointer movement or focus loss. Overflow supports wheel scrolling and arrow buttons. The panel remains one outer keyboard tab stop. Crafting tab selection uses the existing category controller and recipe-scroll reset. Recomposition and reopening preserve the category identity and reveal the selected tab. No item-atlas baking or direct OpenGL is used.
+Only a completed projection replaces the published rows and empty-state diagnosis. The diagnosis resolves alternatives through the active ordering policy and uses the craftable-only controller's `FilterOthers` pass to distinguish craftability restrictions from search/category restrictions without recapturing inventory.
 
-[RecipeBookCategoryIcons](../VanillaExpanded/src/RecipeBook/RecipeBookCategoryIcons.cs) maps All to a four-square grid, Construction to bricks, Decorative to a patterned vase, Mechanics to a plain cogwheel, Terrain to layered earth, Tools to crossed tools, Clothing to a tunic, Items to an ingot and stick, and Other to dots. Unrecognized/mod-added category codes use a generic tag without changing their labels or membership. The ten standalone monochrome [SVG assets](../VanillaExpanded/assets/vanillaexpanded/textures/gui/recipe-book-categories/) use a 24x24 view box. The client system registers their native SVG icon delegates once, retains them across menu/world recomposition, and removes only its own registrations on disposal. Tab textures belong to the composer and are freed on menu closure or replacement. No category, favorites, or recent-recipes behavior is added by the icons.
+The empty-state UI binds to the published diagnosis. Its Clear search and Show uncraftable actions update only their owning controllers, preserving unrelated criteria. Clearing search restores search focus. An empty catalogue has no criteria-clearing action.
 
-[GuiElementRecipeBookSearch](../VanillaExpanded/src/RecipeBook/GuiElementRecipeBookSearch.cs) keeps native text editing in a narrower editable area inside a shared full-width field frame, reserving room for a filled-circle x on the inner right edge. The native input's text/caret clipping cannot overlap the icon. The icon and localized Clear search hint appear only for a nonempty enabled input, including whitespace-only text. A completed left click clears through the existing input callback, resets scroll, and retains input focus without changing other criteria or pins. Edits, focus loss, disabling, and release outside the icon cancel a pending clear. The icon adds no separate tab stop; normal native keyboard editing remains available. Recomposition disposes its texture and hover hint with the input.
-
-The footer's Handbook button resolves the currently visible selected recipe at activation time, obtains a cloned output preview, and invokes the registered native `handbook` link protocol. Page codes use the collectible's `IHandBookPageCodeProvider` when present, otherwise `GuiHandbookItemStackPage.PageCodeForStack`, preserving relevant stack attributes. This action neither calls the placement coordinator nor changes selection, pins, or browsing criteria. No selection, hidden selection, or unresolved preview disables the button and removes its focus; an unavailable native protocol produces a localized in-game error. Layout measurement reserves space for the translated button label plus eight GUI pixels on each side of its centered text, including at the dialog's minimum width. The button uses ordinary native mouse/Enter activation; there is no added keyboard binding. The inventory and recipe book stay open; the opened handbook receives focus, including when it was already open. The recipe book shares the native handbook/inventory draw layer (`0.2`) so focus can bring the handbook in front.
-
-Recomposition keeps the session, criteria, checked state, registrations, selected ordering provider, and scroll position; old tile subscriptions are removed with the old composer. Dialog disposal captures an immutable [RecipeBookBrowsingState](../VanillaExpanded/src/RecipeBook/RecipeBookBrowsingState.cs) before tearing down the composer and disposing the session's filter set. The client system retains only category, exact search text, selected sort identity, and GUI-unscaled scroll offset from successfully opened dialogs. A fresh dialog restores the criteria and sort through their existing controllers, evaluates the current inventory, and then restores/clamps scroll in that ordering. No allocations, selected outputs, pins, focus, hover, presses, or registrations survive the old session.
-
-The first menu in a world starts with All, empty search, Availability sorting, and zero scroll. Closing/reopening the inventory, parent-composer replacement, and explicit menu close/book-tab reopen retain browsing state. World exit, catalogue reinitialization, and system disposal clear it; nothing is written to disk. Craftable-only still starts off in each new dialog. The existing preference to reopen the menu with the inventory remains independent of browsing state. Failed opens do not replace the last successfully captured state.
-
-[RecipeBookIconCache](../VanillaExpanded/src/RecipeBook/RecipeBookIconCache.cs) records missing visible previews during GUI preparation without baking them. Its world-owned renderer submits at most four requests per frame in `EnumRenderStage.Before`, where the native `RenderItemStackToAtlas` API queues work rather than rendering immediately. The native atlas renderer owns the framebuffer/shader work in its normal Ortho batch (order 9 in game 1.22.7, after the GUI manager at order 1). Newly requested icons can therefore remain pending for two GUI frames; tile borders and quantity labels render normally while waiting. Cached icons remain immediate. Crafting rendering neither snapshots shared GUI uniforms nor calls OpenGL directly.
-
-The four-outstanding-request cap includes both locally pending and natively queued work, so repeated preparation or multiple views cannot enqueue an unbounded batch. Native callbacks publish atlas positions or release late results after reload/world exit. Texture reload discards unsubmitted requests and invalidates submitted owners; old completions cannot unblock the new batch. Failed submissions remove their unbaked cache entry and propagate so a later visible request can retry. World cleanup unregisters the Before-stage renderer and discards local work. Automated coverage simulates frame stages and native callbacks in headless unit/native-GUI fixtures, without GPU contexts.
-
-The recipe list and scrollbar share a native `GuiElementInset` background with reduced brightness and a recessed border. Their viewport reaches the frame's top and bottom inner edges, reserving only the native inset's two-physical-pixel border. Tile placement, virtual row binding, scroll calculations, native button backgrounds, icon/count rendering, hit testing, and wheel input use that same viewport, so the first row starts at the inner top edge and scrolling does not leave an extra padding strip at row boundaries. Horizontal padding remains around the list and scrollbar; search and footer controls remain outside the frame.
-
-[GuiElementRecipeBookTiles](../VanillaExpanded/src/RecipeBook/GuiElementRecipeBookTiles.cs) also reapplies the viewport scissor after icon preparation. The scope encloses native button backgrounds, icons, and output counts, and is unwound even when rendering fails. Icon and count draws additionally intersect their tile bounds with that viewport. Each tile reuses pixel bounds matching the native button's integer origin and truncated outer dimensions for both its shader quad and scissors; using fractional quad geometry with native integer scissoring produces uneven edge thickness. The icon shader uses depth 220 and counts use 221, below the native dropdown popup's 310 layer; counts must not use tooltip/overlay depth. Availability borders occupy the outermost two GUI-scaled pixels, rounded to whole physical pixels, with no inset gap, replacing the button edge rather than drawing a second interior frame.
+Hidden selections have disabled footer controls and no recipe tooltip. A hidden pin can survive search and craftable-only changes, subject to normal deselection and category behavior.
 
 ## Grid-item relevance
 
-[CraftingInventorySnapshot](../VanillaExpanded/src/RecipeBook/CraftingInventorySnapshot.cs) exposes immutable `GridStacks` referencing the same captured source objects already included in `Stacks`. It contains only accessible positive-quantity stacks in the nine verified input slots, never the result slot or carried storage. There is no second inventory read, duplicate supply, or origin inference from inventory-name strings.
+[CraftingInventorySnapshot](../VanillaExpanded/src/RecipeBook/CraftingInventorySnapshot.cs) exposes immutable `GridStacks` from the nine verified crafting input slots. These are references to captured source objects already included in the available supply, not a second inventory read or additional supply.
 
-[GridRelevance](../VanillaExpanded/src/RecipeBook/GridRelevance.cs) lives for one allocation pass. It groups captured grid inputs by native stack equality with quantity normalized to one, preserving meaningful persistent attribute distinctions. All source variants remain available within a kind so a temporary-state difference is not lost when native identity equality ignores it. Matching uses cloned stacks normalized to each requirement's quantity, independent of the actual amount supplied. `CraftingIngredientMatch` shares the existing native ingredient and collectible predicate checks with the allocator; this preserves exact attributes, allowed/skipped wildcard variants, tags, durability, and supported collectible-specific predicates. Predicate failures propagate, and cloned inputs isolate native predicate mutations from captured/live stacks.
+[GridRelevance](../VanillaExpanded/src/RecipeBook/GridRelevance.cs) groups inputs by native stack identity with quantity normalized to one, preserving meaningful persistent attributes and all source variants within a kind. Ingredient matching uses cloned stacks normalized to the requirement quantity and the same native predicates as allocation.
 
-The evaluator builds a bipartite graph between distinct input kinds and recipe requirements and uses augmenting-path maximum matching. Each kind contributes at most one point and each recipe position accepts at most one kind, so repeated stacks/positions do not inflate relevance and a single wildcard cannot count two incompatible ingredients simultaneously. Position within the current grid and stack quantity do not contribute. The graph has at most nine kinds and nine positions. Its integer score naturally ranks all-kind matches above fewer-kind matches without additional weights.
+Relevance is the maximum bipartite matching between distinct input kinds and recipe requirements. Each kind and requirement contributes at most one point. Repeated stacks, grid position, and supplied quantity do not inflate the score.
 
-[CraftingAllocator](../VanillaExpanded/src/RecipeBook/CraftingAllocator.cs) publishes the score as immutable `CraftingAllocation.GridMatches` only after a supported allocation has been evaluated and native validation has succeeded where required. Unsupported, unresolved, pending, and noncandidate evaluations receive no boost. Score zero with an empty grid restores the previous Availability and Auto ordering exactly. The score is a display hint, never a proof of craftability or permission to place ingredients. Allocation coverage and transfer validation remain unchanged.
+The allocator publishes immutable `CraftingAllocation.GridMatches` after supported evaluation and required native validation. Availability uses the displayed alternative's own score; Name ignores relevance. A zero score gives no grid-relevance ranking advantage. Relevance is a display hint, not proof of craftability or placement permission.
 
-Availability consumes each resolved alternative's own score; it never ranks using another alternative while displaying or dispatching the current one. Name ignores scores for both rows and automatic alternative selection. Criteria changes reuse existing allocation scores without recapturing inventory. Live grid changes use the existing inventory refresh and interaction reconciliation: scores and deficits update, eligible inspected alternatives and row positions remain stable until interaction ends, and scroll is preserved/clamped. Manual and menu-produced inputs contribute equally. No grid-relevance context is saved in browsing state; reopening evaluates current inputs. A failure during relevance evaluation leaves the prior published rows intact.
+Criteria changes reuse allocation scores; grid changes refresh through the normal inventory and interaction paths. Evaluation failures leave the prior published rows intact.
 
-## Tooltip ingredient coverage
+## Dialog lifecycle and state
 
-[RecipeBookTooltip](../VanillaExpanded/src/RecipeBook/RecipeBookTooltip.cs) adds one compact `have/need name` row per requirement beneath the native recipe grid, using the native detail font, smaller than normal tooltip text. Exact ingredient names come from cloned resolved stacks and are rendered as literal richtext components, not parsed markup. Wildcard/tag alternatives use the localized "Matching ingredient" label rather than a misleading single-variant name or raw matching expression; the native grid still cycles acceptable choices. Names wrap to the measured tooltip width. Short count pairs use the native error-text red; satisfied pairs retain the normal text color.
+The book belongs to its inventory dialog and closes with that parent. [GuiElementRecipeBookButton](../VanillaExpanded/src/RecipeBook/GuiElementRecipeBookButton.cs) is anchored to the crafting output slot and reflects the book's actual open state. Explicit opening requests search focus; automatic restoration opens without taking focus from the inventory. An unfocused book does not capture keyboard input or acquire focus during resizing.
 
-Counts describe coverage for **one craft**, not total stock or Shift-placement quantities. Each requirement's have count is its required quantity minus the matching deficit in the selection's authoritative evaluation. Shared/repeated requirements therefore cannot double-count stock, and reusable tools contribute one only when usable under the allocator's durability rules. Unsupported or unevaluated selections omit counts and retain their existing warning; no separate inventory scan or diagnostic prose is added.
+The native titlebar provides two positioning modes:
 
-[GuiElementRecipeBookTooltip](../VanillaExpanded/src/RecipeBook/GuiElementRecipeBookTooltip.cs) caches the semantic summary with the selected recipe identity and unsupported reason. Inventory refresh republishes the inspected selection through the existing tile callback. Changed counts rebuild and dispose the old popup; equivalent summaries retain the popup and native description resources even when allocations are newly captured or surplus stock changes.
+- **Fixed** uses adaptive inventory-relative placement with a two-screen-pixel docking gap.
+- **Movable** uses native dragging and remembered manual coordinates, clamped to the window.
 
-Pointer movement takes precedence over retained tile focus: leaving a recipe tile, including entering a gap or leaving the viewport, hides its tooltip even after clicking or while holding a press. A held press still freezes session ordering until release. Keyboard navigation restores focused-tile inspection until the next pointer movement; inventory refresh cannot resurrect a tooltip while the pointer remains off the tiles.
+Bounds use window-relative coordinates in both modes. The absence of a native saved manual position means Fixed; choosing Fixed clears that position. Fixed placement is computed from layout, not stored as a separate coordinate.
 
-## Verification scope
+Recomposition retains the current session, criteria, selection, and scroll while replacing GUI resources. Dialog replacement instead captures immutable [RecipeBookBrowsingState](../VanillaExpanded/src/RecipeBook/RecipeBookBrowsingState.cs) and restores category, exact search text, sort identity, and GUI-unscaled scroll into a fresh session evaluated against current inventory.
 
-Provider, catalogue-view, interaction, transfer, lifecycle, and rendering regressions live in [the RecipeBook unit tests](../VanillaExpanded.Tests/Unit/RecipeBook/). Run the regression group from the repository root:
+| State | Lifetime |
+| --- | --- |
+| Category, search, sort, and scroll | Retained across dialog reopening/replacement within the loaded world; cleared on world exit or catalogue reinitialization. |
+| Allocations, selected outputs, pins, focus, hover, presses, and filter registrations | Current session/dialog only. |
+| Craftable-only | Off in each fresh dialog. |
+| Reopen with inventory | Native client boolean setting `vanillaexpanded-recipebook-remember-open`, default true. |
+| Movable position | Native per-dialog position persistence. |
+
+The first dialog in a world starts with All, empty search, Availability, and zero scroll. Actual open state and browsing state are not persisted across client sessions. Failed opens do not replace the last successfully captured browsing state.
+
+Automatic reopening is independent of browsing-state restoration. Disabling reopening leaves an open dialog and its criteria intact; explicitly closing the book also disables the reopening preference.
+
+## Controls and layout
+
+The dialog contains category tabs and a framed content panel with the selected category's localized heading, filtering controls, search, a recessed recipe list, and footer controls. The panel has eight-GUI-pixel inner padding.
+
+Composition and minimum-size measurement use shared named dimensions for spacing, margins, and control chrome. Minimum width accommodates the complete category strip and localized headings and controls; minimum height reserves room for the heading and empty-state text. GUI-scaled dimensions are distinct from physical-pixel borders and docking gaps. [RecipeBookLayout](../VanillaExpanded/src/RecipeBook/RecipeBookLayout.cs) owns placement and preferred dialog dimensions; the options component owns popup-width measurement.
+
+Search is the first keyboard tab stop. Native control focus and input routing are preserved, with the category strip acting as one outer tab stop.
+
+### Category tabs
+
+[GuiElementIconTabs](../VanillaExpanded/src/Gui/GuiElementIconTabs.cs) is a crafting-independent icon tab strip owned by a native child composer. [GuiElementIconTab](../VanillaExpanded/src/Gui/GuiElementIconTab.cs) retains native toggle interaction and renders rounded-top folder tabs. The selected tab's open bottom edge joins the dialog's framed content panel; inactive tabs sit lower.
+
+Category selection updates its controller and panel heading and resets recipe scrolling. Localized tooltips and native focus highlighting provide category identification. The Recipe Book reserves width for every tab; the shared component also supports selection wrapping and overflow navigation in narrower hosts.
+
+[RecipeBookCategoryIcons](../VanillaExpanded/src/RecipeBook/RecipeBookCategoryIcons.cs) maps standard categories to monochrome [SVG assets](../VanillaExpanded/assets/vanillaexpanded/textures/gui/recipe-book-categories/); unknown categories use a generic tag. The client owns icon registrations, while each composer owns its rendered textures.
+
+### Search, filtering, and options
+
+[GuiElementRecipeBookSearch](../VanillaExpanded/src/RecipeBook/GuiElementRecipeBookSearch.cs) reserves an inner-right clear icon outside the native text/caret area. Its clear action uses the normal search callback and preserves input focus.
+
+Hide uncraftable and Sort by bind directly to their feature controllers. Their localized tooltips explain craftability and ordering. Recomposition synchronizes controls without invoking change handlers.
+
+[GuiElementRecipeBookOptions](../VanillaExpanded/src/RecipeBook/GuiElementRecipeBookOptions.cs) binds the titlebar's sliders control to the persisted reopening preference. Its dropdown owns its composer and textures, receives input before underlying controls, and dismisses on Escape, outside clicks, or focus loss.
+
+### Recipes and handbook
+
+[GuiElementRecipeBookTiles](../VanillaExpanded/src/RecipeBook/GuiElementRecipeBookTiles.cs) uses one viewport for tile layout, virtualization, clipping, hit testing, and scrolling. The viewport reaches the recessed list frame's inner vertical edges, and scroll/scrollbar positions clamp together as membership changes.
+
+Recipe activation validates the output and recipe identities retained by the press; removal or rebinding cancels it. Mouse and keyboard activation share the session's placement path.
+
+Handbook resolves the visible selected output through the native `handbook` link protocol, preserving relevant stack attributes. It does not place ingredients or change recipe selection. Missing selection or preview disables the button; unavailable protocol handling reports a localized error. The inventory and book stay open while the handbook receives focus.
+
+## Rendering and tooltips
+
+### Texture ownership and clipping
+
+Category icons use identical integer raster/display sizes and pixel-snapped positions with nearest magnification. Hover and selection change tint without moving or resizing icons. Tab backgrounds share the panel's snapped baseline. Composers dispose their textures when replaced or closed.
+
+Recipe tile backgrounds, icons, and output counts render inside the shared viewport scissor. Scissor scopes unwind on failure. Tile quads and scissors use matching pixel bounds; availability borders occupy the outer edge. Recipe overlays render below dropdowns and tooltips.
+
+[RecipeBookIconCache](../VanillaExpanded/src/RecipeBook/RecipeBookIconCache.cs) is world-owned. It records missing previews during GUI preparation and submits baking requests in the Before render stage through native `RenderItemStackToAtlas`. The cap of four outstanding requests includes both pending and natively queued work. Native atlas rendering owns framebuffer and shader operations; previews can remain pending for two GUI frames.
+
+Texture reload invalidates cached work, and late callbacks release results whose owners no longer exist. Submission failures propagate and leave the request retryable. World cleanup unregisters the renderer and releases its resources.
+
+### Ingredient coverage and inspection
+
+[RecipeBookTooltip](../VanillaExpanded/src/RecipeBook/RecipeBookTooltip.cs) combines the native recipe grid with one compact `have/need name` row per requirement. Coverage describes one craft and comes from authoritative evaluation deficits, so repeated/shared requirements cannot double-count stock. Reusable tools count only when usable under allocation rules.
+
+Exact names use cloned resolved stacks rendered as literal richtext. Wildcard/tag requirements use the localized Matching ingredient label while the grid cycles accepted choices. Counts below requirement use the native error tint. Unsupported or unevaluated selections omit coverage counts.
+
+[GuiElementRecipeBookTooltip](../VanillaExpanded/src/RecipeBook/GuiElementRecipeBookTooltip.cs) caches the semantic summary. Changed counts replace the popup; equivalent summaries retain it. Pointer movement takes precedence over retained tile focus, so leaving a tile hides inspection. Keyboard navigation restores focused-tile inspection until the next pointer movement.
+
+## Verification
+
+[Recipe Book unit tests](../VanillaExpanded.Tests/Unit/RecipeBook/) cover filtering, ordering, allocation, transfer, lifecycle, and rendering. [GUI unit tests](../VanillaExpanded.Tests/Unit/Gui/) cover the shared category tab component. From the repository root:
 
 ```powershell
-dotnet test .\VanillaExpanded.Tests\VanillaExpanded.Tests.csproj --no-restore --filter "FullyQualifiedName~RecipeBook" --verbosity minimal
+dotnet test .\VanillaExpanded.Tests\VanillaExpanded.Tests.csproj --no-restore --filter "FullyQualifiedName~RecipeBook|FullyQualifiedName~GuiElementIconTabsTests" --verbosity minimal
 ```
 
-These tests include native GUI fixtures, not a running game. Automated results and source review do not certify live control/layout behavior, inventory transitions in a running world, multiplayer, or recipe/modpack compatibility. Live-game validation of the provider-based filtering and craftable-only control remains pending; the earlier wooden-planks smoke test covered placement before these additions.
+Native GUI fixtures run without a live game or GPU context. Live-world layout, inventory transitions, multiplayer behavior, and recipe/modpack compatibility require separate in-game validation.

@@ -6,6 +6,10 @@ namespace VanillaExpanded.RecipeBook;
 
 internal static class RecipeBookLayout
 {
+    internal const double PreferredWidth = 320;
+    internal const double PreferredHeight = 420;
+    private const double DockGapPixels = 2;
+
     internal static ElementBounds? Place(ElementBounds parent, ElementBounds inputs,
         ElementBounds output, ElementBounds window, double minimumWidth, double minimumHeight)
     {
@@ -19,7 +23,7 @@ internal static class RecipeBookLayout
         double gridTop = Math.Min(inputs.absY, output.absY) / scale;
         double gridRight = Math.Max(inputs.absX + inputs.OuterWidth, output.absX + output.OuterWidth) / scale;
         double gridBottom = Math.Max(inputs.absY + inputs.OuterHeight, output.absY + output.OuterHeight) / scale;
-        double gap = 2 / scale;
+        double gap = DockGapPixels / scale;
         var spaces = new[]
         {
             ElementBounds.Fixed(right + gap, 0, width - right - gap, height),
@@ -31,8 +35,8 @@ internal static class RecipeBookLayout
         };
         foreach (var space in spaces.Where(space => space.fixedWidth >= minimumWidth && space.fixedHeight >= minimumHeight))
         {
-            double w = Math.Min(Math.Max(320, minimumWidth), space.fixedWidth);
-            double h = Math.Min(Math.Max(420, minimumHeight), space.fixedHeight);
+            double w = Math.Min(Math.Max(PreferredWidth, minimumWidth), space.fixedWidth);
+            double h = Math.Min(Math.Max(PreferredHeight, minimumHeight), space.fixedHeight);
             double x = Math.Clamp(px < space.fixedX ? space.fixedX : space.fixedX + space.fixedWidth - w, 0, width - w);
             double y = Math.Clamp(py, space.fixedY, space.fixedY + space.fixedHeight - h);
             return ElementBounds.Fixed(x, y, w, h).WithParent(window);

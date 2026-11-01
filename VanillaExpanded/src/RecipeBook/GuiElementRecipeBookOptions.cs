@@ -7,6 +7,8 @@ namespace VanillaExpanded.RecipeBook;
 
 internal sealed class GuiElementRecipeBookOptions : GuiElement
 {
+    internal const double IconSize = 17;
+    private const double PopupControlWidth = 40;
     private readonly IconRendererDelegate icon;
     private readonly PopupCheckbox checkbox;
     private readonly ElementBounds popupBounds;
@@ -34,7 +36,7 @@ internal sealed class GuiElementRecipeBookOptions : GuiElement
             new AssetLocation("vanillaexpanded:textures/gui/recipe-book-options.svg")));
         var font = CairoFont.WhiteSmallText();
         string label = Lang.Get("vanillaexpanded:recipebook-remember-open");
-        double width = System.Math.Ceiling(font.GetTextExtents(label).Width / scaled(1) + 40);
+        double width = MeasurePopupWidth(font, label);
         popupBounds = ElementBounds.Fixed(bounds.fixedWidth - width, bounds.fixedHeight, width, 30).WithParent(bounds);
         bounds.WithChild(popupBounds);
         checkbox = new PopupCheckbox(api, CommitPreference,
@@ -45,10 +47,13 @@ internal sealed class GuiElementRecipeBookOptions : GuiElement
         hoverTexture = new LoadedTexture(api);
     }
 
+    internal static double MeasurePopupWidth(CairoFont font, string label) =>
+        System.Math.Ceiling(font.GetTextExtents(label).Width / scaled(1) + PopupControlWidth);
+
     public override void ComposeElements(Context ctx, ImageSurface surface)
     {
         Bounds.CalcWorldBounds();
-        int size = iconSize = System.Math.Max(1, (int)System.Math.Round(scaled(17), System.MidpointRounding.AwayFromZero));
+        int size = iconSize = System.Math.Max(1, (int)System.Math.Round(scaled(IconSize), System.MidpointRounding.AwayFromZero));
         using var iconSurface = new ImageSurface(Format.Argb32, size, size);
         using var iconContext = genContext(iconSurface);
         icon(iconContext, 0, 0, size, size, GuiStyle.DialogDefaultTextColor);
