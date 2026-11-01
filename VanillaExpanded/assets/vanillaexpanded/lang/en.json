@@ -95,6 +95,7 @@
   "recipebook-search": "Search outputs...",
   "recipebook-ingredient-choice": "Matching ingredient",
   "recipebook-sort": "Sort by",
+  "recipebook-sort-hint": "Availability prioritizes supported recipes using more distinct items from your crafting grid, then ingredient availability. Name sorts outputs alphabetically. Your category, search, and Hide uncraftable filters still apply.",
   "recipebook-sort-availability": "Availability",
   "recipebook-sort-name": "Name",
   "recipebook-craftable-only": "Hide uncraftable",

@@ -191,6 +191,9 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
                     tiles.ResetScroll();
                     session.Sort.Select(id);
                 }, sortBounds, CairoFont.WhiteDetailText(), "sort")
+            .AddHoverText(Lang.Get("vanillaexpanded:recipebook-sort-hint"), CairoFont.WhiteSmallText(),
+                300, ElementBounds.Fixed(0, sortTop, sortBounds.fixedX + sortBounds.fixedWidth, craftableHeight),
+                "sort-hint")
             .BeginClip(viewport)
                 .AddInteractiveElement(tiles, "tiles")
             .EndClip()

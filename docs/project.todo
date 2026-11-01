@@ -5,7 +5,7 @@
         
     ## Recipe Book:
         ☑ "hide uncraftable" controls needs a tooltip to describe the functionality.
-        ☐ "sort by" controls needs a tooltip to describe the functionality.
+        ☑ "sort by" controls needs a tooltip to describe the functionality.
         ☐ recipe menus titlebar should have a little "options" button for additional settings and controls. the first setting should be the option for "remember recipe menu open state".
         ☑ Design the "Show recipes using this/these items" functionality. which should function by the player placing items into their grid and then the recipe book increses the sorting priority of relevant recipes.
         ☑ Add a craftable-only toggle that shows recipes whose ingredients are currently available, independently combining with category and search filters.
