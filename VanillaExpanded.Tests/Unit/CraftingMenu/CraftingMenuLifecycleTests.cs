@@ -1484,7 +1484,7 @@ public sealed class CraftingMenuLifecycleTests
             .Max(key => originalComposer.GetButton(key).Bounds.OuterWidth / scale);
         double sortWidth = 16 + originalComposer.GetElement("sort-label").Bounds.OuterWidth / scale + 8 + 40
             + originalComposer.GetDropDown("sort").listMenu.Names
-                .Max(name => CairoFont.WhiteSmallText().GetTextExtents(name).Width / scale);
+                .Max(name => originalComposer.GetDropDown("sort").Font.GetTextExtents(name).Width / scale);
         double minimumWidth = Math.Ceiling(Math.Max(sortWidth,
             Math.Max(actionWidth, Math.Max(craftableWidth, Math.Max(footerWidth, titleWidth)))));
         double textHeight = Math.Ceiling(new[] { "empty", "empty-search", "empty-craftable", "empty-craftable-search" }
@@ -1538,11 +1538,15 @@ public sealed class CraftingMenuLifecycleTests
             var handbook = composer.GetButton("handbook");
             double scale = GuiElement.scaled(1);
             Assert.True(title.Bounds.absY + title.Bounds.OuterHeight + 8 * scale <= tabs.absY + .001);
-            Assert.True(tabs.absY + tabs.OuterHeight + 8 * scale <= search.absY + .001);
-            Assert.True(search.absY + search.OuterHeight + 8 * scale <= craftable.Bounds.absY + .001);
+            Assert.True(tabs.absY + tabs.OuterHeight + 8 * scale <= craftable.Bounds.absY + .001);
             Assert.True(craftable.Bounds.absY + craftable.Bounds.OuterHeight + 8 * scale <= sort.Bounds.absY + .001);
             Assert.True(sortLabel.absX + sortLabel.OuterWidth + 8 * scale <= sort.Bounds.absX + .001);
-            Assert.True(sort.Bounds.absY + sort.Bounds.OuterHeight + 8 * scale <= viewport.absY + .001);
+            Assert.True(sort.Bounds.absY + sort.Bounds.OuterHeight + 8 * scale <= search.absY + .001);
+            Assert.True(search.absY + search.OuterHeight + 8 * scale <= viewport.absY + .001);
+            Assert.True(craftable.Bounds.OuterHeight < search.OuterHeight);
+            Assert.True(sort.Bounds.OuterHeight < search.OuterHeight);
+            Assert.True(sort.Font.UnscaledFontsize < composer.GetTextInput("search").Font.UnscaledFontsize);
+            Assert.True(craftableLabel.Font.UnscaledFontsize < composer.GetTextInput("search").Font.UnscaledFontsize);
             Assert.All(sort.listMenu.Names, name =>
                 Assert.True(sort.Font.GetTextExtents(name).Width + 40 * scale <= sort.Bounds.InnerWidth + .001));
             Assert.Equal(craftable.Bounds.InnerWidth, craftable.Bounds.InnerHeight, 4);

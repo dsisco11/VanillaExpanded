@@ -23,6 +23,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
     private double searchHeight;
     private double craftableHeight;
     private double sortLabelWidth;
+    private double sortValueWidth;
     private double tabsHeight;
     private double footerHeight;
     private double previousWidth;
@@ -125,19 +126,19 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         double contentTop = GuiStyle.TitleBarHeight + 8;
         var content = ElementBounds.Fixed(8, contentTop, width - 16, height - contentTop - 8);
         var tabsBounds = ElementBounds.Fixed(0, 0, content.fixedWidth, tabsHeight);
-        var searchBounds = ElementBounds.Fixed(0, tabsHeight + 8, content.fixedWidth, searchHeight);
-        var craftableBounds = ElementBounds.Fixed(0, searchBounds.fixedY + searchHeight + 8,
+        var craftableBounds = ElementBounds.Fixed(0, tabsHeight + 8,
             craftableHeight, craftableHeight);
-        double textHeight = CairoFont.WhiteSmallText().GetFontExtents().Height / GuiElement.scaled(1);
+        double textHeight = CairoFont.WhiteDetailText().GetFontExtents().Height / GuiElement.scaled(1);
         var craftableLabel = ElementBounds.Fixed(craftableHeight + 8,
             craftableBounds.fixedY + (craftableHeight - textHeight) / 2,
             content.fixedWidth - craftableHeight - 8, textHeight);
         double sortTop = craftableBounds.fixedY + craftableHeight + 8;
         var sortLabel = ElementBounds.Fixed(0, sortTop + (craftableHeight - textHeight) / 2, sortLabelWidth, textHeight);
         var sortBounds = ElementBounds.Fixed(sortLabelWidth + 8, sortTop,
-            content.fixedWidth - sortLabelWidth - 8, craftableHeight);
+            sortValueWidth, craftableHeight);
+        var searchBounds = ElementBounds.Fixed(0, sortTop + craftableHeight + 8, content.fixedWidth, searchHeight);
         var footer = ElementBounds.Fixed(0, content.fixedHeight - footerHeight, content.fixedWidth, footerHeight);
-        double listTop = sortTop + craftableHeight + 8;
+        double listTop = searchBounds.fixedY + searchHeight + 8;
         var viewport = ElementBounds.Fixed(0, listTop, content.fixedWidth - 16, footer.fixedY - 10 - listTop);
         var scrollBounds = ElementBounds.Fixed(0, viewport.fixedY, 12, viewport.fixedHeight).FixedRightOf(viewport, 4);
         var previous = ElementBounds.Fixed(0, 0, previousWidth, footerHeight);
@@ -172,9 +173,9 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
                 tiles.ResetScroll();
                 session.CraftableOnly.SetEnabled(enabled);
             }, craftableBounds, "craftable-only", size: craftableHeight)
-            .AddStaticText(Lang.Get("vanillaexpanded:craftingmenu-craftable-only"), CairoFont.WhiteSmallText(),
+            .AddStaticText(Lang.Get("vanillaexpanded:craftingmenu-craftable-only"), CairoFont.WhiteDetailText(),
                 craftableLabel, "craftable-label")
-            .AddStaticText(Lang.Get("vanillaexpanded:craftingmenu-sort"), CairoFont.WhiteSmallText(),
+            .AddStaticText(Lang.Get("vanillaexpanded:craftingmenu-sort"), CairoFont.WhiteDetailText(),
                 sortLabel, "sort-label")
             .AddDropDown(session.Sort.Orders.Select(order => order.Id).ToArray(),
                 session.Sort.Orders.Select(order => Lang.Get(order.NameKey)).ToArray(),
@@ -183,7 +184,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
                     if (session.Sort.Selected.Id == id) return;
                     tiles.ResetScroll();
                     session.Sort.Select(id);
-                }, sortBounds, "sort")
+                }, sortBounds, CairoFont.WhiteDetailText(), "sort")
             .BeginClip(viewport)
                 .AddInteractiveElement(tiles, "tiles")
             .EndClip()
@@ -233,6 +234,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         double scale = GuiElement.scaled(1);
         var buttonFont = CairoFont.SmallButtonText();
         var textFont = CairoFont.WhiteSmallText();
+        var filterFont = CairoFont.WhiteDetailText();
         previousWidth = Math.Max(24, Math.Ceiling(buttonFont.GetTextExtents("<").Width / scale + 1));
         autoWidth = Math.Max(46, Math.Ceiling(buttonFont.GetTextExtents(
             Lang.Get("vanillaexpanded:craftingmenu-auto")).Width / scale + 1));
@@ -246,17 +248,18 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         footerHeight = Math.Max(24, Math.Ceiling(Math.Max(buttonFont.GetFontExtents().Height,
             textFont.GetFontExtents().Height) / scale));
         searchHeight = Math.Max(26, Math.Ceiling(textFont.GetFontExtents().Height / scale + 6));
-        craftableHeight = Math.Max(26, Math.Ceiling(textFont.GetFontExtents().Height / scale + 8));
+        craftableHeight = Math.Max(20, Math.Ceiling(filterFont.GetFontExtents().Height / scale + 4));
         tabsHeight = GuiElementIconTabs.TabSize + 2;
         double counterWidth = Math.Ceiling(textFont.GetTextExtents("1/1").Width / scale + 1);
         double titleWidth = textFont.GetTextExtents(Lang.Get("vanillaexpanded:craftingmenu-title")).Width / scale;
         // The native title bar reserves space for its menu and close icons.
         double titleControlsWidth = 2 * GuiElementDialogTitleBar.unscaledCloseIconSize + 2 + 20;
-        double craftableWidth = 16 + craftableHeight + 8 + textFont.GetTextExtents(
+        double craftableWidth = 16 + craftableHeight + 8 + filterFont.GetTextExtents(
             Lang.Get("vanillaexpanded:craftingmenu-craftable-only")).Width / scale;
-        sortLabelWidth = Math.Ceiling(textFont.GetTextExtents(Lang.Get("vanillaexpanded:craftingmenu-sort")).Width / scale + 1);
-        double sortWidth = 16 + sortLabelWidth + 8 + 40 + session.Sort.Orders
-            .Max(order => textFont.GetTextExtents(Lang.Get(order.NameKey)).Width / scale);
+        sortLabelWidth = Math.Ceiling(filterFont.GetTextExtents(Lang.Get("vanillaexpanded:craftingmenu-sort")).Width / scale + 1);
+        sortValueWidth = Math.Ceiling(40 + session.Sort.Orders
+            .Max(order => filterFont.GetTextExtents(Lang.Get(order.NameKey)).Width / scale));
+        double sortWidth = 16 + sortLabelWidth + 8 + sortValueWidth;
         minimumWidth = Math.Ceiling(Math.Max(sortWidth, Math.Max(32 + Math.Max(clearSearchWidth, showUncraftableWidth),
             Math.Max(craftableWidth, Math.Max(
             GuiStyle.ElementToDialogPadding + titleWidth + 8 + titleControlsWidth,
@@ -266,8 +269,8 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
             .Where(state => state != CraftingMenuEmptyState.None)
             .Max(state => textUtil.GetMultilineTextHeight(textFont, Lang.Get(EmptyMessageKey(state)),
                 (minimumWidth - 32) * scale)) / scale);
-        minimumHeight = Math.Ceiling(GuiStyle.TitleBarHeight + 8 + tabsHeight + 8 + searchHeight + 8 + craftableHeight + 8
-            + craftableHeight + 8
+        minimumHeight = Math.Ceiling(GuiStyle.TitleBarHeight + 8 + tabsHeight + 8 + craftableHeight + 8
+            + craftableHeight + 8 + searchHeight + 8
             + Math.Max(GuiElementCraftingTiles.TileSize, emptyTextHeight + 8 + footerHeight) + 10 + footerHeight + 8);
     }
 
