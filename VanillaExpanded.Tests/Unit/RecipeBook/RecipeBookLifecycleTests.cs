@@ -1922,7 +1922,7 @@ public sealed class RecipeBookLifecycleTests
             Assert.True(next.absX + next.OuterWidth + 4 * scale <= counter.absX + .001);
             Assert.True(counter.absX + counter.OuterWidth + 4 * scale <= handbook.Bounds.absX + .001);
             Assert.True(CairoFont.SmallButtonText().GetTextExtents(Lang.Get("vanillaexpanded:recipebook-handbook")).Width
-                <= handbook.Bounds.InnerWidth + .001);
+                + 16 * scale <= handbook.Bounds.InnerWidth + .001);
             double titleTextRight = title.Bounds.absX + GuiElement.scaled(GuiStyle.ElementToDialogPadding)
                 + title.Font.GetTextExtents(title.GetText()).Width;
             double titleMenuLeft = title.Bounds.absX + title.Bounds.OuterWidth

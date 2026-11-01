@@ -265,7 +265,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
             Lang.Get("vanillaexpanded:recipebook-auto")).Width / scale + 1));
         nextWidth = Math.Max(24, Math.Ceiling(buttonFont.GetTextExtents(">").Width / scale + 1));
         handbookWidth = Math.Max(70, Math.Ceiling(buttonFont.GetTextExtents(
-            Lang.Get("vanillaexpanded:recipebook-handbook")).Width / scale + 1));
+            Lang.Get("vanillaexpanded:recipebook-handbook")).Width / scale + 2 * 8 + 1));
         clearSearchWidth = Math.Ceiling(buttonFont.GetTextExtents(
             Lang.Get("vanillaexpanded:recipebook-clear-search")).Width / scale + 1);
         showUncraftableWidth = Math.Ceiling(buttonFont.GetTextExtents(

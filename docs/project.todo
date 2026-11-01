@@ -4,10 +4,10 @@
         ☐ Design a better separation of alloy calculator inventory ownership/liveness validation, transfer permissions, and storage-versus-machine access policy. Reconsider the storage-class whitelist without weakening ownership or withdrawal checks, and define coverage for vanilla and modded containers.
         
     ## Recipe Book:
-        ☐ BUG: recipe book should allow repositioning the dialog when its set to "movable".
         ☐ Recipe book should include a new "docked" mode in its list of titlebar positioning options (the dropdown with "fixed" & "moveable").
+        ☐ BUG: recipe book should allow repositioning the dialog when its set to "movable".
         ☑ recipes list box has no background or border styling, making it visually blend with the rest of the dialog.
-        ☐ "Handbook" button has no left/right padding for its text.
+        ☑ "Handbook" button has no left/right padding for its text.
         ☐ Redesign recipe-menu tabs to look more like nice tabs and less like plain buttons.
         ☑ "hide uncraftable" controls needs a tooltip to describe the functionality.
         ☑ "sort by" controls needs a tooltip to describe the functionality.
