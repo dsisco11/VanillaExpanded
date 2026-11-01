@@ -8,7 +8,7 @@ namespace VanillaExpanded.RecipeBook;
 // Native icon buttons do not hide or suppress activation when disabled.
 internal sealed class GuiElementRecipeBookButton(ICoreClientAPI api, string icon,
     Action<bool> onClick, ElementBounds bounds)
-    : GuiElementToggleButton(api, icon, "", CairoFont.WhiteDetailText(), onClick, bounds)
+    : GuiElementToggleButton(api, icon, "", CairoFont.WhiteDetailText(), onClick, bounds, true)
 {
     internal GuiElementHoverText Hint { get; } = new(api, Lang.Get("vanillaexpanded:recipebook-toggle"),
         CairoFont.WhiteSmallText(), 160, bounds);
@@ -33,9 +33,6 @@ internal sealed class GuiElementRecipeBookButton(ICoreClientAPI api, string icon
 
     public override void BeforeCalcBounds()
     {
-        // Anchor to the outer frame, not the dialog's padded content area.
-        Bounds.fixedX = -1 - Bounds.fixedWidth - Bounds.ParentBounds.fixedPaddingX;
-        Bounds.fixedY = 8 - Bounds.ParentBounds.fixedPaddingY;
         base.BeforeCalcBounds();
         Hint.BeforeCalcBounds();
     }

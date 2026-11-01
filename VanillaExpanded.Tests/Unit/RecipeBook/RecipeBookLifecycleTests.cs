@@ -1105,7 +1105,7 @@ public sealed class RecipeBookLifecycleTests
         var button = f.ToggleButton;
         Assert.Empty(button.GetText());
         Assert.Equal("vanillaexpanded-recipe-book", button.icon);
-        Assert.False(button.Toggleable);
+        Assert.True(button.Toggleable);
         Assert.Equal(28 * scale, button.Bounds.InnerWidth, 4);
         Assert.Equal(button.Bounds.InnerWidth, button.Bounds.InnerHeight, 4);
         AssertBookTabPosition(f);
@@ -1124,19 +1124,22 @@ public sealed class RecipeBookLifecycleTests
         f.Parent.TryOpen();
         f.Toggle();
         Assert.True(Assert.Single(f.Menus).IsOpened());
-        f.AssertOpenerInvisible();
+        f.AssertToggleOpen();
         Assert.True(Assert.Single(f.Menus).IsOpened());
-        f.ClickCloseButton(Assert.Single(f.Menus));
+        f.Toggle();
         Assert.Empty(f.Menus);
         Assert.True(button.Visible);
+        Assert.False(button.On);
         button.OnFocusGained();
         var enter = new KeyEvent { KeyCode = (int)GlKeys.Enter };
         button.OnKeyDown(f.Lifecycle.Api.Object, enter);
         Assert.True(enter.Handled);
         Assert.True(Assert.Single(f.Menus).IsOpened());
-        Assert.False(button.HasFocus);
-        f.AssertOpenerInvisible();
-        f.ClickCloseButton(Assert.Single(f.Menus));
+        f.AssertToggleOpen();
+        button.OnFocusGained();
+        var close = new KeyEvent { KeyCode = (int)GlKeys.Enter };
+        button.OnKeyDown(f.Lifecycle.Api.Object, close);
+        Assert.True(close.Handled);
         Assert.Empty(f.Menus);
         Assert.True(button.Visible);
         Assert.False(button.On);
@@ -1146,7 +1149,7 @@ public sealed class RecipeBookLifecycleTests
     [InlineData(1)]
     [InlineData(1.5)]
     [InlineData(2)]
-    public void BookTabStaysAttachedToLeftEdgeNearTopWhenParentMovesResizesAndRecomposes(float scale)
+    public void BookToggleStaysLeftOfOutputSlotWhenParentAndOutputMoveResizeAndRecompose(float scale)
     {
         using var f = new MenuFixture(scale: scale);
         AssertBookTabPosition(f);
@@ -1166,6 +1169,13 @@ public sealed class RecipeBookLifecycleTests
         composer.Bounds.MarkDirtyRecursive();
         composer.Bounds.CalcWorldBounds();
         AssertBookTabPosition(f);
+        var output = composer.GetElement("outputslot").Bounds;
+        output.fixedX += 24;
+        output.fixedY += 16;
+        output.fixedHeight += 16;
+        composer.Bounds.MarkDirtyRecursive();
+        composer.ReCompose();
+        AssertBookTabPosition(f);
         f.Recompose();
         AssertBookTabPosition(f);
         f.Parent.TryOpen();
@@ -1178,9 +1188,12 @@ public sealed class RecipeBookLifecycleTests
         var composer = f.Parent.Composers["maininventory"];
         var button = f.ToggleButton.Bounds;
         var hint = f.ToggleButton.Hint.Bounds;
-        Assert.Equal(composer.Bounds.absX - GuiElement.scaled(1), button.absX + button.OuterWidth, 4);
-        Assert.Equal(composer.Bounds.absY + GuiElement.scaled(8), button.absY, 4);
-        Assert.True(button.absX < composer.Bounds.absX);
+        var output = composer.GetElement("outputslot").Bounds;
+        var inputs = composer.GetElement("craftinggrid").Bounds;
+        Assert.Same(output, button.ParentBounds);
+        Assert.Equal(output.absX - GuiElement.scaled(4), button.absX + button.OuterWidth, 4);
+        Assert.Equal(output.absY + output.InnerHeight / 2, button.absY + button.InnerHeight / 2, 4);
+        Assert.True(button.absY >= inputs.absY + inputs.OuterHeight);
         Assert.Equal(button.absX, hint.absX, 4);
         Assert.Equal(button.absY, hint.absY, 4);
         Assert.Equal(button.OuterWidth, hint.OuterWidth, 4);
@@ -1197,17 +1210,18 @@ public sealed class RecipeBookLifecycleTests
         Assert.Empty(f.Menus);
         Assert.True(f.ToggleButton.Visible);
         Assert.True(f.ToggleButton.Focusable);
+        Assert.False(f.ToggleButton.On);
         f.ResizePanelSpace(320, 420);
         f.Toggle();
         Assert.True(Assert.Single(f.Menus).IsOpened());
-        f.AssertOpenerInvisible();
+        f.AssertToggleOpen();
     }
 
     [Theory]
     [InlineData(1)]
     [InlineData(1.5)]
     [InlineData(2)]
-    public void OpeningReleaseOverNewCloseButtonDoesNotImmediatelyCloseMenu(float scale)
+    public void OpeningReleaseDoesNotImmediatelyToggleTheRecipeBookClosed(float scale)
     {
         using var f = new MenuFixture(scale: scale);
         f.Parent.TryOpen();
@@ -1218,21 +1232,16 @@ public sealed class RecipeBookLifecycleTests
         f.Parent.OnMouseDown(down);
         Assert.True(down.Handled);
         var menu = Assert.Single(f.Menus);
-        var titlebar = menu.SingleComposer.GetTitleBar("titlebar");
-        Assert.InRange(x - titlebar.Bounds.absX,
-            titlebar.Bounds.OuterWidth - GuiElement.scaled(GuiElementDialogTitleBar.unscaledCloseIconSize + 12),
-            titlebar.Bounds.OuterWidth - GuiElement.scaled(10));
-        Assert.InRange(y - titlebar.Bounds.absY, GuiElement.scaled(5), GuiElement.scaled(22));
         var up = new MouseEvent(x, y, EnumMouseButton.Left, 0);
         menu.OnMouseUp(up);
         f.Parent.OnMouseUp(up);
         Assert.Same(menu, Assert.Single(f.Menus));
         Assert.True(menu.IsOpened());
-        f.AssertOpenerInvisible();
-        menu.OnMouseDown(new MouseEvent(x, y, EnumMouseButton.Left, 0));
-        menu.OnMouseUp(new MouseEvent(x, y, EnumMouseButton.Left, 0));
+        f.AssertToggleOpen();
+        f.Toggle();
         Assert.Empty(f.Menus);
         Assert.True(f.ToggleButton.Visible);
+        Assert.False(f.ToggleButton.On);
     }
 
     [Fact]
@@ -1742,7 +1751,7 @@ public sealed class RecipeBookLifecycleTests
             var restored = Assert.Single(f.Menus);
             Assert.NotSame(first, restored);
             Assert.True(restored.IsOpened());
-            f.AssertOpenerInvisible();
+            f.AssertToggleOpen();
             f.Lifecycle.Drain();
             Assert.Same(restored, Assert.Single(f.Menus));
             first = restored;
@@ -2090,7 +2099,7 @@ public sealed class RecipeBookLifecycleTests
         f.Parent.TryClose();
         f.Parent.TryOpen();
         Assert.True(Assert.Single(f.Menus).IsOpened());
-        f.AssertOpenerInvisible();
+        f.AssertToggleOpen();
     }
 
     [Theory]
@@ -2120,7 +2129,7 @@ public sealed class RecipeBookLifecycleTests
             Assert.True(restored.IsOpened());
             f.Lifecycle.Drain();
             Assert.Same(restored, Assert.Single(f.Menus));
-            f.AssertOpenerInvisible();
+            f.AssertToggleOpen();
         }
     }
 
@@ -2144,7 +2153,7 @@ public sealed class RecipeBookLifecycleTests
             Assert.NotSame(menu, Assert.Single(f.Menus));
             f.Lifecycle.Drain();
             Assert.True(Assert.Single(f.Menus).IsOpened());
-            f.AssertOpenerInvisible();
+            f.AssertToggleOpen();
         }
     }
 
@@ -2227,21 +2236,29 @@ public sealed class RecipeBookLifecycleTests
         Assert.True(menu.CaptureAllInputs());
     }
 
-    [Fact]
-    public void ExplicitlyClosingTheMenuKeepsItClosedWhenTheParentReopens()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ExplicitlyClosingTheMenuKeepsItClosedWhenTheParentReopens(bool toggleOff)
     {
         using var f = new MenuFixture();
         f.Parent.TryOpen();
         f.Toggle();
         var menu = Assert.Single(f.Menus);
-        f.ClickCloseButton(menu);
+        menu.SingleComposer.GetTextInput("search").SetValue("remembered search");
+        if (toggleOff) f.Toggle();
+        else f.ClickCloseButton(menu);
         Assert.Empty(f.Menus);
         Assert.True(f.ToggleButton.Visible);
+        Assert.False(f.ToggleButton.On);
         f.Parent.TryClose();
         f.Parent.TryOpen();
         Assert.Empty(f.Menus);
         f.Toggle();
-        Assert.True(Assert.Single(f.Menus).IsOpened());
+        var reopened = Assert.Single(f.Menus);
+        Assert.True(reopened.IsOpened());
+        Assert.Equal("remembered search", reopened.SingleComposer.GetTextInput("search").GetText());
+        f.AssertToggleOpen();
     }
 
     [Fact]
@@ -2258,7 +2275,7 @@ public sealed class RecipeBookLifecycleTests
         f.Lifecycle.Drain();
         var restored = Assert.Single(f.Menus);
         Assert.NotSame(first, restored);
-        f.AssertOpenerInvisible();
+        f.AssertToggleOpen();
         f.Parent.TryClose();
         f.Parent.TryOpen();
         Assert.True(Assert.Single(f.Menus).IsOpened());
@@ -2670,7 +2687,7 @@ public sealed class RecipeBookLifecycleTests
             composer.AddStaticElement(new GuiElementParent(Lifecycle.Api.Object,
                 ElementBounds.Fixed(20, 50, 144, 144)), "craftinggrid");
             composer.AddStaticElement(new GuiElementParent(Lifecycle.Api.Object,
-                ElementBounds.Fixed(180, 90, 48, 48)), "outputslot");
+                ElementBounds.Fixed(72, 214, 48, 48)), "outputslot");
             Lifecycle.System.Attach(Parent, composer);
             Parent.Composers["maininventory"] = composer;
         }
@@ -2732,7 +2749,7 @@ public sealed class RecipeBookLifecycleTests
             ToggleButton.OnMouseDownOnElement(Lifecycle.Api.Object, mouse);
             Assert.False(mouse.Handled);
             Parent.OnMouseDown(mouse);
-            Assert.False(mouse.Handled);
+            Assert.Empty(Menus);
             ToggleButton.OnFocusGained();
             var enter = new KeyEvent { KeyCode = (int)GlKeys.Enter };
             ToggleButton.OnKeyDown(Lifecycle.Api.Object, enter);
@@ -2744,6 +2761,19 @@ public sealed class RecipeBookLifecycleTests
             hint.RenderInteractiveElements(0);
             Assert.False(hint.IsVisible);
             Assert.False(hint.IsNowShown);
+        }
+
+        internal void AssertToggleOpen()
+        {
+            Assert.True(ToggleButton.Visible);
+            Assert.True(ToggleButton.Enabled);
+            Assert.True(ToggleButton.Focusable);
+            Assert.True(ToggleButton.On);
+            var bounds = ToggleButton.Bounds;
+            Assert.True(ToggleButton.IsPositionInside((int)(bounds.absX + 5), (int)(bounds.absY + 5)));
+            graphics.Render.Invocations.Clear();
+            ToggleButton.RenderInteractiveElements(0);
+            Assert.NotEmpty(graphics.Render.Invocations);
         }
 
         internal void ResizePanelSpace(double width, double height)

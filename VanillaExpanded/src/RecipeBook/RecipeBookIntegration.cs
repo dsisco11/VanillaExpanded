@@ -81,7 +81,7 @@ public sealed class RecipeBookSystem : ModSystem, ILiveConfigurable
         foreach (var attachment in attachments.Values)
         {
             attachment.Composer.GetToggleButton("vanillaexpanded-crafting-toggle").Enabled = false;
-            SetOpenerVisible(attachment.Composer, false);
+            SetOpenerState(attachment.Composer, false);
         }
         Dispose();
     }
@@ -95,6 +95,12 @@ public sealed class RecipeBookSystem : ModSystem, ILiveConfigurable
             is not InventoryCraftingGrid grid || grid.Count != 10)
         {
             api.Logger.Warning("[VanillaExpanded] Recipe book requires the native 3x3 crafting grid.");
+            return;
+        }
+        var output = composer.GetElement("outputslot")?.Bounds;
+        if (output == null)
+        {
+            api.Logger.Warning("[VanillaExpanded] Recipe book requires the native crafting output slot.");
             return;
         }
         if (bookIcon == null)
@@ -111,11 +117,19 @@ public sealed class RecipeBookSystem : ModSystem, ILiveConfigurable
             categoryIcons.Add(id, icon);
             api.Gui.Icons.CustomIcons[id] = icon;
         }
-        var buttonBounds = ElementBounds.Fixed(0, 0, 28, 28);
-        composer.AddInteractiveElement(new GuiElementRecipeBookButton(api, BookIcon, _ =>
+        var buttonBounds = ElementBounds.Fixed(-32, 0, 28, 28)
+            .WithAlignment(EnumDialogArea.LeftMiddle).WithParent(output);
+        output.WithChild(buttonBounds);
+        composer.AddInteractiveElement(new GuiElementRecipeBookButton(api, BookIcon, on =>
         {
             if (!VanillaExpandedModSystem.Config.EnableRecipeBook) return;
-            Open(parent, composer);
+            if (on) Open(parent, composer);
+            else
+            {
+                rememberOpen = false;
+                Close(parent);
+            }
+            SetOpenerState(composer, dialogs.TryGetValue(parent, out var dialog) && dialog.IsOpened());
         }, buttonBounds)
         {
             Enabled = VanillaExpandedModSystem.Config.EnableRecipeBook
@@ -168,21 +182,22 @@ public sealed class RecipeBookSystem : ModSystem, ILiveConfigurable
             if (opened) browsingState = dialog.BrowsingState;
             dialogs.Remove(parent);
             if (attachments.TryGetValue(parent, out var attachment) && ReferenceEquals(attachment.Composer, composer))
-                SetOpenerVisible(composer, true);
+                SetOpenerState(composer, false);
         };
         if (dialog.TryOpen())
         {
             opened = true;
             rememberOpen = true;
-            SetOpenerVisible(composer, false);
+            SetOpenerState(composer, true);
         }
         else Close(parent);
     }
 
-    private static void SetOpenerVisible(GuiComposer composer, bool visible)
+    private static void SetOpenerState(GuiComposer composer, bool open)
     {
         var button = (GuiElementRecipeBookButton)composer.GetToggleButton("vanillaexpanded-crafting-toggle");
-        button.Visible = visible && button.Enabled;
+        button.Visible = button.Enabled;
+        button.SetValue(open && button.Enabled);
     }
 
     private void Close(GuiDialog parent)

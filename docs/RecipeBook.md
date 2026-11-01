@@ -1,5 +1,7 @@
 # Recipe-book filtering and ordering
 
+[GuiElementRecipeBookButton](../VanillaExpanded/src/RecipeBook/GuiElementRecipeBookButton.cs) is a native icon toggle anchored through `ElementBounds` to the crafting output slot, four GUI pixels to its left and vertically centered. It stays visible while the book is open, and its pressed state reflects the actual dialog state. Mouse or Enter activation opens and closes the book; failed opens reset the toggle. Explicit toggle-off clears the inventory-reopen preference while retaining browsing criteria. Parent closure, reopening, recomposition, and external dialog disposal synchronize the toggle through the existing lifecycle. Disabling the feature hides and disables the button.
+
 This guide describes the implemented filtering and ordering systems. Classification providers remain deferred until concrete consumers need them.
 
 ## Components and authority
