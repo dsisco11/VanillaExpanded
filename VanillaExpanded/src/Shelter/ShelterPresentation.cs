@@ -28,9 +28,10 @@ internal sealed class ShelterPresentation : IndicatorPresentation
 
     public void Prepare(HudOverlayPreparationContext context)
     {
+        HoverValue = Lang.GetL(context.Locale, "vanillaexpanded:shelter-reading");
         if (Style == HudIndicatorStyle.Text)
         {
-            PrepareText(context, "shelter", Lang.GetL(context.Locale, "vanillaexpanded:shelter-reading"));
+            PrepareText(context, "shelter", HoverValue);
             return;
         }
         content = new("textures/hud/shelter.svg", new(HudOverlaySizes.Small, HudOverlaySizes.Small), null, 0);

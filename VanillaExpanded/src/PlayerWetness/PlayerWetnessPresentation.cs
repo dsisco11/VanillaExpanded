@@ -37,6 +37,7 @@ internal sealed class PlayerWetnessPresentation : IndicatorPresentation
     public void Prepare(HudOverlayPreparationContext context)
     {
         Reading = Lang.GetL(context.Locale, "vanillaexpanded:player-wetness-reading", percentage);
+        HoverValue = Reading;
         if (Style == HudIndicatorStyle.Text) { PrepareText(context, "wetness", Reading); return; }
         var text = MeasureText(context, Reading, 1.5);
         ReadingWidth = text.Width * Math.Min(1, HudOverlaySizes.WetnessReadingHeight / Math.Max(1, text.Height));

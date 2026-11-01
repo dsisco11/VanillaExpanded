@@ -26,6 +26,7 @@ internal sealed class EnvironmentalTemperatureOverlay : IHudOverlay, IHudOverlay
     internal float? Temperature { get; private set; }
     /// <summary>Gets the shared visibility transition.</summary>
     public HudOverlayVisibilityTransition Visibility => presentation.Visibility;
+    public string? HoverValue => presentation.HoverValue;
     /// <summary>Creates the owned presentation with optional headless dependencies.</summary>
     public EnvironmentalTemperatureOverlay(EnvironmentalTemperaturePresentation? presentation = null) => this.presentation = presentation ?? new();
     /// <summary>Binds one client world without retaining another world's player sample.</summary>
@@ -104,4 +105,3 @@ internal sealed class EnvironmentalTemperatureOverlay : IHudOverlay, IHudOverlay
     #endregion
     #endregion
 }
-

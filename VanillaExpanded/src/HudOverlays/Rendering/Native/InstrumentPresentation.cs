@@ -18,6 +18,7 @@ internal abstract class InstrumentPresentation : IDisposable
     public EnvironmentalGaugeStyle Style { get; private set; }
     /// <summary>Gets the measured footprint in GUI units.</summary>
     public SizeF Size { get; protected set; }
+    public string? HoverValue { get; protected set; }
     /// <summary>Gets the feature-owned visibility envelope.</summary>
     public HudOverlayVisibilityTransition Visibility { get; } = new();
     /// <summary>Changes visual structure without clearing sampled data or estimation timing.</summary>
@@ -33,7 +34,7 @@ internal abstract class InstrumentPresentation : IDisposable
     /// <summary>Clears feature data after world teardown or a completed exit.</summary>
     public void Reset()
     {
-        Visibility.Reset(); Size = SizeF.Empty; text = null; Compact = null; ClearContent();
+        Visibility.Reset(); Size = SizeF.Empty; text = null; Compact = null; HoverValue = null; ClearContent();
     }
     /// <summary>Releases controller data; composers retain exclusive ownership of mounted resources.</summary>
     public void Dispose() => Reset();

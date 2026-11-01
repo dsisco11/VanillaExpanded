@@ -42,9 +42,10 @@ internal sealed class WeatherConditionsPresentation : IndicatorPresentation
     {
         if (sample == null) return;
         bool hasData = sample.Precipitation.HasValue || sample.Fog || sample.ThunderIntensity > 0;
+        HoverValue = hasData ? WeatherConditionsText.Format(sample) : null;
         if (Style == HudIndicatorStyle.Text)
         {
-            if (hasData) PrepareText(context, "weather", WeatherConditionsText.Format(sample));
+            if (HoverValue is string reading) PrepareText(context, "weather", reading);
             else Size = SizeF.Empty;
             return;
         }

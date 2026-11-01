@@ -37,9 +37,10 @@ internal sealed class BowAmmunitionPresentation : IndicatorPresentation
     public void Prepare(HudOverlayPreparationContext context)
     {
         if (sample == null) return;
+        HoverValue = sample.Quantity.ToString(CultureInfo.InvariantCulture);
         if (Style == HudIndicatorStyle.Text)
         {
-            PrepareText(context, "ammunition", sample.Quantity.ToString(CultureInfo.InvariantCulture)); return;
+            PrepareText(context, "ammunition", HoverValue); return;
         }
         Reading = sample.Icon == null ? Lang.GetL(context.Locale, "vanillaexpanded:bow-ammunition-empty")
             : Lang.GetL(context.Locale, "vanillaexpanded:bow-ammunition-count", sample.Quantity);

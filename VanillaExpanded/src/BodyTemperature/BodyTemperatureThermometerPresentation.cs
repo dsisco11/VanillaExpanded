@@ -42,7 +42,8 @@ internal sealed class BodyTemperatureThermometerPresentation : IndicatorPresenta
     public void Prepare(HudOverlayPreparationContext context)
     {
         if (Sample == null) return;
-        Reading = ShowReading ? Lang.GetL(context.Locale, "vanillaexpanded:body-temperature-reading", Sample.DisplayCelsius) : string.Empty;
+        HoverValue = Lang.GetL(context.Locale, "vanillaexpanded:body-temperature-reading", Sample.DisplayCelsius);
+        Reading = ShowReading ? HoverValue : string.Empty;
         if (Style == HudIndicatorStyle.Text)
         {
             string value = (ShowReading ? Reading + " " : "") + Sample.Risk.ToString().ToUpperInvariant();

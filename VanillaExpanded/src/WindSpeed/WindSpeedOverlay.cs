@@ -26,6 +26,7 @@ internal sealed class WindSpeedOverlay : IHudOverlay, IHudOverlayVisibilityTrans
     internal int Percentage { get; private set; }
     /// <summary>Gets the shared visibility transition used by the host.</summary>
     public HudOverlayVisibilityTransition Visibility => presentation.Visibility;
+    public string? HoverValue => presentation.HoverValue;
 
     /// <summary>Creates an owned wind presentation with an optional headless substitute.</summary>
     public WindSpeedOverlay(WindSpeedPresentation? presentation = null)

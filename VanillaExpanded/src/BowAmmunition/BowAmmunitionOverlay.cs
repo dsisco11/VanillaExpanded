@@ -23,6 +23,7 @@ internal sealed class BowAmmunitionOverlay : IHudOverlay, IHudOverlayVisibilityT
     private bool styleChanged;
     /// <summary>Controls visibility independently of the current ammunition sample.</summary>
     public HudOverlayVisibilityTransition Visibility => presentation.Visibility;
+    public string? HoverValue => presentation.HoverValue;
     /// <summary>Retains the last preparation for the shared host's exit transition.</summary>
     public void HidePresentation() => ClearSample();
     #region Public API

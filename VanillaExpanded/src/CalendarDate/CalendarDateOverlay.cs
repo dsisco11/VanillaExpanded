@@ -24,6 +24,7 @@ internal sealed class CalendarDateOverlay : IHudOverlay, IHudOverlayVisibilityTr
     #region Lifecycle
     /// <summary>Gets the shared visibility transition for the prepared date.</summary>
     public HudOverlayVisibilityTransition Visibility => presentation.Visibility;
+    public string? HoverValue => presentation.HoverValue;
     /// <summary>Creates the feature-owned calendar presentation.</summary>
     public CalendarDateOverlay(CalendarDatePresentation? presentation = null) => this.presentation = presentation ?? new();
     /// <summary>Binds one client world.</summary>

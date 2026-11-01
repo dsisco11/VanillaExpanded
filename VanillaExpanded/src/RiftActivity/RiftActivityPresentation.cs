@@ -35,9 +35,10 @@ internal sealed class RiftActivityPresentation : IndicatorPresentation
     public void Prepare(HudOverlayPreparationContext context)
     {
         if (!value.HasValue) return;
+        HoverValue = value.Value.ToString().ToUpperInvariant();
         if (Style == HudIndicatorStyle.Text)
         {
-            PrepareText(context, "rift", value.Value.ToString().ToUpperInvariant()); return;
+            PrepareText(context, "rift", HoverValue); return;
         }
         string[] names = ["low", "medium", "high", "apocalyptic"];
         string reading = Lang.GetL(context.Locale, "vanillaexpanded:rift-activity-short-" + value.Value.ToString().ToLowerInvariant());

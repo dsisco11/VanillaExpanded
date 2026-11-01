@@ -51,6 +51,7 @@ internal sealed class ApproximateTimePresentation : InstrumentPresentation
     public void Prepare(HudOverlayPreparationContext context)
     {
         if (!Period.HasValue) return;
+        HoverValue = ClockText;
         if (PrepareSimple(context, "time", ClockText,
             "textures/hud/approximate-time/" + Period.Value.ToString().ToLowerInvariant() + ".png", false)) return;
         Size = new(HudOverlaySizes.Clock, HudOverlaySizes.Clock); Visibility.Show();

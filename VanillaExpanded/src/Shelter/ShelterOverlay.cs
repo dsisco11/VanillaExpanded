@@ -20,6 +20,7 @@ internal sealed class ShelterOverlay : IHudOverlay, IHudOverlayVisibilityTransit
 
     internal bool Sheltered { get; private set; }
     public HudOverlayVisibilityTransition Visibility => presentation.Visibility;
+    public string? HoverValue => presentation.HoverValue;
 
     public ShelterOverlay(ShelterPresentation? presentation = null, System.Func<BlockPos, Room?>? findRoom = null)
     {

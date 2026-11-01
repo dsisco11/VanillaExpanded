@@ -23,6 +23,7 @@ internal sealed class BodyTemperatureOverlay : IHudOverlay, IHudOverlayVisibilit
 
     /// <summary>Controls retained artwork during visibility changes.</summary>
     public HudOverlayVisibilityTransition Visibility => thermometer.Visibility;
+    public string? HoverValue => thermometer.HoverValue;
 
     /// <summary>Retains the last preparation for the shared host's exit transition.</summary>
     public void HidePresentation() => Clear();

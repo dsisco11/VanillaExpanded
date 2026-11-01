@@ -26,6 +26,7 @@ internal sealed class PlayerWetnessOverlay : IHudOverlay, IHudOverlayVisibilityT
     internal float? Wetness { get; private set; }
     /// <summary>Gets the shared visibility transition.</summary>
     public HudOverlayVisibilityTransition Visibility => presentation.Visibility;
+    public string? HoverValue => presentation.HoverValue;
     /// <summary>Creates the owned presentation with optional headless dependencies.</summary>
     public PlayerWetnessOverlay(PlayerWetnessPresentation? presentation = null) => this.presentation = presentation ?? new();
     /// <summary>Binds one client world without retaining another world's player sample.</summary>

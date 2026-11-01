@@ -20,6 +20,7 @@ internal sealed class RiftActivityOverlay : IHudOverlay, IHudOverlayVisibilityTr
 
     /// <summary>Controls retained artwork during visibility changes.</summary>
     public HudOverlayVisibilityTransition Visibility => presentation.Visibility;
+    public string? HoverValue => presentation.HoverValue;
 
     /// <summary>Retains the last preparation for the shared host's exit transition.</summary>
     public void HidePresentation() => Clear();

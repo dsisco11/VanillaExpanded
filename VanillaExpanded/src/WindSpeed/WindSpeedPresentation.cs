@@ -31,6 +31,7 @@ internal sealed class WindSpeedPresentation : IndicatorPresentation
     {
         if (percentage <= 0) return;
         string reading = Lang.GetL(context.Locale, "vanillaexpanded:wind-speed-reading", percentage);
+        HoverValue = reading;
         if (Style == HudIndicatorStyle.Text) { PrepareText(context, "wind-speed", reading); return; }
         SizeF text = MeasureText(context, reading, 1.5);
         content = new("textures/hud/wind-speed/icon.svg", new(HudOverlaySizes.Small, HudOverlaySizes.Small),

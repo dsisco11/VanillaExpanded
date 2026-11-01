@@ -38,12 +38,13 @@ internal sealed class HudOverlayHoverLabels : IDisposable
 
     /// <summary>Renders native hover text outside indicator scissors, rebuilding only for text or scale changes.</summary>
     public void Draw(IEnumerable<HudOverlayGroupLayout> groups, Func<HudOverlayRegistration, bool> isDrawable, float dt,
-        Func<HudOverlayRegistration, string>? label = null)
+        Func<HudOverlayRegistration, string>? label = null, Func<HudOverlayRegistration, bool>? isInactive = null)
     {
         if (api.Input == null) return;
         var target = FindTarget(groups, isDrawable, api.Input.MouseGrabbed, new PointF(api.Input.MouseX, api.Input.MouseY));
         if (target == null) return;
-        string localized = label?.Invoke(target) ?? Lang.Get(target.HoverLabelKey!);
+        string localized = ResolveText(target, label?.Invoke(target) ?? Lang.Get(target.HoverLabelKey!),
+            isInactive?.Invoke(target) == true);
         // Resolve every hover in the current locale, but retain the GPU resources while the resolved label is unchanged.
         if (tooltip == null || text != localized || scale != RuntimeEnv.GUIScale)
         {
@@ -59,6 +60,12 @@ internal sealed class HudOverlayHoverLabels : IDisposable
             tooltip.SetVisible(true);
         }
         tooltip.RenderInteractiveElements(dt);
+    }
+
+    internal static string ResolveText(HudOverlayRegistration target, string label, bool inactive = false)
+    {
+        string? value = inactive ? null : target.Overlay.HoverValue;
+        return label + "\n" + (string.IsNullOrWhiteSpace(value) ? Lang.Get("vanillaexpanded:hud-value-unavailable") : value);
     }
 
     /// <summary>Releases the native tooltip texture and rich text when the host ends its session.</summary>

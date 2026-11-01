@@ -18,6 +18,8 @@ internal abstract class IndicatorPresentation : IDisposable
     public HudOverlayVisibilityTransition Visibility { get; }
     /// <summary>Gets canonical prepared dimensions in GUI units.</summary>
     public SizeF Size { get; protected set; }
+    /// <summary>Gets the prepared hover text for the indicator.</summary>
+    public string? HoverValue { get; protected set; }
     /// <summary>Gets the selected supported style.</summary>
     public HudIndicatorStyle Style { get; private set; }
     /// <summary>Changes presentation structure without clearing sampled data or animation timing.</summary>
@@ -33,7 +35,7 @@ internal abstract class IndicatorPresentation : IDisposable
     /// <summary>Clears prepared and sampled state after an exit or world change.</summary>
     public void Reset()
     {
-        Visibility.Reset(); Size = SizeF.Empty; Text = null; ClearContent();
+        Visibility.Reset(); Size = SizeF.Empty; Text = null; HoverValue = null; ClearContent();
     }
     /// <summary>Releases controller state; generated resources belong to the host's composers.</summary>
     public void Dispose() => Reset();

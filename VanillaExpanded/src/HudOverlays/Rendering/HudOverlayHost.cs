@@ -255,7 +255,8 @@ internal sealed class HudOverlayHost : HudElement, IHudOverlayHost
             hoverLabels.Draw(groups.Where(pair => visibleGroups.Contains(pair.Key)).Select(pair => pair.Value),
                 isDrawable, deltaTime,
                 registration => editPreviews?.IsDrawable(registration) == true ? editPreviews.Label(registration)
-                    : Lang.Get(registration.HoverLabelKey!));
+                    : Lang.Get(registration.HoverLabelKey!),
+                registration => editPreviews?.IsDrawable(registration) == true);
         }
         menuInput?.Draw(deltaTime);
     }

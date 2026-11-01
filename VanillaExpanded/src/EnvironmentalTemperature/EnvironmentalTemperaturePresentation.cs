@@ -38,6 +38,7 @@ internal sealed class EnvironmentalTemperaturePresentation : InstrumentPresentat
     {
         double rounded = Math.Round(Temperature, MidpointRounding.AwayFromZero);
         Reading = Lang.GetL(context.Locale, "vanillaexpanded:environmental-temperature-reading", rounded == 0 ? 0d : rounded);
+        HoverValue = Reading;
         if (PrepareSimple(context, "temperature", Reading, "textures/hud/environmental-temperature/icon.svg")) return;
         Size = new(HudOverlaySizes.EnvironmentalThermometer, HudOverlaySizes.EnvironmentalThermometer); Visibility.Show();
     }

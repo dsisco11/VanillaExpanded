@@ -34,7 +34,8 @@ internal sealed class CalendarDatePresentation : InstrumentPresentation
     {
         if (Date is not CalendarDateReading value) return;
         Month = value.MonthAbbreviation(context.Locale); Day = value.Day.ToString(CultureInfo.InvariantCulture);
-        if (PrepareSimple(context, "date", Month + " " + Day, "textures/hud/calendar-date/icon.svg")) return;
+        HoverValue = Month + " " + Day;
+        if (PrepareSimple(context, "date", HoverValue, "textures/hud/calendar-date/icon.svg")) return;
         Size = new(HudOverlaySizes.Calendar, HudOverlaySizes.Calendar * Canvas.Height / Canvas.Width); Visibility.Show();
     }
     /// <summary>Creates composer-owned native roller windows or the selected simple style.</summary>

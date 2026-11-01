@@ -26,6 +26,8 @@ public interface IHudOverlay : IDisposable, INativePresentation
     HudOverlayChange Refresh();
     #endregion
     #region Presentation
+    /// <summary>Gets the latest prepared tooltip reading without sampling or allocating GUI resources.</summary>
+    string? HoverValue => null;
     /// <summary>Prepares stable presentation data and canonical measurements without allocating element-owned GUI resources.</summary>
     void Prepare(HudOverlayPreparationContext context);
     /// <summary>Measures finite, nonnegative dimensions in unscaled GUI units without another gameplay sample.</summary>

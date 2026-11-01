@@ -51,9 +51,10 @@ internal sealed class TemporalStormPresentation : IndicatorPresentation
     public void Prepare(HudOverlayPreparationContext context)
     {
         if (!value.HasValue) return;
+        HoverValue = value.Value.ToString().ToUpperInvariant();
         if (Style == HudIndicatorStyle.Text)
         {
-            PrepareText(context, "storm", value.Value.ToString().ToUpperInvariant()); return;
+            PrepareText(context, "storm", HoverValue); return;
         }
         string[] names = ["approaching", "imminent", "active"];
 
