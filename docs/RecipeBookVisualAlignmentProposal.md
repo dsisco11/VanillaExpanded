@@ -1,6 +1,6 @@
 # Recipe Book visual alignment proposal
 
-**Status:** Draft for review. This document proposes work; it does not describe completed implementation.
+**Status:** Phase 1 design decisions recorded; implementation pending. Native rendering feasibility and the exact preview inset remain gated. This document does not describe completed implementation.
 
 ## Purpose and design authority
 
@@ -13,7 +13,7 @@ The controlling references are:
 3. The user's explicit correction: **retain the current Tools icon**. The mockup contains an outdated Tools silhouette and is not authoritative for that asset.
 4. Shared, opt-in styled controls, including a reusable clearable text input. Recipe Book semantics remain outside those controls.
 
-The mockup labels recipe tiles and controls as placeholders. This proposal therefore distinguishes direct visual alignment from recommended adaptations for real recipes, availability information, localization, and additional categories. Approval of this proposal would approve those adaptations; they must not be treated as already approved.
+The mockup labels recipe tiles and controls as placeholders. This proposal therefore distinguishes direct visual alignment from the user-approved adaptations for real recipes, availability information, localization, and additional categories. The decision disposition below identifies the remaining approval and feasibility gates.
 
 ## Scope and invariants
 
@@ -85,6 +85,22 @@ Outline and accent thicknesses scale with the interface, then round to physical 
 
 The selected fill already matches the proposed panel color. Work should target the remaining differences rather than replace correct rendering indiscriminately.
 
+### Non-tab control states
+
+The following state treatment is approved for shared controls. It changes appearance, not activation semantics or input ownership.
+
+| State | Treatment |
+| --- | --- |
+| Idle | Use the control-specific fill, outline, and text colors in the palette above. |
+| Hover | Outline `#aa8c54`; button and hovered popup-row fill `#51422e`. Search retains its normal fill and typed-text color. |
+| Pressed | Button and clear-control fill `#382f23`; do not move or resize their content. |
+| Opened dropdown | Fill `#51422e` and outline `#aa8c54`; retain normal selected-value text. |
+| Checked checkbox / selected popup indicator | Indicator `#f5d58d`, separate from hover and keyboard focus. |
+| Disabled | Text and icons at 35% opacity with the normal frame; no hover or pressed emphasis. Preserve the existing disabled-input contract. |
+| Keyboard focus | Separate one-unit inset outline `#fff0cc`, without duplicate native highlighting or geometry changes. Category tabs retain their separately specified dashed focus treatment. |
+
+Disabled treatment takes precedence over hover and press. Keyboard focus is independently identifiable while checked or opened. Controls use only states applicable to their native behavior; this specification does not add a text-field press action or change when focus is acquired.
+
 ## Category presentation
 
 Use the standard order:
@@ -124,7 +140,7 @@ The existing [item-stack dropdown](../VanillaExpanded/src/Gui/GuiElementItemStac
 - Native popup input and scrolling contain fixed row assumptions. Do not independently shrink rendered rows without reconciling their hit testing and scroll geometry.
 - The native focus-overlay method is non-virtual and its visibility is composer-controlled. A subclass override cannot suppress it. Demonstrate a local integration that satisfies the specified focus treatment without duplicate outlines; if native restrictions prevent this, surface the limitation for approval.
 
-Define applicable idle, hover, pressed, disabled, focused, checked, and opened treatments consistently with the proposed palette before visual acceptance. Shared controls retain native composition ownership and dispose their own additional textures and tooltip resources. No production reflection or global control patching is proposed.
+Apply the approved non-tab state treatment above. Shared controls retain native composition ownership and dispose their own additional textures and tooltip resources. No production reflection or global control patching is proposed.
 
 ## Controls and content composition
 
@@ -156,44 +172,45 @@ The navigation group can share one flat outer treatment, but Previous, Auto, and
 
 Apply the smaller regular font, warm palette, and measured text padding consistently. Retain the actual alternative counter and Handbook behavior rather than the mockup's sample values.
 
-## Proposed recipe-grid adaptations
+## Approved recipe-grid adaptations
 
-These are recommendations for approval, not a requirement to reproduce the mockup's placeholder objects.
+These adaptations are approved design directions, not a requirement to reproduce the mockup's placeholder objects. The exact preview inset still requires visual approval.
 
 ### Responsive tiles and spacing
 
-Propose square tiles with a minimum size of 46 units and a minimum five-unit gap. Choose the largest column count that fits those dimensions, then distribute remaining usable width across the tiles. At the baseline width, the target is five balanced columns without an unused strip before the scrollbar.
+Use fixed 30-by-30-unit square tiles with five-unit inter-column and inter-row gaps. Choose the largest column count that fits the usable width, then center the complete column group. Spare width becomes equal left/right outer space, not larger tiles or larger gaps. There is no fixed baseline column-count target.
 
 ```text
 usable width = list interior minus horizontal padding and scrollbar space
-columns = largest count that fits minimum tile size and gaps
-tile size = remaining usable width divided across columns
+columns = largest count that fits 30-unit tiles and 5-unit gaps
+group width = columns times 30 plus inter-column gaps
+leading space = (usable width minus group width) divided by two
 assign whole-pixel tile edges without cumulative rounding drift
 derive row pitch, visible rows, and scrolling from that geometry
 ```
 
-Wider dialogs may show more columns. Layout, virtualization, hit testing, icon quads, quantities, and scrolling must consume the same tile geometry. Resizing must preserve the inspected/selected recipe and restore or clamp scroll using recipe-row position rather than obsolete pixel pitches.
+Wider dialogs may show more columns without changing tile size or gap size. A single column is centered too. If no tile fits, retain the existing explicit minimum-size/placement failure instead of shrinking tiles. Layout, virtualization, hit testing, icon quads, quantities, and scrolling must consume the same tile geometry. Resizing must preserve the inspected/selected recipe and restore or clamp scroll using recipe-row position rather than obsolete pixel pitches.
 
 This intentionally retains square game tiles instead of the mockup's stretched rectangles.
 
 ### Padding and clipping
 
-Propose six units of horizontal list padding, while retaining the full-height inner scissor and no reserved vertical padding strip. The first row reaches the inner top edge, and partially scrolled rows remain visible through the list's inner vertical boundaries.
+Use six units of horizontal list padding, while retaining the full-height inner scissor and no reserved vertical padding strip. Center the column group inside that horizontally padded usable area. The first row reaches the inner top edge, and partially scrolled rows remain visible through the list's inner vertical boundaries.
 
 This intentionally differs from the mockup's six-unit vertical padding to preserve the previously requested list-edge behavior. If literal vertical padding is preferred, it requires separate approval and must not reduce the clipping region to the padded area.
 
 ### Availability, selection, and previews
 
-Propose quieter one-unit tile outlines with these separate meanings:
+Use quieter one-unit tile outlines with these separate meanings:
 
 - Ordinary available tiles use the warm neutral outline.
 - Missing and partially available recipes retain red and yellow availability semantics.
 - Unsupported recipes retain their disabled treatment and warning.
-- Selection uses a distinct inset gold marker or outline; keyboard focus remains independently identifiable.
+- Selection uses a top-left gold corner marker: two eight-unit segments with one-unit strokes, inset three units from the tile edge, colored `#f5d58d`. Keyboard focus remains independently identifiable.
 
-Availability stays on the outer edge. Selection must not hide an availability border, obscure quantity text, or be confused with partial availability. The exact selection marker is an open visual decision.
+Availability stays on the outer edge. The selection marker leaves that edge and the bottom-right quantity area clear; it must not be confused with partial availability.
 
-Propose smaller, centered real item previews with visible breathing room around them. Determine a consistent inset during visual review; do not replace previews with category silhouettes or suppress output quantities. Continue to use the native item atlas and the existing preparation/render ownership.
+Use smaller, centered real item previews with visible breathing room around them. Determine and obtain approval of a consistent inset during visual review; do not replace previews with category silhouettes or suppress output quantities. Continue to use the native item atlas and the existing preparation/render ownership.
 
 The scrollbar, quantities, options icon, and native titlebar controls remain present and receive compatible styling where applicable.
 
@@ -243,7 +260,7 @@ Functional test success alone does not establish visual alignment. Acceptance re
 - Verify the clearable text input with caller-supplied labels and callbacks independent of Recipe Book state. Clearing must notify through the normal text-change contract without duplicate notifications.
 - Verify that footer and empty-state buttons and both checkbox locations use the shared treatment, while unrelated dialogs retain their existing controls and appearance.
 - Verify standard and additional category ordering, restored selection identity, long translations, and sufficient minimum dimensions.
-- Verify responsive columns, whole-pixel edge distribution, tile gaps, scroll preservation, partial-row clipping, and quantity visibility.
+- Verify maximum fitting columns, fixed 30-unit tiles and five-unit gaps, centered groups, whole-pixel edge distribution, scroll preservation, partial-row clipping, and quantity visibility.
 - Preserve native focus, tooltips, mouse/keyboard actions, Fixed/Movable dragging, reopening, and inventory closure behavior.
 - Capture idle, hover, selected, and keyboard-focused states in-game at scales 1, 1.5, and 2, with additional fractional-scale geometry checks.
 - Compare reference and game captures at the same selected category and normalized scale. Use real recipe previews and equivalent interaction states when reviewing intentional placeholder departures.
@@ -253,15 +270,28 @@ Update [GUI tests](../VanillaExpanded.Tests/Unit/Gui/) and [Recipe Book tests](.
 
 After implementation, update only affected current-state sections of [Recipe Book design](RecipeBook.md). Reassess the completion item in [project.todo](project.todo); do not claim full alignment until visual acceptance is complete.
 
-## Decisions requiring approval
+### Evidence baseline and destinations
 
-The following adaptations need approval before implementation:
+The source baseline is revision `b7050bd2e2722c29e96cc202bbe54a2dc9ae6e2d`, before the Phase 1 documentation changes. Build references resolve through `VINTAGE_STORY=G:\Vintagestory`. The installed game library reports 1.22.7; the API DLL reports 1.22.0. API assembly metadata is not proof of patch-level equivalence with reference source in `D:\CODE\VintageStory\vsapi`; native-risk work must validate the relevant public APIs against the installed binaries.
 
-1. Responsive square tiles with five-unit minimum gaps, rather than literal stretched placeholder tiles.
-2. Horizontal list padding without the mockup's vertical padding strip.
-3. Quieter availability borders plus a separate gold selection marker; choose the marker's exact form.
-4. Smaller inset real item previews; approve the inset during visual review.
-5. Local titlebar/dialog rendering adaptations where public native styling cannot reproduce the proposed chrome.
+Preserve the existing Design A reference at `C:\Users\Sisco\.copilot\session-state\d43f7edb-1a48-4194-b923-6ecc0c58fe6d\files\recipe-tab-mockups.html`. Its SHA-256 is `AF3D8D79E59C2FB7321FF76B6FB7D0D4D97DA4F012DD6DFA454A1CF97DF8EDEF`. The current Tools SVG SHA-256 is `38D30686F27E32A9BCB4AA537B8BA9326D477923C42EC2CFEFA5C4496FF5AC41`; the other current category assets also remain authoritative and unchanged.
+
+The retained session checkpoint `023-proposing-recipe-book-visual-a.md` reports 229 passing focused GUI/lifecycle/movable-geometry tests under the IconValidation configuration. This is historical functional evidence, not a new test run, proof of the approved appearance, or confirmation of the currently loaded mod package. Missing evidence includes the shared-control states and extraction, native focus/composition seams, centered 30-unit grid, updated shell geometry, and normalized live captures at the required scales.
+
+The agreed destination for required reference copies, captures, package/version identification, and acceptance results is `C:\Users\Sisco\.copilot\session-state\d43f7edb-1a48-4194-b923-6ecc0c58fe6d\files\recipe-book-visual-alignment`. Create it when evidence is produced; retain that evidence during final cleanup. No acceptance package has been built or identified by Phase 1. Final live evidence must name the tested package and client/API versions rather than infer runtime contents from repository source. No separate implementation diary or audit report is required.
+
+## Decision disposition
+
+| Decision | Disposition |
+| --- | --- |
+| Grid sizing and spare width | Approved: fixed 30-unit square tiles, five-unit gaps, maximum fitting columns, entire group centered. |
+| List padding and clipping | Approved: six-unit horizontal padding, no reserved vertical strip, full-height inner scissor. |
+| Availability and selection | Approved: one-unit outer status outlines retaining red/yellow meanings, plus the specified inset top-left gold corner marker. |
+| Real previews | Inset direction approved; exact inset remains blocked on later rendered visual review and approval. |
+| Non-tab control states | Approved as specified above. |
+| Local titlebar/dialog rendering adapters | Permitted subject to Phase 2 native feasibility; no global patching or production reflection. |
+| Focus and popup/native composition constraints | Explicit Phase 2 feasibility gates; unresolved restrictions must return for approval before dependent implementation. |
+| Acceptance evidence destination | Approved: the session evidence directory above, retained with required captures and results. |
 
 The current Tools icon is **not** an open decision: it must be retained.
 

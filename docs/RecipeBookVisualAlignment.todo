@@ -5,21 +5,22 @@
     ## Goal:
         Align the Recipe Book with Design A using shared, opt-in styled native controls, attached folder tabs, compact composition, and the approved recipe-grid adaptations.
         Preserve the updated Tools icon, native interactions, inventory ownership, placement authority, and existing persistence formats.
-        This is an unexecuted implementation plan. Creating it does not approve the proposal's unresolved adaptations or authorize implementation.
+        Phase 1 records the user's design decisions. Later UI work remains unexecuted and requires its applicable feasibility and visual-approval gates.
 
     ## Execution contract:
         Phase source references govern their tasks and subtasks. The complete proposal governs visual targets and exclusions; the design guide governs unchanged feature semantics.
         Use the repository's existing test fixtures and build tooling. Keep game-source references read-only and new mod-internal controls internal.
         Use native per-instance settings where sufficient and narrow rendering adapters elsewhere. Do not introduce global GUI mutations, production reflection, a general theme framework, or changes to unrelated consumers.
-        Every checkbox begins unchecked. Existing code and earlier passing tests are starting evidence, not completion of this plan.
+        Mark tasks complete only after their verification and independent completion audit. Existing code and earlier passing tests are starting evidence, not completion of this plan.
         Run focused validation for each changed surface; broaden only when dependency changes or failures require it. Unit fixtures are not live GPU or in-game evidence.
         A blocked approval or native limitation leaves affected work unchecked. Do not silently substitute a different appearance or claim full alignment with outstanding requirements.
 
     ## Assumptions and open questions:
-        The proposal remains a draft. Shared reusable controls and retention of the current Tools artwork are established directions, not open alternatives.
-        Approval is still required for responsive square tiles with minimum five-unit gaps, horizontal-only list padding, quieter availability outlines, the separate gold selection marker, inset previews, and local dialog/titlebar adapters.
-        The exact selection marker and preview inset are not specified. Determine the marker before its implementation; obtain approval of the preview inset through visual review before acceptance.
-        Applicable non-tab hover, pressed, disabled, focused, checked, and opened treatments need concrete definitions consistent with the proposal palette.
+        The proposal records approved design directions, including shared reusable controls and retention of the current Tools artwork.
+        Tiles are fixed 30-unit squares with five-unit gaps; fit the maximum column count and center the entire group. Do not distribute spare width into tiles or gaps.
+        Horizontal-only list padding, one-unit status outlines, the specified gold top-left selection marker, and non-tab states are approved.
+        The real-preview inset direction is approved; obtain approval of its exact inset through rendered visual review before acceptance.
+        Local dialog/titlebar adaptations are permitted subject to Phase 2 native feasibility, not assumed to be technically resolved.
         Native focus highlighting is composer-controlled and non-virtual. A local, non-duplicating focus treatment is a feasibility gate, not an assumed subclass override.
         Native popup row assumptions and non-virtual recomposition must be reconciled before a compact popup is accepted.
         The visual reference is Design A in the existing recipe-tab-mockups.html session artifact. Preserve access to that reference for comparison; the proposal overrides its outdated Tools glyph and distinguishes placeholder content.
@@ -27,25 +28,25 @@
 
     ## Phase 1: Confirm the implementation and acceptance contract:
         Prerequisites: None.
-        Sources: Proposal sections "Purpose and design authority", "Scope and invariants", "Decisions requiring approval", and "Acceptance and verification"; the design guide's lifecycle and authority contracts.
+        Sources: Proposal sections "Purpose and design authority", "Scope and invariants", "Decision disposition", and "Acceptance and verification"; the design guide's lifecycle and authority contracts.
         Outcome: Implementation can proceed against explicit decisions without treating mockup placeholders or unresolved recommendations as approved behavior.
 
-        ☐ Confirm outstanding approvals and record their disposition in the authoritative proposal.
-            ☐ Confirm minimum-46-unit responsive square tiles, minimum-five-unit gaps, and the five-column baseline target.
-            ☐ Confirm six-unit horizontal list padding without a reserved vertical padding strip.
-            ☐ Confirm one-unit availability outlines and choose a distinct gold selection marker that cannot obscure availability or quantities.
-            ☐ Confirm the inset-preview direction and arrange visual approval of its exact inset.
-            ☐ Confirm the permitted local dialog/titlebar adaptations; leave native feasibility questions explicitly unresolved until Phase 2.
-            ☐ Define applicable non-tab state treatments and objective visual expectations without inventing new interaction semantics.
-        ☐ Establish the evidence baseline.
-            ☐ Preserve access to Design A and the current category assets, including the updated Tools SVG.
-            ☐ Identify the target game/API version and distinguish reference-source evidence from the client/package used for live acceptance.
-            ☐ Record applicable existing test results and identify gaps for the changed controls, geometry, rendering, and lifecycle.
-            ☐ Keep permanent decisions in the proposal and required acceptance evidence in its agreed destination; do not create a separate planning diary.
+        ☑ Confirm outstanding approvals and record their disposition in the authoritative proposal.
+            ☑ Confirm fixed 30-unit square tiles, five-unit gaps, maximum fitting columns, and centering without spare-width redistribution.
+            ☑ Confirm six-unit horizontal list padding without a reserved vertical padding strip.
+            ☑ Confirm one-unit availability outlines and choose a distinct gold selection marker that cannot obscure availability or quantities.
+            ☑ Confirm the inset-preview direction and arrange visual approval of its exact inset.
+            ☑ Confirm the permitted local dialog/titlebar adaptations; leave native feasibility questions explicitly unresolved until Phase 2.
+            ☑ Define applicable non-tab state treatments and objective visual expectations without inventing new interaction semantics.
+        ☑ Establish the evidence baseline.
+            ☑ Preserve access to Design A and the current category assets, including the updated Tools SVG.
+            ☑ Identify the target game/API version and distinguish reference-source evidence from the client/package used for live acceptance.
+            ☑ Record applicable existing test results and identify gaps for the changed controls, geometry, rendering, and lifecycle.
+            ☑ Keep permanent decisions in the proposal and required acceptance evidence in its agreed destination; do not create a separate planning diary.
 
         Completion criteria:
-            ☐ Required design choices have explicit approval or an explicitly blocked disposition; blocked choices do not permit dependent implementation.
-            ☐ The visual reference, target environment, acceptance states, and preserved contracts are identifiable to the executing agent.
+            ☑ Required design choices have explicit approval or an explicitly blocked disposition; blocked choices do not permit dependent implementation.
+            ☑ The visual reference, target environment, acceptance states, and preserved contracts are identifiable to the executing agent.
 
     ## Phase 2: Establish shared visual foundations and resolve native risks:
         Prerequisites: Phase 1's approvals for the affected work.
@@ -171,12 +172,13 @@
 
     ## Phase 6: Implement approved responsive grid and recipe presentation:
         Prerequisites: Phase 5 and explicit Phase 1 approval of grid, padding, availability, and selection choices.
-        Sources: Proposal section "Proposed recipe-grid adaptations"; the design guide's rendering, interaction, and browsing-state contracts.
+        Sources: Proposal section "Approved recipe-grid adaptations"; the design guide's rendering, interaction, and browsing-state contracts.
         Outcome: Real recipes fill the aligned viewport with coherent responsive geometry and readable independent status, selection, focus, and quantities.
 
         ☐ Introduce one shared tile geometry consumed by GuiElementRecipeBookTiles, GuiElementRecipeBookTile, RecipeBookIconRenderer, quantities, and scrolling.
-            ☐ Subtract approved horizontal padding and scrollbar space, select the largest fitting column count, and distribute spare width across square tiles.
-            ☐ Enforce minimum 46-unit tiles and five-unit gaps, with five balanced columns at the approved baseline layout and no unused width strip.
+            ☐ Subtract approved horizontal padding and scrollbar space, select the largest fitting column count, and center the complete column group inside the usable width.
+            ☐ Keep tiles fixed at 30 units and gaps fixed at five units; leave equal outer spare space without a fixed baseline column-count target.
+            ☐ Center single-column groups too; preserve explicit minimum-size/placement failure if no tile fits instead of shrinking tiles.
             ☐ Assign whole-physical-pixel edges without cumulative drift; derive row pitch, visible rows, icon quads, and hit testing from the same geometry.
             ☐ Use six-unit horizontal padding, no reserved vertical strip, and clipping to the inner top/bottom edges, including partial rows.
             ☐ Preserve selected/inspected recipe identity on resize and restore or clamp scroll through recipe-row position rather than obsolete fixed pitches.
@@ -193,7 +195,7 @@
             ☐ Verify mouse and keyboard placement still use live validation and existing controller actions, not displayed eligibility alone.
 
         Completion criteria:
-            ☐ Baseline columns, minimum dimensions/gaps, horizontal distribution, and full-height clipping satisfy the approved measurable targets.
+            ☐ Maximum fitting columns, fixed 30-unit tiles/five-unit gaps, centered groups, and full-height clipping satisfy the approved measurable targets.
             ☐ All geometry consumers agree after resize and scrolling; real previews, quantities, status, selection, and focus remain legible.
             ☐ The exact preview inset has visual approval and rendering/interaction tests pass without changed allocation, filtering, or transfer semantics.
 
