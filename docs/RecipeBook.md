@@ -139,6 +139,28 @@ The [shared visual helpers](../VanillaExpanded/src/Gui/GuiControlVisuals.cs) exp
 
 Search is the first keyboard tab stop. Native control focus and input routing are preserved, with the category strip acting as one outer tab stop.
 
+### Shared styled controls
+
+The shared GUI layer provides opt-in native-derived controls. Callers supply labels, fonts, and callbacks; the controls have no filtering, catalogue, localization-key, or persistence dependencies. The Recipe Book's filtering, footer, and search composition still use their existing controls.
+
+| Component | Rendering and ownership |
+| --- | --- |
+| [GuiElementStyledButton](../VanillaExpanded/src/Gui/GuiElementStyledButton.cs) | Native borderless text and activation, with owned flat state backgrounds. A render-only tracker follows native press/release events. Call its active-state setter through the shared type, not the non-virtual native setter through a base reference. |
+| [GuiElementClearableTextInput](../VanillaExpanded/src/Gui/GuiElementClearableTextInput.cs) | Native editing, selection, caret, and focus with a full-field frame, caller-provided placeholder, and owned clear textures and tooltip. Clearing uses the normal text-change callback. Editable bounds account for the native physical-pixel text inset. |
+| [GuiElementStyledDropDown](../VanillaExpanded/src/Gui/GuiElementStyledDropDown.cs) and [GuiElementStyledListMenu](../VanillaExpanded/src/Gui/GuiElementStyledListMenu.cs) | Native single-selection and popup interaction at 30-unit selector/row heights. Styled textures remain separate from native recomposition resources and are supplied during rendering. Cached rendering invalidates for relevant label, geometry, scale, and state changes. Width measurement includes the longest label and arrow reservation. |
+| [GuiElementStyledCheckbox](../VanillaExpanded/src/Gui/GuiElementStyledCheckbox.cs) | Owned flat frame and checked indicator over native toggle interaction, with coordinated 17-unit visual and input bounds. |
+
+```mermaid
+flowchart LR
+    Caller[Caller labels, fonts, and callbacks] --> Adapter[Opt-in styled control]
+    Input[Native input and focus] --> Adapter
+    Adapter --> Native[Native editing and activation]
+    Native --> Callback[Caller callback]
+    Adapter --> Visual[Owned state textures and tooltips]
+```
+
+Native composition and the adapters' additional resources retain separate ownership. Closing or replacing the owning composer disposes both; rendering does not replace global GUI styles or the unrelated native control helpers.
+
 ### Category tabs
 
 [GuiElementIconTabs](../VanillaExpanded/src/Gui/GuiElementIconTabs.cs) is a crafting-independent icon tab strip owned by a native child composer. Its 30-unit tabs have four-unit inter-tab gaps and no end spacing; the first tab is flush with the panel edge. [GuiElementIconTab](../VanillaExpanded/src/Gui/GuiElementIconTab.cs) retains native toggle interaction and renders rounded-top folder tabs. Selected tabs are 36 units high with a scaled upper accent and an open bottom edge joining the framed panel; inactive tabs are 32 units high. Idle, hover, and selected states have distinct background and icon tints without changing icon geometry.

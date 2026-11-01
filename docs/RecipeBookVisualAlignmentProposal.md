@@ -134,7 +134,7 @@ The existing [item-stack dropdown](../VanillaExpanded/src/Gui/GuiElementItemStac
 
 ### Native rendering constraints
 
-- Native button textures and pressed state are private. The adapter must preserve native activation rather than copy the button's interaction implementation to obtain a different appearance.
+- Native button textures and pressed state are private. The approved adapter-owned visual tracker follows native press/release events without replacing activation or callbacks. Callers must use the shared adapter's active-state API, because the native setter is non-virtual.
 - Native text-input editing padding is internal, and placeholder rendering is private. Coordinate editable bounds and any custom placeholder presentation so text, selection, caret, and mouse positioning stay aligned at every supported scale; do not rely on inaccessible engine fields.
 - Dropdown and popup composition includes private/non-virtual methods, including recomposition when opening or replacing list contents. Custom rendering must remain authoritative after those operations; overriding an initial composition method alone is insufficient.
 - Native popup input and scrolling contain fixed 30-unit row assumptions, including a click-boundary check coupled to the selector height. Retain the approved 30-unit selector and popup rows. Compact styling changes fonts, chevron, and chrome, not their input geometry.
@@ -146,7 +146,7 @@ Apply the approved non-tab state treatment above. Shared controls retain native 
 
 The [shared visual helpers](../VanillaExpanded/src/Gui/GuiControlVisuals.cs) provide explicit palette values, generic control measurements, flat/gradient drawing, and host-relative pixel snapping. [Recipe Book visual measurements](../VanillaExpanded/src/RecipeBook/RecipeBookVisualMetrics.cs) keep preferred dimensions and dialog-specific spacing separate from reusable controls. Their availability does not mean the dialog has adopted the new appearance.
 
-- **Button:** compose native borderless text and state textures, with a local flat background behind them. Retain native activation instead of mirroring its private press state.
+- **Button:** compose native borderless text and state textures, with a local flat background behind them. Track press/active state only for background presentation, as explicitly approved; retain native activation and callbacks. Use the shared adapter's active-state setter rather than the non-virtual native setter through a base-typed reference.
 - **Text input:** compose native editing and focus textures independently of the full field frame. Translate the editable bounds to account for the native three-physical-pixel text inset. Render caller-supplied placeholder text separately, using the same field inset, without accessing private placeholder or editing fields.
 - **Dropdown:** retain native selector/row geometry and selection handling. Replace the protected arrow textures and supply visible popup textures after native opening/list replacement has recomposed them. Production adapters must cache their derived textures and invalidate them when relevant labels, bounds, scale, or state change; the probe's per-render regeneration is not a production rendering strategy.
 - **Titlebar:** retain native composition initialization, icon hit regions, movement, close callback, and position persistence. Compose native initialization offscreen, then draw local visible chrome and text/icons at their native coordinates. Native control behavior and hover resources remain owned by the titlebar.
@@ -304,6 +304,7 @@ The agreed destination for required reference copies, captures, package/version 
 | Non-tab control states | Approved as specified above. |
 | Local titlebar/dialog rendering adapters | Permitted subject to Phase 2 native feasibility; no global patching or production reflection. |
 | Focus appearance | Retain native appearance and keyboard routing; no custom focus outline or router. |
+| Button visual state | Approved: a render-only press/active tracker with native activation and callbacks; callers use the shared adapter's active-state API. |
 | Dropdown height | Retain native-compatible 30-unit selector height and popup rows; no compact-height coordinate adapter. |
 | Popup/native composition constraints | Explicit Phase 2 feasibility gates; unresolved restrictions must return for approval before dependent implementation. |
 | Acceptance evidence destination | Approved: the session evidence directory above, retained with required captures and results. |

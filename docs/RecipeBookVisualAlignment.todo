@@ -103,33 +103,34 @@
         Sources: Proposal section "Shared control architecture", including its native constraints and ownership requirements.
         Outcome: Recipe Book composition can adopt independently tested shared controls without feature dependencies.
 
-        ☐ Implement the shared styled text-button adapter.
-            ☐ Retain native borderless text and interaction rendering; supply flat backgrounds, outlines, and approved state overlays.
-            ☐ Preserve native click consumption, keyboard activation, active/pressed behavior, enabled/visible state, and text measurement/padding.
-        ☐ Generalize GuiElementRecipeBookSearch into a shared styled clearable text input.
-            ☐ Accept caller-provided placeholder, clear-tooltip text, font/style inputs, and text-change callback.
-            ☐ Preserve native editing, text selection, caret, focus, clear visibility, pointer cursor, and clear-button press/release behavior.
-            ☐ Give the shared component ownership of clear textures and tooltip lifecycle without Recipe Book localization or controller dependencies.
-            ☐ Keep the old feature-specific class only until Phase 5 migrates its consumers and tests; do not maintain two permanent implementations.
-        ☐ Implement shared styled dropdown and popup-list adapters.
-            ☐ Reuse the item-stack dropdown's owned-list replacement pattern without introducing item-preview behavior.
-            ☐ Style both the closed selector and expanded list, including the compact chevron and approved states.
-            ☐ Retain the approved 30-unit selector and popup row heights; cache styled textures with invalidation for changed labels, geometry, scale, and state.
-            ☐ Preserve native selection, callbacks, focus loss, opening/closing, keyboard/mouse navigation, wheel handling, and scrolling.
-            ☐ Keep custom rendering authoritative across recomposition and list replacement, and dispose replaced/native/additional owned resources correctly.
-        ☐ Implement the shared styled checkbox adapter.
-            ☐ Draw the flat frame and checked state while retaining native toggling, focus, keyboard/mouse activation, and callbacks.
-            ☐ Keep the 17-unit visual checkbox and reliable input bounds coordinated with measurement.
-        ☐ Add focused reusable-control tests in the GUI unit-test area.
-            ☐ Exercise applicable idle/hover/pressed/disabled/focused/checked/opened states and approved styling.
-            ☐ Test clear-input behavior with arbitrary caller labels and callbacks without constructing Recipe Book state.
-            ☐ Verify clearing produces the normal text-change notification exactly once and retains expected focus.
-            ☐ Cover text/caret/selection geometry, long labels, list recomposition, popup input bounds, fractional scales, and texture/tooltip disposal.
+        ☑ Implement the shared styled text-button adapter.
+            ☑ Retain native borderless text and interaction rendering; supply flat backgrounds, outlines, and approved state overlays.
+            ☑ Preserve native click consumption, keyboard activation, active/pressed behavior, enabled/visible state, and text measurement/padding.
+            ☑ Use the approved render-only press/active tracker without replacing native activation; expose the typed active-state API required by the non-virtual native setter.
+        ☑ Generalize GuiElementRecipeBookSearch into a shared styled clearable text input.
+            ☑ Accept caller-provided placeholder, clear-tooltip text, font/style inputs, and text-change callback.
+            ☑ Preserve native editing, text selection, caret, focus, clear visibility, pointer cursor, and clear-button press/release behavior.
+            ☑ Give the shared component ownership of clear textures and tooltip lifecycle without Recipe Book localization or controller dependencies.
+            ☑ Keep the old feature-specific class only until Phase 5 migrates its consumers and tests; do not maintain two permanent implementations.
+        ☑ Implement shared styled dropdown and popup-list adapters.
+            ☑ Reuse the item-stack dropdown's owned-list replacement pattern without introducing item-preview behavior.
+            ☑ Style both the closed selector and expanded list, including the compact chevron and approved states.
+            ☑ Retain the approved 30-unit selector and popup row heights; cache styled textures with invalidation for changed labels, geometry, scale, and state.
+            ☑ Preserve native selection, callbacks, focus loss, opening/closing, keyboard/mouse navigation, wheel handling, and scrolling.
+            ☑ Keep custom rendering authoritative across recomposition and list replacement, and dispose replaced/native/additional owned resources correctly.
+        ☑ Implement the shared styled checkbox adapter.
+            ☑ Draw the flat frame and checked state while retaining native toggling, focus, keyboard/mouse activation, and callbacks.
+            ☑ Keep the 17-unit visual checkbox and reliable input bounds coordinated with measurement.
+        ☑ Add focused reusable-control tests in the GUI unit-test area.
+            ☑ Exercise applicable idle/hover/pressed/disabled/focused/checked/opened states and approved styling.
+            ☑ Test clear-input behavior with arbitrary caller labels and callbacks without constructing Recipe Book state.
+            ☑ Verify clearing produces the normal text-change notification exactly once and retains expected focus.
+            ☑ Cover text/caret/selection geometry, long labels, list recomposition, popup input bounds, fractional scales, and texture/tooltip disposal.
 
         Completion criteria:
-            ☐ All four control types are reusable, opt-in native-derived adapters with no Recipe Book semantic dependencies.
-            ☐ Control state and rendering tests pass, including recomposition and clear-input callback guarantees.
-            ☐ Existing unrelated consumers remain on their original controls with unchanged appearance and behavior.
+            ☑ All four control types are reusable, opt-in native-derived adapters with no Recipe Book semantic dependencies.
+            ☑ Control state and rendering tests pass, including recomposition and clear-input callback guarantees.
+            ☑ Existing unrelated consumers remain on their original controls with unchanged appearance and behavior.
 
     ## Phase 5: Adopt shared controls and align dialog composition:
         Prerequisites: Phases 3 and 4, plus Phase 2's approved local chrome path.

@@ -70,6 +70,9 @@ internal static class GuiControlMetrics
     internal const double NativePopupRowHeight = 30;
     internal const double NativeArrowWidth = 20;
     internal const double ChevronSize = 8;
+    internal const double DropdownTextInset = 5;
+    internal const double PopupSelectionWidth = 1;
+    internal const double ClearStroke = 1.5;
 
     internal static double MeasureTextWidth(CairoFont font, string text, double inset = TextInset) =>
         Math.Ceiling(font.GetTextExtents(text).Width / GuiElement.scaled(1) + 2 * inset);
@@ -91,6 +94,15 @@ internal static class GuiControlMetrics
 
 internal static class GuiControlDrawing
 {
+    internal static void FrameTexture(ICoreClientAPI api, int width, int height, int fill, int outline,
+        double scale, ref LoadedTexture texture)
+    {
+        using var surface = new ImageSurface(Format.Argb32, width, height);
+        using var ctx = new Context(surface);
+        Frame(ctx, 0, 0, width, height, fill, outline, scale);
+        api.Gui.LoadOrUpdateCairoTexture(surface, false, ref texture);
+    }
+
     internal static int Pixels(double units, double scale)
     {
         if (!double.IsFinite(units) || units < 0) throw new ArgumentOutOfRangeException(nameof(units));
