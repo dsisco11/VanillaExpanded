@@ -20,6 +20,70 @@ namespace VanillaExpanded.Tests.Unit.RecipeBook;
 public sealed class RecipeBookLifecycleTests
 {
     [Theory]
+    [InlineData(1)]
+    [InlineData(1.5)]
+    [InlineData(2)]
+    public void RecipeListInsetFramesViewportAndScrollbarWithoutOverlappingAdjacentControls(float scale)
+    {
+        using var f = new MenuFixture(scale: scale, includeRecipes: true);
+        for (int i = 0; i < 80; i++)
+            f.Lifecycle.Recipes.Add(f.Lifecycle.F.Catalogue.Recipe("other-" + i));
+        f.Lifecycle.F.Register(f.Lifecycle.Recipes.ToArray());
+        f.Lifecycle.FinalizeWorld();
+        f.Recompose();
+        f.Parent.TryOpen();
+        f.Toggle();
+        var book = Assert.Single(f.Menus);
+        AssertFrame();
+        var composer = book.SingleComposer;
+        f.ResizePanelSpace(composer.Bounds.fixedWidth + 40, composer.Bounds.fixedHeight - 10);
+        book.TryOpen();
+        AssertFrame();
+
+        void AssertFrame()
+        {
+            var composer = book.SingleComposer;
+            var frame = Assert.IsType<GuiElementInset>(composer.GetElement("recipes-background")).Bounds;
+            var viewport = composer.GetElement("tiles").InsideClipBounds;
+            var scrollbar = composer.GetScrollbar("scroll").Bounds;
+            double padding = GuiElement.scaled(3);
+            Assert.Equal(viewport.absX - padding, frame.absX, 4);
+            Assert.Equal(frame.absY + 2, viewport.absY, 4);
+            Assert.Equal(frame.absY + frame.OuterHeight - 2, viewport.absY + viewport.OuterHeight, 4);
+            Assert.Equal(frame.absY + 2, scrollbar.absY, 4);
+            Assert.Equal(frame.absY + frame.OuterHeight - 2, scrollbar.absY + scrollbar.OuterHeight, 4);
+            var tiles = Assert.IsType<GuiElementRecipeBookTiles>(composer.GetElement("tiles"));
+            tiles.ResetScroll();
+            Assert.Equal(viewport.absY, tiles.Bounds.absY, 4);
+            Assert.Equal(viewport.absY, tiles.Elements[0].Bounds.absY, 4);
+            Assert.All(tiles.Elements, tile => Assert.Same(viewport, tile.InsideClipBounds));
+            foreach (float position in new[] { 45f, 48f, 49f, 96f })
+            {
+                tiles.Scroll(position * scale);
+                Assert.Equal(position, tiles.ScrollPosition);
+                var first = Assert.IsType<GuiElementRecipeBookTile>(tiles.Elements[0]);
+                Assert.NotNull(first.Selection);
+                Assert.Equal(viewport.absY - position % GuiElementRecipeBookTiles.TileSize * scale,
+                    first.Bounds.absY, 4);
+                Assert.True(first.Bounds.absY <= viewport.absY);
+                Assert.True(first.Bounds.absY + first.Bounds.OuterHeight >= viewport.absY);
+            }
+            tiles.ResetScroll();
+            composer.GetTextInput("search").SetValue("no matching recipe");
+            var render = Mock.Get(f.Lifecycle.Api.Object.Render);
+            render.Invocations.Clear();
+            tiles.RenderInteractiveElements(0);
+            Assert.Contains(render.Invocations, call => call.Method.Name == nameof(IRenderAPI.PushScissor)
+                && ReferenceEquals(call.Arguments[0], viewport) && (bool)call.Arguments[1]);
+            composer.GetTextInput("search").SetValue("");
+            Assert.Equal(scrollbar.absX + scrollbar.OuterWidth + padding, frame.absX + frame.OuterWidth, 4);
+            var search = composer.GetTextInput("search").Bounds;
+            Assert.True(search.absY + search.OuterHeight < frame.absY);
+            Assert.True(frame.absY + frame.OuterHeight < composer.GetButton("previous").Bounds.absY);
+        }
+    }
+
+    [Theory]
     [InlineData(1, false)]
     [InlineData(1, true)]
     [InlineData(1.5, false)]
@@ -1819,7 +1883,7 @@ public sealed class RecipeBookLifecycleTests
             var craftableLabel = composer.GetStaticText("craftable-label");
             var sort = composer.GetDropDown("sort");
             var sortLabel = composer.GetElement("sort-label").Bounds;
-            var viewport = composer.GetElement("tiles").InsideClipBounds;
+            var viewport = composer.GetElement("tiles").Bounds.ParentBounds;
             var scroll = composer.GetScrollbar("scroll").Bounds;
             var empty = composer.GetDynamicText("empty").Bounds;
             var previous = composer.GetElement("previous").Bounds;
@@ -1833,7 +1897,7 @@ public sealed class RecipeBookLifecycleTests
             Assert.True(craftable.Bounds.absY + craftable.Bounds.OuterHeight + 8 * scale <= sort.Bounds.absY + .001);
             Assert.True(sortLabel.absX + sortLabel.OuterWidth + 8 * scale <= sort.Bounds.absX + .001);
             Assert.True(sort.Bounds.absY + sort.Bounds.OuterHeight + 8 * scale <= search.absY + .001);
-            Assert.True(search.absY + search.OuterHeight + 8 * scale <= viewport.absY + .001);
+            Assert.True(search.absY + search.OuterHeight + 5 * scale + 2 <= viewport.absY + .001);
             Assert.True(craftable.Bounds.OuterHeight < search.OuterHeight);
             Assert.True(sort.Bounds.OuterHeight < search.OuterHeight);
             Assert.True(sort.Font.UnscaledFontsize < composer.GetTextInput("search").Font.UnscaledFontsize);
@@ -1852,7 +1916,7 @@ public sealed class RecipeBookLifecycleTests
             Assert.True(viewport.absX + viewport.OuterWidth + 4 * scale <= scroll.absX + .001);
             Assert.Equal(viewport.absY, scroll.absY, 4);
             Assert.Equal(viewport.OuterHeight, scroll.OuterHeight, 4);
-            Assert.True(viewport.absY + viewport.OuterHeight + 10 * scale <= previous.absY + .001);
+            Assert.True(viewport.absY + viewport.OuterHeight + 7 * scale + 2 <= previous.absY + .001);
             Assert.True(previous.absX + previous.OuterWidth + 3 * scale <= auto.absX + .001);
             Assert.True(auto.absX + auto.OuterWidth + 3 * scale <= next.absX + .001);
             Assert.True(next.absX + next.OuterWidth + 4 * scale <= counter.absX + .001);
@@ -2282,7 +2346,7 @@ public sealed class RecipeBookLifecycleTests
             Assert.Equal(category, GetCategoryTabs(current.SingleComposer).activeElement);
             var currentTiles = Assert.IsType<GuiElementRecipeBookTiles>(current.SingleComposer.GetElement("tiles"));
             Assert.Equal(73, currentTiles.ScrollPosition);
-            Assert.Equal(73 * scale, current.SingleComposer.GetScrollbar("scroll").CurrentYPosition);
+            Assert.Equal(73 * scale, current.SingleComposer.GetScrollbar("scroll").CurrentYPosition, 4);
             Assert.Equal(firstOutput, Assert.IsType<GuiElementRecipeBookTile>(currentTiles.Elements[0]).Selection?.Output.Id);
         }
     }

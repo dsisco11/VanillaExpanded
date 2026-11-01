@@ -148,7 +148,11 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         var searchBounds = ElementBounds.Fixed(0, sortTop + craftableHeight + 8, content.fixedWidth, searchHeight);
         var footer = ElementBounds.Fixed(0, content.fixedHeight - footerHeight, content.fixedWidth, footerHeight);
         double listTop = searchBounds.fixedY + searchHeight + 8;
-        var viewport = ElementBounds.Fixed(0, listTop, content.fixedWidth - 16, footer.fixedY - 10 - listTop);
+        double listHeight = footer.fixedY - 10 - listTop;
+        var listFrame = ElementBounds.Fixed(-3, listTop - 3, content.fixedWidth + 6, listHeight + 6);
+        double border = 2 / GuiElement.scaled(1);
+        var viewport = ElementBounds.Fixed(0, listFrame.fixedY + border, content.fixedWidth - 16,
+            listFrame.fixedHeight - 2 * border);
         var scrollBounds = ElementBounds.Fixed(0, viewport.fixedY, 12, viewport.fixedHeight).FixedRightOf(viewport, 4);
         var previous = ElementBounds.Fixed(0, 0, previousWidth, footerHeight);
         var auto = ElementBounds.Fixed(0, 0, autoWidth, footerHeight).FixedRightOf(previous, 3);
@@ -156,7 +160,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         double labelLeft = next.fixedX + next.fixedWidth + 4;
         var handbook = ElementBounds.Fixed(content.fixedWidth - handbookWidth, 0, handbookWidth, footerHeight);
         var label = ElementBounds.Fixed(labelLeft, 0, handbook.fixedX - 4 - labelLeft, footerHeight);
-        var tiles = new GuiElementRecipeBookTiles(capi, ElementBounds.Fixed(0, 0, viewport.fixedWidth, viewport.fixedHeight),
+        var tiles = new GuiElementRecipeBookTiles(capi, ElementBounds.Fixed(0, 0, viewport.fixedWidth, viewport.fixedHeight).WithParent(viewport),
             viewport, session, Inspect, Activate, icons);
         var newTooltip = new GuiElementRecipeBookTooltip(capi);
         var newOptions = new GuiElementRecipeBookOptions(capi, ElementBounds.Fixed(width - 80, 7, 17, 17));
@@ -201,6 +205,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
             .AddHoverText(Lang.Get("vanillaexpanded:recipebook-sort-hint"), CairoFont.WhiteSmallText(),
                 300, ElementBounds.Fixed(0, sortTop, sortBounds.fixedX + sortBounds.fixedWidth, craftableHeight),
                 "sort-hint")
+            .AddStaticElement(new GuiElementInset(capi, listFrame, 2, 0.65f), "recipes-background")
             .BeginClip(viewport)
                 .AddInteractiveElement(tiles, "tiles")
             .EndClip()

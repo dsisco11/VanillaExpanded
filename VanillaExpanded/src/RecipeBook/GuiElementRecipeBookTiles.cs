@@ -45,7 +45,7 @@ internal sealed class GuiElementRecipeBookTiles : GuiElementContainer
             Add(tile);
         }
         InsideClipBounds = viewport;
-        foreach (var tile in Elements) tile.InsideClipBounds = viewport;
+        foreach (var tile in Elements) tile.InsideClipBounds = InsideClipBounds;
         session.Changed += Changed;
         BindRows(false);
     }
@@ -132,7 +132,7 @@ internal sealed class GuiElementRecipeBookTiles : GuiElementContainer
     {
         icons.Prepare(Elements);
         // Native atlas baking can change the active GL scissor rectangle.
-        api.Render.PushScissor(viewport, true);
+        api.Render.PushScissor(InsideClipBounds, true);
         try
         {
             base.RenderInteractiveElements(deltaTime);
@@ -167,7 +167,7 @@ internal sealed class GuiElementRecipeBookTiles : GuiElementContainer
 
     public override void OnMouseWheel(ICoreClientAPI api, MouseWheelEventArgs args)
     {
-        if (viewport.PointInside(api.Input.MouseX, api.Input.MouseY)) scrollbar?.OnMouseWheel(api, args);
+        if (InsideClipBounds.PointInside(api.Input.MouseX, api.Input.MouseY)) scrollbar?.OnMouseWheel(api, args);
     }
 
     public override void OnFocusGained()
