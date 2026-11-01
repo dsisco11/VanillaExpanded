@@ -135,13 +135,15 @@ The dialog contains category tabs and a framed content panel with the selected c
 
 Composition and minimum-size measurement use shared named dimensions for spacing, margins, and control chrome. Minimum width accommodates the complete category strip and localized headings and controls; minimum height reserves room for the heading and empty-state text. GUI-scaled dimensions are distinct from physical-pixel borders and docking gaps. [RecipeBookLayout](../VanillaExpanded/src/RecipeBook/RecipeBookLayout.cs) owns placement and preferred dialog dimensions; the options component owns popup-width measurement.
 
-The [shared visual helpers](../VanillaExpanded/src/Gui/GuiControlVisuals.cs) expose opt-in palette, frame drawing, control measurement, and host-relative pixel snapping. Category-tab rendering uses the shared snapping helper. The separate [visual dimensions](../VanillaExpanded/src/RecipeBook/RecipeBookVisualMetrics.cs) are not yet used by dialog composition; current control appearance and layout remain governed by the existing components.
+The [shared visual helpers](../VanillaExpanded/src/Gui/GuiControlVisuals.cs) expose opt-in palette, frame drawing, control measurement, and host-relative pixel snapping. Category tabs and their panel use the shared palette, scaled outlines, and snapping rules; tab measurements also govern strip sizing. The separate [visual dimensions](../VanillaExpanded/src/RecipeBook/RecipeBookVisualMetrics.cs) are not yet used by dialog composition. Other control appearance and layout remain governed by their existing components.
 
 Search is the first keyboard tab stop. Native control focus and input routing are preserved, with the category strip acting as one outer tab stop.
 
 ### Category tabs
 
-[GuiElementIconTabs](../VanillaExpanded/src/Gui/GuiElementIconTabs.cs) is a crafting-independent icon tab strip owned by a native child composer. [GuiElementIconTab](../VanillaExpanded/src/Gui/GuiElementIconTab.cs) retains native toggle interaction and renders rounded-top folder tabs. The selected tab's open bottom edge joins the dialog's framed content panel; inactive tabs sit lower.
+[GuiElementIconTabs](../VanillaExpanded/src/Gui/GuiElementIconTabs.cs) is a crafting-independent icon tab strip owned by a native child composer. Its 30-unit tabs have four-unit inter-tab gaps and no end spacing; the first tab is flush with the panel edge. [GuiElementIconTab](../VanillaExpanded/src/Gui/GuiElementIconTab.cs) retains native toggle interaction and renders rounded-top folder tabs. Selected tabs are 36 units high with a scaled upper accent and an open bottom edge joining the framed panel; inactive tabs are 32 units high. Idle, hover, and selected states have distinct background and icon tints without changing icon geometry.
+
+All appears first. Present standard categories follow Construction, Decorative, Mechanics, Terrain, Tools, Clothing, and Items. Additional categories follow those standards, ordered by localized name with an ordinal category-code tie-breaker; Other appears last when present. This presentation order does not change catalogue membership, filtering, or code-based browsing restoration.
 
 Category selection updates its controller and panel heading and resets recipe scrolling. Localized tooltips and native focus highlighting provide category identification. The Recipe Book reserves width for every tab; the shared component also supports selection wrapping and overflow navigation in narrower hosts.
 

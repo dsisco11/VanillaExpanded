@@ -24,7 +24,8 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
     private const double ListFrameOutset = 3;
     private const double ListFooterSpacing = 10;
     private const int ListBorderPixels = 2;
-    private const double PanelSeamPixels = 1;
+    private static readonly string[] StandardCategories =
+        ["construction", "decorative", "mechanics", "terrain", "tools", "clothing", "items"];
     private const float ListBackgroundBrightness = 0.65f;
     private const double ScrollbarWidth = 12;
     private const double ScrollbarSpacing = 4;
@@ -92,7 +93,13 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         categories = [null,
             .. catalogue.CategoryCodes.Where(code => code is not (CraftingCatalogue.OtherCategory
                 or "flora" or "clutter" or "aquatic" or "liquids" or "creatures" or "meta"))
-                .OrderBy(CategoryName, StringComparer.CurrentCultureIgnoreCase),
+                .OrderBy(code =>
+                {
+                    int index = Array.IndexOf(StandardCategories, code);
+                    return index >= 0 ? index : StandardCategories.Length;
+                })
+                .ThenBy(CategoryName, StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(code => code, StringComparer.Ordinal),
             .. catalogue.CategoryCodes.Where(code => code == CraftingCatalogue.OtherCategory)];
         coordinator = new(api, allocator, result => Error(result.Reason!));
         session = new(catalogue, allocator,
@@ -173,7 +180,8 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         double contentTop = GuiStyle.TitleBarHeight + DialogPadding;
         var content = ElementBounds.Fixed(ContentInset, contentTop, width - 2 * ContentInset, height - contentTop - ContentInset);
         var tabsBounds = ElementBounds.Fixed(-PanelPadding, 0, content.fixedWidth + 2 * PanelPadding, tabsHeight);
-        double panelTop = tabsHeight - PanelSeamPixels / GuiElement.scaled(1);
+        double panelTop = tabsHeight - Math.Max(1,
+            GuiControlDrawing.Pixels(GuiControlMetrics.Outline, GuiElement.scaled(1))) / GuiElement.scaled(1);
         var categoryPanel = ElementBounds.Fixed(-PanelPadding, panelTop, content.fixedWidth + 2 * PanelPadding,
             content.fixedHeight - panelTop + PanelPadding);
         var categoryTitle = ElementBounds.Fixed(0, tabsHeight + CategoryTitleTopPadding, content.fixedWidth, categoryTitleHeight);

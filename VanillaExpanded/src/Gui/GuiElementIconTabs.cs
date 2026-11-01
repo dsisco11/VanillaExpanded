@@ -9,9 +9,9 @@ namespace VanillaExpanded.Gui;
 
 internal sealed class GuiElementIconTabs : GuiElement
 {
-    internal const double TabSize = 30;
-    internal const double TabHeight = 36;
-    private const double Spacing = 4;
+    internal const double TabSize = GuiControlMetrics.TabWidth;
+    internal const double TabHeight = GuiControlMetrics.TabHeight;
+    private const double Spacing = GuiControlMetrics.TabGap;
     private const double ArrowWidth = 16;
     internal readonly GuiTab[] tabs;
     private readonly string[] icons;
@@ -55,7 +55,7 @@ internal sealed class GuiElementIconTabs : GuiElement
     internal static double MeasureWidth(int count)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(count);
-        return count * TabSize + (count + 1) * Spacing;
+        return count * TabSize + (count - 1) * Spacing;
     }
 
     public override void ComposeElements(Context ctx, ImageSurface surface)
@@ -66,13 +66,13 @@ internal sealed class GuiElementIconTabs : GuiElement
         Bounds.WithChild(root);
         Composer = api.Gui.CreateCompo("icon-tabs", root);
         Composer.Tabbable = false;
-        // Include the snapped tab/panel seam despite native scissor truncation at fractional scales.
-        Viewport = ElementBounds.Fixed(0, 0, root.fixedWidth, root.fixedHeight + 1 / scaled(1));
+        // Include snapped right/bottom edges despite native scissor truncation at fractional scales.
+        Viewport = ElementBounds.Fixed(0, 0, root.fixedWidth + 1 / scaled(1), root.fixedHeight + 1 / scaled(1));
         content = ElementBounds.Fixed(0, 0, 0, root.fixedHeight);
         var buttonBounds = new ElementBounds[tabs.Length];
         for (int i = 0; i < tabs.Length; i++)
         {
-            buttonBounds[i] = ElementBounds.Fixed(Spacing, 0, TabSize, TabHeight)
+            buttonBounds[i] = ElementBounds.Fixed(0, 0, TabSize, TabHeight)
                 .WithAlignment(EnumDialogArea.LeftBottom);
             if (i > 0) buttonBounds[i].FixedRightOf(buttonBounds[i - 1], Spacing);
         }
@@ -80,7 +80,7 @@ internal sealed class GuiElementIconTabs : GuiElement
         bool overflow = content.fixedWidth > root.fixedWidth;
         if (overflow)
             Viewport.WithFixedPosition(ArrowWidth + Spacing, 0)
-                .WithFixedWidth(Math.Max(1, root.fixedWidth - 2 * (ArrowWidth + Spacing)));
+                .WithFixedWidth(Math.Max(1, root.fixedWidth - 2 * (ArrowWidth + Spacing)) + 1 / scaled(1));
         Composer.BeginClip(Viewport)
             .BeginChildElements(content);
         buttons = new GuiElementToggleButton[tabs.Length];

@@ -56,6 +56,8 @@ internal static class GuiControlMetrics
     internal const double TabGap = 4;
     internal const double CategoryIconSize = 20;
     internal const double TabAccent = 2;
+    internal const double TabCornerRadius = 5;
+    internal const double CategoryIconBottomInset = 7;
     internal const double TextInset = 8;
     internal const double CheckboxSize = 17;
     internal const double SearchHeight = 28;
@@ -145,9 +147,7 @@ internal static class GuiControlDrawing
 
     internal static (double X, double Y) RenderOrigin(ElementBounds bounds, int rasterHeight)
     {
-        ElementBounds? surface = null;
-        for (var parent = bounds.ParentBounds; parent != null; parent = parent.ParentBounds)
-            if (parent.IsDrawingSurface) surface = parent;
+        var surface = DrawingSurface(bounds);
         if (surface == null)
             return (Math.Round(bounds.renderX, MidpointRounding.AwayFromZero),
                 Math.Round(bounds.renderY, MidpointRounding.AwayFromZero));
@@ -156,5 +156,22 @@ internal static class GuiControlDrawing
         return ((int)surface.renderX + Math.Round(bounds.renderX - surface.renderX, MidpointRounding.AwayFromZero),
             (int)surface.renderY + Math.Round(bounds.renderY - surface.renderY + bounds.OuterHeight,
                 MidpointRounding.AwayFromZero) - rasterHeight);
+    }
+
+    internal static int RenderWidth(ElementBounds bounds)
+    {
+        if (!double.IsFinite(bounds.OuterWidth) || bounds.OuterWidth <= 0)
+            throw new ArgumentOutOfRangeException(nameof(bounds), "Raster width must be positive and finite.");
+        double x = bounds.renderX - (DrawingSurface(bounds)?.renderX ?? 0);
+        return Math.Max(1, checked((int)(Math.Round(x + bounds.OuterWidth, MidpointRounding.AwayFromZero)
+            - Math.Round(x, MidpointRounding.AwayFromZero))));
+    }
+
+    private static ElementBounds? DrawingSurface(ElementBounds bounds)
+    {
+        ElementBounds? surface = null;
+        for (var parent = bounds.ParentBounds; parent != null; parent = parent.ParentBounds)
+            if (parent.IsDrawingSurface) surface = parent;
+        return surface;
     }
 }

@@ -36,20 +36,20 @@ public sealed class GuiElementIconTabsTests
         using var surface = new ImageSurface(Format.Argb32, 64, 64);
         using var ctx = new Context(surface);
         button.ComposeElements(ctx, surface);
-        Assert.Equal(2, draws.Count);
+        Assert.Equal(3, draws.Count);
         Assert.All(draws, draw =>
         {
             Assert.Equal(draw.Width, draw.Height);
             Assert.Equal((double)draw.Width, draw.WidthRequested);
         });
         Assert.Equal(draws[0].Width, draws[1].Width);
-        Assert.Equal(button.Font.Color, draws[0].Color);
-        Assert.Equal(GuiStyle.ActiveButtonTextColor, draws[1].Color);
-        Assert.False(draws[0].Color.SequenceEqual(draws[1].Color));
-        Assert.Equal(4, graphics.Gui.Invocations.Count(call =>
+        Assert.Equal(Color(0xb7a98c), draws[0].Color);
+        Assert.Equal(Color(0xfff0cc), draws[1].Color);
+        Assert.Equal(Color(0xf5d58d), draws[2].Color);
+        Assert.Equal(6, graphics.Gui.Invocations.Count(call =>
             call.Method.Name == nameof(IGuiAPI.LoadOrUpdateCairoTexture) && !(bool)call.Arguments[1]));
-        var textures = new Dictionary<bool, int>();
-        var backgrounds = new Dictionary<bool, int>();
+        var textures = new Dictionary<int, int>();
+        var backgrounds = new Dictionary<int, int>();
         (double X, double Y)? iconPosition = null;
         foreach (var state in new[] { (On: false, Hover: false), (On: false, Hover: true),
             (On: true, Hover: false), (On: true, Hover: true) })
@@ -65,11 +65,13 @@ public sealed class GuiElementIconTabsTests
             var background = calls[0].Arguments;
             Assert.Equal(Math.Round(button.Bounds.renderX, MidpointRounding.AwayFromZero), (double)background[1]);
             Assert.Equal(Math.Round(button.Bounds.renderY, MidpointRounding.AwayFromZero), (double)background[2]);
-            Assert.Equal(Math.Round(30 * scale, MidpointRounding.AwayFromZero), (double)background[3]);
+            Assert.Equal(Math.Round(button.Bounds.renderX + 30 * scale, MidpointRounding.AwayFromZero)
+                - Math.Round(button.Bounds.renderX, MidpointRounding.AwayFromZero), (double)background[3]);
             Assert.Equal(Math.Round(36 * scale, MidpointRounding.AwayFromZero), (double)background[4]);
-            if (backgrounds.TryGetValue(state.On, out int backgroundTexture))
+            int key = state.On ? 2 : state.Hover ? 1 : 0;
+            if (backgrounds.TryGetValue(key, out int backgroundTexture))
                 Assert.Equal(backgroundTexture, (int)background[0]);
-            else backgrounds.Add(state.On, (int)background[0]);
+            else backgrounds.Add(key, (int)background[0]);
             var overlay = calls[1].Arguments;
             int size = (int)Math.Round(20 * scale, MidpointRounding.AwayFromZero);
             Assert.Equal((double)size, (double)overlay[3]);
@@ -80,14 +82,19 @@ public sealed class GuiElementIconTabsTests
             if (iconPosition is { } previous) Assert.Equal(previous, position);
             else iconPosition = position;
             Assert.Equal(51f, (float)overlay[5]);
-            bool active = state.On || state.Hover;
-            if (textures.TryGetValue(active, out int texture)) Assert.Equal(texture, (int)overlay[0]);
-            else textures.Add(active, (int)overlay[0]);
+            if (textures.TryGetValue(key, out int texture)) Assert.Equal(texture, (int)overlay[0]);
+            else textures.Add(key, (int)overlay[0]);
+            Assert.DoesNotContain(graphics.Render.Invocations, call => call.Method.Name == "RenderRectangle");
         }
-        Assert.NotEqual(textures[false], textures[true]);
-        Assert.NotEqual(backgrounds[false], backgrounds[true]);
+        Assert.Equal(3, textures.Values.Distinct().Count());
+        Assert.Equal(3, backgrounds.Values.Distinct().Count());
+        Assert.Equal(6, graphics.Gui.Invocations.Count(call =>
+            call.Method.Name == nameof(IGuiAPI.LoadOrUpdateCairoTexture)));
         button.Dispose();
         Assert.Empty(graphics.Textures);
+
+        static double[] Color(int rgb) =>
+            [((rgb >> 16) & 255) / 255d, ((rgb >> 8) & 255) / 255d, (rgb & 255) / 255d, 1];
     }
 
     [Theory]
@@ -96,6 +103,7 @@ public sealed class GuiElementIconTabsTests
     [InlineData(1.5f)]
     [InlineData(1.75f)]
     [InlineData(2f)]
+    [InlineData(1.1f)]
     public void FolderTabRasterHasRoundedShouldersAndOpensIntoTheMatchingPanel(float scale)
     {
         using var graphics = new RecipeBookRenderFixture(scale);
@@ -118,26 +126,55 @@ public sealed class GuiElementIconTabsTests
         using var ctx = new Context(surface);
         button.ComposeElements(ctx, surface);
         var released = uploads[0];
-        var selected = uploads[1];
-        Assert.Equal(4, uploads.Count);
+        var hovered = uploads[1];
+        var selected = uploads[2];
+        Assert.Equal(6, uploads.Count);
         Assert.Equal((released.Width, released.Height), (selected.Width, selected.Height));
         int middle = selected.Width / 2;
         Assert.Equal(0, Pixel(released, middle, 0)[3]);
         Assert.Equal(255, Pixel(selected, middle, 0)[3]);
         Assert.Equal(0, Pixel(selected, 0, 0)[3]);
-        Assert.Equal(255, Pixel(released, middle, (int)Math.Round(4 * scale))[3]);
+        int inactiveTop = selected.Height - (int)Math.Round(32 * scale, MidpointRounding.AwayFromZero);
+        int stroke = Math.Max(1, (int)Math.Round(scale, MidpointRounding.AwayFromZero));
+        int accent = (int)Math.Round(2 * scale, MidpointRounding.AwayFromZero);
+        Assert.Equal(255, Pixel(released, middle, inactiveTop)[3]);
+        Assert.Equal(0, Pixel(released, middle, inactiveTop - 1)[3]);
+        Assert.Equal(0x382f23, Rgb(released, middle, released.Height / 2));
+        Assert.Equal(0x51422e, Rgb(hovered, middle, hovered.Height / 2));
+        Assert.Equal(0x51432f, Rgb(selected, middle, selected.Height / 2));
+        for (int i = 0; i < stroke; i++)
+        {
+            Assert.Equal(0x766349, Rgb(released, middle, inactiveTop + i));
+            Assert.Equal(0x766349, Rgb(hovered, middle, inactiveTop + i));
+            Assert.Equal(0xaa8c54, Rgb(selected, middle, i));
+            Assert.Equal(0x766349, Rgb(released, i, released.Height / 2));
+            Assert.Equal(0xaa8c54, Rgb(selected, i, selected.Height / 2));
+        }
+        for (int i = 0; i < accent; i++)
+            Assert.Equal(0xd3b46f, Rgb(selected, middle, stroke + i));
+        Assert.Equal(0x51432f, Rgb(selected, middle, stroke + accent));
 
         var panelBounds = ElementBounds.Fixed(0, 0, 80, 80).WithEmptyParent();
         panelBounds.CalcWorldBounds();
         GuiElementIconTab.DrawPanel(ctx, surface, panelBounds);
         surface.Flush();
         var panel = (surface.Width, surface.Height, surface.Stride, surface.Data.ToArray());
-        Assert.Equal(Pixel(panel, 10, 10), Pixel(selected, middle, selected.Height - 1));
-        Assert.Equal(Pixel(panel, 10, 0), Pixel(released, middle, released.Height - 1));
+        for (int i = 0; i < stroke; i++)
+        {
+            Assert.Equal(0x887453, Rgb(panel, 10, i));
+            Assert.Equal(Pixel(panel, 10, 10), Pixel(selected, middle, selected.Height - 1 - i));
+            Assert.Equal(Pixel(panel, 10, i), Pixel(released, middle, released.Height - 1 - i));
+            Assert.Equal(Pixel(panel, 10, i), Pixel(hovered, middle, hovered.Height - 1 - i));
+        }
         Assert.NotEqual(Pixel(released, middle, released.Height - 1), Pixel(selected, middle, selected.Height - 1));
 
         static byte[] Pixel((int Width, int Height, int Stride, byte[] Pixels) image, int x, int y) =>
             image.Pixels.AsSpan(y * image.Stride + x * 4, 4).ToArray();
+        static int Rgb((int Width, int Height, int Stride, byte[] Pixels) image, int x, int y)
+        {
+            byte[] pixel = Pixel(image, x, y);
+            return pixel[2] << 16 | pixel[1] << 8 | pixel[0];
+        }
     }
 
     [Theory]
@@ -156,14 +193,18 @@ public sealed class GuiElementIconTabsTests
         host.IsDrawingSurface = true;
         tabs.Bounds.WithParent(host);
         host.WithChild(tabs.Bounds);
-        var panel = ElementBounds.Fixed(120, 65 + GuiElementIconTabs.TabHeight - 1 / GuiElement.scaled(1), 180, 50).WithParent(host);
+        int stroke = Math.Max(1, (int)Math.Round(scale, MidpointRounding.AwayFromZero));
+        var panel = ElementBounds.Fixed(120, 65 + 36 - stroke / GuiElement.scaled(1), 180, 50).WithParent(host);
         host.WithChild(panel);
+        int textureCount = graphics.Textures.Count;
         foreach (double position in new[] { .1, .3, .7 })
         {
             host.fixedX = 100 + position;
             host.fixedY = 80 + position;
             host.MarkDirtyRecursive();
             host.CalcWorldBounds();
+            Compose(tabs);
+            Assert.Equal(textureCount, graphics.Textures.Count);
             tabs.SetValue(8, false);
             graphics.Render.Invocations.Clear();
             tabs.RenderInteractiveElements(0);
@@ -173,7 +214,7 @@ public sealed class GuiElementIconTabsTests
             Assert.Equal(9, backgrounds.Length);
             var selected = backgrounds[8].Arguments;
             Assert.Equal((int)host.renderY + Math.Round(panel.drawY, MidpointRounding.AwayFromZero),
-                (double)selected[2] + (double)selected[4] - 1);
+                (double)selected[2] + (double)selected[4] - stroke);
             Assert.True((double)selected[2] + (double)selected[4] <=
                 (int)tabs.Viewport!.renderY + tabs.Viewport.OuterHeightInt);
             var selectedBounds = tabs.Composer!.GetToggleButton("tab-8").Bounds;
@@ -202,7 +243,7 @@ public sealed class GuiElementIconTabsTests
         Assert.Equal("", second.GetText());
         Assert.Equal(first.Bounds.OuterWidth, second.Bounds.OuterWidth);
         Assert.Equal(GuiElementIconTabs.TabSize * scale, first.Bounds.OuterWidth, 4);
-        Assert.Equal(tabs.Bounds.absX + 4 * scale, first.Bounds.absX, 4);
+        Assert.Equal(tabs.Bounds.absX, first.Bounds.absX, 4);
         Assert.Equal(first.Bounds.absX + first.Bounds.OuterWidth + 4 * scale, second.Bounds.absX, 4);
         Assert.Equal(tabs.Bounds.absY + tabs.Bounds.InnerHeight,
             first.Bounds.absY + first.Bounds.OuterHeight, 4);
@@ -225,6 +266,7 @@ public sealed class GuiElementIconTabsTests
 
     [Theory]
     [InlineData(1f, 9)]
+    [InlineData(1.25f, 1)]
     [InlineData(1.25f, 10)]
     [InlineData(1.5f, 18)]
     [InlineData(1.75f, 9)]
@@ -234,7 +276,7 @@ public sealed class GuiElementIconTabsTests
         using var graphics = new RecipeBookRenderFixture(scale);
         Setup(graphics);
         double width = GuiElementIconTabs.MeasureWidth(count);
-        Assert.Equal(count * 30 + (count + 1) * 4, width);
+        Assert.Equal(count * 30 + (count - 1) * 4, width);
         using var tabs = Create(graphics, Enumerable.Range(0, count).Select(i => "Entry " + i).ToArray(), width, _ => { });
         Assert.False(tabs.Composer!.GetButton("left").Visible);
         Assert.False(tabs.Composer.GetButton("right").Visible);
@@ -245,7 +287,22 @@ public sealed class GuiElementIconTabsTests
             Assert.True(bounds.absX + bounds.OuterWidth <= tabs.Viewport.absX + tabs.Viewport.InnerWidth + .001);
         });
         tabs.SetValue(count - 1, false);
-        Assert.Equal(tabs.Bounds.absX + 4 * scale, tabs.Composer.GetToggleButton("tab-0").Bounds.absX, 4);
+        Assert.Equal(tabs.Bounds.absX, tabs.Composer.GetToggleButton("tab-0").Bounds.absX, 4);
+        var last = tabs.Composer.GetToggleButton("tab-" + (count - 1)).Bounds;
+        Assert.Equal(tabs.Bounds.absX + width * scale, last.absX + last.OuterWidth, 4);
+        graphics.Render.Invocations.Clear();
+        tabs.RenderInteractiveElements(0);
+        var backgrounds = graphics.Render.Invocations.Where(call =>
+            call.Method.Name == nameof(IRenderAPI.Render2DTexturePremultipliedAlpha)
+            && call.Arguments.Count == 7 && (float)call.Arguments[5] == 50).ToArray();
+        Assert.Equal(count, backgrounds.Length);
+        Assert.All(backgrounds, call =>
+        {
+            double x = (double)call.Arguments[1];
+            double right = x + (double)call.Arguments[3];
+            Assert.True(x >= (int)tabs.Viewport!.renderX);
+            Assert.True(right <= (int)tabs.Viewport.renderX + tabs.Viewport.OuterWidthInt);
+        });
         Assert.Throws<ArgumentOutOfRangeException>(() => GuiElementIconTabs.MeasureWidth(0));
     }
 

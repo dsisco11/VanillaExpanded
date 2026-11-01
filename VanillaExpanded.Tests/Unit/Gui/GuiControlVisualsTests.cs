@@ -78,6 +78,8 @@ public sealed class GuiControlVisualsTests
         Assert.Equal(4d, GuiControlMetrics.TabGap);
         Assert.Equal(20d, GuiControlMetrics.CategoryIconSize);
         Assert.Equal(2d, GuiControlMetrics.TabAccent);
+        Assert.Equal(5d, GuiControlMetrics.TabCornerRadius);
+        Assert.Equal(7d, GuiControlMetrics.CategoryIconBottomInset);
         Assert.Equal(30d, GuiControlMetrics.NativeDropdownHeight);
         Assert.Equal(30d, GuiControlMetrics.NativePopupRowHeight);
         Assert.Equal(.35, GuiControlPalette.DisabledOpacity);

@@ -78,25 +78,25 @@
         Sources: Proposal sections "Palette and tab states" and "Category presentation".
         Outcome: The tab strip matches the approved state treatment and exposes complete, stable category presentation to dialog composition.
 
-        ☐ Update GuiElementIconTab rendering without replacing correct category artwork.
-            ☐ Use the approved idle, hover, and selected icon tints with identical 20-by-20 GUI-unit display geometry.
-            ☐ Add the inactive hover fill, scaled outlines, and separate two-unit selected upper accent.
-            ☐ Keep selected tabs 36 units high with an open bottom edge, inactive tabs 32 units high with lower shoulders, and inactive bottom borders matching the panel.
-            ☐ Preserve selected treatment on hover and retain the native category-strip focus outline without adding a per-tab outline.
-            ☐ Coordinate tab/panel baseline snapping during fractional dragging and recomposition; preserve nearest magnification and texture ownership.
-        ☐ Update GuiElementIconTabs strip geometry and Recipe Book category ordering.
-            ☐ Use 30-unit tab widths and four-unit inter-tab gaps without extra leading/trailing spacing.
-            ☐ Order present standard categories All, Construction, Decorative, Mechanics, Terrain, Tools, Clothing, Items, Other.
-            ☐ Insert additional categories before Other, after the standard named categories, sorted by localized name with an ordinal code tie-breaker.
-            ☐ Preserve code-based selection/restoration, category membership, localized headings/tooltips, wrapping, and shared-host overflow navigation.
-        ☐ Extend GUI and category lifecycle tests.
-            ☐ Assert approved raster colors, accent, seam continuity, stationary icons, and fractional-scale geometry independently.
-            ☐ Cover omitted categories, additional categories, translated names/ties, restored identity, keyboard/mouse selection, and resource disposal.
+        ☑ Update GuiElementIconTab rendering without replacing correct category artwork.
+            ☑ Use the approved idle, hover, and selected icon tints with identical 20-by-20 GUI-unit display geometry.
+            ☑ Add the inactive hover fill, scaled outlines, and separate two-unit selected upper accent.
+            ☑ Keep selected tabs 36 units high with an open bottom edge, inactive tabs 32 units high with lower shoulders, and inactive bottom borders matching the panel.
+            ☑ Preserve selected treatment on hover and retain the native category-strip focus outline without adding a per-tab outline.
+            ☑ Coordinate tab/panel baseline snapping during fractional dragging and recomposition; preserve nearest magnification and texture ownership.
+        ☑ Update GuiElementIconTabs strip geometry and Recipe Book category ordering.
+            ☑ Use 30-unit tab widths and four-unit inter-tab gaps without extra leading/trailing spacing.
+            ☑ Order present standard categories All, Construction, Decorative, Mechanics, Terrain, Tools, Clothing, Items, Other.
+            ☑ Insert additional categories before Other, after the standard named categories, sorted by localized name with an ordinal code tie-breaker.
+            ☑ Preserve code-based selection/restoration, category membership, localized headings/tooltips, wrapping, and shared-host overflow navigation.
+        ☑ Extend GUI and category lifecycle tests.
+            ☑ Assert approved raster colors, accent, seam continuity, stationary icons, and fractional-scale geometry independently.
+            ☑ Cover omitted categories, additional categories, translated names/ties, restored identity, keyboard/mouse selection, and resource disposal.
 
         Completion criteria:
-            ☐ The strip width matches tab widths plus inter-tab gaps, and the first tab is flush with the panel edge.
-            ☐ All required tab states meet the specified palette and geometry without moving icons or duplicating focus outlines.
-            ☐ Ordering changes preserve membership, restoration, and generic strip interaction behavior.
+            ☑ The strip width matches tab widths plus inter-tab gaps, and the first tab is flush with the panel edge.
+            ☑ All required tab states meet the specified palette and geometry without moving icons or duplicating focus outlines.
+            ☑ Ordering changes preserve membership, restoration, and generic strip interaction behavior.
 
     ## Phase 4: Implement reusable styled native controls:
         Prerequisites: Phases 1 and 2. Independent of Phase 3.
