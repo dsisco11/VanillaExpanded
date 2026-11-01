@@ -103,16 +103,17 @@ public sealed class HudOverlayHoverLabelTests : IDisposable
 
     [Theory]
     [Trait("Category", "Unit")]
-    [InlineData("42%", false, "Indicator\n42%")]
-    [InlineData(null, false, "Indicator\nUnavailable")]
-    [InlineData("", false, "Indicator\nUnavailable")]
-    [InlineData(" ", false, "Indicator\nUnavailable")]
-    [InlineData("stale reading", true, "Indicator (inactive)\nUnavailable")]
+    [InlineData("42%", false, "Indicator\nValue: 42%")]
+    [InlineData("0", false, "Indicator\nValue: 0")]
+    [InlineData(null, false, "Indicator\n")]
+    [InlineData("", false, "Indicator\n")]
+    [InlineData(" ", false, "Indicator\n")]
+    [InlineData("stale reading", true, "Indicator (inactive)\n")]
     public void TooltipHasValueOnSecondLineWithoutReadingInactiveState(string? value, bool inactive, string expected)
     {
         Mock.Get(Lang.AvailableLanguages["en"])
-            .Setup(language => language.Get("vanillaexpanded:hud-value-unavailable", It.IsAny<object[]>()))
-            .Returns("Unavailable");
+            .Setup(language => language.Get("vanillaexpanded:hud-value-format", It.IsAny<object[]>()))
+            .Returns((string _, object[] args) => "Value: " + args[0]);
         var overlay = new Mock<IHudOverlay>();
         overlay.SetupGet(feature => feature.HoverValue).Returns(value);
         var registration = new HudOverlayRegistration("test:value", overlay.Object, () => true, "group");
@@ -260,8 +261,8 @@ public sealed class HudOverlayHoverLabelTests : IDisposable
                 texture.Width = surface.Width; texture.Height = surface.Height;
             }));
         Mock.Get(Lang.AvailableLanguages["en"])
-            .Setup(language => language.Get("vanillaexpanded:hud-value-unavailable", It.IsAny<object[]>()))
-            .Returns("Unavailable");
+            .Setup(language => language.Get("vanillaexpanded:hud-value-format", It.IsAny<object[]>()))
+            .Returns((string _, object[] args) => "Value: " + args[0]);
         string value = "125%";
         var overlay = new Mock<IHudOverlay>();
         overlay.SetupGet(feature => feature.HoverValue).Returns(() => value);
@@ -291,16 +292,16 @@ public sealed class HudOverlayHoverLabelTests : IDisposable
 
         Draw();
         var first = Tooltip();
-        Assert.Equal("Wind Speed\n125%", Text());
+        Assert.Equal("Wind Speed\nValue: 125%", Text());
         Assert.True(Description(first).Bounds.fixedHeight > singleLineHeight);
         int cachedUploads = uploads;
         for (int frame = 0; frame < 5; frame++) Draw();
         Assert.Same(first, Tooltip()); Assert.Equal(cachedUploads, uploads);
         value = "126%"; Draw();
         Assert.NotSame(first, Tooltip()); Assert.True(uploads > cachedUploads);
-        Assert.Equal("Wind Speed\n126%", Text());
+        Assert.Equal("Wind Speed\nValue: 126%", Text());
         inactive = true; overlay.Invocations.Clear(); Draw();
-        Assert.Equal("Wind Speed (inactive)\nUnavailable", Text());
+        Assert.Equal("Wind Speed (inactive)\n", Text());
         overlay.VerifyGet(feature => feature.HoverValue, Times.Never());
         cachedUploads = uploads; Draw();
         Assert.Equal(cachedUploads, uploads);

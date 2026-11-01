@@ -15,7 +15,7 @@
   "mappingkey-icon": "Icon",
   "mappingkey-text": "Text",
   "hud-edit-hidden": "{0} (inactive)",
-  "hud-value-unavailable": "Unavailable",
+  "hud-value-format": "Value: {0}",
   "hotkey-edit-hud": "[VE] Toggle HUD editing",
   "hud-custom-group": "HUD group",
   "hud-group-world-status": "World status",

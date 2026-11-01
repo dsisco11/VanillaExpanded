@@ -65,7 +65,7 @@ internal sealed class HudOverlayHoverLabels : IDisposable
     internal static string ResolveText(HudOverlayRegistration target, string label, bool inactive = false)
     {
         string? value = inactive ? null : target.Overlay.HoverValue;
-        return label + "\n" + (string.IsNullOrWhiteSpace(value) ? Lang.Get("vanillaexpanded:hud-value-unavailable") : value);
+        return label + "\n" + (string.IsNullOrWhiteSpace(value) ? string.Empty : Lang.Get("vanillaexpanded:hud-value-format", value));
     }
 
     /// <summary>Releases the native tooltip texture and rich text when the host ends its session.</summary>
