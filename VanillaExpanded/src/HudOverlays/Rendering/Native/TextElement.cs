@@ -132,15 +132,13 @@ internal sealed class TextElement : GuiElementTextBase
         LoadedTexture texture;
         if (font.Orientation == EnumTextOrientation.Left)
         {
-            texture = context.Api.Gui.TextTexture.GenTextTexture(value, font);
+            texture = TextDrawing.CreateTexture(context.Api, value, font);
         }
         else
         {
-            // Native auto-boxing defaults to left alignment regardless of the font's orientation.
             var pixels = CairoTextSizing.PixelSize(value, font);
-            var background = new TextBackground { VerPadding = (int)Math.Ceiling(font.StrokeWidth) };
-            texture = context.Api.Gui.TextTexture.GenTextTexture(value, font, pixels.Width, pixels.Height,
-                background, orientation: font.Orientation);
+            texture = TextDrawing.CreateTexture(context.Api, value, font, pixels.Width, pixels.Height,
+                font.Orientation, paddingY: (int)Math.Ceiling(font.StrokeWidth));
         }
         try { return HudOverlayTextureFiltering.Prepare(texture); }
         catch { texture.Dispose(); throw; }

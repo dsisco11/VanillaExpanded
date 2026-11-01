@@ -1,5 +1,6 @@
 using System;
 
+using VanillaExpanded.Gui;
 using Vintagestory.API.Client;
 using Vintagestory.API.MathTools;
 
@@ -207,12 +208,11 @@ public sealed class RadialProgressBarRenderer : IRenderer, IRadialProgressBar
             return;
         }
 
-        renderedText = Text;
-        textTexture?.Dispose();
-        textTexture = null;
-
         if (string.IsNullOrEmpty(Text))
         {
+            textTexture?.Dispose();
+            textTexture = null;
+            renderedText = Text;
             return;
         }
 
@@ -220,7 +220,10 @@ public sealed class RadialProgressBarRenderer : IRenderer, IRadialProgressBar
         var textExtents = textFont.GetTextExtents(Text);
         int textureWidth = (int)Math.Ceiling(textExtents.Width) + 4;
         int textureHeight = (int)Math.Ceiling(textFont.GetFontExtents().Height) + 4;
-        textTexture = capi.Gui.TextTexture.GenTextTexture(Text, textFont, textureWidth, textureHeight, null, EnumTextOrientation.Center);
+        var replacement = TextDrawing.CreateTexture(capi, Text, textFont, textureWidth, textureHeight, EnumTextOrientation.Center);
+        textTexture?.Dispose();
+        textTexture = replacement;
+        renderedText = Text;
     }
 
     /// <inheritdoc />

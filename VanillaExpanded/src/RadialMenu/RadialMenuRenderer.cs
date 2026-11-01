@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using OpenTK.Graphics.OpenGL4;
+using VanillaExpanded.Gui;
 using Vintagestory.API.Client;
 using Vintagestory.API.MathTools;
 using Vintagestory.Client.NoObf;
@@ -356,8 +357,7 @@ internal sealed class RadialMenuRenderer : IDisposable
         string cacheKey = text + '\0' + circleDiameter + '\0' + fontScale + '\0' + Vintagestory.API.Config.RuntimeEnv.GUIScale;
         if (!renderedLabels.TryGetValue(id, out string? previous) || previous != cacheKey)
         {
-            if (labels.Remove(id, out LoadedTexture? old)) old.Dispose();
-            renderedLabels[id] = cacheKey;
+            LoadedTexture? replacement = null;
             if (!string.IsNullOrEmpty(text))
             {
                 labelFont ??= CairoFont.WhiteSmallText().WithStroke([0, 0, 0, 0.65], 1.5);
@@ -375,14 +375,17 @@ internal sealed class RadialMenuRenderer : IDisposable
                     int width = (int)Math.Ceiling(widestLine) + CenterLabelTexturePaddingPixels * 2;
                     int height = (int)Math.Ceiling(lineHeight * lines.Length)
                         + CenterLabelTexturePaddingPixels * 2;
-                    labels[id] = capi.Gui.TextTexture.GenTextTexture(wrapped, labelFont, width, height,
-                        null, EnumTextOrientation.Center);
+                    replacement = TextDrawing.CreateTexture(capi, wrapped, labelFont, width, height,
+                        EnumTextOrientation.Center);
                 }
                 else
                 {
-                    labels[id] = capi.Gui.TextTexture.GenTextTexture(text, labelFont);
+                    replacement = TextDrawing.CreateTexture(capi, text, labelFont);
                 }
             }
+            if (labels.Remove(id, out LoadedTexture? old)) old.Dispose();
+            if (replacement != null) labels[id] = replacement;
+            renderedLabels[id] = cacheKey;
         }
 
         if (labels.TryGetValue(id, out LoadedTexture? label))
@@ -394,8 +397,6 @@ internal sealed class RadialMenuRenderer : IDisposable
     }
     #endregion
 }
-
-
 
 
 

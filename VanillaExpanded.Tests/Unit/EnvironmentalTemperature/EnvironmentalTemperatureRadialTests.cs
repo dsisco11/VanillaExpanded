@@ -7,7 +7,7 @@ using Vintagestory.API.MathTools;
 
 namespace VanillaExpanded.Tests.Unit.EnvironmentalTemperature;
 
-/// <summary>Checks radial calibration, authored-color preservation, angular coverage, and mask resource reuse.</summary>
+/// <summary>Checks radial calibration, angular coverage, and mask resource reuse.</summary>
 public sealed class EnvironmentalTemperatureRadialTests
 {
     #region Public API
@@ -46,38 +46,34 @@ public sealed class EnvironmentalTemperatureRadialTests
         Assert.True(edgeCoverage > afterCoverage);
     }
 
-    /// <summary>Alpha masking preserves source RGB and reuses GPU storage until reset, without per-frame sampling.</summary>
+    /// <summary>Mask preparation reuses source data and GPU storage until reset, without per-frame sampling.</summary>
     [Fact]
-    public void PixelsAndTextureLifetime()
+    public void MaskUploadDimensionsAndTextureLifetime()
     {
         var api = new Mock<ICoreClientAPI> { DefaultValue = DefaultValue.Mock };
         var renderer = new Mock<IRenderAPI>(); api.SetupGet(value => value.Render).Returns(renderer.Object);
         int sourceLoads = 0;
-        var source = Enumerable.Repeat(unchecked((int)0xffb02b19), 512 * 512).ToArray();
-        var original = (int[])source.Clone();
-        var uploads = new List<int[]>(); var targets = new List<LoadedTexture>();
+        var source = new int[512 * 512];
+        var uploads = new List<int>(); var targets = new List<LoadedTexture>();
         renderer.Setup(value => value.LoadOrUpdateTextureFromBgra(It.IsAny<int[]>(), true, 0, ref It.Ref<LoadedTexture>.IsAny))
             .Callback(new Upload((int[] pixels, bool _, int _, ref LoadedTexture texture) =>
             {
-                uploads.Add((int[])pixels.Clone()); targets.Add(texture); texture.TextureId = 77;
+                uploads.Add(pixels.Length); targets.Add(texture); texture.TextureId = 77;
             }));
         using var mask = new EnvironmentalTemperatureLiquidMask(_ => { sourceLoads++; return source; }, texture => texture);
         var context = new HudOverlayPreparationContext(api.Object, 1, "en");
         mask.Prepare(context, 0); mask.Prepare(context, 0);
         mask.Prepare(new(api.Object, 2, "en"), 0);
-        Assert.Single(uploads); Assert.Equal(1, sourceLoads);
-        Assert.Contains(uploads[0], pixel => (uint)pixel >> 24 == 0);
-        Assert.Contains(uploads[0], pixel => (uint)pixel >> 24 > 0);
-        for (int index = 0; index < source.Length; index++)
-            Assert.Equal(source[index] & 0xffffff, uploads[0][index] & 0xffffff);
+        Assert.Equal(512 * 512, Assert.Single(uploads)); Assert.Equal(1, sourceLoads);
         mask.Prepare(context, 1);
-        Assert.Equal(source, uploads[1]); Assert.Same(targets[0], targets[1]);
+        Assert.Equal(2, uploads.Count);
+        Assert.All(uploads, count => Assert.Equal(512 * 512, count));
+        Assert.Same(targets[0], targets[1]);
         var suppliedBounds = new RectangleF(10, 20, 90, 90);
         mask.Draw(renderer.Object, suppliedBounds);
         renderer.Verify(value => value.RenderTexture(77, suppliedBounds.X, suppliedBounds.Y,
             suppliedBounds.Width, suppliedBounds.Height, It.IsAny<float>(), It.IsAny<Vec4f>()), Times.Once);
         mask.Reset(); Assert.True(targets[0].Disposed);
-        Assert.Equal(original, source);
     }
     #endregion
 

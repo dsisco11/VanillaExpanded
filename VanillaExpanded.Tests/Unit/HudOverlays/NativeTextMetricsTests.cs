@@ -1,7 +1,6 @@
 using Cairo;
 using System.Drawing;
 using Moq;
-using System.Runtime.InteropServices;
 using VanillaExpanded.Gui;
 using VanillaExpanded.HudOverlays.Rendering.Native;
 using VanillaExpanded.RadialMenu;
@@ -58,21 +57,17 @@ public sealed class NativeTextMetricsTests
     [Theory]
     [Trait("Category", "Unit")]
     [InlineData(1)]
+    [InlineData(1.125)]
     [InlineData(1.5)]
     [InlineData(2)]
-    public void CenteredReadingRasterCentersEveryLineAtNaturalPixelSize(float scale)
+    public void CenteredReadingRetainsOrientationNaturalDimensionsAndCachedGeometry(float scale)
     {
         using var fixture = new HudNativeComponentFixture(scale);
-        fixture.Gui.SetupGet(gui => gui.TextTexture).Returns(new TextTextureUtil(fixture.Api.Object));
-        byte[] pixels = [];
-        int width = 0, height = 0, stride = 0, uploads = 0;
+        int width = 0, height = 0, uploads = 0;
         fixture.Gui.Setup(gui => gui.LoadOrUpdateCairoTexture(It.IsAny<ImageSurface>(), It.IsAny<bool>(), ref It.Ref<LoadedTexture>.IsAny))
             .Callback(new Upload((ImageSurface surface, bool _, ref LoadedTexture texture) =>
             {
                 width = texture.Width = surface.Width; height = texture.Height = surface.Height;
-                stride = surface.Stride;
-                pixels = new byte[stride * height];
-                Marshal.Copy(surface.DataPtr, pixels, 0, pixels.Length);
                 uploads++;
             }));
         var bounds = ElementBounds.Fixed(0, 0, 180, 100).WithEmptyParent();
@@ -82,20 +77,9 @@ public sealed class NativeTextMetricsTests
         bounds.CalcWorldBounds();
         element.LayoutCompleted(new(0, 0, 1000, 1000));
         Assert.Equal(new SizeF(width, height), element.State.Target.Size);
-        double Center(int top, int bottom)
-        {
-            int left = width, right = -1;
-            for (int y = top; y < bottom; y++)
-                for (int x = 0; x < width; x++)
-                    if (pixels[y * stride + x * 4 + 3] > 16)
-                    {
-                        left = Math.Min(left, x); right = Math.Max(right, x);
-                    }
-            Assert.True(right >= left);
-            return (left + right + 1) / 2d;
-        }
-        Assert.InRange(Math.Abs(Center(0, height / 2) - width / 2d), 0, scale);
-        Assert.InRange(Math.Abs(Center(height / 2, height) - width / 2d), 0, scale);
+        Assert.Equal(EnumTextOrientation.Center, element.Font.Orientation);
+        Assert.Equal(Math.Round(bounds.renderX + (bounds.OuterWidth - width) / 2), element.State.Target.X);
+        Assert.Equal(Math.Round(bounds.renderY + (bounds.OuterHeight - height) / 2), element.State.Target.Y);
         int cachedUploads = uploads;
         element.Prepare(fixture.Context, "88888\n8");
         for (int frame = 0; frame < 4; frame++) element.RenderInteractiveElements(.1f);
@@ -105,6 +89,7 @@ public sealed class NativeTextMetricsTests
 
     [Theory]
     [InlineData(1, 1)]
+    [InlineData(1.125, 1)]
     [InlineData(1.5, .5)]
     [InlineData(2, 2)]
     public void FittedHudTextDrawsNativePixelsAndCachesItsRaster(float scale, double indicatorScale)
@@ -119,7 +104,7 @@ public sealed class NativeTextMetricsTests
             (context, value, font) =>
             {
                 Assert.Equal(EnumTextOrientation.Center, font.Orientation);
-                var raster = new TextTextureUtil(context.Api).GenTextTexture(value, font);
+                var raster = TextDrawing.CreateTexture(context.Api, value, font);
                 var predicted = CairoTextSizing.PixelSize(value, font);
                 Assert.Equal(predicted.Width, raster.Width);
                 Assert.Equal(predicted.Height, raster.Height);

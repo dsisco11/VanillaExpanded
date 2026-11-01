@@ -1,5 +1,6 @@
 using System;
 using Cairo;
+using VanillaExpanded.Gui;
 using VanillaExpanded.HudOverlays.Rendering;
 using VanillaExpanded.RadialMenu;
 using Vintagestory.API.Client;
@@ -27,8 +28,7 @@ internal sealed class HudOverlayGroupTitleBar : GuiElementTextBase
             context.Fill();
             context.Rectangle(Bounds.bgDrawX, Bounds.bgDrawY, Bounds.OuterWidth, Bounds.OuterHeight);
             context.Clip();
-            Font.SetupContext(context);
-            DrawTextLineAt(context, text, scaled(6), Math.Max(0, (Bounds.InnerHeight - Font.GetFontExtents().Height) / 2));
+            TextDrawing.DrawTextLine(context, Font, text, scaled(6), Math.Max(0, (Bounds.InnerHeight - Font.GetFontExtents().Height) / 2));
         }
         finally { context.Restore(); }
     }

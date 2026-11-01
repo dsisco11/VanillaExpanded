@@ -211,6 +211,8 @@ Mount each view once. `Prepare` updates changed strings, resources and local dim
 
 **Text rasterization rule:** Cairo-rendered text images must always draw at their natural pixel dimensions, never be shrunk or enlarged after rasterization. Change font size before Cairo renders text, including per-indicator Size changes and fitting into smaller reading areas. Font fitting uses Cairo's actual metrics and scales the outline with the font; it does not assume linearly scaled glyph widths or kerning. Text targets snap to whole pixels. Natural preferred-size measurements remain independent of fitted rasters so repeated sizing cannot progressively collapse layout. Unchanged text, layout and context reuse their raster; movement and draw calls never rerasterize. Apertures smaller than the minimum valid font raster clip pixels rather than resampling them. This also applies to radial-menu center labels and bounded Style lists.
 
+Default HUD glyph textures and group captions use the shared `TextDrawing` renderer: Cairo paths supply only the contrast outline, while `ShowText` paints the foreground glyphs at the same baseline. Native-compatible boxing, word wrapping, and alignment remain unchanged. Font fitting and proportional outline sizing are separate from this painting policy. Native tooltip, menu, and input controls still own their internal text rendering; see the [text-rendering catalog](../TextDrawing.md) for the direct and delegated paths.
+
 ## Implementing the lifecycle
 
 ### Presentation rendering
