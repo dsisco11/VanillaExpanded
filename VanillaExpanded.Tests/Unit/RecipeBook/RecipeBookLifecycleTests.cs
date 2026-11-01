@@ -616,6 +616,49 @@ public sealed class RecipeBookLifecycleTests
     [InlineData(1)]
     [InlineData(1.5)]
     [InlineData(2)]
+    public void HandbookHintAppearsOverEnabledAndDisabledButtonAndFollowsResize(float scale)
+    {
+        using var f = new MenuFixture(scale: scale, includeRecipes: true);
+        f.Parent.TryOpen();
+        f.Toggle();
+        var menu = Assert.Single(f.Menus);
+        Assert.False(menu.SingleComposer.GetButton("handbook").Enabled);
+        AssertHint();
+        var session = (RecipeBookSession)typeof(GuiDialogRecipeBook).GetField("session",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
+        session.Select(session.Rows[0].Output.Id);
+        Assert.True(menu.SingleComposer.GetButton("handbook").Enabled);
+        AssertHint();
+        var composer = menu.SingleComposer;
+        f.ResizePanelSpace(composer.Bounds.fixedWidth + 40, composer.Bounds.fixedHeight - 10);
+        menu.TryOpen();
+        Assert.NotSame(composer, menu.SingleComposer);
+        AssertHint();
+
+        void AssertHint()
+        {
+            var composer = menu.SingleComposer;
+            var button = composer.GetButton("handbook");
+            var hint = composer.GetHoverText("handbook-hint");
+            Assert.Equal(button.Bounds.absX, hint.Bounds.absX, 4);
+            Assert.Equal(button.Bounds.absY, hint.Bounds.absY, 4);
+            Assert.Equal(button.Bounds.OuterWidth, hint.Bounds.OuterWidth, 4);
+            Assert.Equal(button.Bounds.OuterHeight, hint.Bounds.OuterHeight, 4);
+            f.SetMouse((int)(button.Bounds.absX + button.Bounds.OuterWidth / 2),
+                (int)(button.Bounds.absY + button.Bounds.OuterHeight / 2));
+            hint.RenderInteractiveElements(0);
+            Assert.True(hint.IsNowShown);
+            f.SetMouse((int)(hint.Bounds.absX - GuiElement.scaled(5)),
+                (int)(hint.Bounds.absY + hint.Bounds.OuterHeight / 2));
+            hint.RenderInteractiveElements(0);
+            Assert.False(hint.IsNowShown);
+        }
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(1.5)]
+    [InlineData(2)]
     public void CraftableHintAppearsOverCheckboxAndLabelAndHidesOutside(float scale)
     {
         using var f = new MenuFixture(scale: scale);

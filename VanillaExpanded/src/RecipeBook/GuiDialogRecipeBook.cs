@@ -227,6 +227,8 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
                 300, ElementBounds.Fixed(0, 0, next.fixedX + next.fixedWidth, footerHeight))
             .AddDynamicText("", CairoFont.WhiteSmallText(), label, "alternative")
             .AddSmallButton(Lang.Get("vanillaexpanded:recipebook-handbook"), OpenHandbook, handbook, key: "handbook")
+            .AddHoverText(Lang.Get("vanillaexpanded:recipebook-handbook-hint"), CairoFont.WhiteSmallText(),
+                300, ElementBounds.Fixed(handbook.fixedX, 0, handbook.fixedWidth, footerHeight), "handbook-hint")
             .EndChildElements()
             .AddInteractiveElement(newTooltip, "tooltip")
             .EndChildElements()

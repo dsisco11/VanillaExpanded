@@ -107,6 +107,7 @@
   "recipebook-category-other": "Other",
   "recipebook-auto": "Auto",
   "recipebook-handbook": "Handbook",
+  "recipebook-handbook-hint": "Open the handbook page for the selected recipe output.",
   "recipebook-handbook-unavailable": "The survival handbook is not available.",
   "recipebook-alternative-hint": "Click a tile to select it. Arrows select a recipe variant; Auto restores automatic selection. Tile colors indicate ingredient availability.",
   "recipebook-empty": "No recipes are available in this category.",
