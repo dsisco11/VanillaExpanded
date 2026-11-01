@@ -62,8 +62,7 @@ internal sealed class BowAmmunitionPresentation : IndicatorPresentation
     /// <summary>Preserves muted empty-state contrast while native elements retain glyph ownership.</summary>
     private LoadedTexture CreateArrowText(HudOverlayPreparationContext context, string text, CairoFont font)
     {
-        font.StrokeWidth = 1.5;
-        font.WithColor(Icon == null ? new double[] { .7, .7, .7, 1 } : new double[] { 1, 1, 1, 1 });
+        font.WithColor(Icon == null ? [ .7, .7, .7, 1 ] : [1, 1, 1, 1]);
         if (CreateText != null) return CreateText(context, text, font);
         var texture = context.Api.Gui.TextTexture.GenTextTexture(text, font);
         try { return HudOverlayTextureFiltering.Prepare(texture); }

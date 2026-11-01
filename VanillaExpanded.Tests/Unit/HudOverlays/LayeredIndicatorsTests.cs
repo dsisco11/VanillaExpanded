@@ -169,10 +169,11 @@ public sealed class LayeredIndicatorsTests
         {
             Assert.NotEmpty(loaded); Assert.All(paths, path => Assert.EndsWith(".png", path));
             Assert.All(loaded, texture => Assert.True(texture.IgnoreUndisposed));
-            var glyphIds = fixture.Glyphs.Select(glyph => glyph.TextureId).ToArray();
+            var glyphIds = fixture.Glyphs.Where(glyph => !glyph.Disposed).Select(glyph => glyph.TextureId).ToArray();
             composition.Dispose(); composition.Dispose();
             Assert.All(loaded, texture => Assert.False(texture.Disposed));
             foreach (int id in glyphIds) fixture.Resources.Native.Gui.Verify(gui => gui.DeleteTexture(id), Times.Once);
+            Assert.All(fixture.Glyphs, glyph => Assert.True(glyph.Disposed));
         }
     }
     #endregion
@@ -252,7 +253,13 @@ public sealed class LayeredIndicatorsTests
                 Assert.True(previous.State.Target.Bottom <= marker.State.Target.Top);
             }
         }
-        Assert.Equal(showReading ? 1 : 0, fixture.Glyphs.Count);
+        Assert.Equal(showReading ? 2 : 0, fixture.Glyphs.Count);
+        if (showReading)
+        {
+            Assert.True(fixture.Glyphs[0].Disposed);
+            Assert.True(reading.Font.UnscaledFontsize < 14);
+            Assert.Equal(new SizeF(fixture.Glyphs[^1].Width, fixture.Glyphs[^1].Height), reading.State.Target.Size);
+        }
         Assert.Equal(Math.Abs(direction) == 0 ? 2 : 3, fixture.Bindings.Count);
         if (direction != 0) Assert.Contains(fixture.Bindings.Keys, path => path.EndsWith(direction > 0 ? "chevron-up.png" : "chevron-down.png"));
     }

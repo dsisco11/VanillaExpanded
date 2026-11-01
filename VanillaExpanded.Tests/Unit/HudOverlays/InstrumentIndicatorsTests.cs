@@ -279,8 +279,9 @@ public sealed class InstrumentIndicatorsTests
             foreach (var call in calls)
             {
                 var bounds = Assert.IsAssignableFrom<ElementBounds>(call.Arguments[0]);
-                Assert.Equal(clip.X, bounds.renderX); Assert.Equal(clip.Y, bounds.renderY);
-                Assert.Equal(clip.Width, bounds.OuterWidth); Assert.Equal(clip.Height, bounds.OuterHeight); Assert.Equal(true, call.Arguments[1]);
+                Assert.True(Contains(clip, new((float)bounds.renderX, (float)bounds.renderY,
+                    (float)bounds.OuterWidth, (float)bounds.OuterHeight)));
+                Assert.Equal(true, call.Arguments[1]);
             }
         }
     }

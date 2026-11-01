@@ -19,7 +19,6 @@ internal sealed class RadialMenuRenderer : IDisposable
     private readonly Matrixf matrix = new();
     private readonly Dictionary<string, LoadedTexture> labels = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> renderedLabels = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, float> labelScales = new(StringComparer.Ordinal);
     private CairoFont? labelFont;
     private readonly LoadedTexture dimTexture;
     private readonly RadialMenuIconHalo iconHalo;
@@ -57,7 +56,6 @@ internal sealed class RadialMenuRenderer : IDisposable
             if (retainedIds.Contains(id)) continue;
             if (labels.Remove(id, out LoadedTexture? texture)) texture.Dispose();
             renderedLabels.Remove(id);
-            labelScales.Remove(id);
         }
     }
 
@@ -194,7 +192,6 @@ internal sealed class RadialMenuRenderer : IDisposable
         labelFont?.Dispose();
         labelFont = null;
         labels.Clear();
-        labelScales.Clear();
     }
     #endregion
 
@@ -356,7 +353,7 @@ internal sealed class RadialMenuRenderer : IDisposable
     /// <summary>Caches a text-only entry label and centers its texture at the entry position.</summary>
     private void DrawLabel(string id, string text, double x, double y, int circleDiameter = 0, double fontScale = 1)
     {
-        string cacheKey = text + '\0' + circleDiameter + '\0' + fontScale;
+        string cacheKey = text + '\0' + circleDiameter + '\0' + fontScale + '\0' + Vintagestory.API.Config.RuntimeEnv.GUIScale;
         if (!renderedLabels.TryGetValue(id, out string? previous) || previous != cacheKey)
         {
             if (labels.Remove(id, out LoadedTexture? old)) old.Dispose();
@@ -366,17 +363,15 @@ internal sealed class RadialMenuRenderer : IDisposable
                 labelFont ??= CairoFont.WhiteSmallText().WithStroke([0, 0, 0, 0.65], 1.5);
                 // Use the owning ring's preferred font size; long labels still fit the circle.
                 labelFont.WithFontSize((float)(GuiStyle.SmallFontSize * fontScale));
+                labelFont.StrokeWidth = 1.5;
                 if (circleDiameter > 0)
                 {
-                    double lineHeight = labelFont.GetFontExtents().Height;
-                    string wrapped = RadialMenuLabelLayout.FitToCircle(text, circleDiameter, lineHeight,
-                        value => labelFont.GetTextExtents(value).Width, CenterLabelTexturePaddingPixels);
+                    string wrapped = RadialMenuLabelLayout.FitFontToCircle(text, circleDiameter, labelFont, CenterLabelTexturePaddingPixels);
+                    double lineHeight = Math.Ceiling(labelFont.GetFontExtents().Height);
                     string[] lines = wrapped.Split('\n');
-                    labelScales[id] = (float)RadialMenuLabelLayout.GetScaleForCircle(lines, circleDiameter,
-                        lineHeight, value => labelFont.GetTextExtents(value).Width, CenterLabelTexturePaddingPixels);
                     double widestLine = 1d;
                     foreach (string line in lines)
-                        widestLine = Math.Max(widestLine, labelFont.GetTextExtents(line).Width);
+                        widestLine = Math.Max(widestLine, RadialMenuLabelLayout.LineWidth(labelFont, line));
                     int width = (int)Math.Ceiling(widestLine) + CenterLabelTexturePaddingPixels * 2;
                     int height = (int)Math.Ceiling(lineHeight * lines.Length)
                         + CenterLabelTexturePaddingPixels * 2;
@@ -385,7 +380,6 @@ internal sealed class RadialMenuRenderer : IDisposable
                 }
                 else
                 {
-                    labelScales.Remove(id);
                     labels[id] = capi.Gui.TextTexture.GenTextTexture(text, labelFont);
                 }
             }
@@ -394,22 +388,12 @@ internal sealed class RadialMenuRenderer : IDisposable
         if (labels.TryGetValue(id, out LoadedTexture? label))
         {
             capi.Render.GetEngineShader(EnumShaderProgram.Gui).Use();
-            float scale = circleDiameter > 0 && labelScales.TryGetValue(id, out float fittedScale)
-                ? fittedScale
-                : 1f;
-            float width = label.Width * scale;
-            float height = label.Height * scale;
-            if (scale < 1f)
-                capi.Render.Render2DTexture(label.TextureId, (float)x - width / 2f, (float)y - height / 2f,
-                    width, height, 60);
-            else
-                capi.Render.Render2DLoadedTexture(label, (float)x - label.Width / 2f, (float)y - label.Height / 2f, 60);
+            capi.Render.Render2DLoadedTexture(label, (float)Math.Round(x - label.Width / 2d),
+                (float)Math.Round(y - label.Height / 2d), 60);
         }
     }
     #endregion
 }
-
-
 
 
 

@@ -120,7 +120,6 @@ public sealed class RadialMenuDialogKeyTests
             SetField(renderer, "hoverAnimation", new RadialMenuHoverAnimation());
             SetField(renderer, "renderedLabels", new Dictionary<string, string>());
             SetField(renderer, "labels", new Dictionary<string, LoadedTexture>());
-            SetField(renderer, "labelScales", new Dictionary<string, float>());
             SetField(Dialog, "renderer", renderer);
         }
 

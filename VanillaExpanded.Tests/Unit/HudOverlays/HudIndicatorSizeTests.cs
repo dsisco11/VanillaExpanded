@@ -231,7 +231,7 @@ public sealed class HudIndicatorSizeTests
                 Assert.Equal(2 * setting.Scale, context.GuiScale, 5);
                 Assert.Equal(14 * setting.Scale, font.UnscaledFontsize, 5);
                 Assert.Equal(setting.Scale, font.StrokeWidth, 5);
-                return new(context.Api, 100 + creates, 20, 10);
+                return new(context.Api, 100 + creates, Math.Max(1, (int)(20 * setting.Scale)), Math.Max(1, (int)(10 * setting.Scale)));
             });
         using var composition = new IndicatorComposition(fixture.Api.Object, new SizedNativeView(view, setting), fixture.Context,
             setting.Apply(new(49, 28)));

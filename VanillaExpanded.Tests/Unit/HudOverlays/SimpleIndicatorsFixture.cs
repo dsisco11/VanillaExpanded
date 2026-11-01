@@ -101,7 +101,9 @@ internal sealed class SimpleIndicatorsFixture : IDisposable
     public LoadedTexture CreateText(HudOverlayPreparationContext context, string value, CairoFont font)
     {
         Values.Add(value);
-        var texture = new LoadedTexture(context.Api, nextId++, (int)(value.Length * 7 * context.GuiScale), (int)(13 * context.GuiScale));
+        double fit = font.UnscaledFontsize / (14 * context.IndicatorScale);
+        var texture = new LoadedTexture(context.Api, nextId++, Math.Max(1, (int)(value.Length * 7 * context.GuiScale * fit)),
+            Math.Max(1, (int)(13 * context.GuiScale * fit)));
         Owned.Add(texture); return texture;
     }
     /// <summary>Creates the arrow element's owned background independently for each visual instance.</summary>

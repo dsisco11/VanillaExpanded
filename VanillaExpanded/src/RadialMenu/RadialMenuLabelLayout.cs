@@ -1,11 +1,32 @@
 using System;
 using System.Collections.Generic;
+using VanillaExpanded.Gui;
+using Vintagestory.API.Client;
 
 namespace VanillaExpanded.RadialMenu;
 
 /// <summary>Builds readable center-label lines without splitting individual words.</summary>
 internal static class RadialMenuLabelLayout
 {
+    internal static double LineWidth(CairoFont font, string line)
+    {
+        var extents = font.GetTextExtents(line);
+        return Math.Ceiling(Math.Max(extents.Width, extents.XAdvance));
+    }
+
+    internal static string FitFontToCircle(string text, double diameter, CairoFont font, double padding)
+    {
+        string wrapped = FitToCircle(text, diameter, Math.Ceiling(font.GetFontExtents().Height),
+            line => LineWidth(font, line), padding);
+        string[] lines = wrapped.Split('\n');
+        CairoTextSizing.Fit(font, candidate =>
+        {
+            double height = Math.Ceiling(candidate.GetFontExtents().Height);
+            return GetScaleForCircle(lines, diameter, height, line => LineWidth(candidate, line), padding) == 1;
+        });
+        return wrapped;
+    }
+
     /// <summary>Chooses the whole-word line layout that maximizes rendered size inside a circle.</summary>
     internal static string FitToCircle(string text, double diameter, double lineHeight,
         Func<string, double> measure, double padding)

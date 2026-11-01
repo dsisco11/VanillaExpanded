@@ -64,10 +64,16 @@ public sealed class HudOverlayListMenuTests
                 new[] { "A deliberately long localized label", "Another long label", "Final label" }, 0, (code, _) => selected = code);
             var viewport = new RectangleF(x, y, width, height);
             Assert.True(list.Prepare(new PointF(px, py), viewport));
-            Assert.Equal(12, list.Font.UnscaledFontsize);
+            Assert.InRange(list.Font.UnscaledFontsize, .1, 12);
+            var listTexture = (LoadedTexture)typeof(GuiElementListMenu).GetField("dropDownTexture",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(list)!;
             Assert.Equal(26, list.Bounds.fixedHeight);
             Assert.True(viewport.Contains(list.VisibleBounds));
             render.Invocations.Clear(); list.Draw(0);
+            Assert.Contains(render.Invocations, call => call.Method.Name == "Render2DTexture"
+                && (int)call.Arguments[0] == listTexture.TextureId
+                && Convert.ToInt32(call.Arguments[3]) == listTexture.Width
+                && Convert.ToInt32(call.Arguments[4]) == listTexture.Height);
             var active = new Stack<RectangleF>(); int draws = 0;
             foreach (var invocation in render.Invocations)
             {

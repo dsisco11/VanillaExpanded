@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using Cairo;
+using VanillaExpanded.Gui;
 using VanillaExpanded.HudOverlays.Registration;
 using Vintagestory.API.Client;
 
@@ -12,8 +13,10 @@ internal sealed class TextElement : GuiElementTextBase
     private readonly Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture> create;
     private readonly Action draw;
     private LoadedTexture? texture;
+    private SizeF naturalSize;
     private HudOverlayPreparationContext? context;
     private RectangleF aperture, clip;
+    private SizeF? fittedSize;
     private bool hasLayout, disposed;
     private readonly double strokeWidth;
     private readonly float depth;
@@ -22,8 +25,7 @@ internal sealed class TextElement : GuiElementTextBase
     /// <summary>Gets pre-render clip, target, tint and failure state.</summary>
     public ElementState State { get; }
     /// <summary>Gets intrinsic glyph size in unscaled GUI units.</summary>
-    public SizeF Size => texture == null || context == null ? SizeF.Empty
-        : new((float)(texture.Width / context.GuiScale), (float)(texture.Height / context.GuiScale));
+    public SizeF Size => naturalSize;
     #region Preparation
     /// <summary>Creates a passive native text element with an optional headless glyph factory.</summary>
     public TextElement(ICoreClientAPI api, ElementBounds bounds, Action<Exception> failure,
@@ -35,7 +37,7 @@ internal sealed class TextElement : GuiElementTextBase
         State = new(failure);
         draw = DrawTexture;
     }
-    /// <summary>Replaces glyphs only when characters or preparation context change.</summary>
+    /// <summary>Replaces glyphs only when characters, font sizing or preparation context change.</summary>
     public void Prepare(HudOverlayPreparationContext preparation, string? value)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
@@ -43,7 +45,7 @@ internal sealed class TextElement : GuiElementTextBase
         if (!ReferenceEquals(api, preparation.Api)) throw new ArgumentException("A native element cannot change API ownership.", nameof(preparation));
         value ??= string.Empty;
         if (context == preparation && text == value) return;
-        CairoFont nextFont = context == preparation ? Font : TextMetrics.Font(strokeWidth)
+        CairoFont nextFont = TextMetrics.Font(strokeWidth)
             .WithFontSize((float)(HudOverlaySizes.Text * preparation.IndicatorScale))
             .WithStroke(new double[] { 0, 0, 0, .85 }, strokeWidth * preparation.IndicatorScale);
         // Allocate before replacing the surviving resource so generation failure preserves cleanup ownership.
@@ -51,15 +53,36 @@ internal sealed class TextElement : GuiElementTextBase
             ?? throw new InvalidOperationException("Native glyph preparation returned no texture.");
         LoadedTexture? previous = texture;
         texture = replacement; text = value; context = preparation; Font = nextFont;
+        naturalSize = replacement == null ? SizeF.Empty
+            : new((float)(replacement.Width / preparation.GuiScale), (float)(replacement.Height / preparation.GuiScale));
+        fittedSize = null;
         if (!ReferenceEquals(previous, replacement)) previous?.Dispose();
-        if (hasLayout) CacheFit();
+        if (hasLayout) CacheGeometry();
     }
-    /// <summary>Caches native bounds and fits glyphs once after changed layout.</summary>
+    /// <summary>Rerasterizes at the fitted font size after layout, then caches natural-size pixels.</summary>
     public void LayoutCompleted(RectangleF effectiveClip)
     {
         aperture = new((float)Bounds.renderX, (float)Bounds.renderY, (float)Bounds.OuterWidth, (float)Bounds.OuterHeight);
         clip = effectiveClip; hasLayout = true;
-        CacheFit();
+        if (context != null && text.Length > 0 && aperture.Width > 0 && aperture.Height > 0
+            && (texture?.Width > aperture.Width || texture?.Height > aperture.Height
+                || fittedSize != aperture.Size && Font.UnscaledFontsize < (float)(HudOverlaySizes.Text * context.IndicatorScale)))
+        {
+            var nextFont = TextMetrics.Font(strokeWidth)
+                .WithFontSize((float)(HudOverlaySizes.Text * context.IndicatorScale))
+                .WithStroke(new double[] { 0, 0, 0, .85 }, strokeWidth * context.IndicatorScale);
+            CairoTextSizing.FitRectangle(nextFont, text, aperture.Size);
+            if (nextFont.UnscaledFontsize != Font.UnscaledFontsize || nextFont.StrokeWidth != Font.StrokeWidth)
+            {
+                var replacement = create(context, text, nextFont)
+                    ?? throw new InvalidOperationException("Native glyph preparation returned no texture.");
+                var previous = texture;
+                texture = replacement; Font = nextFont;
+                if (!ReferenceEquals(previous, replacement)) previous?.Dispose();
+            }
+            fittedSize = aperture.Size;
+        }
+        CacheGeometry();
     }
     /// <summary>Keeps composition free of duplicate glyph generation or inherited bounds recalculation.</summary>
     public override void ComposeElements(Context ctx, ImageSurface surface) { }
@@ -77,20 +100,21 @@ internal sealed class TextElement : GuiElementTextBase
     {
         if (disposed) return;
         disposed = true;
-        var owned = texture; texture = null; context = null;
+        var owned = texture; texture = null; context = null; naturalSize = SizeF.Empty;
         owned?.Dispose();
     }
     #endregion
     #endregion
 
     #region Private
-    /// <summary>Prepares fitting without enlarging the normal font or modifying component bounds.</summary>
-    private void CacheFit()
+    /// <summary>Centers whole pixels without changing the raster's dimensions.</summary>
+    private void CacheGeometry()
     {
-        double fit = texture == null ? 0 : Math.Min(1,
-            Math.Min(aperture.Width / Math.Max(1, texture.Width), aperture.Height / Math.Max(1, texture.Height)));
-        float width = (float)((texture?.Width ?? 0) * fit), height = (float)((texture?.Height ?? 0) * fit);
-        State.SetGeometry(new(aperture.X + (aperture.Width - width) / 2, aperture.Y + (aperture.Height - height) / 2, width, height), clip);
+        if (aperture.Width <= 0 || aperture.Height <= 0) { State.SetGeometry(RectangleF.Empty, clip); return; }
+        float width = texture?.Width ?? 0, height = texture?.Height ?? 0;
+        State.SetGeometry(new((float)Math.Round(aperture.X + (aperture.Width - width) / 2),
+            (float)Math.Round(aperture.Y + (aperture.Height - height) / 2), width, height),
+            RectangleF.Intersect(aperture, clip));
     }
     /// <summary>Submits prepared premultiplied glyphs inside the already-cached clip.</summary>
     private void DrawTexture()

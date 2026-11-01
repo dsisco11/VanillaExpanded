@@ -77,7 +77,9 @@ internal sealed class LayeredIndicatorsFixture : IDisposable
     {
         Values.Add(text);
         var size = Dimensions(text);
-        var texture = new LoadedTexture(context.Api, nextId++, (int)(size.Width * context.GuiScale), (int)(size.Height * context.GuiScale));
+        double fit = font.UnscaledFontsize / (14 * context.IndicatorScale);
+        var texture = new LoadedTexture(context.Api, nextId++, Math.Max(1, (int)(size.Width * context.GuiScale * fit)),
+            Math.Max(1, (int)(size.Height * context.GuiScale * fit)));
         Glyphs.Add(texture); return texture;
     }
     /// <summary>Borrows engine-like cached PNGs and records the selected asset paths.</summary>

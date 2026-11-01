@@ -105,7 +105,7 @@ public sealed class HudNativeComponentTests
         Assert.Equal(previous.Y + 23, icon.State.Target.Y, 4);
         Assert.Equal(1, fixture.TextCreates); Assert.Equal(1, fixture.IconLoads);
     }
-    /// <summary>Context changes replace only affected glyphs and constrained readings preserve their aspect ratio.</summary>
+    /// <summary>Constrained readings rerasterize at a smaller font, and context changes replace affected glyphs.</summary>
     [Fact]
     public void ContextInvalidationAndReadingFitArePreparedBeforeDrawing()
     {
@@ -113,20 +113,22 @@ public sealed class HudNativeComponentTests
         fixture.Content = fixture.Content with { IconPath = null, MaximumReadingHeight = 6 };
         using var view = fixture.CreateView(); using var composer = fixture.CreateComposer();
         fixture.Mount(view, composer);
-        var glyph = fixture.Glyphs[0];
-        float fit = fixture.Content.MaximumReadingHeight / glyph.Height;
-        Assert.Equal(new SizeF(glyph.Width * fit, glyph.Height * fit), view.Size);
         var reading = Assert.IsType<TextElement>(composer.GetElement("test:reading"));
+        var glyph = fixture.Glyphs[^1];
+        Assert.Equal(new SizeF(glyph.Width, glyph.Height), reading.State.Target.Size);
+        Assert.True(reading.Font.UnscaledFontsize < 14);
+        Assert.True(glyph.Height <= fixture.Content.MaximumReadingHeight);
+        int initialCreates = fixture.TextCreates;
         var font = reading.Font;
         view.Prepare(new HudOverlayPreparationContext(fixture.Api.Object, 1, "en", 1));
-        Assert.Equal(2, fixture.TextCreates); Assert.Equal(0, fixture.IconLoads);
+        Assert.Equal(initialCreates + 1, fixture.TextCreates); Assert.Equal(0, fixture.IconLoads);
         Assert.True(glyph.Disposed); Assert.NotSame(font, reading.Font);
         view.Prepare(new HudOverlayPreparationContext(fixture.Api.Object, 1, "fr", 1));
-        Assert.Equal(3, fixture.TextCreates);
+        Assert.Equal(initialCreates + 2, fixture.TextCreates);
         Vintagestory.API.Config.RuntimeEnv.GUIScale = 2;
         view.Prepare(new HudOverlayPreparationContext(fixture.Api.Object, 2, "fr", 1));
-        Assert.Equal(4, fixture.TextCreates);
-        Assert.Equal(fixture.Content.MaximumReadingHeight, view.Size.Height);
+        Assert.Equal(initialCreates + 3, fixture.TextCreates);
+        Assert.True(view.Size.Height <= fixture.Content.MaximumReadingHeight);
     }
     #endregion
     #region Input and drawing boundaries

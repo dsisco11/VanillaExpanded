@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using Cairo;
+using VanillaExpanded.Gui;
 using VanillaExpanded.HudOverlays.Rendering;
 using Vintagestory.API.Client;
 using Vintagestory.API.Config;
@@ -41,6 +42,16 @@ internal sealed class HudOverlayListMenu : GuiElementListMenu, IHudMenuPopup
         Bounds.fixedX = 0;
         Bounds.fixedY = -Bounds.fixedHeight;
         MaxHeight = Math.Max(1, (int)Math.Ceiling(viewport.Height / scale));
+        Font.WithFontSize(HudOverlaySizes.MenuText);
+        CairoTextSizing.Fit(Font, candidate =>
+        {
+            foreach (string name in Names)
+            {
+                var extents = candidate.GetTextExtents(name);
+                if (Math.Ceiling(Math.Max(extents.Width, extents.XAdvance)) + 20 * scale > viewport.Width) return false;
+            }
+            return true;
+        });
         Open();
         RectangleF fitted = HudPopupPlacement.Fit(pointer, new((float)expandedBoxWidth, (float)expandedBoxHeight), viewport);
         if (fitted.IsEmpty) { OnFocusLost(); return false; }
@@ -48,8 +59,7 @@ internal sealed class HudOverlayListMenu : GuiElementListMenu, IHudMenuPopup
         Bounds.fixedY = fitted.Y / scale - Bounds.fixedHeight;
         Bounds.MarkDirtyRecursive();
         Bounds.CalcWorldBounds();
-        // Native rendering scales the prepared surface to expandedBoxWidth. Constrain both the surface and
-        // scrollbar geometry together when a localized label is wider than the viewport.
+        // Retain a fitted input/scrollbar rectangle, but never resample Cairo's list surface.
         expandedBoxWidth = fitted.Width;
         visibleBounds = ElementBounds.Fixed(fitted.X / scale, fitted.Y / scale, fitted.Width / scale,
             fitted.Height / scale).WithParent(api.Gui.WindowBounds);
@@ -70,6 +80,18 @@ internal sealed class HudOverlayListMenu : GuiElementListMenu, IHudMenuPopup
     #region Rendering and pointer delegation
     /// <inheritdoc />
     public void Draw(float deltaTime) { if (!disposed) RenderInteractiveElements(deltaTime); }
+    public override void RenderInteractiveElements(float deltaTime)
+    {
+        if (disposed || !IsOpened) return;
+        double width = expandedBoxWidth, height = expandedBoxHeight;
+        try
+        {
+            expandedBoxWidth = dropDownTexture.Width;
+            expandedBoxHeight = dropDownTexture.Height;
+            base.RenderInteractiveElements(deltaTime);
+        }
+        finally { expandedBoxWidth = width; expandedBoxHeight = height; }
+    }
     /// <inheritdoc />
     public void MouseDown(MouseEvent args) { if (!disposed) OnMouseDown(api, args); }
     /// <inheritdoc />

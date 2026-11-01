@@ -40,11 +40,13 @@ internal sealed class HudNativeComponentFixture : IDisposable
     }
     /// <summary>Creates unique component instances with observable owned/borrowed resources.</summary>
     public IconReadingView CreateView() => new(Api.Object, () => Content, Failures.Add,
-        (context, value, _) =>
+        (context, value, font) =>
         {
             if (ThrowText) throw new InvalidOperationException("glyph failure");
             TextCreates++;
-            var texture = new LoadedTexture(context.Api, nextTexture++, (int)(value.Length * 7 * context.GuiScale), (int)(13 * context.GuiScale));
+            double fit = font.UnscaledFontsize / (14 * context.IndicatorScale);
+            var texture = new LoadedTexture(context.Api, nextTexture++,
+                Math.Max(1, (int)(value.Length * 7 * context.GuiScale * fit)), Math.Max(1, (int)(13 * context.GuiScale * fit)));
             Glyphs.Add(texture);
             return texture;
         },
