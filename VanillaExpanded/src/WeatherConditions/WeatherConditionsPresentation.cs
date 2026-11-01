@@ -41,7 +41,7 @@ internal sealed class WeatherConditionsPresentation : IndicatorPresentation
     public void Prepare(HudOverlayPreparationContext context)
     {
         if (sample == null) return;
-        bool hasData = sample.Precipitation.HasValue || sample.Fog || sample.CloudCoverage.HasValue || sample.ThunderIntensity > 0;
+        bool hasData = sample.Precipitation.HasValue || sample.Fog || sample.ThunderIntensity > 0;
         if (Style == HudIndicatorStyle.Text)
         {
             if (hasData) PrepareText(context, "weather", WeatherConditionsText.Format(sample));

@@ -162,7 +162,7 @@ public sealed class LayeredIndicatorsTests
                 body.SetContent(new(34, 37, BodyTemperatureRisk.Cold, .25f, 2), true); body.Prepare(fixture.Context); presentation = body; view = body.CreateView(fixture.Context.Api); break;
             default:
                 var weather = new WeatherConditionsPresentation(loadBackdrop: _ => null, hasCompletePack: _ => true);
-                weather.SetContent(new(null, false) { CloudCoverage = 0 }); weather.Prepare(fixture.Context); presentation = weather; view = weather.CreateView(fixture.Context.Api); break;
+                weather.SetContent(new(EnumPrecipitationType.Rain, false)); weather.Prepare(fixture.Context); presentation = weather; view = weather.CreateView(fixture.Context.Api); break;
         }
         using (presentation)
         using (var composition = new IndicatorComposition(fixture.Context.Api, view, fixture.Context, presentation.Size))
@@ -371,18 +371,19 @@ public sealed class LayeredIndicatorsTests
     {
         using var fixture = new LayeredIndicatorsFixture(2);
         using var content = new WeatherConditionsPresentation(fixture.Measure, fixture.CreateText, fixture.Load, _ => fixture.Resources.Backdrop.Object, fixture.CheckPack);
-        var sample = new WeatherConditionsSample(precipitation, true) { CloudCoverage = 3, PrecipitationIntensity = 3, FogIntensity = 2, ThunderIntensity = 1 };
+        var sample = new WeatherConditionsSample(precipitation, true) { PrecipitationIntensity = 3, FogIntensity = 2, ThunderIntensity = 1 };
         content.SetContent(sample); content.Prepare(fixture.Context);
         using var composition = new IndicatorComposition(fixture.Context.Api, content.CreateView(fixture.Context.Api), fixture.Context, content.Size);
-        var layers = Enumerable.Range(0, 4).Select(index => Assert.IsType<TextureElement>(composition.Composer.GetElement("test:layer-" + index))).ToArray();
+        var layers = Enumerable.Range(0, 3).Select(index => Assert.IsType<TextureElement>(composition.Composer.GetElement("test:layer-" + index))).ToArray();
         Assert.All(layers, layer => Assert.Equal(layers[0].State.Target, layer.State.Target));
         composition.View.CollectBackdrops(fixture.Resources.Native.Render.Object); composition.Composer.Render(0);
         Assert.Single(fixture.Resources.Backdrop.Invocations);
         var expected = WeatherConditionsLayers.Select(sample).Select(index => fixture.Bindings["textures/hud/weather/composite/" + WeatherConditionsLayers.Names[index] + ".png"].TextureId);
         Assert.Equal(expected, fixture.Resources.Native.Render.Invocations.Where(call => call.Method.Name == "RenderTexture").Select(call => (int)call.Arguments[0]));
-        content.SetContent(new(null, false) { CloudCoverage = 0 }); content.Prepare(fixture.Context); composition.Update(fixture.Context);
+        content.SetContent(new(null, false)); content.Prepare(fixture.Context); composition.Update(fixture.Context);
         fixture.Resources.Native.Render.Invocations.Clear(); composition.Composer.Render(0);
-        Assert.Single(fixture.Resources.Native.Render.Invocations, call => call.Method.Name == "RenderTexture");
+        Assert.DoesNotContain(fixture.Resources.Native.Render.Invocations, call => call.Method.Name == "RenderTexture");
+        Assert.True(content.Size.IsEmpty);
         Assert.Equal(1, fixture.PackChecks);
     }
     /// <summary>A partial composite pack selects precipitation/fog together and never requests any composite sprite.</summary>
@@ -395,10 +396,11 @@ public sealed class LayeredIndicatorsTests
         assets.Setup(manager => manager.Exists(It.IsAny<AssetLocation>()))
             .Returns((AssetLocation location) => complete || !location.Path.EndsWith("thunder-heavy.png"));
         using var content = new WeatherConditionsPresentation(load: fixture.Load, loadBackdrop: _ => null);
-        content.SetContent(new(EnumPrecipitationType.Rain, true) { CloudCoverage = 4, ThunderIntensity = 1 }); content.Prepare(fixture.Context);
+        content.SetContent(new(EnumPrecipitationType.Rain, true) { ThunderIntensity = 1 }); content.Prepare(fixture.Context);
         using var composition = new IndicatorComposition(fixture.Context.Api, content.CreateView(fixture.Context.Api), fixture.Context, content.Size);
-        Assert.Equal(complete ? 4 : 2, fixture.Bindings.Count);
+        Assert.Equal(complete ? 3 : 2, fixture.Bindings.Count);
         Assert.All(fixture.Bindings.Keys, path => Assert.Equal(complete, path.Contains("/composite/")));
+        Assert.DoesNotContain(assets.Invocations, call => call.Arguments.OfType<AssetLocation>().Any(location => location.Path.Contains("sky-")));
         if (!complete)
         {
             var rain = Assert.IsType<TextureElement>(composition.Composer.GetElement("test:layer-0"));
@@ -410,21 +412,27 @@ public sealed class LayeredIndicatorsTests
         int checks = assets.Invocations.Count; content.Prepare(fixture.Context); composition.View.Prepare(fixture.Context);
         Assert.Equal(checks, assets.Invocations.Count);
     }
-    /// <summary>The incomplete pack hides unsupported sky/thunder-only data while the complete pack shows clear or unknown sky.</summary>
+    /// <summary>Thunder-only data needs a complete pack; inactive weather stays hidden in both styles.</summary>
     [Theory]
-    [InlineData(false, 0, false)] [InlineData(true, 0, true)] [InlineData(true, null, true)]
-    public void WeatherVisibilityRespectsPackCapabilities(bool complete, int? cloud, bool visible)
+    [InlineData(false, 1, HudIndicatorStyle.Icon, false)] [InlineData(true, 1, HudIndicatorStyle.Icon, true)]
+    [InlineData(false, 0, HudIndicatorStyle.Icon, false)] [InlineData(true, 0, HudIndicatorStyle.Icon, false)]
+    [InlineData(false, 0, HudIndicatorStyle.Text, false)] [InlineData(true, 0, HudIndicatorStyle.Text, false)]
+    [InlineData(false, 1, HudIndicatorStyle.Text, true)]
+    public void WeatherVisibilityRespectsPackCapabilities(bool complete, int thunder, HudIndicatorStyle style, bool visible)
     {
         using var fixture = new LayeredIndicatorsFixture { CompletePack = complete };
         using var content = new WeatherConditionsPresentation(fixture.Measure, fixture.CreateText, fixture.Load, _ => null, fixture.CheckPack);
-        content.SetContent(new(null, false) { CloudCoverage = cloud, ThunderIntensity = 1 }); content.Prepare(fixture.Context);
+        content.SetStyle(style);
+        content.SetContent(new(null, false) { ThunderIntensity = thunder }); content.Prepare(fixture.Context);
         Assert.Equal(visible, !content.Size.IsEmpty);
-        if (visible) Assert.EndsWith(cloud.HasValue ? "sky-clear.png" : "sky-unknown.png", content.Layers[0].Path);
+        if (visible && style == HudIndicatorStyle.Icon) Assert.EndsWith("thunder-light.png", Assert.Single(content.Layers).Path);
         else Assert.Empty(content.Layers);
+        Assert.Empty(fixture.Bindings);
+        if (!visible) Assert.Empty(fixture.Values);
     }
     /// <summary>Native text styles retain localized readings and skip artwork, masks, backdrop and pack inspection.</summary>
     [Theory]
-    [InlineData("wetness", "26%")] [InlineData("body", "34°C COLD +2")] [InlineData("weather", "CLD4 RAIN2 FOG2 THR1")]
+    [InlineData("wetness", "26%")] [InlineData("body", "34°C COLD +2")] [InlineData("weather", "RAIN2 FOG2 THR1")]
     public void TextStylesRetainFeatureReadingsWithoutArtwork(string kind, string expected)
     {
         using var fixture = new LayeredIndicatorsFixture();
@@ -466,7 +474,7 @@ public sealed class LayeredIndicatorsTests
         {
             "wetness" => ["drop-0", "drop-1", "drop-2", "drop-3", "reading"],
             "body" => ["fill", "outline", "trend-0", "trend-1", "reading"],
-            _ => ["layer-0", "layer-1", "layer-2", "layer-3"]
+            _ => ["layer-0", "layer-1", "layer-2"]
         };
         return keys.Select(key => composition.Composer.GetElement("test:" + key)).ToArray();
     }

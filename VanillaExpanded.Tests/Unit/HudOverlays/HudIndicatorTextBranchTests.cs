@@ -46,11 +46,11 @@ public sealed class HudIndicatorTextBranchTests : IDisposable
 
 
 
-    /// <summary>Unknown cloud coverage remains explicit while all other weather channels retain their intensities.</summary>
+    /// <summary>Weather text retains precipitation, fog, and thunder without cloud coverage.</summary>
     [Fact]
-    public void UnknownCloudCoverageDoesNotEraseOtherWeatherChannels()
+    public void WeatherTextContainsOnlyActiveWeatherChannels()
     {
-        Assert.Equal("CLD? SNOW3 FOG1 THR3", WeatherConditionsText.Format(new(EnumPrecipitationType.Snow, true)
+        Assert.Equal("SNOW3 FOG1 THR3", WeatherConditionsText.Format(new(EnumPrecipitationType.Snow, true)
             { PrecipitationIntensity = 3, FogIntensity = 1, ThunderIntensity = 3 }));
     }
 

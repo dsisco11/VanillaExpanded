@@ -12,7 +12,7 @@ internal sealed class WeatherView : NativeView
 {
     private readonly WeatherConditionsPresentation content;
     private readonly ElementBounds root = ElementBounds.Fixed(0, 0, 0, 0).WithAlignment(EnumDialogArea.LeftMiddle);
-    private readonly TextureElement[] layers = new TextureElement[4];
+    private readonly TextureElement[] layers = new TextureElement[3];
     private float opacity;
     private double x, y, scale;
 
@@ -81,7 +81,7 @@ internal sealed class WeatherView : NativeView
     #endregion
 
     #region Protected API
-    /// <summary>Mounts the four channel slots in stable back-to-front order under one native origin.</summary>
+    /// <summary>Mounts the three channel slots in stable back-to-front order under one native origin.</summary>
     protected override void AddElements(GuiComposer composer, string prefix)
     {
         composer.BeginChildElements(root);

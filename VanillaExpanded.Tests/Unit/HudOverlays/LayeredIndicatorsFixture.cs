@@ -58,9 +58,9 @@ internal sealed class LayeredIndicatorsFixture : IDisposable
                 break;
             case "weather":
                 var weather = new WeatherConditionsPresentation(Measure, CreateText, Load, _ => Resources.Backdrop.Object, CheckPack);
-                weather.SetContent(new(EnumPrecipitationType.Rain, true) { CloudCoverage = 4, PrecipitationIntensity = 2, FogIntensity = 2, ThunderIntensity = 1 });
+                weather.SetContent(new(EnumPrecipitationType.Rain, true) { PrecipitationIntensity = 2, FogIntensity = 2, ThunderIntensity = 1 });
                 presentation = weather; overlay = new WeatherConditionsOverlay(weather); prepare = () => weather.Prepare(Context);
-                change = () => weather.SetContent(new(EnumPrecipitationType.Snow, true) { CloudCoverage = 1, PrecipitationIntensity = 3, FogIntensity = 1, ThunderIntensity = 2 });
+                change = () => weather.SetContent(new(EnumPrecipitationType.Snow, true) { PrecipitationIntensity = 3, FogIntensity = 1, ThunderIntensity = 2 });
                 break;
             default: throw new ArgumentOutOfRangeException(nameof(kind));
         }

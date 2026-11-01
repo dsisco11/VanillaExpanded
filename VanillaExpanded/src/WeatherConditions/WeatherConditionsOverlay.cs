@@ -90,7 +90,7 @@ internal sealed class WeatherConditionsOverlay : IHudOverlay, IHudOverlayVisibil
             Clear();
             return changed ? HudOverlayChange.Presentation | HudOverlayChange.Measurement : HudOverlayChange.None;
         }
-        var next = WeatherConditionsSampler.Sample(api, weather, snapshot, climate,
+        var next = WeatherConditionsSampler.Sample(api, snapshot, climate,
             ReferenceEquals(sampledEntity, entity) ? Sample : null);
         sampledEntity = entity;
         if (next == Sample && !styleChanged) return HudOverlayChange.None;

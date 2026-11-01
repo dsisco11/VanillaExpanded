@@ -308,7 +308,7 @@
   "config-enable-weather-conditions-overlay": "Show weather conditions",
   "config-enable-rift-activity-overlay": "Show rift activity",
   "config-enable-rift-activity-overlay-tooltip": "Shows current temporal rift activity using the selected icon or text style. Calm activity hides the indicator. Changes take effect immediately.",
-  "config-enable-weather-conditions-overlay-tooltip": "Shows local cloud coverage, precipitation, fog, and thunder beneath the calendar using the selected icon or text style. Changes take effect immediately.",
+  "config-enable-weather-conditions-overlay-tooltip": "Shows local precipitation, fog, and thunder beneath the calendar using the selected icon or text style. Hides when none are active. Changes take effect immediately.",
   "config-section-hud-overlays": "HUD Overlays",
   "config-enable-hud-overlays": "Enable HUD overlays",
   "config-enable-hud-overlays-tooltip": "Show passive anchored HUD overlays. Disable to stop their sampling. Changes take effect immediately.",
