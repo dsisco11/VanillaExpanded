@@ -19,8 +19,8 @@ internal sealed class ToolModeSkillIcon(SkillItem skillItem) : IRadialMenuIcon
         float iconScale = VanillaExpandedModSystem.Config.ToolModeIconSize;
         sizePixels *= float.IsFinite(iconScale) ? Math.Clamp(iconScale, 0.15f, 2.5f) : 0.75f;
         float offset = sizePixels / 2f;
-        float x = (float)centerX - offset;
-        float y = (float)centerY - offset;
+        float x = (float)Math.Truncate(centerX - offset);
+        float y = (float)Math.Truncate(centerY - offset);
         if (skillItem.Texture is not null)
         {
             if (skillItem.TexturePremultipliedAlpha)
