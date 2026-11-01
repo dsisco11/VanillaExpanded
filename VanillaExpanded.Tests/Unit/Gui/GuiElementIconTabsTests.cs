@@ -15,6 +15,69 @@ namespace VanillaExpanded.Tests.Unit.Gui;
 public sealed class GuiElementIconTabsTests
 {
     [Theory]
+    [InlineData(1f)]
+    [InlineData(1.25f)]
+    [InlineData(1.5f)]
+    [InlineData(1.75f)]
+    [InlineData(2f)]
+    public void IconToggleRetainsNativeBackgroundAndRendersPixelAlignedNearestFilteredOverlay(float scale)
+    {
+        using var graphics = new RecipeBookRenderFixture(scale);
+        Setup(graphics);
+        var draws = new List<(int Width, int Height, double WidthRequested, double[] Color)>();
+        graphics.Gui.Object.Icons.CustomIcons["test-icon"] = (ctx, _, _, width, _, color) =>
+        {
+            using var target = ctx.GetTarget();
+            var surface = Assert.IsType<ImageSurface>(target);
+            draws.Add((surface.Width, surface.Height, width, color.ToArray()));
+        };
+        using var button = new GuiElementIconToggleButton(graphics.Api.Object, "test-icon",
+            CairoFont.WhiteSmallText(), _ => { }, ElementBounds.Fixed(120.3, 65.3, 28, 28).WithEmptyParent(), true);
+        using var surface = new ImageSurface(Format.Argb32, 64, 64);
+        using var ctx = new Context(surface);
+        button.ComposeElements(ctx, surface);
+        Assert.Equal(2, draws.Count);
+        Assert.All(draws, draw =>
+        {
+            Assert.Equal(draw.Width, draw.Height);
+            Assert.Equal((double)draw.Width, draw.WidthRequested);
+        });
+        Assert.Equal(draws[0].Width, draws[1].Width);
+        Assert.Equal(button.Font.Color, draws[0].Color);
+        Assert.Equal(GuiStyle.ActiveButtonTextColor, draws[1].Color);
+        Assert.False(draws[0].Color.SequenceEqual(draws[1].Color));
+        Assert.Equal(2, graphics.Gui.Invocations.Count(call =>
+            call.Method.Name == nameof(IGuiAPI.LoadOrUpdateCairoTexture) && !(bool)call.Arguments[1]));
+        var textures = new Dictionary<bool, int>();
+        foreach (var state in new[] { (On: false, Hover: false), (On: false, Hover: true),
+            (On: true, Hover: false), (On: true, Hover: true) })
+        {
+            button.On = state.On;
+            SetMouse(graphics, state.Hover ? button.Bounds.absX + 10 : -100,
+                state.Hover ? button.Bounds.absY + 10 : -100);
+            graphics.Render.Invocations.Clear();
+            button.RenderInteractiveElements(0);
+            var calls = graphics.Render.Invocations.Where(call =>
+                call.Method.Name == nameof(IRenderAPI.Render2DTexturePremultipliedAlpha)).ToArray();
+            Assert.Equal(2, calls.Length);
+            Assert.Same(button.Bounds, calls[0].Arguments[1]);
+            var overlay = calls[1].Arguments;
+            int size = (int)Math.Round(20 * scale, MidpointRounding.AwayFromZero);
+            Assert.Equal((double)size, (double)overlay[3]);
+            Assert.Equal((double)size, (double)overlay[4]);
+            Assert.Equal(Math.Round((double)overlay[1]), (double)overlay[1]);
+            Assert.Equal(Math.Round((double)overlay[2]), (double)overlay[2]);
+            Assert.Equal(51f, (float)overlay[5]);
+            bool active = state.On || state.Hover;
+            if (textures.TryGetValue(active, out int texture)) Assert.Equal(texture, (int)overlay[0]);
+            else textures.Add(active, (int)overlay[0]);
+        }
+        Assert.NotEqual(textures[false], textures[true]);
+        button.Dispose();
+        Assert.Empty(graphics.Textures);
+    }
+
+    [Theory]
     [InlineData(.75f)]
     [InlineData(1f)]
     [InlineData(1.5f)]

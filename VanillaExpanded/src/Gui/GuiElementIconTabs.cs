@@ -79,7 +79,7 @@ internal sealed class GuiElementIconTabs : GuiElement
         for (int i = 0; i < tabs.Length; i++)
         {
             int index = i;
-            buttons[i] = new GuiElementToggleButton(api, icons[i], "", CairoFont.WhiteSmallText(),
+            buttons[i] = new GuiElementIconToggleButton(api, icons[i], CairoFont.WhiteSmallText(),
                 _ => SetValue(index), buttonBounds[i], true);
             Composer.AddInteractiveElement(buttons[i], "tab-" + i);
         }
