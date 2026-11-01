@@ -25,6 +25,7 @@ public sealed class CraftingMenuSystem : ModSystem, ILiveConfigurable
     private const string BookIcon = "vanillaexpanded-crafting-book";
     private ICoreClientAPI? api;
     private IconRendererDelegate? bookIcon;
+    private readonly Dictionary<string, IconRendererDelegate> categoryIcons = new();
     private readonly Dictionary<GuiDialog, GuiDialogCraftingMenu> dialogs = new();
     private readonly Dictionary<GuiDialog, (GuiComposer Composer, Action Opened)> attachments = new();
     private readonly System.Func<ICoreClientAPI, (CraftingCatalogue Catalogue, CraftingAllocator Allocator)> build;
@@ -101,6 +102,14 @@ public sealed class CraftingMenuSystem : ModSystem, ILiveConfigurable
             bookIcon = api.Gui.Icons.SvgIconSource(api.Assets.Get(
                 new AssetLocation("vanillaexpanded:textures/gui/crafting-book.svg")));
             api.Gui.Icons.CustomIcons[BookIcon] = bookIcon;
+        }
+        foreach (string code in CraftingCategoryIcons.Codes)
+        {
+            string id = CraftingCategoryIcons.Id(code);
+            if (categoryIcons.ContainsKey(id)) continue;
+            var icon = api.Gui.Icons.SvgIconSource(api.Assets.Get(CraftingCategoryIcons.Asset(code)));
+            categoryIcons.Add(id, icon);
+            api.Gui.Icons.CustomIcons[id] = icon;
         }
         var buttonBounds = ElementBounds.Fixed(0, 0, 28, 28);
         composer.AddInteractiveElement(new GuiElementCraftingMenuButton(api, BookIcon, _ =>
@@ -200,6 +209,10 @@ public sealed class CraftingMenuSystem : ModSystem, ILiveConfigurable
         {
             if (bookIcon != null) api.Gui.Icons.CustomIcons.Remove(BookIcon);
             bookIcon = null;
+            foreach (var icon in categoryIcons)
+                if (api.Gui.Icons.CustomIcons.TryGetValue(icon.Key, out var current) && ReferenceEquals(current, icon.Value))
+                    api.Gui.Icons.CustomIcons.Remove(icon.Key);
+            categoryIcons.Clear();
             api.Event.LevelFinalize -= Initialize;
             api.Event.LeaveWorld -= Clear;
             Clear();

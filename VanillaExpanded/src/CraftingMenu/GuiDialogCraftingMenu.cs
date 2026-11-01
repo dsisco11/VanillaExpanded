@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using VanillaExpanded.Gui;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -158,13 +159,14 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
                 tiles.ResetScroll();
                 session.Search(text);
             }), "search")
-            .AddHorizontalTabs(categories.Select((code, index) => new GuiTab { DataInt = index, Name = CategoryName(code) })
-                .ToArray(), tabsBounds, index =>
+            .AddInteractiveElement(new GuiElementIconTabs(capi,
+                categories.Select((code, index) => new GuiTab { DataInt = index, Name = CategoryName(code) }).ToArray(),
+                categories.Select(CraftingCategoryIcons.ForCategory).ToArray(), tabsBounds, index =>
                 {
                     if (session.Category == categories[index]) return;
                     tiles.ResetScroll();
                     session.SelectCategory(categories[index]);
-                }, CairoFont.WhiteSmallText(), CairoFont.WhiteSmallText().WithWeight(Cairo.FontWeight.Bold), "categories")
+                }), "categories")
             .AddSwitch(enabled =>
             {
                 tiles.ResetScroll();
@@ -211,7 +213,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
         SingleComposer = composer;
         tooltip = newTooltip;
         composer.GetSwitch("craftable-only").SetValue(session.CraftableOnly.Enabled);
-        composer.GetHorizontalTabs("categories").SetValue(Array.IndexOf(categories, session.Category), false);
+        ((GuiElementIconTabs)composer.GetElement("categories")).SetValue(Array.IndexOf(categories, session.Category), false);
         composer.GetTextInput("search").SetPlaceHolderText(Lang.Get("vanillaexpanded:craftingmenu-search"));
         composer.GetTextInput("search").SetValue(search);
         tiles.Bind(composer.GetScrollbar("scroll"));
@@ -245,7 +247,7 @@ internal sealed class GuiDialogCraftingMenu : GuiDialog
             textFont.GetFontExtents().Height) / scale));
         searchHeight = Math.Max(26, Math.Ceiling(textFont.GetFontExtents().Height / scale + 6));
         craftableHeight = Math.Max(26, Math.Ceiling(textFont.GetFontExtents().Height / scale + 8));
-        tabsHeight = Math.Max(26, Math.Ceiling(textFont.GetFontExtents().Height / scale + 6));
+        tabsHeight = GuiElementIconTabs.TabSize + 2;
         double counterWidth = Math.Ceiling(textFont.GetTextExtents("1/1").Width / scale + 1);
         double titleWidth = textFont.GetTextExtents(Lang.Get("vanillaexpanded:craftingmenu-title")).Width / scale;
         // The native title bar reserves space for its menu and close icons.
