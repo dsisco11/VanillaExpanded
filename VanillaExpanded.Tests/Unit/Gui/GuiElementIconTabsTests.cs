@@ -2,7 +2,7 @@ using System.Reflection;
 using Cairo;
 using Moq;
 using VanillaExpanded.Gui;
-using VanillaExpanded.Tests.Unit.CraftingMenu;
+using VanillaExpanded.Tests.Unit.RecipeBook;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -11,7 +11,7 @@ using Vintagestory.API.MathTools;
 namespace VanillaExpanded.Tests.Unit.Gui;
 
 [Trait("Category", "Unit")]
-[Collection("Crafting native GUI")]
+[Collection("Recipe book native GUI")]
 public sealed class GuiElementIconTabsTests
 {
     [Theory]
@@ -21,7 +21,7 @@ public sealed class GuiElementIconTabsTests
     [InlineData(2f)]
     public void NativeComposerOwnsIconOnlyButtonsAndBoundsAndRecompositionDisposesTextures(float scale)
     {
-        using var graphics = new CraftingRenderFixture(scale);
+        using var graphics = new RecipeBookRenderFixture(scale);
         Setup(graphics);
         using var tabs = Create(graphics, ["First", "A much longer localized name", "Third"], 500, _ => { });
         var composer = Assert.IsType<GuiComposer>(tabs.Composer);
@@ -60,7 +60,7 @@ public sealed class GuiElementIconTabsTests
     [InlineData(2f)]
     public void SelectionKeyboardWrapAndWheelScrollingUseNativeBoundsAndClipHitTesting(float scale)
     {
-        using var graphics = new CraftingRenderFixture(scale);
+        using var graphics = new RecipeBookRenderFixture(scale);
         Setup(graphics);
         var changes = new List<int>();
         using var tabs = Create(graphics, Enumerable.Range(0, 9).Select(i => "Entry " + i).ToArray(), 180, changes.Add);
@@ -134,7 +134,7 @@ public sealed class GuiElementIconTabsTests
 
     private static void AssertHints()
     {
-        using var graphics = new CraftingRenderFixture();
+        using var graphics = new RecipeBookRenderFixture();
         Setup(graphics);
         using var tabs = Create(graphics, ["Localized first", "Localized second", "Localized third"], 85, _ => { });
         var first = tabs.Composer!.GetToggleButton("tab-0").Bounds;
@@ -173,7 +173,7 @@ public sealed class GuiElementIconTabsTests
     [Fact]
     public void NativeCompositionRestoresTheHostClipWhenRenderingFails()
     {
-        using var graphics = new CraftingRenderFixture();
+        using var graphics = new RecipeBookRenderFixture();
         Setup(graphics);
         using var tabs = Create(graphics, ["One", "Two"], 150, _ => { });
         var host = ElementBounds.Fixed(0, 0, 1000, 1000).WithEmptyParent();
@@ -191,7 +191,7 @@ public sealed class GuiElementIconTabsTests
     [Fact]
     public void IconClickSelectsAndInvalidSelectionsAndDescriptionsFailExplicitly()
     {
-        using var graphics = new CraftingRenderFixture();
+        using var graphics = new RecipeBookRenderFixture();
         Setup(graphics);
         var changes = new List<int>();
         using var tabs = Create(graphics, ["One", "Two", "Three"], 500, changes.Add);
@@ -210,7 +210,7 @@ public sealed class GuiElementIconTabsTests
         Assert.Equal(1, tabs.activeElement);
     }
 
-    private static void Setup(CraftingRenderFixture graphics)
+    private static void Setup(RecipeBookRenderFixture graphics)
     {
         var icons = new IconUtil(graphics.Api.Object);
         icons.CustomIcons["test-icon"] = (_, _, _, _, _, _) => { };
@@ -223,14 +223,14 @@ public sealed class GuiElementIconTabsTests
         SetMouse(graphics, -100, -100);
     }
 
-    private static void SetMouse(CraftingRenderFixture graphics, double x, double y)
+    private static void SetMouse(RecipeBookRenderFixture graphics, double x, double y)
     {
         var input = Mock.Get(graphics.Api.Object.Input);
         input.SetupGet(value => value.MouseX).Returns((int)x);
         input.SetupGet(value => value.MouseY).Returns((int)y);
     }
 
-    private static GuiElementIconTabs Create(CraftingRenderFixture graphics, string[] names, double width, Action<int> changed)
+    private static GuiElementIconTabs Create(RecipeBookRenderFixture graphics, string[] names, double width, Action<int> changed)
     {
         var bounds = ElementBounds.Fixed(120, 65, width, 30).WithEmptyParent();
         bounds.CalcWorldBounds();

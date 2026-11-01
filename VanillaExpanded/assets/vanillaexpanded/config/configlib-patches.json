@@ -61,11 +61,11 @@
         "default": true,
         "weight": 4.1
       },
-      "EnableCraftingMenu": {
-        "code": "EnableCraftingMenu",
-        "name": "EnableCraftingMenu",
-        "ingui": "vanillaexpanded:config-enable-crafting-menu",
-        "comment": "vanillaexpanded:config-enable-crafting-menu-tooltip",
+      "EnableRecipeBook": {
+        "code": "EnableRecipeBook",
+        "name": "EnableRecipeBook",
+        "ingui": "vanillaexpanded:config-enable-recipe-book",
+        "comment": "vanillaexpanded:config-enable-recipe-book-tooltip",
         "default": true,
         "weight": 4.6,
         "clientSide": true
@@ -484,7 +484,7 @@
     },
     {
       "type": "separator",
-      "title": "vanillaexpanded:config-section-crafting-menu",
+      "title": "vanillaexpanded:config-section-recipe-book",
       "weight": 4.5
     },
     {

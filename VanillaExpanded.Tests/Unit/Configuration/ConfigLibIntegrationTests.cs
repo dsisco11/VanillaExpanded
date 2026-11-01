@@ -11,30 +11,30 @@ namespace VanillaExpanded.Tests.Unit.Configuration;
 public class ConfigLibIntegrationTests
 {
     [Fact]
-    public void CraftingMenuToggle_DefaultsToEnabledAndPersistsExplicitDisable()
+    public void RecipeBookToggle_DefaultsToEnabledAndPersistsExplicitDisable()
     {
         var config = Newtonsoft.Json.JsonConvert.DeserializeObject<VanillaExpandedConfig>(
             "{\"EnableAutoStash\":false}")!;
-        Assert.True(config.EnableCraftingMenu);
+        Assert.True(config.EnableRecipeBook);
         Assert.Equal(1, ConfigLibIntegrationModSystem.ApplyConfigLibSettings(config,
-            new StringAttribute("{\"EnableCraftingMenu\":\"false\"}")));
+            new StringAttribute("{\"EnableRecipeBook\":\"false\"}")));
         var restored = Newtonsoft.Json.JsonConvert.DeserializeObject<VanillaExpandedConfig>(
             Newtonsoft.Json.JsonConvert.SerializeObject(config))!;
-        Assert.False(restored.EnableCraftingMenu);
+        Assert.False(restored.EnableRecipeBook);
         Assert.False(restored.EnableAutoStash);
     }
 
     [Fact]
-    public void CraftingMenuToggle_IsClientSideLocalizedAndMatchesTheConfigDefault()
+    public void RecipeBookToggle_IsClientSideLocalizedAndMatchesTheConfigDefault()
     {
         string assets = Path.Combine(FindRepositoryRoot(), "VanillaExpanded", "assets", "vanillaexpanded");
         using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(assets, "config", "configlib-patches.json")));
         using var language = JsonDocument.Parse(File.ReadAllText(Path.Combine(assets, "lang", "en.json")));
-        var toggle = document.RootElement.GetProperty("settings").GetProperty("boolean").GetProperty("EnableCraftingMenu");
-        Assert.Equal(new VanillaExpandedConfig().EnableCraftingMenu, toggle.GetProperty("default").GetBoolean());
+        var toggle = document.RootElement.GetProperty("settings").GetProperty("boolean").GetProperty("EnableRecipeBook");
+        Assert.Equal(new VanillaExpandedConfig().EnableRecipeBook, toggle.GetProperty("default").GetBoolean());
         Assert.True(toggle.GetProperty("clientSide").GetBoolean());
         var heading = document.RootElement.GetProperty("formatting").EnumerateArray().Single(entry =>
-            entry.GetProperty("title").GetString() == "vanillaexpanded:config-section-crafting-menu");
+            entry.GetProperty("title").GetString() == "vanillaexpanded:config-section-recipe-book");
         Assert.InRange(toggle.GetProperty("weight").GetDouble(), heading.GetProperty("weight").GetDouble(), 4.99);
         foreach (string key in new[] { toggle.GetProperty("ingui").GetString()!,
             toggle.GetProperty("comment").GetString()!, heading.GetProperty("title").GetString()! })

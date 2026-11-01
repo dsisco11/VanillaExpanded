@@ -1,0 +1,62 @@
+using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Linq;
+
+namespace VanillaExpanded.RecipeBook;
+
+internal sealed class RecipeSort(Action changed)
+{
+    internal const string Default = "availability";
+    internal ImmutableArray<IRecipeOrder> Orders { get; } = [new AvailabilityOrder(), new NameOrder()];
+    private IRecipeOrder? selected;
+    internal IRecipeOrder Selected => selected ?? Orders[0];
+
+    internal void Select(string id)
+    {
+        var order = Orders.FirstOrDefault(order => order.Id == id)
+            ?? throw new ArgumentException("Unknown crafting recipe order.", nameof(id));
+        if (Selected == order) return;
+        selected = order;
+        changed();
+    }
+
+    internal static IOrderedEnumerable<CraftingRecipeSelection> ByCoverage(
+        IOrderedEnumerable<CraftingRecipeSelection> selections) =>
+        selections.ThenByDescending(selection => selection.Evaluation.Relevance)
+            .ThenBy(selection => selection.Evaluation.MissingUnits);
+}
+
+internal interface IRecipeOrder
+{
+    string Id { get; }
+    string NameKey { get; }
+    IOrderedEnumerable<CraftingRecipeSelection> Order(IEnumerable<CraftingRecipeSelection> selections);
+    IOrderedEnumerable<CraftingRecipeSelection> OrderAlternatives(IEnumerable<CraftingRecipeSelection> selections) =>
+        RecipeSort.ByCoverage(selections.OrderByDescending(selection => selection.Evaluation.IsSupported));
+}
+
+internal sealed class AvailabilityOrder : IRecipeOrder
+{
+    public string Id => RecipeSort.Default;
+    public string NameKey => "vanillaexpanded:recipebook-sort-availability";
+
+    public IOrderedEnumerable<CraftingRecipeSelection> Order(IEnumerable<CraftingRecipeSelection> selections) =>
+        RecipeSort.ByCoverage(selections.OrderByDescending(selection => selection.Evaluation.IsSupported)
+            .ThenByDescending(selection => selection.GridMatches)
+            .ThenByDescending(selection => selection.Evaluation.CanCraft))
+            .ThenBy(selection => selection.Recipe.DisplayName, StringComparer.CurrentCultureIgnoreCase);
+
+    public IOrderedEnumerable<CraftingRecipeSelection> OrderAlternatives(IEnumerable<CraftingRecipeSelection> selections) =>
+        RecipeSort.ByCoverage(selections.OrderByDescending(selection => selection.Evaluation.IsSupported)
+            .ThenByDescending(selection => selection.GridMatches));
+}
+
+internal sealed class NameOrder : IRecipeOrder
+{
+    public string Id => "name";
+    public string NameKey => "vanillaexpanded:recipebook-sort-name";
+
+    public IOrderedEnumerable<CraftingRecipeSelection> Order(IEnumerable<CraftingRecipeSelection> selections) =>
+        selections.OrderBy(selection => selection.Recipe.DisplayName, StringComparer.CurrentCultureIgnoreCase);
+}

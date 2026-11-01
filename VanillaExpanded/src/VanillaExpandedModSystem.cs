@@ -4,7 +4,7 @@ using HarmonyLib;
 
 using VanillaExpanded.AlloyCalculator;
 using VanillaExpanded.AutoStashing;
-using VanillaExpanded.CraftingMenu;
+using VanillaExpanded.RecipeBook;
 using VanillaExpanded.Fishing;
 using VanillaExpanded.IgnitionTools;
 using VanillaExpanded.SpawnDecal;
@@ -102,9 +102,9 @@ public class VanillaExpandedModSystem : ModSystem
     private static void ApplySelectivePatches(Harmony harmony)
     {
         new PatchClassProcessor(harmony, typeof(FishingBiteSoundPatch)).Patch();
-        if (Config.EnableCraftingMenu)
+        if (Config.EnableRecipeBook)
         {
-            new PatchClassProcessor(harmony, typeof(CraftingMenuDialogPatch)).Patch();
+            new PatchClassProcessor(harmony, typeof(RecipeBookDialogPatch)).Patch();
         }
 
         // Patch the firepit GUI open/close hooks unless explicitly disabled.
