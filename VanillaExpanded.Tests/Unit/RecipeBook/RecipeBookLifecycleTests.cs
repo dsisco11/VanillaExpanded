@@ -552,6 +552,35 @@ public sealed class RecipeBookLifecycleTests
     [InlineData(1)]
     [InlineData(1.5)]
     [InlineData(2)]
+    public void CraftableHintAppearsOverCheckboxAndLabelAndHidesOutside(float scale)
+    {
+        using var f = new MenuFixture(scale: scale);
+        f.Parent.TryOpen();
+        f.Toggle();
+        var composer = Assert.Single(f.Menus).SingleComposer;
+        var hint = composer.GetHoverText("craftable-hint");
+        var input = Mock.Get(f.Lifecycle.Api.Object.Input);
+        foreach (var bounds in new[]
+        {
+            composer.GetSwitch("craftable-only").Bounds,
+            composer.GetElement("craftable-label").Bounds
+        })
+        {
+            input.SetupGet(value => value.MouseX).Returns((int)(bounds.absX + bounds.OuterWidth / 2));
+            input.SetupGet(value => value.MouseY).Returns((int)(bounds.absY + bounds.OuterHeight / 2));
+            hint.RenderInteractiveElements(0);
+            Assert.True(hint.IsNowShown);
+        }
+        input.SetupGet(value => value.MouseX).Returns((int)(hint.Bounds.absX - GuiElement.scaled(5)));
+        hint.RenderInteractiveElements(0);
+        Assert.False(hint.IsNowShown);
+        Assert.False(composer.GetSwitch("craftable-only").On);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(1.5)]
+    [InlineData(2)]
     public void NativeCraftableCheckboxPreservesIndependentCriteriaAcrossInputResizeAndSessionReset(float scale)
     {
         using var f = new MenuFixture(scale: scale, includeRecipes: true);

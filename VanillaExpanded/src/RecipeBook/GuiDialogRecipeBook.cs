@@ -178,6 +178,9 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
             }, craftableBounds, "craftable-only", size: craftableHeight)
             .AddStaticText(Lang.Get("vanillaexpanded:recipebook-craftable-only"), CairoFont.WhiteDetailText(),
                 craftableLabel, "craftable-label")
+            .AddHoverText(Lang.Get("vanillaexpanded:recipebook-craftable-only-hint"), CairoFont.WhiteSmallText(),
+                300, ElementBounds.Fixed(0, craftableBounds.fixedY, content.fixedWidth, craftableHeight),
+                "craftable-hint")
             .AddStaticText(Lang.Get("vanillaexpanded:recipebook-sort"), CairoFont.WhiteDetailText(),
                 sortLabel, "sort-label")
             .AddDropDown(session.Sort.Orders.Select(order => order.Id).ToArray(),
