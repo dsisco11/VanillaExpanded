@@ -6,12 +6,14 @@ using VanillaExpanded.Gui;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
+using Vintagestory.API.MathTools;
 using Vintagestory.GameContent;
 
 namespace VanillaExpanded.RecipeBook;
 
 internal sealed class GuiDialogRecipeBook : GuiDialog
 {
+    private const string ComposerName = "vanillaexpanded-recipebook";
     private readonly GuiDialog parent;
     private readonly GuiComposer parentComposer;
     private readonly RecipeBookSession session;
@@ -164,7 +166,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
             viewport, session, Inspect, Activate, icons);
         var newTooltip = new GuiElementRecipeBookTooltip(capi);
         var newOptions = new GuiElementRecipeBookOptions(capi, ElementBounds.Fixed(width - 80, 7, 17, 17));
-        var composer = capi.Gui.CreateCompo("vanillaexpanded-recipebook", bounds)
+        var composer = capi.Gui.CreateCompo(ComposerName, bounds)
             .AddShadedDialogBG(ElementBounds.Fill)
             .AddDialogTitleBar(Lang.Get("vanillaexpanded:recipebook-title"), () => CloseByUser(), key: "titlebar")
             .BeginChildElements(content)
@@ -314,8 +316,14 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         if (grid == null) { CloseWithParent(); return false; }
         var output = parentComposer.GetElement("outputslot").Bounds;
         if (SingleComposer == null || composedScale != RuntimeEnv.GUIScale) MeasureLayout();
-        var next = RecipeBookLayout.Place(parentComposer.Bounds, grid, output, capi.Gui.WindowBounds,
-            minimumWidth, minimumHeight);
+        var savedPosition = SingleComposer == null ? capi.Gui.GetDialogPosition(ComposerName) : null;
+        bool movable = SingleComposer?.GetTitleBar("titlebar").Movable ?? savedPosition != null;
+        var next = movable
+            ? RecipeBookLayout.PlaceMovable(SingleComposer?.Bounds
+                ?? ElementBounds.Fixed(savedPosition!.X, savedPosition.Y, 320, 420),
+                capi.Gui.WindowBounds, minimumWidth, minimumHeight)
+            : RecipeBookLayout.Place(parentComposer.Bounds, grid, output, capi.Gui.WindowBounds,
+                minimumWidth, minimumHeight);
         if (next == null)
         {
             Error("vanillaexpanded:recipebook-screen-space");
@@ -325,6 +333,8 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         if (SingleComposer == null || composedScale != RuntimeEnv.GUIScale
             || SingleComposer.Bounds.fixedWidth != next.fixedWidth || SingleComposer.Bounds.fixedHeight != next.fixedHeight)
         {
+            if (movable)
+                capi.Gui.SetDialogPosition(ComposerName, new Vec2i((int)next.fixedX, (int)next.fixedY));
             Compose(next, focusFirstElement);
             composedScale = RuntimeEnv.GUIScale;
         }

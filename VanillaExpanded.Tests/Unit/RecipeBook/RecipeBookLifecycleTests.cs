@@ -9,6 +9,7 @@ using VanillaExpanded.Gui;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
+using Vintagestory.API.MathTools;
 using Vintagestory.Client.NoObf;
 using Vintagestory.Common;
 using Vintagestory.GameContent;
@@ -19,6 +20,125 @@ namespace VanillaExpanded.Tests.Unit.RecipeBook;
 [Collection("Recipe book native GUI")]
 public sealed class RecipeBookLifecycleTests
 {
+    [Theory]
+    [InlineData(1)]
+    [InlineData(1.5)]
+    [InlineData(2)]
+    public void NativeMovementMenuAllowsDraggingAndFixedResumesInventoryFollowing(float scale)
+    {
+        using var f = new MenuFixture(scale: scale);
+        f.Parent.TryOpen();
+        f.Toggle();
+        var book = Assert.Single(f.Menus);
+        var composer = book.SingleComposer;
+        var parent = f.Parent.Composers["maininventory"].Bounds;
+        Assert.False(composer.GetTitleBar("titlebar").Movable);
+        Assert.Empty(f.DialogPositions);
+        Assert.Equal(2, composer.Bounds.absX - parent.absX - parent.OuterWidth, 4);
+        double dockedX = composer.Bounds.absX;
+        parent.fixedX += 20;
+        parent.MarkDirtyRecursive();
+        parent.CalcWorldBounds();
+        book.OnRenderGUI(0);
+        Assert.Equal(dockedX + 20 * scale, composer.Bounds.absX, 4);
+        f.SelectMovement(book, movable: true);
+        book.OnRenderGUI(0);
+        var titlebar = composer.GetTitleBar("titlebar");
+        Assert.True(titlebar.Movable);
+        double x = composer.Bounds.absX;
+        double y = composer.Bounds.absY;
+        int startX = (int)(titlebar.Bounds.absX + GuiElement.scaled(30));
+        int startY = (int)(titlebar.Bounds.absY + GuiElement.scaled(12));
+        var down = new MouseEvent(startX, startY, EnumMouseButton.Left, 0);
+        book.OnMouseDown(down);
+        Assert.True(down.Handled);
+        int deltaX = (int)(40 * scale);
+        int deltaY = (int)(30 * scale);
+        book.OnMouseMove(new MouseEvent(startX + deltaX, startY + deltaY, EnumMouseButton.None, 0));
+        Assert.Equal(x + deltaX, composer.Bounds.absX, 4);
+        Assert.Equal(y + deltaY, composer.Bounds.absY, 4);
+        book.OnMouseUp(new MouseEvent(startX + deltaX, startY + deltaY, EnumMouseButton.Left, 0));
+        book.OnMouseMove(new MouseEvent(startX + deltaX + 10, startY + deltaY + 10, EnumMouseButton.None, 0));
+        parent.fixedX += 30;
+        parent.fixedY += 20;
+        parent.MarkDirtyRecursive();
+        parent.CalcWorldBounds();
+        book.OnRenderGUI(0);
+        Assert.Same(composer, book.SingleComposer);
+        Assert.Equal(x + deltaX, composer.Bounds.absX, 4);
+        Assert.Equal(y + deltaY, composer.Bounds.absY, 4);
+        Assert.Equal((int)((x + deltaX) / scale), f.DialogPositions["vanillaexpanded-recipebook"].X);
+        Assert.Equal((int)((y + deltaY) / scale), f.DialogPositions["vanillaexpanded-recipebook"].Y);
+        f.Parent.TryClose();
+        f.Parent.TryOpen();
+        book = Assert.Single(f.Menus);
+        composer = book.SingleComposer;
+        titlebar = composer.GetTitleBar("titlebar");
+        Assert.True(titlebar.Movable);
+        Assert.Equal(x + deltaX, composer.Bounds.absX, 4);
+        Assert.Equal(y + deltaY, composer.Bounds.absY, 4);
+        f.SelectMovement(book, movable: false);
+        Assert.False(titlebar.Movable);
+        Assert.DoesNotContain("vanillaexpanded-recipebook", f.DialogPositions.Keys);
+        book.OnRenderGUI(0);
+        var expected = RecipeBookLayout.Place(parent,
+            f.Parent.Composers["maininventory"].GetElement("craftinggrid").Bounds,
+            f.Parent.Composers["maininventory"].GetElement("outputslot").Bounds,
+            f.Lifecycle.Api.Object.Gui.WindowBounds, 1, 1)!;
+        expected.CalcWorldBounds();
+        Assert.Equal(expected.absX, book.SingleComposer.Bounds.absX, 4);
+        Assert.Equal(expected.absY, book.SingleComposer.Bounds.absY, 4);
+        f.Parent.TryClose();
+        f.Parent.TryOpen();
+        book = Assert.Single(f.Menus);
+        Assert.False(book.SingleComposer.GetTitleBar("titlebar").Movable);
+        Assert.DoesNotContain("vanillaexpanded-recipebook", f.DialogPositions.Keys);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(1.5)]
+    [InlineData(2)]
+    public void MovablePositionSurvivesReopeningAndScaleChangesWithoutNeedingDockSpace(float scale)
+    {
+        var positions = new Dictionary<string, Vec2i>
+        {
+            ["vanillaexpanded-recipebook"] = new(50, 60)
+        };
+        using var f = new MenuFixture(scale: scale, savedPositions: positions);
+        f.ResizePanelSpace(0, 700);
+        f.Parent.TryOpen();
+        f.Toggle();
+        var book = Assert.Single(f.Menus);
+        AssertPosition(book, 50, 60);
+        var original = book.SingleComposer;
+        book.SingleComposer.GetTextInput("search").SetValue("retained");
+        RuntimeEnv.GUIScale = scale + 0.25f;
+        book.TryOpen(false);
+        Assert.NotSame(original, book.SingleComposer);
+        AssertPosition(book, 50, 60);
+        Assert.Equal("retained", book.SingleComposer.GetTextInput("search").GetText());
+        f.Parent.TryClose();
+        f.Parent.TryOpen();
+        book = Assert.Single(f.Menus);
+        AssertPosition(book, 50, 60);
+        f.ResizePanelSpace(0, 350);
+        book.TryOpen(false);
+        Assert.True(book.IsOpened());
+        Assert.True(book.SingleComposer.GetTitleBar("titlebar").Movable);
+        Assert.True(book.SingleComposer.Bounds.absY + book.SingleComposer.Bounds.OuterHeight
+            <= f.Lifecycle.Api.Object.Gui.WindowBounds.InnerHeight + .001);
+        f.Parent.TryClose();
+        Assert.Empty(f.Menus);
+
+        static void AssertPosition(GuiDialogRecipeBook book, double x, double y)
+        {
+            Assert.True(book.SingleComposer.GetTitleBar("titlebar").Movable);
+            Assert.Equal(x * GuiElement.scaled(1), book.SingleComposer.Bounds.absX, 4);
+            Assert.Equal(y * GuiElement.scaled(1), book.SingleComposer.Bounds.absY, 4);
+        }
+    }
+
     [Theory]
     [InlineData(1)]
     [InlineData(1.5)]
@@ -3038,11 +3158,22 @@ public sealed class RecipeBookLifecycleTests
         internal readonly Dictionary<string, IAsset> CategoryAssets = new();
         internal readonly List<(IAsset Asset, int X, int Y, int Width, int Height, int SurfaceWidth, int SurfaceHeight, int? Color)> CategoryDraws = new();
         internal int TextureCount => graphics.Textures.Count;
+        internal readonly Dictionary<string, Vec2i> DialogPositions;
 
         internal MenuFixture(bool enabled = true, float scale = 1, bool longLabels = false, bool includeRecipes = false,
-            Dictionary<string, bool>? savedSettings = null)
+            Dictionary<string, bool>? savedSettings = null,
+            Dictionary<string, Vec2i>? savedPositions = null)
         {
             graphics = new RecipeBookRenderFixture(scale);
+            DialogPositions = savedPositions ?? new();
+            graphics.Gui.Setup(value => value.GetDialogPosition(It.IsAny<string>()))
+                .Returns((string name) => DialogPositions.GetValueOrDefault(name));
+            graphics.Gui.Setup(value => value.SetDialogPosition(It.IsAny<string>(), It.IsAny<Vec2i>()))
+                .Callback<string, Vec2i?>((name, position) =>
+                {
+                    if (position == null) DialogPositions.Remove(name);
+                    else DialogPositions[name] = new(position.X, position.Y);
+                });
             Lifecycle = new LifecycleFixture(enabled, savedSettings);
             var translations = new Mock<ITranslationService>();
             translations.Setup(value => value.Get(It.IsAny<string>(), It.IsAny<object[]>()))
@@ -3179,6 +3310,29 @@ public sealed class RecipeBookLifecycleTests
             Parent.OnMouseUp(new MouseEvent(x, y, EnumMouseButton.Left, 0));
         }
 
+        internal void SelectMovement(GuiDialogRecipeBook book, bool movable)
+        {
+            var titlebar = book.SingleComposer.GetTitleBar("titlebar");
+            int x = (int)(titlebar.Bounds.absX + titlebar.Bounds.OuterWidth - GuiElement.scaled(44));
+            int y = (int)(titlebar.Bounds.absY + GuiElement.scaled(10));
+            SetMouse(x, y);
+            book.OnMouseDown(new MouseEvent(x, y, EnumMouseButton.Left, 0));
+            book.OnMouseUp(new MouseEvent(x, y, EnumMouseButton.Left, 0));
+            var menu = (GuiElementListMenu)typeof(GuiElementDialogTitleBar)
+                .GetField("listMenu", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(titlebar)!;
+            Assert.True(menu.IsOpened);
+            Assert.Equal(new[] { "auto", "manual" }, menu.Values);
+            x = (int)(menu.Bounds.renderX + GuiElement.scaled(5));
+            y = (int)(menu.Bounds.renderY + menu.Bounds.InnerHeight + GuiElement.scaled(movable ? 45 : 15));
+            SetMouse(x, y);
+            var down = new MouseEvent(x, y, EnumMouseButton.Left, 0);
+            book.OnMouseDown(down);
+            Assert.True(down.Handled);
+            book.OnMouseUp(new MouseEvent(x, y, EnumMouseButton.Left, 0));
+            Assert.False(menu.IsOpened);
+            Assert.Equal(movable, titlebar.Movable);
+        }
+
         internal GuiElementRecipeBookOptions OpenOptions(GuiDialogRecipeBook book)
         {
             var options = Assert.IsType<GuiElementRecipeBookOptions>(book.SingleComposer.GetElement("options"));
@@ -3282,7 +3436,7 @@ public sealed class RecipeBookLifecycleTests
         internal void ResizePanelSpace(double width, double height)
         {
             var window = graphics.Gui.Object.WindowBounds;
-            window.fixedWidth = 906 + width;
+            window.fixedWidth = 900 + 2 / GuiElement.scaled(1) + width;
             window.fixedHeight = height;
             window.MarkDirtyRecursive();
             window.CalcWorldBounds();

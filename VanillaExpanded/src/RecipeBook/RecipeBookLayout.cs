@@ -19,7 +19,7 @@ internal static class RecipeBookLayout
         double gridTop = Math.Min(inputs.absY, output.absY) / scale;
         double gridRight = Math.Max(inputs.absX + inputs.OuterWidth, output.absX + output.OuterWidth) / scale;
         double gridBottom = Math.Max(inputs.absY + inputs.OuterHeight, output.absY + output.OuterHeight) / scale;
-        const double gap = 6;
+        double gap = 2 / scale;
         var spaces = new[]
         {
             ElementBounds.Fixed(right + gap, 0, width - right - gap, height),
@@ -35,9 +35,21 @@ internal static class RecipeBookLayout
             double h = Math.Min(Math.Max(420, minimumHeight), space.fixedHeight);
             double x = Math.Clamp(px < space.fixedX ? space.fixedX : space.fixedX + space.fixedWidth - w, 0, width - w);
             double y = Math.Clamp(py, space.fixedY, space.fixedY + space.fixedHeight - h);
-            return ElementBounds.Fixed(x - px - parent.absPaddingX / scale,
-                y - py - parent.absPaddingY / scale, w, h).WithParent(parent);
+            return ElementBounds.Fixed(x, y, w, h).WithParent(window);
         }
         return null;
+    }
+
+    internal static ElementBounds? PlaceMovable(ElementBounds bounds, ElementBounds window,
+        double minimumWidth, double minimumHeight)
+    {
+        double scale = GuiElement.scaled(1);
+        double width = window.InnerWidth / scale;
+        double height = window.InnerHeight / scale;
+        if (width < minimumWidth || height < minimumHeight) return null;
+        double w = Math.Clamp(bounds.fixedWidth, minimumWidth, width);
+        double h = Math.Clamp(bounds.fixedHeight, minimumHeight, height);
+        return ElementBounds.Fixed(Math.Clamp(bounds.fixedX, 0, width - w),
+            Math.Clamp(bounds.fixedY, 0, height - h), w, h).WithParent(window);
     }
 }
