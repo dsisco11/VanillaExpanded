@@ -1231,10 +1231,11 @@ public sealed class RecipeBookLifecycleTests
         var down = new MouseEvent(x, y, EnumMouseButton.Left, 0);
         f.Parent.OnMouseDown(down);
         Assert.True(down.Handled);
-        var menu = Assert.Single(f.Menus);
+        Assert.Empty(f.Menus);
         var up = new MouseEvent(x, y, EnumMouseButton.Left, 0);
-        menu.OnMouseUp(up);
         f.Parent.OnMouseUp(up);
+        var menu = Assert.Single(f.Menus);
+        menu.OnMouseUp(up);
         Assert.Same(menu, Assert.Single(f.Menus));
         Assert.True(menu.IsOpened());
         f.AssertToggleOpen();
@@ -1242,6 +1243,31 @@ public sealed class RecipeBookLifecycleTests
         Assert.Empty(f.Menus);
         Assert.True(f.ToggleButton.Visible);
         Assert.False(f.ToggleButton.On);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void CancelledBookButtonPressPreservesTheOpenState(bool initiallyOpen, bool loseFocus)
+    {
+        using var f = new MenuFixture();
+        f.Parent.TryOpen();
+        if (initiallyOpen) f.Toggle();
+        var button = f.ToggleButton;
+        int x = (int)(button.Bounds.absX + GuiElement.scaled(5));
+        int y = (int)(button.Bounds.absY + GuiElement.scaled(5));
+        f.Parent.OnMouseDown(new MouseEvent(x, y, EnumMouseButton.Left, 0));
+        if (loseFocus) button.OnFocusLost();
+        else x = (int)(button.Bounds.absX - GuiElement.scaled(5));
+        f.Parent.OnMouseUp(new MouseEvent(x, y, EnumMouseButton.Left, 0));
+
+        Assert.Equal(initiallyOpen, f.Menus.Any(menu => menu.IsOpened()));
+        Assert.Equal(initiallyOpen, button.On);
+        f.Toggle();
+        Assert.Equal(!initiallyOpen, f.Menus.Any(menu => menu.IsOpened()));
+        Assert.Equal(!initiallyOpen, button.On);
     }
 
     [Fact]
@@ -2237,6 +2263,75 @@ public sealed class RecipeBookLifecycleTests
     }
 
     [Theory]
+    [InlineData(GlKeys.E, 'e')]
+    [InlineData(GlKeys.I, 'i')]
+    public void InventoryHotkeyRestoresAnUnfocusedBookAndItsTextEventDoesNotChangeSearch(GlKeys key, char character)
+    {
+        using var f = new MenuFixture();
+        f.Parent.Opening = f.Recompose;
+        var hotkey = new HotKey { CurrentMapping = new KeyCombination { KeyCode = (int)key } };
+        Mock.Get(f.Lifecycle.Api.Object.Input).Setup(value => value.GetHotKeyByCode("inventory")).Returns(hotkey);
+        f.Parent.TryOpen();
+        f.Toggle();
+        var initial = Assert.Single(f.Menus);
+        initial.SingleComposer.GetTextInput("search").SetValue("saved query");
+        f.Parent.TryClose();
+
+        typeof(GuiDialog).GetMethod("OnKeyCombinationToggle", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(f.Parent, [hotkey.CurrentMapping]);
+        var restored = Assert.Single(f.Menus);
+        Assert.True(f.Parent.Focused);
+        Assert.False(restored.Focused);
+        Assert.False(restored.CaptureAllInputs());
+        Assert.False(restored.SingleComposer.GetTextInput("search").HasFocus);
+        DispatchText(new KeyEvent { KeyCode = (int)key, KeyChar = character });
+        Assert.Equal("saved query", restored.SingleComposer.GetTextInput("search").GetText());
+
+        var composer = restored.SingleComposer;
+        f.ResizePanelSpace(composer.Bounds.fixedWidth + 40, composer.Bounds.fixedHeight - 20);
+        restored.OnRenderGUI(0);
+        Assert.NotSame(composer, restored.SingleComposer);
+        Assert.True(f.Parent.Focused);
+        Assert.False(restored.CaptureAllInputs());
+        Assert.False(restored.SingleComposer.GetTextInput("search").HasFocus);
+
+        var search = restored.SingleComposer.GetTextInput("search");
+        restored.SingleComposer.FocusElement(search.TabIndex);
+        Assert.True(restored.Focused);
+        var typed = new KeyEvent { KeyCode = (int)key, KeyChar = character };
+        DispatchText(typed);
+        Assert.True(typed.Handled);
+        Assert.Equal("saved query" + character, search.GetText());
+        restored.UnFocus();
+        Assert.False(restored.CaptureAllInputs());
+
+        void DispatchText(KeyEvent args)
+        {
+            foreach (var dialog in f.Lifecycle.Api.Object.Gui.LoadedGuis.ToArray())
+            {
+                if (!dialog.ShouldReceiveKeyboardEvents()) continue;
+                dialog.OnKeyPress(args);
+                if (args.Handled) break;
+            }
+        }
+    }
+
+    [Fact]
+    public void ExplicitBookOpeningFocusesSearchAndAcceptsTheFirstCharacter()
+    {
+        using var f = new MenuFixture();
+        f.Parent.TryOpen();
+        f.Toggle();
+        var book = Assert.Single(f.Menus);
+        Assert.True(book.Focused);
+        Assert.True(book.SingleComposer.GetTextInput("search").HasFocus);
+        var typed = new KeyEvent { KeyCode = (int)GlKeys.E, KeyChar = 'e' };
+        book.OnKeyPress(typed);
+        Assert.True(typed.Handled);
+        Assert.Equal("e", book.SingleComposer.GetTextInput("search").GetText());
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void ExplicitlyClosingTheMenuKeepsItClosedWhenTheParentReopens(bool toggleOff)
@@ -2651,6 +2746,12 @@ public sealed class RecipeBookLifecycleTests
             graphics.Gui.SetupGet(value => value.LoadedGuis).Returns(loaded);
             graphics.Gui.Setup(value => value.RegisterDialog(It.IsAny<GuiDialog[]>()))
                 .Callback<GuiDialog[]>(dialogs => loaded.AddRange(dialogs));
+            graphics.Gui.Setup(value => value.RequestFocus(It.IsAny<GuiDialog>()))
+                .Callback<GuiDialog>(dialog =>
+                {
+                    foreach (var existing in loaded) existing.UnFocus();
+                    dialog.Focus();
+                });
             var window = ElementBounds.Fixed(0, 0, 1920, 1080).WithEmptyParent();
             window.CalcWorldBounds();
             graphics.Gui.SetupGet(value => value.WindowBounds).Returns(window);

@@ -148,7 +148,7 @@ public sealed class RecipeBookSystem : ModSystem, ILiveConfigurable
                 && attachments.TryGetValue(parent, out var current) && ReferenceEquals(current.Composer, composer)
                 && parent.Composers.ContainsKey("maininventory")
                 && ReferenceEquals(parent.Composers["maininventory"], composer))
-                Open(parent, composer);
+                Open(parent, composer, false);
         }
         attachments[parent] = (composer, Restore);
         parent.OnOpened += Restore;
@@ -156,7 +156,7 @@ public sealed class RecipeBookSystem : ModSystem, ILiveConfigurable
             api.Event.EnqueueMainThreadTask(Restore, "vanillaexpanded-crafting-restore");
     }
 
-    private void Open(GuiDialog parent, GuiComposer composer)
+    private void Open(GuiDialog parent, GuiComposer composer, bool withFocus = true)
     {
         if (api == null || !VanillaExpandedModSystem.Config.EnableRecipeBook
             || dialogs.TryGetValue(parent, out var open) && open.IsOpened()) return;
@@ -184,7 +184,7 @@ public sealed class RecipeBookSystem : ModSystem, ILiveConfigurable
             if (attachments.TryGetValue(parent, out var attachment) && ReferenceEquals(attachment.Composer, composer))
                 SetOpenerState(composer, false);
         };
-        if (dialog.TryOpen())
+        if (dialog.TryOpen(withFocus))
         {
             opened = true;
             rememberOpen = true;

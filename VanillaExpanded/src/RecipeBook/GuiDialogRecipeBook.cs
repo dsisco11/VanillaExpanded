@@ -71,10 +71,13 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
     public override string ToggleKeyCombinationCode => "";
     public override double DrawOrder => 0.2;
     public override bool PrefersUngrabbedMouse => true;
-    public override bool CaptureAllInputs() => IsOpened() && (SingleComposer?.GetTextInput("search")?.HasFocus ?? false);
+    public override bool CaptureAllInputs() => Focused && IsOpened()
+        && (SingleComposer?.GetTextInput("search")?.HasFocus ?? false);
     public override bool OnEscapePressed() => parent.OnEscapePressed();
 
-    public override bool TryOpen()
+    public override bool TryOpen() => TryOpen(true);
+
+    public override bool TryOpen(bool withFocus)
     {
         long start = Stopwatch.GetTimestamp();
         if (restoreScroll != null)
@@ -83,7 +86,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
             session.SelectCategory(BrowsingState.Category);
             session.Sort.Select(BrowsingState.Sort);
         }
-        if (!Follow()) return false;
+        if (!Follow(withFocus)) return false;
         double composeMs = Stopwatch.GetElapsedTime(start).TotalMilliseconds;
         start = Stopwatch.GetTimestamp();
         Refresh();
@@ -95,7 +98,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         }
         capi.Logger.Debug("[VanillaExpanded] Recipe book: layout/composition {0:F1} ms, inventory evaluation {1:F1} ms, {2} outputs.",
             composeMs, Stopwatch.GetElapsedTime(start).TotalMilliseconds, session.Rows.Length);
-        return base.TryOpen();
+        return base.TryOpen(withFocus);
     }
 
     internal void NativeGridDirty() { if (IsOpened()) coordinator.QueueRefresh(); }
@@ -118,7 +121,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         }
     }
 
-    private void Compose(ElementBounds bounds)
+    private void Compose(ElementBounds bounds, bool focusFirstElement)
     {
         float scroll = (SingleComposer?.GetElement("tiles") as GuiElementRecipeBookTiles)?.ScrollPosition ?? 0;
         double width = bounds.fixedWidth;
@@ -209,7 +212,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
             .EndChildElements()
             .AddInteractiveElement(newTooltip, "tooltip")
             .EndChildElements()
-            .Compose();
+            .Compose(focusFirstElement);
         SingleComposer?.Dispose();
         SingleComposer = composer;
         tooltip = newTooltip;
@@ -274,7 +277,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
             + Math.Max(GuiElementRecipeBookTiles.TileSize, emptyTextHeight + 8 + footerHeight) + 10 + footerHeight + 8);
     }
 
-    private bool Follow()
+    private bool Follow(bool focusFirstElement)
     {
         if (!parent.IsOpened() || !parent.Composers.ContainsKey("maininventory")
             || !ReferenceEquals(parent.Composers["maininventory"], parentComposer))
@@ -297,7 +300,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         if (SingleComposer == null || composedScale != RuntimeEnv.GUIScale
             || SingleComposer.Bounds.fixedWidth != next.fixedWidth || SingleComposer.Bounds.fixedHeight != next.fixedHeight)
         {
-            Compose(next);
+            Compose(next, focusFirstElement);
             composedScale = RuntimeEnv.GUIScale;
         }
         else
@@ -313,7 +316,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
     public override void OnRenderGUI(float deltaTime)
     {
         if (capi.Render.FrameWidth == 0 || capi.Render.FrameHeight == 0) return;
-        if (disposed || !Follow()) return;
+        if (disposed || !Follow(Focused)) return;
         base.OnRenderGUI(deltaTime);
     }
 
@@ -332,7 +335,6 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
 
     public override void OnMouseUp(MouseEvent args)
     {
-        // The opener's release can land on this dialog's newly positioned close button.
         if (!pressedMouseButtons.Remove(args.Button)) return;
         base.OnMouseUp(args);
     }
