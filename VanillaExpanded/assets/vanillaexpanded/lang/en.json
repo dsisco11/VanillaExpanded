@@ -91,6 +91,9 @@
   "gui-alloycalculator-nuggets": "nuggets",
 
   "recipebook-title": "Recipe Book",
+  "recipebook-options": "Options",
+  "recipebook-remember-open": "Reopen with inventory",
+  "recipebook-remember-open-hint": "Automatically reopen the recipe book with your inventory if it was open when you closed the inventory.",
   "recipebook-toggle": "Recipe Book",
   "recipebook-search": "Search outputs...",
   "recipebook-ingredient-choice": "Matching ingredient",

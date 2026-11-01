@@ -34,6 +34,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
     private double clearSearchWidth;
     private double showUncraftableWidth;
     private GuiElementRecipeBookTooltip? tooltip;
+    private GuiElementRecipeBookOptions? options;
     private string search = "";
     private float? restoreScroll;
     private bool disposed;
@@ -73,7 +74,12 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
     public override bool PrefersUngrabbedMouse => true;
     public override bool CaptureAllInputs() => Focused && IsOpened()
         && (SingleComposer?.GetTextInput("search")?.HasFocus ?? false);
-    public override bool OnEscapePressed() => parent.OnEscapePressed();
+    public override bool OnEscapePressed()
+    {
+        if (options?.IsOpened != true) return parent.OnEscapePressed();
+        options.CloseMenu();
+        return true;
+    }
 
     public override bool TryOpen() => TryOpen(true);
 
@@ -153,6 +159,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         var tiles = new GuiElementRecipeBookTiles(capi, ElementBounds.Fixed(0, 0, viewport.fixedWidth, viewport.fixedHeight),
             viewport, session, Inspect, Activate, icons);
         var newTooltip = new GuiElementRecipeBookTooltip(capi);
+        var newOptions = new GuiElementRecipeBookOptions(capi, ElementBounds.Fixed(width - 80, 7, 17, 17));
         var composer = capi.Gui.CreateCompo("vanillaexpanded-recipebook", bounds)
             .AddShadedDialogBG(ElementBounds.Fill)
             .AddDialogTitleBar(Lang.Get("vanillaexpanded:recipebook-title"), () => CloseByUser(), key: "titlebar")
@@ -218,10 +225,14 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
             .EndChildElements()
             .AddInteractiveElement(newTooltip, "tooltip")
             .EndChildElements()
+            .AddInteractiveElement(newOptions, "options")
+            .AddHoverText(Lang.Get("vanillaexpanded:recipebook-options"), CairoFont.WhiteSmallText(),
+                200, ElementBounds.Fixed(width - 80, 7, 17, 17))
             .Compose(focusFirstElement);
         SingleComposer?.Dispose();
         SingleComposer = composer;
         tooltip = newTooltip;
+        options = newOptions;
         composer.GetSwitch("craftable-only").SetValue(session.CraftableOnly.Enabled);
         ((GuiElementIconTabs)composer.GetElement("categories")).SetValue(Array.IndexOf(categories, session.Category), false);
         composer.GetTextInput("search").SetPlaceHolderText(Lang.Get("vanillaexpanded:recipebook-search"));
@@ -262,17 +273,18 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         double counterWidth = Math.Ceiling(textFont.GetTextExtents("1/1").Width / scale + 1);
         double titleWidth = textFont.GetTextExtents(Lang.Get("vanillaexpanded:recipebook-title")).Width / scale;
         // The native title bar reserves space for its menu and close icons.
-        double titleControlsWidth = 2 * GuiElementDialogTitleBar.unscaledCloseIconSize + 2 + 20;
+        double titleControlsWidth = 2 * GuiElementDialogTitleBar.unscaledCloseIconSize + 2 + 20 + 30;
         double craftableWidth = 16 + craftableHeight + 8 + filterFont.GetTextExtents(
             Lang.Get("vanillaexpanded:recipebook-craftable-only")).Width / scale;
         sortLabelWidth = Math.Ceiling(filterFont.GetTextExtents(Lang.Get("vanillaexpanded:recipebook-sort")).Width / scale + 1);
         sortValueWidth = Math.Ceiling(40 + session.Sort.Orders
             .Max(order => filterFont.GetTextExtents(Lang.Get(order.NameKey)).Width / scale));
         double sortWidth = 16 + sortLabelWidth + 8 + sortValueWidth;
-        minimumWidth = Math.Ceiling(Math.Max(sortWidth, Math.Max(32 + Math.Max(clearSearchWidth, showUncraftableWidth),
+        double optionsWidth = textFont.GetTextExtents(Lang.Get("vanillaexpanded:recipebook-remember-open")).Width / scale + 120;
+        minimumWidth = Math.Ceiling(Math.Max(optionsWidth, Math.Max(sortWidth, Math.Max(32 + Math.Max(clearSearchWidth, showUncraftableWidth),
             Math.Max(craftableWidth, Math.Max(
             GuiStyle.ElementToDialogPadding + titleWidth + 8 + titleControlsWidth,
-            16 + previousWidth + 3 + autoWidth + 3 + nextWidth + 4 + counterWidth + 4 + handbookWidth)))));
+            16 + previousWidth + 3 + autoWidth + 3 + nextWidth + 4 + counterWidth + 4 + handbookWidth))))));
         var textUtil = new TextDrawUtil();
         emptyTextHeight = Math.Ceiling(Enum.GetValues<RecipeBookEmptyState>()
             .Where(state => state != RecipeBookEmptyState.None)
@@ -328,6 +340,8 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
 
     public override void OnMouseMove(MouseEvent args)
     {
+        options?.OnMouseMove(capi, args);
+        if (args.Handled) return;
         (SingleComposer?.GetElement("tiles") as GuiElementRecipeBookTiles)?.UpdateHover(args.X, args.Y);
         base.OnMouseMove(args);
     }
@@ -335,14 +349,17 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
     public override void OnMouseDown(MouseEvent args)
     {
         if (args.Handled) return;
-        base.OnMouseDown(args);
+        if (options?.IsOpened == true) options.OnMouseDown(capi, args);
+        if (!args.Handled) base.OnMouseDown(args);
         if (args.Handled) pressedMouseButtons.Add(args.Button);
+        if (options?.HasFocus == true) tooltip?.Inspect(null);
     }
 
     public override void OnMouseUp(MouseEvent args)
     {
         if (!pressedMouseButtons.Remove(args.Button)) return;
         base.OnMouseUp(args);
+        if (options?.IsOpened == true) tooltip?.Inspect(null);
     }
 
     public override void OnKeyDown(KeyEvent args)

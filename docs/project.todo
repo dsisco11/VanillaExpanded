@@ -4,9 +4,14 @@
         ☐ Design a better separation of alloy calculator inventory ownership/liveness validation, transfer permissions, and storage-versus-machine access policy. Reconsider the storage-class whitelist without weakening ownership or withdrawal checks, and define coverage for vanilla and modded containers.
         
     ## Recipe Book:
+        ☐ BUG: recipe book should allow repositioning the dialog when its set to "movable".
+        ☐ Recipe book should include a new "docked" mode in its list of titlebar positioning options (the dropdown with "fixed" & "moveable").
+        ☐ recipes list box has no background or border styling, making it visually blend with the rest of the dialog.
+        ☐ "Handbook" button has no left/right padding for its text.
+        ☐ Redesign recipe-menu tabs to look more like nice tabs and less like plain buttons.
         ☑ "hide uncraftable" controls needs a tooltip to describe the functionality.
         ☑ "sort by" controls needs a tooltip to describe the functionality.
-        ☐ recipe menus titlebar should have a little "options" button for additional settings and controls. the first setting should be the option for "remember recipe menu open state".
+        ☑ recipe menus titlebar should have a little "options" button for additional settings and controls. the first setting should be the option for "remember recipe menu open state".
         ☑ Design the "Show recipes using this/these items" functionality. which should function by the player placing items into their grid and then the recipe book increses the sorting priority of relevant recipes.
         ☑ Add a craftable-only toggle that shows recipes whose ingredients are currently available, independently combining with category and search filters.
         ☐ Add favorites: let players star recipe outputs and browse a Favorites tab, with favorites saved between game sessions.

@@ -22,6 +22,7 @@ internal static class RecipeBookDialogPatch
 
 public sealed class RecipeBookSystem : ModSystem, ILiveConfigurable
 {
+    internal const string RememberOpenSetting = "vanillaexpanded-recipebook-remember-open";
     private const string BookIcon = "vanillaexpanded-recipe-book";
     private ICoreClientAPI? api;
     private IconRendererDelegate? bookIcon;
@@ -144,7 +145,8 @@ public sealed class RecipeBookSystem : ModSystem, ILiveConfigurable
         composer.ReCompose();
         void Restore()
         {
-            if (VanillaExpandedModSystem.Config.EnableRecipeBook && rememberOpen && parent.IsOpened()
+            if (api != null && VanillaExpandedModSystem.Config.EnableRecipeBook && rememberOpen
+                && api.Settings.Bool.Get(RememberOpenSetting, true) && parent.IsOpened()
                 && attachments.TryGetValue(parent, out var current) && ReferenceEquals(current.Composer, composer)
                 && parent.Composers.ContainsKey("maininventory")
                 && ReferenceEquals(parent.Composers["maininventory"], composer))
