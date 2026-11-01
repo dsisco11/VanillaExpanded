@@ -184,8 +184,8 @@ public sealed class RadialProgressBarRenderer : IRenderer, IRadialProgressBar
             return;
         }
 
-        float textX = ScreenX + (Width - textTexture.Width) / 2f;
-        float textY = ScreenY + Height + TextTopPaddingPx;
+        float textX = (float)Math.Round(ScreenX + (Width - textTexture.Width) / 2d);
+        float textY = (float)Math.Round((double)ScreenY + Height + TextTopPaddingPx);
 
         // Render2DLoadedTexture requires the engine's own Gui shader to be active.
         var guiShader = capi.Render.GetEngineShader(EnumShaderProgram.Gui);
