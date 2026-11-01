@@ -21,8 +21,8 @@
         Horizontal-only list padding, one-unit status outlines, the specified gold top-left selection marker, and non-tab states are approved.
         The real-preview inset direction is approved; obtain approval of its exact inset through rendered visual review before acceptance.
         Local dialog/titlebar adaptations are permitted subject to Phase 2 native feasibility, not assumed to be technically resolved.
-        Native focus highlighting is composer-controlled and non-virtual. A local, non-duplicating focus treatment is a feasibility gate, not an assumed subclass override.
-        Native popup row assumptions and non-virtual recomposition must be reconciled before a compact popup is accepted.
+        Retain native focus appearance and Tab/Shift+Tab routing. Do not suppress native highlighting, introduce a custom focus router, or add competing outlines.
+        Retain approved native-compatible 30-unit selector height and popup rows. Non-virtual popup recomposition must not revert the styled appearance.
         The visual reference is Design A in the existing recipe-tab-mockups.html session artifact. Preserve access to that reference for comparison; the proposal overrides its outdated Tools glyph and distinguishes placeholder content.
         Do not add recipe features, change filtering or sort defaults, alter category membership, add movement modes, change transfer rules, replace icon artwork, or persist new state.
 
@@ -53,25 +53,25 @@
         Sources: Proposal sections "Visual specification", "Shared control architecture", "Native rendering constraints", and "Outer chrome and integration".
         Outcome: Tabs and core-control adapters can consume verified shared drawing, measurement, and focus mechanisms.
 
-        ☐ Define shared named palette values, dimensions, and narrowly scoped drawing helpers in the shared GUI layer.
-            ☐ Cover every palette role in the proposal, with GUI-scaled outline/accent thickness and whole-physical-pixel rasterization.
-            ☐ Keep reusable control styling independent of Recipe Book session types, localization keys, catalogue state, and persistence.
-            ☐ Separate generic control measurements from dialog-specific composition, while exposing measurements needed by minimum sizing, popup placement, and tooltip bounds.
-            ☐ Share rounding and baseline rules without introducing a configurable theme framework.
-        ☐ Resolve risky native rendering seams through focused fixtures or minimal local probes before broad migration.
-            ☐ Verify borderless native button rendering can retain activation, text, visibility, enabled state, and native callbacks with custom chrome.
-            ☐ Verify editable bounds and placeholder presentation can satisfy the eight-unit inset without inaccessible fields or misaligned text/caret/selection.
-            ☐ Verify dropdown/popup adapters retain their appearance after opening, selection, and list replacement despite non-virtual recomposition.
-            ☐ Reconcile any changed popup row geometry with native hit testing and scrolling; do not independently shrink rendered rows.
-            ☐ Demonstrate a local focus integration with no competing native outline, including the category strip's one outer tab stop.
-            ☐ Verify native dialog/titlebar composition can support the specified chrome while retaining movement and close behavior.
-            ☐ Surface any restriction to the user for approval; do not add reflection, global patches, or silent visual fallbacks.
-        ☐ Add independent style and geometry expectations in GUI tests rather than importing production constants as expected results.
+        ☑ Define shared named palette values, dimensions, and narrowly scoped drawing helpers in the shared GUI layer.
+            ☑ Cover every palette role in the proposal, with GUI-scaled outline/accent thickness and whole-physical-pixel rasterization.
+            ☑ Keep reusable control styling independent of Recipe Book session types, localization keys, catalogue state, and persistence.
+            ☑ Separate generic control measurements from dialog-specific composition, while exposing measurements needed by minimum sizing, popup placement, and tooltip bounds.
+            ☑ Share rounding and baseline rules without introducing a configurable theme framework.
+        ☑ Resolve risky native rendering seams through focused fixtures or minimal local probes before broad migration.
+            ☑ Verify borderless native button rendering can retain activation, text, visibility, enabled state, and native callbacks with custom chrome.
+            ☑ Verify editable bounds and placeholder presentation can satisfy the eight-unit inset without inaccessible fields or misaligned text/caret/selection.
+            ☑ Verify dropdown/popup adapters retain their appearance after opening, selection, and list replacement despite non-virtual recomposition.
+            ☑ Reconcile any changed popup row geometry with native hit testing and scrolling; do not independently shrink rendered rows.
+            ☑ Verify native focus appearance and routing remain intact with no added outline, including the category strip's one outer tab stop.
+            ☑ Verify native dialog/titlebar composition can support the specified chrome while retaining movement and close behavior.
+            ☑ Surface any restriction to the user for approval; do not add reflection, global patches, or silent visual fallbacks.
+        ☑ Add independent style and geometry expectations in GUI tests rather than importing production constants as expected results.
 
         Completion criteria:
-            ☐ Shared helpers reproduce approved dimensions and palette roles with correct physical-pixel behavior.
-            ☐ Native-risk probes provide evidence for each proposed adapter boundary; unresolved restrictions block their consumers.
-            ☐ Focus integration and dialog/titlebar adaptation have an approved, locally scoped implementation path.
+            ☑ Shared helpers reproduce approved dimensions and palette roles with correct physical-pixel behavior.
+            ☑ Native-risk probes provide evidence for each proposed adapter boundary; unresolved restrictions block their consumers.
+            ☑ Native focus is preserved, and dialog/titlebar adaptation has an approved, locally scoped implementation path.
 
     ## Phase 3: Align category tabs and presentation:
         Prerequisites: Phases 1 and 2. Independent of Phase 4.
@@ -82,7 +82,7 @@
             ☐ Use the approved idle, hover, and selected icon tints with identical 20-by-20 GUI-unit display geometry.
             ☐ Add the inactive hover fill, scaled outlines, and separate two-unit selected upper accent.
             ☐ Keep selected tabs 36 units high with an open bottom edge, inactive tabs 32 units high with lower shoulders, and inactive bottom borders matching the panel.
-            ☐ Preserve selected treatment on hover and add the approved thin inset dashed warm-white category-focus treatment through the verified local integration.
+            ☐ Preserve selected treatment on hover and retain the native category-strip focus outline without adding a per-tab outline.
             ☐ Coordinate tab/panel baseline snapping during fractional dragging and recomposition; preserve nearest magnification and texture ownership.
         ☐ Update GuiElementIconTabs strip geometry and Recipe Book category ordering.
             ☐ Use 30-unit tab widths and four-unit inter-tab gaps without extra leading/trailing spacing.
@@ -114,6 +114,7 @@
         ☐ Implement shared styled dropdown and popup-list adapters.
             ☐ Reuse the item-stack dropdown's owned-list replacement pattern without introducing item-preview behavior.
             ☐ Style both the closed selector and expanded list, including the compact chevron and approved states.
+            ☐ Retain the approved 30-unit selector and popup row heights; cache styled textures with invalidation for changed labels, geometry, scale, and state.
             ☐ Preserve native selection, callbacks, focus loss, opening/closing, keyboard/mouse navigation, wheel handling, and scrolling.
             ☐ Keep custom rendering authoritative across recomposition and list replacement, and dispose replaced/native/additional owned resources correctly.
         ☐ Implement the shared styled checkbox adapter.

@@ -49,7 +49,7 @@ Dimensions are GUI/design units unless explicitly identified as physical pixels.
 | Category heading | 11-unit font, at least 17 units of line space, followed by eight units of spacing. |
 | Main control text | 14-unit regular text; use measured font extents for localized labels. |
 | Checkbox | 17-unit visual square, vertically centered in the shared filter row. |
-| Sort selector | 12-unit text, compact chevron, and restrained horizontal padding; measure the selected options rather than fixing the width. |
+| Sort selector | Native-compatible 30-unit height and popup rows, 12-unit text, compact chevron, and restrained horizontal padding; measure the selected options rather than fixing the width. |
 | Search | 28-unit minimum height, 14-unit text, eight-unit horizontal text inset, and a ten-unit gap below. |
 | Footer | 12-unit regular text, restrained flat controls, eight-unit horizontal button padding, and 12 units of spacing above. |
 
@@ -81,7 +81,7 @@ The native input's clear-icon reservation remains separate from the editable tex
 
 The selected tab has a separate two-unit upper accent and an open bottom edge that joins the panel. Inactive tabs have lower shoulders and a bottom border matching the panel outline. Hover lightens an inactive background and changes its icon tint; hovering a selected tab retains its selected treatment.
 
-Outline and accent thicknesses scale with the interface, then round to physical pixels. Tab and panel baseline snapping must remain coordinated during dragging and recomposition. A focused category receives a thin inset dashed warm-white outline, distinguishable from selection, without resizing or displacing the icon. The strip remains one outer keyboard tab stop; native focus ownership must not produce a competing second outline.
+Outline and accent thicknesses scale with the interface, then round to physical pixels. Tab and panel baseline snapping must remain coordinated during dragging and recomposition. Retain native focus appearance and keyboard routing. The strip remains one outer keyboard tab stop with its native focus outline; do not add a custom per-tab focus outline.
 
 The selected fill already matches the proposed panel color. Work should target the remaining differences rather than replace correct rendering indiscriminately.
 
@@ -97,7 +97,7 @@ The following state treatment is approved for shared controls. It changes appear
 | Opened dropdown | Fill `#51422e` and outline `#aa8c54`; retain normal selected-value text. |
 | Checked checkbox / selected popup indicator | Indicator `#f5d58d`, separate from hover and keyboard focus. |
 | Disabled | Text and icons at 35% opacity with the normal frame; no hover or pressed emphasis. Preserve the existing disabled-input contract. |
-| Keyboard focus | Separate one-unit inset outline `#fff0cc`, without duplicate native highlighting or geometry changes. Category tabs retain their separately specified dashed focus treatment. |
+| Keyboard focus | Retain native focus appearance and routing, including native text-input highlighting. Do not add a competing custom outline or change control geometry. |
 
 Disabled treatment takes precedence over hover and press. Keyboard focus is independently identifiable while checked or opened. Controls use only states applicable to their native behavior; this specification does not add a text-field press action or change when focus is acquired.
 
@@ -137,10 +137,22 @@ The existing [item-stack dropdown](../VanillaExpanded/src/Gui/GuiElementItemStac
 - Native button textures and pressed state are private. The adapter must preserve native activation rather than copy the button's interaction implementation to obtain a different appearance.
 - Native text-input editing padding is internal, and placeholder rendering is private. Coordinate editable bounds and any custom placeholder presentation so text, selection, caret, and mouse positioning stay aligned at every supported scale; do not rely on inaccessible engine fields.
 - Dropdown and popup composition includes private/non-virtual methods, including recomposition when opening or replacing list contents. Custom rendering must remain authoritative after those operations; overriding an initial composition method alone is insufficient.
-- Native popup input and scrolling contain fixed row assumptions. Do not independently shrink rendered rows without reconciling their hit testing and scroll geometry.
-- The native focus-overlay method is non-virtual and its visibility is composer-controlled. A subclass override cannot suppress it. Demonstrate a local integration that satisfies the specified focus treatment without duplicate outlines; if native restrictions prevent this, surface the limitation for approval.
+- Native popup input and scrolling contain fixed 30-unit row assumptions, including a click-boundary check coupled to the selector height. Retain the approved 30-unit selector and popup rows. Compact styling changes fonts, chevron, and chrome, not their input geometry.
+- The native focus-overlay method is non-virtual and its visibility is composer-controlled. Retain that rendering and native Tab/Shift+Tab routing; no suppression, custom focus router, or second focus outline is required.
 
 Apply the approved non-tab state treatment above. Shared controls retain native composition ownership and dispose their own additional textures and tooltip resources. No production reflection or global control patching is proposed.
+
+### Native adapter boundaries
+
+The [shared visual helpers](../VanillaExpanded/src/Gui/GuiControlVisuals.cs) provide explicit palette values, generic control measurements, flat/gradient drawing, and host-relative pixel snapping. [Recipe Book visual measurements](../VanillaExpanded/src/RecipeBook/RecipeBookVisualMetrics.cs) keep preferred dimensions and dialog-specific spacing separate from reusable controls. Their availability does not mean the dialog has adopted the new appearance.
+
+- **Button:** compose native borderless text and state textures, with a local flat background behind them. Retain native activation instead of mirroring its private press state.
+- **Text input:** compose native editing and focus textures independently of the full field frame. Translate the editable bounds to account for the native three-physical-pixel text inset. Render caller-supplied placeholder text separately, using the same field inset, without accessing private placeholder or editing fields.
+- **Dropdown:** retain native selector/row geometry and selection handling. Replace the protected arrow textures and supply visible popup textures after native opening/list replacement has recomposed them. Production adapters must cache their derived textures and invalidate them when relevant labels, bounds, scale, or state change; the probe's per-render regeneration is not a production rendering strategy.
+- **Titlebar:** retain native composition initialization, icon hit regions, movement, close callback, and position persistence. Compose native initialization offscreen, then draw local visible chrome and text/icons at their native coordinates. Native control behavior and hover resources remain owned by the titlebar.
+- **Focus:** leave native composition, outlines, and Tab/Shift+Tab handling intact, including the category strip's one outer stop.
+
+[Native-control probes](../VanillaExpanded.Tests/Unit/Gui/GuiControlNativeProbeTests.cs) exercise these boundaries against the installed API references without a live graphics context. [Visual-helper tests](../VanillaExpanded.Tests/Unit/Gui/GuiControlVisualsTests.cs) independently specify the palette and geometry expectations. These fixtures establish source/API feasibility, not final in-game visual acceptance.
 
 ## Controls and content composition
 
@@ -242,6 +254,7 @@ Implementation surfaces:
 | Surface | Responsibility |
 | --- | --- |
 | [Shared GUI layer](../VanillaExpanded/src/Gui/) | Reusable button, clearable text-input, dropdown/popup-list, and checkbox adapters with shared visual helpers. |
+| [GuiControlVisuals](../VanillaExpanded/src/Gui/GuiControlVisuals.cs) and [RecipeBookVisualMetrics](../VanillaExpanded/src/RecipeBook/RecipeBookVisualMetrics.cs) | Generic palette/drawing/measurement foundations and separate dialog-specific dimensions. |
 | [GuiDialogRecipeBook](../VanillaExpanded/src/RecipeBook/GuiDialogRecipeBook.cs) | Adopt shared controls, supply localized labels and controller callbacks, and compose the shared row, heading, footer groups, measurement, and outer chrome. |
 | [RecipeBookLayout](../VanillaExpanded/src/RecipeBook/RecipeBookLayout.cs) | Preferred dimensions and placement within the existing positioning contract. |
 | [GuiElementIconTabs](../VanillaExpanded/src/Gui/GuiElementIconTabs.cs) and [GuiElementIconTab](../VanillaExpanded/src/Gui/GuiElementIconTab.cs) | Strip geometry, state palette, accent, outlines, and pixel-aligned panel connection. |
@@ -290,7 +303,9 @@ The agreed destination for required reference copies, captures, package/version 
 | Real previews | Inset direction approved; exact inset remains blocked on later rendered visual review and approval. |
 | Non-tab control states | Approved as specified above. |
 | Local titlebar/dialog rendering adapters | Permitted subject to Phase 2 native feasibility; no global patching or production reflection. |
-| Focus and popup/native composition constraints | Explicit Phase 2 feasibility gates; unresolved restrictions must return for approval before dependent implementation. |
+| Focus appearance | Retain native appearance and keyboard routing; no custom focus outline or router. |
+| Dropdown height | Retain native-compatible 30-unit selector height and popup rows; no compact-height coordinate adapter. |
+| Popup/native composition constraints | Explicit Phase 2 feasibility gates; unresolved restrictions must return for approval before dependent implementation. |
 | Acceptance evidence destination | Approved: the session evidence directory above, retained with required captures and results. |
 
 The current Tools icon is **not** an open decision: it must be retained.

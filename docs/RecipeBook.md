@@ -135,6 +135,8 @@ The dialog contains category tabs and a framed content panel with the selected c
 
 Composition and minimum-size measurement use shared named dimensions for spacing, margins, and control chrome. Minimum width accommodates the complete category strip and localized headings and controls; minimum height reserves room for the heading and empty-state text. GUI-scaled dimensions are distinct from physical-pixel borders and docking gaps. [RecipeBookLayout](../VanillaExpanded/src/RecipeBook/RecipeBookLayout.cs) owns placement and preferred dialog dimensions; the options component owns popup-width measurement.
 
+The [shared visual helpers](../VanillaExpanded/src/Gui/GuiControlVisuals.cs) expose opt-in palette, frame drawing, control measurement, and host-relative pixel snapping. Category-tab rendering uses the shared snapping helper. The separate [visual dimensions](../VanillaExpanded/src/RecipeBook/RecipeBookVisualMetrics.cs) are not yet used by dialog composition; current control appearance and layout remain governed by the existing components.
+
 Search is the first keyboard tab stop. Native control focus and input routing are preserved, with the category strip acting as one outer tab stop.
 
 ### Category tabs

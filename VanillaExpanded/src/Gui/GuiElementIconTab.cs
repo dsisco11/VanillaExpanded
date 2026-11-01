@@ -94,7 +94,7 @@ internal sealed class GuiElementIconTab : GuiElementToggleButton
 
     public override void RenderInteractiveElements(float deltaTime)
     {
-        var (x, y) = RenderOrigin();
+        var (x, y) = GuiControlDrawing.RenderOrigin(Bounds, releasedBackground.Height);
         var background = On ? selectedBackground : releasedBackground;
         api.Render.Render2DTexturePremultipliedAlpha(
             background.TextureId, x, y, background.Width, background.Height, 50);
@@ -104,21 +104,6 @@ internal sealed class GuiElementIconTab : GuiElementToggleButton
             x + Math.Round((background.Width - iconSize) / 2d, MidpointRounding.AwayFromZero),
             y + background.Height - Math.Round(scaled(7), MidpointRounding.AwayFromZero) - iconSize,
             iconSize, iconSize, 51);
-    }
-
-    private (double X, double Y) RenderOrigin()
-    {
-        ElementBounds? surface = null;
-        for (var parent = Bounds.ParentBounds; parent != null; parent = parent.ParentBounds)
-            if (parent.IsDrawingSurface) surface = parent;
-        if (surface == null)
-            return (Math.Round(Bounds.renderX, MidpointRounding.AwayFromZero),
-                Math.Round(Bounds.renderY, MidpointRounding.AwayFromZero));
-
-        // Snap the bottom to the host's panel border, whose static texture has an integer render origin.
-        return ((int)surface.renderX + Math.Round(Bounds.renderX - surface.renderX, MidpointRounding.AwayFromZero),
-            (int)surface.renderY + Math.Round(Bounds.renderY - surface.renderY + Bounds.OuterHeight,
-                MidpointRounding.AwayFromZero) - releasedBackground.Height);
     }
 
     public override void Dispose()
