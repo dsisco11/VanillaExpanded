@@ -72,14 +72,14 @@ internal sealed class WeatherConditionsPresentation : IndicatorPresentation
             if (sample.Precipitation is EnumPrecipitationType type)
             {
                 string name = type switch { EnumPrecipitationType.Snow => "snow", EnumPrecipitationType.Hail => "hail", _ => "rain" };
-                layers.Add(new("textures/hud/weather/" + name + ".png", new(0, top, side, side)));
+                layers.Add(new("textures/hud/weather/" + name + ".svg", new(0, top, side, side)));
             }
-            if (sample.Fog) layers.Add(new("textures/hud/weather/fog.png", new(both ? side : 0, top, side, side)));
+            if (sample.Fog) layers.Add(new("textures/hud/weather/fog.svg", new(both ? side : 0, top, side, side)));
             Layers = layers.ToArray();
         }
         Backdrop = loadBackdrop(context); Visibility.Show();
     }
-    /// <summary>Creates native text or distinct borrowed weather-layer elements for one composer.</summary>
+    /// <summary>Creates native text or distinct owned SVG weather-layer elements for one composer.</summary>
     public INativeView CreateView(ICoreClientAPI api) => Style == HudIndicatorStyle.Text ? CreateTextView(api) : new WeatherView(api, this, load);
     #endregion
 

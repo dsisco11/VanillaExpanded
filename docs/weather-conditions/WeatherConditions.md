@@ -4,11 +4,11 @@ The weather indicator occupies 36 × 36 GUI units before native GUI scaling in t
 
 ## Composition and visibility
 
-Native GUI scaling applies to the measured footprint and its child bounds. Source textures use a 64 × 64 transparent canvas.
+Native GUI scaling applies to the measured footprint and its child bounds. Composite sources use a 64 × 64 transparent canvas; fallback sources use a 96 × 96 transparent canvas.
 
 The active composite set consists of 15 textures. Independent precipitation, fog/haze, and thunder layers combine inside one fixed footprint. A missing or incomplete composite pack uses precipitation and fog textures from `textures/hud/weather/`. When both are active, their native bounds divide the slot horizontally. Thunder and intensity have no fallback artwork.
 
-The indicator hides and releases its layout space when precipitation, fog/haze, and thunder are all inactive, in both icon and text styles. Cloud coverage is not sampled or displayed; the legacy sky assets are not required or loaded. Disabling the feature, losing the player or climate data, and leaving the world clear presentation and transition history. Changing API ownership reloads texture bindings; unchanged layer identities reuse their bindings across GUI scale and weather changes. Native elements own rasterized SVG textures; fallback PNG textures remain engine-owned.
+The indicator hides and releases its layout space when precipitation, fog/haze, and thunder are all inactive, in both icon and text styles. Cloud coverage is not sampled or displayed; the legacy sky assets are not required or loaded. Disabling the feature, losing the player or climate data, and leaving the world clear presentation and transition history. Changing API ownership reloads texture bindings; unchanged layer identities reuse their bindings across GUI scale and weather changes. Native elements own rasterized SVG textures for both composite and fallback artwork.
 
 See [wind speed](../wind-speed/WindSpeed.md) for local wind readings.
 
@@ -37,7 +37,7 @@ The native particle renderer stops particles at rainfall ≤ .02, so the precipi
 
 ## Artwork contract
 
-All layers live under `assets/vanillaexpanded/textures/hud/weather/composite/`. Each icon is loaded directly from its editable `.svg` source and rasterized at 64 × 64 for display. Loading requires the complete active SVG set; an absent or partial set uses the precipitation/fog PNG fallback without requesting missing composite textures.
+Composite layers live under `assets/vanillaexpanded/textures/hud/weather/composite/`. Each icon is loaded directly from its editable `.svg` source and rasterized at 64 × 64 for display. Composite loading requires the complete active SVG set; an absent or partial set independently selects `rain.svg`, `snow.svg`, `hail.svg`, and `fog.svg` from `textures/hud/weather/` without requesting missing composite textures. These fallback sources retain their transparent 96 × 96 canvases and also use the shared 64 × 64 SVG rasterizer.
 
 | Draw order | Texture names |
 | --- | --- |
@@ -45,7 +45,7 @@ All layers live under `assets/vanillaexpanded/textures/hud/weather/composite/`. 
 | Fog/haze | `fog-light`, `fog-moderate`, `fog-dense` |
 | Thunder | `thunder-light`, `thunder-moderate`, `thunder-heavy` |
 
-Each layer uses the entire transparent 64 × 64 canvas. Spatial allocation belongs in the artwork; no condition moves another layer. Thunder draws last. Keep shape boundaries distinct in monochrome and avoid overlap that erases precipitation type. Pack availability is cached for the client API binding and cleared with presentation state. Native texture elements rasterize only the selected SVG layers, own the generated textures, and dispose them on replacement or teardown. Each live or source-trace composition has distinct elements and bounds. Fallback PNGs are borrowed from the engine cache. Layer identities, local bounds, clipping and the shared backdrop anchor are prepared before rendering.
+Each composite layer uses the entire transparent 64 × 64 canvas. Spatial allocation belongs in the artwork; no condition moves another composite layer. Thunder draws last. Keep shape boundaries distinct in monochrome and avoid overlap that erases precipitation type. Pack availability is cached for the client API binding and cleared with presentation state. Native texture elements rasterize only the selected SVG layers, own the generated textures, and dispose them on replacement or teardown. Each live or source-trace composition has distinct elements and bounds, including independently owned fallback textures. A single fallback fills the slot; simultaneous precipitation and fog use vertically centered half-size slots. Layer identities, local bounds, clipping and the shared backdrop anchor are prepared before rendering.
 
 ## Artwork appearance
 

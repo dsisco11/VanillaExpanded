@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
+  <title>Hail</title>
+  <path d="M26 54 A12 12 0 0 1 26 30 A16 16 0 0 1 55.438 21.317 A17 17 0 0 1 78.99 36.52 A9 9 0 0 1 76 54 Z" fill="#e8eff3" stroke="#1e2730" stroke-width="4" stroke-linejoin="round"/>
+  <g fill="#62baf0" stroke="#1e2730" stroke-width="1.8">
+    <circle cx="24" cy="72" r="6.1"/>
+    <circle cx="48" cy="72" r="6.1"/>
+    <circle cx="72" cy="72" r="6.1"/>
+  </g>
+</svg>

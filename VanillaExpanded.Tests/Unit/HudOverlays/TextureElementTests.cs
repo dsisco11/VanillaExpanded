@@ -7,20 +7,20 @@ using Vintagestory.API.Common;
 
 namespace VanillaExpanded.Tests.Unit.HudOverlays;
 
-/// <summary>Verifies generated SVG and engine-cached PNG texture ownership at the native texture boundary.</summary>
+/// <summary>Verifies generated SVG and borrowed PNG texture ownership at the native texture boundary.</summary>
 [Trait("Category", "Unit")]
 [Collection("HudOverlayGeometry")]
 public sealed class TextureElementTests
 {
     #region Public API
-    /// <summary>Replacing owned SVG artwork releases it while borrowed PNG fallback artwork remains engine-owned.</summary>
+    /// <summary>Replacing generated SVG artwork releases it while a generic borrowed PNG remains engine-owned.</summary>
     [Fact]
-    public void SvgTexturesAreDisposedAndPngFallbackTexturesRemainBorrowed()
+    public void GeneratedSvgTexturesAreDisposedAndGenericPngTexturesRemainBorrowed()
     {
         // Arrange
         using var fixture = new HudNativeComponentFixture();
         const string svgPath = "textures/hud/weather/composite/rain-light.svg";
-        const string pngPath = "textures/hud/weather/rain.png";
+        const string pngPath = "textures/test/borrowed.png";
         var svgTexture = new LoadedTexture(fixture.Api.Object);
         fixture.Gui.Setup(gui => gui.LoadSvg(It.IsAny<AssetLocation>(), 64, 64, 64, 64, It.IsAny<int?>()))
             .Returns(svgTexture);

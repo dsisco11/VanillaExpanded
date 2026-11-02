@@ -145,37 +145,104 @@ public sealed class LayeredIndicatorsTests
             if (glyphs > 0) Assert.True(fixture.Glyphs.Count > beforeContext);
         }
     }
-    /// <summary>The weather PNG fallback borrows engine-cached textures while generated glyphs are deleted exactly once.</summary>
+    /// <summary>Weather fallback SVGs use the default generated-texture loader with per-composition reuse and ownership.</summary>
     [Fact]
-    public void WeatherFallbackLoaderKeepsEngineTextureOwnership()
+    public void WeatherFallbackSvgLoaderOwnsIndependentResourcesAcrossUpdates()
     {
         // Arrange
         using var fixture = new LayeredIndicatorsFixture();
-        var loaded = new List<LoadedTexture>();
-        var paths = new List<string>();
-        fixture.Resources.Native.Render.Setup(renderer => renderer.GetOrLoadTexture(It.IsAny<AssetLocation>(), ref It.Ref<LoadedTexture>.IsAny))
-            .Callback(new TextureLoad((AssetLocation location, ref LoadedTexture texture) => { paths.Add(location.Path); loaded.Add(texture); }));
+        var requests = new List<string>();
+        var svgTextures = new List<LoadedTexture>();
+        fixture.Resources.Native.Gui
+            .Setup(gui => gui.LoadSvg(It.IsAny<AssetLocation>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int?>()))
+            .Callback<AssetLocation, int, int, int, int, int?>((location, _, _, _, _, _) => requests.Add(location.Path))
+            .Returns(() =>
+            {
+                // A zero texture ID keeps filtering independent of a headless GL context.
+                var texture = new LoadedTexture(fixture.Context.Api);
+                svgTextures.Add(texture);
+                return texture;
+            });
         using var presentation = new WeatherConditionsPresentation(loadBackdrop: _ => null, hasCompletePack: _ => false);
-        presentation.SetContent(new(EnumPrecipitationType.Rain, false));
+        presentation.SetContent(new(EnumPrecipitationType.Rain, true));
         presentation.Prepare(fixture.Context);
 
         // Act
-        using (var composition = new IndicatorComposition(
-            fixture.Context.Api, presentation.CreateView(fixture.Context.Api), fixture.Context, presentation.Size))
-        {
-            // Assert
-            Assert.NotEmpty(loaded); Assert.All(paths, path => Assert.EndsWith(".png", path));
-            Assert.All(loaded, texture => Assert.True(texture.IgnoreUndisposed));
-            var glyphIds = fixture.Glyphs.Where(glyph => !glyph.Disposed).Select(glyph => glyph.TextureId).ToArray();
+        var firstView = (NativeView)presentation.CreateView(fixture.Context.Api);
+        var secondView = (NativeView)presentation.CreateView(fixture.Context.Api);
+        firstView.SetFailureHandler(fixture.Resources.Native.Failures.Add);
+        secondView.SetFailureHandler(fixture.Resources.Native.Failures.Add);
+        using var first = new IndicatorComposition(fixture.Context.Api, firstView, fixture.Context, presentation.Size);
+        using var second = new IndicatorComposition(fixture.Context.Api, secondView, fixture.Context, presentation.Size);
 
-            // Act
-            composition.Dispose(); composition.Dispose();
+        // Assert
+        string[] initialPaths =
+        [
+            "textures/hud/weather/rain.svg", "textures/hud/weather/fog.svg",
+            "textures/hud/weather/rain.svg", "textures/hud/weather/fog.svg"
+        ];
+        Assert.Equal(initialPaths, requests);
+        Assert.Equal(4, svgTextures.Count);
+        Assert.Equal(4, svgTextures.Distinct().Count());
+        var firstRain = svgTextures[0];
+        var firstFog = svgTextures[1];
+        var secondRain = svgTextures[2];
+        var secondFog = svgTextures[3];
 
-            // Assert
-            Assert.All(loaded, texture => Assert.False(texture.Disposed));
-            foreach (int id in glyphIds) fixture.Resources.Native.Gui.Verify(gui => gui.DeleteTexture(id), Times.Once);
-            Assert.All(fixture.Glyphs, glyph => Assert.True(glyph.Disposed));
-        }
+        // Act
+        firstView.Prepare(fixture.Context);
+        secondView.Prepare(fixture.Context);
+
+        // Assert
+        Assert.Equal(initialPaths, requests);
+        Assert.All(svgTextures, texture => Assert.False(texture.Disposed));
+
+        // Assign synthetic IDs after filtering so draw routing can be observed without graphics initialization.
+        for (int index = 0; index < svgTextures.Count; index++) svgTextures[index].TextureId = 700 + index;
+        fixture.Resources.Native.Render.Invocations.Clear();
+        first.Composer.Render(0);
+        Assert.Equal(
+            new[] { firstRain.TextureId, firstFog.TextureId },
+            fixture.Resources.Native.Render.Invocations
+                .Where(call => call.Method.Name == "RenderTexture")
+                .Select(call => (int)call.Arguments[0]));
+        Assert.Empty(fixture.Resources.Native.Failures);
+
+        // Act
+        presentation.SetContent(new(EnumPrecipitationType.Snow, true));
+        presentation.Prepare(fixture.Context);
+        first.Update(fixture.Context);
+
+        // Assert
+        Assert.True(firstRain.Disposed);
+        Assert.False(firstFog.Disposed);
+        Assert.False(secondRain.Disposed);
+        Assert.False(secondFog.Disposed);
+        Assert.Equal("textures/hud/weather/snow.svg", requests[^1]);
+        var firstSnow = Assert.IsType<LoadedTexture>(svgTextures[^1]);
+        Assert.False(firstSnow.Disposed);
+
+        // Act
+        second.Update(fixture.Context);
+
+        // Assert
+        Assert.True(secondRain.Disposed);
+        Assert.False(secondFog.Disposed);
+        Assert.Equal("textures/hud/weather/snow.svg", requests[^1]);
+        var secondSnow = Assert.IsType<LoadedTexture>(svgTextures[^1]);
+        Assert.NotSame(firstSnow, secondSnow);
+
+        // Act
+        first.Dispose();
+
+        // Assert
+        Assert.True(firstSnow.Disposed);
+        Assert.True(firstFog.Disposed);
+        Assert.False(secondSnow.Disposed);
+        Assert.False(secondFog.Disposed);
+        second.Dispose();
+        Assert.All(svgTextures, texture => Assert.True(texture.Disposed));
+        Assert.Empty(fixture.Resources.Native.Failures);
     }
     #endregion
     #region Wetness and thermometer geometry
@@ -645,7 +712,7 @@ public sealed class LayeredIndicatorsTests
         Assert.Equal(1, fixture.PackChecks);
         string[] expectedArtwork = complete
             ? ["textures/hud/weather/composite/rain-light.svg", "textures/hud/weather/composite/fog-light.svg", "textures/hud/weather/composite/thunder-light.svg"]
-            : ["textures/hud/weather/rain.png", "textures/hud/weather/fog.png"];
+            : ["textures/hud/weather/rain.svg", "textures/hud/weather/fog.svg"];
         Assert.Equal(expectedArtwork.OrderBy(path => path), fixture.Bindings.Keys.OrderBy(path => path));
         if (!complete)
         {

@@ -57,10 +57,10 @@ All in-game verification is deferred until the end of Phase 7, after all impleme
 ## Phase 6: Weather fallback icons (4 tasks)
     Preserve fallback selection when the composite SVG pack is absent or incomplete, including the split precipitation/fog layout.
     Complete rain, snow, and hail SVGs before switching the shared precipitation loading path. Keep fallback icons independent of composite-pack availability.
-    [ ] Convert weather/rain.png to rain.svg.
-    [ ] Convert weather/snow.png to snow.svg.
-    [ ] Convert weather/hail.png to hail.svg.
-    [ ] Convert weather/fog.png to fog.svg.
+    [x] Convert weather/rain.png to rain.svg.
+    [x] Convert weather/snow.png to snow.svg.
+    [x] Convert weather/hail.png to hail.svg.
+    [x] Convert weather/fog.png to fog.svg.
 
 ## Phase 7: Native-pixel SVG rendering for all non-immersive indicators
     Prerequisite: Complete phases 1-6.
