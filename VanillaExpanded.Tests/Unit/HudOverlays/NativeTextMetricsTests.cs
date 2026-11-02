@@ -12,6 +12,76 @@ namespace VanillaExpanded.Tests.Unit.HudOverlays;
 [Collection("HudOverlayGeometry")]
 public sealed class NativeTextMetricsTests
 {
+    [Theory]
+    [Trait("Category", "Unit")]
+    [InlineData(0, 0)]
+    [InlineData(.5, 1.5)]
+    [InlineData(1, 1.5)]
+    [InlineData(1.5, 1.5)]
+    [InlineData(3, 3)]
+    public void HudFontsPreserveDisabledAndWiderOutlines(double requested, double expected)
+    {
+        using var fixture = new HudNativeComponentFixture();
+        var font = TextMetrics.Font(requested);
+        Assert.Equal(expected, font.StrokeWidth);
+        Assert.Equal(1.5, TextMetrics.Font().StrokeWidth);
+    }
+
+    [Theory]
+    [Trait("Category", "Unit")]
+    [InlineData(1, .25, 1.5)]
+    [InlineData(1.125, .25, 1.5)]
+    [InlineData(2, 3, 1.5)]
+    [InlineData(1.125, 0, 1.5)]
+    [InlineData(1.125, 2, 0)]
+    public void OutlineMinimumIsAppliedBeforeEveryFittingMeasurement(float scale, double stroke, double minimum)
+    {
+        using var fixture = new HudNativeComponentFixture(scale);
+        using var font = CairoFont.WhiteSmallText().WithFontSize(14).WithStroke(new double[] { 0, 0, 0, .85 }, stroke);
+        font.GetFontExtents();
+        int measurements = 0;
+        CairoTextSizing.Fit(font, candidate =>
+        {
+            measurements++;
+            double expected = stroke == 0 ? 0 : Math.Max(minimum, stroke * candidate.UnscaledFontsize / 14);
+            Assert.Equal(expected, candidate.StrokeWidth, 5);
+            var pixels = CairoTextSizing.PixelSize("Reading", candidate);
+            Assert.True(pixels.Width > 0 && pixels.Height > 0);
+            return candidate.UnscaledFontsize <= 7;
+        }, minimum);
+        Assert.True(measurements > 2);
+        Assert.InRange(font.UnscaledFontsize, 6.99, 7);
+        Assert.Equal(stroke == 0 ? 0 : Math.Max(minimum, stroke * font.UnscaledFontsize / 14), font.StrokeWidth, 5);
+    }
+
+    [Theory]
+    [Trait("Category", "Unit")]
+    [InlineData(1)]
+    [InlineData(1.125)]
+    [InlineData(2)]
+    public void TinyHudAperturesClipTheNaturalRasterWithoutReducingTheOutline(float scale)
+    {
+        using var fixture = new HudNativeComponentFixture(scale);
+        fixture.Gui.Setup(gui => gui.LoadOrUpdateCairoTexture(It.IsAny<ImageSurface>(), It.IsAny<bool>(), ref It.Ref<LoadedTexture>.IsAny))
+            .Callback(new Upload((ImageSurface surface, bool _, ref LoadedTexture texture) =>
+            { texture.Width = surface.Width; texture.Height = surface.Height; }));
+        var bounds = ElementBounds.Fixed(0, 0, 6 / scale, 6 / scale).WithEmptyParent();
+        using var element = new TextElement(fixture.Api.Object, bounds, fixture.Failures.Add,
+            (context, value, font) => TextDrawing.CreateTexture(context.Api, value, font));
+        element.Prepare(fixture.Context, "Reading");
+        bounds.CalcWorldBounds();
+        element.LayoutCompleted(new(0, 0, 1000, 1000));
+        var raster = CairoTextSizing.PixelSize("Reading", element.Font);
+        Assert.Equal(1 / scale, element.Font.UnscaledFontsize, 5);
+        Assert.Equal(1.5, element.Font.StrokeWidth);
+        Assert.Equal(new SizeF(raster.Width, raster.Height), element.State.Target.Size);
+        Assert.True(element.State.Target.Height > bounds.OuterHeight);
+        element.RenderInteractiveElements(0);
+        Assert.Contains(fixture.Render.Invocations, call => call.Method.Name == "Render2DTexturePremultipliedAlpha"
+            && Convert.ToSingle(call.Arguments[3]) == raster.Width && Convert.ToSingle(call.Arguments[4]) == raster.Height);
+        Assert.Empty(fixture.Failures);
+    }
+
     [Fact]
     public void NativeFontSizeChangesItsMetrics()
     {
@@ -99,11 +169,12 @@ public sealed class NativeTextMetricsTests
             .Callback(new Upload((ImageSurface surface, bool _, ref LoadedTexture texture) =>
             { texture.Width = surface.Width; texture.Height = surface.Height; }));
         var glyphs = new List<LoadedTexture>();
-        var bounds = ElementBounds.Fixed(0, 0, 150 * indicatorScale, Math.Max(8 / scale, 12 * indicatorScale)).WithEmptyParent();
+        var bounds = ElementBounds.Fixed(0, 0, 150 * indicatorScale, Math.Max(12 / scale, 12 * indicatorScale)).WithEmptyParent();
         using var element = new TextElement(fixture.Api.Object, bounds, fixture.Failures.Add,
             (context, value, font) =>
             {
                 Assert.Equal(EnumTextOrientation.Center, font.Orientation);
+                Assert.True(font.StrokeWidth >= 1.5);
                 var raster = TextDrawing.CreateTexture(context.Api, value, font);
                 var predicted = CairoTextSizing.PixelSize(value, font);
                 Assert.Equal(predicted.Width, raster.Width);
@@ -118,6 +189,7 @@ public sealed class NativeTextMetricsTests
         Assert.Equal(Status.Success, CairoFont.FontMeasuringContext.Status);
         var fitted = glyphs[^1];
         Assert.True(element.Font.UnscaledFontsize < 14 * indicatorScale);
+        Assert.True(element.Font.StrokeWidth >= 1.5);
         Assert.Equal(new SizeF(fitted.Width, fitted.Height), element.State.Target.Size);
         Assert.True(fitted.Width <= bounds.OuterWidth);
         Assert.True(fitted.Height <= bounds.OuterHeight, $"Font {element.Font.UnscaledFontsize}: raster {fitted.Width}x{fitted.Height}, aperture {bounds.OuterWidth}x{bounds.OuterHeight}");

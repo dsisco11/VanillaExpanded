@@ -30,7 +30,8 @@ internal sealed class TextElement : GuiElementTextBase
     #region Preparation
     /// <summary>Creates a passive native text element with an optional headless glyph factory.</summary>
     public TextElement(ICoreClientAPI api, ElementBounds bounds, Action<Exception> failure,
-        Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? create = null, double strokeWidth = 1, float depth = 51,
+        Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? create = null,
+        double strokeWidth = TextMetrics.MinimumOutlineWidth, float depth = 51,
         EnumTextOrientation orientation = EnumTextOrientation.Left)
         : base(api, string.Empty, TextMetrics.Font(strokeWidth).WithOrientation(orientation), bounds)
     {
@@ -47,10 +48,9 @@ internal sealed class TextElement : GuiElementTextBase
         if (!ReferenceEquals(api, preparation.Api)) throw new ArgumentException("A native element cannot change API ownership.", nameof(preparation));
         value ??= string.Empty;
         if (context == preparation && text == value) return;
-        CairoFont nextFont = TextMetrics.Font(strokeWidth)
+        CairoFont nextFont = TextMetrics.Font(strokeWidth * preparation.IndicatorScale)
             .WithOrientation(orientation)
-            .WithFontSize((float)(HudOverlaySizes.Text * preparation.IndicatorScale))
-            .WithStroke(new double[] { 0, 0, 0, .85 }, strokeWidth * preparation.IndicatorScale);
+            .WithFontSize((float)(HudOverlaySizes.Text * preparation.IndicatorScale));
         // Allocate before replacing the surviving resource so generation failure preserves cleanup ownership.
         LoadedTexture? replacement = value.Length == 0 ? null : create(preparation, value, nextFont)
             ?? throw new InvalidOperationException("Native glyph preparation returned no texture.");
@@ -71,11 +71,10 @@ internal sealed class TextElement : GuiElementTextBase
             && (texture?.Width > aperture.Width || texture?.Height > aperture.Height
                 || fittedSize != aperture.Size && Font.UnscaledFontsize < (float)(HudOverlaySizes.Text * context.IndicatorScale)))
         {
-            var nextFont = TextMetrics.Font(strokeWidth)
+            var nextFont = TextMetrics.Font(strokeWidth * context.IndicatorScale)
                 .WithOrientation(orientation)
-                .WithFontSize((float)(HudOverlaySizes.Text * context.IndicatorScale))
-                .WithStroke(new double[] { 0, 0, 0, .85 }, strokeWidth * context.IndicatorScale);
-            CairoTextSizing.FitRectangle(nextFont, text, aperture.Size);
+                .WithFontSize((float)(HudOverlaySizes.Text * context.IndicatorScale));
+            CairoTextSizing.FitRectangle(nextFont, text, aperture.Size, TextMetrics.MinimumOutlineWidth);
             if (nextFont.UnscaledFontsize != Font.UnscaledFontsize || nextFont.StrokeWidth != Font.StrokeWidth)
             {
                 var replacement = create(context, text, nextFont)

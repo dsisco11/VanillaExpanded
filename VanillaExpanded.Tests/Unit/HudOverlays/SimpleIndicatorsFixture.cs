@@ -30,6 +30,7 @@ internal sealed class SimpleIndicatorsFixture : IDisposable
     public List<LoadedTexture> Artwork { get; } = new();
     /// <summary>Gets the glyph values actually rasterized by the native elements.</summary>
     public List<string> Values { get; } = new();
+    public List<double> StrokeWidths { get; } = new();
     /// <summary>Gets the procedural circle submission boundary.</summary>
     public Mock<VanillaExpanded.HudOverlays.Rendering.IHudOverlayIconBackdrop> Backdrop { get; } = new();
     /// <summary>Gets observable CPU measurement calls.</summary>
@@ -101,6 +102,7 @@ internal sealed class SimpleIndicatorsFixture : IDisposable
     public LoadedTexture CreateText(HudOverlayPreparationContext context, string value, CairoFont font)
     {
         Values.Add(value);
+        StrokeWidths.Add(font.StrokeWidth);
         double fit = font.UnscaledFontsize / (14 * context.IndicatorScale);
         var texture = new LoadedTexture(context.Api, nextId++, Math.Max(1, (int)(value.Length * 7 * context.GuiScale * fit)),
             Math.Max(1, (int)(13 * context.GuiScale * fit)));

@@ -26,7 +26,8 @@ internal sealed class IconReadingView : NativeView
         Action<Exception> failure,
         Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? createText = null,
         Func<HudOverlayPreparationContext, string, TextureBinding>? loadIcon = null,
-        Func<IHudOverlayIconBackdrop?>? backdrop = null, Func<float>? effect = null, double strokeWidth = 1) : base(api)
+        Func<IHudOverlayIconBackdrop?>? backdrop = null, Func<float>? effect = null,
+        double strokeWidth = TextMetrics.MinimumOutlineWidth) : base(api)
     {
         ArgumentNullException.ThrowIfNull(content);
         this.content = content;

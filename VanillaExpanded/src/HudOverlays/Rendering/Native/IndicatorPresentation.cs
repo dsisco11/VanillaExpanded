@@ -53,7 +53,7 @@ internal abstract class IndicatorPresentation : IDisposable
     /// <summary>Gets prepared localized text without retaining element resources.</summary>
     protected TextContent? Text { get; private set; }
     /// <summary>Measures a reading without generating a duplicate glyph texture.</summary>
-    protected SizeF MeasureText(HudOverlayPreparationContext context, string value, double strokeWidth = 1) =>
+    protected SizeF MeasureText(HudOverlayPreparationContext context, string value, double strokeWidth = TextMetrics.MinimumOutlineWidth) =>
         measure != null ? measure(context, value) : TextMetrics.Measure(context, value, strokeWidth);
     /// <summary>Publishes localized two-line content and its canonical footprint.</summary>
     protected void PrepareText(HudOverlayPreparationContext context, string shortName, string reading)

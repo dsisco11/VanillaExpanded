@@ -199,6 +199,7 @@ public sealed class HudIndicatorSizeTests
             AssertScaled(baseline, resized, setting.Scale);
             change(); prepare(); baseline.Update(fixture.Context); resized.Update(fixture.Context);
             AssertScaled(baseline, resized, setting.Scale);
+            Assert.All(fixture.Resources.StrokeWidths, width => Assert.True(width >= 1.5));
             if (style == HudIndicatorStyle.Icon)
             {
                 resized.View.CollectBackdrops(fixture.Context.Api.Render);
@@ -230,7 +231,7 @@ public sealed class HudIndicatorSizeTests
                 creates++;
                 Assert.Equal(2 * setting.Scale, context.GuiScale, 5);
                 Assert.Equal(14 * setting.Scale, font.UnscaledFontsize, 5);
-                Assert.Equal(setting.Scale, font.StrokeWidth, 5);
+                Assert.Equal(Math.Max(TextMetrics.MinimumOutlineWidth, TextMetrics.MinimumOutlineWidth * setting.Scale), font.StrokeWidth, 5);
                 return new(context.Api, 100 + creates, Math.Max(1, (int)(20 * setting.Scale)), Math.Max(1, (int)(10 * setting.Scale)));
             });
         using var composition = new IndicatorComposition(fixture.Api.Object, new SizedNativeView(view, setting), fixture.Context,
@@ -263,6 +264,17 @@ public sealed class HudIndicatorSizeTests
             AssertScaled(baseline, resized, setting.Scale);
             change(); prepare(); baseline.Update(fixture.Context); resized.Update(fixture.Context);
             AssertScaled(baseline, resized, setting.Scale);
+            if (kind == "time" && style != EnvironmentalGaugeStyle.Text)
+                Assert.Empty(fixture.Resources.StrokeWidths);
+            else
+            {
+                Assert.NotEmpty(fixture.Resources.StrokeWidths);
+                Assert.All(fixture.Resources.StrokeWidths, width =>
+                {
+                    if (style == EnvironmentalGaugeStyle.Immersive) Assert.Equal(0, width);
+                    else Assert.True(width >= 1.5);
+                });
+            }
         }
     }
 

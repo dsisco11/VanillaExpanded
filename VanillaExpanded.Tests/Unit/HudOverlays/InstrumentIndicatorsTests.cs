@@ -14,6 +14,32 @@ namespace VanillaExpanded.Tests.Unit.HudOverlays;
 [Collection("HudOverlayGeometry")]
 public sealed class InstrumentIndicatorsTests
 {
+    [Theory]
+    [Trait("Category", "Unit")]
+    [InlineData("temperature", EnvironmentalGaugeStyle.Immersive)]
+    [InlineData("temperature", EnvironmentalGaugeStyle.Icon)]
+    [InlineData("temperature", EnvironmentalGaugeStyle.Text)]
+    [InlineData("date", EnvironmentalGaugeStyle.Immersive)]
+    [InlineData("date", EnvironmentalGaugeStyle.Icon)]
+    [InlineData("date", EnvironmentalGaugeStyle.Text)]
+    public void InstrumentOutlinePolicyAppliesToEveryRasterAtGuiScaleNine(string kind, EnvironmentalGaugeStyle style)
+    {
+        using var fixture = new InstrumentIndicatorsFixture(1.125f);
+        var (overlay, presentation, prepare, change) = fixture.Create(kind, style);
+        using (overlay)
+        using (var composition = fixture.Mount(overlay, presentation))
+        {
+            change(); prepare(); composition.Update(fixture.Context);
+            Assert.NotEmpty(fixture.Resources.StrokeWidths);
+            Assert.All(fixture.Resources.StrokeWidths, width =>
+            {
+                if (style == EnvironmentalGaugeStyle.Immersive) Assert.Equal(0, width);
+                else Assert.True(width >= 1.5);
+            });
+            Assert.Empty(fixture.Resources.Native.Failures);
+        }
+    }
+
     #region Public API
     #region Native registration and rendering
     /// <summary>Every instrument/style uses passive native components and canonical preparation allocates no GUI resources.</summary>
