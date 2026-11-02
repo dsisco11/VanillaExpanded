@@ -46,7 +46,7 @@ internal sealed class ClimateView : NativeView
                 var center = EnvironmentalTemperatureGaugeLayout.Position(degree, 128);
                 labels[index] = Own(new TextureElement(api, Region(new(center.X - width / 2, center.Y - 32, width, 64)), _ => { }, load, depth: 52));
             }
-            reading = Own(new TextElement(api, Region(EnvironmentalTemperatureGaugeLayout.Reading), _ => { }, createText, depth: 52));
+            reading = Own(new TextElement(api, Region(EnvironmentalTemperatureGaugeLayout.Reading), _ => { }, createText, strokeWidth: 0, depth: 52));
             clamps = Own(new TextureElement(api, ElementBounds.Fill, _ => { }, load, depth: 53));
             glass = Own(new TextureElement(api, ElementBounds.Fill, _ => { }, load, depth: 54));
         }

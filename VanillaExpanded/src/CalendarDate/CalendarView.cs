@@ -26,8 +26,8 @@ internal sealed class CalendarView : NativeView
         housing = Own(new TextureElement(api, ElementBounds.Fill, _ => { }, load));
         try
         {
-            month = Own(new TextElement(api, Window(0), _ => { }, createText));
-            day = Own(new TextElement(api, Window(1), _ => { }, createText));
+            month = Own(new TextElement(api, Window(0), _ => { }, createText, strokeWidth: 0));
+            day = Own(new TextElement(api, Window(1), _ => { }, createText, strokeWidth: 0));
             glass = Own(new TextureElement(api, ElementBounds.Fill, _ => { }, load, depth: 52));
         }
         catch { Dispose(); throw; }
