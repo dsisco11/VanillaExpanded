@@ -2,6 +2,7 @@ using Cairo;
 using Moq;
 using VanillaExpanded.RecipeBook;
 using VanillaExpanded.Tests.TestSupport.Gui;
+using VanillaExpanded.Tests.TestSupport.RecipeBook;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -924,8 +925,7 @@ public sealed class RecipeBookIconRendererTests
     [Fact]
     public void ShaderSourceRetainsApprovedPaletteOutlineAndSeparateCornerGeometry()
     {
-        string source = System.IO.File.ReadAllText(System.IO.Path.GetFullPath(System.IO.Path.Combine(
-            AppContext.BaseDirectory, @"..\..\..\..\VanillaExpanded\assets\vanillaexpanded\shaders\recipebook_icons.fsh")));
+        string source = System.IO.File.ReadAllText(MenuFixture.GetAssetPath("shaders", "recipebook_icons.fsh"));
         Assert.Contains("vec4(73.0 / 255.0, 61.0 / 255.0, 44.0 / 255.0, 1.0)", source);
         Assert.Contains("vec4(113.0 / 255.0, 97.0 / 255.0, 70.0 / 255.0, 1.0)", source);
         Assert.Contains("recipeState == 2 ? vec4(0.0, 0.0, 0.0, 0.92)", source);

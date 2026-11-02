@@ -40,6 +40,17 @@ internal sealed class MenuFixture : IDisposable
     internal int TextureCount => graphics.Textures.Count;
     internal readonly Dictionary<string, Vec2i> DialogPositions;
 
+    internal static string GetAssetPath(params string[] assetSegments)
+    {
+        string path = System.IO.Path.GetFullPath(System.IO.Path.Combine(
+            AppContext.BaseDirectory, "..", "..", "..", "..", "VanillaExpanded", "assets", "vanillaexpanded",
+            System.IO.Path.Combine(assetSegments)));
+        if (!System.IO.File.Exists(path))
+            throw new System.IO.FileNotFoundException(
+                $"Required Recipe Book test asset '{string.Join("/", assetSegments)}' was not found.", path);
+        return path;
+    }
+
     internal MenuFixture(bool enabled = true, float scale = 1, bool longLabels = false, bool includeRecipes = false,
         Dictionary<string, bool>? savedSettings = null,
         Dictionary<string, Vec2i>? savedPositions = null, Dictionary<string, string>? categoryNames = null)
@@ -101,20 +112,17 @@ internal sealed class MenuFixture : IDisposable
         var assets = new Mock<IAssetManager>();
         assets.Setup(value => value.Get(It.IsAny<AssetLocation>()))
             .Returns(Mock.Of<IAsset>(value => value.Data == Array.Empty<byte>()));
-        byte[] svg = File.ReadAllBytes(System.IO.Path.GetFullPath(System.IO.Path.Combine(AppContext.BaseDirectory,
-            @"..\..\..\..\VanillaExpanded\assets\vanillaexpanded\textures\gui\recipe-book.svg")));
+        byte[] svg = File.ReadAllBytes(GetAssetPath("textures", "gui", "recipe-book.svg"));
         BookAsset = Mock.Of<IAsset>(value => value.Data == svg);
         assets.Setup(value => value.Get(new AssetLocation("vanillaexpanded:textures/gui/recipe-book.svg")))
             .Returns(BookAsset);
-        byte[] optionsSvg = File.ReadAllBytes(System.IO.Path.GetFullPath(System.IO.Path.Combine(AppContext.BaseDirectory,
-            @"..\..\..\..\VanillaExpanded\assets\vanillaexpanded\textures\gui\recipe-book-options.svg")));
+        byte[] optionsSvg = File.ReadAllBytes(GetAssetPath("textures", "gui", "recipe-book-options.svg"));
         OptionsAsset = Mock.Of<IAsset>(value => value.Data == optionsSvg);
         assets.Setup(value => value.Get(new AssetLocation("vanillaexpanded:textures/gui/recipe-book-options.svg")))
             .Returns(OptionsAsset);
         foreach (string code in RecipeBookCategoryIcons.Codes)
         {
-            byte[] categorySvg = File.ReadAllBytes(System.IO.Path.GetFullPath(System.IO.Path.Combine(AppContext.BaseDirectory,
-                @"..\..\..\..\VanillaExpanded\assets\vanillaexpanded\textures\gui\recipe-book-categories", code + ".svg")));
+            byte[] categorySvg = File.ReadAllBytes(GetAssetPath("textures", "gui", "recipe-book-categories", code + ".svg"));
             var asset = Mock.Of<IAsset>(value => value.Data == categorySvg);
             CategoryAssets.Add(code, asset);
             assets.Setup(value => value.Get(RecipeBookCategoryIcons.Asset(code))).Returns(asset);

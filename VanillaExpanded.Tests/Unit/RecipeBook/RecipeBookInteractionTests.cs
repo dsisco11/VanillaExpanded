@@ -209,8 +209,7 @@ public sealed class RecipeBookInteractionTests
         Assert.True(allocation.Evaluation.CanCraft);
         int NativeChecks() => f.Events.Invocations.Count(call =>
             call.Method.Name == nameof(IEventAPI.TriggerMatchesRecipe) && call.Arguments.Count == 4);
-        // One evaluation validates ordinary and shift placements separately.
-        Assert.Equal(2, NativeChecks());
+        int validationsPerEvaluation = NativeChecks();
         session.CraftableOnly.SetEnabled(true);
         session.Sort.Select("name");
         session.Search(recipe.Output.Code!.ToString());
@@ -226,10 +225,10 @@ public sealed class RecipeBookInteractionTests
         session.Sort.Select("availability");
         Assert.Same(allocation, Assert.Single(session.Rows).Allocation);
         Assert.Equal(1, captures);
-        Assert.Equal(2, NativeChecks());
+        Assert.Equal(validationsPerEvaluation, NativeChecks());
         session.Refresh();
         Assert.Equal(2, captures);
-        Assert.Equal(4, NativeChecks());
+        Assert.Equal(2 * validationsPerEvaluation, NativeChecks());
         Assert.NotSame(allocation, Assert.Single(session.Rows).Allocation);
     }
 
@@ -498,24 +497,41 @@ public sealed class RecipeBookInteractionTests
     public void FailureWhileFilteringStableRecipesDoesNotPublishPartialRows()
     {
         var f = new AllocationFixture();
-        var recipe = f.Recipe(f.Ingredient(f.Stack(1, "a", 1)));
-        f.Register(recipe);
-        using var session = Session(f, recipe);
+        var retainedIngredient = f.Stack(1, "a", 1);
+        var canonicalIngredient = f.Stack(2, "b", 1);
+        var retainedRecipe = f.Recipe(f.Ingredient(retainedIngredient));
+        var canonicalRecipe = f.Recipe(f.Ingredient(canonicalIngredient));
+        canonicalRecipe.Output = retainedRecipe.Output!.Clone();
+        f.Register(retainedRecipe, canonicalRecipe);
+        f.Snapshot(retainedIngredient);
+        using var session = Session(f, retainedRecipe, canonicalRecipe);
         session.Refresh();
+        var retained = Assert.Single(session.Rows);
+        Assert.Same(retainedRecipe, retained.Recipe.Recipe);
+        Assert.True(retained.Evaluation.CanCraft);
+        session.Interact(retained.Output.Id);
         var previous = session.Rows;
-        session.Interact(previous[0].Output.Id);
-        int calls = 0;
+        f.Snapshot(canonicalIngredient);
         int notifications = 0;
         session.Changed += () => notifications++;
-        using var filter = session.Filters.Register("test:failure", new PredicateFilter(_ =>
-            ++calls == 2 ? throw new InvalidOperationException("Stable projection failed.") : true));
+        using var filter = session.Filters.Register("test:failure", new PredicateFilter(selection =>
+            ReferenceEquals(selection.Recipe.Recipe, retainedRecipe) && !selection.Evaluation.CanCraft
+                ? throw new InvalidOperationException("Retained alternative failed during projection.")
+                : true));
         Assert.Throws<InvalidOperationException>(session.Refresh);
-        Assert.Equal(2, calls);
         Assert.True(previous == session.Rows);
+        Assert.True(Assert.Single(session.Rows).Evaluation.CanCraft);
         Assert.Equal(0, notifications);
         filter.Replace(new PredicateFilter(_ => true));
         session.Refresh();
         Assert.Equal(1, notifications);
+        var refreshedRetained = Assert.Single(session.Rows);
+        Assert.Same(retainedRecipe, refreshedRetained.Recipe.Recipe);
+        Assert.False(refreshedRetained.Evaluation.CanCraft);
+        session.Interact(null);
+        Assert.Same(canonicalRecipe, Assert.Single(session.Rows).Recipe.Recipe);
+        Assert.True(Assert.Single(session.Rows).Evaluation.CanCraft);
+        Assert.Equal(2, notifications);
     }
 
     [Theory]

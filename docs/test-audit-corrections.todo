@@ -73,32 +73,34 @@ Exit criteria:
 
 Dependencies: Phase 1, so corrected methods retain traceable identities during extraction.
 
-- [ ] P2.1 Fix portable asset lookup (F1).
-  - [ ] Replace the three lifecycle fixture asset paths at original lines 3672-3685 in [RecipeBookLifecycleTests.cs](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookLifecycleTests.cs).
-  - [ ] Replace the shader asset path at original lines 924-927 in [RecipeBookIconRendererTests.cs](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookIconRendererTests.cs).
-  - [ ] Use platform-portable path segments or deliberately copied test assets; changing only the working directory is insufficient.
-  - [ ] Fail explicitly for missing assets rather than skipping or returning successful defaults.
-- [ ] P2.2 Correct filter-contract overconstraint (F2a).
-  - [ ] Rewrite `ProvidersReceiveTheExactEvaluatedSelectionAndMayShortCircuit`, original lines 73-88 in [RecipeFilterSetTests.cs](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeFilterSetTests.cs).
-  - [ ] Preserve exact evaluated-selection identity and intersection-result assertions.
-  - [ ] Make providers independently evaluable; do not make a later provider throw solely to enforce registration order or short-circuiting.
-- [ ] P2.3 Correct atomic-publication failure injection (F2b).
-  - [ ] Rewrite `FailureWhileFilteringStableRecipesDoesNotPublishPartialRows`, original lines 498-520 in [RecipeBookInteractionTests.cs](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookInteractionTests.cs).
-  - [ ] Fail for a semantically identifiable selection/scenario, not the second predicate call.
-  - [ ] Preserve assertions that published rows remain unchanged, no premature notification occurs, and a subsequent valid operation recovers.
-  - [ ] Do not require invocation counts that the filtering contract explicitly excludes.
-- [ ] P2.4 Decouple session reuse from allocator validation protocol (F3).
-  - [ ] Correct `CriteriaChangesReuseAllocationsAndInventoryRefreshEvaluatesExactlyOnce`, original lines 192-233 in [RecipeBookInteractionTests.cs](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookInteractionTests.cs).
-  - [ ] Retain capture counts and allocation-identity evidence.
-  - [ ] Compare criteria-change validation work against a recorded baseline rather than hardcoding native callback totals of two and four.
-  - [ ] Keep any justified ordinary/shift native-validation protocol assertions in allocator/native-validation suites, not session reuse tests.
-- [ ] P2.5 Remove the duplicate managed Cairo reference (O2).
-  - [ ] Remove only the identical duplicate at original lines 83-86 in [VanillaExpanded.Tests.csproj](../VanillaExpanded.Tests/VanillaExpanded.Tests.csproj); preserve the existing reference and native library copying.
+Completion evidence: the four affected suites passed 386 tests with zero failures or skips on Windows; 34 existing compiler/analyzer warnings remain. The second review and independent completion audit accepted P2.1-P2.5. Linux execution remains deferred to Phase 6.
+
+- [x] P2.1 Fix portable asset lookup (F1).
+  - [x] Replace the three lifecycle fixture asset paths, originally at lines 3672-3685 in [RecipeBookLifecycleTests.cs](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookLifecycleTests.cs) and extracted in Phase 1 to [RecipeBookTestFixtures.cs](../VanillaExpanded.Tests/TestSupport/RecipeBook/RecipeBookTestFixtures.cs).
+  - [x] Replace the shader asset path at original lines 924-927 in [RecipeBookIconRendererTests.cs](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookIconRendererTests.cs).
+  - [x] Use platform-portable path segments or deliberately copied test assets; changing only the working directory is insufficient.
+  - [x] Fail explicitly for missing assets rather than skipping or returning successful defaults.
+- [x] P2.2 Correct filter-contract overconstraint (F2a).
+  - [x] Rewrite `ProvidersReceiveTheExactEvaluatedSelectionAndMayShortCircuit`, original lines 73-88 in [RecipeFilterSetTests.cs](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeFilterSetTests.cs).
+  - [x] Preserve exact evaluated-selection identity and intersection-result assertions.
+  - [x] Make providers independently evaluable; do not make a later provider throw solely to enforce registration order or short-circuiting.
+- [x] P2.3 Correct atomic-publication failure injection (F2b).
+  - [x] Rewrite `FailureWhileFilteringStableRecipesDoesNotPublishPartialRows`, original lines 498-520 in [RecipeBookInteractionTests.cs](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookInteractionTests.cs).
+  - [x] Fail for a semantically identifiable selection/scenario, not the second predicate call.
+  - [x] Preserve assertions that published rows remain unchanged, no premature notification occurs, and a subsequent valid operation recovers.
+  - [x] Do not require invocation counts that the filtering contract explicitly excludes.
+- [x] P2.4 Decouple session reuse from allocator validation protocol (F3).
+  - [x] Correct `CriteriaChangesReuseAllocationsAndInventoryRefreshEvaluatesExactlyOnce`, original lines 192-233 in [RecipeBookInteractionTests.cs](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookInteractionTests.cs).
+  - [x] Retain capture counts and allocation-identity evidence.
+  - [x] Compare criteria-change validation work against a recorded baseline rather than hardcoding native callback totals of two and four.
+  - [x] Keep any justified ordinary/shift native-validation protocol assertions in allocator/native-validation suites, not session reuse tests.
+- [x] P2.5 Remove the duplicate managed Cairo reference (O2).
+  - [x] Remove only the identical duplicate at original lines 83-86 in [VanillaExpanded.Tests.csproj](../VanillaExpanded.Tests/VanillaExpanded.Tests.csproj); preserve the existing reference and native library copying.
 
 Exit criteria:
-- [ ] Corrected tests enforce behavioral contracts rather than incidental iteration/validation implementation.
-- [ ] No assertion strength is lost merely to make tests pass.
-- [ ] Portable asset lookup is ready for actual Windows and Linux execution in Phase 6.
+- [x] Corrected tests enforce behavioral contracts rather than incidental iteration/validation implementation.
+- [x] No assertion strength is lost merely to make tests pass.
+- [x] Portable asset lookup is ready for actual Windows and Linux execution in Phase 6.
 
 ## Phase 3 - Move and split tests by responsibility and boundary
 

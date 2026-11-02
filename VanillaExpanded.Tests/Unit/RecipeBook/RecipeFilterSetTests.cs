@@ -73,18 +73,27 @@ public sealed class RecipeFilterSetTests
     public void ProvidersReceiveTheExactEvaluatedSelectionAndMayShortCircuit()
     {
         using var manager = new RecipeFilterSet();
-        var row = Rows()[0] with { Evaluation = CatalogueFixture.Full(), IsExplicit = true };
-        using var reject = manager.Register("reject", new Provider(selection =>
+        var source = Rows();
+        var selected = source[0] with { Evaluation = CatalogueFixture.Full(), IsExplicit = true };
+        var automatic = source[1] with { Evaluation = CatalogueFixture.Full(), IsExplicit = false };
+        var unavailable = source[2] with {
+            Evaluation = CraftingRecipeEvaluation.Unsupported("test:unavailable"), IsExplicit = true
+        };
+        using var craftable = manager.Register("craftable", new Provider(selection =>
         {
-            Assert.Same(row, selection);
-            Assert.True(selection.Evaluation.CanCraft);
-            Assert.True(selection.IsExplicit);
-            return false;
+            if (selection.Output.Id == selected.Output.Id)
+            {
+                Assert.Same(selected, selection);
+                Assert.Same(selected.Evaluation, selection.Evaluation);
+                Assert.True(selection.Evaluation.CanCraft);
+                Assert.True(selection.IsExplicit);
+            }
+            return selection.Evaluation.CanCraft;
         }));
-        using var later = manager.Register("later", new Provider(_ =>
-            throw new InvalidOperationException("The earlier rejection can short-circuit.")));
+        using var explicitSelection = manager.Register("explicit", new Provider(selection => selection.IsExplicit));
 
-        Assert.Empty(manager.Filter([row]));
+        var filtered = manager.Filter([selected, automatic, unavailable]);
+        Assert.Same(selected, Assert.Single(filtered));
     }
 
     [Fact]
