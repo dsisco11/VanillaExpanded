@@ -1,7 +1,7 @@
 using Cairo;
 using VanillaExpanded.Gui;
 using VanillaExpanded.RecipeBook;
-using VanillaExpanded.Tests.Unit.RecipeBook;
+using VanillaExpanded.Tests.TestSupport.Gui;
 using Vintagestory.API.Client;
 
 namespace VanillaExpanded.Tests.Unit.Gui;

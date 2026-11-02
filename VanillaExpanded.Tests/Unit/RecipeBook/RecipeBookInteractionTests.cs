@@ -1467,6 +1467,3 @@ public sealed class RecipeBookInteractionTests
         public override void RecomposeHandle() { }
     }
 }
-
-[CollectionDefinition("Recipe book native GUI", DisableParallelization = true)]
-public sealed class CraftingGuiCollection;

@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Moq;
 using VanillaExpanded.RecipeBook;
+using VanillaExpanded.Tests.TestSupport.Gui;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Xunit;

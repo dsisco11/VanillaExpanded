@@ -2,7 +2,7 @@ using System.Reflection;
 using Cairo;
 using Moq;
 using VanillaExpanded.Gui;
-using VanillaExpanded.Tests.Unit.RecipeBook;
+using VanillaExpanded.Tests.TestSupport.Gui;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;

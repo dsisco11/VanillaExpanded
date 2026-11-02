@@ -39,28 +39,35 @@
 
 Dependencies: none.
 
-- [ ] P1.1 Capture a method-level baseline for all 332 introduced methods, including original fully qualified identity, theory data, category, fixture, collection, and actual tested boundary.
-  - [ ] Keep the existing configuration methods outside this branch's additions out of remediation unless fixture extraction directly requires compatibility work.
-  - [ ] Use the complete reviewed-file inventory below to ensure no added suite is omitted.
-- [ ] P1.2 Establish `Unit`, `Component`, and `Integration` directories and matching category traits within the existing test project.
-  - [ ] Unit: an isolated rule/subject; real data objects alone do not automatically make a test component-level.
-  - [ ] Component: composed production collaborators exercised behind mocked external services.
-  - [ ] Integration: a real native/engine boundary or compatibility contract.
-  - [ ] Reserve E2E for a complete externally driven workflow. The seven current native-transfer tests do not qualify.
-  - [ ] Do not migrate to a separate test assembly merely to obtain an Integration folder; first preserve internal access, fixtures, and discovery.
-- [ ] P1.3 Assign each method exactly one primary responsibility, destination, and level before moving mixed suites.
-  - [ ] Follow the responsibility matrix below, including narrow unit cases that must not move wholesale with a mixed file.
-  - [ ] Preserve coherent multi-transition lifecycle scenarios when they test one responsibility.
-  - [ ] Record any further split needed to distinguish a pure rule from its native compatibility coverage.
-- [ ] P1.4 Identify shared fixture ownership and serialization requirements.
-  - [ ] Extract `RecipeBookRenderFixture` from the renderer-test file to feature-neutral support when shared GUI tests use it.
-  - [ ] Extract common dialog/session fixtures from catch-all suites only where multiple focused suites need them.
-  - [ ] Preserve engine-global restoration, disposal, and collection-based serialization.
+Implementation assets:
+- [Pinned method ledger](../VanillaExpanded.Tests/TestAudit/recipebook-baseline.jsonl): the first JSONL record defines source/placement identifiers and row fields; the following 332 rows retain original identities, categories, fixtures, collections, and theory data separately from planned placements. Fixture references use bare names for direct dependencies and `helper:Method()->Fixture` for dependencies created through helpers.
+- [Category contract](../VanillaExpanded.Tests/TestCategories.cs): the trait key is `Category`; values match the `Unit`, `Component`, `Integration`, and `E2E` directory names. Component and Integration locations are reserved in this project; existing mixed suites keep their original categories until Phase 3.
+- [Shared GUI support](../VanillaExpanded.Tests/TestSupport/Gui/RecipeBookRenderFixture.cs) owns the common native GUI collection and render fixture outside a test suite. [Recipe Book support](../VanillaExpanded.Tests/TestSupport/RecipeBook/RecipeBookTestFixtures.cs) owns shared dialog/session helpers.
+- Preserve the `Recipe book native GUI` collection's disabled parallelization across all consumers and retain global/configuration/language restoration and resource disposal. Placement changes must not create another collection definition.
+- Completion evidence: the eight affected suites passed 578 tests with zero failures or skips. The second review and independent completion audit accepted the phase after helper-resolved fixture metadata corrections; the ledger retains 332 unique methods and the 123/141/68 planned placement totals.
+
+- [x] P1.1 Capture a method-level baseline for all 332 introduced methods, including original fully qualified identity, theory data, category, fixture, collection, and actual tested boundary.
+  - [x] Keep the existing configuration methods outside this branch's additions out of remediation unless fixture extraction directly requires compatibility work.
+  - [x] Use the complete reviewed-file inventory below to ensure no added suite is omitted.
+- [x] P1.2 Establish `Unit`, `Component`, and `Integration` directories and matching category traits within the existing test project.
+  - [x] Unit: an isolated rule/subject; real data objects alone do not automatically make a test component-level.
+  - [x] Component: composed production collaborators exercised behind mocked external services.
+  - [x] Integration: a real native/engine boundary or compatibility contract.
+  - [x] Reserve E2E for a complete externally driven workflow. The seven current native-transfer tests do not qualify.
+  - [x] Do not migrate to a separate test assembly merely to obtain an Integration folder; first preserve internal access, fixtures, and discovery.
+- [x] P1.3 Assign each method exactly one primary responsibility, destination, and level before moving mixed suites.
+  - [x] Follow the responsibility matrix below, including narrow unit cases that must not move wholesale with a mixed file.
+  - [x] Preserve coherent multi-transition lifecycle scenarios when they test one responsibility.
+  - [x] Record any further split needed to distinguish a pure rule from its native compatibility coverage.
+- [x] P1.4 Identify shared fixture ownership and serialization requirements.
+  - [x] Extract `RecipeBookRenderFixture` from the renderer-test file to feature-neutral support when shared GUI tests use it.
+  - [x] Extract common dialog/session fixtures from catch-all suites only where multiple focused suites need them.
+  - [x] Preserve engine-global restoration, disposal, and collection-based serialization.
 
 Exit criteria:
-- [ ] Every introduced method has one destination; no method is unassigned or duplicated.
-- [ ] Destination names express production responsibility, not the feature that happened to introduce the test.
-- [ ] The discovery and serialization contract is explicit before extraction.
+- [x] Every introduced method has one destination; no method is unassigned or duplicated.
+- [x] Destination names express production responsibility, not the feature that happened to introduce the test.
+- [x] The discovery and serialization contract is explicit before extraction.
 
 ## Phase 2 - Correct known test defects without changing feature behavior
 
