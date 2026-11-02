@@ -228,10 +228,10 @@ Exact names use cloned resolved stacks rendered as literal richtext. Wildcard/ta
 
 ## Verification
 
-[Recipe Book tests](../VanillaExpanded.Tests/Unit/RecipeBook/) cover filtering, ordering, allocation, transfer, lifecycle, responsive geometry, and rendering. [GUI tests](../VanillaExpanded.Tests/Unit/Gui/) independently specify shared-control palette, dimensions, state rendering, native adapter boundaries, and category-tab behavior. These suites include isolated logic tests and composed-control fixtures with mocked client services. From the repository root:
+Recipe Book tests are separated by their exercised boundary: [Unit](../VanillaExpanded.Tests/Unit/RecipeBook/) covers isolated rules, [Component](../VanillaExpanded.Tests/Component/RecipeBook/) covers composed sessions, dialogs, tiles, and rendering behind mocked external services, and [Integration](../VanillaExpanded.Tests/Integration/RecipeBook/) covers real native compatibility. Shared GUI controls follow the same split across [Unit](../VanillaExpanded.Tests/Unit/Gui/), [Component](../VanillaExpanded.Tests/Component/Gui/), and [Integration](../VanillaExpanded.Tests/Integration/Gui/). The native-transfer suite is Integration coverage, not an E2E client/server workflow. From the repository root:
 
 ```powershell
-dotnet test .\VanillaExpanded.Tests\VanillaExpanded.Tests.csproj --no-restore --filter "FullyQualifiedName~RecipeBook|FullyQualifiedName~GuiStyledControlsTests|FullyQualifiedName~GuiControlVisualsTests|FullyQualifiedName~GuiControlNativeProbeTests|FullyQualifiedName~GuiElementIconTabsTests" --verbosity minimal
+dotnet test .\VanillaExpanded.Tests\VanillaExpanded.Tests.csproj --no-restore --filter "FullyQualifiedName~.RecipeBook.|FullyQualifiedName~.Gui.|FullyQualifiedName~RecipeBookConfigContractTests" --verbosity minimal
 ```
 
 Native GUI fixtures run without a live game or GPU context. Shader-source assertions and mocked shader uniforms do not prove GPU compilation or rendered appearance. Use the existing Cake pipeline through `.\build.ps1` to validate JSON, publish the mod, and package its shader/assets.

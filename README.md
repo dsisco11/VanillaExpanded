@@ -248,15 +248,17 @@ Recipe-toggle changes require a world reload to rebuild the available recipes. `
 
 ## Testing
 
-The project includes comprehensive unit and end-to-end tests organized by namespace within `VanillaExpanded.Tests`.
+The project includes unit, component, and native integration suites organized by responsibility within `VanillaExpanded.Tests`.
 
 ### Test Organization
 
 - **Unit Tests** (`VanillaExpanded.Tests/Unit/`): Fast, isolated tests for individual components
   - `AutoStashing/`: Tests for item matching, stashable items detection, and timing constants
   - `EquipLightSource/`: Tests for light source detection logic
-- **E2E Tests** (`VanillaExpanded.Tests/E2E/`): Integration tests for system interactions
-  - `AutoStashing/`: Tests for network packet handling and client-server communication
+- **Component Tests** (`VanillaExpanded.Tests/Component/`): Composed production collaborators behind mocked external services, including Recipe Book sessions, dialogs, and rendering
+- **Integration Tests** (`VanillaExpanded.Tests/Integration/`): Real native/engine compatibility, including GUI routing and crafting transfers
+
+The E2E category is reserved for complete externally driven workflows; the headless native-transfer fixtures are Integration tests, not E2E coverage.
 
 ### Running Tests
 
@@ -267,8 +269,11 @@ dotnet test
 # Run only unit tests (fast feedback)
 dotnet test --filter "Category=Unit"
 
-# Run only E2E tests (integration validation)
-dotnet test --filter "Category=E2E"
+# Run only component tests
+dotnet test --filter "Category=Component"
+
+# Run only native integration tests
+dotnet test --filter "Category=Integration"
 
 # Run tests for a specific feature
 dotnet test --filter "FullyQualifiedName~AutoStashing"

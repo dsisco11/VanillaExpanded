@@ -4,10 +4,14 @@ using VanillaExpanded.Tests.Unit.RecipeBook;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.Common;
+using VanillaExpanded.Tests;
+using VanillaExpanded.Tests.TestSupport.Gui;
+using VanillaExpanded.Tests.TestSupport.RecipeBook;
+using VanillaExpanded.Tests.TestSupport.Configuration;
 
-namespace VanillaExpanded.Tests.E2E.RecipeBook;
+namespace VanillaExpanded.Tests.Integration.RecipeBook;
 
-[Trait("Category", "E2E")]
+[Trait(TestCategories.TraitName, TestCategories.Integration)]
 public sealed class CraftingNativeTransferTests
 {
     [Fact]
@@ -200,7 +204,7 @@ public sealed class CraftingNativeTransferTests
         Assert.Equal(2, f.F.Grid[1].StackSize);
     }
 
-    private static IClientWorldAccessor Resolver(ItemStack sample)
+private static IClientWorldAccessor Resolver(ItemStack sample)
     {
         var world = new Mock<IClientWorldAccessor>();
         world.Setup(resolver => resolver.GetItem(sample.Id)).Returns(sample.Item);
@@ -221,5 +225,4 @@ public sealed class CraftingNativeTransferTests
             return base.TryPutInto(sinkSlot, ref op);
         }
     }
-
 }

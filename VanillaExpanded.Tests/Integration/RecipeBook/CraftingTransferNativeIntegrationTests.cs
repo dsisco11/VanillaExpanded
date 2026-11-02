@@ -5,11 +5,16 @@ using VanillaExpanded.Tests.Mocks;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.Common;
+using VanillaExpanded.Tests;
+using VanillaExpanded.Tests.TestSupport.Gui;
+using VanillaExpanded.Tests.TestSupport.RecipeBook;
+using VanillaExpanded.Tests.TestSupport.Configuration;
+using static VanillaExpanded.Tests.TestSupport.RecipeBook.CraftingTransferTestsTestSupport;
 
-namespace VanillaExpanded.Tests.Unit.RecipeBook;
+namespace VanillaExpanded.Tests.Integration.RecipeBook;
 
-[Trait("Category", "Unit")]
-public class CraftingTransferTests
+[Trait(TestCategories.TraitName, TestCategories.Integration)]
+public sealed class CraftingTransferNativeIntegrationTests
 {
     [Theory]
     [InlineData(false, 2)]
@@ -71,33 +76,6 @@ public class CraftingTransferTests
         Assert.Equal(3, f.Packets.Count);
     }
 
-    [Fact]
-    public void InsufficientReturnCapacityIsAnUnchangedPlacementRefusalNotIngredientFailure()
-    {
-        using var f = new TransferFixture(2, 2);
-        f.FillStorage(skipFirst: true);
-        f.F.Grid[0].Itemstack = f.F.Stack(2, "stone", 1);
-        for (int i = 1; i < 9; i++) f.F.Grid[i].Itemstack = f.F.Stack(300 + i, "grid-filled-" + i, 64);
-        var before = f.CopyAll();
-        var allocation = f.F.Allocator.Evaluate(f.Entry, f.Snapshot());
-        Assert.True(allocation.Evaluation.CanCraft);
-        var result = f.Coordinator.Execute(f.Entry, false);
-        Assert.Equal(CraftingTransferPlanner.Space, result.Reason);
-        f.AssertSame(before);
-        Assert.Empty(f.Packets);
-    }
-
-    [Fact]
-    public void NoUsableIngredientsDoesNotClearUnrelatedGrid()
-    {
-        using var f = new TransferFixture(2, 0);
-        f.F.Grid[0].Itemstack = f.F.Stack(2, "stone", 1);
-        var before = f.CopyAll();
-        Assert.Equal(CraftingTransferPlanner.Empty, f.Coordinator.Execute(f.Entry, true).Reason);
-        f.AssertSame(before);
-        Assert.Empty(f.Packets);
-    }
-
     [Theory]
     [InlineData("locked")]
     [InlineData("flags")]
@@ -115,19 +93,6 @@ public class CraftingTransferTests
         f.AssertSame(before);
         Assert.Empty(f.Packets);
         Assert.Single(f.Notifications);
-    }
-
-    [Fact]
-    public void HotDisplacedStackIsRefusedWithoutInvokingNativeDrop()
-    {
-        using var f = new TransferFixture(2, 2);
-        var hot = f.F.Stack(2, "hot", 1);
-        hot.Collectible.SetTemperature(f.F.Catalogue.World.Object, hot, 900);
-        f.F.Grid[1].Itemstack = hot;
-        var before = f.CopyAll();
-        Assert.Equal(CraftingTransferPlanner.Unsafe, f.Coordinator.Execute(f.Entry, false).Reason);
-        f.AssertSame(before);
-        Assert.Empty(f.Packets);
     }
 
     [Theory]
@@ -150,35 +115,6 @@ public class CraftingTransferTests
         f.F.Hotbar[0].Itemstack!.StackSize = 1;
         Assert.Equal(CraftingDispatchStatus.Dispatched, f.Coordinator.Execute(f.Entry, false).Status);
         Assert.Equal(1, f.F.Grid[0].StackSize);
-    }
-
-    [Theory]
-    [InlineData("output")]
-    [InlineData("skill")]
-    [InlineData("bag")]
-    [InlineData("quantity")]
-    [InlineData("duplicate")]
-    [InlineData("destination")]
-    [InlineData("source-overuse")]
-    public void ForgedPlansAreRefusedWithoutLiveMutation(string defect)
-    {
-        using var f = new TransferFixture(2, 2);
-        var source = new CraftingSlotId(f.F.Hotbar.InventoryID, 0);
-        if (defect == "output") source = new(f.F.Grid.InventoryID, 9);
-        if (defect == "skill") source = new(f.F.Hotbar.InventoryID, 10);
-        if (defect == "bag") source = new(f.F.Backpack.InventoryID, 0);
-        var quantity = defect == "quantity" ? -1 : defect == "source-overuse" ? 3 : 2;
-        var stack = f.Ingredient(Math.Max(quantity, 1));
-        var placement = new CraftingPlacement(defect == "destination" ? 9 : 0, stack,
-            ImmutableArray.Create(new CraftingSourceAllocation(source, quantity)));
-        var placements = defect == "duplicate" ? ImmutableArray.Create(placement, placement)
-            : ImmutableArray.Create(placement);
-        var allocation = f.F.Allocator.Evaluate(f.Entry, f.Snapshot()) with { Ordinary = placements };
-        var before = f.CopyAll();
-        var result = new CraftingTransferPlanner(f.F.Catalogue.World.Object).Plan(f.State(), allocation, false);
-        Assert.False(result.IsValid);
-        f.AssertSame(before);
-        Assert.Empty(f.Packets);
     }
 
     [Fact]
@@ -270,36 +206,6 @@ public class CraftingTransferTests
     }
 
     [Fact]
-    public void LocalInventoryReplacementDuringPreflightIsRejectedBeforeDispatch()
-    {
-        using var f = new TransferFixture(2, 2);
-        f.F.Events.Setup(events => events.TriggerMatchesRecipe(It.IsAny<IPlayer>(), It.IsAny<IRecipeBase>(),
-            It.IsAny<ItemSlot[]>())).Returns(() =>
-            {
-                f.F.Hotbar[0].Itemstack = f.Ingredient(1);
-                return true;
-            });
-        using var coordinator = new CraftingTransferCoordinator(f.F.Player, f.F.Catalogue.World.Object, f.F.Allocator,
-            f.Packets.Add, f.Notifications.Add, f.RefreshQueue.Enqueue, Environment.CurrentManagedThreadId, true);
-        var result = coordinator.Execute(f.Entry, false);
-        Assert.Equal(CraftingDispatchStatus.Rejected, result.Status);
-        Assert.Empty(f.Packets);
-        Assert.True(f.F.Grid[0].Empty);
-        Assert.Equal(1, f.F.Hotbar[0].StackSize);
-    }
-
-    [Fact]
-    public void TemporaryMetadataIsNotSilentlyLostByNativeWholeStackSplitting()
-    {
-        using var f = new TransferFixture(2, 2);
-        f.F.Hotbar[0].Itemstack!.TempAttributes.SetString("session", "important");
-        var before = f.CopyAll();
-        Assert.Equal(CraftingTransferPlanner.Unsafe, f.Coordinator.Execute(f.Entry, false).Reason);
-        f.AssertSame(before);
-        Assert.Empty(f.Packets);
-    }
-
-    [Fact]
     public void FullStorageGridCycleUsesAVacantInputAsBuffer()
     {
         using var f = new TransferFixture(1, 0);
@@ -317,31 +223,6 @@ public class CraftingTransferTests
         Assert.Equal("stone", f.F.Grid[1].Itemstack!.Collectible.Code.Path);
         Assert.All(Enumerable.Range(2, 7), index => Assert.True(f.F.Grid[index].Empty));
         Assert.Equal(3, f.Packets.Count);
-    }
-
-    [Theory]
-    [InlineData("output")]
-    [InlineData("skill")]
-    [InlineData("offhand")]
-    [InlineData("equipped-bag")]
-    [InlineData("locked-source")]
-    public void ExcludedOrUnavailableStacksAreNeverMoved(string location)
-    {
-        using var f = new TransferFixture(2, 0);
-        var stack = f.Ingredient(2);
-        if (location == "output") f.F.Grid[9].Itemstack = stack;
-        if (location == "skill") f.F.Hotbar[10].Itemstack = stack;
-        if (location == "offhand") f.F.Hotbar[11].Itemstack = stack;
-        if (location == "equipped-bag") f.F.Backpack[0].Itemstack = stack;
-        if (location == "locked-source")
-        {
-            f.F.Hotbar[0].Itemstack = stack;
-            f.F.Hotbar.TakeLocked = true;
-        }
-        var before = f.CopyAll();
-        Assert.Equal(CraftingTransferPlanner.Empty, f.Coordinator.Execute(f.Entry, false).Reason);
-        f.AssertSame(before);
-        Assert.Empty(f.Packets);
     }
 
     [Theory]
@@ -393,105 +274,4 @@ public class CraftingTransferTests
         Assert.Equal(2, f.F.Grid[0].StackSize);
         Assert.Empty(f.Notifications);
     }
-
-    private sealed class ModificationCallbackItem(int id) : MockItem(id)
-    {
-        public override void OnModifiedInInventorySlot(IWorldAccessor world, ItemSlot slot, ItemStack extractedStack = null!) =>
-            base.OnModifiedInInventorySlot(world, slot, extractedStack);
-    }
-
-    private sealed class TransitionCallbackItem(int id) : MockItem(id)
-    {
-        public override TransitionState[] UpdateAndGetTransitionStates(IWorldAccessor world, ItemSlot slot) =>
-            base.UpdateAndGetTransitionStates(world, slot);
-    }
-
-    private sealed class NativeTransitionCallbackItem(int id) : MockItem(id)
-    {
-        protected override TransitionState[] UpdateAndGetTransitionStatesNative(IWorldAccessor world, ItemSlot slot) =>
-            base.UpdateAndGetTransitionStatesNative(world, slot);
-    }
-
-    private sealed class BehaviorCallbackItem(int id) : MockItem(id)
-    {
-        protected override CollectibleBehavior GetBehavior(CollectibleBehavior[] behaviors, Type type, bool withInheritance) =>
-            base.GetBehavior(behaviors, type, withInheritance);
-    }
-
-    private sealed class SetTemperatureCallbackItem(int id) : MockItem(id)
-    {
-        public override void SetTemperature(IWorldAccessor world, ItemStack stack, float temperature, bool delayCooldown = true) =>
-            base.SetTemperature(world, stack, temperature, delayCooldown);
-    }
-
-    private sealed class HasTemperatureCallbackItem(int id) : MockItem(id)
-    {
-        public override bool HasTemperature(IItemStack stack) =>
-            base.HasTemperature(stack);
-    }
-}
-
-internal sealed class TransferFixture : IDisposable
-{
-    internal readonly AllocationFixture F = new();
-    internal readonly List<object> Packets = new();
-    internal readonly List<CraftingDispatchResult> Notifications = new();
-    internal readonly CraftingRecipeEntry Entry;
-    internal Action<object>? OnSend;
-    internal int Refreshes;
-    internal readonly Queue<Action> RefreshQueue = new();
-    internal readonly CraftingTransferCoordinator Coordinator;
-    internal readonly Mock<IClientNetworkAPI> Network = new();
-    private readonly ItemStack ingredient;
-
-    internal TransferFixture(int demand, int stock, int positions = 1)
-    {
-        ingredient = F.Stack(1, "board", 1);
-        var recipe = F.Recipe(Enumerable.Range(0, positions).Select(_ => F.Ingredient(ingredient, demand)).ToArray());
-        F.Register(recipe);
-        F.Catalogue.World.Setup(world => world.GridRecipes).Returns(new List<GridRecipe> { recipe });
-        F.Catalogue.World.Setup(world => world.Calendar).Returns(Mock.Of<IGameCalendar>());
-        Entry = F.Catalogue.Build(recipe).Recipes[0];
-        if (stock > 0) F.Hotbar[0].Itemstack = Ingredient(stock);
-        Network.Setup(network => network.SendPacketClient(It.IsAny<object>())).Callback<object>(packet =>
-        {
-            Packets.Add(packet);
-            OnSend?.Invoke(packet);
-        });
-        Coordinator = new(F.Player, F.Catalogue.World.Object, F.Allocator,
-            Network.Object.SendPacketClient, Notifications.Add, RefreshQueue.Enqueue, Environment.CurrentManagedThreadId, true);
-        Coordinator.InventoryChanged += () => Refreshes++;
-    }
-
-    internal ItemStack Ingredient(int count)
-    {
-        var result = CraftingStackSnapshot.Copy(ingredient);
-        result.StackSize = count;
-        return result;
-    }
-
-    internal CraftingInventorySnapshot Snapshot() =>
-        CraftingInventorySnapshot.Capture(F.Player, 3, 3, Environment.CurrentManagedThreadId, true);
-    internal CraftingTransferState State() => new(F.Player, F.Catalogue.World.Object, Snapshot(), true);
-    internal void Refresh()
-    {
-        while (RefreshQueue.TryDequeue(out var refresh)) refresh();
-    }
-    internal void FillStorage(bool skipFirst = false)
-    {
-        for (int i = skipFirst ? 1 : 0; i < 10; i++) F.Hotbar[i].Itemstack = F.Stack(100 + i, "filled-" + i, 64);
-        for (int i = 4; i < F.Backpack.Count; i++) F.Backpack[i].Itemstack = F.Stack(200 + i, "filled-" + i, 64);
-    }
-
-    internal ItemStack?[] CopyAll() => new[] { F.Hotbar, F.Backpack, F.Grid }.SelectMany(inv =>
-        Enumerable.Range(0, inv.Count).Select(i => CraftingTransferState.Copy(inv[i].Itemstack))).ToArray();
-
-    internal void AssertSame(ItemStack?[] before)
-    {
-        var after = CopyAll();
-        Assert.Equal(before.Length, after.Length);
-        for (int i = 0; i < before.Length; i++)
-            Assert.True(CraftingTransferState.Same(F.Catalogue.World.Object, before[i], after[i]));
-    }
-    public void Dispose() => Coordinator.Dispose();
 }

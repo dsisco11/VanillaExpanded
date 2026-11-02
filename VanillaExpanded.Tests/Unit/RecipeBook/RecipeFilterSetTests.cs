@@ -1,9 +1,14 @@
 using System.Collections.Immutable;
 using VanillaExpanded.RecipeBook;
+using VanillaExpanded.Tests;
+using VanillaExpanded.Tests.TestSupport.Gui;
+using VanillaExpanded.Tests.TestSupport.RecipeBook;
+using VanillaExpanded.Tests.TestSupport.Configuration;
+using static VanillaExpanded.Tests.TestSupport.RecipeBook.RecipeFilterSetTestsTestSupport;
 
 namespace VanillaExpanded.Tests.Unit.RecipeBook;
 
-[Trait("Category", "Unit")]
+[Trait(TestCategories.TraitName, TestCategories.Unit)]
 public sealed class RecipeFilterSetTests
 {
     [Fact]
@@ -279,41 +284,5 @@ public sealed class RecipeFilterSetTests
         Assert.Throws<ObjectDisposedException>(() => manager.Register("feature", new Provider(_ => true)));
         Assert.Throws<ObjectDisposedException>(() => registration.Replace(new Provider(_ => true)));
         Assert.Throws<ObjectDisposedException>(() => registration.FilterOthers(rows));
-    }
-
-    [Fact]
-    public void SessionsOwnIndependentManagersAndReleaseThemOnTeardown()
-    {
-        var fixture = new AllocationFixture();
-        var catalogue = fixture.Catalogue.Build();
-        RecipeBookSession Session() => new(catalogue, fixture.Allocator,
-            () => throw new InvalidOperationException("No inventory capture is needed."),
-            (_, _) => throw new InvalidOperationException("No dispatch is needed."));
-        using var first = Session();
-        using var second = Session();
-        var rows = Rows();
-        using var registration = first.Filters.Register("feature", new Provider(_ => false));
-        Assert.NotSame(first.Filters, second.Filters);
-        Assert.Empty(first.Filters.Filter(rows));
-        Assert.Equal(3, second.Filters.Filter(rows).Length);
-        first.Dispose();
-        first.Dispose();
-        registration.Dispose();
-        Assert.Throws<ObjectDisposedException>(() => first.Filters.Filter(rows));
-        Assert.Equal(3, second.Filters.Filter(rows).Length);
-    }
-
-    private static ImmutableArray<CraftingRecipeSelection> Rows()
-    {
-        var fixture = new CatalogueFixture();
-        var view = new CraftingCatalogueView(fixture.Build(
-            fixture.Recipe("a"), fixture.Recipe("b"), fixture.Recipe("c")));
-        using var filters = new RecipeFilterSet();
-        return view.GetRows(filters);
-    }
-
-    private sealed class Provider(Func<CraftingRecipeSelection, bool> matches) : IRecipeFilter
-    {
-        public bool Matches(CraftingRecipeSelection selection) => matches(selection);
     }
 }

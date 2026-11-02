@@ -10,7 +10,7 @@
 - Same-reviewer reconciliation assigned all 332 methods once: 123 Unit, 141 Component, 68 Integration, and zero E2E. No test deletion, duplication, or method splitting is required by this disposition.
 - Behavioral reference: [Recipe Book design](RecipeBook.md). Existing implementation is evidence, not permission to strengthen its public contract.
 - Preserve all existing behavior and unrelated work. Do not remove meaningful coverage merely because it is misclassified or shares a large file.
-- Source line references below describe the audited revision. Use method identities when moves change line numbers.
+- Source line references below describe the audited revision. Original-suite links point to that pinned revision; use the ledger's placements and method identities for migrated suites.
 
 ### Confirmed findings
 
@@ -41,7 +41,7 @@ Dependencies: none.
 
 Implementation assets:
 - [Pinned method ledger](../VanillaExpanded.Tests/TestAudit/recipebook-baseline.jsonl): the first JSONL record defines source/placement identifiers and row fields; the following 332 rows retain original identities, categories, fixtures, collections, and theory data separately from planned placements. Fixture references use bare names for direct dependencies and `helper:Method()->Fixture` for dependencies created through helpers.
-- [Category contract](../VanillaExpanded.Tests/TestCategories.cs): the trait key is `Category`; values match the `Unit`, `Component`, `Integration`, and `E2E` directory names. Component and Integration locations are reserved in this project; existing mixed suites keep their original categories until Phase 3.
+- [Category contract](../VanillaExpanded.Tests/TestCategories.cs): the trait key is `Category`; values match the `Unit`, `Component`, `Integration`, and `E2E` directory names. Phase 1 reserved the Component and Integration locations and recorded each method's target category; Phase 3 applies those placements.
 - [Shared GUI support](../VanillaExpanded.Tests/TestSupport/Gui/RecipeBookRenderFixture.cs) owns the common native GUI collection and render fixture outside a test suite. [Recipe Book support](../VanillaExpanded.Tests/TestSupport/RecipeBook/RecipeBookTestFixtures.cs) owns shared dialog/session helpers.
 - Preserve the `Recipe book native GUI` collection's disabled parallelization across all consumers and retain global/configuration/language restoration and resource disposal. Placement changes must not create another collection definition.
 - Completion evidence: the eight affected suites passed 578 tests with zero failures or skips. The second review and independent completion audit accepted the phase after helper-resolved fixture metadata corrections; the ledger retains 332 unique methods and the 123/141/68 planned placement totals.
@@ -76,8 +76,8 @@ Dependencies: Phase 1, so corrected methods retain traceable identities during e
 Completion evidence: the four affected suites passed 386 tests with zero failures or skips on Windows; 34 existing compiler/analyzer warnings remain. The second review and independent completion audit accepted P2.1-P2.5. Linux execution remains deferred to Phase 6.
 
 - [x] P2.1 Fix portable asset lookup (F1).
-  - [x] Replace the three lifecycle fixture asset paths, originally at lines 3672-3685 in [RecipeBookLifecycleTests.cs](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookLifecycleTests.cs) and extracted in Phase 1 to [RecipeBookTestFixtures.cs](../VanillaExpanded.Tests/TestSupport/RecipeBook/RecipeBookTestFixtures.cs).
-  - [x] Replace the shader asset path at original lines 924-927 in [RecipeBookIconRendererTests.cs](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookIconRendererTests.cs).
+  - [x] Replace the three lifecycle fixture asset paths, originally at lines 3672-3685 in [RecipeBookLifecycleTests.cs](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookLifecycleTests.cs) and extracted in Phase 1 to [RecipeBookTestFixtures.cs](../VanillaExpanded.Tests/TestSupport/RecipeBook/RecipeBookTestFixtures.cs).
+  - [x] Replace the shader asset path at original lines 924-927 in [RecipeBookIconRendererTests.cs](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookIconRendererTests.cs).
   - [x] Use platform-portable path segments or deliberately copied test assets; changing only the working directory is insufficient.
   - [x] Fail explicitly for missing assets rather than skipping or returning successful defaults.
 - [x] P2.2 Correct filter-contract overconstraint (F2a).
@@ -85,12 +85,12 @@ Completion evidence: the four affected suites passed 386 tests with zero failure
   - [x] Preserve exact evaluated-selection identity and intersection-result assertions.
   - [x] Make providers independently evaluable; do not make a later provider throw solely to enforce registration order or short-circuiting.
 - [x] P2.3 Correct atomic-publication failure injection (F2b).
-  - [x] Rewrite `FailureWhileFilteringStableRecipesDoesNotPublishPartialRows`, original lines 498-520 in [RecipeBookInteractionTests.cs](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookInteractionTests.cs).
+  - [x] Rewrite `FailureWhileFilteringStableRecipesDoesNotPublishPartialRows`, original lines 498-520 in [RecipeBookInteractionTests.cs](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookInteractionTests.cs).
   - [x] Fail for a semantically identifiable selection/scenario, not the second predicate call.
   - [x] Preserve assertions that published rows remain unchanged, no premature notification occurs, and a subsequent valid operation recovers.
   - [x] Do not require invocation counts that the filtering contract explicitly excludes.
 - [x] P2.4 Decouple session reuse from allocator validation protocol (F3).
-  - [x] Correct `CriteriaChangesReuseAllocationsAndInventoryRefreshEvaluatesExactlyOnce`, original lines 192-233 in [RecipeBookInteractionTests.cs](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookInteractionTests.cs).
+  - [x] Correct `CriteriaChangesReuseAllocationsAndInventoryRefreshEvaluatesExactlyOnce`, original lines 192-233 in [RecipeBookInteractionTests.cs](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookInteractionTests.cs).
   - [x] Retain capture counts and allocation-identity evidence.
   - [x] Compare criteria-change validation work against a recorded baseline rather than hardcoding native callback totals of two and four.
   - [x] Keep any justified ordinary/shift native-validation protocol assertions in allocator/native-validation suites, not session reuse tests.
@@ -106,13 +106,15 @@ Exit criteria:
 
 Dependencies: Phases 1 and 2.
 
+Completion evidence: all 332 methods occupy their 69 mapped suites with bodies and theory data preserved: 123 Unit, 141 Component, and 68 Integration. Focused verification passed 833 tests; the full test project passed 2,789, with zero failures or skips. The build reported 29 warnings. The second review and independent completion audit accepted the migration and its documented collection reconciliation.
+
 The following deterministic mapping supersedes broad file-level classifications. Source selectors refer to attributed test-method declaration lines at `95a3d284`, inclusive, not slices of method bodies. They exclude helpers, constructors, and disposal methods. Move complete methods with every theory-data attribute. Each method belongs to one row only.
 
-Destination files are within the existing test project at `{Level}/{Feature}/{Destination}.cs`. Use `RecipeBook` as the feature unless the row names `Gui/` or `Configuration/`. An unchanged destination name retains the responsibility, not an incorrect original directory. These are planned destinations, not files claimed to exist already.
+Destination files are within the existing test project at `{Level}/{Feature}/{Destination}.cs`. Use `RecipeBook` as the feature unless the row names `Gui/` or `Configuration/`. An unchanged destination name retains the responsibility, not an incorrect original directory. These destinations now identify the migrated suites; source selectors remain historical.
 
 ### Lifecycle: all 72 methods
 
-Source: [RecipeBookLifecycleTests.cs](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookLifecycleTests.cs).
+Source: [RecipeBookLifecycleTests.cs](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookLifecycleTests.cs).
 
 | Declaration selector | Count | Level | Destination |
 | --- | ---: | --- | --- |
@@ -134,7 +136,7 @@ Source: [RecipeBookLifecycleTests.cs](../VanillaExpanded.Tests/Unit/RecipeBook/R
 
 ### Interaction: all 39 methods
 
-Source: [RecipeBookInteractionTests.cs](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookInteractionTests.cs).
+Source: [RecipeBookInteractionTests.cs](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookInteractionTests.cs).
 
 | Declaration selector | Count | Level | Destination |
 | --- | ---: | --- | --- |
@@ -153,7 +155,7 @@ The policy test at line 1257 merely arranges a native event object; the method a
 
 ### Renderer/cache/assets: all 27 methods
 
-Source: [RecipeBookIconRendererTests.cs](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookIconRendererTests.cs).
+Source: [RecipeBookIconRendererTests.cs](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookIconRendererTests.cs).
 
 | Declaration selector | Count | Level | Destination |
 | --- | ---: | --- | --- |
@@ -168,7 +170,7 @@ Mocked atlas/render submission remains Component. A shader-source file read is n
 
 ### Styled controls: all 13 methods
 
-Source: [GuiStyledControlsTests.cs](../VanillaExpanded.Tests/Unit/Gui/GuiStyledControlsTests.cs).
+Source: [GuiStyledControlsTests.cs](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/Gui/GuiStyledControlsTests.cs).
 
 | Declaration selector | Count | Level | Destination |
 | --- | ---: | --- | --- |
@@ -180,7 +182,7 @@ Keep whole native-compatibility scenarios intact, including their accompanying v
 
 ### Icon tabs: all 11 methods
 
-Source: [GuiElementIconTabsTests.cs](../VanillaExpanded.Tests/Unit/Gui/GuiElementIconTabsTests.cs).
+Source: [GuiElementIconTabsTests.cs](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/Gui/GuiElementIconTabsTests.cs).
 
 | Declaration selector | Count | Level | Destination |
 | --- | ---: | --- | --- |
@@ -191,7 +193,7 @@ Source: [GuiElementIconTabsTests.cs](../VanillaExpanded.Tests/Unit/Gui/GuiElemen
 
 ### Transfer: all 22 methods
 
-Source: [CraftingTransferTests.cs](../VanillaExpanded.Tests/Unit/RecipeBook/CraftingTransferTests.cs).
+Source: [CraftingTransferTests.cs](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/RecipeBook/CraftingTransferTests.cs).
 
 | Declaration selector | Count | Level | Destination |
 | --- | ---: | --- | --- |
@@ -250,22 +252,24 @@ For [GuiControlVisualsTests.cs](../VanillaExpanded.Tests/Unit/Gui/GuiControlVisu
 
 Disposition checksum: **123 Unit + 141 Component + 68 Integration = 332 introduced methods; zero introduced E2E methods.** Native value types, mocked native events, and native naming alone do not justify promoting isolated allocator/grid-relevance rules.
 
-- [ ] P3.1 Apply GUI/control and native-probe extraction.
-- [ ] P3.2 Apply catalogue, allocation, snapshot, transfer, grid-priority, and filter extraction.
-- [ ] P3.3 Apply session, tile/container, tooltip, and layout extraction.
-- [ ] P3.4 Split the 72 lifecycle cases by their owning system/dialog/control responsibility.
-- [ ] P3.5 Separate rendering, cache, catalogue sharing, and shader-asset ownership.
-- [ ] P3.6 Relocate configuration additions and correctness cases currently living under Performance.
-- [ ] P3.7 Update namespaces, class names, traits, fixture references, and collection attributes together.
-  - [ ] Do not treat moving a file alone as correcting mixed per-method responsibilities.
-  - [ ] Preserve source-to-destination traceability for every original method and theory.
-  - [ ] Verify the disposition checksum and selectors against the pinned revision before moving methods.
-  - [ ] Do not discard assertions, weaken behavior, or introduce duplicated scenarios during moves.
+Collection reconciliation: the two methods assigned to `RecipeBookSessionOwnershipTests` originally had different xUnit collection membership. Keep the single mapped suite in `Recipe book native GUI`, preserving the existing serialized method and conservatively adding `SessionsOwnIndependentManagersAndReleaseThemOnTeardown` to that collection. This intentional scheduling adjustment does not change the original metadata in the immutable ledger or authorize dropping any previously serialized member.
+
+- [x] P3.1 Apply GUI/control and native-probe extraction.
+- [x] P3.2 Apply catalogue, allocation, snapshot, transfer, grid-priority, and filter extraction.
+- [x] P3.3 Apply session, tile/container, tooltip, and layout extraction.
+- [x] P3.4 Split the 72 lifecycle cases by their owning system/dialog/control responsibility.
+- [x] P3.5 Separate rendering, cache, catalogue sharing, and shader-asset ownership.
+- [x] P3.6 Relocate configuration additions and correctness cases currently living under Performance.
+- [x] P3.7 Update namespaces, class names, traits, fixture references, and collection attributes together.
+  - [x] Do not treat moving a file alone as correcting mixed per-method responsibilities.
+  - [x] Preserve source-to-destination traceability for every original method and theory.
+  - [x] Verify the disposition checksum and selectors against the pinned revision before moving methods.
+  - [x] Do not discard assertions, weaken behavior, or introduce duplicated scenarios during moves.
 
 Exit criteria:
-- [ ] No reviewed test remains under an incorrect level or unrelated subject file.
-- [ ] Shared generic GUI tests do not depend on support declared in a Recipe Book renderer test file.
-- [ ] All original coverage is accounted for, with any changed method count explicitly explained.
+- [x] No reviewed test remains under an incorrect level or unrelated subject file.
+- [x] Shared generic GUI tests do not depend on support declared in a Recipe Book renderer test file.
+- [x] All original coverage is accounted for, with any changed method count explicitly explained.
 
 ## Phase 4 - Clarify test phases and fixture ownership
 
@@ -299,7 +303,7 @@ Exit criteria:
 
 Dependencies: Phase 3's renderer/cache/asset split and Phase 2's portable asset lookup.
 
-- [ ] P5.1 Replace the overclaimed source-syntax mechanism in `ShaderSourceRetainsApprovedPaletteOutlineAndSeparateCornerGeometry` (F4), original lines 924-945 in [RecipeBookIconRendererTests.cs](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookIconRendererTests.cs).
+- [ ] P5.1 Replace the overclaimed source-syntax mechanism in `ShaderSourceRetainsApprovedPaletteOutlineAndSeparateCornerGeometry` (F4), now in [RecipeBookShaderAssetTests.cs](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookShaderAssetTests.cs), originally at lines 924-945 in the pinned renderer suite.
   - [ ] Retain approved palette values and geometry dimensions as legitimate requirements.
   - [ ] Remove dependence on exact expression spelling and textual ordering where equivalent shader behavior is allowed.
   - [ ] Keep any useful source/asset check explicitly labelled as a limited structural guard, not proof of compilation or rendered appearance.
@@ -346,30 +350,30 @@ All rows also participate in F5's phase-clarity review; "no additional defect" d
 
 | New suite | Methods | Reviewed disposition |
 | --- | ---: | --- |
-| [CraftingNativeTransferTests](../VanillaExpanded.Tests/E2E/RecipeBook/CraftingNativeTransferTests.cs) | 7 | Native Integration, not E2E. |
-| [GuiControlNativeProbeTests](../VanillaExpanded.Tests/Unit/Gui/GuiControlNativeProbeTests.cs) | 5 | Native compatibility Integration; deletion not justified. |
-| [GuiControlVisualsTests](../VanillaExpanded.Tests/Unit/Gui/GuiControlVisualsTests.cs) | 4 | Three shared GUI units; one Recipe Book visual-metrics unit. |
-| [GuiElementIconTabsTests](../VanillaExpanded.Tests/Unit/Gui/GuiElementIconTabsTests.cs) | 11 | Component/native Integration split. |
-| [GuiStyledControlsTests](../VanillaExpanded.Tests/Unit/Gui/GuiStyledControlsTests.cs) | 13 | Per-control Component/native Integration split. |
-| [CraftingAllocationTests](../VanillaExpanded.Tests/Unit/RecipeBook/CraftingAllocationTests.cs) | 24 | 23 allocator units and one pipeline component. |
-| [CraftingCandidateTests](../VanillaExpanded.Tests/Unit/RecipeBook/CraftingCandidateTests.cs) | 10 | Narrow candidate/index rules; no additional defect. |
-| [CraftingCatalogueTests](../VanillaExpanded.Tests/Unit/RecipeBook/CraftingCatalogueTests.cs) | 10 | Catalogue construction rules; no additional defect. |
-| [CraftingCatalogueViewTests](../VanillaExpanded.Tests/Unit/RecipeBook/CraftingCatalogueViewTests.cs) | 15 | Nine projection units, five category/search components, one invariant unit. |
-| [CraftingInventorySnapshotTests](../VanillaExpanded.Tests/Unit/RecipeBook/CraftingInventorySnapshotTests.cs) | 9 | Capture rules plus misplaced allocator/native-pipeline cases. |
-| [CraftingTransferTests](../VanillaExpanded.Tests/Unit/RecipeBook/CraftingTransferTests.cs) | 22 | Planner/coordinator/native interoperability split. |
-| [GridPriorityTests](../VanillaExpanded.Tests/Unit/RecipeBook/GridPriorityTests.cs) | 5 | Session/evaluation Component coverage. |
-| [GridRelevanceTests](../VanillaExpanded.Tests/Unit/RecipeBook/GridRelevanceTests.cs) | 10 | Narrow matching rules using native predicates remain Unit; no additional defect. |
-| [RecipeBookCategoryIconsTests](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookCategoryIconsTests.cs) | 1 | Mapping rule; no additional defect. |
-| [RecipeBookIconRendererTests](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookIconRendererTests.cs) | 27 | Renderer/cache/sharing/asset split; F1 and F4. |
-| [RecipeBookInteractionTests](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookInteractionTests.cs) | 39 | Session/control/native/rule split; F2b and F3. |
-| [RecipeBookLifecycleTests](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookLifecycleTests.cs) | 72 | System/dialog/control/native split; F1. |
-| [RecipeBookPerformanceTests](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookPerformanceTests.cs) | 12 | Two profiling workloads; ten correctness cases to relocate. |
-| [RecipeBookTileGeometryTests](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookTileGeometryTests.cs) | 5 | Two geometry units; three tile Component scenarios. |
-| [RecipeBookTooltipSummaryTests](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookTooltipSummaryTests.cs) | 5 | Four allocation-to-summary components and one formatter-guard unit. |
-| [RecipeFilterFeatureTests](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeFilterFeatureTests.cs) | 7 | Predicate/controller rules plus feature composition. |
-| [RecipeFilterSetTests](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeFilterSetTests.cs) | 15 | Registry/projection rules plus session ownership; F2a. |
-| [RecipeSortTests](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeSortTests.cs) | 2 | Sort state/ordering rules; no additional defect. |
-| Added [ConfigLibIntegrationTests](../VanillaExpanded.Tests/Unit/Configuration/ConfigLibIntegrationTests.cs) methods | 2 | Configuration contract additions, not ConfigLib runtime interoperability. |
+| [CraftingNativeTransferTests](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/E2E/RecipeBook/CraftingNativeTransferTests.cs) | 7 | Native Integration, not E2E. |
+| [GuiControlNativeProbeTests](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/Gui/GuiControlNativeProbeTests.cs) | 5 | Native compatibility Integration; deletion not justified. |
+| [GuiControlVisualsTests](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/Gui/GuiControlVisualsTests.cs) | 4 | Three shared GUI units; one Recipe Book visual-metrics unit. |
+| [GuiElementIconTabsTests](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/Gui/GuiElementIconTabsTests.cs) | 11 | Component/native Integration split. |
+| [GuiStyledControlsTests](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/Gui/GuiStyledControlsTests.cs) | 13 | Per-control Component/native Integration split. |
+| [CraftingAllocationTests](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/RecipeBook/CraftingAllocationTests.cs) | 24 | 23 allocator units and one pipeline component. |
+| [CraftingCandidateTests](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/RecipeBook/CraftingCandidateTests.cs) | 10 | Narrow candidate/index rules; no additional defect. |
+| [CraftingCatalogueTests](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/RecipeBook/CraftingCatalogueTests.cs) | 10 | Catalogue construction rules; no additional defect. |
+| [CraftingCatalogueViewTests](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/RecipeBook/CraftingCatalogueViewTests.cs) | 15 | Nine projection units, five category/search components, one invariant unit. |
+| [CraftingInventorySnapshotTests](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/RecipeBook/CraftingInventorySnapshotTests.cs) | 9 | Capture rules plus misplaced allocator/native-pipeline cases. |
+| [CraftingTransferTests](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/RecipeBook/CraftingTransferTests.cs) | 22 | Planner/coordinator/native interoperability split. |
+| [GridPriorityTests](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/RecipeBook/GridPriorityTests.cs) | 5 | Session/evaluation Component coverage. |
+| [GridRelevanceTests](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/RecipeBook/GridRelevanceTests.cs) | 10 | Narrow matching rules using native predicates remain Unit; no additional defect. |
+| [RecipeBookCategoryIconsTests](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookCategoryIconsTests.cs) | 1 | Mapping rule; no additional defect. |
+| [RecipeBookIconRendererTests](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookIconRendererTests.cs) | 27 | Renderer/cache/sharing/asset split; F1 and F4. |
+| [RecipeBookInteractionTests](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookInteractionTests.cs) | 39 | Session/control/native/rule split; F2b and F3. |
+| [RecipeBookLifecycleTests](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookLifecycleTests.cs) | 72 | System/dialog/control/native split; F1. |
+| [RecipeBookPerformanceTests](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookPerformanceTests.cs) | 12 | Two profiling workloads; ten correctness cases to relocate. |
+| [RecipeBookTileGeometryTests](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookTileGeometryTests.cs) | 5 | Two geometry units; three tile Component scenarios. |
+| [RecipeBookTooltipSummaryTests](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookTooltipSummaryTests.cs) | 5 | Four allocation-to-summary components and one formatter-guard unit. |
+| [RecipeFilterFeatureTests](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/RecipeBook/RecipeFilterFeatureTests.cs) | 7 | Predicate/controller rules plus feature composition. |
+| [RecipeFilterSetTests](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/RecipeBook/RecipeFilterSetTests.cs) | 15 | Registry/projection rules plus session ownership; F2a. |
+| [RecipeSortTests](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/RecipeBook/RecipeSortTests.cs) | 2 | Sort state/ordering rules; no additional defect. |
+| Added [ConfigLibIntegrationTests](https://github.com/dsisco11/VanillaExpanded/blob/95a3d284156b0a7546554fbb393ae908d9edd914/VanillaExpanded.Tests/Unit/Configuration/ConfigLibIntegrationTests.cs) methods | 2 | Configuration contract additions, not ConfigLib runtime interoperability. |
 | Total introduced methods | 332 | Includes 330 methods in new files and two in an existing file. |
 
 ## Explicit non-findings and limits

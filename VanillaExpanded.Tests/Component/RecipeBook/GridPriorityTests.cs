@@ -2,10 +2,14 @@ using Moq;
 using VanillaExpanded.RecipeBook;
 using VanillaExpanded.Tests.Mocks;
 using Vintagestory.API.Common;
+using VanillaExpanded.Tests;
+using VanillaExpanded.Tests.TestSupport.Gui;
+using VanillaExpanded.Tests.TestSupport.RecipeBook;
+using VanillaExpanded.Tests.TestSupport.Configuration;
 
-namespace VanillaExpanded.Tests.Unit.RecipeBook;
+namespace VanillaExpanded.Tests.Component.RecipeBook;
 
-[Trait("Category", "Unit")]
+[Trait(TestCategories.TraitName, TestCategories.Component)]
 public sealed class GridPriorityTests
 {
     [Fact]
@@ -202,7 +206,7 @@ public sealed class GridPriorityTests
         Assert.Equal(1, Assert.Single(session.Rows).GridMatches);
     }
 
-    private static GridRecipe Named(GridRecipe recipe, string name)
+private static GridRecipe Named(GridRecipe recipe, string name)
     {
         recipe.Output!.ResolvedItemStack!.Attributes.SetString("displayName", name);
         return recipe;

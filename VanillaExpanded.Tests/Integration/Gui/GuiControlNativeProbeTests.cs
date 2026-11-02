@@ -7,32 +7,16 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
+using VanillaExpanded.Tests;
+using VanillaExpanded.Tests.TestSupport.RecipeBook;
+using VanillaExpanded.Tests.TestSupport.Configuration;
 
-namespace VanillaExpanded.Tests.Unit.Gui;
+namespace VanillaExpanded.Tests.Integration.Gui;
 
-[Trait("Category", "Unit")]
+[Trait(TestCategories.TraitName, TestCategories.Integration)]
 [Collection("Recipe book native GUI")]
-public sealed class GuiControlNativeProbeTests : IDisposable
+public sealed class GuiControlNativeProbeTests: IDisposable
 {
-    private readonly string originalLocale = Lang.CurrentLocale;
-    private readonly ITranslationService? originalEnglish = Lang.AvailableLanguages.GetValueOrDefault("en");
-
-    public GuiControlNativeProbeTests()
-    {
-        var translations = new Mock<ITranslationService>();
-        translations.Setup(value => value.Get(It.IsAny<string>(), It.IsAny<object[]>()))
-            .Returns((string key, object[] _) => key);
-        Lang.AvailableLanguages["en"] = translations.Object;
-        Lang.ChangeLanguage("en");
-    }
-
-    public void Dispose()
-    {
-        if (originalEnglish == null) Lang.AvailableLanguages.Remove("en");
-        else Lang.AvailableLanguages["en"] = originalEnglish;
-        Lang.ChangeLanguage(originalLocale);
-    }
-
     [Fact]
     public void BorderlessButtonRetainsNativeActivationAndVisibilityWithLocalFlatChrome()
     {
@@ -43,17 +27,17 @@ public sealed class GuiControlNativeProbeTests : IDisposable
             ElementBounds.Fixed(0, 0, 100, 26).WithEmptyParent());
         using var surface = new ImageSurface(Format.Argb32, 200, 80);
         using var ctx = new Context(surface);
-        int untouchedPixel = GuiControlVisualsTests.Pixel(surface, 120, 40);
+        int untouchedPixel = GuiTestPixels.Pixel(surface, 120, 40);
 
         // Act
         button.BeforeCalcBounds();
         button.ComposeElements(ctx, surface);
 
         // Assert
-        int interiorPixel = GuiControlVisualsTests.Pixel(surface, 2, 2);
+        int interiorPixel = GuiTestPixels.Pixel(surface, 2, 2);
         Assert.NotEqual(untouchedPixel, interiorPixel);
-        Assert.Equal(interiorPixel, GuiControlVisualsTests.Pixel(surface, 90, 20));
-        Assert.Equal(untouchedPixel, GuiControlVisualsTests.Pixel(surface, 120, 40));
+        Assert.Equal(interiorPixel, GuiTestPixels.Pixel(surface, 90, 20));
+        Assert.Equal(untouchedPixel, GuiTestPixels.Pixel(surface, 120, 40));
 
         // Act
         var mouse = new MouseEvent(10, 10, EnumMouseButton.Left, 0);
@@ -143,7 +127,7 @@ public sealed class GuiControlNativeProbeTests : IDisposable
         using var surface = new ImageSurface(Format.Argb32, 300, 150);
         using var ctx = new Context(surface);
         dropdown.ComposeElements(ctx, surface);
-        Assert.Equal(0x382f23, GuiControlVisualsTests.Pixel(surface, 25, 25));
+        Assert.Equal(0x382f23, GuiTestPixels.Pixel(surface, 25, 25));
         var menu = Assert.IsType<ListProbe>(dropdown.listMenu);
         menu.Open();
         dropdown.RenderInteractiveElements(0);
@@ -223,6 +207,35 @@ public sealed class GuiControlNativeProbeTests : IDisposable
             new MouseEvent(closeX, (int)title.Bounds.absY + 10, EnumMouseButton.Left, 0));
         Assert.True(closed);
     }
+
+private readonly string originalLocale = Lang.CurrentLocale;
+    private readonly ITranslationService? originalEnglish = Lang.AvailableLanguages.GetValueOrDefault("en");
+
+    public GuiControlNativeProbeTests()
+    {
+        var translations = new Mock<ITranslationService>();
+        translations.Setup(value => value.Get(It.IsAny<string>(), It.IsAny<object[]>()))
+            .Returns((string key, object[] _) => key);
+        Lang.AvailableLanguages["en"] = translations.Object;
+        Lang.ChangeLanguage("en");
+    }
+
+    public void Dispose()
+    {
+        if (originalEnglish == null) Lang.AvailableLanguages.Remove("en");
+        else Lang.AvailableLanguages["en"] = originalEnglish;
+        Lang.ChangeLanguage(originalLocale);
+    }
+
+
+
+
+
+
+
+
+
+
 
     private static RecipeBookRenderFixture Graphics(float scale = 1)
     {
@@ -385,7 +398,7 @@ public sealed class GuiControlNativeProbeTests : IDisposable
                 GuiControlDrawing.Frame(ctx, 0, 0, expandedBoxWidth, expandedBoxHeight,
                     GuiControlPalette.DropdownFill, GuiControlPalette.DropdownOutline, scaled(1));
                 foreach (var text in richtTextElem) text.ComposeFor(text.Bounds, ctx, image);
-                LastFill = GuiControlVisualsTests.Pixel(image, 2, 2);
+                LastFill = GuiTestPixels.Pixel(image, 2, 2);
                 generateTexture(image, ref dropDownTexture);
                 using var hover = new ImageSurface(Format.Argb32, (int)expandedBoxWidth, (int)(unscaledLineHeight * scaled(1)));
                 using var hoverContext = new Context(hover);
@@ -434,8 +447,8 @@ public sealed class GuiControlNativeProbeTests : IDisposable
             ctx.SetSourceRGBA(GuiControlPalette.Color(GuiControlPalette.TitleSeparator));
             ctx.Rectangle(Bounds.drawX, Bounds.drawY + Bounds.OuterHeight - stroke, Bounds.OuterWidth, stroke);
             ctx.Fill();
-            TopFill = GuiControlVisualsTests.Pixel(surface, (int)Bounds.drawX + 150, (int)Bounds.drawY + 1);
-            BottomFill = GuiControlVisualsTests.Pixel(surface, (int)Bounds.drawX + 150, (int)(Bounds.drawY + Bounds.OuterHeight) - 2);
+            TopFill = GuiTestPixels.Pixel(surface, (int)Bounds.drawX + 150, (int)Bounds.drawY + 1);
+            BottomFill = GuiTestPixels.Pixel(surface, (int)Bounds.drawX + 150, (int)(Bounds.drawY + Bounds.OuterHeight) - 2);
         }
     }
 }

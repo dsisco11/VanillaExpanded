@@ -1,8 +1,12 @@
 using VanillaExpanded.RecipeBook;
+using VanillaExpanded.Tests;
+using VanillaExpanded.Tests.TestSupport.Gui;
+using VanillaExpanded.Tests.TestSupport.RecipeBook;
+using VanillaExpanded.Tests.TestSupport.Configuration;
 
 namespace VanillaExpanded.Tests.Unit.RecipeBook;
 
-[Trait("Category", "Unit")]
+[Trait(TestCategories.TraitName, TestCategories.Unit)]
 public sealed class RecipeBookCategoryIconsTests
 {
     [Theory]

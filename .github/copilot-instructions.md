@@ -3,7 +3,7 @@
 ## Project Overview
 VintageStory mod adding QoL enhancements. Multi-project workspace includes:
 - `VanillaExpanded/` - Main mod code
-- `VanillaExpanded.Tests/` - Unit and E2E tests
+- `VanillaExpanded.Tests/` - Unit, component, and native integration tests
 - `vsapi/`, `vssurvivalmod/`, `vscreativemod/` - Game source references (read-only, explore for API patterns)
 
 ## Architecture Patterns
@@ -32,7 +32,11 @@ New block behaviors extend `BlockBehavior` with static `RegistryId` property. JS
 
 ### Test Organization
 - **Unit tests**: `VanillaExpanded.Tests/Unit/{Feature}/` - Mark with `[Trait("Category", "Unit")]`
-- **E2E tests**: `VanillaExpanded.Tests/E2E/{Feature}/` - Mark with `[Trait("Category", "E2E")]`
+- **Component tests**: `VanillaExpanded.Tests/Component/{Feature}/` - Mark with `[Trait("Category", "Component")]`
+- **Integration tests**: `VanillaExpanded.Tests/Integration/{Feature}/` - Mark with `[Trait("Category", "Integration")]`
+- **E2E tests**: Reserve `VanillaExpanded.Tests/E2E/{Feature}/` and `[Trait("Category", "E2E")]` for complete externally driven workflows.
+
+Separate files/suites by production responsibility and actual boundary: isolated rules are Unit; composed production collaborators behind mocked external services are Component; real native/engine compatibility is Integration. Native value types alone do not establish an integration boundary. Use `TestCategories` constants for migrated suite traits. Shared fixtures belong in `TestSupport/`, not another test suite; preserve their resource cleanup and serialized GUI collection membership.
 
 ### Mock Infrastructure (`Mocks/`)
 Use existing mocks rather than creating new ones:
@@ -54,6 +58,8 @@ inventory[0].Itemstack = new ItemStack(MockItem.CreateLightSource(id: 1, brightn
 # Run tests
 dotnet test                                          # All tests
 dotnet test --filter "Category=Unit"                 # Fast unit tests
+dotnet test --filter "Category=Component"            # Composed subsystem tests
+dotnet test --filter "Category=Integration"          # Native compatibility tests
 dotnet test --filter "FullyQualifiedName~AutoStashing"  # Feature-specific
 
 # Build mod release (uses Cake)

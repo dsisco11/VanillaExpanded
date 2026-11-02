@@ -2,11 +2,15 @@ using Moq;
 using VanillaExpanded.RecipeBook;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
+using VanillaExpanded.Tests;
+using VanillaExpanded.Tests.TestSupport.Gui;
+using VanillaExpanded.Tests.TestSupport.RecipeBook;
+using VanillaExpanded.Tests.TestSupport.Configuration;
 
 namespace VanillaExpanded.Tests.Unit.RecipeBook;
 
-[Trait("Category", "Unit")]
-public class CraftingCandidateTests
+[Trait(TestCategories.TraitName, TestCategories.Unit)]
+public sealed class CraftingCandidateTests
 {
     [Fact]
     public void CandidateUnionIgnoresQuantityButDoesNotClaimCraftability()
@@ -169,7 +173,7 @@ public class CraftingCandidateTests
         Assert.Single(catalogue.FindCandidates(new[] { fixture.Stack(1, "game:stick") }));
     }
 
-    private sealed class CustomIngredient : CraftingRecipeIngredient
+private sealed class CustomIngredient : CraftingRecipeIngredient
     {
         public override bool SatisfiesAsIngredient(ItemStack inputStack, bool checkStackSize = true) => true;
     }

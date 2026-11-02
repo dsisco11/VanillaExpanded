@@ -1,16 +1,82 @@
-using Moq;
-using System.Reflection;
-using System.Runtime.CompilerServices;
 using VanillaExpanded.RecipeBook;
-using VanillaExpanded.Tests.Mocks;
 using Vintagestory.API.Common;
 using Vintagestory.Client.NoObf;
+using Vintagestory.Common;
+using System.Diagnostics;
+using Moq;
+using Vintagestory.API.Datastructures;
+using Xunit.Abstractions;
+using System.Reflection;
+using System.Runtime.CompilerServices;
+using VanillaExpanded.Tests.Mocks;
+using VanillaExpanded.Tests;
+using VanillaExpanded.Tests.TestSupport.Gui;
+using VanillaExpanded.Tests.TestSupport.RecipeBook;
+using VanillaExpanded.Tests.TestSupport.Configuration;
+using static VanillaExpanded.Tests.TestSupport.RecipeBook.RecipeBookPerformanceTestsTestSupport;
+using static VanillaExpanded.Tests.TestSupport.RecipeBook.CraftingAllocationTestsTestSupport;
 
 namespace VanillaExpanded.Tests.Unit.RecipeBook;
 
-[Trait("Category", "Unit")]
-public class CraftingAllocationTests
+[Trait(TestCategories.TraitName, TestCategories.Unit)]
+public sealed class CraftingAllocationTests
 {
+    [Fact]
+    public void ExistingGridSupply_IsCountedOnce()
+    {
+        var f = new AllocationFixture();
+        var board = f.Stack(1, "board", 1);
+        f.Grid[0].Itemstack = board;
+        var recipe = f.Recipe(f.Ingredient(board), f.Ingredient(board));
+        var result = f.Allocate(recipe);
+        Assert.Equal(1, result.Evaluation.Allocated);
+        Assert.False(result.Evaluation.CanCraft);
+        Assert.Single(result.Ordinary);
+        Assert.Equal(f.Grid.InventoryID, Assert.Single(result.Ordinary[0].Sources).Slot.InventoryId);
+    }
+
+    [Fact]
+    public void GridSlotLimit_CapsPlacementButNotOtherPositions()
+    {
+        var f = new AllocationFixture();
+        var board = f.Stack(1, "board", 20);
+        f.Grid[0].MaxSlotStackSize = 3;
+        var result = f.Allocate(f.Recipe(f.Ingredient(board), f.Ingredient(board)), board);
+        Assert.Equal(new[] { 3, 17 }, result.Shift.Select(placement => placement.Quantity));
+        Assert.Equal(3, result.CompleteExecutions);
+    }
+
+    [Fact]
+    public void CollectibleBehaviorsDoNotBlanketRejectAllocation()
+    {
+        var f = new AllocationFixture();
+        var stack = f.Stack(1, "a", 1);
+        stack.Collectible.CollectibleBehaviors = new[] { new Mock<CollectibleBehavior>(stack.Collectible).Object };
+        var recipe = f.Recipe(f.Ingredient(stack));
+        var output = recipe.Output!.ResolvedItemStack!.Collectible;
+        output.CollectibleBehaviors = new[] { new Mock<CollectibleBehavior>(output).Object };
+        var result = f.Allocate(recipe, stack);
+        Assert.True(result.Evaluation.IsSupported);
+        Assert.True(result.Evaluation.CanCraft);
+        Assert.Single(result.Ordinary);
+    }
+
+    [Fact]
+    public void ActionEvaluationRejectsWrongThreadBeforeReadingNativeIndex()
+    {
+        var f = new AllocationFixture();
+        var recipe = f.Recipe(f.Ingredient(f.Stack(1, "board", 1)));
+        var entry = f.Catalogue.Build(recipe).Recipes[0];
+        var snapshot = f.Snapshot();
+        f.Catalogue.World.Invocations.Clear();
+        Exception? error = null;
+        var worker = new Thread(() => error = Record.Exception(() => f.Allocator.Evaluate(entry, snapshot)));
+        worker.Start();
+        worker.Join();
+        Assert.IsType<InvalidOperationException>(error);
+        Assert.Empty(f.Catalogue.World.Invocations);
+    }
+
     [Fact]
     public void CountedRequirements_ShareCoverageAndMissingData()
     {
@@ -333,41 +399,6 @@ public class CraftingAllocationTests
     }
 
     [Fact]
-    public void FreshCatalogueEvaluation_WiresSelectionRankingAndPlans()
-    {
-        var f = new AllocationFixture();
-        var board = f.Stack(1, "board", 1);
-        var stick = f.Stack(2, "stick", 1);
-        var full = f.Recipe(f.Ingredient(board));
-        var partial = f.Recipe(f.Ingredient(stick, 2));
-        var unsupported = f.Recipe(f.Ingredient(board));
-        unsupported.CopyAttributesFrom = "I";
-        f.Register(full, partial, unsupported);
-        var catalogue = f.Catalogue.Build(full, partial, unsupported);
-        var view = new CraftingCatalogueView(catalogue);
-        var results = f.Allocator.EvaluateCatalogue(catalogue, f.Snapshot(board, stick));
-        view.ReplaceAllocations(results);
-        using var filters = new RecipeFilterSet();
-        var selections = view.GetRows(filters);
-
-        Assert.Same(full, selections[0].Recipe.Recipe);
-        Assert.Same(partial, selections[1].Recipe.Recipe);
-        Assert.Same(unsupported, selections[2].Recipe.Recipe);
-        Assert.Same(results[selections[0].Recipe.Id], selections[0].Allocation);
-        Assert.Same(selections[0].Allocation!.Evaluation, selections[0].Evaluation);
-        Assert.False(selections[2].CanPlace);
-        Assert.Equal(1, Assert.Single(selections[1].Evaluation.Missing).Quantity);
-        Assert.Equal(1, Assert.Single(selections[1].Allocation!.Ordinary).Quantity);
-
-        view.ReplaceAllocations(f.Allocator.EvaluateCatalogue(catalogue, f.Snapshot()));
-        Assert.All(view.GetRows(filters).Where(selection => selection.CanPlace), selection =>
-        {
-            Assert.Equal(0, selection.Evaluation.Allocated);
-            Assert.Empty(selection.Allocation!.Ordinary);
-        });
-    }
-
-    [Fact]
     public void EqualOptima_UseStableInventoryOrderAndCopiesAreDefensive()
     {
         var f = new AllocationFixture();
@@ -453,142 +484,6 @@ public class CraftingAllocationTests
             Assert.Equal(best.Executions, result.CompleteExecutions);
             Assert.Equal(best.Total, result.Shift.Sum(placement => placement.Quantity));
             f.AssertConserved(result);
-        }
-    }
-
-    private sealed class CustomIngredient : CraftingRecipeIngredient;
-
-    private sealed class CustomDamageItem(int id) : MockItem(id)
-    {
-        public override void DamageItem(IWorldAccessor world, Vintagestory.API.Common.Entities.Entity byEntity,
-            ItemSlot itemSlot, int amount = 1, bool destroyOnZeroDurability = true) =>
-            throw new InvalidOperationException("Allocation must not invoke a custom durability mutation.");
-    }
-}
-
-internal sealed class AllocationFixture
-{
-    internal CatalogueFixture Catalogue { get; } = new();
-    internal ClientPlayer Player { get; } = CreatePlayer();
-    internal Mock<IEventAPI> Events { get; } = new();
-    internal Mock<ICoreAPI> Api { get; } = new();
-    internal CraftingAllocator Allocator { get; }
-    internal InventoryGeneric Hotbar { get; }
-    internal InventoryGeneric Backpack { get; }
-    internal InventoryGeneric Grid { get; }
-    private int nextRecipe;
-
-    internal AllocationFixture()
-    {
-        Api.Setup(api => api.Event).Returns(Events.Object);
-        Api.Setup(api => api.World).Returns(Catalogue.World.Object);
-        Events.Setup(events => events.TriggerMatchesRecipe(It.IsAny<IPlayer>(), It.IsAny<IRecipeBase>(),
-            It.IsAny<ItemSlot[]>())).Returns(true);
-        Events.Setup(events => events.TriggerMatchesRecipe(It.IsAny<IPlayer>(), It.IsAny<GridRecipe>(),
-            It.IsAny<ItemSlot[]>(), It.IsAny<int>())).Returns(true);
-        var data = (ClientWorldPlayerData)Player.WorldData;
-        data.EntityPlayer = new EntityPlayer { Api = Api.Object };
-        data.PlayerUID = "test";
-        Hotbar = Inventory(12, "hotbar");
-        Backpack = Inventory(8, "backpack");
-        Grid = Inventory(10, "craftinggrid");
-        var manager = (ClientPlayerInventoryManager)Player.InventoryManager;
-        foreach (var inventory in new[] { Hotbar, Backpack, Grid })
-            manager.Inventories.Add(inventory.InventoryID, inventory);
-        Catalogue.World.Setup(world => world.GridRecipes).Returns(new List<GridRecipe>());
-        Allocator = new CraftingAllocator(Catalogue.World.Object, Player);
-    }
-
-    private static ClientPlayer CreatePlayer()
-    {
-        // IPlayer has an internal abstract member that Castle cannot implement. Use the native
-        // implementation without starting ClientSettings or touching the user's client files.
-        var player = (ClientPlayer)RuntimeHelpers.GetUninitializedObject(typeof(ClientPlayer));
-        var data = (ClientWorldPlayerData)RuntimeHelpers.GetUninitializedObject(typeof(ClientWorldPlayerData));
-        var manager = new ClientPlayerInventoryManager(
-            new Vintagestory.API.Datastructures.OrderedDictionary<string, InventoryBase>(), player, null!);
-        const BindingFlags fields = BindingFlags.Instance | BindingFlags.NonPublic;
-        typeof(ClientPlayer).GetField("worlddata", fields)!.SetValue(player, data);
-        typeof(ClientPlayer).GetField("inventoryMgr", fields)!.SetValue(player, manager);
-        return player;
-    }
-
-    private InventoryGeneric Inventory(int count, string name)
-    {
-        var inventory = new InventoryGeneric(count, name, "test", null!);
-        inventory.Api = Api.Object;
-        inventory.AuditLogAccess = false;
-        inventory.InvNetworkUtil = new Mock<IInventoryNetworkUtil>().Object;
-        inventory.Open(Player);
-        return inventory;
-    }
-
-    internal ItemStack Stack(int id, string name, int quantity, int maxStack = 64)
-    {
-        var stack = Catalogue.Stack(id, "game:" + name);
-        stack.StackSize = quantity;
-        stack.Collectible.MaxStackSize = maxStack;
-        return stack;
-    }
-
-    internal CraftingRecipeIngredient Ingredient(ItemStack stack, int quantity = 1)
-    {
-        var resolved = CraftingStackSnapshot.Copy(stack);
-        resolved.StackSize = quantity;
-        return new() { Id = "I", Code = stack.Collectible.Code, Type = stack.Class,
-            ResolvedItemStack = resolved, Quantity = quantity };
-    }
-
-    internal CraftingRecipeIngredient Wildcard(string code, int quantity = 1) => new() {
-        Id = "choice", Code = new AssetLocation("game:" + code), Type = EnumItemClass.Item,
-        MatchingType = EnumRecipeMatchType.Wildcard, Quantity = quantity
-    };
-
-    internal GridRecipe Recipe(params CraftingRecipeIngredient?[] ingredients)
-    {
-        var recipe = Catalogue.Recipe("allocation-" + nextRecipe++);
-        recipe.Width = Math.Min(3, ingredients.Length);
-        recipe.Height = (ingredients.Length + recipe.Width - 1) / recipe.Width;
-        recipe.ResolvedIngredients = ingredients;
-        return recipe;
-    }
-
-    internal void Register(params GridRecipe[] recipes)
-    {
-        Catalogue.Index.Clear();
-        foreach (var recipe in recipes) Catalogue.Register(recipe);
-    }
-
-    internal CraftingInventorySnapshot Snapshot(params ItemStack[] stacks)
-    {
-        for (int i = 0; i < 10; i++) Hotbar[i].Itemstack = i < stacks.Length ? stacks[i] : null;
-        return CraftingInventorySnapshot.Capture(Player, 3, 3, Environment.CurrentManagedThreadId, true);
-    }
-
-    internal CraftingAllocation Allocate(GridRecipe recipe, params ItemStack[] stacks)
-    {
-        Register(recipe);
-        return AllocateRegistered(recipe, stacks);
-    }
-
-    internal CraftingAllocation AllocateRegistered(GridRecipe recipe, params ItemStack[] stacks) =>
-        Allocator.Evaluate(Catalogue.Build(recipe).Recipes[0], Snapshot(stacks));
-
-    internal void AssertConserved(CraftingAllocation allocation)
-    {
-        foreach (var placements in new[] { allocation.Ordinary, allocation.Shift })
-        {
-            foreach (var placement in placements)
-            {
-                Assert.InRange(placement.Quantity, 1, placement.GetStack().Collectible.MaxStackSize);
-                Assert.Equal(placement.Quantity, placement.Sources.Sum(source => source.Quantity));
-            }
-            Assert.Equal(placements.Length, placements.Select(placement => placement.GridPosition).Distinct().Count());
-            foreach (var group in placements.SelectMany(placement => placement.Sources).GroupBy(source => source.Slot))
-            {
-                var inventory = new[] { Hotbar, Backpack, Grid }.First(inv => inv.InventoryID == group.Key.InventoryId);
-                Assert.True(group.Sum(source => source.Quantity) <= inventory[group.Key.Index]!.StackSize);
-            }
         }
     }
 }

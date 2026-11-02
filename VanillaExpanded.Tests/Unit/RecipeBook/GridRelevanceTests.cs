@@ -4,10 +4,14 @@ using VanillaExpanded.RecipeBook;
 using VanillaExpanded.Tests.Mocks;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
+using VanillaExpanded.Tests;
+using VanillaExpanded.Tests.TestSupport.Gui;
+using VanillaExpanded.Tests.TestSupport.RecipeBook;
+using VanillaExpanded.Tests.TestSupport.Configuration;
 
 namespace VanillaExpanded.Tests.Unit.RecipeBook;
 
-[Trait("Category", "Unit")]
+[Trait(TestCategories.TraitName, TestCategories.Unit)]
 public sealed class GridRelevanceTests
 {
     [Theory]
@@ -206,7 +210,7 @@ public sealed class GridRelevanceTests
         Assert.Equal(9, grid.Count(recipe, Requirements(recipe)));
     }
 
-    private static ImmutableArray<CraftingRequirement> Requirements(GridRecipe recipe) =>
+private static ImmutableArray<CraftingRequirement> Requirements(GridRecipe recipe) =>
         recipe.ResolvedIngredients!.Select((ingredient, index) => new CraftingRequirement(index, "need-" + index, ingredient!))
             .ToImmutableArray();
 
