@@ -150,6 +150,7 @@ public sealed class LayeredIndicatorsTests
     [InlineData("wetness")] [InlineData("body")] [InlineData("weather")]
     public void ProductionLoadersKeepEngineTextureOwnership(string kind)
     {
+        // Arrange
         using var fixture = new LayeredIndicatorsFixture();
         var loaded = new List<LoadedTexture>();
         var paths = new List<string>();
@@ -166,12 +167,14 @@ public sealed class LayeredIndicatorsTests
                 var body = new BodyTemperatureThermometerPresentation(fixture.Measure, fixture.CreateText, loadBackdrop: _ => null);
                 body.SetContent(new(34, 37, BodyTemperatureRisk.Cold, .25f, 2), true); body.Prepare(fixture.Context); presentation = body; view = body.CreateView(fixture.Context.Api); break;
             default:
-                var weather = new WeatherConditionsPresentation(loadBackdrop: _ => null, hasCompletePack: _ => true);
+                var weather = new WeatherConditionsPresentation(loadBackdrop: _ => null, hasCompletePack: _ => false);
                 weather.SetContent(new(EnumPrecipitationType.Rain, false)); weather.Prepare(fixture.Context); presentation = weather; view = weather.CreateView(fixture.Context.Api); break;
         }
+        // Act
         using (presentation)
         using (var composition = new IndicatorComposition(fixture.Context.Api, view, fixture.Context, presentation.Size))
         {
+            // Assert
             Assert.NotEmpty(loaded); Assert.All(paths, path => Assert.EndsWith(".png", path));
             Assert.All(loaded, texture => Assert.True(texture.IgnoreUndisposed));
             var glyphIds = fixture.Glyphs.Where(glyph => !glyph.Disposed).Select(glyph => glyph.TextureId).ToArray();
@@ -381,48 +384,61 @@ public sealed class LayeredIndicatorsTests
     [InlineData(EnumPrecipitationType.Rain)] [InlineData(EnumPrecipitationType.Snow)] [InlineData(EnumPrecipitationType.Hail)]
     public void WeatherChannelsShareOriginAndOrderedDraws(EnumPrecipitationType precipitation)
     {
+        // Arrange
         using var fixture = new LayeredIndicatorsFixture(2);
         using var content = new WeatherConditionsPresentation(fixture.Measure, fixture.CreateText, fixture.Load, _ => fixture.Resources.Backdrop.Object, fixture.CheckPack);
         var sample = new WeatherConditionsSample(precipitation, true) { PrecipitationIntensity = 3, FogIntensity = 2, ThunderIntensity = 1 };
-        content.SetContent(sample); content.Prepare(fixture.Context);
+        content.SetContent(sample);
+        // Act
+        content.Prepare(fixture.Context);
         using var composition = new IndicatorComposition(fixture.Context.Api, content.CreateView(fixture.Context.Api), fixture.Context, content.Size);
+        // Assert
         var layers = Enumerable.Range(0, 3).Select(index => Assert.IsType<TextureElement>(composition.Composer.GetElement("test:layer-" + index))).ToArray();
         Assert.All(layers, layer => Assert.Equal(layers[0].State.Target, layer.State.Target));
         composition.View.CollectBackdrops(fixture.Resources.Native.Render.Object); composition.Composer.Render(0);
         Assert.Single(fixture.Resources.Backdrop.Invocations);
-        var expected = WeatherConditionsLayers.Select(sample).Select(index => fixture.Bindings["textures/hud/weather/composite/" + WeatherConditionsLayers.Names[index] + ".png"].TextureId);
+        var expected = WeatherConditionsLayers.Select(sample).Select(index => fixture.Bindings["textures/hud/weather/composite/" + WeatherConditionsLayers.Names[index] + ".svg"].TextureId);
         Assert.Equal(expected, fixture.Resources.Native.Render.Invocations.Where(call => call.Method.Name == "RenderTexture").Select(call => (int)call.Arguments[0]));
+        // Act
         content.SetContent(new(null, false)); content.Prepare(fixture.Context); composition.Update(fixture.Context);
         fixture.Resources.Native.Render.Invocations.Clear(); composition.Composer.Render(0);
+        // Assert
         Assert.DoesNotContain(fixture.Resources.Native.Render.Invocations, call => call.Method.Name == "RenderTexture");
         Assert.True(content.Size.IsEmpty);
         Assert.Equal(1, fixture.PackChecks);
     }
-    /// <summary>A partial composite pack selects precipitation/fog together and never requests any composite sprite.</summary>
+    /// <summary>Weather composition uses full-canvas SVGs or the established precipitation/fog fallback.</summary>
     [Theory]
     [InlineData(true)] [InlineData(false)]
-    public void WeatherPackDetectionLoadsOnlySelectedCompleteOrFallbackArtwork(bool complete)
+    public void WeatherCompositionUsesCompleteOrFallbackArtwork(bool complete)
     {
+        // Arrange
         using var fixture = new LayeredIndicatorsFixture();
-        var assets = new Mock<IAssetManager>(); fixture.Resources.Native.Api.SetupGet(api => api.Assets).Returns(assets.Object);
-        assets.Setup(manager => manager.Exists(It.IsAny<AssetLocation>()))
-            .Returns((AssetLocation location) => complete || !location.Path.EndsWith("thunder-heavy.png"));
-        using var content = new WeatherConditionsPresentation(load: fixture.Load, loadBackdrop: _ => null);
-        content.SetContent(new(EnumPrecipitationType.Rain, true) { ThunderIntensity = 1 }); content.Prepare(fixture.Context);
+        fixture.CompletePack = complete;
+        using var content = new WeatherConditionsPresentation(load: fixture.Load, loadBackdrop: _ => null, hasCompletePack: fixture.CheckPack);
+        content.SetContent(new(EnumPrecipitationType.Rain, true) { ThunderIntensity = 1 });
+        // Act
+        content.Prepare(fixture.Context);
         using var composition = new IndicatorComposition(fixture.Context.Api, content.CreateView(fixture.Context.Api), fixture.Context, content.Size);
-        Assert.Equal(complete ? 3 : 2, fixture.Bindings.Count);
-        Assert.All(fixture.Bindings.Keys, path => Assert.Equal(complete, path.Contains("/composite/")));
-        Assert.DoesNotContain(assets.Invocations, call => call.Arguments.OfType<AssetLocation>().Any(location => location.Path.Contains("sky-")));
+        // Assert
+        Assert.Equal(1, fixture.PackChecks);
+        string[] expectedArtwork = complete
+            ? ["textures/hud/weather/composite/rain-light.svg", "textures/hud/weather/composite/fog-light.svg", "textures/hud/weather/composite/thunder-light.svg"]
+            : ["textures/hud/weather/rain.png", "textures/hud/weather/fog.png"];
+        Assert.Equal(expectedArtwork.OrderBy(path => path), fixture.Bindings.Keys.OrderBy(path => path));
         if (!complete)
         {
+            Assert.DoesNotContain(fixture.Bindings.Keys, path => path.Contains("/composite/"));
             var rain = Assert.IsType<TextureElement>(composition.Composer.GetElement("test:layer-0"));
             var fog = Assert.IsType<TextureElement>(composition.Composer.GetElement("test:layer-1"));
             Assert.Equal(rain.State.Target.Size, fog.State.Target.Size);
             Assert.Equal(rain.State.Target.Right, fog.State.Target.Left, 4); Assert.Equal(rain.State.Target.Top, fog.State.Target.Top);
             Assert.True(rain.State.Target.Height < rain.Bounds.ParentBounds.OuterHeight);
         }
-        int checks = assets.Invocations.Count; content.Prepare(fixture.Context); composition.View.Prepare(fixture.Context);
-        Assert.Equal(checks, assets.Invocations.Count);
+        // Act
+        content.Prepare(fixture.Context); composition.View.Prepare(fixture.Context);
+        // Assert
+        Assert.Equal(1, fixture.PackChecks);
     }
     /// <summary>Thunder-only data needs a complete pack; inactive weather stays hidden in both styles.</summary>
     [Theory]
@@ -437,7 +453,7 @@ public sealed class LayeredIndicatorsTests
         content.SetStyle(style);
         content.SetContent(new(null, false) { ThunderIntensity = thunder }); content.Prepare(fixture.Context);
         Assert.Equal(visible, !content.Size.IsEmpty);
-        if (visible && style == HudIndicatorStyle.Icon) Assert.EndsWith("thunder-light.png", Assert.Single(content.Layers).Path);
+        if (visible && style == HudIndicatorStyle.Icon) Assert.EndsWith("thunder-light.svg", Assert.Single(content.Layers).Path);
         else Assert.Empty(content.Layers);
         Assert.Empty(fixture.Bindings);
         if (!visible) Assert.Empty(fixture.Values);

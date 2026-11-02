@@ -60,7 +60,7 @@ internal sealed class WeatherConditionsPresentation : IndicatorPresentation
             int[] selected = WeatherConditionsLayers.Select(sample);
             Layers = new WeatherLayer[selected.Length];
             for (int index = 0; index < selected.Length; index++)
-                Layers[index] = new("textures/hud/weather/composite/" + WeatherConditionsLayers.Names[selected[index]] + ".png",
+                Layers[index] = new("textures/hud/weather/composite/" + WeatherConditionsLayers.Names[selected[index]] + ".svg",
                     new(0, 0, Size.Width, Size.Height));
         }
         else
@@ -93,7 +93,7 @@ internal sealed class WeatherConditionsPresentation : IndicatorPresentation
     private static bool CompletePack(HudOverlayPreparationContext context)
     {
         foreach (string name in WeatherConditionsLayers.Names)
-            if (!context.Api.Assets.Exists(new AssetLocation(Constants.ModId, "textures/hud/weather/composite/" + name + ".png"))) return false;
+            if (!context.Api.Assets.Exists(new AssetLocation(Constants.ModId, "textures/hud/weather/composite/" + name + ".svg"))) return false;
         return true;
     }
     #endregion

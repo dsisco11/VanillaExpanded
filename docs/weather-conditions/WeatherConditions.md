@@ -8,7 +8,7 @@ Native GUI scaling applies to the measured footprint and its child bounds. Sourc
 
 The active composite set consists of 15 textures. Independent precipitation, fog/haze, and thunder layers combine inside one fixed footprint. A missing or incomplete composite pack uses precipitation and fog textures from `textures/hud/weather/`. When both are active, their native bounds divide the slot horizontally. Thunder and intensity have no fallback artwork.
 
-The indicator hides and releases its layout space when precipitation, fog/haze, and thunder are all inactive, in both icon and text styles. Cloud coverage is not sampled or displayed; the legacy sky assets are not required or loaded. Disabling the feature, losing the player or climate data, and leaving the world clear presentation and transition history. Changing API ownership reloads borrowed texture bindings; GUI scale and weather changes reuse them. The engine owns the textures.
+The indicator hides and releases its layout space when precipitation, fog/haze, and thunder are all inactive, in both icon and text styles. Cloud coverage is not sampled or displayed; the legacy sky assets are not required or loaded. Disabling the feature, losing the player or climate data, and leaving the world clear presentation and transition history. Changing API ownership reloads texture bindings; unchanged layer identities reuse their bindings across GUI scale and weather changes. Native elements own rasterized SVG textures; fallback PNG textures remain engine-owned.
 
 See [wind speed](../wind-speed/WindSpeed.md) for local wind readings.
 
@@ -37,7 +37,7 @@ The native particle renderer stops particles at rainfall ≤ .02, so the precipi
 
 ## Artwork contract
 
-All layers live under `assets/vanillaexpanded/textures/hud/weather/composite/`. Each icon has an editable `.svg` source and a `.png` texture used by the current renderer. Loading requires the complete PNG set; an absent or partial set uses the precipitation/fog fallback without requesting missing composite textures.
+All layers live under `assets/vanillaexpanded/textures/hud/weather/composite/`. Each icon is loaded directly from its editable `.svg` source and rasterized at 64 × 64 for display. Loading requires the complete active SVG set; an absent or partial set uses the precipitation/fog PNG fallback without requesting missing composite textures.
 
 | Draw order | Texture names |
 | --- | --- |
@@ -45,7 +45,7 @@ All layers live under `assets/vanillaexpanded/textures/hud/weather/composite/`. 
 | Fog/haze | `fog-light`, `fog-moderate`, `fog-dense` |
 | Thunder | `thunder-light`, `thunder-moderate`, `thunder-heavy` |
 
-Each layer uses the entire transparent 64 × 64 canvas. Spatial allocation belongs in the artwork; no condition moves another layer. Thunder draws last. Keep shape boundaries distinct in monochrome and avoid overlap that erases precipitation type. Pack availability is cached for the client API binding and cleared with presentation state. Native texture elements borrow only the selected sprites from the engine cache. Each live or source-trace composition has distinct elements and bounds; none owns the cached PNG storage. Layer identities, local bounds, clipping and the shared backdrop anchor are prepared before rendering.
+Each layer uses the entire transparent 64 × 64 canvas. Spatial allocation belongs in the artwork; no condition moves another layer. Thunder draws last. Keep shape boundaries distinct in monochrome and avoid overlap that erases precipitation type. Pack availability is cached for the client API binding and cleared with presentation state. Native texture elements rasterize only the selected SVG layers, own the generated textures, and dispose them on replacement or teardown. Each live or source-trace composition has distinct elements and bounds. Fallback PNGs are borrowed from the engine cache. Layer identities, local bounds, clipping and the shared backdrop anchor are prepared before rendering.
 
 ## Artwork appearance
 
@@ -53,4 +53,4 @@ The active artwork uses distinct precipitation marks without a cloud canopy or o
 
 Rain and hail increase from two to four to six marks. Snow increases from one to two to four larger flakes, preserving its distinct shape at small HUD sizes. Fog increases from one to three strokes. Thunder increases bolt breadth. Intensity distinctions and precipitation types therefore do not depend solely on colour.
 
-The 15 active SVG sources contain the paths, colours, and contrasting outlines directly on a shared `0 0 64 64` view box. Each declares `preserveAspectRatio="xMidYMid meet"` and uses explicit fills and rounded strokes, without stylesheet rules, clones, masks, or filters. Edit these source assets directly. Runtime rendering uses the 64 × 64 PNG textures; changing an SVG alone does not update its PNG counterpart.
+The 15 active SVG sources contain the paths, colours, and contrasting outlines directly on a shared `0 0 64 64` view box. Each declares `preserveAspectRatio="xMidYMid meet"` and uses explicit fills and rounded strokes, without stylesheet rules, clones, masks, or filters. Edit these source assets directly; no PNG counterpart is required.
