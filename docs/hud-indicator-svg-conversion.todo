@@ -50,9 +50,9 @@ All in-game verification is deferred until the end of Phase 7, after all impleme
 
 ## Phase 5: Temporal storm (3 tasks)
     Preserve distinguishable stages and existing pulse/visibility behavior. Complete all three SVGs before switching the shared stage-based loading path.
-    [ ] Convert temporal-storm/approaching.png to approaching.svg.
-    [ ] Convert temporal-storm/imminent.png to imminent.svg.
-    [ ] Convert temporal-storm/active.png to active.svg.
+    [x] Convert temporal-storm/approaching.png to approaching.svg.
+    [x] Convert temporal-storm/imminent.png to imminent.svg.
+    [x] Convert temporal-storm/active.png to active.svg.
 
 ## Phase 6: Weather fallback icons (4 tasks)
     Preserve fallback selection when the composite SVG pack is absent or incomplete, including the split precipitation/fog layout.

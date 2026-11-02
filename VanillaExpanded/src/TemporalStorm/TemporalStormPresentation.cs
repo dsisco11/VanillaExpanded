@@ -58,7 +58,7 @@ internal sealed class TemporalStormPresentation : IndicatorPresentation
         }
         string[] names = ["approaching", "imminent", "active"];
 
-        content = new("textures/hud/temporal-storm/" + names[(int)value.Value] + ".png",
+        content = new("textures/hud/temporal-storm/" + names[(int)value.Value] + ".svg",
             new(HudOverlaySizes.Small, HudOverlaySizes.Small), null, 0);
         Size = content.IconSize;
         backdrop = loadBackdrop(context);

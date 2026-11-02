@@ -164,7 +164,7 @@ public sealed class SimpleIndicatorsTests
             if (survivingNow.Length > 0) Assert.Contains(survivingNow, texture => !texture.Disposed);
             source.Dispose();
             Assert.All(fixture.Owned, texture => Assert.True(texture.Disposed));
-            if (style == HudIndicatorStyle.Icon && (kind is "wind" or "rift"))
+            if (style == HudIndicatorStyle.Icon && (kind is "wind" or "rift" or "storm"))
                 Assert.All(fixture.Artwork, texture => Assert.True(texture.Disposed));
             else Assert.All(fixture.Artwork, texture => Assert.False(texture.Disposed));
         }
@@ -411,6 +411,122 @@ public sealed class SimpleIndicatorsTests
             Assert.Empty(fixture.Native.Failures);
         }
     }
+    /// <summary>The default storm SVG route maps all stages, reuses unchanged artwork, and retires each composer's textures independently.</summary>
+    [Fact]
+    public void StormDefaultSvgLoaderCachesReplacesAndDisposesPerComposer()
+    {
+        // Arrange
+        using var fixture = new SimpleIndicatorsFixture();
+        var requests = new List<string>();
+        var svgTextures = new List<LoadedTexture>();
+        fixture.Native.Gui
+            .Setup(gui => gui.LoadSvg(It.IsAny<AssetLocation>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int?>()))
+            .Callback<AssetLocation, int, int, int, int, int?>((location, width, height, textureWidth, textureHeight, _) =>
+                requests.Add(location.Path))
+            .Returns(() =>
+            {
+                var texture = new LoadedTexture(fixture.Native.Api.Object) { TextureId = 0 };
+                svgTextures.Add(texture);
+                return texture;
+            });
+        using var presentation = new TemporalStormPresentation(
+            fixture.Measure, fixture.CreateText, loadBackdrop: _ => fixture.Backdrop.Object);
+        presentation.SetContent(TemporalStormStage.Approaching, .4);
+        presentation.Prepare(fixture.Native.Context);
+        var liveView = presentation.CreateView(fixture.Native.Api.Object);
+        ((NativeView)liveView).SetFailureHandler(fixture.Native.Failures.Add);
+        var sourceView = presentation.CreateView(fixture.Native.Api.Object);
+        ((NativeView)sourceView).SetFailureHandler(fixture.Native.Failures.Add);
+
+        // Act
+        using (var live = new IndicatorComposition(
+                   fixture.Native.Api.Object, liveView, fixture.Native.Context, presentation.Size))
+        using (var source = new IndicatorComposition(
+                   fixture.Native.Api.Object, sourceView, fixture.Native.Context, presentation.Size))
+        {
+            // Assert
+            Assert.Equal(
+                ["textures/hud/temporal-storm/approaching.svg", "textures/hud/temporal-storm/approaching.svg"],
+                requests);
+            Assert.Equal(2, svgTextures.Count);
+            var liveApproaching = svgTextures[0];
+            var sourceApproaching = svgTextures[1];
+            Assert.NotSame(liveApproaching, sourceApproaching);
+            Assert.All(svgTextures, texture => Assert.False(texture.Disposed));
+
+            // Act
+            presentation.SetContent(TemporalStormStage.Approaching, .2);
+            presentation.Prepare(fixture.Native.Context);
+            live.Update(fixture.Native.Context);
+            source.Update(fixture.Native.Context);
+
+            // Assert
+            Assert.Equal(2, requests.Count);
+            Assert.Equal(2, svgTextures.Count);
+            Assert.All(svgTextures, texture => Assert.False(texture.Disposed));
+
+            // Act
+            presentation.SetContent(TemporalStormStage.Imminent, .01);
+            presentation.Prepare(fixture.Native.Context);
+            live.Update(fixture.Native.Context);
+            source.Update(fixture.Native.Context);
+
+            // Assert
+            Assert.Equal([
+                "textures/hud/temporal-storm/approaching.svg",
+                "textures/hud/temporal-storm/approaching.svg",
+                "textures/hud/temporal-storm/imminent.svg",
+                "textures/hud/temporal-storm/imminent.svg"
+            ], requests);
+            Assert.Equal(4, svgTextures.Count);
+            Assert.True(liveApproaching.Disposed);
+            Assert.True(sourceApproaching.Disposed);
+            var liveImminent = svgTextures[2];
+            var sourceImminent = svgTextures[3];
+            Assert.NotSame(liveImminent, sourceImminent);
+            Assert.False(liveImminent.Disposed);
+            Assert.False(sourceImminent.Disposed);
+
+            // Act
+            presentation.SetContent(TemporalStormStage.Active, .1);
+            presentation.Prepare(fixture.Native.Context);
+            live.Update(fixture.Native.Context);
+            source.Update(fixture.Native.Context);
+
+            // Assert
+            Assert.Equal([
+                "textures/hud/temporal-storm/approaching.svg",
+                "textures/hud/temporal-storm/approaching.svg",
+                "textures/hud/temporal-storm/imminent.svg",
+                "textures/hud/temporal-storm/imminent.svg",
+                "textures/hud/temporal-storm/active.svg",
+                "textures/hud/temporal-storm/active.svg"
+            ], requests);
+            Assert.Equal(6, svgTextures.Count);
+            Assert.True(liveImminent.Disposed);
+            Assert.True(sourceImminent.Disposed);
+            var liveActive = svgTextures[4];
+            var sourceActive = svgTextures[5];
+            Assert.NotSame(liveActive, sourceActive);
+            Assert.False(liveActive.Disposed);
+            Assert.False(sourceActive.Disposed);
+
+            // Act
+            live.Dispose();
+
+            // Assert
+            Assert.True(liveActive.Disposed);
+            Assert.False(sourceActive.Disposed);
+
+            // Act
+            source.Dispose();
+
+            // Assert
+            Assert.True(sourceActive.Disposed);
+            Assert.Empty(fixture.Native.Failures);
+        }
+    }
+
     /// <summary>Storm rendering never advances the shared pulse; both styles and source copies see the same frame.</summary>
     [Theory]
     [InlineData(HudIndicatorStyle.Icon)] [InlineData(HudIndicatorStyle.Text)]
