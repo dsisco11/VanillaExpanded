@@ -7,7 +7,6 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
-using VanillaExpanded.Tests.TestSupport.RecipeBook;
 
 namespace VanillaExpanded.Tests.TestSupport.Gui;
 
@@ -16,7 +15,7 @@ internal static class GuiElementIconTabsTestsTestSupport
 
 internal static void AssertHints()
     {
-        using var graphics = new RecipeBookRenderFixture();
+        using var graphics = new GuiRenderFixture();
         Setup(graphics);
         using var tabs = Create(graphics, ["Localized first", "Localized second", "Localized third"], 85, _ => { });
         var first = tabs.Composer!.GetToggleButton("tab-0").Bounds;
@@ -52,7 +51,7 @@ internal static void AssertHints()
         Assert.All(tabs.Hints, hint => Assert.False(hint.IsVisible));
     }
 
-internal static (int Left, int Top, int Right, int Bottom) NativeScissorRectangle(RecipeBookRenderFixture graphics)
+internal static (int Left, int Top, int Right, int Bottom) NativeScissorRectangle(GuiRenderFixture graphics)
     {
         var call = Assert.Single(graphics.Render.Invocations.Where(value =>
             value.Method.Name == nameof(IRenderAPI.PushScissor)));
@@ -65,7 +64,7 @@ internal static (int Left, int Top, int Right, int Bottom) NativeScissorRectangl
         return (left, bottom - (int)bounds.InnerHeight, left + (int)bounds.InnerWidth, bottom);
     }
 
-    internal static void Setup(RecipeBookRenderFixture graphics)
+    internal static void Setup(GuiRenderFixture graphics)
     {
         var icons = new IconUtil(graphics.Api.Object);
         icons.CustomIcons["test-icon"] = (_, _, _, _, _, _) => { };
@@ -78,14 +77,14 @@ internal static (int Left, int Top, int Right, int Bottom) NativeScissorRectangl
         SetMouse(graphics, -100, -100);
     }
 
-    internal static void SetMouse(RecipeBookRenderFixture graphics, double x, double y)
+    internal static void SetMouse(GuiRenderFixture graphics, double x, double y)
     {
         var input = Mock.Get(graphics.Api.Object.Input);
         input.SetupGet(value => value.MouseX).Returns((int)x);
         input.SetupGet(value => value.MouseY).Returns((int)y);
     }
 
-    internal static GuiElementIconTabs Create(RecipeBookRenderFixture graphics, string[] names, double width, Action<int> changed)
+    internal static GuiElementIconTabs Create(GuiRenderFixture graphics, string[] names, double width, Action<int> changed)
     {
         var bounds = ElementBounds.Fixed(120, 65, width, GuiElementIconTabs.TabHeight).WithEmptyParent();
         bounds.CalcWorldBounds();

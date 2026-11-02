@@ -26,7 +26,7 @@ public sealed class GuiElementIconTabsTests
     [InlineData(2f)]
     public void FolderTabRendersDistinctBackgroundsAndFixedPixelAlignedNearestFilteredIcons(float scale)
     {
-        using var graphics = new RecipeBookRenderFixture(scale);
+        using var graphics = new GuiRenderFixture(scale);
         Setup(graphics);
         var draws = new List<(int Width, int Height, double WidthRequested, double[] Color)>();
         graphics.Gui.Object.Icons.CustomIcons["test-icon"] = (ctx, _, _, width, _, color) =>
@@ -110,7 +110,7 @@ public sealed class GuiElementIconTabsTests
     [InlineData(1.1f)]
     public void FolderTabRasterHasRoundedShouldersAndOpensIntoTheMatchingPanel(float scale)
     {
-        using var graphics = new RecipeBookRenderFixture(scale);
+        using var graphics = new GuiRenderFixture(scale);
         Setup(graphics);
         var uploads = new List<(int Width, int Height, int Stride, byte[] Pixels)>();
         graphics.Gui.Setup(value => value.LoadOrUpdateCairoTexture(It.IsAny<ImageSurface>(), It.IsAny<bool>(),
@@ -190,7 +190,7 @@ public sealed class GuiElementIconTabsTests
     [InlineData(1.1f)]
     public void SelectedTabStaysJoinedToHostPanelAcrossFractionalMovementAndScrolling(float scale)
     {
-        using var graphics = new RecipeBookRenderFixture(scale);
+        using var graphics = new GuiRenderFixture(scale);
         Setup(graphics);
         using var tabs = Create(graphics, Enumerable.Range(0, 9).Select(i => "Entry " + i).ToArray(), 180, _ => { });
         var host = ElementBounds.Fixed(100.3, 80.3, 1000, 1000).WithEmptyParent();
@@ -245,7 +245,7 @@ public sealed class GuiElementIconTabsTests
     [InlineData(2f, true)]
     public void NativeScissorRetainsEverySelectedBorderAcrossFractionalMovementAndScrolling(float scale, bool overflow)
     {
-        using var graphics = new RecipeBookRenderFixture(scale);
+        using var graphics = new GuiRenderFixture(scale);
         Setup(graphics);
         double callerWidth = overflow ? 180 : 400;
         using var tabs = Create(graphics, Enumerable.Range(0, 9).Select(i => "Entry " + i).ToArray(),
@@ -305,7 +305,8 @@ public sealed class GuiElementIconTabsTests
     [InlineData(2f)]
     public void ClippedTabsRejectPointerActivationAndKeyboardWrapRestoresAccessAfterMovement(float scale)
     {
-        using var graphics = new RecipeBookRenderFixture(scale);
+        // Arrange nine tabs in a clipped host where the outer tabs extend beyond the input viewport.
+        using var graphics = new GuiRenderFixture(scale);
         Setup(graphics);
         var changes = new List<int>();
         using var tabs = Create(graphics, Enumerable.Range(0, 9).Select(i => "Entry " + i).ToArray(), 180, changes.Add);
@@ -317,6 +318,8 @@ public sealed class GuiElementIconTabsTests
         Compose(tabs);
         double expectedLeft = 0;
         double expectedRight = 0;
+
+        // Act: move the host at fractional offsets, reject clipped input, scroll, and wrap keyboard focus.
         foreach (double offset in new[] { .1, .75 })
         {
             host.fixedX = 100 + offset;
@@ -335,12 +338,14 @@ public sealed class GuiElementIconTabsTests
             Assert.Equal(expectedRight - expectedLeft, viewport.InnerWidth, 4);
             Assert.Equal(callerBounds.InnerHeight, viewport.InnerHeight, 4);
             Assert.NotEqual(Math.Round(expectedRight), expectedRight);
+            // Assert pointer activation is rejected on both clipped edges before movement.
             AssertClippedClickRejected(left: false);
             SetMouse(graphics, (expectedLeft + expectedRight) / 2,
                 callerBounds.absY + callerBounds.InnerHeight / 2);
             var wheel = new MouseWheelEventArgs { deltaPrecise = 1000 };
             tabs.OnMouseWheel(graphics.Api.Object, wheel);
             Assert.True(wheel.IsHandled);
+            // Assert the clipped edge remains inert after scrolling; activate the last visible tab.
             AssertClippedClickRejected(left: true);
 
             var last = tabs.Composer!.GetToggleButton("tab-8").Bounds;
@@ -350,6 +355,7 @@ public sealed class GuiElementIconTabsTests
             tabs.OnFocusGained();
             Navigate(GlKeys.Right, 0);
             Navigate(GlKeys.Left, 8);
+            // Assert keyboard traversal returns to the moved tab and ignores input after focus loss.
             Assert.Equal(new[] { 8, 0, 8 }, changes);
             tabs.OnFocusLost();
             var unfocused = new KeyEvent { KeyCode = (int)GlKeys.Right };
@@ -402,7 +408,7 @@ public sealed class GuiElementIconTabsTests
     [InlineData(2f, 10)]
     public void MeasuredWidthShowsEveryTabWithoutScrollingOrArrows(float scale, int count)
     {
-        using var graphics = new RecipeBookRenderFixture(scale);
+        using var graphics = new GuiRenderFixture(scale);
         Setup(graphics);
         double width = GuiElementIconTabs.MeasureWidth(count);
         Assert.Equal(count * 30 + (count - 1) * 4, width);
@@ -442,7 +448,7 @@ public sealed class GuiElementIconTabsTests
     [InlineData(2f)]
     public void SelectionKeyboardWrapAndWheelScrollingUseNativeBoundsAndClipHitTesting(float scale)
     {
-        using var graphics = new RecipeBookRenderFixture(scale);
+        using var graphics = new GuiRenderFixture(scale);
         Setup(graphics);
         var changes = new List<int>();
         using var tabs = Create(graphics, Enumerable.Range(0, 9).Select(i => "Entry " + i).ToArray(), 180, changes.Add);
@@ -517,7 +523,7 @@ public sealed class GuiElementIconTabsTests
     [Fact]
     public void NativeCompositionRestoresTheHostClipWhenRenderingFails()
     {
-        using var graphics = new RecipeBookRenderFixture();
+        using var graphics = new GuiRenderFixture();
         Setup(graphics);
         using var tabs = Create(graphics, ["One", "Two"], 150, _ => { });
         var host = ElementBounds.Fixed(0, 0, 1000, 1000).WithEmptyParent();
@@ -536,7 +542,7 @@ public sealed class GuiElementIconTabsTests
     [Fact]
     public void IconClickSelectsAndInvalidSelectionsAndDescriptionsFailExplicitly()
     {
-        using var graphics = new RecipeBookRenderFixture();
+        using var graphics = new GuiRenderFixture();
         Setup(graphics);
         var changes = new List<int>();
         using var tabs = Create(graphics, ["One", "Two", "Three"], 500, changes.Add);

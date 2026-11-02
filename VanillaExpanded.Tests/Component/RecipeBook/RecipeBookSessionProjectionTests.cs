@@ -23,6 +23,7 @@ public sealed class RecipeBookSessionProjectionTests
     [Fact]
     public void CriteriaChangesReuseAllocationsAndInventoryRefreshEvaluatesExactlyOnce()
     {
+        // Arrange an evaluated session and distinguish its initial capture from later projections.
         var f = new AllocationFixture();
         var ingredient = f.Stack(1, "a", 1);
         var recipe = f.Recipe(f.Ingredient(ingredient));
@@ -42,6 +43,8 @@ public sealed class RecipeBookSessionProjectionTests
         int NativeChecks() => f.Events.Invocations.Count(call =>
             call.Method.Name == nameof(IEventAPI.TriggerMatchesRecipe) && call.Arguments.Count == 4);
         int validationsPerEvaluation = NativeChecks();
+
+        // Act: change criteria repeatedly; these projections should reuse the existing evaluation.
         session.CraftableOnly.SetEnabled(true);
         session.Sort.Select("name");
         session.Search(recipe.Output.Code!.ToString());
@@ -55,10 +58,16 @@ public sealed class RecipeBookSessionProjectionTests
         session.Search("");
         session.SelectCategory(null);
         session.Sort.Select("availability");
+
+        // Assert criteria changes neither capture inventory nor replace the row's allocation.
         Assert.Same(allocation, Assert.Single(session.Rows).Allocation);
         Assert.Equal(1, captures);
         Assert.Equal(validationsPerEvaluation, NativeChecks());
+
+        // Act: refresh inventory, the separate transition that captures and evaluates again.
         session.Refresh();
+
+        // Assert one fresh capture and allocation were published.
         Assert.Equal(2, captures);
         Assert.Equal(2 * validationsPerEvaluation, NativeChecks());
         Assert.NotSame(allocation, Assert.Single(session.Rows).Allocation);
@@ -314,6 +323,7 @@ public sealed class RecipeBookSessionProjectionTests
     [Fact]
     public void FailureWhileFilteringStableRecipesDoesNotPublishPartialRows()
     {
+        // Arrange a retained displayed row before a refresh makes its evaluation fail.
         var f = new AllocationFixture();
         var retainedIngredient = f.Stack(1, "a", 1);
         var canonicalIngredient = f.Stack(2, "b", 1);
@@ -332,21 +342,31 @@ public sealed class RecipeBookSessionProjectionTests
         f.Snapshot(canonicalIngredient);
         int notifications = 0;
         session.Changed += () => notifications++;
+
+        // Act: fail projection for the retained alternative during the inventory refresh.
         using var filter = session.Filters.Register("test:failure", new PredicateFilter(selection =>
             ReferenceEquals(selection.Recipe.Recipe, retainedRecipe) && !selection.Evaluation.CanCraft
                 ? throw new InvalidOperationException("Retained alternative failed during projection.")
                 : true));
         Assert.Throws<InvalidOperationException>(session.Refresh);
+
+        // Assert failure preserves the previous publication and emits no change notification.
         Assert.True(previous == session.Rows);
         Assert.True(Assert.Single(session.Rows).Evaluation.CanCraft);
         Assert.Equal(0, notifications);
+
+        // Act: recover by replacing the failing predicate, then end the interaction freeze.
         filter.Replace(new PredicateFilter(_ => true));
         session.Refresh();
+
+        // Assert the recovered refresh publishes once before canonical interaction ordering resumes.
         Assert.Equal(1, notifications);
         var refreshedRetained = Assert.Single(session.Rows);
         Assert.Same(retainedRecipe, refreshedRetained.Recipe.Recipe);
         Assert.False(refreshedRetained.Evaluation.CanCraft);
         session.Interact(null);
+
+        // Assert ending interaction selects the newly eligible canonical alternative.
         Assert.Same(canonicalRecipe, Assert.Single(session.Rows).Recipe.Recipe);
         Assert.True(Assert.Single(session.Rows).Evaluation.CanCraft);
         Assert.Equal(2, notifications);

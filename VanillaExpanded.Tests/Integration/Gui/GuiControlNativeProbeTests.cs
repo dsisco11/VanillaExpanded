@@ -237,9 +237,9 @@ private readonly string originalLocale = Lang.CurrentLocale;
 
 
 
-    private static RecipeBookRenderFixture Graphics(float scale = 1)
+    private static GuiRenderFixture Graphics(float scale = 1)
     {
-        var graphics = new RecipeBookRenderFixture(scale);
+        var graphics = new GuiRenderFixture(scale);
         graphics.Render.SetupGet(value => value.FrameWidth).Returns(1000);
         graphics.Render.SetupGet(value => value.FrameHeight).Returns(1000);
         var icons = new IconUtil(graphics.Api.Object);
@@ -263,11 +263,11 @@ private readonly string originalLocale = Lang.CurrentLocale;
         return graphics;
     }
 
-    private static GuiComposer Composer(RecipeBookRenderFixture graphics, ElementBounds bounds, string name = "native-probe") =>
+    private static GuiComposer Composer(GuiRenderFixture graphics, ElementBounds bounds, string name = "native-probe") =>
         (GuiComposer)Activator.CreateInstance(typeof(GuiComposer), BindingFlags.Instance | BindingFlags.NonPublic,
             null, [graphics.Api.Object, bounds, name], null)!;
 
-    private static void SetMouse(RecipeBookRenderFixture graphics, double x, double y)
+    private static void SetMouse(GuiRenderFixture graphics, double x, double y)
     {
         var input = Mock.Get(graphics.Api.Object.Input);
         input.SetupGet(value => value.MouseX).Returns((int)x);

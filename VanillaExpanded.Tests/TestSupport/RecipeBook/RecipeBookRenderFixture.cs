@@ -1,33 +1,22 @@
-using Cairo;
 using Moq;
 using VanillaExpanded.RecipeBook;
+using VanillaExpanded.Tests.TestSupport.Gui;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.Client.NoObf;
 
-namespace VanillaExpanded.Tests.TestSupport.Gui;
+namespace VanillaExpanded.Tests.TestSupport.RecipeBook;
 
-[CollectionDefinition("Recipe book native GUI", DisableParallelization = true)]
-public sealed class CraftingGuiCollection;
-
-internal sealed class RecipeBookRenderFixture : IDisposable
+internal sealed class RecipeBookRenderFixture : GuiRenderFixture
 {
     internal sealed record Bake(int Id, ItemStack Stack, int Size, float Scale, Action<int> Callback);
-    internal readonly Mock<ICoreClientAPI> Api = new();
-    internal readonly Mock<IGuiAPI> Gui = new();
-    internal readonly Mock<IRenderAPI> Render = new();
-    internal readonly Mock<IClientEventAPI> Events = new();
-    internal readonly Mock<IShaderProgram> GuiProgram = new();
     internal readonly RecipeBookIconCache Cache;
     internal readonly List<Mock<IRecipeBookIconShaderProgram>> Programs = new();
     internal readonly List<Mock<MeshRef>> Meshes = new();
     internal readonly List<Bake> Bakes = new();
     internal readonly HashSet<int> Allocations = new();
-    internal readonly HashSet<int> Textures = new();
-    internal readonly Stack<ElementBounds> Clips = new();
-    internal IShaderProgram? Active;
     internal bool CompleteOnFrame = true;
     internal bool CompileShaders = true;
     internal Action? OnBake;
@@ -35,50 +24,21 @@ internal sealed class RecipeBookRenderFixture : IDisposable
     private readonly HashSet<IRenderer> renderers = new();
     private readonly HashSet<Bake> completed = new();
     private readonly TextureAtlasPosition[] positions = new TextureAtlasPosition[4096];
-    private readonly float oldScale = RuntimeEnv.GUIScale;
-    private readonly int oldThread = RuntimeEnv.MainThreadId;
-    private int nextTexture;
 
-    internal RecipeBookRenderFixture(float scale = 1)
+    internal RecipeBookRenderFixture(float scale = 1) : base(scale)
     {
         Cache = new RecipeBookIconCache(Api.Object);
-        RuntimeEnv.GUIScale = scale;
-        RuntimeEnv.MainThreadId = Environment.CurrentManagedThreadId;
         var atlas = new Mock<IItemTextureAtlasAPI>();
         atlas.SetupGet(value => value.Positions).Returns(positions);
         atlas.Setup(value => value.FreeTextureSpace(It.IsAny<int>())).Callback<int>(id => Assert.True(Allocations.Remove(id)));
         Api.SetupGet(value => value.ItemTextureAtlas).Returns(atlas.Object);
-        Api.SetupGet(value => value.Gui).Returns(Gui.Object);
-        Api.SetupGet(value => value.Render).Returns(Render.Object);
-        Api.SetupGet(value => value.Event).Returns(Events.Object);
+        var shaders = new Mock<IShaderAPI>();
+        shaders.Setup(value => value.NewShader(It.IsAny<EnumShaderType>())).Returns(() => Mock.Of<IShader>());
+        Api.SetupGet(value => value.Shader).Returns(shaders.Object);
         Events.Setup(value => value.RegisterRenderer(It.IsAny<IRenderer>(), EnumRenderStage.Before, It.IsAny<string>()))
             .Callback<IRenderer, EnumRenderStage, string>((renderer, _, _) => Assert.True(renderers.Add(renderer)));
         Events.Setup(value => value.UnregisterRenderer(It.IsAny<IRenderer>(), EnumRenderStage.Before))
             .Callback<IRenderer, EnumRenderStage>((renderer, _) => Assert.True(renderers.Remove(renderer)));
-        Api.SetupGet(value => value.Input).Returns(Mock.Of<IInputAPI>());
-        Api.SetupGet(value => value.Logger).Returns(Mock.Of<ILogger>());
-        Gui.SetupGet(value => value.TextTexture).Returns(new TextTextureUtil(Api.Object));
-        Gui.Setup(value => value.LoadOrUpdateCairoTexture(It.IsAny<ImageSurface>(), It.IsAny<bool>(),
-            ref It.Ref<LoadedTexture>.IsAny)).Callback(new Upload((ImageSurface image, bool linear, ref LoadedTexture texture) =>
-        {
-            if (texture.TextureId == 0) { texture.TextureId = ++nextTexture; Textures.Add(texture.TextureId); }
-            texture.Width = image.Width;
-            texture.Height = image.Height;
-        }));
-        Gui.Setup(value => value.DeleteTexture(It.IsAny<int>())).Callback<int>(id => Assert.True(Textures.Remove(id)));
-        var shaders = new Mock<IShaderAPI>();
-        shaders.Setup(value => value.NewShader(It.IsAny<EnumShaderType>())).Returns(() => Mock.Of<IShader>());
-        Api.SetupGet(value => value.Shader).Returns(shaders.Object);
-        GuiProgram.Setup(value => value.Use()).Callback(() => Active = GuiProgram.Object);
-        GuiProgram.Setup(value => value.Stop()).Callback(() => Active = null);
-        Active = GuiProgram.Object;
-        Render.SetupGet(value => value.CurrentActiveShader).Returns(() => Active!);
-        Render.SetupGet(value => value.CurrentProjectionMatrix).Returns(Mat4f.Create());
-        Render.SetupGet(value => value.CurrentModelviewMatrix).Returns(Mat4f.Create());
-        Render.SetupGet(value => value.ScissorStack).Returns(Clips);
-        Render.Setup(value => value.PushScissor(It.IsAny<ElementBounds>(), It.IsAny<bool>()))
-            .Callback<ElementBounds, bool>((bounds, _) => Clips.Push(bounds));
-        Render.Setup(value => value.PopScissor()).Callback(() => { Assert.NotEmpty(Clips); Clips.Pop(); });
         Render.Setup(value => value.UploadMesh(It.IsAny<MeshData>())).Returns(() =>
         {
             var mesh = new Mock<MeshRef> { CallBase = true };
@@ -149,12 +109,15 @@ internal sealed class RecipeBookRenderFixture : IDisposable
 
     internal void ReplaceAtlasPosition(int id) => positions[id] = new TextureAtlasPosition { reloadIteration = 1 };
 
-    private delegate void Upload(ImageSurface image, bool linear, ref LoadedTexture texture);
-
-    public void Dispose()
+    public override void Dispose()
     {
-        Cache.Dispose();
-        RuntimeEnv.GUIScale = oldScale;
-        RuntimeEnv.MainThreadId = oldThread;
+        try
+        {
+            Cache.Dispose();
+        }
+        finally
+        {
+            base.Dispose();
+        }
     }
 }

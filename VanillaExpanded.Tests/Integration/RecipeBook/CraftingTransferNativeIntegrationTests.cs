@@ -134,9 +134,14 @@ public sealed class CraftingTransferNativeIntegrationTests
     [Fact]
     public void CompetingUpdateAfterFirstPacketStopsUnsentWorkAndKeepsAcceptedMove()
     {
+        // Arrange a competing native update that blocks the next transfer after one packet is accepted.
         using var f = new TransferFixture(2, 4, positions: 2);
         f.OnSend = _ => f.F.Grid.PutLocked = true;
+
+        // Act: begin a two-position transfer and let the competing update interrupt it.
         var result = f.Coordinator.Execute(f.Entry, false);
+
+        // Assert the accepted movement remains while unsent work is stopped.
         Assert.Equal(CraftingDispatchStatus.Interrupted, result.Status);
         Assert.Single(f.Packets);
         Assert.Equal(2, f.F.Grid[0].StackSize);

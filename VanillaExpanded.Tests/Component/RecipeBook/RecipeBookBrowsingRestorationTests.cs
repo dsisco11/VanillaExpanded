@@ -140,6 +140,7 @@ public sealed class RecipeBookBrowsingRestorationTests
     [InlineData(2, true)]
     public void BrowsingStateSurvivesInventoryReopeningAndComposerReplacement(float scale, bool recomposeParent)
     {
+        // Arrange a populated dialog and establish non-default search, category, sort, selection, and scroll.
         using var f = new MenuFixture(scale: scale, includeRecipes: true);
         foreach (var recipe in f.Lifecycle.Recipes)
             recipe.Output!.ResolvedItemStack!.Collectible.CreativeInventoryTabs = ["tools"];
@@ -174,11 +175,16 @@ public sealed class RecipeBookBrowsingRestorationTests
         int? firstOutput = Assert.IsType<GuiElementRecipeBookTile>(tiles.Elements[0]).Selection?.Output.Id;
         Assert.NotNull(firstOutput);
 
+        // Act: resize and replace this dialog's composer without replacing its session.
         var composer = menu.SingleComposer;
         f.ResizePanelSpace(composer.Bounds.fixedWidth, composer.Bounds.fixedHeight - 10);
         menu.TryOpen();
         Assert.NotSame(composer, menu.SingleComposer);
+
+        // Assert recomposition keeps the current dialog's browsing state and session.
         AssertBrowsingState(menu);
+
+        // Act: close and reopen the parent inventory; each reopening creates a new dialog.
         for (int i = 0; i < 3; i++)
         {
             f.Parent.TryClose();
@@ -186,12 +192,15 @@ public sealed class RecipeBookBrowsingRestorationTests
             f.Parent.TryOpen();
             var reopened = Assert.Single(f.Menus);
             Assert.NotSame(menu, reopened);
+
+            // Assert each replacement dialog restores the same browsing state.
             AssertBrowsingState(reopened);
             f.Lifecycle.Drain();
             Assert.Same(reopened, Assert.Single(f.Menus));
             menu = reopened;
         }
 
+        // Act: explicitly close the book, then reopen the inventory before toggling it back on.
         f.ClickCloseButton(menu);
         f.Parent.TryClose();
         f.Parent.TryOpen();
@@ -199,7 +208,11 @@ public sealed class RecipeBookBrowsingRestorationTests
         Assert.Empty(f.Menus);
         f.Toggle();
         menu = Assert.Single(f.Menus);
+
+        // Assert explicit-close state and browsing-state restoration remain independent.
         AssertBrowsingState(menu);
+
+        // Act: update browsing state once more, then reopen the inventory to verify persistence.
         menu.SingleComposer.GetTextInput("search").SetValue("no matching recipe");
         Assert.Equal(0, menu.SingleComposer.GetScrollbar("scroll").CurrentYPosition);
         f.Parent.TryClose();

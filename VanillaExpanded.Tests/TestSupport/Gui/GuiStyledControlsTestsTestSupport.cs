@@ -6,7 +6,6 @@ using VanillaExpanded.Tests.TestSupport.Gui;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
-using VanillaExpanded.Tests.TestSupport.RecipeBook;
 
 namespace VanillaExpanded.Tests.TestSupport.Gui;
 
@@ -32,7 +31,7 @@ internal sealed record Raster(int Width, int Height, int Stride, byte[] Pixels)
 
     internal sealed class ControlsFixture : IDisposable
     {
-        internal readonly RecipeBookRenderFixture Graphics;
+        internal readonly GuiRenderFixture Graphics;
         internal ICoreClientAPI Api => Graphics.Api.Object;
         private readonly string oldLocale = Lang.CurrentLocale;
         private readonly ITranslationService? oldEnglish = Lang.AvailableLanguages.GetValueOrDefault("en");
@@ -44,7 +43,7 @@ internal sealed record Raster(int Width, int Height, int Stride, byte[] Pixels)
 
         internal ControlsFixture(float scale = 1)
         {
-            Graphics = new RecipeBookRenderFixture(scale);
+            Graphics = new GuiRenderFixture(scale);
             var translations = new Mock<ITranslationService>();
             translations.Setup(value => value.Get(It.IsAny<string>(), It.IsAny<object[]>()))
                 .Returns((string key, object[] _) => key);

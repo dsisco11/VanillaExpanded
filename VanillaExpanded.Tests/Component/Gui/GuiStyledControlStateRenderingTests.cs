@@ -52,6 +52,7 @@ public sealed class GuiStyledControlStateRenderingTests
     [InlineData(2f)]
     public void ScrollbarPointerFeedbackTracksCaptureAndCancelsWithoutExtraScrollOrUploads(float scale)
     {
+        // Arrange a scrollable control and record callback and texture-upload behavior.
         using var f = new ControlsFixture(scale);
         var changes = new List<float>();
         using var scrollbar = new GuiElementStyledScrollbar(f.Api, changes.Add,
@@ -60,6 +61,8 @@ public sealed class GuiStyledControlStateRenderingTests
         float visible = (float)scrollbar.Bounds.InnerHeight;
         scrollbar.SetHeights(visible, 1000 * scale);
         int uploads = f.Uploads;
+
+        // Act: capture each arrow, move away and back, then release outside its hit target.
         foreach (int index in new[] { 1, 2 })
         {
             scrollbar.CurrentYPosition = 200 * scale;
@@ -95,6 +98,7 @@ public sealed class GuiStyledControlStateRenderingTests
             Assert.Single(changes);
         }
 
+        // Act: drag the thumb outside the track, release it, then cancel a later capture on focus loss.
         f.SetMouse(-100, -100);
         f.Render(scrollbar);
         int idleThumb = (int)f.Draws[3].Arguments[0];
@@ -129,6 +133,8 @@ public sealed class GuiStyledControlStateRenderingTests
         f.Render(scrollbar);
         Assert.False(scrollbar.mouseDownOnScrollbarHandle);
         Assert.Equal(hoverThumb, f.Draws[3].Arguments[0]);
+
+        // Act: exercise disabled/re-enabled arrows and collapse/restore the scroll range.
         var downMouse = PointAt(2);
         composer.OnMouseDown(downMouse);
         f.Render(scrollbar);
@@ -159,6 +165,8 @@ public sealed class GuiStyledControlStateRenderingTests
         f.SetMouse(-100, -100);
         f.Render(scrollbar);
         Assert.Equal(idleThumb, f.Draws[3].Arguments[0]);
+
+        // Assert transitions reuse existing render resources and disposal releases them.
         composer.Dispose();
         scrollbar.Dispose();
         Assert.Empty(f.Graphics.Textures);

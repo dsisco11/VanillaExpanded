@@ -152,6 +152,7 @@ public sealed class RecipeBookDialogLayoutTests
     [InlineData(1.75, 1.25)]
     public void ScaleTransitionCapturesTheOldCompositionRowBeforeRestoringAtTheNewScale(float oldScale, float newScale)
     {
+        // Arrange scroll and inspection state in the old composition before changing GUI scale.
         using var f = new MenuFixture(scale: oldScale, includeRecipes: true);
         for (int i = 0; i < 100; i++)
             f.Lifecycle.Recipes.Add(f.Lifecycle.F.Catalogue.Recipe("other-" + i));
@@ -167,12 +168,16 @@ public sealed class RecipeBookDialogLayoutTests
         original.UpdateHover((int)first.PixelBounds.renderX + 5, (int)original.InsideClipBounds.renderY + 5);
         var before = original.CaptureView();
         Assert.Equal(7, before.RowOffset, 4);
+
+        // Act: change scale only after capturing the anchor, then let the dialog recompose.
         RuntimeEnv.GUIScale = newScale;
         Assert.Equal(157, original.ScrollPosition, 4);
         book.TryOpen();
         var resized = Assert.IsType<GuiElementRecipeBookTiles>(book.SingleComposer.GetElement("tiles"));
         Assert.NotSame(original, resized);
         var after = resized.CaptureView();
+
+        // Assert the new composition restores the old anchor and inspection state.
         Assert.Equal(before.AnchorOutput, after.AnchorOutput);
         Assert.Equal(before.RowOffset, after.RowOffset, 4);
         Assert.Equal(before.InspectedOutput, after.InspectedOutput);

@@ -25,7 +25,7 @@ public sealed class GuiElementIconTabsComposerIntegrationTests
     [InlineData(2f)]
     public void NativeComposerOwnsIconOnlyButtonsAndBoundsAndRecompositionDisposesTextures(float scale)
     {
-        using var graphics = new RecipeBookRenderFixture(scale);
+        using var graphics = new GuiRenderFixture(scale);
         Setup(graphics);
         using var tabs = Create(graphics, ["First", "A much longer localized name", "Third"], 500, _ => { });
         var composer = Assert.IsType<GuiComposer>(tabs.Composer);
@@ -56,6 +56,8 @@ public sealed class GuiElementIconTabsComposerIntegrationTests
         tabs.Dispose();
         Assert.Empty(tabs.Bounds.ChildBounds);
         Assert.Empty(graphics.Textures);
-        Assert.Empty(graphics.Bakes);
+        graphics.Render.Verify(value => value.RenderItemStackToAtlas(It.IsAny<ItemStack>(),
+            It.IsAny<ITextureAtlasAPI>(), It.IsAny<int>(), It.IsAny<Action<int>>(),
+            It.IsAny<int>(), It.IsAny<float>(), It.IsAny<float>()), Times.Never);
     }
 }

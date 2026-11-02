@@ -59,6 +59,7 @@ public sealed class RecipeBookSystemLifecycleTests
     [Fact]
     public void DisabledAtWorldLoadDoesNotLoadSystemAndEnablingWaitsForReload()
     {
+        // Arrange a world whose system was never started because the feature was disabled at load.
         using var f = new MenuFixture(false);
         Assert.False(f.Lifecycle.Loaded);
         Assert.False(f.Lifecycle.System.ShouldLoad(EnumAppSide.Server));
@@ -69,6 +70,8 @@ public sealed class RecipeBookSystemLifecycleTests
         f.Lifecycle.Events.VerifyAdd(value => value.LevelFinalize += It.IsAny<Action>(), Times.Never);
         f.Lifecycle.Events.VerifyAdd(value => value.LeaveWorld += It.IsAny<Action>(), Times.Never);
         f.Parent.TryOpen();
+
+        // Act: enabling the setting mid-world cannot retroactively load or compose the system.
         f.SetEnabled(true);
         f.Lifecycle.FinalizeWorld();
         f.Recompose();
@@ -76,7 +79,11 @@ public sealed class RecipeBookSystemLifecycleTests
         Assert.Null(f.Lifecycle.System.Catalogue);
         Assert.Null(f.Parent.Composers["maininventory"].GetElement("vanillaexpanded-crafting-toggle"));
         Assert.Empty(f.Menus);
+
+        // Act: represent a world reload with a newly constructed system.
         using var reloaded = new LifecycleFixture();
+
+        // Assert only the reloaded system reaches the world-finalize build step.
         Assert.True(reloaded.Loaded);
         Assert.False(reloaded.System.ShouldLoad(EnumAppSide.Server));
         reloaded.FinalizeWorld();
@@ -89,18 +96,25 @@ public sealed class RecipeBookSystemLifecycleTests
     [InlineData(true)]
     public void DisablingLiveDisposesSystemAndBlocksReactivationUntilReload(bool queuedRestore)
     {
+        // Arrange an enabled, open dialog; optionally queue restoration before disabling.
         using var f = new MenuFixture();
         f.Parent.TryOpen();
         f.Toggle();
         var menu = Assert.Single(f.Menus);
         if (queuedRestore) f.Recompose();
+
+        // Act: disable at runtime and drain any queued restoration work.
         f.SetEnabled(false);
         f.Lifecycle.Drain();
+
+        // Assert disposal closes the dialog and releases world-owned services and toggle.
         Assert.False(menu.IsOpened());
         Assert.Empty(f.Menus);
         Assert.Null(f.Lifecycle.System.Catalogue);
         Assert.Null(f.Lifecycle.System.IconCache);
         f.AssertToggleHidden();
+
+        // Act: re-enable in the same world and try its remaining lifecycle entry points.
         f.SetEnabled(true);
         f.Lifecycle.FinalizeWorld();
         f.Parent.TryClose();
@@ -111,6 +125,8 @@ public sealed class RecipeBookSystemLifecycleTests
         Assert.Null(f.Lifecycle.System.Catalogue);
         f.Recompose();
         Assert.Null(f.Parent.Composers["maininventory"].GetElement("vanillaexpanded-crafting-toggle"));
+
+        // Assert a fresh system after reload can initialize normally.
         using var reloaded = new LifecycleFixture();
         reloaded.FinalizeWorld();
         Assert.Equal(1, reloaded.Builds);

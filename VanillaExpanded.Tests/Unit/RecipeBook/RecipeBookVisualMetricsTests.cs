@@ -16,7 +16,7 @@ public sealed class RecipeBookVisualMetricsTests
     [Fact]
     public void MetricsSeparateGenericControlsFromRecipeBookComposition()
     {
-        using var graphics = new RecipeBookRenderFixture();
+        using var graphics = new GuiRenderFixture();
         Assert.Equal(17d, GuiControlMetrics.CheckboxSize);
         Assert.Equal(28d, GuiControlMetrics.SearchHeight);
         Assert.Equal(14f, GuiControlMetrics.TextFontSize);

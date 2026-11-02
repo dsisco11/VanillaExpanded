@@ -1,7 +1,6 @@
 using Cairo;
 using Moq;
 using VanillaExpanded.RecipeBook;
-using VanillaExpanded.Tests.TestSupport.Gui;
 using VanillaExpanded.Tests.TestSupport.RecipeBook;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;

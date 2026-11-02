@@ -86,7 +86,7 @@ public sealed class GuiControlVisualsTests
         Assert.Throws<ArgumentOutOfRangeException>(() => GuiControlPalette.Color(0, double.NaN));
         Assert.Throws<ArgumentOutOfRangeException>(() => GuiControlPalette.Color(0, 2));
         Assert.Throws<ArgumentOutOfRangeException>(() => GuiControlDrawing.Frame(ctx, 0, 0, 0, 1, 0, 0, 1));
-        using var graphics = new RecipeBookRenderFixture();
+        using var graphics = new GuiRenderFixture();
         Assert.Throws<ArgumentException>(() => GuiControlMetrics.InputBounds(ElementBounds.Fixed(0, 0, 20, 28)));
         Assert.Throws<ArgumentException>(() => GuiControlMetrics.InputBounds(ElementBounds.Fixed(0, 0, 100, 0)));
     }

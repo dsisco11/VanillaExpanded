@@ -221,6 +221,7 @@ public sealed class RecipeBookDialogNativeInputTests
     [InlineData(2)]
     public void InlineSearchClearUsesNativeEditingAndPreservesOtherCriteriaAcrossResizeAndReopen(float scale)
     {
+        // Arrange a native dialog with a selected recipe and a non-default category.
         using var f = new MenuFixture(scale: scale, includeRecipes: true);
         Assert.Single(f.Lifecycle.Recipes).Output!.ResolvedItemStack!.Collectible.CreativeInventoryTabs = ["tools"];
         f.Lifecycle.FinalizeWorld();
@@ -238,6 +239,8 @@ public sealed class RecipeBookDialogNativeInputTests
         var row = Assert.Single(session.Rows);
         session.Select(row.Output.Id);
         session.ChooseAlternative(row.Recipe.Id);
+
+        // Act: enter a no-match query and clear it through the native clear control.
         input.SetValue(new string('x', 400));
         Assert.Empty(session.Rows);
         Assert.True(input.ClearVisible);
@@ -248,6 +251,8 @@ public sealed class RecipeBookDialogNativeInputTests
             input.ClearBounds.absY + input.ClearBounds.OuterHeight / 2, 4);
         Assert.True(menu.SingleComposer.FocusElement(tabs.TabIndex));
         ClickClear();
+
+        // Assert clearing restores search focus without resetting category, pin, or evaluation.
         Assert.Equal("", input.GetText());
         Assert.False(input.ClearVisible);
         Assert.True(input.HasFocus);
@@ -257,6 +262,8 @@ public sealed class RecipeBookDialogNativeInputTests
         Assert.Same(row.Allocation, Assert.Single(session.Rows).Allocation);
         Assert.Equal(0, menu.SingleComposer.GetScrollbar("scroll").CurrentYPosition);
         AssertIcon(false);
+
+        // Act: repeat clearing with craftable-only enabled, including whitespace-only input.
         f.ToggleCraftable(menu);
         input.SetValue("no matching recipe");
         ClickClear();
@@ -268,6 +275,8 @@ public sealed class RecipeBookDialogNativeInputTests
         ClickClear();
         Assert.Equal("", input.GetText());
         input.SetValue("output");
+
+        // Act: resize and reopen the same dialog composer while retaining the active query.
         for (int i = 0; i < 3; i++)
         {
             int textures = f.TextureCount;
@@ -289,10 +298,14 @@ public sealed class RecipeBookDialogNativeInputTests
             Assert.True(input.ClearVisible);
             AssertIcon(true);
         }
+
+        // Act: close and reopen the parent inventory, creating a new dialog from browsing state.
         f.Parent.TryClose();
         f.Parent.TryOpen();
         menu = Assert.Single(f.Menus);
         input = Assert.IsType<GuiElementClearableTextInput>(menu.SingleComposer.GetTextInput("search"));
+
+        // Assert the reopened dialog retained the query and still clears it through native input.
         Assert.Equal("output", input.GetText());
         Assert.True(input.ClearVisible);
         ClickClear();

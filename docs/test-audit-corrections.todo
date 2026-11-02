@@ -42,7 +42,7 @@ Dependencies: none.
 Implementation assets:
 - [Pinned method ledger](../VanillaExpanded.Tests/TestAudit/recipebook-baseline.jsonl): the first JSONL record defines source/placement identifiers and row fields; the following 332 rows retain original identities, categories, fixtures, collections, and theory data separately from planned placements. Fixture references use bare names for direct dependencies and `helper:Method()->Fixture` for dependencies created through helpers.
 - [Category contract](../VanillaExpanded.Tests/TestCategories.cs): the trait key is `Category`; values match the `Unit`, `Component`, `Integration`, and `E2E` directory names. Phase 1 reserved the Component and Integration locations and recorded each method's target category; Phase 3 applies those placements.
-- [Shared GUI support](../VanillaExpanded.Tests/TestSupport/Gui/RecipeBookRenderFixture.cs) owns the common native GUI collection and render fixture outside a test suite. [Recipe Book support](../VanillaExpanded.Tests/TestSupport/RecipeBook/RecipeBookTestFixtures.cs) owns shared dialog/session helpers.
+- [Shared GUI support](../VanillaExpanded.Tests/TestSupport/Gui/GuiRenderFixture.cs) owns the common native GUI collection and client/render/texture fixture outside a test suite. [Recipe Book rendering support](../VanillaExpanded.Tests/TestSupport/RecipeBook/RecipeBookRenderFixture.cs) adds feature-owned cache, atlas, shader, and bake lifetimes; [Recipe Book dialog support](../VanillaExpanded.Tests/TestSupport/RecipeBook/RecipeBookTestFixtures.cs) owns shared dialog/session helpers.
 - Preserve the `Recipe book native GUI` collection's disabled parallelization across all consumers and retain global/configuration/language restoration and resource disposal. Placement changes must not create another collection definition.
 - Completion evidence: the eight affected suites passed 578 tests with zero failures or skips. The second review and independent completion audit accepted the phase after helper-resolved fixture metadata corrections; the ledger retains 332 unique methods and the 123/141/68 planned placement totals.
 
@@ -275,29 +275,35 @@ Exit criteria:
 
 Dependencies: Phase 3.
 
-- [ ] P4.1 Add necessary Arrange/Act/Assert phase delineation to complex reviewed additions (F5).
-  - [ ] Make setup, interactions, and expectations clear in long multi-transition tests.
-  - [ ] Retain coherent lifecycle scenarios rather than mechanically splitting them to obtain a single assertion block.
-  - [ ] Respect the project rule against unnecessary comments. The review reference literally requires AAA comments without a simple-test exception, but that is not an established project requirement for filler comments. Record this policy reconciliation rather than treating clear simple tests as behavioral defects.
-  - [ ] Clarify evaluation/projection/refresh boundaries in `CriteriaChangesReuseAllocationsAndInventoryRefreshEvaluatesExactlyOnce` and prior-publication/failure/recovery boundaries in `FailureWhileFilteringStableRecipesDoesNotPublishPartialRows`.
-  - [ ] Clarify old press/rebinding/new press in `HeldReleaseCannotActivateReboundTileAndRequiresNewPress`, and editing/clear/resize/reopen in `InlineSearchClearUsesNativeEditingAndPreservesOtherCriteriaAcrossResizeAndReopen`.
-  - [ ] Clarify old-composition capture before scale mutation in `ScaleTransitionCapturesTheOldCompositionRowBeforeRestoringAtTheNewScale`.
-  - [ ] Clarify mid-world enable/disable versus reload in `DisabledAtWorldLoadDoesNotLoadSystemAndEnablingWaitsForReload` and `DisablingLiveDisposesSystemAndBlocksReactivationUntilReload`.
-  - [ ] Distinguish inventory reopen from composer replacement in `BrowsingStateSurvivesInventoryReopeningAndComposerReplacement`.
-  - [ ] Distinguish old/new request generations in `ReloadedDeferredCompletionsDoNotUnblockTheNewFourRequestBatch`, and submission failure/retry in `NativeSubmissionFailurePropagatesWithoutTouchingGuiStateAndCanRetry`.
-  - [ ] Clarify capture/cancellation/resource reuse in `ScrollbarPointerFeedbackTracksCaptureAndCancelsWithoutExtraScrollOrUploads`, and clipped input/scrolling/keyboard restoration in `ClippedTabsRejectPointerActivationAndKeyboardWrapRestoresAccessAfterMovement`.
-  - [ ] Distinguish accepted movement from interrupted unsent work in `CompetingUpdateAfterFirstPacketStopsUnsentWorkAndKeepsAcceptedMove`, and local dispatch from authoritative updates in `NativeSynchronizationRefreshesCurrentInventoryWithoutClassifyingServerOutcomes`.
-- [ ] P4.2 Ensure extracted fixtures have clear ownership, complete cleanup, and a focused public testing vocabulary.
-  - [ ] Preserve native texture/composer disposal, engine-global restoration, and existing GUI serialization.
-  - [ ] Reuse existing support rather than cloning fixture implementations into each new suite.
-  - [ ] Keep feature-specific composition helpers out of generic shared-GUI support.
-- [ ] P4.3 Reconcile the original method inventory with the final suites before verification.
-  - [ ] Identify every retained, moved, split, or deliberately replaced method.
-  - [ ] Preserve theory cases and failure-path assertions, not just aggregate method counts.
+Implementation evidence:
+- Generic GUI consumers use [GuiRenderFixture](../VanillaExpanded.Tests/TestSupport/Gui/GuiRenderFixture.cs); [RecipeBookRenderFixture](../VanillaExpanded.Tests/TestSupport/RecipeBook/RecipeBookRenderFixture.cs) adds Recipe Book composition and disposes its cache before restoring shared engine globals.
+- Inventory reconciliation retains every original method exactly once in its Phase 3 destination: 332 methods across 69 suites (123 Unit, 141 Component, 68 Integration). No Phase 4 method moves, splits, or replacements were needed. All 129 theories retain their data, including the 40-entry MemberData provider and its recorded hash; the immutable ledger remains unchanged.
+- Separate full-project verification passed 2,789 tests with zero failures or skips; the build retained 29 existing warnings. The original 176 serialized GUI methods plus the approved ownership-test addition remain in the single disabled-parallelization GUI collection.
+- The second review and fresh independent completion audit accepted the phase with no required issues or evidence gaps. Linux, GPU, and live-runtime acceptance remain outside this phase.
+
+- [x] P4.1 Add necessary Arrange/Act/Assert phase delineation to complex reviewed additions (F5).
+  - [x] Make setup, interactions, and expectations clear in long multi-transition tests.
+  - [x] Retain coherent lifecycle scenarios rather than mechanically splitting them to obtain a single assertion block.
+  - [x] Respect the project rule against unnecessary comments. The review reference literally requires AAA comments without a simple-test exception, but that is not an established project requirement for filler comments. Record this policy reconciliation rather than treating clear simple tests as behavioral defects.
+  - [x] Clarify evaluation/projection/refresh boundaries in `CriteriaChangesReuseAllocationsAndInventoryRefreshEvaluatesExactlyOnce` and prior-publication/failure/recovery boundaries in `FailureWhileFilteringStableRecipesDoesNotPublishPartialRows`.
+  - [x] Clarify old press/rebinding/new press in `HeldReleaseCannotActivateReboundTileAndRequiresNewPress`, and editing/clear/resize/reopen in `InlineSearchClearUsesNativeEditingAndPreservesOtherCriteriaAcrossResizeAndReopen`.
+  - [x] Clarify old-composition capture before scale mutation in `ScaleTransitionCapturesTheOldCompositionRowBeforeRestoringAtTheNewScale`.
+  - [x] Clarify mid-world enable/disable versus reload in `DisabledAtWorldLoadDoesNotLoadSystemAndEnablingWaitsForReload` and `DisablingLiveDisposesSystemAndBlocksReactivationUntilReload`.
+  - [x] Distinguish inventory reopen from composer replacement in `BrowsingStateSurvivesInventoryReopeningAndComposerReplacement`.
+  - [x] Distinguish old/new request generations in `ReloadedDeferredCompletionsDoNotUnblockTheNewFourRequestBatch`, and submission failure/retry in `NativeSubmissionFailurePropagatesWithoutTouchingGuiStateAndCanRetry`.
+  - [x] Clarify capture/cancellation/resource reuse in `ScrollbarPointerFeedbackTracksCaptureAndCancelsWithoutExtraScrollOrUploads`, and clipped input/scrolling/keyboard restoration in `ClippedTabsRejectPointerActivationAndKeyboardWrapRestoresAccessAfterMovement`.
+  - [x] Distinguish accepted movement from interrupted unsent work in `CompetingUpdateAfterFirstPacketStopsUnsentWorkAndKeepsAcceptedMove`, and local dispatch from authoritative updates in `NativeSynchronizationRefreshesCurrentInventoryWithoutClassifyingServerOutcomes`.
+- [x] P4.2 Ensure extracted fixtures have clear ownership, complete cleanup, and a focused public testing vocabulary.
+  - [x] Preserve native texture/composer disposal, engine-global restoration, and existing GUI serialization.
+  - [x] Reuse existing support rather than cloning fixture implementations into each new suite.
+  - [x] Keep feature-specific composition helpers out of generic shared-GUI support.
+- [x] P4.3 Reconcile the original method inventory with the final suites before verification.
+  - [x] Identify every retained, moved, split, or deliberately replaced method.
+  - [x] Preserve theory cases and failure-path assertions, not just aggregate method counts.
 
 Exit criteria:
-- [ ] Test flow and fixture responsibility are understandable without navigating unrelated test suites.
-- [ ] No cleanup, isolation, or coverage is lost through extraction.
+- [x] Test flow and fixture responsibility are understandable without navigating unrelated test suites.
+- [x] No cleanup, isolation, or coverage is lost through extraction.
 
 ## Phase 5 - Make shader evidence truthful and behavioral
 

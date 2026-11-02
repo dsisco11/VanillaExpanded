@@ -29,6 +29,7 @@ public sealed class RecipeBookTilesInteractionTests
     [InlineData("reintroduced", true)]
     public void HeldReleaseCannotActivateReboundTileAndRequiresNewPress(string change, bool craftable)
     {
+        // Arrange a visible tile and press it before the backing selection changes.
         using var scale = new GuiScaleScope();
         var f = new AllocationFixture();
         var a = f.Stack(1, "a", 1);
@@ -58,6 +59,8 @@ public sealed class RecipeBookTilesInteractionTests
         var original = tile.Selection!;
         tiles.OnMouseDown(api.Object, new MouseEvent(10, 10, EnumMouseButton.Left, 0));
         Assert.True(tile.Pressed);
+
+        // Act: change inventory or filter membership, forcing the held press to be reconciled.
         if (change == "reintroduced")
         {
             if (craftable) f.Snapshot();
@@ -70,6 +73,8 @@ public sealed class RecipeBookTilesInteractionTests
         }
         else f.Snapshot(b);
         session.Refresh();
+
+        // Assert refresh canceled the old press before the pointer's held release arrives.
         Assert.False(tile.Pressed);
         Assert.NotNull(tile.Selection);
         if (change == "output") Assert.NotEqual(original.Output.Id, tile.Selection.Output.Id);
@@ -79,10 +84,14 @@ public sealed class RecipeBookTilesInteractionTests
             Assert.NotEqual(original.Recipe.Id, tile.Selection.Recipe.Id);
         }
         if (change == "reintroduced") Assert.Equal(original.Recipe.Id, tile.Selection.Recipe.Id);
+
+        // Act: release the old gesture, then make a fresh press against the rebound tile.
         tiles.OnMouseUp(api.Object, new MouseEvent(10, 10, EnumMouseButton.Left, 0));
         Assert.Empty(actions);
         tiles.OnMouseDown(api.Object, new MouseEvent(10, 10, EnumMouseButton.Left, 0));
         tiles.OnMouseUp(api.Object, new MouseEvent(10, 10, EnumMouseButton.Left, 0));
+
+        // Assert only the new gesture dispatches the current selection.
         Assert.Equal(tile.Selection.Output.Id, Assert.Single(actions));
         tiles.OnMouseUp(api.Object, new MouseEvent(10, 10, EnumMouseButton.Left, 0));
         Assert.Single(actions);

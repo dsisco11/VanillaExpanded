@@ -33,12 +33,15 @@ public sealed class CraftingNativeTransferTests
     [Fact]
     public void NativeSynchronizationRefreshesCurrentInventoryWithoutClassifyingServerOutcomes()
     {
+        // Arrange native slot/network utilities and issue the first local dispatch.
         using var f = new TransferFixture(2, 4, positions: 2);
         var initial = f.Ingredient(4);
         var intermediate = f.Ingredient(2);
         Assert.Equal(CraftingDispatchStatus.Dispatched, f.Coordinator.Execute(f.Entry, false).Status);
         f.Refresh();
         Assert.Equal(1, f.Refreshes);
+
+        // Act: apply asynchronous native updates; they are not classified as feature notifications.
         var world = Resolver(initial);
         var network = new InventoryNetworkUtil(f.F.Hotbar, f.F.Api.Object);
         Apply(network, world, f.F.Hotbar, 0, intermediate);
@@ -47,6 +50,8 @@ public sealed class CraftingNativeTransferTests
         Assert.Empty(f.Notifications);
         f.Refresh();
         Assert.Equal(2, f.Refreshes);
+
+        // Act: dispatch again before the first grid updates arrive, then apply those authoritative updates.
         // A later click is legal even though grid updates for the first action are still in flight.
         Assert.Equal(CraftingDispatchStatus.Dispatched, f.Coordinator.Execute(f.Entry, true).Status);
         var gridNetwork = new InventoryNetworkUtil(f.F.Grid, f.F.Api.Object);
@@ -57,7 +62,9 @@ public sealed class CraftingNativeTransferTests
         Apply(gridNetwork, world, f.F.Grid, 1, intermediate);
         Assert.Equal(2, f.F.Grid[1].StackSize);
         Assert.Empty(f.Notifications);
+        // Act: refresh from the current native inventory after the queued updates have arrived.
         f.Refresh();
+        // Assert only explicit refreshes are feature-owned; native outcomes remain unclassified.
         Assert.Equal(3, f.Refreshes);
     }
 

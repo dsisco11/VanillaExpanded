@@ -210,6 +210,7 @@ public sealed class RecipeBookIconCacheTests
     [Fact]
     public void ReloadedDeferredCompletionsDoNotUnblockTheNewFourRequestBatch()
     {
+        // Arrange a first four-request batch whose atlas callbacks remain deferred.
         using var graphics = new RecipeBookRenderFixture { CompleteOnFrame = false };
         var f = new AllocationFixture();
         var recipes = Enumerable.Range(1, 6)
@@ -221,19 +222,29 @@ public sealed class RecipeBookIconCacheTests
         using var tiles = CreateTiles(graphics, session, rows: 2);
         graphics.Warm(tiles, 2);
         Assert.Equal(4, graphics.Bakes.Count);
+
+        // Act: invalidate that request generation, then fill a fresh batch after atlas reload.
         graphics.Events.Raise(value => value.ReloadTextures += null);
         graphics.Warm(tiles, 2);
         Assert.Equal(8, graphics.Bakes.Count);
+
+        // Assert late callbacks from the old generation cannot allocate slots or free new capacity.
         foreach (var bake in graphics.Bakes.Take(4)) graphics.Complete(bake);
         Assert.Empty(graphics.Allocations);
         graphics.Frame(tiles);
         Assert.Equal(8, graphics.Bakes.Count);
+
+        // Act: complete a current-generation request and verify its released slot can be reused.
         graphics.Complete(graphics.Bakes[4]);
         graphics.Warm(tiles, 2);
         Assert.Equal(9, graphics.Bakes.Count);
+
+        // Act: dispose both cache consumers before the remaining current-generation callbacks arrive.
         tiles.Dispose();
         graphics.Cache.Dispose();
         foreach (var bake in graphics.Bakes.Skip(5)) graphics.Complete(bake);
+
+        // Assert every late completion is released instead of becoming an orphaned allocation.
         Assert.Empty(graphics.Allocations);
     }
 
@@ -263,6 +274,7 @@ public sealed class RecipeBookIconCacheTests
     [Fact]
     public void NativeSubmissionFailurePropagatesWithoutTouchingGuiStateAndCanRetry()
     {
+        // Arrange a render request whose native submission fails on every attempt.
         using var graphics = new RecipeBookRenderFixture();
         var f = new AllocationFixture();
         var recipe = f.Recipe(f.Ingredient(f.Stack(1, "board", 1)));
@@ -279,20 +291,28 @@ public sealed class RecipeBookIconCacheTests
             attempts++;
             throw new InvalidOperationException("submission failed");
         };
+
+        // Act: retry submission twice while the injected boundary failure remains active.
         tiles.RenderInteractiveElements(0);
         Assert.Throws<InvalidOperationException>(() => graphics.BeforeFrame());
         tiles.RenderInteractiveElements(0);
         Assert.Throws<InvalidOperationException>(() => graphics.BeforeFrame());
+
+        // Assert failure leaves the GUI scissor and atlas allocation state untouched.
         Assert.Equal(2, attempts);
         Assert.Same(clip, Assert.Single(graphics.Clips));
         graphics.Render.Verify(value => value.GlScissorFlag(It.IsAny<bool>()), Times.Never);
         Assert.Empty(graphics.Allocations);
+
+        // Act: remove the failure and retry the still-pending request.
         graphics.OnBake = null;
         tiles.RenderInteractiveElements(0);
         graphics.BeforeFrame();
         graphics.EndFrame();
         Assert.Single(graphics.Bakes);
         Assert.Single(graphics.Allocations);
+
+        // Assert the successful retry now has a cache entry for the displayed recipe.
         Assert.NotNull(graphics.Cache.Get(Assert.Single(session.Rows).Recipe, 44, false, out _));
     }
 
