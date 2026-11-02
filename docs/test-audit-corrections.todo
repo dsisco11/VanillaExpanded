@@ -1,0 +1,374 @@
+# Branch test audit: correction tasklist
+
+## Scope and evidence
+
+- Purpose: an implementation contract for maintainers correcting test responsibility, placement, and confirmed defects. This document does not implement those corrections.
+- Audited branch: `crafting-menu`, at `95a3d284156b0a7546554fbb393ae908d9edd914`.
+- Comparison: `origin/master...HEAD`; merge base `ce97c109caa953085666ad09a797bf49fe81b430`.
+- Scope: all 330 test methods in 23 new files, the two added configuration methods, their fixtures, and the changed test-project configuration. Theory rows are additional executions, not additional methods.
+- Review: configured `test_reviewer`, using the test-workflow review guidance and actual boundaries rather than folder names.
+- Same-reviewer reconciliation assigned all 332 methods once: 123 Unit, 141 Component, 68 Integration, and zero E2E. No test deletion, duplication, or method splitting is required by this disposition.
+- Behavioral reference: [Recipe Book design](RecipeBook.md). Existing implementation is evidence, not permission to strengthen its public contract.
+- Preserve all existing behavior and unrelated work. Do not remove meaningful coverage merely because it is misclassified or shares a large file.
+- Source line references below describe the audited revision. Use method identities when moves change line numbers.
+
+### Confirmed findings
+
+| ID | Priority | Discrepancy | Correction phases |
+| --- | --- | --- | --- |
+| F1 | High | Windows-only asset paths in lifecycle and shader tests contradict the supported Ubuntu test configuration. | 2, 6 |
+| F2a | Medium | Filter intersection test requires registration-order short-circuiting excluded by the contract. | 2 |
+| F2b | Medium | Atomic-publication test injects failure by numbered predicate invocation rather than semantic scenario. | 2 |
+| F3 | Medium | Session allocation-reuse test hardcodes allocator-internal native-validation counts. | 2 |
+| F4 | Medium | Exact GLSL substring/order checks freeze syntax without proving compilation or rendered behavior. | 5 |
+| F5 | Low | Complex added tests lack clear setup/action/assertion phase delineation. | 4 |
+| C1 | Organization | Unit/E2E folders and traits misdescribe component and native-integration boundaries. | 1, 3, 6 |
+| O1 | Organization | Mixed subjects, levels, and fixture ownership put tests in unrelated files. | 1, 3, 4 |
+| O2 | Low | Test project adds an identical second managed `cairo-sharp` reference. | 2 |
+
+### Verification already obtained
+
+- A focused Windows run built successfully: 39 passed, zero failed, zero skipped.
+- Selector: `FullyQualifiedName~CraftingNativeTransferTests|FullyQualifiedName~RecipeFilterSetTests|FullyQualifiedName~RecipeBookToggle_|FullyQualifiedName~ShaderSourceRetainsApprovedPaletteOutlineAndSeparateCornerGeometry|FullyQualifiedName~ExplicitBookOpeningFocusesSearchAndAcceptsTheFirstCharacter`.
+- Command shape: `dotnet test .\VanillaExpanded.Tests\VanillaExpanded.Tests.csproj --no-restore --filter "<selector above>" --verbosity minimal`.
+- Compilation/analyzer warnings were present. This is not a warning-free-build claim.
+- Remaining methods were reviewed statically, not executed.
+- No Linux run, live multiplayer workflow, GPU compilation/rendering, or in-game visual acceptance was performed.
+
+## Phase 1 - Establish the placement and discovery contract
+
+Dependencies: none.
+
+- [ ] P1.1 Capture a method-level baseline for all 332 introduced methods, including original fully qualified identity, theory data, category, fixture, collection, and actual tested boundary.
+  - [ ] Keep the existing configuration methods outside this branch's additions out of remediation unless fixture extraction directly requires compatibility work.
+  - [ ] Use the complete reviewed-file inventory below to ensure no added suite is omitted.
+- [ ] P1.2 Establish `Unit`, `Component`, and `Integration` directories and matching category traits within the existing test project.
+  - [ ] Unit: an isolated rule/subject; real data objects alone do not automatically make a test component-level.
+  - [ ] Component: composed production collaborators exercised behind mocked external services.
+  - [ ] Integration: a real native/engine boundary or compatibility contract.
+  - [ ] Reserve E2E for a complete externally driven workflow. The seven current native-transfer tests do not qualify.
+  - [ ] Do not migrate to a separate test assembly merely to obtain an Integration folder; first preserve internal access, fixtures, and discovery.
+- [ ] P1.3 Assign each method exactly one primary responsibility, destination, and level before moving mixed suites.
+  - [ ] Follow the responsibility matrix below, including narrow unit cases that must not move wholesale with a mixed file.
+  - [ ] Preserve coherent multi-transition lifecycle scenarios when they test one responsibility.
+  - [ ] Record any further split needed to distinguish a pure rule from its native compatibility coverage.
+- [ ] P1.4 Identify shared fixture ownership and serialization requirements.
+  - [ ] Extract `RecipeBookRenderFixture` from the renderer-test file to feature-neutral support when shared GUI tests use it.
+  - [ ] Extract common dialog/session fixtures from catch-all suites only where multiple focused suites need them.
+  - [ ] Preserve engine-global restoration, disposal, and collection-based serialization.
+
+Exit criteria:
+- [ ] Every introduced method has one destination; no method is unassigned or duplicated.
+- [ ] Destination names express production responsibility, not the feature that happened to introduce the test.
+- [ ] The discovery and serialization contract is explicit before extraction.
+
+## Phase 2 - Correct known test defects without changing feature behavior
+
+Dependencies: Phase 1, so corrected methods retain traceable identities during extraction.
+
+- [ ] P2.1 Fix portable asset lookup (F1).
+  - [ ] Replace the three lifecycle fixture asset paths at original lines 3672-3685 in [RecipeBookLifecycleTests.cs](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookLifecycleTests.cs).
+  - [ ] Replace the shader asset path at original lines 924-927 in [RecipeBookIconRendererTests.cs](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookIconRendererTests.cs).
+  - [ ] Use platform-portable path segments or deliberately copied test assets; changing only the working directory is insufficient.
+  - [ ] Fail explicitly for missing assets rather than skipping or returning successful defaults.
+- [ ] P2.2 Correct filter-contract overconstraint (F2a).
+  - [ ] Rewrite `ProvidersReceiveTheExactEvaluatedSelectionAndMayShortCircuit`, original lines 73-88 in [RecipeFilterSetTests.cs](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeFilterSetTests.cs).
+  - [ ] Preserve exact evaluated-selection identity and intersection-result assertions.
+  - [ ] Make providers independently evaluable; do not make a later provider throw solely to enforce registration order or short-circuiting.
+- [ ] P2.3 Correct atomic-publication failure injection (F2b).
+  - [ ] Rewrite `FailureWhileFilteringStableRecipesDoesNotPublishPartialRows`, original lines 498-520 in [RecipeBookInteractionTests.cs](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookInteractionTests.cs).
+  - [ ] Fail for a semantically identifiable selection/scenario, not the second predicate call.
+  - [ ] Preserve assertions that published rows remain unchanged, no premature notification occurs, and a subsequent valid operation recovers.
+  - [ ] Do not require invocation counts that the filtering contract explicitly excludes.
+- [ ] P2.4 Decouple session reuse from allocator validation protocol (F3).
+  - [ ] Correct `CriteriaChangesReuseAllocationsAndInventoryRefreshEvaluatesExactlyOnce`, original lines 192-233 in [RecipeBookInteractionTests.cs](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookInteractionTests.cs).
+  - [ ] Retain capture counts and allocation-identity evidence.
+  - [ ] Compare criteria-change validation work against a recorded baseline rather than hardcoding native callback totals of two and four.
+  - [ ] Keep any justified ordinary/shift native-validation protocol assertions in allocator/native-validation suites, not session reuse tests.
+- [ ] P2.5 Remove the duplicate managed Cairo reference (O2).
+  - [ ] Remove only the identical duplicate at original lines 83-86 in [VanillaExpanded.Tests.csproj](../VanillaExpanded.Tests/VanillaExpanded.Tests.csproj); preserve the existing reference and native library copying.
+
+Exit criteria:
+- [ ] Corrected tests enforce behavioral contracts rather than incidental iteration/validation implementation.
+- [ ] No assertion strength is lost merely to make tests pass.
+- [ ] Portable asset lookup is ready for actual Windows and Linux execution in Phase 6.
+
+## Phase 3 - Move and split tests by responsibility and boundary
+
+Dependencies: Phases 1 and 2.
+
+The following deterministic mapping supersedes broad file-level classifications. Source selectors refer to attributed test-method declaration lines at `95a3d284`, inclusive, not slices of method bodies. They exclude helpers, constructors, and disposal methods. Move complete methods with every theory-data attribute. Each method belongs to one row only.
+
+Destination files are within the existing test project at `{Level}/{Feature}/{Destination}.cs`. Use `RecipeBook` as the feature unless the row names `Gui/` or `Configuration/`. An unchanged destination name retains the responsibility, not an incorrect original directory. These are planned destinations, not files claimed to exist already.
+
+### Lifecycle: all 72 methods
+
+Source: [RecipeBookLifecycleTests.cs](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookLifecycleTests.cs).
+
+| Declaration selector | Count | Level | Destination |
+| --- | ---: | --- | --- |
+| `2472-2576, 3209-3290, 3399` | 10 | Component | `RecipeBookSystemLifecycleTests` |
+| `148, 293-338, 1599, 2224, 2407, 3489` | 7 | Component | `RecipeBookDialogLayoutTests` |
+| `27-102, 215, 442, 995, 1549, 2074-2124, 2703, 2961-3147` | 15 | Integration | `RecipeBookDialogNativeInputTests` |
+| `373, 610, 842-971, 1526` | 7 | Component | `RecipeBookDialogFeedbackTests` |
+| `557` | 1 | Component | `RecipeBookSearchClearTests` |
+| `716` | 1 | Integration | `RecipeBookHandbookIntegrationTests` |
+| `806-822` | 2 | Component | `RecipeBookHandbookActionTests` |
+| `1110, 1343-1379, 1492` | 4 | Integration | `RecipeBookNativeTooltipIntegrationTests` |
+| `1223-1315, 1463` | 3 | Component | `RecipeBookTooltipCompositionTests` |
+| `1673-1851` | 6 | Component | `RecipeBookOptionsTests` |
+| `1651, 1868-1897` | 3 | Component | `RecipeBookOpenerStateTests` |
+| `1918` | 1 | Component | `RecipeBookSessionOwnershipTests` |
+| `1961-1996` | 2 | Component | `RecipeBookCategoryPresentationTests` |
+| `2591-2618, 2777-2941, 3164-3187` | 8 | Component | `RecipeBookBrowsingRestorationTests` |
+| `3307, 3436` | 2 | Component | `RecipeBookDialogCleanupTests` |
+
+### Interaction: all 39 methods
+
+Source: [RecipeBookInteractionTests.cs](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookInteractionTests.cs).
+
+| Declaration selector | Count | Level | Destination |
+| --- | ---: | --- | --- |
+| `192-498, 693-740, 868-899, 940` | 14 | Component | `RecipeBookSessionProjectionTests` |
+| `23-130` | 5 | Component | `RecipeBookEmptyDiagnosisTests` |
+| `163, 779, 839, 1306` | 4 | Integration | `RecipeBookSessionTransferIntegrationTests` |
+| `528-648, 1145-1210` | 5 | Component | `RecipeBookTilesInteractionTests` |
+| `800` | 1 | Integration | `RecipeBookInventoryRefreshIntegrationTests` |
+| `958-1013` | 2 | Integration | `RecipeBookTileNativeInputTests` |
+| `1063-1121` | 3 | Unit | `RecipeBookLayoutTests` |
+| `1257` | 1 | Unit | `CraftingClientPolicyTests` |
+| `1275` | 1 | Integration | `CraftingClientPolicyNativeTests` |
+| `920, 1364-1398` | 3 | Component | `RecipeBookAllocationTooltipWarningsTests` |
+
+The policy test at line 1257 merely arranges a native event object; the method at 1275 actually exercises native trait-policy interoperability. Do not classify both by the native types they reference.
+
+### Renderer/cache/assets: all 27 methods
+
+Source: [RecipeBookIconRendererTests.cs](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookIconRendererTests.cs).
+
+| Declaration selector | Count | Level | Destination |
+| --- | ---: | --- | --- |
+| `40-94, 319, 409, 483-583, 788-849` | 10 | Component | `RecipeBookIconRendererTests` |
+| `130-298, 377, 601-754` | 13 | Component | `RecipeBookIconCacheTests` |
+| `17` | 1 | Unit | `RecipeBookShaderAdapterTests` |
+| `354` | 1 | Unit | `CraftingCataloguePreviewSharingTests` |
+| `433` | 1 | Integration | `RecipeBookNativePopupLayeringTests` |
+| `924` | 1 | Unit | `RecipeBookShaderAssetTests`, corrected under F4 |
+
+Mocked atlas/render submission remains Component. A shader-source file read is not positive native/GPU Integration coverage.
+
+### Styled controls: all 13 methods
+
+Source: [GuiStyledControlsTests.cs](../VanillaExpanded.Tests/Unit/Gui/GuiStyledControlsTests.cs).
+
+| Declaration selector | Count | Level | Destination |
+| --- | ---: | --- | --- |
+| `22-165, 271-448, 743` | 10 | Integration | `Gui/GuiStyledControlsNativeCompatibilityTests` |
+| `247, 607` | 2 | Component | `Gui/GuiStyledControlStateRenderingTests` |
+| `809` | 1 | Unit | `Gui/GuiStyledScrollbarValidationTests` |
+
+Keep whole native-compatibility scenarios intact, including their accompanying visual assertions; do not duplicate them into another level.
+
+### Icon tabs: all 11 methods
+
+Source: [GuiElementIconTabsTests.cs](../VanillaExpanded.Tests/Unit/Gui/GuiElementIconTabsTests.cs).
+
+| Declaration selector | Count | Level | Destination |
+| --- | ---: | --- | --- |
+| `23-302, 440-612` | 10 | Component | `Gui/GuiElementIconTabsTests` |
+| `397` | 1 | Integration | `Gui/GuiElementIconTabsComposerIntegrationTests` |
+
+`NativeScissorRetainsEverySelectedBorderAcrossFractionalMovementAndScrolling` stays Component: its render API is mocked and its native scissor conversion is modeled, not executed through the real renderer.
+
+### Transfer: all 22 methods
+
+Source: [CraftingTransferTests.cs](../VanillaExpanded.Tests/Unit/RecipeBook/CraftingTransferTests.cs).
+
+| Declaration selector | Count | Level | Destination |
+| --- | ---: | --- | --- |
+| `17-62, 106, 136-146, 185-258, 303, 372` | 15 | Integration | `CraftingTransferNativeIntegrationTests` |
+| `75-91, 121, 273-292, 328` | 6 | Component | `CraftingTransferPreflightTests` |
+| `163` | 1 | Unit | `CraftingTransferPlannerTests` |
+
+### Remaining suites: all 148 methods
+
+Source locations are the original files listed in the reviewed-file inventory below.
+
+| Source suite | Declaration selector | Count | Level | Destination |
+| --- | --- | ---: | --- | --- |
+| CraftingNativeTransferTests | All seven | 7 | Integration | `CraftingNativeTransferTests` |
+| GuiControlNativeProbeTests | All five | 5 | Integration | `Gui/GuiControlNativeProbeTests` |
+| GuiControlVisualsTests | `39-57, 113` | 3 | Unit | `Gui/GuiControlVisualsTests` |
+| GuiControlVisualsTests | `72` | 1 | Unit | `RecipeBookVisualMetricsTests` |
+| CraftingAllocationTests | `15-321, 371-416` | 23 | Unit | `CraftingAllocationTests` |
+| CraftingAllocationTests | `336` | 1 | Component | `CraftingCatalogueEvaluationPipelineTests` |
+| CraftingCandidateTests | All ten | 10 | Unit | `CraftingCandidateTests` |
+| CraftingCatalogueTests | All ten | 10 | Unit | `CraftingCatalogueTests` |
+| CraftingCatalogueViewTests | `11-45, 168-277` | 9 | Unit | `CraftingCatalogueViewTests` |
+| CraftingCatalogueViewTests | `73-119` | 3 | Component | `CraftingCategoryProjectionTests` |
+| CraftingCatalogueViewTests | `141-153` | 2 | Component | `RecipeSearchProjectionTests` |
+| CraftingCatalogueViewTests | `295` | 1 | Unit | `CraftingRecipeEvaluationTests` |
+| CraftingInventorySnapshotTests | `12-81, 173-183` | 6 | Unit | `CraftingInventorySnapshotTests` |
+| CraftingInventorySnapshotTests | `94, 162` | 2 | Unit | Merge into `CraftingAllocationTests` |
+| CraftingInventorySnapshotTests | `117` | 1 | Integration | `CraftingNativeGridDetectionTests` |
+| GridPriorityTests | All five | 5 | Component | `GridPriorityTests` |
+| GridRelevanceTests | All ten | 10 | Unit | `GridRelevanceTests` |
+| RecipeBookCategoryIconsTests | Single method | 1 | Unit | `RecipeBookCategoryIconsTests` |
+| RecipeBookPerformanceTests | `14-35` | 2 | Unit | `CraftingAllocationProfileTests`; profiling purpose/tag, not a new level |
+| RecipeBookPerformanceTests | `54` | 1 | Component | `CraftingEvaluationCacheTests` |
+| RecipeBookPerformanceTests | `75, 230-254` | 3 | Unit | `CraftingIngredientLookupTests` |
+| RecipeBookPerformanceTests | `106-192` | 4 | Unit | `CraftingNativeEqualityContractTests` |
+| RecipeBookPerformanceTests | `215, 267` | 2 | Unit | Merge into `CraftingAllocationTests` |
+| RecipeBookTileGeometryTests | `24-63` | 2 | Unit | `RecipeBookTileGeometryTests` |
+| RecipeBookTileGeometryTests | `77-235` | 3 | Component | `RecipeBookTilesGeometryTests` |
+| RecipeBookTooltipSummaryTests | `15-68` | 4 | Component | `RecipeBookAllocationSummaryTests` |
+| RecipeBookTooltipSummaryTests | `84` | 1 | Unit | `RecipeBookTooltipSummaryTests` |
+| RecipeFilterFeatureTests | `15-107, 160-180` | 6 | Unit | `RecipeFilterFeatureTests` |
+| RecipeFilterFeatureTests | `117` | 1 | Component | `RecipeFilterCompositionTests` |
+| RecipeFilterSetTests | `10-259` | 14 | Unit | `RecipeFilterSetTests` |
+| RecipeFilterSetTests | `276` | 1 | Component | Merge into `RecipeBookSessionOwnershipTests` |
+| RecipeSortTests | Both methods | 2 | Unit | `RecipeSortTests` |
+| ConfigLibIntegrationTests additions | Named methods below | 2 | Unit | `Configuration/RecipeBookConfigContractTests` |
+
+Move only these two additions from [ConfigLibIntegrationTests.cs](../VanillaExpanded.Tests/Unit/Configuration/ConfigLibIntegrationTests.cs):
+
+1. `RecipeBookToggle_DefaultsToEnabledAndPersistsExplicitDisable`.
+2. `RecipeBookToggle_IsClientSideLocalizedAndMatchesTheConfigDefault`.
+
+Neither exercises actual ConfigLib runtime interoperability. Preserve unrelated legacy contents.
+
+For [GuiControlVisualsTests.cs](../VanillaExpanded.Tests/Unit/Gui/GuiControlVisualsTests.cs), retain `PaletteMatchesApprovedReferenceAndReturnsIndependentColors`, `FrameHasApprovedFillAndGuiScaledWholePixelOutline`, and `GradientsAreLocalAndInvalidPixelGeometryFailsExplicitly` as Unit tests. In-memory Cairo raster output alone does not require Integration classification. Move the entire `MetricsSeparateGenericControlsFromRecipeBookComposition` method to Recipe Book visual metrics; do not duplicate its shared constants merely to partition assertions.
+
+Disposition checksum: **123 Unit + 141 Component + 68 Integration = 332 introduced methods; zero introduced E2E methods.** Native value types, mocked native events, and native naming alone do not justify promoting isolated allocator/grid-relevance rules.
+
+- [ ] P3.1 Apply GUI/control and native-probe extraction.
+- [ ] P3.2 Apply catalogue, allocation, snapshot, transfer, grid-priority, and filter extraction.
+- [ ] P3.3 Apply session, tile/container, tooltip, and layout extraction.
+- [ ] P3.4 Split the 72 lifecycle cases by their owning system/dialog/control responsibility.
+- [ ] P3.5 Separate rendering, cache, catalogue sharing, and shader-asset ownership.
+- [ ] P3.6 Relocate configuration additions and correctness cases currently living under Performance.
+- [ ] P3.7 Update namespaces, class names, traits, fixture references, and collection attributes together.
+  - [ ] Do not treat moving a file alone as correcting mixed per-method responsibilities.
+  - [ ] Preserve source-to-destination traceability for every original method and theory.
+  - [ ] Verify the disposition checksum and selectors against the pinned revision before moving methods.
+  - [ ] Do not discard assertions, weaken behavior, or introduce duplicated scenarios during moves.
+
+Exit criteria:
+- [ ] No reviewed test remains under an incorrect level or unrelated subject file.
+- [ ] Shared generic GUI tests do not depend on support declared in a Recipe Book renderer test file.
+- [ ] All original coverage is accounted for, with any changed method count explicitly explained.
+
+## Phase 4 - Clarify test phases and fixture ownership
+
+Dependencies: Phase 3.
+
+- [ ] P4.1 Add necessary Arrange/Act/Assert phase delineation to complex reviewed additions (F5).
+  - [ ] Make setup, interactions, and expectations clear in long multi-transition tests.
+  - [ ] Retain coherent lifecycle scenarios rather than mechanically splitting them to obtain a single assertion block.
+  - [ ] Respect the project rule against unnecessary comments. The review reference literally requires AAA comments without a simple-test exception, but that is not an established project requirement for filler comments. Record this policy reconciliation rather than treating clear simple tests as behavioral defects.
+  - [ ] Clarify evaluation/projection/refresh boundaries in `CriteriaChangesReuseAllocationsAndInventoryRefreshEvaluatesExactlyOnce` and prior-publication/failure/recovery boundaries in `FailureWhileFilteringStableRecipesDoesNotPublishPartialRows`.
+  - [ ] Clarify old press/rebinding/new press in `HeldReleaseCannotActivateReboundTileAndRequiresNewPress`, and editing/clear/resize/reopen in `InlineSearchClearUsesNativeEditingAndPreservesOtherCriteriaAcrossResizeAndReopen`.
+  - [ ] Clarify old-composition capture before scale mutation in `ScaleTransitionCapturesTheOldCompositionRowBeforeRestoringAtTheNewScale`.
+  - [ ] Clarify mid-world enable/disable versus reload in `DisabledAtWorldLoadDoesNotLoadSystemAndEnablingWaitsForReload` and `DisablingLiveDisposesSystemAndBlocksReactivationUntilReload`.
+  - [ ] Distinguish inventory reopen from composer replacement in `BrowsingStateSurvivesInventoryReopeningAndComposerReplacement`.
+  - [ ] Distinguish old/new request generations in `ReloadedDeferredCompletionsDoNotUnblockTheNewFourRequestBatch`, and submission failure/retry in `NativeSubmissionFailurePropagatesWithoutTouchingGuiStateAndCanRetry`.
+  - [ ] Clarify capture/cancellation/resource reuse in `ScrollbarPointerFeedbackTracksCaptureAndCancelsWithoutExtraScrollOrUploads`, and clipped input/scrolling/keyboard restoration in `ClippedTabsRejectPointerActivationAndKeyboardWrapRestoresAccessAfterMovement`.
+  - [ ] Distinguish accepted movement from interrupted unsent work in `CompetingUpdateAfterFirstPacketStopsUnsentWorkAndKeepsAcceptedMove`, and local dispatch from authoritative updates in `NativeSynchronizationRefreshesCurrentInventoryWithoutClassifyingServerOutcomes`.
+- [ ] P4.2 Ensure extracted fixtures have clear ownership, complete cleanup, and a focused public testing vocabulary.
+  - [ ] Preserve native texture/composer disposal, engine-global restoration, and existing GUI serialization.
+  - [ ] Reuse existing support rather than cloning fixture implementations into each new suite.
+  - [ ] Keep feature-specific composition helpers out of generic shared-GUI support.
+- [ ] P4.3 Reconcile the original method inventory with the final suites before verification.
+  - [ ] Identify every retained, moved, split, or deliberately replaced method.
+  - [ ] Preserve theory cases and failure-path assertions, not just aggregate method counts.
+
+Exit criteria:
+- [ ] Test flow and fixture responsibility are understandable without navigating unrelated test suites.
+- [ ] No cleanup, isolation, or coverage is lost through extraction.
+
+## Phase 5 - Make shader evidence truthful and behavioral
+
+Dependencies: Phase 3's renderer/cache/asset split and Phase 2's portable asset lookup.
+
+- [ ] P5.1 Replace the overclaimed source-syntax mechanism in `ShaderSourceRetainsApprovedPaletteOutlineAndSeparateCornerGeometry` (F4), original lines 924-945 in [RecipeBookIconRendererTests.cs](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookIconRendererTests.cs).
+  - [ ] Retain approved palette values and geometry dimensions as legitimate requirements.
+  - [ ] Remove dependence on exact expression spelling and textual ordering where equivalent shader behavior is allowed.
+  - [ ] Keep any useful source/asset check explicitly labelled as a limited structural guard, not proof of compilation or rendered appearance.
+  - [ ] Preserve mocked renderer protocol/state tests; their responsibility is submission and state management, not GPU behavior.
+- [ ] P5.2 Establish actual compiled/rendered evidence for palette, availability outlines, and separate selection-corner geometry where a suitable environment is available.
+  - [ ] Confirm meaningful changes to those outcomes are detected and behavior-preserving source refactoring does not fail merely for syntax.
+  - [ ] If GPU/in-game validation is unavailable, record the exact remaining acceptance gap and keep that validation item open. Do not silently substitute substring checks or a mocked compile result.
+
+Exit criteria:
+- [ ] Asset guards and renderer mocks no longer imply GPU coverage they do not supply.
+- [ ] Actual visual validation has evidence, or its incompleteness remains explicit and unchecked.
+
+## Phase 6 - Verify discovery, portability, behavior, and documentation
+
+Dependencies: Phases 2-5. Unavailable environment-dependent acceptance stays open rather than being marked complete.
+
+- [ ] P6.1 Build and run the focused changed suites using the repository's existing test runner.
+  - [ ] First run the affected responsibilities together; expand to the full project after the extraction changes discovery/fixtures broadly.
+  - [ ] Run category-filtered discovery/execution for Unit, Component, and Integration and compare with P1's method-level map.
+  - [ ] Confirm each mapped method is discovered exactly once at its intended level; verify any retained E2E category contains genuine E2E workflows.
+  - [ ] Preserve and investigate failures rather than masking them with skips, broad catches, or successful defaults.
+- [ ] P6.2 Execute affected asset-dependent suites on Windows and Linux.
+  - [ ] Verify all three lifecycle asset locations and the shader location are read successfully on both platforms.
+  - [ ] Preserve the existing unfiltered Ubuntu CI test run; do not claim classification alone caused CI omissions.
+  - [ ] Record commands, revision, passed/failed/skipped counts, warnings, and environment limitations.
+- [ ] P6.3 Reconcile behavioral assertions after extraction.
+  - [ ] Confirm filter failures still preserve published rows and recover without enforcing excluded invocation semantics.
+  - [ ] Confirm criteria changes reuse allocations without binding session tests to allocator-internal validation counts.
+  - [ ] Confirm native-transfer tests still exercise the real native compatibility boundary after reclassification.
+  - [ ] Confirm global-state cleanup and collection serialization remain effective across the new suites.
+- [ ] P6.4 Update directly related test documentation to match the implemented organization.
+  - [ ] Update verification links and commands in [RecipeBook.md](RecipeBook.md).
+  - [ ] Update testing conventions in [copilot-instructions.md](../.github/copilot-instructions.md) for Component/Integration locations and traits while preserving Unit/E2E guidance.
+  - [ ] Remove misleading E2E or shader-proof claims wherever the moved suites are documented.
+  - [ ] Clearly separate headless automation from GPU, live multiplayer, and in-game acceptance.
+- [ ] P6.5 Obtain configured independent test review of the complete coherent correction batch.
+  - [ ] Reconcile every confirmed finding F1-F5, C1, O1, and O2 against this tasklist and final evidence.
+  - [ ] Resolve new issues caused by the moves without expanding into unrelated pre-existing test debt.
+  - [ ] Close all correction tasks only when their evidence is recorded; leave unavailable visual/runtime acceptance explicitly open.
+
+## Complete reviewed-file inventory
+
+All rows also participate in F5's phase-clarity review; "no additional defect" does not exempt a file from retaining its existing coverage.
+
+| New suite | Methods | Reviewed disposition |
+| --- | ---: | --- |
+| [CraftingNativeTransferTests](../VanillaExpanded.Tests/E2E/RecipeBook/CraftingNativeTransferTests.cs) | 7 | Native Integration, not E2E. |
+| [GuiControlNativeProbeTests](../VanillaExpanded.Tests/Unit/Gui/GuiControlNativeProbeTests.cs) | 5 | Native compatibility Integration; deletion not justified. |
+| [GuiControlVisualsTests](../VanillaExpanded.Tests/Unit/Gui/GuiControlVisualsTests.cs) | 4 | Three shared GUI units; one Recipe Book visual-metrics unit. |
+| [GuiElementIconTabsTests](../VanillaExpanded.Tests/Unit/Gui/GuiElementIconTabsTests.cs) | 11 | Component/native Integration split. |
+| [GuiStyledControlsTests](../VanillaExpanded.Tests/Unit/Gui/GuiStyledControlsTests.cs) | 13 | Per-control Component/native Integration split. |
+| [CraftingAllocationTests](../VanillaExpanded.Tests/Unit/RecipeBook/CraftingAllocationTests.cs) | 24 | 23 allocator units and one pipeline component. |
+| [CraftingCandidateTests](../VanillaExpanded.Tests/Unit/RecipeBook/CraftingCandidateTests.cs) | 10 | Narrow candidate/index rules; no additional defect. |
+| [CraftingCatalogueTests](../VanillaExpanded.Tests/Unit/RecipeBook/CraftingCatalogueTests.cs) | 10 | Catalogue construction rules; no additional defect. |
+| [CraftingCatalogueViewTests](../VanillaExpanded.Tests/Unit/RecipeBook/CraftingCatalogueViewTests.cs) | 15 | Nine projection units, five category/search components, one invariant unit. |
+| [CraftingInventorySnapshotTests](../VanillaExpanded.Tests/Unit/RecipeBook/CraftingInventorySnapshotTests.cs) | 9 | Capture rules plus misplaced allocator/native-pipeline cases. |
+| [CraftingTransferTests](../VanillaExpanded.Tests/Unit/RecipeBook/CraftingTransferTests.cs) | 22 | Planner/coordinator/native interoperability split. |
+| [GridPriorityTests](../VanillaExpanded.Tests/Unit/RecipeBook/GridPriorityTests.cs) | 5 | Session/evaluation Component coverage. |
+| [GridRelevanceTests](../VanillaExpanded.Tests/Unit/RecipeBook/GridRelevanceTests.cs) | 10 | Narrow matching rules using native predicates remain Unit; no additional defect. |
+| [RecipeBookCategoryIconsTests](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookCategoryIconsTests.cs) | 1 | Mapping rule; no additional defect. |
+| [RecipeBookIconRendererTests](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookIconRendererTests.cs) | 27 | Renderer/cache/sharing/asset split; F1 and F4. |
+| [RecipeBookInteractionTests](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookInteractionTests.cs) | 39 | Session/control/native/rule split; F2b and F3. |
+| [RecipeBookLifecycleTests](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookLifecycleTests.cs) | 72 | System/dialog/control/native split; F1. |
+| [RecipeBookPerformanceTests](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookPerformanceTests.cs) | 12 | Two profiling workloads; ten correctness cases to relocate. |
+| [RecipeBookTileGeometryTests](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookTileGeometryTests.cs) | 5 | Two geometry units; three tile Component scenarios. |
+| [RecipeBookTooltipSummaryTests](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookTooltipSummaryTests.cs) | 5 | Four allocation-to-summary components and one formatter-guard unit. |
+| [RecipeFilterFeatureTests](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeFilterFeatureTests.cs) | 7 | Predicate/controller rules plus feature composition. |
+| [RecipeFilterSetTests](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeFilterSetTests.cs) | 15 | Registry/projection rules plus session ownership; F2a. |
+| [RecipeSortTests](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeSortTests.cs) | 2 | Sort state/ordering rules; no additional defect. |
+| Added [ConfigLibIntegrationTests](../VanillaExpanded.Tests/Unit/Configuration/ConfigLibIntegrationTests.cs) methods | 2 | Configuration contract additions, not ConfigLib runtime interoperability. |
+| Total introduced methods | 332 | Includes 330 methods in new files and two in an existing file. |
+
+## Explicit non-findings and limits
+
+- No category-filtered CI omission was established; current CI runs unfiltered tests.
+- Classification/reorganization alone is not an established release blocker.
+- Native probes were not established as redundant.
+- No measured performance regression or unjustified GUI serialization was established.
+- Numeric approved palette/dimension assertions and bounded exhaustive algorithm examples are not defects merely for being exact or extensive.
+- Temporary-metadata-loss coverage was not confirmed: the unchanged-state helper's use of production `CraftingTransferState.Copy/Same` received incomplete native-equality reconciliation. Do not turn that uncertainty into a required defect fix.
+- This tasklist does not authorize unrelated production changes, a new E2E infrastructure project, or replacement of the test framework.
