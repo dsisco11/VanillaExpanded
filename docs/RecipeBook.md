@@ -234,6 +234,6 @@ Recipe Book tests are separated by their exercised boundary: [Unit](../VanillaEx
 dotnet test .\VanillaExpanded.Tests\VanillaExpanded.Tests.csproj --no-restore --filter "FullyQualifiedName~.RecipeBook.|FullyQualifiedName~.Gui.|FullyQualifiedName~RecipeBookConfigContractTests" --verbosity minimal
 ```
 
-Native GUI fixtures run without a live game or GPU context. Shader-source assertions and mocked shader uniforms do not prove GPU compilation or rendered appearance. Use the existing Cake pipeline through `.\build.ps1` to validate JSON, publish the mod, and package its shader/assets.
+Native GUI fixtures run without a live game or GPU context. Mocked shader tests cover renderer submission and state management, not GPU compilation or rendered appearance. One-time GPU acceptance is separate evidence, not a permanent regression suite. Use the existing Cake pipeline through `.\build.ps1` to validate JSON, publish the mod, and package its shader/assets.
 
 Package-identified captures at equivalent category, scale, and state support reproducible visual comparisons. Live-world layout, inventory transitions, multiplayer behavior, and recipe/modpack compatibility need in-game validation independently of automated fixtures.
