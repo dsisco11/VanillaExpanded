@@ -145,10 +145,9 @@ public sealed class LayeredIndicatorsTests
             if (glyphs > 0) Assert.True(fixture.Glyphs.Count > beforeContext);
         }
     }
-    /// <summary>Production PNG loaders borrow cache wrappers, while each generated glyph is deleted exactly once.</summary>
-    [Theory]
-    [InlineData("wetness")] [InlineData("weather")]
-    public void ProductionLoadersKeepEngineTextureOwnership(string kind)
+    /// <summary>The weather PNG fallback borrows engine-cached textures while generated glyphs are deleted exactly once.</summary>
+    [Fact]
+    public void WeatherFallbackLoaderKeepsEngineTextureOwnership()
     {
         // Arrange
         using var fixture = new LayeredIndicatorsFixture();
@@ -156,26 +155,23 @@ public sealed class LayeredIndicatorsTests
         var paths = new List<string>();
         fixture.Resources.Native.Render.Setup(renderer => renderer.GetOrLoadTexture(It.IsAny<AssetLocation>(), ref It.Ref<LoadedTexture>.IsAny))
             .Callback(new TextureLoad((AssetLocation location, ref LoadedTexture texture) => { paths.Add(location.Path); loaded.Add(texture); }));
-        IndicatorPresentation presentation;
-        INativeView view;
-        switch (kind)
-        {
-            case "wetness":
-                var wetness = new PlayerWetnessPresentation(fixture.Measure, fixture.CreateText, loadBackdrop: _ => null);
-                wetness.SetContent(.5f); wetness.Prepare(fixture.Context); presentation = wetness; view = wetness.CreateView(fixture.Context.Api); break;
-            default:
-                var weather = new WeatherConditionsPresentation(loadBackdrop: _ => null, hasCompletePack: _ => false);
-                weather.SetContent(new(EnumPrecipitationType.Rain, false)); weather.Prepare(fixture.Context); presentation = weather; view = weather.CreateView(fixture.Context.Api); break;
-        }
+        using var presentation = new WeatherConditionsPresentation(loadBackdrop: _ => null, hasCompletePack: _ => false);
+        presentation.SetContent(new(EnumPrecipitationType.Rain, false));
+        presentation.Prepare(fixture.Context);
+
         // Act
-        using (presentation)
-        using (var composition = new IndicatorComposition(fixture.Context.Api, view, fixture.Context, presentation.Size))
+        using (var composition = new IndicatorComposition(
+            fixture.Context.Api, presentation.CreateView(fixture.Context.Api), fixture.Context, presentation.Size))
         {
             // Assert
             Assert.NotEmpty(loaded); Assert.All(paths, path => Assert.EndsWith(".png", path));
             Assert.All(loaded, texture => Assert.True(texture.IgnoreUndisposed));
             var glyphIds = fixture.Glyphs.Where(glyph => !glyph.Disposed).Select(glyph => glyph.TextureId).ToArray();
+
+            // Act
             composition.Dispose(); composition.Dispose();
+
+            // Assert
             Assert.All(loaded, texture => Assert.False(texture.Disposed));
             foreach (int id in glyphIds) fixture.Resources.Native.Gui.Verify(gui => gui.DeleteTexture(id), Times.Once);
             Assert.All(fixture.Glyphs, glyph => Assert.True(glyph.Disposed));
@@ -188,33 +184,181 @@ public sealed class LayeredIndicatorsTests
     [InlineData(.001f, "1%")] [InlineData(.5f, "50%")] [InlineData(1, "100%")]
     public void WetnessReadingsFitAboveStableFullDrops(float wetness, string expected)
     {
+        // Arrange
         using var fixture = new LayeredIndicatorsFixture(2) { TextSize = new(140, 32) };
         using var content = new PlayerWetnessPresentation(fixture.Measure, fixture.CreateText, fixture.Load, _ => fixture.Resources.Backdrop.Object);
+
+        // Act
         content.SetContent(wetness); content.Prepare(fixture.Context);
         using var composition = new IndicatorComposition(fixture.Context.Api, content.CreateView(fixture.Context.Api), fixture.Context, content.Size);
+
+        // Assert
         Assert.Contains(expected, fixture.Values);
         var reading = Assert.IsType<TextElement>(composition.Composer.GetElement("test:reading"));
         var drops = Enumerable.Range(0, 4).Select(index => Assert.IsType<TextureElement>(composition.Composer.GetElement("test:drop-" + index))).ToArray();
         Assert.Equal(drops[0].State.Target, drops[1].State.Target); Assert.Equal(drops[2].State.Target, drops[3].State.Target);
-        Assert.Equal(24 * 2, drops[0].Bounds.ParentBounds.OuterWidth);
-        Assert.Equal(24 * 2, drops[0].Bounds.ParentBounds.OuterHeight);
-        Assert.Equal(15 * 2, drops[0].State.Target.Width);
-        Assert.Equal(9 * 2, drops[2].State.Target.Width);
+        Assert.Equal(drops[0].Bounds.ParentBounds.OuterWidth, drops[0].Bounds.ParentBounds.OuterHeight);
+        Assert.True(drops[0].State.Target.Width > drops[2].State.Target.Width);
+        Assert.Equal(drops[0].State.Target.Width, drops[0].State.Target.Height);
+        Assert.Equal(drops[2].State.Target.Width, drops[2].State.Target.Height);
+        Assert.NotNull(drops[0].State.Tint(false));
+        Assert.Null(drops[1].State.Tint(false));
+        Assert.NotNull(drops[2].State.Tint(false));
+        Assert.Null(drops[3].State.Tint(false));
+        string[] expectedAssets =
+        [
+            "textures/hud/player-wetness/fill-mask.svg",
+            "textures/hud/player-wetness/outline.svg"
+        ];
+        Assert.Equal(expectedAssets.OrderBy(path => path), fixture.Bindings.Keys.OrderBy(path => path));
+
+        // Act
         composition.View.CollectBackdrops(fixture.Context.Api.Render);
+
+        // Assert
         var backdrop = Assert.Single(fixture.Resources.Backdrop.Invocations);
         Assert.Equal(drops[0].Bounds.ParentBounds.renderX, Assert.IsType<double>(backdrop.Arguments[1]), 4);
         Assert.Equal(drops[0].Bounds.ParentBounds.renderY, Assert.IsType<double>(backdrop.Arguments[2]), 4);
-        Assert.Equal(2d * 24 / 36, Assert.IsType<double>(backdrop.Arguments[3]), 6);
+        Assert.Equal(drops[0].Bounds.ParentBounds.OuterWidth / HudOverlaySizes.Standard,
+            Assert.IsType<double>(backdrop.Arguments[3]), 6);
         Assert.True(reading.State.Target.Bottom <= drops.Min(drop => drop.State.Target.Top) + .001);
         Assert.Equal(reading.Bounds.renderX + reading.Bounds.OuterWidth / 2,
             drops[0].Bounds.ParentBounds.renderX + drops[0].Bounds.ParentBounds.OuterWidth / 2, 4);
+
+        // Act
+        composition.View.SetOpacity(0);
+        fixture.Resources.Native.Render.Invocations.Clear();
+        composition.Composer.Render(0);
+
+        // Assert
+        Assert.Empty(fixture.Resources.Native.Render.Invocations.Where(call => call.Method.Name == "Render2DTexture"));
+
+        // Act
+        composition.View.SetOpacity(1);
         var targets = drops.Select(drop => drop.State.Target).ToArray();
+
+        // Act
         content.SetContent(.26f); content.Prepare(fixture.Context); composition.Update(fixture.Context);
+
+        // Assert
         Assert.Equal(targets, drops.Select(drop => drop.State.Target));
         fixture.Resources.Native.Render.Invocations.Clear(); composition.Composer.Render(0);
         var draws = fixture.Resources.Native.Render.Invocations.Where(call => call.Method.Name == "Render2DTexture").ToArray();
         Assert.Equal(4, draws.Length);
-        Assert.Equal(draws[0].Arguments[0], draws[2].Arguments[0]); Assert.Equal(draws[1].Arguments[0], draws[3].Arguments[0]);
+        int fillTexture = fixture.Bindings[expectedAssets[0]].TextureId;
+        int outlineTexture = fixture.Bindings[expectedAssets[1]].TextureId;
+        Assert.Equal(new[] { fillTexture, outlineTexture, fillTexture, outlineTexture }, draws.Select(draw => (int)draw.Arguments[0]));
+        Assert.NotNull(draws[0].Arguments[6]);
+        Assert.Null(draws[1].Arguments[6]);
+        Assert.NotNull(draws[2].Arguments[6]);
+        Assert.Null(draws[3].Arguments[6]);
+    }
+
+    /// <summary>Wetness fill and outline layers use independent default SVG resources, reuse unchanged paths, and retire per composition.</summary>
+    [Fact]
+    public void WetnessSvgLayersReuseDefaultLoadsAndRetainIndependentCompositionOwnership()
+    {
+        // Arrange
+        using var fixture = new LayeredIndicatorsFixture();
+        var requests = new List<(string Path, int Width, int Height, int TextureWidth, int TextureHeight)>();
+        var svgTextures = new List<LoadedTexture>();
+        fixture.Resources.Native.Gui
+            .Setup(gui => gui.LoadSvg(It.IsAny<AssetLocation>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int?>()))
+            .Callback<AssetLocation, int, int, int, int, int?>((location, width, height, textureWidth, textureHeight, _) =>
+                requests.Add((location.Path, width, height, textureWidth, textureHeight)))
+            .Returns(() =>
+            {
+                var texture = new LoadedTexture(fixture.Context.Api);
+                svgTextures.Add(texture);
+                return texture;
+            });
+        using var content = new PlayerWetnessPresentation(fixture.Measure, fixture.CreateText, loadBackdrop: _ => null);
+        content.SetContent(.5f);
+        content.Prepare(fixture.Context);
+        string[] expectedPaths =
+        [
+            "textures/hud/player-wetness/fill-mask.svg",
+            "textures/hud/player-wetness/outline.svg",
+            "textures/hud/player-wetness/fill-mask.svg",
+            "textures/hud/player-wetness/outline.svg"
+        ];
+
+        // Act
+        using var first = new IndicatorComposition(
+            fixture.Context.Api, content.CreateView(fixture.Context.Api), fixture.Context, content.Size);
+
+        // Assert
+        Assert.Equal(expectedPaths, requests.Select(request => request.Path));
+        Assert.Equal(4, svgTextures.Count);
+        Assert.Equal(4, svgTextures.Distinct().Count());
+        Assert.All(requests, request =>
+        {
+            Assert.True(request.Width > 0);
+            Assert.True(request.Height > 0);
+            Assert.Equal(request.Width, request.TextureWidth);
+            Assert.Equal(request.Height, request.TextureHeight);
+        });
+        fixture.Resources.Native.Render.Verify(
+            renderer => renderer.GetOrLoadTexture(It.IsAny<AssetLocation>(), ref It.Ref<LoadedTexture>.IsAny),
+            Times.Never);
+        var firstTextures = svgTextures.ToArray();
+        Assert.All(firstTextures, texture => Assert.False(texture.Disposed));
+
+        // Act
+        content.Prepare(fixture.Context);
+        first.Update(fixture.Context);
+        content.SetContent(.26f);
+        content.Prepare(fixture.Context);
+        first.Update(fixture.Context);
+
+        // Assert
+        Assert.Equal(4, requests.Count);
+        Assert.All(firstTextures, texture => Assert.False(texture.Disposed));
+
+        // Act
+        var secondView = content.CreateView(fixture.Context.Api);
+        ((NativeView)secondView).SetFailureHandler(fixture.Resources.Native.Failures.Add);
+        using var second = new IndicatorComposition(
+            fixture.Context.Api, secondView, fixture.Context, content.Size);
+
+        // Assert
+        Assert.Equal(expectedPaths.Concat(expectedPaths), requests.Select(request => request.Path));
+        Assert.Equal(8, svgTextures.Count);
+        var secondTextures = svgTextures.Skip(4).ToArray();
+        Assert.Equal(4, secondTextures.Distinct().Count());
+        Assert.All(secondTextures, texture => Assert.False(texture.Disposed));
+
+        // Act
+        // Keep default-loader filtering headless with zero-ID wrappers; add synthetic draw identities only afterward.
+        for (int index = 0; index < secondTextures.Length; index++)
+            secondTextures[index].TextureId = 3000 + index;
+
+        // Act
+        first.Dispose();
+
+        // Assert
+        Assert.All(firstTextures, texture => Assert.True(texture.Disposed));
+        Assert.All(secondTextures, texture => Assert.False(texture.Disposed));
+
+        // Act
+        fixture.Resources.Native.Render.Invocations.Clear();
+        second.Composer.Render(0);
+        var draws = fixture.Resources.Native.Render.Invocations
+            .Where(call => call.Method.Name == "Render2DTexture").ToArray();
+
+        // Assert
+        Assert.Equal(4, draws.Length);
+        var secondTextureIds = secondTextures.Select(texture => texture.TextureId).ToArray();
+        Assert.All(secondTextureIds, textureId => Assert.True(textureId > 0));
+        Assert.Equal(secondTextureIds.Length, secondTextureIds.Distinct().Count());
+        Assert.Equal(secondTextureIds, draws.Select(draw => (int)draw.Arguments[0]));
+        Assert.Empty(fixture.Resources.Native.Failures);
+
+        // Act
+        second.Dispose();
+
+        // Assert
+        Assert.All(secondTextures, texture => Assert.True(texture.Disposed));
     }
     /// <summary>Optional readings and both marker strengths preserve direction, containment and stable icon-slot alignment.</summary>
     [Theory]

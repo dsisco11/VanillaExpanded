@@ -48,7 +48,7 @@ internal sealed class WetnessView : NativeView
         ThrowIfDisposed(); scale = context.GuiScale;
         reading.Prepare(context, content.Reading);
         for (int index = 0; index < drops.Length; index++)
-            drops[index].Prepare(context, "textures/hud/player-wetness/" + (index % 2 == 0 ? "fill-mask" : "outline") + ".png");
+            drops[index].Prepare(context, "textures/hud/player-wetness/" + (index % 2 == 0 ? "fill-mask" : "outline") + ".svg");
         bool changed = root.fixedWidth != content.Size.Width || root.fixedHeight != content.Size.Height
             || reading.Bounds.fixedWidth != content.ReadingWidth;
         if (changed)

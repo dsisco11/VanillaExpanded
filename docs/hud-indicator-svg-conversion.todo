@@ -38,8 +38,8 @@ All in-game verification is deferred until the end of Phase 7, after all impleme
 
 ## Phase 3: Player wetness (2 tasks)
     Complete both SVGs before switching the shared fill/outline loading path; preserve both drop instances.
-    [ ] Convert player-wetness/fill-mask.png to fill-mask.svg, preserving runtime tinting and alignment with each drop outline.
-    [ ] Convert player-wetness/outline.png to outline.svg, preserving alignment with the fill mask at both drop sizes.
+    [x] Convert player-wetness/fill-mask.png to fill-mask.svg, preserving runtime tinting and alignment with each drop outline.
+    [x] Convert player-wetness/outline.png to outline.svg, preserving alignment with the fill mask at both drop sizes.
 
 ## Phase 4: Rift activity (4 tasks)
     Preserve distinguishable activity levels and the accompanying reading. Complete all four SVGs before switching the shared level-based loading path.
