@@ -545,11 +545,11 @@ public sealed class RecipeBookInteractionTests
         var input = new Mock<IInputAPI>();
         input.SetupGet(value => value.KeyboardKeyStateRaw).Returns(new bool[256]);
         api.SetupGet(value => value.Input).Returns(input.Object);
-        var viewport = Calculated(ElementBounds.Fixed(0, 0, 96, 72).WithEmptyParent());
+        var viewport = Calculated(ElementBounds.Fixed(0, 0, 82, 72).WithEmptyParent());
         var actions = new List<int>();
         using var icons = new RecipeBookIconCache(api.Object);
         using var tiles = new GuiElementRecipeBookTiles(api.Object,
-            ElementBounds.Fixed(0, 0, 96, 72).WithParent(viewport), viewport, session,
+            ElementBounds.Fixed(0, 0, 82, 72).WithParent(viewport), viewport, session,
             _ => { }, (id, _) => actions.Add(id), icons);
         PrepareTiles(tiles);
         var tile = Assert.IsType<GuiElementRecipeBookTile>(tiles.Elements[0]);
@@ -609,11 +609,11 @@ public sealed class RecipeBookInteractionTests
         session.CraftableOnly.SetEnabled(craftable);
         session.Refresh();
         var api = new Mock<ICoreClientAPI>();
-        var viewport = Calculated(ElementBounds.Fixed(0, 0, 96, 72).WithEmptyParent());
+        var viewport = Calculated(ElementBounds.Fixed(0, 0, 82, 72).WithEmptyParent());
         CraftingRecipeSelection? inspected = null;
         using var icons = new RecipeBookIconCache(api.Object);
         using var tiles = new GuiElementRecipeBookTiles(api.Object,
-            ElementBounds.Fixed(0, 0, 96, 72).WithParent(viewport), viewport, session,
+            ElementBounds.Fixed(0, 0, 82, 72).WithParent(viewport), viewport, session,
             row => inspected = row, (_, _) => { }, icons);
         PrepareTiles(tiles);
         if (focus) tiles.OnFocusGained();
@@ -659,19 +659,19 @@ public sealed class RecipeBookInteractionTests
         var input = new Mock<IInputAPI>();
         input.SetupGet(value => value.KeyboardKeyStateRaw).Returns(new bool[256]);
         api.SetupGet(value => value.Input).Returns(input.Object);
-        var viewport = Calculated(ElementBounds.Fixed(0, 0, 96, 72).WithEmptyParent());
+        var viewport = Calculated(ElementBounds.Fixed(0, 0, 82, 72).WithEmptyParent());
         var actions = new List<int>();
         CraftingRecipeSelection? inspected = null;
         using var icons = new RecipeBookIconCache(api.Object);
         using var tiles = new GuiElementRecipeBookTiles(api.Object,
-            ElementBounds.Fixed(0, 0, 96, 72).WithParent(viewport), viewport, session,
+            ElementBounds.Fixed(0, 0, 82, 72).WithParent(viewport), viewport, session,
             row => inspected = row, (id, _) => actions.Add(id), icons);
         PrepareTiles(tiles);
         using var scrollbar = new HeadlessScrollbar(api.Object, tiles.Scroll,
             Calculated(ElementBounds.Fixed(100, 0, 12, 72).WithEmptyParent()));
         tiles.Bind(scrollbar);
-        tiles.Scroll(192);
-        Assert.Equal(192, scrollbar.CurrentYPosition);
+        tiles.Scroll(105);
+        Assert.Equal(105, scrollbar.CurrentYPosition);
         int pressed = Assert.IsType<GuiElementRecipeBookTile>(tiles.Elements[0]).Selection!.Output.Id;
         int retained = retainPressed ? pressed : session.Rows[0].Output.Id;
         tiles.OnMouseDown(api.Object, new MouseEvent(10, 10, EnumMouseButton.Left, 0));
@@ -971,10 +971,10 @@ public sealed class RecipeBookInteractionTests
         api.SetupGet(value => value.Input).Returns(input.Object);
         var actions = new List<(int Output, bool Shift)>();
         CraftingRecipeSelection? inspected = null;
-        var bounds = ElementBounds.Fixed(0, 0, 96, 96).WithEmptyParent();
+        var bounds = ElementBounds.Fixed(0, 0, 82, 96).WithEmptyParent();
         bounds.CalcWorldBounds();
         using var icons = new RecipeBookIconCache(api.Object);
-        using var tiles = new GuiElementRecipeBookTiles(api.Object, ElementBounds.Fixed(0, 0, 96, 96).WithParent(bounds),
+        using var tiles = new GuiElementRecipeBookTiles(api.Object, ElementBounds.Fixed(0, 0, 82, 96).WithParent(bounds),
             bounds, session,
             row => inspected = row, (id, shift) => actions.Add((id, shift)), icons);
         PrepareTiles(tiles);
@@ -1152,15 +1152,15 @@ public sealed class RecipeBookInteractionTests
         var session = Session(f, recipes);
         session.Refresh();
         var api = new Mock<ICoreClientAPI>();
-        var viewport = Calculated(ElementBounds.Fixed(0, 0, 96, 72).WithEmptyParent());
+        var viewport = Calculated(ElementBounds.Fixed(0, 0, 82, 72).WithEmptyParent());
         CraftingRecipeSelection? inspected = null;
         using var icons = new RecipeBookIconCache(api.Object);
         using var tiles = new GuiElementRecipeBookTiles(api.Object,
-            ElementBounds.Fixed(0, 0, 96, 72).WithParent(viewport), viewport, session,
+            ElementBounds.Fixed(0, 0, 82, 72).WithParent(viewport), viewport, session,
             row => inspected = row, (_, _) => { }, icons);
         PrepareTiles(tiles);
         var pool = tiles.Elements.ToArray();
-        Assert.Equal(6, pool.Length);
+        Assert.Equal(8, pool.Length);
         Assert.All(pool, tile =>
         {
             Assert.IsAssignableFrom<GuiElementTextButton>(tile);
@@ -1174,7 +1174,7 @@ public sealed class RecipeBookInteractionTests
             Assert.True(tab.Handled);
             Assert.Equal(session.Rows[i].Output.Id, inspected!.Output.Id);
             var focused = tiles.CurrentTabIndexElement;
-            Assert.InRange(focused.Bounds.absY, viewport.absY, viewport.absY + viewport.InnerHeight - 46);
+            Assert.InRange(focused.Bounds.absY, viewport.absY, viewport.absY + viewport.InnerHeight - 30);
         }
         for (int i = 29; i >= 0; i--)
         {
@@ -1220,11 +1220,11 @@ public sealed class RecipeBookInteractionTests
         var input = new Mock<IInputAPI>();
         api.SetupGet(value => value.Input).Returns(input.Object);
         input.SetupGet(value => value.KeyboardKeyStateRaw).Returns(new bool[256]);
-        var viewport = Calculated(ElementBounds.Fixed(0, 0, 96, 72).WithEmptyParent());
+        var viewport = Calculated(ElementBounds.Fixed(0, 0, 82, 72).WithEmptyParent());
         var actions = new List<int>();
         using var icons = new RecipeBookIconCache(api.Object);
         using var tiles = new GuiElementRecipeBookTiles(api.Object,
-            ElementBounds.Fixed(0, 0, 96, 72).WithParent(viewport), viewport, session,
+            ElementBounds.Fixed(0, 0, 82, 72).WithParent(viewport), viewport, session,
             _ => { }, (id, _) => actions.Add(id), icons);
         PrepareTiles(tiles);
         var outside = new MouseEvent(10, 100, EnumMouseButton.Left, 0);
@@ -1238,17 +1238,17 @@ public sealed class RecipeBookInteractionTests
         int pressed = session.Rows[0].Output.Id;
         tiles.OnMouseDown(api.Object, new MouseEvent(10, 10, EnumMouseButton.Left, 0));
         tiles.OnFocusGained();
-        tiles.Scroll(96);
+        tiles.Scroll(70);
         tiles.OnKeyDown(api.Object, new KeyEvent { KeyCode = (int)GlKeys.Down });
         session.Refresh();
         tiles.OnMouseUp(api.Object, new MouseEvent(10, 10, EnumMouseButton.Left, 0));
         Assert.Equal(pressed, Assert.Single(actions));
-        tiles.Scroll(96);
+        tiles.Scroll(70);
         Assert.Equal(session.Rows[4], ((GuiElementRecipeBookTile)tiles.Elements[0]).Selection);
         tiles.Scroll(40);
         int partial = session.Rows[4].Output.Id;
         tiles.OnMouseDown(api.Object, new MouseEvent(10, 60, EnumMouseButton.Left, 0));
-        Assert.Equal(-40, tiles.Bounds.absY);
+        Assert.Equal(0, tiles.Bounds.absY);
         tiles.OnMouseUp(api.Object, new MouseEvent(10, 60, EnumMouseButton.Left, 0));
         Assert.Equal(partial, actions[1]);
     }

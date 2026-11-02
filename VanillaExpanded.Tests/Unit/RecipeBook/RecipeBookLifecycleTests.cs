@@ -185,7 +185,7 @@ public sealed class RecipeBookLifecycleTests
                 Assert.Equal(position, tiles.ScrollPosition);
                 var first = Assert.IsType<GuiElementRecipeBookTile>(tiles.Elements[0]);
                 Assert.NotNull(first.Selection);
-                Assert.Equal(viewport.absY - position % GuiElementRecipeBookTiles.TileSize * scale,
+                Assert.Equal(viewport.absY + Math.Round(-position % 35 * scale, MidpointRounding.AwayFromZero),
                     first.Bounds.absY, 4);
                 Assert.True(first.Bounds.absY <= viewport.absY);
                 Assert.True(first.Bounds.absY + first.Bounds.OuterHeight >= viewport.absY);
@@ -205,6 +205,90 @@ public sealed class RecipeBookLifecycleTests
             Assert.True(search.absY + search.OuterHeight < frame.absY);
             Assert.True(frame.absY + frame.OuterHeight < composer.GetButton("previous").Bounds.absY);
         }
+    }
+
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(1.25, false)]
+    [InlineData(1.5, false)]
+    [InlineData(1.75, false)]
+    [InlineData(2, false)]
+    [InlineData(1, true)]
+    [InlineData(1.25, true)]
+    [InlineData(1.5, true)]
+    [InlineData(1.75, true)]
+    [InlineData(2, true)]
+    public void ResponsiveDialogRecompositionRestoresFocusedRecipeAndRowAnchor(float scale, bool keyboard)
+    {
+        using var f = new MenuFixture(scale: scale, includeRecipes: true);
+        for (int i = 0; i < 100; i++)
+            f.Lifecycle.Recipes.Add(f.Lifecycle.F.Catalogue.Recipe("other-" + i));
+        f.Lifecycle.F.Register(f.Lifecycle.Recipes.ToArray());
+        f.Lifecycle.FinalizeWorld();
+        f.Recompose();
+        f.Parent.TryOpen();
+        f.Toggle();
+        var book = Assert.Single(f.Menus);
+        var original = Assert.IsType<GuiElementRecipeBookTiles>(book.SingleComposer.GetElement("tiles"));
+        var session = (RecipeBookSession)typeof(GuiDialogRecipeBook).GetField("session",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(book)!;
+        session.Select(session.Rows[36].Output.Id);
+        original.Scroll(112 * scale);
+        if (keyboard) original.OnKeyDown(f.Lifecycle.Api.Object, new KeyEvent { KeyCode = (int)GlKeys.Tab });
+        book.SingleComposer.FocusElement(original.TabIndex);
+        original.Scroll(112 * scale);
+        original.FocusElement(original.Geometry.Columns + 2);
+        var before = original.CaptureView();
+        Assert.Equal(7, before.RowOffset, 4);
+        int selected = session.SelectedOutput!.Value;
+        double minimumWidth = (double)typeof(GuiDialogRecipeBook).GetField("minimumWidth",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(book)!;
+        f.ResizePanelSpace(minimumWidth, 420);
+        book.TryOpen();
+        var resized = Assert.IsType<GuiElementRecipeBookTiles>(book.SingleComposer.GetElement("tiles"));
+        Assert.NotSame(original, resized);
+        Assert.True(resized.Geometry.Columns < original.Geometry.Columns);
+        var after = resized.CaptureView();
+        int anchorIndex = session.Rows.IndexOf(session.Rows.Single(row => row.Output.Id == before.AnchorOutput));
+        Assert.Equal(anchorIndex / resized.Geometry.Columns * 35 + before.RowOffset, resized.ScrollPosition, 3);
+        Assert.Equal(before.FocusedOutput, after.FocusedOutput);
+        Assert.Equal(before.InspectedOutput, after.InspectedOutput);
+        Assert.Equal(selected, session.SelectedOutput);
+        Assert.True(resized.HasFocus);
+        Assert.Equal(keyboard, after.KeyboardFocus);
+    }
+
+    [Theory]
+    [InlineData(1, 2)]
+    [InlineData(2, 1)]
+    [InlineData(1.25, 1.75)]
+    [InlineData(1.75, 1.25)]
+    public void ScaleTransitionCapturesTheOldCompositionRowBeforeRestoringAtTheNewScale(float oldScale, float newScale)
+    {
+        using var f = new MenuFixture(scale: oldScale, includeRecipes: true);
+        for (int i = 0; i < 100; i++)
+            f.Lifecycle.Recipes.Add(f.Lifecycle.F.Catalogue.Recipe("other-" + i));
+        f.Lifecycle.F.Register(f.Lifecycle.Recipes.ToArray());
+        f.Lifecycle.FinalizeWorld();
+        f.Recompose();
+        f.Parent.TryOpen();
+        f.Toggle();
+        var book = Assert.Single(f.Menus);
+        var original = Assert.IsType<GuiElementRecipeBookTiles>(book.SingleComposer.GetElement("tiles"));
+        original.Scroll(112 * oldScale);
+        var first = Assert.IsType<GuiElementRecipeBookTile>(original.Elements[0]);
+        original.UpdateHover((int)first.PixelBounds.renderX + 5, (int)original.InsideClipBounds.renderY + 5);
+        var before = original.CaptureView();
+        Assert.Equal(7, before.RowOffset, 4);
+        RuntimeEnv.GUIScale = newScale;
+        Assert.Equal(112, original.ScrollPosition, 4);
+        book.TryOpen();
+        var resized = Assert.IsType<GuiElementRecipeBookTiles>(book.SingleComposer.GetElement("tiles"));
+        Assert.NotSame(original, resized);
+        var after = resized.CaptureView();
+        Assert.Equal(before.AnchorOutput, after.AnchorOutput);
+        Assert.Equal(before.RowOffset, after.RowOffset, 4);
+        Assert.Equal(before.InspectedOutput, after.InspectedOutput);
     }
 
     [Theory]
@@ -866,7 +950,7 @@ public sealed class RecipeBookLifecycleTests
         tabs.SetValue(Array.FindIndex(tabs.tabs, tab => tab.Name == "tools"));
         Assert.Equal(41, session.Rows.Length);
         var tiles = Assert.IsType<GuiElementRecipeBookTiles>(menu.SingleComposer.GetElement("tiles"));
-        tiles.Scroll(48 * scale);
+        tiles.Scroll(35 * scale);
         Assert.True(menu.SingleComposer.GetScrollbar("scroll").CurrentYPosition > 0);
         f.ToggleCraftable(menu);
         Assert.True(toggle.On);
@@ -1964,7 +2048,7 @@ public sealed class RecipeBookLifecycleTests
         var tool = Assert.Single(f.Lifecycle.Recipes);
         tool.Output!.ResolvedItemStack!.Collectible.CreativeInventoryTabs =
             ["general", "items", "tools", .. Enumerable.Range(0, 8).Select(index => "mod:long-category-" + index)];
-        for (int i = 0; i < 40; i++)
+        for (int i = 0; i < 80; i++)
         {
             var recipe = f.Lifecycle.F.Catalogue.Recipe("construction-" + i);
             recipe.Output!.ResolvedItemStack!.Collectible.CreativeInventoryTabs = ["general", "construction"];
@@ -1983,10 +2067,10 @@ public sealed class RecipeBookLifecycleTests
         Assert.Equal("All", tabs.tabs[0].Name);
         Assert.Equal("Other", tabs.tabs[^1].Name);
         Assert.DoesNotContain(tabs.tabs, tab => tab.Name is "general" or "flora");
-        Assert.Equal(42, session.Rows.Length);
+        Assert.Equal(82, session.Rows.Length);
         menu.SingleComposer.GetTextInput("search").SetValue("output");
         var tiles = Assert.IsType<GuiElementRecipeBookTiles>(menu.SingleComposer.GetElement("tiles"));
-        tiles.Scroll(48 * scale);
+        tiles.Scroll(35 * scale);
         Assert.True(menu.SingleComposer.GetScrollbar("scroll").CurrentYPosition > 0);
         var pressed = Assert.IsType<GuiElementRecipeBookTile>(tiles.Elements[0]);
         int pressX = (int)pressed.Bounds.absX + 10;
@@ -1995,10 +2079,10 @@ public sealed class RecipeBookLifecycleTests
         Assert.True(pressed.Pressed);
         menu.SingleComposer.GetTextInput("search").SetValue(" output ");
         Assert.False(pressed.Pressed);
-        Assert.Equal(42, session.Rows.Length);
+        Assert.Equal(82, session.Rows.Length);
         Assert.Equal(0, menu.SingleComposer.GetScrollbar("scroll").CurrentYPosition);
         menu.SingleComposer.GetTextInput("search").SetValue("output");
-        tiles.Scroll(48 * scale);
+        tiles.Scroll(35 * scale);
         Assert.True(menu.SingleComposer.GetScrollbar("scroll").CurrentYPosition > 0);
 
         int toolIndex = Array.FindIndex(tabs.tabs, tab => tab.Name == "tools");
@@ -2034,7 +2118,7 @@ public sealed class RecipeBookLifecycleTests
         Assert.Equal("construction", session.Category);
         Assert.Empty(session.Rows);
         menu.SingleComposer.GetTextInput("search").SetValue("output");
-        Assert.Equal(40, session.Rows.Length);
+        Assert.Equal(80, session.Rows.Length);
         tabs.SetValue(0, false);
         var firstTab = tabs.Composer!.GetToggleButton("tab-0");
         int x = (int)(firstTab.Bounds.absX + firstTab.Bounds.OuterWidth / 2);
@@ -2043,7 +2127,7 @@ public sealed class RecipeBookLifecycleTests
         Assert.True(firstTab.IsPositionInside(x, y));
         tabs.OnMouseDownOnElement(f.Lifecycle.Api.Object, new MouseEvent(x, y, EnumMouseButton.Left, 0));
         Assert.Null(session.Category);
-        Assert.Equal(42, session.Rows.Length);
+        Assert.Equal(82, session.Rows.Length);
         Assert.Equal("output", menu.SingleComposer.GetTextInput("search").GetText());
     }
 
@@ -2563,8 +2647,8 @@ public sealed class RecipeBookLifecycleTests
             BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
         Assert.Equal("ZZZZ", session.Rows[0].Recipe.DisplayName);
         var tiles = Assert.IsType<GuiElementRecipeBookTiles>(menu.SingleComposer.GetElement("tiles"));
-        tiles.Scroll(72 * scale);
-        Assert.Equal(72, tiles.ScrollPosition);
+        tiles.Scroll(35 * scale);
+        Assert.Equal(35, tiles.ScrollPosition);
         var pressed = Assert.IsType<GuiElementRecipeBookTile>(tiles.Elements[0]);
         pressed.OnMouseDownOnElement(f.Lifecycle.Api.Object, new MouseEvent(
             (int)(pressed.Bounds.absX + 5), (int)(pressed.Bounds.absY + 5), EnumMouseButton.Left, 0));
@@ -3159,15 +3243,15 @@ public sealed class RecipeBookLifecycleTests
         using var graphics = new RecipeBookRenderFixture(scale);
         var render = graphics.Render;
         var liveTextures = graphics.Textures;
-        var viewport = ElementBounds.Fixed(0, 0, 96, 96).WithEmptyParent();
+        var viewport = ElementBounds.Fixed(0, 0, 82, 65).WithEmptyParent();
         viewport.CalcWorldBounds();
         render.Setup(value => value.RenderMesh(It.IsAny<MeshRef>())).Callback(() =>
         {
             Assert.Equal(2, graphics.Clips.Count);
             Assert.Same(viewport, graphics.Clips.ToArray()[1]);
             var bounds = graphics.Clips.Peek();
-            Assert.Equal((int)(46 * scale), bounds.InnerWidth, 4);
-            Assert.Equal((int)(46 * scale), bounds.InnerHeight, 4);
+            Assert.InRange(bounds.InnerWidth, Math.Floor(30 * scale), Math.Ceiling(30 * scale));
+            Assert.InRange(bounds.InnerHeight, Math.Floor(30 * scale), Math.Ceiling(30 * scale));
             Assert.Same(graphics.Programs[^1].Object, graphics.Active);
         });
         using var surface = new ImageSurface(Format.Argb32, 96, 144);
@@ -3181,7 +3265,7 @@ public sealed class RecipeBookLifecycleTests
             tiles.BeforeCalcBounds();
             tiles.Bounds.CalcWorldBounds();
             tiles.ComposeElements(ctx, surface);
-            Assert.Equal(25, liveTextures.Count);
+            Assert.Single(liveTextures);
             int beforeBakes = graphics.Bakes.Count;
             for (int frame = 0; frame < 6; frame++)
             {
@@ -3205,7 +3289,8 @@ public sealed class RecipeBookLifecycleTests
             Assert.Equal(6, graphics.Allocations.Count);
             Assert.All(graphics.Bakes, bake =>
             {
-                Assert.Equal((int)Math.Ceiling(46 * scale / 2) * 2, bake.Size);
+                Assert.Equal((int)Math.Ceiling((Math.Round(30 * scale, MidpointRounding.AwayFromZero)
+                    - 2 * Math.Round(2 * scale, MidpointRounding.AwayFromZero)) / 2) * 2, bake.Size);
                 Assert.Equal(2 * GuiElementPassiveItemSlot.unscaledItemSize / GuiElementPassiveItemSlot.unscaledSlotSize,
                     bake.Scale, 5);
             });

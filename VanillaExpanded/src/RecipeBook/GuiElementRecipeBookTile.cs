@@ -1,4 +1,5 @@
 using System;
+using Cairo;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 
@@ -39,14 +40,16 @@ internal sealed class GuiElementRecipeBookTile : GuiElementTextButton
     }
 
     internal bool Pressed => pressedIdentity != null;
+    internal bool Selected { get; set; }
     internal ElementBounds PixelBounds
     {
         get
         {
-            pixelBounds.absFixedX = (int)Bounds.renderX;
-            pixelBounds.absFixedY = (int)Bounds.renderY;
-            pixelBounds.absInnerWidth = Bounds.OuterWidthInt;
-            pixelBounds.absInnerHeight = Bounds.OuterHeightInt;
+            var origin = InsideClipBounds ?? Bounds;
+            pixelBounds.absFixedX = (int)origin.renderX + Math.Round(Bounds.renderX - origin.renderX, MidpointRounding.AwayFromZero);
+            pixelBounds.absFixedY = (int)origin.renderY + Math.Round(Bounds.renderY - origin.renderY, MidpointRounding.AwayFromZero);
+            pixelBounds.absInnerWidth = Math.Round(Bounds.OuterWidth, MidpointRounding.AwayFromZero);
+            pixelBounds.absInnerHeight = Math.Round(Bounds.OuterHeight, MidpointRounding.AwayFromZero);
             return pixelBounds;
         }
     }
@@ -62,11 +65,12 @@ internal sealed class GuiElementRecipeBookTile : GuiElementTextButton
     // Image-only buttons keep their tile dimensions instead of autosizing to text.
     public override void BeforeCalcBounds() { }
 
-    public override void RenderInteractiveElements(float deltaTime)
-    {
-        if (!IsInViewport) return;
-        base.RenderInteractiveElements(deltaTime);
-    }
+    // The shared icon pass draws flat chrome and selection; native buttons still own activation and focus.
+    public override void ComposeElements(Context ctx, ImageSurface surface) => Bounds.CalcWorldBounds();
+    public override void RenderInteractiveElements(float deltaTime) { }
+
+    public override bool IsPositionInside(int x, int y) => Visible && PixelBounds.PointInside(x, y)
+        && (InsideClipBounds == null || InsideClipBounds.PointInside(x, y));
 
     public override void OnMouseDownOnElement(ICoreClientAPI api, MouseEvent args)
     {

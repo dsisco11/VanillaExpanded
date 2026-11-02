@@ -140,7 +140,7 @@ public sealed class RecipeBookIconRendererTests
         using var tiles = CreateTiles(graphics, session);
         for (int i = 0; i < 10; i++)
         {
-            tiles.Scroll(i * 48);
+            tiles.Scroll(i * 35);
             graphics.Warm(tiles, 3);
             Assert.Equal((i + 1) * 3, graphics.Allocations.Count);
         }
@@ -189,7 +189,7 @@ public sealed class RecipeBookIconRendererTests
         program.VerifySet(value => value.TextureBounds = It.IsAny<System.Numerics.Vector4>(), Times.Never);
         Assert.Empty(graphics.Bakes);
         graphics.Frame(tiles);
-        tiles.Scroll(48);
+        tiles.Scroll(35);
         graphics.Warm(tiles, 2);
         Assert.Equal(4, graphics.Bakes.Count);
         graphics.Complete(graphics.Bakes[0]);
@@ -231,7 +231,7 @@ public sealed class RecipeBookIconRendererTests
         }
         tiles.RenderInteractiveElements(0);
         Assert.Equal(9, graphics.Bakes.Count);
-        tiles.Scroll(48);
+        tiles.Scroll(35);
         graphics.Warm(tiles, 3);
         Assert.Equal(10, graphics.Bakes.Count);
     }
@@ -251,7 +251,7 @@ public sealed class RecipeBookIconRendererTests
         using var tiles = CreateTiles(graphics, session);
         for (int row = 0; row < count / 3; row++)
         {
-            tiles.Scroll(row * 48);
+            tiles.Scroll(row * 35);
             graphics.Warm(tiles, 3);
             Assert.Equal((row + 1) * 3, graphics.Allocations.Count);
         }
@@ -259,7 +259,7 @@ public sealed class RecipeBookIconRendererTests
         Assert.All(graphics.Bakes, bake => Assert.Contains(bake.Id, graphics.Allocations));
         for (int row = count / 3 - 1; row >= 0; row--)
         {
-            tiles.Scroll(row * 48);
+            tiles.Scroll(row * 35);
             graphics.Warm(tiles, 3);
             Assert.Equal(count, graphics.Bakes.Count);
         }
@@ -307,7 +307,7 @@ public sealed class RecipeBookIconRendererTests
         using (var first = CreateTiles(graphics, session)) graphics.Warm(first, 3);
         RuntimeEnv.GUIScale = 1.5f;
         using (var scaled = CreateTiles(graphics, session)) graphics.Warm(scaled, 3);
-        Assert.Equal(new[] { 46, 70 }, graphics.Bakes.Select(bake => bake.Size));
+        Assert.Equal(new[] { 26, 40 }, graphics.Bakes.Select(bake => bake.Size));
         RuntimeEnv.GUIScale = 1;
         using var restored = CreateTiles(graphics, session);
         restored.RenderInteractiveElements(0);
@@ -653,7 +653,7 @@ public sealed class RecipeBookIconRendererTests
         graphics.EndFrame();
         Assert.Single(graphics.Bakes);
         Assert.Single(graphics.Allocations);
-        Assert.NotNull(graphics.Cache.Get(Assert.Single(session.Rows).Recipe, 46, false, out _));
+        Assert.NotNull(graphics.Cache.Get(Assert.Single(session.Rows).Recipe, 26, false, out _));
     }
 
     [Fact]
@@ -794,8 +794,8 @@ public sealed class RecipeBookIconRendererTests
         var pixels = tile.PixelBounds;
         Assert.Equal((int)tile.Bounds.renderX, pixels.renderX);
         Assert.Equal((int)tile.Bounds.renderY, pixels.renderY);
-        Assert.Equal(tile.Bounds.OuterWidthInt, pixels.InnerWidth);
-        Assert.Equal(tile.Bounds.OuterHeightInt, pixels.InnerHeight);
+        Assert.Equal(Math.Round(tile.Bounds.OuterWidth, MidpointRounding.AwayFromZero), pixels.InnerWidth);
+        Assert.Equal(Math.Round(tile.Bounds.OuterHeight, MidpointRounding.AwayFromZero), pixels.InnerHeight);
         tile.Bounds.fixedY -= 13.17;
         tile.Bounds.MarkDirtyRecursive();
         tile.Bounds.CalcWorldBounds();
@@ -840,16 +840,116 @@ public sealed class RecipeBookIconRendererTests
         Assert.Empty(graphics.Allocations);
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(1.25)]
+    [InlineData(1.5)]
+    [InlineData(1.75)]
+    [InlineData(2)]
+    public void AvailabilitySelectionNativeFocusAndQuantitiesRemainIndependent(float scale)
+    {
+        using var graphics = new RecipeBookRenderFixture(scale);
+        var f = new AllocationFixture();
+        var board = f.Stack(1, "board", 2);
+        var recipes = new[] {
+            f.Recipe(f.Ingredient(board)),
+            f.Recipe(f.Ingredient(board, 4)),
+            f.Recipe(f.Ingredient(f.Stack(2, "stone", 1))),
+            f.Recipe(f.Ingredient(f.Stack(3, "clay", 1)))
+        };
+        recipes[3].CopyAttributesFrom = "A";
+        foreach (var recipe in recipes) recipe.Output!.Quantity = 12;
+        f.Register(recipes);
+        using var session = new RecipeBookSession(f.Catalogue.Build(recipes), f.Allocator,
+            () => f.Snapshot(board), (_, _) => throw new InvalidOperationException());
+        session.Refresh();
+        using var tiles = CreateTiles(graphics, session, rows: 2);
+        graphics.Warm(tiles, 4);
+        int bakes = graphics.Bakes.Count;
+        var program = Assert.Single(graphics.Programs);
+        for (int selected = -1; selected < 4; selected++)
+        {
+            if (selected >= 0) session.Select(session.Rows[selected].Output.Id);
+            for (int focused = -1; focused < 4; focused++)
+            {
+                tiles.OnFocusLost();
+                if (focused >= 0)
+                {
+                    tiles.OnKeyDown(graphics.Api.Object, new KeyEvent { KeyCode = (int)GlKeys.Tab });
+                    tiles.OnFocusGained();
+                    tiles.FocusElement(focused);
+                }
+                program.Invocations.Clear();
+                graphics.Render.Invocations.Clear();
+                tiles.RenderInteractiveElements(0);
+                Assert.Equal(new[] { 0, 3, 1, 2 }, States(program));
+                Assert.Equal(Enumerable.Range(0, 4).Select(index => index == selected),
+                    program.Invocations.Where(call => call.Method.Name == "set_Selected")
+                        .Select(call => (bool)call.Arguments[0]));
+                program.VerifySet(value => value.PreviewInset = 2, Times.Once);
+                var focusCalls = graphics.Render.Invocations.Where(call => call.Method.Name == nameof(IRenderAPI.RenderRectangle)).ToArray();
+                Assert.Equal(focused >= 0 ? 1 : 0, focusCalls.Length);
+                if (focused >= 0)
+                {
+                    var bounds = tiles.Elements[focused].Bounds;
+                    var call = Assert.Single(focusCalls);
+                    Assert.Equal((int)bounds.renderX, Convert.ToInt32(call.Arguments[0]));
+                    Assert.Equal((int)bounds.renderY, Convert.ToInt32(call.Arguments[1]));
+                    Assert.Equal(800f, Convert.ToSingle(call.Arguments[2]));
+                    Assert.Equal(bounds.OuterWidthInt, Convert.ToInt32(call.Arguments[3]));
+                    Assert.Equal(bounds.OuterHeightInt, Convert.ToInt32(call.Arguments[4]));
+                }
+                var counts = graphics.Render.Invocations.Where(call => call.Method.Name == nameof(IRenderAPI.Render2DTexturePremultipliedAlpha)
+                    && call.Arguments.Count > 5 && Convert.ToSingle(call.Arguments[5]) == 221).ToArray();
+                Assert.Equal(4, counts.Length);
+                for (int index = 0; index < counts.Length; index++)
+                {
+                    var bounds = ((GuiElementRecipeBookTile)tiles.Elements[index]).PixelBounds;
+                    Assert.Equal(bounds.renderX + bounds.InnerWidth - Convert.ToDouble(counts[index].Arguments[3]) - 2 * scale,
+                        Convert.ToDouble(counts[index].Arguments[1]), 4);
+                    Assert.Equal(bounds.renderY + bounds.InnerHeight - Convert.ToDouble(counts[index].Arguments[4]) - 2 * scale,
+                        Convert.ToDouble(counts[index].Arguments[2]), 4);
+                }
+                Assert.Equal(bakes, graphics.Bakes.Count);
+                Assert.Empty(graphics.Clips);
+            }
+        }
+    }
+
     private static int[] States(Mock<IRecipeBookIconShaderProgram> program) => program.Invocations
         .Where(call => call.Method.Name == "set_" + nameof(IRecipeBookIconShaderProgram.RecipeState))
         .Select(call => (int)(CraftingTileStatus)call.Arguments[0]).ToArray();
 
+    [Fact]
+    public void ShaderSourceRetainsApprovedPaletteOutlineAndSeparateCornerGeometry()
+    {
+        string source = System.IO.File.ReadAllText(System.IO.Path.GetFullPath(System.IO.Path.Combine(
+            AppContext.BaseDirectory, @"..\..\..\..\VanillaExpanded\assets\vanillaexpanded\shaders\recipebook_icons.fsh")));
+        Assert.Contains("vec4(73.0 / 255.0, 61.0 / 255.0, 44.0 / 255.0, 1.0)", source);
+        Assert.Contains("vec4(113.0 / 255.0, 97.0 / 255.0, 70.0 / 255.0, 1.0)", source);
+        Assert.Contains("recipeState == 2 ? vec4(0.0, 0.0, 0.0, 0.92)", source);
+        Assert.Contains("icon.rgb = vec3(luminance * 0.12)", source);
+        Assert.Contains("float borderWidth = max(1.0, floor(guiScale + 0.5))", source);
+        Assert.Contains("if (edgeDistance < borderWidth)", source);
+        Assert.Contains("recipeState == 3 ? vec4(0.95, 0.85, 0.12, 1.0)", source);
+        Assert.Contains("recipeState == 1 ? vec4(0.85, 0.12, 0.12, 1.0)", source);
+        Assert.Contains("vec2 corner = uv * tileBounds.zw - floor(3.0 * guiScale + 0.5)", source);
+        Assert.Contains("float length = max(1.0, floor(8.0 * guiScale + 0.5))", source);
+        Assert.Contains("if (selected != 0 && all(greaterThanEqual(corner, vec2(0.0))) &&", source);
+        Assert.Contains("((corner.x < length && corner.y < borderWidth) || (corner.y < length && corner.x < borderWidth))", source);
+        Assert.Contains("vec4(245.0 / 255.0, 213.0 / 255.0, 141.0 / 255.0, 1.0)", source);
+        Assert.Contains("min(tileBounds.z, tileBounds.w) - 2.0 * floor(previewInset * guiScale + 0.5)", source);
+        Assert.Contains("(uv * tileBounds.zw - (tileBounds.zw - size) * 0.5) / size", source);
+        Assert.True(source.IndexOf("if (edgeDistance < borderWidth)", StringComparison.Ordinal)
+            < source.IndexOf("if (selected != 0", StringComparison.Ordinal));
+    }
+
     private static GuiElementRecipeBookTiles CreateTiles(RecipeBookRenderFixture graphics, RecipeBookSession session, int rows = 1)
     {
-        var viewport = ElementBounds.Fixed(0, 0, 144, rows * 48).WithEmptyParent();
+        var viewport = ElementBounds.Fixed(0, 0, 112, rows * 35 - 5).WithEmptyParent();
         viewport.CalcWorldBounds();
         var tiles = new GuiElementRecipeBookTiles(graphics.Api.Object,
-            ElementBounds.Fixed(0, 0, 144, (rows + 1) * 48).WithParent(viewport), viewport, session, _ => { }, (_, _) => { },
+            ElementBounds.Fixed(0, 0, 112, (rows + 1) * 35).WithParent(viewport), viewport, session, _ => { }, (_, _) => { },
             graphics.Cache, graphics.CreateShader);
         tiles.BeforeCalcBounds();
         tiles.Bounds.CalcWorldBounds();

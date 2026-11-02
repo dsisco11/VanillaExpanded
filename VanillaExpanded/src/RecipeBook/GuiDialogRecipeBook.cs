@@ -149,7 +149,8 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
 
     private void Compose(ElementBounds bounds, bool focusFirstElement)
     {
-        float scroll = (SingleComposer?.GetElement("tiles") as GuiElementRecipeBookTiles)?.ScrollPosition ?? 0;
+        var oldTiles = SingleComposer?.GetElement("tiles") as GuiElementRecipeBookTiles;
+        var view = oldTiles?.CaptureView();
         double width = bounds.fixedWidth;
         double height = bounds.fixedHeight;
         double contentTop = TitleHeight + TitleSpacing;
@@ -271,7 +272,11 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         ((GuiElementIconTabs)composer.GetElement("categories")).SetValue(Array.IndexOf(categories, session.Category), false);
         composer.GetTextInput("search").SetValue(search);
         tiles.Bind(composer.GetScrollbar("scroll"));
-        tiles.Scroll(scroll * (float)GuiElement.scaled(1));
+        if (view != null)
+        {
+            if (view.HasFocus && focusFirstElement) composer.FocusElement(tiles.TabIndex);
+            tiles.RestoreView(view with { HasFocus = view.HasFocus && focusFirstElement });
+        }
         UpdateLabels();
     }
 
@@ -349,7 +354,8 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         double footerWidth = 2 * ContentInset + 2 * (Math.Max(navigationWidth, handbookWidth) + FooterLabelSpacing) + counterWidth;
         minimumWidth = Math.Ceiling(new[]
         {
-            tabsWidth, categoryWidth, optionsWidth, filterWidth, emptyActionWidth, titleMinimumWidth, footerWidth
+            tabsWidth, categoryWidth, optionsWidth, filterWidth, emptyActionWidth, titleMinimumWidth, footerWidth,
+            viewportWidthReserve + RecipeBookTileGeometry.MinimumWidth
         }.Max());
         var textUtil = new TextDrawUtil();
         emptyTextHeight = Math.Ceiling(Enum.GetValues<RecipeBookEmptyState>()

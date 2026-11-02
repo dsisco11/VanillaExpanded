@@ -1,6 +1,6 @@
 # Recipe Book visual alignment proposal
 
-**Status:** Phase 1 design decisions recorded; implementation pending. Native rendering feasibility and the exact preview inset remain gated. This document does not describe completed implementation.
+**Status:** Approved design, including the two-unit real-preview inset. Implementation and final acceptance are tracked in the linked plan; this proposal defines the target rather than certifying full visual alignment.
 
 ## Purpose and design authority
 
@@ -186,7 +186,7 @@ Apply the smaller regular font, warm palette, and measured text padding consiste
 
 ## Approved recipe-grid adaptations
 
-These adaptations are approved design directions, not a requirement to reproduce the mockup's placeholder objects. The exact preview inset still requires visual approval.
+These adaptations are approved design directions, not a requirement to reproduce the mockup's placeholder objects. The two-unit preview inset has visual approval.
 
 ### Responsive tiles and spacing
 
@@ -222,7 +222,7 @@ Use quieter one-unit tile outlines with these separate meanings:
 
 Availability stays on the outer edge. The selection marker leaves that edge and the bottom-right quantity area clear; it must not be confused with partial availability.
 
-Use smaller, centered real item previews with visible breathing room around them. Determine and obtain approval of a consistent inset during visual review; do not replace previews with category silhouettes or suppress output quantities. Continue to use the native item atlas and the existing preparation/render ownership.
+Use smaller, centered real item previews with visible breathing room around them and the visually approved two-unit inset. Do not replace previews with category silhouettes or suppress output quantities. Continue to use the native item atlas and the existing preparation/render ownership.
 
 The scrollbar, quantities, options icon, and native titlebar controls remain present and receive compatible styling where applicable.
 
@@ -300,7 +300,7 @@ The agreed destination for required reference copies, captures, package/version 
 | Grid sizing and spare width | Approved: fixed 30-unit square tiles, five-unit gaps, maximum fitting columns, entire group centered. |
 | List padding and clipping | Approved: six-unit horizontal padding, no reserved vertical strip, full-height inner scissor. |
 | Availability and selection | Approved: one-unit outer status outlines retaining red/yellow meanings, plus the specified inset top-left gold corner marker. |
-| Real previews | Inset direction approved; exact inset remains blocked on later rendered visual review and approval. |
+| Real previews | Approved: two-GUI-unit inset, following rendered visual review. |
 | Non-tab control states | Approved as specified above. |
 | Local titlebar/dialog rendering adapters | Permitted subject to Phase 2 native feasibility; no global patching or production reflection. |
 | Focus appearance | Retain native appearance and keyboard routing; no custom focus outline or router. |

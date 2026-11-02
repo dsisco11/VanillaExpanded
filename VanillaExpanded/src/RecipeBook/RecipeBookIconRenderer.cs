@@ -45,13 +45,14 @@ internal sealed class RecipeBookIconRenderer(ICoreClientAPI api, RecipeBookIconC
         foreach (var key in visibleQuantities)
             if (!quantities.ContainsKey(key))
                 quantities.Add(key, api.Gui.TextTexture.GenTextTexture(
-                    key.Quantity.ToString(CultureInfo.InvariantCulture), CairoFont.WhiteSmallText().WithFontSize(11)));
+                    key.Quantity.ToString(CultureInfo.InvariantCulture),
+                    CairoFont.WhiteSmallText().WithFontSize(RecipeBookTileGeometry.QuantityFontSize)));
         int requests = 0;
         foreach (GuiElementRecipeBookTile tile in elements)
         {
             if (!tile.IsInViewport) continue;
             var selection = tile.Selection!;
-            int size = Math.Max(2, (int)Math.Ceiling(Math.Min(tile.Bounds.InnerWidth, tile.Bounds.InnerHeight) / 2) * 2);
+            int size = RecipeBookTileGeometry.PreviewSize(GuiElement.scaled(1));
             var position = cache.Get(selection.Recipe, size, requests < RecipeBookIconCache.BakesPerFrame, out bool queued);
             if (queued) requests++;
             if (position != null) visiblePreviews[selection.Recipe.Id] = position;
@@ -70,6 +71,7 @@ internal sealed class RecipeBookIconRenderer(ICoreClientAPI api, RecipeBookIconC
             shader.ProjectionMatrix = render.CurrentProjectionMatrix;
             shader.ModelViewMatrix = render.CurrentModelviewMatrix;
             shader.GuiScale = (float)GuiElement.scaled(1);
+            shader.PreviewInset = (float)RecipeBookTileGeometry.PreviewInset;
             render.GlToggleBlend(true, EnumBlendMode.PremultipliedAlpha);
             int texture = -1;
             foreach (GuiElementRecipeBookTile tile in elements)
@@ -85,6 +87,7 @@ internal sealed class RecipeBookIconRenderer(ICoreClientAPI api, RecipeBookIconC
                 shader.TileBounds = new((float)bounds.renderX, (float)bounds.renderY,
                     (float)bounds.InnerWidth, (float)bounds.InnerHeight);
                 shader.RecipeState = tile.Status;
+                shader.Selected = tile.Selected;
                 shader.HasIcon = position != null;
                 if (position != null)
                     shader.TextureBounds = new(position.x1, position.y1, position.x2, position.y2);
@@ -108,8 +111,8 @@ internal sealed class RecipeBookIconRenderer(ICoreClientAPI api, RecipeBookIconC
             {
                 if (quantities.TryGetValue((tile.Selection!.Recipe.OutputQuantity, GuiElement.scaled(1)), out var quantity))
                     render.Render2DTexturePremultipliedAlpha(quantity.TextureId,
-                        bounds.renderX + bounds.InnerWidth - quantity.Width - GuiElement.scaled(2),
-                        bounds.renderY + bounds.InnerHeight - quantity.Height - GuiElement.scaled(2),
+                        bounds.renderX + bounds.InnerWidth - quantity.Width - GuiElement.scaled(RecipeBookTileGeometry.QuantityInset),
+                        bounds.renderY + bounds.InnerHeight - quantity.Height - GuiElement.scaled(RecipeBookTileGeometry.QuantityInset),
                         quantity.Width, quantity.Height, 221);
             }
             finally { render.PopScissor(); }

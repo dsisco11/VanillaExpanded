@@ -12,6 +12,8 @@ internal interface IRecipeBookIconShaderProgram : IShaderProgram
     Vector4 TextureBounds { set; }
     CraftingTileStatus RecipeState { set; }
     bool HasIcon { set; }
+    bool Selected { set; }
+    float PreviewInset { set; }
     float GuiScale { set; }
     int IconTexture { set; }
 }
@@ -51,6 +53,16 @@ internal sealed class RecipeBookIconShaderProgram : ShaderProgram, IRecipeBookIc
     public float GuiScale
     {
         set => Uniform("guiScale", value);
+    }
+
+    public bool Selected
+    {
+        set => Uniform("selected", value ? 1 : 0);
+    }
+
+    public float PreviewInset
+    {
+        set => Uniform("previewInset", value);
     }
 
     public int IconTexture

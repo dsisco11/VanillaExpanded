@@ -19,7 +19,7 @@
         The proposal records approved design directions, including shared reusable controls and retention of the current Tools artwork.
         Tiles are fixed 30-unit squares with five-unit gaps; fit the maximum column count and center the entire group. Do not distribute spare width into tiles or gaps.
         Horizontal-only list padding, one-unit status outlines, the specified gold top-left selection marker, and non-tab states are approved.
-        The real-preview inset direction is approved; obtain approval of its exact inset through rendered visual review before acceptance.
+        The two-GUI-unit real-preview inset has approval following rendered visual review.
         Local dialog/titlebar adaptations are permitted subject to Phase 2 native feasibility, not assumed to be technically resolved.
         Retain native focus appearance and Tab/Shift+Tab routing. Do not suppress native highlighting, introduce a custom focus router, or add competing outlines.
         Retain approved native-compatible 30-unit selector height and popup rows. Non-virtual popup recomposition must not revert the styled appearance.
@@ -176,30 +176,31 @@
         Prerequisites: Phase 5 and explicit Phase 1 approval of grid, padding, availability, and selection choices.
         Sources: Proposal section "Approved recipe-grid adaptations"; the design guide's rendering, interaction, and browsing-state contracts.
         Outcome: Real recipes fill the aligned viewport with coherent responsive geometry and readable independent status, selection, focus, and quantities.
+        Acceptance gate: The two-GUI-unit preview inset has explicit user approval following rendered visual review.
 
-        ☐ Introduce one shared tile geometry consumed by GuiElementRecipeBookTiles, GuiElementRecipeBookTile, RecipeBookIconRenderer, quantities, and scrolling.
-            ☐ Subtract approved horizontal padding and scrollbar space, select the largest fitting column count, and center the complete column group inside the usable width.
-            ☐ Keep tiles fixed at 30 units and gaps fixed at five units; leave equal outer spare space without a fixed baseline column-count target.
-            ☐ Center single-column groups too; preserve explicit minimum-size/placement failure if no tile fits instead of shrinking tiles.
-            ☐ Assign whole-physical-pixel edges without cumulative drift; derive row pitch, visible rows, icon quads, and hit testing from the same geometry.
-            ☐ Use six-unit horizontal padding, no reserved vertical strip, and clipping to the inner top/bottom edges, including partial rows.
-            ☐ Preserve selected/inspected recipe identity on resize and restore or clamp scroll through recipe-row position rather than obsolete fixed pitches.
-            ☐ Reconcile scrollbar/membership changes and world-local reopened scroll with responsive geometry without adding a persistence format.
-        ☐ Update tile and shader presentation using the approved status/selection treatment.
-            ☐ Use warm neutral available outlines, one-unit outer red/yellow availability outlines, and the existing unsupported disabled treatment and warning.
-            ☐ Render the approved separate gold selection marker and independent keyboard focus without hiding availability or quantity text.
-            ☐ Center real native-atlas previews using the proposed inset; obtain visual approval of the exact inset before marking presentation accepted.
-            ☐ Keep output quantities visible and preserve icon preparation, atlas ownership, overlay depth, scissor unwinding, and reload/disposal behavior.
-        ☐ Add geometry, rendering, and interaction regression tests.
-            ☐ Test baseline/wider/constrained widths, column thresholds, independently expected tile edges/gaps, partial rows, and fractional scaling.
-            ☐ Test resize/membership scroll reconciliation, scrollbar clamping, selected/inspected identity, and cancelled stale tile presses.
-            ☐ Test available/missing/partial/unsupported/selected/focused combinations and output counts without conflating selection with availability.
-            ☐ Verify mouse and keyboard placement still use live validation and existing controller actions, not displayed eligibility alone.
+        ☑ Introduce one shared tile geometry consumed by GuiElementRecipeBookTiles, GuiElementRecipeBookTile, RecipeBookIconRenderer, quantities, and scrolling.
+            ☑ Subtract approved horizontal padding and scrollbar space, select the largest fitting column count, and center the complete column group inside the usable width.
+            ☑ Keep tiles fixed at 30 units and gaps fixed at five units; leave equal outer spare space without a fixed baseline column-count target.
+            ☑ Center single-column groups too; preserve explicit minimum-size/placement failure if no tile fits instead of shrinking tiles.
+            ☑ Assign whole-physical-pixel edges without cumulative drift; derive row pitch, visible rows, icon quads, and hit testing from the same geometry.
+            ☑ Use six-unit horizontal padding, no reserved vertical strip, and clipping to the inner top/bottom edges, including partial rows.
+            ☑ Preserve selected/inspected recipe identity on resize and restore or clamp scroll through recipe-row position rather than obsolete fixed pitches.
+            ☑ Reconcile scrollbar/membership changes and world-local reopened scroll with responsive geometry without adding a persistence format.
+        ☑ Update tile and shader presentation using the approved status/selection treatment.
+            ☑ Use warm neutral available outlines, one-unit outer red/yellow availability outlines, and the existing unsupported disabled treatment and warning.
+            ☑ Render the approved separate gold selection marker and independent keyboard focus without hiding availability or quantity text.
+            ☑ Center real native-atlas previews using the proposed inset; obtain visual approval of the exact inset before marking presentation accepted.
+            ☑ Keep output quantities visible and preserve icon preparation, atlas ownership, overlay depth, scissor unwinding, and reload/disposal behavior.
+        ☑ Add geometry, rendering, and interaction regression tests.
+            ☑ Test baseline/wider/constrained widths, column thresholds, independently expected tile edges/gaps, partial rows, and fractional scaling.
+            ☑ Test resize/membership scroll reconciliation, scrollbar clamping, selected/inspected identity, and cancelled stale tile presses.
+            ☑ Test available/missing/partial/unsupported/selected/focused combinations and output counts without conflating selection with availability.
+            ☑ Verify mouse and keyboard placement still use live validation and existing controller actions, not displayed eligibility alone.
 
         Completion criteria:
-            ☐ Maximum fitting columns, fixed 30-unit tiles/five-unit gaps, centered groups, and full-height clipping satisfy the approved measurable targets.
-            ☐ All geometry consumers agree after resize and scrolling; real previews, quantities, status, selection, and focus remain legible.
-            ☐ The exact preview inset has visual approval and rendering/interaction tests pass without changed allocation, filtering, or transfer semantics.
+            ☑ Maximum fitting columns, fixed 30-unit tiles/five-unit gaps, centered groups, and full-height clipping satisfy the approved measurable targets.
+            ☑ All geometry consumers agree after resize and scrolling; real previews, quantities, status, selection, and focus remain legible.
+            ☑ The exact preview inset has visual approval and rendering/interaction tests pass without changed allocation, filtering, or transfer semantics.
 
     ## Phase 7: Final review, acceptance, and document cleanup:
         Prerequisites: Phases 3 through 6 complete, with all applicable approval and native-feasibility gates resolved.

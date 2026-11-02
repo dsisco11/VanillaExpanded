@@ -186,7 +186,9 @@ Search, the recessed list frame, and footer actions share horizontal edges. The 
 
 ### Recipes and handbook
 
-[GuiElementRecipeBookTiles](../VanillaExpanded/src/RecipeBook/GuiElementRecipeBookTiles.cs) uses one viewport for tile layout, virtualization, clipping, hit testing, and scrolling. The viewport reaches the recessed list frame's inner vertical edges, and scroll/scrollbar positions clamp together as membership changes.
+[GuiElementRecipeBookTiles](../VanillaExpanded/src/RecipeBook/GuiElementRecipeBookTiles.cs) uses [shared tile geometry](../VanillaExpanded/src/RecipeBook/RecipeBookTileGeometry.cs) for layout, virtualization, hit testing, previews, quantities, and scrolling. After the dialog reserves scrollbar space, the geometry reserves six units of horizontal padding, fits the maximum number of 30-unit tiles separated by five-unit gaps, and centers the entire column group, including a single column. Tile edges are snapped independently to physical pixels rather than accumulating rounded pitches.
+
+The viewport reaches the recessed list frame's inner vertical edges without vertical padding; partially scrolled rows remain clipped to those edges. Scroll/scrollbar positions clamp together as membership changes. Recomposition maps the first visible recipe and its within-row offset to the new column count, retaining selection, inspection, and existing tile focus. This transient view anchor does not change the world-local browsing-state format.
 
 Recipe activation validates the output and recipe identities retained by the press; removal or rebinding cancels it. Mouse and keyboard activation share the session's placement path.
 
@@ -198,7 +200,9 @@ Handbook resolves the visible selected output through the native `handbook` link
 
 Category icons use identical integer raster/display sizes and pixel-snapped positions with nearest magnification. Hover and selection change tint without moving or resizing icons. Tab backgrounds share the panel's snapped baseline. Composers dispose their textures when replaced or closed.
 
-Recipe tile backgrounds, icons, and output counts render inside the shared viewport scissor. Scissor scopes unwind on failure. Tile quads and scissors use matching pixel bounds; availability borders occupy the outer edge. Recipe overlays render below dropdowns and tooltips.
+Recipe tile backgrounds, icons, and output counts render inside the shared viewport scissor. Scissor scopes unwind on failure. Tile quads, scissors, and pointer hit regions use matching pixel bounds. The dedicated shader draws flat warm backgrounds and one-unit availability outlines: neutral for available recipes, red for missing ingredients, and yellow for partial availability. Unsupported previews retain their dark disabled treatment. Selection is a separate gold top-left corner, inset three units with eight-unit segments and a one-unit stroke; native keyboard focus remains unchanged.
+
+Native-atlas previews are centered inside a two-unit inset. Output counts use 11-unit text anchored two units from the bottom-right, independently of selection and availability. Recipe shader overlays and counts render below dropdowns and tooltips; the native focus overlay retains native depth.
 
 [RecipeBookIconCache](../VanillaExpanded/src/RecipeBook/RecipeBookIconCache.cs) is world-owned. It records missing previews during GUI preparation and submits baking requests in the Before render stage through native `RenderItemStackToAtlas`. The cap of four outstanding requests includes both pending and natively queued work. Native atlas rendering owns framebuffer and shader operations; previews can remain pending for two GUI frames.
 
