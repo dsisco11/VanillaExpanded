@@ -12,6 +12,7 @@
 - Preserve all existing behavior and unrelated work. Do not remove meaningful coverage merely because it is misclassified or shares a large file.
 - Source line references below describe the audited revision. Original-suite links point to that pinned revision; use the ledger's placements and method identities for migrated suites.
 - User-approved retirement after Phase 5: remove the shader-source guard rather than retain or replace it. The original 332-method ledger remains immutable; final reconciliation must account for this one deliberately retired method, leaving 331 retained audited methods across 68 suites and 176 mapped serialized GUI members. The one-time GPU acceptance evidence remains valid.
+- Final platform scope: the user explicitly excluded Linux execution from Phase 6 acceptance. Verify Windows execution and asset reads, retain portable path construction and the existing unfiltered Ubuntu CI configuration, and do not claim Linux validation.
 
 ### Confirmed findings
 
@@ -339,29 +340,51 @@ Exit criteria:
 
 Dependencies: Phases 2-5. Unavailable environment-dependent acceptance stays open rather than being marked complete.
 
-- [ ] P6.1 Build and run the focused changed suites using the repository's existing test runner.
-  - [ ] First run the affected responsibilities together; expand to the full project after the extraction changes discovery/fixtures broadly.
-  - [ ] Run category-filtered discovery/execution for Unit, Component, and Integration and compare with P1's method-level map.
-  - [ ] Confirm each retained mapped method is discovered exactly once at its intended level, accounting for the user-approved shader-guard retirement recorded in Phase 5; verify any retained E2E category contains genuine E2E workflows.
-  - [ ] Preserve and investigate failures rather than masking them with skips, broad catches, or successful defaults.
-- [ ] P6.2 Execute affected asset-dependent suites on Windows and Linux.
-  - [ ] Verify all three lifecycle asset locations and the shader location are read successfully on both platforms.
-  - [ ] Preserve the existing unfiltered Ubuntu CI test run; do not claim classification alone caused CI omissions.
-  - [ ] Record commands, revision, passed/failed/skipped counts, warnings, and environment limitations.
-- [ ] P6.3 Reconcile behavioral assertions after extraction.
-  - [ ] Confirm filter failures still preserve published rows and recover without enforcing excluded invocation semantics.
-  - [ ] Confirm criteria changes reuse allocations without binding session tests to allocator-internal validation counts.
-  - [ ] Confirm native-transfer tests still exercise the real native compatibility boundary after reclassification.
-  - [ ] Confirm global-state cleanup and collection serialization remain effective across the new suites.
-- [ ] P6.4 Update directly related test documentation to match the implemented organization.
-  - [ ] Update verification links and commands in [RecipeBook.md](RecipeBook.md).
-  - [ ] Update testing conventions in [copilot-instructions.md](../.github/copilot-instructions.md) for Component/Integration locations and traits while preserving Unit/E2E guidance.
-  - [ ] Remove misleading E2E or shader-proof claims wherever the moved suites are documented.
-  - [ ] Clearly separate headless automation from GPU, live multiplayer, and in-game acceptance.
-- [ ] P6.5 Obtain configured independent test review of the complete coherent correction batch.
-  - [ ] Reconcile every confirmed finding F1-F5, C1, O1, and O2 against this tasklist and final evidence.
-  - [ ] Resolve new issues caused by the moves without expanding into unrelated pre-existing test debt.
-  - [ ] Close all correction tasks only when their evidence is recorded; leave unavailable visual/runtime acceptance explicitly open.
+Verification scope:
+- The user confirmed Linux is not required. No Linux tests or asset reads were performed; registered Ubuntu could not attach its missing backing disk and Docker's Linux engine was unavailable. These diagnostics are limitations, not a remaining acceptance requirement under the revised scope.
+- The existing Ubuntu CI still runs unfiltered Release tests and is unchanged. Windows-only acceptance does not imply a Linux CI pass, live-game validation, or multiplayer acceptance.
+- Windows verification used code revision `db59d2d8b5e170f8b1135e5522497569d487a287`, .NET SDK `10.0.401`, `net10.0`, VSTest, and xUnit `2.9.2`. No dependencies were restored or installed. Subsequent changes only record Phase 6 scope and evidence in this document.
+- The focused build reported 35 warnings: `CS0414` (1), `CS8600` (1), `CS8602` (27), `CS8603` (4), `CS8604` (1), and `xUnit2031` (1). Reusing its build for later runs is not a warning-free-build claim.
+- Windows read the book and options SVGs, all ten category SVGs, and both shader stages using repository-relative path construction. Shader SHA-256 values match the Phase 5 GPU acceptance; no source-syntax shader test was reintroduced.
+- Category-filtered discovery was compared against every retained ledger destination FQN after normalizing theory argument suffixes: 331 retained methods across 68 suites (122 Unit, 141 Component, 68 Integration), no missing or duplicate retained mappings, and only the authorized shader-guard retirement. All 176 retained mapped GUI collection members remain serialized under the single disabled-parallelization definition. No E2E methods or cases were discovered.
+- Whole-project discovery contains 957 Unit, 141 Component, and 68 Integration methods plus 164 pre-existing untagged methods. The latter account for the 262 executions outside the three category runs; they are not newly misclassified tests. Discovery lists 2,646 cases while execution expands to 2,788, including 142 additional Unit theory executions.
+- Theory-data preservation reuses the accepted Phase 4 source/provider audit: all 129 theories, 590 InlineData entries, and the 40-entry MemberData provider remain unchanged. The only test-source delta from `9eb04eb3` to the verified revision is deletion of the one Fact-only shader-guard file; the immutable ledger also matches Phase 1. Phase 6 counted ledger records and checked current discovery; it did not independently recompute the provider hash. These 630 theory executions plus 202 retained Facts account for the 832 focused executions.
+
+All commands below target `.\VanillaExpanded.Tests\VanillaExpanded.Tests.csproj`. The focused command built with `--no-restore --verbosity minimal`; subsequent executions reused that build with `--no-build --no-restore --verbosity minimal`.
+
+| Execution | Filter | Passed | Failed | Skipped |
+| --- | --- | ---: | ---: | ---: |
+| Focused | `FullyQualifiedName~.RecipeBook.\|FullyQualifiedName~.Gui.\|FullyQualifiedName~RecipeBookConfigContractTests` | 832 | 0 | 0 |
+| Full project | None | 2,788 | 0 | 0 |
+| Unit | `Category=Unit` | 1,934 | 0 | 0 |
+| Component | `Category=Component` | 383 | 0 | 0 |
+| Integration | `Category=Integration` | 209 | 0 | 0 |
+
+The second review and fresh configured independent completion audit accepted the complete correction batch, reconciling F1-F5, C1, O1, and O2 under the final Windows-only scope. No required issues or evidence gaps remain. Broader live-game, multiplayer, packaged visual, and other-platform acceptance is not claimed.
+
+- [x] P6.1 Build and run the focused changed suites using the repository's existing test runner.
+  - [x] First run the affected responsibilities together; expand to the full project after the extraction changes discovery/fixtures broadly.
+  - [x] Run category-filtered discovery/execution for Unit, Component, and Integration and compare with P1's method-level map.
+  - [x] Confirm each retained mapped method is discovered exactly once at its intended level, accounting for the user-approved shader-guard retirement recorded in Phase 5; verify any retained E2E category contains genuine E2E workflows.
+  - [x] Preserve and investigate failures rather than masking them with skips, broad catches, or successful defaults.
+- [x] P6.2 Execute affected asset-dependent suites on Windows; Linux execution is excluded by the user's final scope.
+  - [x] Verify all three lifecycle asset locations and the shader location are read successfully on Windows, with portable path construction retained.
+  - [x] Preserve the existing unfiltered Ubuntu CI test run; do not claim classification alone caused CI omissions.
+  - [x] Record commands, revision, passed/failed/skipped counts, warnings, and environment limitations.
+- [x] P6.3 Reconcile behavioral assertions after extraction.
+  - [x] Confirm filter failures still preserve published rows and recover without enforcing excluded invocation semantics.
+  - [x] Confirm criteria changes reuse allocations without binding session tests to allocator-internal validation counts.
+  - [x] Confirm native-transfer tests still exercise the real native compatibility boundary after reclassification.
+  - [x] Confirm global-state cleanup and collection serialization remain effective across the new suites.
+- [x] P6.4 Update directly related test documentation to match the implemented organization.
+  - [x] Update verification links and commands in [RecipeBook.md](RecipeBook.md).
+  - [x] Update testing conventions in [copilot-instructions.md](../.github/copilot-instructions.md) for Component/Integration locations and traits while preserving Unit/E2E guidance.
+  - [x] Remove misleading E2E or shader-proof claims wherever the moved suites are documented.
+  - [x] Clearly separate headless automation from GPU, live multiplayer, and in-game acceptance.
+- [x] P6.5 Obtain configured independent test review of the complete coherent correction batch.
+  - [x] Reconcile every confirmed finding F1-F5, C1, O1, and O2 against this tasklist and final evidence.
+  - [x] Resolve new issues caused by the moves without expanding into unrelated pre-existing test debt.
+  - [x] Close all correction tasks only when their evidence is recorded; leave unavailable visual/runtime acceptance explicitly open.
 
 ## Complete reviewed-file inventory
 
