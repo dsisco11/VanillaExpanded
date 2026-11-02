@@ -164,7 +164,8 @@ public sealed class SimpleIndicatorsTests
             if (survivingNow.Length > 0) Assert.Contains(survivingNow, texture => !texture.Disposed);
             source.Dispose();
             Assert.All(fixture.Owned, texture => Assert.True(texture.Disposed));
-            if (kind == "wind" && style == HudIndicatorStyle.Icon) Assert.All(fixture.Artwork, texture => Assert.True(texture.Disposed));
+            if (style == HudIndicatorStyle.Icon && (kind is "wind" or "rift"))
+                Assert.All(fixture.Artwork, texture => Assert.True(texture.Disposed));
             else Assert.All(fixture.Artwork, texture => Assert.False(texture.Disposed));
         }
     }
@@ -193,7 +194,7 @@ public sealed class SimpleIndicatorsTests
     }
     #endregion
     #region Feature semantics
-    /// <summary>Rift abbreviation changes select matching borrowed artwork and align the procedural circle.</summary>
+    /// <summary>Each rift level keeps its localized reading and icon layout while selecting matching SVG artwork.</summary>
     [Theory]
     [InlineData(0, "LOW", "low")]
     [InlineData(1, "MEDIUM", "medium")]
@@ -201,16 +202,137 @@ public sealed class SimpleIndicatorsTests
     [InlineData(3, "APOCALYPTIC", "apocalyptic")]
     public void RiftLabelsAndBackdropsUsePreparedIconGeometry(int level, string expected, string asset)
     {
+        // Arrange
         using var fixture = new SimpleIndicatorsFixture(2);
         using var presentation = new RiftActivityPresentation(fixture.Measure, fixture.CreateText, fixture.Load, _ => fixture.Backdrop.Object);
+
+        // Act
         presentation.SetContent((RiftActivityLevel)level); presentation.Prepare(fixture.Native.Context);
         using var composition = new IndicatorComposition(fixture.Native.Api.Object, presentation.CreateView(fixture.Native.Api.Object), fixture.Native.Context, presentation.Size);
-        Assert.Contains(expected, fixture.Values); Assert.EndsWith(asset + ".png", Assert.Single(fixture.Paths));
+
+        // Assert
+        Assert.True(presentation.Visibility.Renderable);
+        Assert.Equal(expected, Assert.Single(fixture.Values));
+        Assert.Equal($"textures/hud/rift-activity/{asset}.svg", Assert.Single(fixture.Paths));
         var icon = Assert.IsType<TextureElement>(composition.Composer.GetElement("test:icon"));
+        var reading = Assert.IsType<TextElement>(composition.Composer.GetElement("test:reading"));
+        Assert.Same(reading.Bounds.ParentBounds, icon.Bounds.ParentBounds);
+        Assert.True(reading.State.Target.Bottom <= icon.State.Target.Top + .001f);
+        Assert.Equal(reading.State.Target.Left + reading.State.Target.Width / 2,
+            icon.State.Target.Left + icon.State.Target.Width / 2, 4);
+
+        // Act
         composition.View.CollectBackdrops(fixture.Native.Render.Object);
+
+        // Assert
         var queued = Assert.Single(fixture.Backdrop.Invocations);
         Assert.Equal((double)icon.State.Target.X, queued.Arguments[1]); Assert.Equal((double)icon.State.Target.Y, queued.Arguments[2]);
         Assert.Equal(2d * 24 / 36, Assert.IsType<double>(queued.Arguments[3]), 6);
+    }
+    /// <summary>The default rift SVG route reuses artwork, replaces it, and retires each composer's owned texture independently.</summary>
+    [Fact]
+    public void RiftDefaultSvgLoaderCachesReplacesAndDisposesPerComposer()
+    {
+        // Arrange
+        using var fixture = new SimpleIndicatorsFixture();
+        var requests = new List<string>();
+        var svgTextures = new List<LoadedTexture>();
+        fixture.Native.Gui
+            .Setup(gui => gui.LoadSvg(It.IsAny<AssetLocation>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int?>()))
+            .Callback<AssetLocation, int, int, int, int, int?>((location, width, height, textureWidth, textureHeight, _) =>
+                requests.Add(location.Path))
+            .Returns(() =>
+            {
+                var texture = new LoadedTexture(fixture.Native.Api.Object) { TextureId = 0 };
+                svgTextures.Add(texture);
+                return texture;
+            });
+        using var presentation = new RiftActivityPresentation(
+            fixture.Measure, fixture.CreateText, loadBackdrop: _ => fixture.Backdrop.Object);
+        presentation.SetContent(RiftActivityLevel.Low);
+        presentation.Prepare(fixture.Native.Context);
+        var liveView = presentation.CreateView(fixture.Native.Api.Object);
+        ((NativeView)liveView).SetFailureHandler(fixture.Native.Failures.Add);
+        var sourceView = presentation.CreateView(fixture.Native.Api.Object);
+        ((NativeView)sourceView).SetFailureHandler(fixture.Native.Failures.Add);
+
+        // Act
+        using (var live = new IndicatorComposition(
+                   fixture.Native.Api.Object, liveView, fixture.Native.Context, presentation.Size))
+        using (var source = new IndicatorComposition(
+                   fixture.Native.Api.Object, sourceView, fixture.Native.Context, presentation.Size))
+        {
+            // Assert
+            Assert.Equal(
+                ["textures/hud/rift-activity/low.svg", "textures/hud/rift-activity/low.svg"],
+                requests);
+            Assert.Equal(2, svgTextures.Count);
+            var liveLow = svgTextures[0];
+            var sourceLow = svgTextures[1];
+            Assert.NotSame(liveLow, sourceLow);
+            Assert.All(svgTextures, texture => Assert.False(texture.Disposed));
+
+            // Act
+            presentation.SetContent(RiftActivityLevel.Low);
+            presentation.Prepare(fixture.Native.Context);
+            live.Update(fixture.Native.Context);
+            source.Update(fixture.Native.Context);
+
+            // Assert
+            Assert.Equal(2, requests.Count);
+            Assert.Equal(2, svgTextures.Count);
+            Assert.All(svgTextures, texture => Assert.False(texture.Disposed));
+
+            // Act
+            presentation.SetContent(RiftActivityLevel.Medium);
+            presentation.Prepare(fixture.Native.Context);
+            live.Update(fixture.Native.Context);
+            source.Update(fixture.Native.Context);
+
+            // Assert
+            Assert.Equal([
+                "textures/hud/rift-activity/low.svg",
+                "textures/hud/rift-activity/low.svg",
+                "textures/hud/rift-activity/medium.svg",
+                "textures/hud/rift-activity/medium.svg"
+            ], requests);
+            Assert.Equal(4, svgTextures.Count);
+            var liveMedium = svgTextures[2];
+            var sourceMedium = svgTextures[3];
+            Assert.NotSame(liveMedium, sourceMedium);
+            Assert.True(svgTextures[0].Disposed);
+            Assert.True(svgTextures[1].Disposed);
+            Assert.False(liveMedium.Disposed);
+            Assert.False(sourceMedium.Disposed);
+
+            // Keep the mocked loader/filtering headless; only assign synthetic identities after both views are mounted.
+            liveMedium.TextureId = 301;
+            sourceMedium.TextureId = 302;
+            fixture.Native.Render.Invocations.Clear();
+
+            // Act
+            live.Dispose();
+
+            // Assert
+            Assert.True(liveMedium.Disposed);
+            Assert.False(sourceMedium.Disposed);
+
+            // Act
+            source.View.SetOpacity(.5f);
+            source.Composer.Render(.1f);
+
+            // Assert
+            var draw = Assert.Single(fixture.Native.Render.Invocations
+                .Where(call => call.Method.Name == nameof(IRenderAPI.RenderTexture)));
+            Assert.Equal(sourceMedium.TextureId, (int)draw.Arguments[0]);
+            Assert.Empty(fixture.Native.Failures);
+
+            // Act
+            source.Dispose();
+
+            // Assert
+            Assert.True(sourceMedium.Disposed);
+        }
     }
     /// <summary>Wind retains whole percentages above one hundred in both native styles.</summary>
     [Theory]

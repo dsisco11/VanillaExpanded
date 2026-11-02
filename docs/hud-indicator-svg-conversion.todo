@@ -43,10 +43,10 @@ All in-game verification is deferred until the end of Phase 7, after all impleme
 
 ## Phase 4: Rift activity (4 tasks)
     Preserve distinguishable activity levels and the accompanying reading. Complete all four SVGs before switching the shared level-based loading path.
-    [ ] Convert rift-activity/low.png to low.svg.
-    [ ] Convert rift-activity/medium.png to medium.svg.
-    [ ] Convert rift-activity/high.png to high.svg.
-    [ ] Convert rift-activity/apocalyptic.png to apocalyptic.svg.
+    [x] Convert rift-activity/low.png to low.svg.
+    [x] Convert rift-activity/medium.png to medium.svg.
+    [x] Convert rift-activity/high.png to high.svg.
+    [x] Convert rift-activity/apocalyptic.png to apocalyptic.svg.
 
 ## Phase 5: Temporal storm (3 tasks)
     Preserve distinguishable stages and existing pulse/visibility behavior. Complete all three SVGs before switching the shared stage-based loading path.
