@@ -1,13 +1,16 @@
 # Vanilla: Expanded TODO List:
     ## Issues:
-        ☐ Make game start paused by default.
-        ☐ BUG: Quern auto stash not working for items which the base game prefers not to merge (e.g. perishable foods which have a large difference in freshness). FIX: the quern should force merge items when auto stashing.
-        ☐ Design a better separation of alloy calculator inventory ownership/liveness validation, transfer permissions, and storage-versus-machine access policy. Reconsider the storage-class whitelist without weakening ownership or withdrawal checks, and define coverage for vanilla and modded containers.
-        ☐ Prevent "Equip light source" hotkey from triggering when the player is holding a hammer and has tongs equipped in offhand.
-
+        ☐ [BUG]: Quern auto stash not working for items which the base game prefers not to merge (e.g. perishable foods which have a large difference in freshness). FIX: the quern should force merge items when auto stashing.
+        ☐ [QOL]: Prevent "Equip light source" hotkey from triggering when the player is holding a hammer and has tongs equipped in offhand.
+        ☐ [DEV]: Design a better separation of alloy calculator inventory ownership/liveness validation, transfer permissions, and storage-versus-machine access policy. Reconsider the storage-class whitelist without weakening ownership or withdrawal checks, and define coverage for vanilla and modded containers.
+        
     ## New Features:
-        ☐ Add a "Todo List" feature which allows players to create their own ingame tasks and reminders.
-        ☐ Targeted items such as tools on toolracks have a subtle highlight to indicate that they are targeted.
+        ☐ [QOL]: Make game start paused by default.
+        ☐ [UI][Crucibles]: Show smelting radial progress indicator in-world above active crucibles & crucibles which have finished smelting. (consider )
+        ☐ [FEAT]: Add a "Todo List" feature which allows players to create their own ingame tasks and reminders.
+    
+    ## Under Consideration:
+        ☐ [UX]: Targeted items such as tools on toolracks have a subtle highlight to indicate that they are targeted.
 
     ## Death Penalties:
         ☐ New death penalty option: lose *bag* items on death (items in inventory are lost, items on hotbar and equipped armor and weapons are kept).
@@ -25,5 +28,6 @@
 
     ## Monster Rebalancing:
         ☐ Monsters cant spawn under roofs.
+        ☐ Locusts drop copper bits.
         ☐ Increase gear drop rates from monsters (and trading costs for gears) by 500%. this will make fighting monsters feel more rewarding.
         ☐ Add other items to monster drops (bones, scrapmetal, metal parts (uncommon), gems (rare), etc) to make them more rewarding to fight.
