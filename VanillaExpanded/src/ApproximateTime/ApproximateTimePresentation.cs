@@ -53,7 +53,7 @@ internal sealed class ApproximateTimePresentation : InstrumentPresentation
         if (!Period.HasValue) return;
         HoverValue = ClockText;
         if (PrepareSimple(context, "time", ClockText,
-            "textures/hud/approximate-time/" + Period.Value.ToString().ToLowerInvariant() + ".png", false)) return;
+            "textures/hud/approximate-time/" + Period.Value.ToString().ToLowerInvariant() + ".svg", false)) return;
         Size = new(HudOverlaySizes.Clock, HudOverlaySizes.Clock); Visibility.Show();
     }
     /// <summary>Creates independently owned native layers for the current style.</summary>

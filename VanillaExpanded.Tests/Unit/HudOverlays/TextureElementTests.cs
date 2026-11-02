@@ -35,6 +35,7 @@ public sealed class TextureElementTests
 
         // Act
         element.Prepare(fixture.Context, svgPath);
+        element.Prepare(fixture.Context, svgPath);
 
         // Assert
         Assert.False(svgTexture.Disposed);

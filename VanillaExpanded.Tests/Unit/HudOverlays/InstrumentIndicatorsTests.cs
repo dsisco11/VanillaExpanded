@@ -133,6 +133,131 @@ public sealed class InstrumentIndicatorsTests
             Assert.DoesNotContain(fixture.Resources.Paths, path => path.Contains("workshop-gauges"));
         }
     }
+
+    /// <summary>Each compact solar period routes its semantic state through the native icon view to its SVG asset.</summary>
+    [Theory]
+    [InlineData(nameof(ApproximateTimePeriod.Unknown), "textures/hud/approximate-time/unknown.svg")]
+    [InlineData(nameof(ApproximateTimePeriod.Dawn), "textures/hud/approximate-time/dawn.svg")]
+    [InlineData(nameof(ApproximateTimePeriod.Morning), "textures/hud/approximate-time/morning.svg")]
+    [InlineData(nameof(ApproximateTimePeriod.Noon), "textures/hud/approximate-time/noon.svg")]
+    [InlineData(nameof(ApproximateTimePeriod.Afternoon), "textures/hud/approximate-time/afternoon.svg")]
+    [InlineData(nameof(ApproximateTimePeriod.Dusk), "textures/hud/approximate-time/dusk.svg")]
+    [InlineData(nameof(ApproximateTimePeriod.Night), "textures/hud/approximate-time/night.svg")]
+    public void CompactTimePeriodLoadsItsSvgThroughTheNativeIconView(string periodName, string expectedPath)
+    {
+        // Arrange
+        using var fixture = new InstrumentIndicatorsFixture();
+        var (overlay, presentation, prepare, _) = fixture.Create("time", EnvironmentalGaugeStyle.Icon);
+        using (overlay)
+        {
+            var time = Assert.IsType<ApproximateTimePresentation>(presentation);
+            var period = Enum.Parse<ApproximateTimePeriod>(periodName);
+
+            // Act
+            time.SetContent(period, .5, actualHour: 12);
+            prepare();
+            using var composition = fixture.Mount(overlay, presentation);
+
+            // Assert
+            Assert.IsType<TextureElement>(composition.Composer.GetElement("test:icon"));
+            Assert.Equal(period, time.Period);
+            Assert.Equal(expectedPath, Assert.Single(fixture.Resources.Paths));
+            Assert.Empty(fixture.Resources.Native.Failures);
+        }
+    }
+
+    /// <summary>Compact SVGs are reused for unchanged periods and owned replacements retire with their composition.</summary>
+    [Fact]
+    public void CompactTimeUpdatesReuseAndReplaceOwnedPeriodTextures()
+    {
+        // Arrange
+        using var fixture = new InstrumentIndicatorsFixture();
+        var (overlay, presentation, prepare, _) = fixture.Create("time", EnvironmentalGaugeStyle.Icon);
+        using (overlay)
+        {
+            var time = Assert.IsType<ApproximateTimePresentation>(presentation);
+            LoadedTexture? dusk = null;
+            time.SetContent(ApproximateTimePeriod.Afternoon, .68, actualHour: 16.25);
+            prepare();
+            using (var composition = fixture.Mount(overlay, presentation))
+            {
+                var icon = Assert.IsType<TextureElement>(composition.Composer.GetElement("test:icon"));
+                var afternoon = Assert.Single(fixture.Resources.Artwork);
+                const string afternoonPath = "textures/hud/approximate-time/afternoon.svg";
+                const string duskPath = "textures/hud/approximate-time/dusk.svg";
+                Assert.Equal(afternoonPath, Assert.Single(fixture.Resources.Paths));
+
+                // Act
+                time.SetContent(ApproximateTimePeriod.Afternoon, .69, actualHour: 16.52);
+                prepare();
+                composition.Update(fixture.Context);
+
+                // Assert
+                Assert.Same(icon, composition.Composer.GetElement("test:icon"));
+                Assert.Equal("16:31", time.ClockText);
+                Assert.Single(fixture.Resources.Paths);
+                Assert.False(afternoon.Disposed);
+
+                // Act
+                time.SetContent(ApproximateTimePeriod.Dusk, .8, actualHour: 19.1);
+                prepare();
+                composition.Update(fixture.Context);
+
+                // Assert
+                dusk = fixture.Resources.Artwork[^1];
+                Assert.Equal(new[] { afternoonPath, duskPath }, fixture.Resources.Paths);
+                Assert.True(afternoon.Disposed);
+                Assert.False(dusk.Disposed);
+            }
+
+            // Assert
+            Assert.NotNull(dusk);
+            Assert.True(dusk!.Disposed);
+            Assert.Empty(fixture.Resources.Native.Failures);
+        }
+    }
+
+    /// <summary>Changing compact and text styles preserves the sampled period and actual calendar reading.</summary>
+    [Fact]
+    public void CompactTimeStyleTransitionsRetainPeriodAndClockText()
+    {
+        // Arrange
+        using var fixture = new InstrumentIndicatorsFixture();
+        var (overlay, presentation, prepare, _) = fixture.Create("time", EnvironmentalGaugeStyle.Icon);
+        using (overlay)
+        {
+            var time = Assert.IsType<ApproximateTimePresentation>(presentation);
+            time.SetContent(ApproximateTimePeriod.Afternoon, .75, actualHour: 15.5);
+            prepare();
+            using var compact = fixture.Mount(overlay, presentation);
+            const string expectedPath = "textures/hud/approximate-time/afternoon.svg";
+            Assert.Equal(expectedPath, Assert.Single(fixture.Resources.Paths));
+
+            // Act
+            time.SetStyle(EnvironmentalGaugeStyle.Text);
+            prepare();
+            using var text = fixture.Mount(overlay, presentation);
+            text.Composer.Render(0);
+
+            // Assert
+            Assert.Equal(ApproximateTimePeriod.Afternoon, time.Period);
+            Assert.Equal("15:30", time.ClockText);
+            Assert.Contains("15:30", fixture.Resources.Values);
+            Assert.Single(fixture.Resources.Paths);
+
+            // Act
+            time.SetStyle(EnvironmentalGaugeStyle.Icon);
+            prepare();
+            using var restoredCompact = fixture.Mount(overlay, presentation);
+
+            // Assert
+            Assert.Equal(ApproximateTimePeriod.Afternoon, time.Period);
+            Assert.Equal("15:30", time.ClockText);
+            Assert.Equal(new[] { expectedPath, expectedPath }, fixture.Resources.Paths);
+            Assert.Empty(fixture.Resources.Native.Failures);
+        }
+    }
+
     /// <summary>Authored mechanism regions share native parents and full canvases, preserving aspect ratios and layer order.</summary>
     [Theory]
     [InlineData("time", 1)] [InlineData("temperature", 1)] [InlineData("date", 1)]

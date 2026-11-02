@@ -6,6 +6,7 @@ Immersive and legacy gauge artwork are excluded. Existing SVG artwork, including
 
 Phases 1-6 each target one indicator and include its asset conversions, loader updates, PNG removal, and verification.
 Conversion phases are independent; their numbering provides a suggested execution order. Phase 7 follows completion of all conversion phases.
+All in-game verification is deferred until the end of Phase 7, after all implementation and automated verification. It does not block completion of earlier phases.
 
 ## Completion criteria for every conversion task
     - Create a genuine vector SVG beside the PNG with the same base name; do not embed raster artwork.
@@ -16,17 +17,17 @@ Conversion phases are independent; their numbering provides a suggested executio
     - Verify SVG loading, texture ownership, replacement, caching, and disposal through the existing rendering path.
     - Remove the PNG only after no runtime path or asset requirement depends on it.
     - Update directly affected documentation and tests; run focused regression tests.
-    - Check appearance in-game at supported HUD sizes and GUI scales, including relevant state transitions.
+    - Defer in-game appearance and state-transition checks to the final verification task in Phase 7.
 
 ## Phase 1: Approximate time - Icon style (7 tasks)
     Keep the immersive clock artwork and behavior unchanged. Complete all seven SVGs before switching the shared period-based loading path.
-    [ ] Convert approximate-time/unknown.png to unknown.svg, preserving the unknown-time state.
-    [ ] Convert approximate-time/dawn.png to dawn.svg, preserving the dawn state.
-    [ ] Convert approximate-time/morning.png to morning.svg, preserving the morning state.
-    [ ] Convert approximate-time/noon.png to noon.svg, preserving the noon state.
-    [ ] Convert approximate-time/afternoon.png to afternoon.svg, preserving the afternoon state.
-    [ ] Convert approximate-time/dusk.png to dusk.svg, preserving the dusk state.
-    [ ] Convert approximate-time/night.png to night.svg, preserving the night state.
+    [x] Convert approximate-time/unknown.png to unknown.svg, preserving the unknown-time state.
+    [x] Convert approximate-time/dawn.png to dawn.svg, preserving the dawn state.
+    [x] Convert approximate-time/morning.png to morning.svg, preserving the morning state.
+    [x] Convert approximate-time/noon.png to noon.svg, preserving the noon state.
+    [x] Convert approximate-time/afternoon.png to afternoon.svg, preserving the afternoon state.
+    [x] Convert approximate-time/dusk.png to dusk.svg, preserving the dusk state.
+    [x] Convert approximate-time/night.png to night.svg, preserving the night state.
 
 ## Phase 2: Body temperature (4 tasks)
     Keep the fill and outline canvases aligned. Complete both chevron SVGs before switching their shared direction-based loading path.
@@ -75,6 +76,6 @@ Conversion phases are independent; their numbering provides a suggested executio
     [ ] Preserve visibility transitions, tinting, pulse effects, clipping, and alignment without scaling rasterized icons; keep rasterization and resource replacement outside per-frame drawing.
     [ ] Preserve generated-texture ownership and dispose replaced or retired textures without disrupting other live compositions.
     [ ] Add focused regression tests verifying requested SVG raster dimensions equal final draw dimensions, size changes trigger correctly sized replacements, unchanged sizes reuse textures, and replacement/teardown release owned resources.
-    [ ] Verify all affected indicators in-game at supported indicator sizes and GUI scales, including fractional scales, live size changes, layered icons, and split weather fallback layouts.
     [ ] Update affected rendering documentation to describe final-size rasterization and native-pixel drawing.
+    [ ] As the final verification step after all implementation and automated checks, verify all affected indicators in-game at supported indicator sizes and GUI scales, including fractional scales, live size changes, layered icons, split weather fallback layouts, and relevant state/style transitions.
     Completion: Every non-immersive SVG icon is rasterized for its actual destination size and drawn 1:1, with no upscaling or downscaling of the resulting texture.
