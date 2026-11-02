@@ -10,11 +10,13 @@ internal sealed class GuiElementStyledCheckbox : GuiElementSwitch
     private LoadedTexture hover;
     private LoadedTexture check;
     private LoadedTexture disabledCheck;
+    private readonly float renderDepth;
     private bool disposed;
 
-    internal GuiElementStyledCheckbox(ICoreClientAPI api, Action<bool> changed, ElementBounds bounds)
+    internal GuiElementStyledCheckbox(ICoreClientAPI api, Action<bool> changed, ElementBounds bounds, float renderDepth = 50)
         : base(api, changed, bounds, GuiControlMetrics.CheckboxSize, 0)
     {
+        this.renderDepth = renderDepth;
         idle = new(api);
         hover = new(api);
         check = new(api);
@@ -50,9 +52,11 @@ internal sealed class GuiElementStyledCheckbox : GuiElementSwitch
     public override void RenderInteractiveElements(float deltaTime)
     {
         var background = Enabled && Bounds.PointInside(api.Input.MouseX, api.Input.MouseY) ? hover : idle;
-        api.Render.Render2DTexturePremultipliedAlpha(background.TextureId, Bounds);
+        api.Render.Render2DTexturePremultipliedAlpha(background.TextureId, Bounds.renderX, Bounds.renderY,
+            Bounds.OuterWidth, Bounds.OuterHeight, renderDepth);
         if (On)
-            api.Render.Render2DTexturePremultipliedAlpha((Enabled ? check : disabledCheck).TextureId, Bounds);
+            api.Render.Render2DTexturePremultipliedAlpha((Enabled ? check : disabledCheck).TextureId,
+                Bounds.renderX, Bounds.renderY, Bounds.OuterWidth, Bounds.OuterHeight, renderDepth);
     }
 
     public override void OnKeyDown(ICoreClientAPI api, KeyEvent args)

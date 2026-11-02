@@ -1,16 +1,17 @@
 using Cairo;
+using VanillaExpanded.Gui;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
+using static VanillaExpanded.RecipeBook.RecipeBookVisualMetrics;
 
 namespace VanillaExpanded.RecipeBook;
 
 internal sealed class GuiElementRecipeBookOptions : GuiElement
 {
-    internal const double IconSize = 17;
-    private const double PopupControlWidth = 40;
+    internal const double IconSize = OptionsIconSize;
     private readonly IconRendererDelegate icon;
-    private readonly PopupCheckbox checkbox;
+    private readonly GuiElementStyledCheckbox checkbox;
     private readonly ElementBounds popupBounds;
     private readonly GuiElementHoverText hint;
     private GuiComposer? popup;
@@ -34,21 +35,26 @@ internal sealed class GuiElementRecipeBookOptions : GuiElement
     {
         icon = api.Gui.Icons.SvgIconSource(api.Assets.Get(
             new AssetLocation("vanillaexpanded:textures/gui/recipe-book-options.svg")));
-        var font = CairoFont.WhiteSmallText();
+        var font = PopupFont();
         string label = Lang.Get("vanillaexpanded:recipebook-remember-open");
         double width = MeasurePopupWidth(font, label);
-        popupBounds = ElementBounds.Fixed(bounds.fixedWidth - width, bounds.fixedHeight, width, 30).WithParent(bounds);
+        popupBounds = ElementBounds.Fixed(bounds.fixedWidth - width, bounds.fixedHeight, width, PopupHeight).WithParent(bounds);
         bounds.WithChild(popupBounds);
-        checkbox = new PopupCheckbox(api, CommitPreference,
-            ElementBounds.Fixed(5, 6, 18, 18).WithParent(popupBounds));
+        checkbox = new GuiElementStyledCheckbox(api, CommitPreference,
+            ElementBounds.Fixed(PopupPadding, (PopupHeight - GuiControlMetrics.CheckboxSize) / 2,
+                GuiControlMetrics.CheckboxSize, GuiControlMetrics.CheckboxSize).WithParent(popupBounds), PopupDepth + 1);
         hint = new GuiElementHoverText(api, Lang.Get("vanillaexpanded:recipebook-remember-open-hint"),
-            font, 300, ElementBounds.Fixed(bounds.fixedWidth - width, bounds.fixedHeight, width, 30).WithParent(bounds));
+            font, HintWidth, ElementBounds.Fixed(bounds.fixedWidth - width, bounds.fixedHeight, width, PopupHeight).WithParent(bounds));
         iconTexture = new LoadedTexture(api);
         hoverTexture = new LoadedTexture(api);
     }
 
     internal static double MeasurePopupWidth(CairoFont font, string label) =>
-        System.Math.Ceiling(font.GetTextExtents(label).Width / scaled(1) + PopupControlWidth);
+        GuiControlMetrics.MeasureTextWidth(font, label, PopupPadding)
+            + GuiControlMetrics.CheckboxSize + LabelSpacing;
+
+    private static CairoFont PopupFont() => CairoFont.WhiteSmallText().WithFontSize(GuiControlMetrics.TextFontSize)
+        .WithColor(GuiControlPalette.Color(GuiControlPalette.Text));
 
     public override void ComposeElements(Context ctx, ImageSurface surface)
     {
@@ -56,23 +62,25 @@ internal sealed class GuiElementRecipeBookOptions : GuiElement
         int size = iconSize = System.Math.Max(1, (int)System.Math.Round(scaled(IconSize), System.MidpointRounding.AwayFromZero));
         using var iconSurface = new ImageSurface(Format.Argb32, size, size);
         using var iconContext = genContext(iconSurface);
-        icon(iconContext, 0, 0, size, size, GuiStyle.DialogDefaultTextColor);
+        icon(iconContext, 0, 0, size, size, GuiControlPalette.Color(GuiControlPalette.Text));
         generateTexture(iconSurface, ref iconTexture, linearMag: false);
         using var hoverSurface = new ImageSurface(Format.Argb32, size, size);
         using var hoverContext = genContext(hoverSurface);
-        icon(hoverContext, 0, 0, size, size, [0, 0.8, 0, 0.6]);
+        icon(hoverContext, 0, 0, size, size, GuiControlPalette.Color(GuiControlPalette.HoverIcon));
         generateTexture(hoverSurface, ref hoverTexture, linearMag: false);
         if (popup == null)
         {
-            var font = CairoFont.WhiteSmallText();
+            var font = PopupFont();
             double textHeight = font.GetFontExtents().Height / scaled(1);
             popup = api.Gui.CreateCompo("vanillaexpanded-recipebook-options", popupBounds);
             popup.Tabbable = false;
-            popup.zDepth = 310;
+            popup.zDepth = PopupDepth;
             popup.AddStaticElement(new GuiElementCustomDraw(api, ElementBounds.Fill, DrawBackground))
                 .AddInteractiveElement(checkbox, "remember-open")
                 .AddStaticText(Lang.Get("vanillaexpanded:recipebook-remember-open"), font,
-                    ElementBounds.Fixed(28, (30 - textHeight) / 2, popupBounds.fixedWidth - 33, textHeight))
+                    ElementBounds.Fixed(PopupPadding + GuiControlMetrics.CheckboxSize + LabelSpacing,
+                        (PopupHeight - textHeight) / 2,
+                        popupBounds.fixedWidth - 2 * PopupPadding - GuiControlMetrics.CheckboxSize - LabelSpacing, textHeight))
                 .Compose(false);
         }
         else popup.ReCompose();
@@ -186,30 +194,7 @@ internal sealed class GuiElementRecipeBookOptions : GuiElement
 
     private static void DrawBackground(Context ctx, ImageSurface surface, ElementBounds bounds)
     {
-        RoundRectangle(ctx, bounds.drawX, bounds.drawY, bounds.InnerWidth, bounds.InnerHeight, 1);
-        ctx.SetSourceRGBA(GuiStyle.DialogStrongBgColor);
-        ctx.FillPreserve();
-        ctx.SetSourceRGBA(0, 0, 0, 0.5);
-        ctx.LineWidth = 2;
-        ctx.Stroke();
-    }
-
-    private sealed class PopupCheckbox(ICoreClientAPI api, System.Action<bool> changed, ElementBounds bounds)
-        : GuiElementSwitch(api, changed, bounds, 18, 2)
-    {
-        public override void ComposeElements(Context ctx, ImageSurface surface)
-        {
-            base.ComposeElements(ctx, surface);
-            if (!On) return;
-            double padding = scaled(2);
-            RoundRectangle(ctx, Bounds.drawX + padding, Bounds.drawY + padding,
-                Bounds.InnerWidth - 2 * padding, Bounds.InnerHeight - 2 * padding, 1);
-            ctx.SetSourceRGBA(0, 0, 0, 1);
-            ctx.FillPreserve();
-            fillWithPattern(api, ctx, waterTextureName, false, true, 255, 0.5f);
-        }
-
-        // Bake the checked state into the popup texture so it shares the dropdown's foreground depth.
-        public override void RenderInteractiveElements(float deltaTime) { }
+        GuiControlDrawing.Frame(ctx, bounds.drawX, bounds.drawY, bounds.InnerWidth, bounds.InnerHeight,
+            GuiControlPalette.DropdownFill, GuiControlPalette.DropdownOutline, scaled(1));
     }
 }

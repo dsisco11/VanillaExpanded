@@ -6,8 +6,8 @@ namespace VanillaExpanded.RecipeBook;
 
 internal static class RecipeBookLayout
 {
-    internal const double PreferredWidth = 320;
-    internal const double PreferredHeight = 420;
+    internal const double PreferredWidth = RecipeBookVisualMetrics.PreferredWidth;
+    internal const double PreferredHeight = RecipeBookVisualMetrics.PreferredHeight;
     private const double DockGapPixels = 2;
 
     internal static ElementBounds? Place(ElementBounds parent, ElementBounds inputs,
@@ -18,20 +18,23 @@ internal static class RecipeBookLayout
         double height = window.InnerHeight / scale;
         double px = parent.absX / scale;
         double py = parent.absY / scale;
-        double right = (parent.absX + parent.OuterWidth) / scale;
-        double gridLeft = Math.Min(inputs.absX, output.absX) / scale;
-        double gridTop = Math.Min(inputs.absY, output.absY) / scale;
-        double gridRight = Math.Max(inputs.absX + inputs.OuterWidth, output.absX + output.OuterWidth) / scale;
-        double gridBottom = Math.Max(inputs.absY + inputs.OuterHeight, output.absY + output.OuterHeight) / scale;
-        double gap = DockGapPixels / scale;
+        double right = parent.absX + parent.OuterWidth;
+        double gridLeft = Math.Min(inputs.absX, output.absX);
+        double gridTop = Math.Min(inputs.absY, output.absY);
+        double gridRight = Math.Max(inputs.absX + inputs.OuterWidth, output.absX + output.OuterWidth);
+        double gridBottom = Math.Max(inputs.absY + inputs.OuterHeight, output.absY + output.OuterHeight);
+        // Subtract docking extents in screen pixels before converting to GUI units.
         var spaces = new[]
         {
-            ElementBounds.Fixed(right + gap, 0, width - right - gap, height),
-            ElementBounds.Fixed(0, 0, px - gap, height),
-            ElementBounds.Fixed(0, 0, gridLeft - gap, height),
-            ElementBounds.Fixed(gridRight + gap, 0, width - gridRight - gap, height),
-            ElementBounds.Fixed(0, 0, width, gridTop - gap),
-            ElementBounds.Fixed(0, gridBottom + gap, width, height - gridBottom - gap)
+            ElementBounds.Fixed((right + DockGapPixels) / scale, 0,
+                (window.InnerWidth - right - DockGapPixels) / scale, height),
+            ElementBounds.Fixed(0, 0, (parent.absX - DockGapPixels) / scale, height),
+            ElementBounds.Fixed(0, 0, (gridLeft - DockGapPixels) / scale, height),
+            ElementBounds.Fixed((gridRight + DockGapPixels) / scale, 0,
+                (window.InnerWidth - gridRight - DockGapPixels) / scale, height),
+            ElementBounds.Fixed(0, 0, width, (gridTop - DockGapPixels) / scale),
+            ElementBounds.Fixed(0, (gridBottom + DockGapPixels) / scale,
+                width, (window.InnerHeight - gridBottom - DockGapPixels) / scale)
         };
         foreach (var space in spaces.Where(space => space.fixedWidth >= minimumWidth && space.fixedHeight >= minimumHeight))
         {

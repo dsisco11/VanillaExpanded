@@ -137,40 +137,40 @@
         Sources: Proposal sections "Dimensions and typography", "Controls and content composition", and "Outer chrome and integration"; the design guide's lifecycle and controls contracts.
         Outcome: The Recipe Book shell matches the mockup's compact structure while preserving the existing grid behavior for Phase 6.
 
-        ☐ Update GuiDialogRecipeBook composition and RecipeBookLayout measurements together.
-            ☐ Use preferred width 340 and approximately 420 height; grow minimum dimensions for complete tabs, translated headings/controls, empty-state content, and footer groups.
-            ☐ Apply the 36-unit titlebar with 14-unit bold text, 12-unit gap before tabs, eight-unit outer border-box spacing, and specified content-panel padding.
-            ☐ Keep the localized 11-unit category heading with at least 17-unit line space and eight-unit separation.
-            ☐ Compose Hide uncraftable and the compact 12-unit sort selector on one row, remove the separate visible Sort by row, and retain localized explanation/labeling.
-            ☐ Measure checkbox/label/selector separation without overlap; keep Hide uncraftable wording and Availability as the initial sort policy.
-            ☐ Adopt the shared clearable input with Recipe Book-provided Search outputs placeholder, clear tooltip, and existing search callback.
-            ☐ Apply 28-unit minimum search height, 14-unit text, eight-unit text inset, and ten-unit separation below.
-            ☐ Align search, recessed list, and footer horizontal edges; remove the list frame outset and reserve scrollbar space internally.
-            ☐ Retain one full-height inner viewport for scissor, layout, virtualization, input, and scrolling; do not introduce vertical-padding clipping.
-        ☐ Compose the flat footer and recovery controls with shared buttons.
-            ☐ Group Previous, Auto, and Next visually on the left while keeping distinct hit regions, enabled states, tooltips, and keyboard actions.
-            ☐ Center the real alternative counter in the footer and place Handbook on the right; reserve symmetric space sufficient to avoid overlaps.
-            ☐ Apply 12-unit regular footer text, eight-unit horizontal button padding, and 12-unit separation above.
-            ☐ Style Clear search and Show uncraftable empty-state actions consistently without changing which controller they update.
-        ☐ Integrate options and outer chrome locally.
-            ☐ Use the shared checkbox in the options popup while retaining persisted preference handling, popup precedence, Escape/outside-click/focus-loss dismissal, and localized hints.
-            ☐ Match approved dialog/titlebar gradients, outlines, separator, shadow, and text hierarchy without replacing native Fixed/Movable or close behavior.
-            ☐ Retain and compatibly style scrollbar, options, movement, and close controls; derive popup and icon/tooltip geometry from shared measurements.
-        ☐ Complete the clear-input migration after verifying its consumers.
-            ☐ Update composition accessors, placeholder assignment, focus/clear paths, and directly affected tests to use the shared component.
-            ☐ Remove GuiElementRecipeBookSearch and obsolete compatibility wrappers only after targeted validation passes.
-            ☐ Keep maintained current-state documentation accurate for the migrated component without appending implementation history.
-        ☐ Extend Recipe Book lifecycle and minimum-layout tests.
-            ☐ Cover complete tabs at baseline width, long translations, additional categories, centered-footer overlap bounds, and constrained screens.
-            ☐ Preserve search-first tab order, explicit-open search focus, automatic reopen without focus theft, and no focus acquisition during resize.
-            ☐ Cover Fixed's two-physical-pixel docking gap, native Movable coordinates/dragging, reopening/recomposition, inventory closure, and popup precedence.
-            ☐ Preserve category/search/sort and world-local browsing restoration, fresh-dialog craftable-only state, empty-state actions, hidden-selection disablement, and Handbook behavior.
+        ☑ Update GuiDialogRecipeBook composition and RecipeBookLayout measurements together.
+            ☑ Use preferred width 340 and approximately 420 height; grow minimum dimensions for complete tabs, translated headings/controls, empty-state content, and footer groups.
+            ☑ Apply the 36-unit titlebar with 14-unit bold text, 12-unit gap before tabs, eight-unit outer border-box spacing, and specified content-panel padding.
+            ☑ Keep the localized 11-unit category heading with at least 17-unit line space and eight-unit separation.
+            ☑ Compose Hide uncraftable and the compact 12-unit sort selector on one row, remove the separate visible Sort by row, and retain localized explanation/labeling.
+            ☑ Measure checkbox/label/selector separation without overlap; keep Hide uncraftable wording and Availability as the initial sort policy.
+            ☑ Adopt the shared clearable input with Recipe Book-provided Search outputs placeholder, clear tooltip, and existing search callback.
+            ☑ Apply 28-unit minimum search height, 14-unit text, eight-unit text inset, and ten-unit separation below.
+            ☑ Align search, recessed list, and footer horizontal edges; remove the list frame outset and reserve scrollbar space internally.
+            ☑ Retain one full-height inner viewport for scissor, layout, virtualization, input, and scrolling; do not introduce vertical-padding clipping.
+        ☑ Compose the flat footer and recovery controls with shared buttons.
+            ☑ Group Previous, Auto, and Next visually on the left while keeping distinct hit regions, enabled states, tooltips, and keyboard actions.
+            ☑ Center the real alternative counter in the footer and place Handbook on the right; reserve symmetric space sufficient to avoid overlaps.
+            ☑ Apply 12-unit regular footer text, eight-unit horizontal button padding, and 12-unit separation above.
+            ☑ Style Clear search and Show uncraftable empty-state actions consistently without changing which controller they update.
+        ☑ Integrate options and outer chrome locally.
+            ☑ Use the shared checkbox in the options popup while retaining persisted preference handling, popup precedence, Escape/outside-click/focus-loss dismissal, and localized hints.
+            ☑ Match approved dialog/titlebar gradients, outlines, separator, shadow, and text hierarchy without replacing native Fixed/Movable or close behavior.
+            ☑ Retain and compatibly style scrollbar, options, movement, and close controls; derive popup and icon/tooltip geometry from shared measurements.
+        ☑ Complete the clear-input migration after verifying its consumers.
+            ☑ Update composition accessors, placeholder assignment, focus/clear paths, and directly affected tests to use the shared component.
+            ☑ Remove GuiElementRecipeBookSearch and obsolete compatibility wrappers only after targeted validation passes.
+            ☑ Keep maintained current-state documentation accurate for the migrated component without appending implementation history.
+        ☑ Extend Recipe Book lifecycle and minimum-layout tests.
+            ☑ Cover complete tabs at baseline width, long translations, additional categories, centered-footer overlap bounds, and constrained screens.
+            ☑ Preserve search-first tab order, explicit-open search focus, automatic reopen without focus theft, and no focus acquisition during resize.
+            ☑ Cover Fixed's two-physical-pixel docking gap, native Movable coordinates/dragging, reopening/recomposition, inventory closure, and popup precedence.
+            ☑ Preserve category/search/sort and world-local browsing restoration, fresh-dialog craftable-only state, empty-state actions, hidden-selection disablement, and Handbook behavior.
 
         Completion criteria:
-            ☐ Shell geometry, typography, controls, and palette match approved targets with no cropped labels or overlapping footer groups.
-            ☐ Footer/recovery buttons and both checkbox locations use shared controls; the old search class has no remaining code/test consumers.
-            ☐ Native lifecycle, controller callbacks, transfer authority, and persistence behavior remain unchanged.
-            ☐ Existing square-grid behavior remains functional until Phase 6; responsive-grid fidelity is not claimed here.
+            ☑ Shell geometry, typography, controls, and palette match approved targets with no cropped labels or overlapping footer groups.
+            ☑ Footer/recovery buttons and both checkbox locations use shared controls; the old search class has no remaining code/test consumers.
+            ☑ Native lifecycle, controller callbacks, transfer authority, and persistence behavior remain unchanged.
+            ☑ Existing square-grid behavior remains functional until Phase 6; responsive-grid fidelity is not claimed here.
 
     ## Phase 6: Implement approved responsive grid and recipe presentation:
         Prerequisites: Phase 5 and explicit Phase 1 approval of grid, padding, availability, and selection choices.

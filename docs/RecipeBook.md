@@ -108,7 +108,7 @@ Criteria changes reuse allocation scores; grid changes refresh through the norma
 
 The book belongs to its inventory dialog and closes with that parent. [GuiElementRecipeBookButton](../VanillaExpanded/src/RecipeBook/GuiElementRecipeBookButton.cs) is anchored to the crafting output slot and reflects the book's actual open state. Explicit opening requests search focus; automatic restoration opens without taking focus from the inventory. An unfocused book does not capture keyboard input or acquire focus during resizing.
 
-The native titlebar provides two positioning modes:
+The [local titlebar adapter](../VanillaExpanded/src/RecipeBook/GuiElementRecipeBookChrome.cs) retains native movement, close controls, hover resources, and two positioning modes:
 
 - **Fixed** uses adaptive inventory-relative placement with a two-screen-pixel docking gap.
 - **Movable** uses native dragging and remembered manual coordinates, clamped to the window.
@@ -131,17 +131,17 @@ Automatic reopening is independent of browsing-state restoration. Disabling reop
 
 ## Controls and layout
 
-The dialog contains category tabs and a framed content panel with the selected category's localized heading, filtering controls, search, a recessed recipe list, and footer controls. The panel has eight-GUI-pixel inner padding.
+The dialog contains category tabs and a framed content panel with the selected category's localized heading, filtering controls, search, a recessed recipe list, and footer controls. Its preferred size is 340 by 420 GUI units; minimum dimensions grow for translated labels, complete tabs, empty-state actions, and the footer. The 36-unit titlebar uses 14-unit bold text, with a 12-unit gap before the tabs and eight-unit outer spacing. Panel content has eight-unit horizontal/bottom padding and 12-unit top spacing.
 
 Composition and minimum-size measurement use shared named dimensions for spacing, margins, and control chrome. Minimum width accommodates the complete category strip and localized headings and controls; minimum height reserves room for the heading and empty-state text. GUI-scaled dimensions are distinct from physical-pixel borders and docking gaps. [RecipeBookLayout](../VanillaExpanded/src/RecipeBook/RecipeBookLayout.cs) owns placement and preferred dialog dimensions; the options component owns popup-width measurement.
 
-The [shared visual helpers](../VanillaExpanded/src/Gui/GuiControlVisuals.cs) expose opt-in palette, frame drawing, control measurement, and host-relative pixel snapping. Category tabs and their panel use the shared palette, scaled outlines, and snapping rules; tab measurements also govern strip sizing. The separate [visual dimensions](../VanillaExpanded/src/RecipeBook/RecipeBookVisualMetrics.cs) are not yet used by dialog composition. Other control appearance and layout remain governed by their existing components.
+The [shared visual helpers](../VanillaExpanded/src/Gui/GuiControlVisuals.cs) expose opt-in palette, frame drawing, control measurement, and host-relative pixel snapping. [Dialog-specific dimensions](../VanillaExpanded/src/RecipeBook/RecipeBookVisualMetrics.cs) govern composition and minimum sizing. [Local chrome adapters](../VanillaExpanded/src/RecipeBook/GuiElementRecipeBookChrome.cs) draw the warm dialog/titlebar gradients, outline, title separator, shadow, recessed list, and scrollbar without changing native positioning or scroll handling.
 
 Search is the first keyboard tab stop. Native control focus and input routing are preserved, with the category strip acting as one outer tab stop.
 
 ### Shared styled controls
 
-The shared GUI layer provides opt-in native-derived controls. Callers supply labels, fonts, and callbacks; the controls have no filtering, catalogue, localization-key, or persistence dependencies. The Recipe Book's filtering, footer, and search composition still use their existing controls.
+The shared GUI layer provides opt-in native-derived controls. Callers supply labels, fonts, and callbacks; the controls have no filtering, catalogue, localization-key, or persistence dependencies. Recipe Book composition supplies its localized labels and controller callbacks to these adapters for search, sorting, both checkboxes, footer navigation, and empty-state actions.
 
 | Component | Rendering and ownership |
 | --- | --- |
@@ -157,6 +157,9 @@ flowchart LR
     Adapter --> Native[Native editing and activation]
     Native --> Callback[Caller callback]
     Adapter --> Visual[Owned state textures and tooltips]
+    Metrics[Shared and dialog measurements] --> Book[Recipe Book composition]
+    Book --> Caller
+    Book --> Chrome[Local native-compatible chrome]
 ```
 
 Native composition and the adapters' additional resources retain separate ownership. Closing or replacing the owning composer disposes both; rendering does not replace global GUI styles or the unrelated native control helpers.
@@ -173,11 +176,13 @@ Category selection updates its controller and panel heading and resets recipe sc
 
 ### Search, filtering, and options
 
-[GuiElementRecipeBookSearch](../VanillaExpanded/src/RecipeBook/GuiElementRecipeBookSearch.cs) reserves an inner-right clear icon outside the native text/caret area. Its clear action uses the normal search callback and preserves input focus.
+[GuiElementClearableTextInput](../VanillaExpanded/src/Gui/GuiElementClearableTextInput.cs) reserves an inner-right clear icon outside the native text/caret area. Recipe Book supplies the Search outputs placeholder and clear tooltip. Its clear action uses the normal search callback and preserves input focus. The field uses 14-unit text, a minimum height of 28, and an eight-unit text inset.
 
-Hide uncraftable and Sort by bind directly to their feature controllers. Their localized tooltips explain craftability and ordering. Recomposition synchronizes controls without invoking change handlers.
+Hide uncraftable and the sort selector share one row below the 11-unit category heading. The 17-unit checkbox and 14-unit label sit on the left; the 30-unit selector with 12-unit text sits on the right. Minimum width includes their measured separation. The selector's tooltip carries the localized Sort by label and ordering explanation rather than a separate visible label row. Both controls bind directly to their feature controllers; Availability remains the initial order. Recomposition synchronizes controls without invoking change handlers.
 
 [GuiElementRecipeBookOptions](../VanillaExpanded/src/RecipeBook/GuiElementRecipeBookOptions.cs) binds the titlebar's sliders control to the persisted reopening preference. Its dropdown owns its composer and textures, receives input before underlying controls, and dismisses on Escape, outside clicks, or focus loss.
+
+Search, the recessed list frame, and footer actions share horizontal edges. The list reserves its scrollbar internally and starts ten units below search. The footer starts 12 units below the list: Previous, Auto, and Next form a left group with separate hit regions, the real alternative counter is centered, and Handbook is right-aligned. Symmetric width reservations prevent either group from overlapping the counter, including outputs with many alternatives. Footer and recovery buttons use 12-unit regular text and eight-unit horizontal padding.
 
 ### Recipes and handbook
 

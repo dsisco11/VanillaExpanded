@@ -8,48 +8,21 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.GameContent;
+using static VanillaExpanded.RecipeBook.RecipeBookVisualMetrics;
 
 namespace VanillaExpanded.RecipeBook;
 
 internal sealed class GuiDialogRecipeBook : GuiDialog
 {
     private const string ComposerName = "vanillaexpanded-recipebook";
-    private const double DialogPadding = 8;
-    private const double PanelPadding = 8;
-    private const double ContentInset = DialogPadding + PanelPadding;
+    private const double ContentInset = OuterPadding + PanelPadding;
     private const double RowSpacing = 8;
-    private const double LabelSpacing = 8;
-    private const double CategoryTitleTopPadding = 12;
-    private const float CategoryTitleFontSize = 11;
-    private const double ListFrameOutset = 3;
-    private const double ListFooterSpacing = 10;
-    private const int ListBorderPixels = 2;
     private static readonly string[] StandardCategories =
         ["construction", "decorative", "mechanics", "terrain", "tools", "clothing", "items"];
-    private const float ListBackgroundBrightness = 0.65f;
-    private const double ScrollbarWidth = 12;
-    private const double ScrollbarSpacing = 4;
     private const double ScrollbarSpace = ScrollbarWidth + ScrollbarSpacing;
-    private const double FooterButtonSpacing = 3;
-    private const double FooterLabelSpacing = 4;
-    private const double HandbookTextPadding = 8;
-    private const double MinimumNavigationWidth = 24;
-    private const double MinimumAutoWidth = 46;
-    private const double MinimumHandbookWidth = 70;
-    private const double MinimumFooterHeight = 24;
-    private const double MinimumSearchHeight = 26;
     private const double SearchTextPadding = 3;
-    private const double MinimumFilterHeight = 20;
-    private const double FilterTextPadding = 2;
     private const double TextWidthAllowance = 1;
-    private const int HintMaxWidth = 300;
-    private const double OptionsIconTop = 7;
-    private const double OptionsIconSpacing = 11;
-    private const double OptionsTitlebarReserve = 30;
-    // The native controls expose their icon size, but not these chrome dimensions.
-    private const double NativeTitlebarRightSpacing = 20;
-    private const double NativeMenuIconExpansion = 2;
-    private const double NativeDropdownChromeWidth = 40;
+    private const int HintMaxWidth = HintWidth;
     private readonly GuiDialog parent;
     private readonly GuiComposer parentComposer;
     private readonly RecipeBookSession session;
@@ -59,8 +32,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
     private double minimumWidth;
     private double minimumHeight;
     private double searchHeight;
-    private double craftableHeight;
-    private double sortLabelWidth;
+    private double filterHeight;
     private double sortValueWidth;
     private double tabsHeight;
     private double categoryTitleHeight;
@@ -72,6 +44,8 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
     private double emptyTextHeight;
     private double clearSearchWidth;
     private double showUncraftableWidth;
+    private double counterWidth;
+    private readonly int maximumAlternatives;
     private GuiElementRecipeBookTooltip? tooltip;
     private GuiElementRecipeBookOptions? options;
     private string search = "";
@@ -90,6 +64,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         this.parent = parent;
         this.parentComposer = parentComposer;
         this.icons = icons;
+        maximumAlternatives = catalogue.Groups.Select(group => group.Alternatives.Length).DefaultIfEmpty(1).Max();
         categories = [null,
             .. catalogue.CategoryCodes.Where(code => code is not (CraftingCatalogue.OtherCategory
                 or "flora" or "clutter" or "aquatic" or "liquids" or "creatures" or "meta"))
@@ -177,52 +152,53 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         float scroll = (SingleComposer?.GetElement("tiles") as GuiElementRecipeBookTiles)?.ScrollPosition ?? 0;
         double width = bounds.fixedWidth;
         double height = bounds.fixedHeight;
-        double contentTop = GuiStyle.TitleBarHeight + DialogPadding;
+        double contentTop = TitleHeight + TitleSpacing;
         var content = ElementBounds.Fixed(ContentInset, contentTop, width - 2 * ContentInset, height - contentTop - ContentInset);
         var tabsBounds = ElementBounds.Fixed(-PanelPadding, 0, content.fixedWidth + 2 * PanelPadding, tabsHeight);
         double panelTop = tabsHeight - Math.Max(1,
             GuiControlDrawing.Pixels(GuiControlMetrics.Outline, GuiElement.scaled(1))) / GuiElement.scaled(1);
         var categoryPanel = ElementBounds.Fixed(-PanelPadding, panelTop, content.fixedWidth + 2 * PanelPadding,
             content.fixedHeight - panelTop + PanelPadding);
-        var categoryTitle = ElementBounds.Fixed(0, tabsHeight + CategoryTitleTopPadding, content.fixedWidth, categoryTitleHeight);
-        var craftableBounds = ElementBounds.Fixed(0, categoryTitle.fixedY + categoryTitleHeight + RowSpacing,
-            craftableHeight, craftableHeight);
-        double textHeight = CairoFont.WhiteDetailText().GetFontExtents().Height / GuiElement.scaled(1);
-        var craftableLabel = ElementBounds.Fixed(craftableHeight + LabelSpacing,
-            craftableBounds.fixedY + (craftableHeight - textHeight) / 2,
-            content.fixedWidth - craftableHeight - LabelSpacing, textHeight);
-        double sortTop = craftableBounds.fixedY + craftableHeight + RowSpacing;
-        var sortLabel = ElementBounds.Fixed(0, sortTop + (craftableHeight - textHeight) / 2, sortLabelWidth, textHeight);
-        var sortBounds = ElementBounds.Fixed(sortLabelWidth + LabelSpacing, sortTop,
-            sortValueWidth, craftableHeight);
-        var searchBounds = ElementBounds.Fixed(0, sortTop + craftableHeight + RowSpacing, content.fixedWidth, searchHeight);
+        var categoryTitle = ElementBounds.Fixed(0, tabsHeight + PanelTopPadding, content.fixedWidth, categoryTitleHeight);
+        double filterTop = categoryTitle.fixedY + categoryTitleHeight + HeadingSpacing;
+        var craftableBounds = ElementBounds.Fixed(0, filterTop + (filterHeight - GuiControlMetrics.CheckboxSize) / 2,
+            GuiControlMetrics.CheckboxSize, GuiControlMetrics.CheckboxSize);
+        double textHeight = MainFont().GetFontExtents().Height / GuiElement.scaled(1);
+        var craftableLabel = ElementBounds.Fixed(GuiControlMetrics.CheckboxSize + LabelSpacing,
+            filterTop + (filterHeight - textHeight) / 2,
+            content.fixedWidth - GuiControlMetrics.CheckboxSize - 2 * LabelSpacing - sortValueWidth, textHeight);
+        var sortBounds = ElementBounds.Fixed(content.fixedWidth - sortValueWidth,
+            filterTop + (filterHeight - GuiControlMetrics.NativeDropdownHeight) / 2,
+            sortValueWidth, GuiControlMetrics.NativeDropdownHeight);
+        var searchBounds = ElementBounds.Fixed(0, filterTop + filterHeight + FilterSpacing, content.fixedWidth, searchHeight);
         var footer = ElementBounds.Fixed(0, content.fixedHeight - footerHeight, content.fixedWidth, footerHeight);
-        double listTop = searchBounds.fixedY + searchHeight + RowSpacing;
-        double listHeight = footer.fixedY - ListFooterSpacing - listTop;
-        var listFrame = ElementBounds.Fixed(-ListFrameOutset, listTop - ListFrameOutset,
-            content.fixedWidth + 2 * ListFrameOutset, listHeight + 2 * ListFrameOutset);
-        double border = ListBorderPixels / GuiElement.scaled(1);
-        var viewport = ElementBounds.Fixed(0, listFrame.fixedY + border, content.fixedWidth - ScrollbarSpace,
+        double listTop = searchBounds.fixedY + searchHeight + SearchSpacing;
+        double listHeight = footer.fixedY - FooterSpacing - listTop;
+        var listFrame = ElementBounds.Fixed(0, listTop, content.fixedWidth, listHeight);
+        double border = ListBorderWidth;
+        var viewport = ElementBounds.Fixed(border, listFrame.fixedY + border, content.fixedWidth - 2 * border - ScrollbarSpace,
             listFrame.fixedHeight - 2 * border);
         var scrollBounds = ElementBounds.Fixed(0, viewport.fixedY, ScrollbarWidth, viewport.fixedHeight)
             .FixedRightOf(viewport, ScrollbarSpacing);
         var previous = ElementBounds.Fixed(0, 0, previousWidth, footerHeight);
-        var auto = ElementBounds.Fixed(0, 0, autoWidth, footerHeight).FixedRightOf(previous, FooterButtonSpacing);
-        var next = ElementBounds.Fixed(0, 0, nextWidth, footerHeight).FixedRightOf(auto, FooterButtonSpacing);
-        double labelLeft = next.fixedX + next.fixedWidth + FooterLabelSpacing;
+        var auto = ElementBounds.Fixed(previousWidth + FooterButtonSpacing, 0, autoWidth, footerHeight);
+        var next = ElementBounds.Fixed(previousWidth + autoWidth + 2 * FooterButtonSpacing, 0, nextWidth, footerHeight);
         var handbook = ElementBounds.Fixed(content.fixedWidth - handbookWidth, 0, handbookWidth, footerHeight);
-        var label = ElementBounds.Fixed(labelLeft, 0, handbook.fixedX - FooterLabelSpacing - labelLeft, footerHeight);
+        var label = ElementBounds.Fixed((content.fixedWidth - counterWidth) / 2, 0, counterWidth, footerHeight);
         var tiles = new GuiElementRecipeBookTiles(capi, ElementBounds.Fixed(0, 0, viewport.fixedWidth, viewport.fixedHeight).WithParent(viewport),
             viewport, session, Inspect, Activate, icons);
         var newTooltip = new GuiElementRecipeBookTooltip(capi);
         var newOptions = new GuiElementRecipeBookOptions(capi, ElementBounds.Fixed(width - OptionsRightInset,
             OptionsIconTop, GuiElementRecipeBookOptions.IconSize, GuiElementRecipeBookOptions.IconSize));
-        var composer = capi.Gui.CreateCompo(ComposerName, bounds)
-            .AddShadedDialogBG(ElementBounds.Fill)
-            .AddDialogTitleBar(Lang.Get("vanillaexpanded:recipebook-title"), () => CloseByUser(), key: "titlebar")
+        var composer = capi.Gui.CreateCompo(ComposerName, bounds);
+        composer
+            .AddInteractiveElement(new GuiElementRecipeBookBackground(capi, ElementBounds.Fill), "dialog-background")
+            .AddInteractiveElement(new GuiElementRecipeBookTitleBar(capi, Lang.Get("vanillaexpanded:recipebook-title"),
+                composer, () => CloseByUser(), ElementBounds.Fixed(0, 0, width, TitleHeight)), "titlebar")
             .BeginChildElements(content)
             .AddStaticElement(new GuiElementCustomDraw(capi, categoryPanel, GuiElementIconTab.DrawPanel), "category-panel")
-            .AddInteractiveElement(new GuiElementRecipeBookSearch(capi, searchBounds, text =>
+            .AddInteractiveElement(new GuiElementClearableTextInput(capi, searchBounds,
+                Lang.Get("vanillaexpanded:recipebook-search"), Lang.Get("vanillaexpanded:recipebook-clear-search"), text =>
             {
                 search = text;
                 tiles.ResetScroll();
@@ -237,59 +213,55 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
                     session.SelectCategory(categories[index]);
                 }), "categories")
             .AddDynamicText(CategoryName(session.Category), CategoryTitleFont(), categoryTitle, "category-title")
-            .AddSwitch(enabled =>
+            .AddInteractiveElement(new GuiElementStyledCheckbox(capi, enabled =>
             {
                 tiles.ResetScroll();
                 session.CraftableOnly.SetEnabled(enabled);
-            }, craftableBounds, "craftable-only", size: craftableHeight)
-            .AddStaticText(Lang.Get("vanillaexpanded:recipebook-craftable-only"), CairoFont.WhiteDetailText(),
+            }, craftableBounds), "craftable-only")
+            .AddStaticText(Lang.Get("vanillaexpanded:recipebook-craftable-only"), MainFont(),
                 craftableLabel, "craftable-label")
             .AddHoverText(Lang.Get("vanillaexpanded:recipebook-craftable-only-hint"), CairoFont.WhiteSmallText(),
-                HintMaxWidth, ElementBounds.Fixed(0, craftableBounds.fixedY, content.fixedWidth, craftableHeight),
+                HintMaxWidth, ElementBounds.Fixed(0, filterTop, craftableLabel.fixedX + craftableLabel.fixedWidth, filterHeight),
                 "craftable-hint")
-            .AddStaticText(Lang.Get("vanillaexpanded:recipebook-sort"), CairoFont.WhiteDetailText(),
-                sortLabel, "sort-label")
-            .AddDropDown(session.Sort.Orders.Select(order => order.Id).ToArray(),
+            .AddInteractiveElement(new GuiElementStyledDropDown(capi, session.Sort.Orders.Select(order => order.Id).ToArray(),
                 session.Sort.Orders.Select(order => Lang.Get(order.NameKey)).ToArray(),
                 session.Sort.Orders.IndexOf(session.Sort.Selected), (id, _) =>
                 {
                     if (session.Sort.Selected.Id == id) return;
                     tiles.ResetScroll();
                     session.Sort.Select(id);
-                }, sortBounds, CairoFont.WhiteDetailText(), "sort")
-            .AddHoverText(Lang.Get("vanillaexpanded:recipebook-sort-hint"), CairoFont.WhiteSmallText(),
-                HintMaxWidth, ElementBounds.Fixed(0, sortTop, sortBounds.fixedX + sortBounds.fixedWidth, craftableHeight),
+                }, sortBounds), "sort")
+            .AddHoverText(Lang.Get("vanillaexpanded:recipebook-sort") + ": " + Lang.Get("vanillaexpanded:recipebook-sort-hint"),
+                CairoFont.WhiteSmallText(), HintMaxWidth, sortBounds.FlatCopy(),
                 "sort-hint")
-            .AddStaticElement(new GuiElementInset(capi, listFrame, ListBorderPixels, ListBackgroundBrightness), "recipes-background")
+            .AddStaticElement(new GuiElementCustomDraw(capi, listFrame, GuiElementRecipeBookBackground.DrawList), "recipes-background")
             .BeginClip(viewport)
                 .AddInteractiveElement(tiles, "tiles")
             .EndClip()
-            .AddVerticalScrollbar(tiles.Scroll, scrollBounds, "scroll")
-            .AddDynamicText("", CairoFont.WhiteSmallText().WithOrientation(EnumTextOrientation.Center),
-                ElementBounds.Fixed(0, viewport.fixedY, viewport.fixedWidth, emptyTextHeight), "empty")
-            .AddSmallButton(Lang.Get("vanillaexpanded:recipebook-clear-search"), ClearSearch,
-                ElementBounds.Fixed(0, viewport.fixedY + emptyTextHeight + RowSpacing, clearSearchWidth, footerHeight),
-                key: "clear-search")
-            .AddSmallButton(Lang.Get("vanillaexpanded:recipebook-show-uncraftable"), ShowUncraftable,
-                ElementBounds.Fixed(0, viewport.fixedY + emptyTextHeight + RowSpacing, showUncraftableWidth, footerHeight),
-                key: "show-uncraftable")
+            .AddInteractiveElement(new GuiElementRecipeBookScrollbar(capi, tiles.Scroll, scrollBounds), "scroll")
+            .AddDynamicText("", MainFont().WithOrientation(EnumTextOrientation.Center),
+                ElementBounds.Fixed(viewport.fixedX, viewport.fixedY, viewport.fixedWidth, emptyTextHeight), "empty")
+            .AddInteractiveElement(StyledButton(Lang.Get("vanillaexpanded:recipebook-clear-search"), ClearSearch,
+                ElementBounds.Fixed(viewport.fixedX, viewport.fixedY + emptyTextHeight + RowSpacing, clearSearchWidth, footerHeight)), "clear-search")
+            .AddInteractiveElement(StyledButton(Lang.Get("vanillaexpanded:recipebook-show-uncraftable"), ShowUncraftable,
+                ElementBounds.Fixed(viewport.fixedX, viewport.fixedY + emptyTextHeight + RowSpacing, showUncraftableWidth, footerHeight)), "show-uncraftable")
             .BeginChildElements(footer)
-            .AddSmallButton("<", () => Cycle(-1), previous, key: "previous")
-            .AddSmallButton(Lang.Get("vanillaexpanded:recipebook-auto"), () => { session.Auto(); return true; },
-                auto, key: "auto")
-            .AddSmallButton(">", () => Cycle(1), next, key: "next")
+            .AddInteractiveElement(StyledButton("<", () => Cycle(-1), previous), "previous")
+            .AddInteractiveElement(StyledButton(Lang.Get("vanillaexpanded:recipebook-auto"),
+                () => { session.Auto(); return true; }, auto), "auto")
+            .AddInteractiveElement(StyledButton(">", () => Cycle(1), next), "next")
             .AddHoverText(Lang.Get("vanillaexpanded:recipebook-alternative-hint"), CairoFont.WhiteSmallText(),
-                HintMaxWidth, ElementBounds.Fixed(0, 0, next.fixedX + next.fixedWidth, footerHeight))
-            .AddDynamicText("", CairoFont.WhiteSmallText(), label, "alternative")
-            .AddSmallButton(Lang.Get("vanillaexpanded:recipebook-handbook"), OpenHandbook, handbook, key: "handbook")
+                HintMaxWidth, ElementBounds.Fixed(0, 0, next.fixedX + nextWidth, footerHeight))
+            .AddDynamicText("", FooterFont().WithOrientation(EnumTextOrientation.Center), label, "alternative")
+            .AddInteractiveElement(StyledButton(Lang.Get("vanillaexpanded:recipebook-handbook"), OpenHandbook, handbook), "handbook")
             .AddHoverText(Lang.Get("vanillaexpanded:recipebook-handbook-hint"), CairoFont.WhiteSmallText(),
-                HintMaxWidth, ElementBounds.Fixed(handbook.fixedX, 0, handbook.fixedWidth, footerHeight), "handbook-hint")
+                HintMaxWidth, ElementBounds.Fixed(handbook.fixedX, 0, handbookWidth, footerHeight), "handbook-hint")
             .EndChildElements()
             .AddInteractiveElement(newTooltip, "tooltip")
             .EndChildElements()
             .AddInteractiveElement(newOptions, "options")
             .AddHoverText(Lang.Get("vanillaexpanded:recipebook-options"), CairoFont.WhiteSmallText(),
-                200, ElementBounds.Fixed(width - 80, 7, 17, 17))
+                HintMaxWidth, newOptions.Bounds.FlatCopy(), "options-hint")
             .Compose(focusFirstElement);
         SingleComposer?.Dispose();
         SingleComposer = composer;
@@ -297,7 +269,6 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         options = newOptions;
         composer.GetSwitch("craftable-only").SetValue(session.CraftableOnly.Enabled);
         ((GuiElementIconTabs)composer.GetElement("categories")).SetValue(Array.IndexOf(categories, session.Category), false);
-        composer.GetTextInput("search").SetPlaceHolderText(Lang.Get("vanillaexpanded:recipebook-search"));
         composer.GetTextInput("search").SetValue(search);
         tiles.Bind(composer.GetScrollbar("scroll"));
         tiles.Scroll(scroll * (float)GuiElement.scaled(1));
@@ -312,69 +283,83 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
     };
 
     private static double NativeTitlebarControlsWidth =>
-        2 * GuiElementDialogTitleBar.unscaledCloseIconSize + NativeMenuIconExpansion + NativeTitlebarRightSpacing;
+        2 * GuiElementDialogTitleBar.unscaledCloseIconSize + NativeMenuExpansion + NativeTitleRightSpacing;
 
     private static double OptionsRightInset =>
         NativeTitlebarControlsWidth + OptionsIconSpacing + GuiElementRecipeBookOptions.IconSize;
 
-    private static CairoFont CategoryTitleFont() => CairoFont.WhiteDetailText().WithFontSize(CategoryTitleFontSize)
-        .WithColor([200 / 255d, 184 / 255d, 151 / 255d, 1]);
+    private static double ListBorderWidth => Math.Max(1,
+        GuiControlDrawing.Pixels(ListOutline, GuiElement.scaled(1))) / GuiElement.scaled(1);
+
+    private static CairoFont CategoryTitleFont() => MainFont().WithFontSize(HeadingFontSize)
+        .WithColor(GuiControlPalette.Color(GuiControlPalette.Heading));
+
+    private static CairoFont MainFont() => CairoFont.WhiteSmallText().WithFontSize(GuiControlMetrics.TextFontSize)
+        .WithColor(GuiControlPalette.Color(GuiControlPalette.Text));
+
+    private static CairoFont FooterFont() => CairoFont.WhiteSmallText().WithFontSize(GuiControlMetrics.CompactFontSize)
+        .WithColor(GuiControlPalette.Color(GuiControlPalette.ButtonText));
+
+    // Native button bounds measure the content box; layout reserves its padded outer width.
+    private GuiElementStyledButton StyledButton(string text, ActionConsumable clicked, ElementBounds bounds) =>
+        new(capi, text, clicked, bounds.WithFixedWidth(bounds.fixedWidth - 2 * GuiControlMetrics.TextInset), FooterFont());
 
     private void MeasureLayout()
     {
         double scale = GuiElement.scaled(1);
-        var buttonFont = CairoFont.SmallButtonText();
-        var textFont = CairoFont.WhiteSmallText();
-        var filterFont = CairoFont.WhiteDetailText();
+        var buttonFont = FooterFont();
+        var textFont = MainFont();
+        var sortFont = FooterFont();
+        var titleFont = MainFont().WithWeight(Cairo.FontWeight.Bold);
         var categoryFont = CategoryTitleFont();
-        previousWidth = Math.Max(MinimumNavigationWidth, Math.Ceiling(buttonFont.GetTextExtents("<").Width / scale + TextWidthAllowance));
-        autoWidth = Math.Max(MinimumAutoWidth, Math.Ceiling(buttonFont.GetTextExtents(
-            Lang.Get("vanillaexpanded:recipebook-auto")).Width / scale + TextWidthAllowance));
-        nextWidth = Math.Max(MinimumNavigationWidth, Math.Ceiling(buttonFont.GetTextExtents(">").Width / scale + TextWidthAllowance));
-        handbookWidth = Math.Max(MinimumHandbookWidth, Math.Ceiling(buttonFont.GetTextExtents(
-            Lang.Get("vanillaexpanded:recipebook-handbook")).Width / scale + 2 * HandbookTextPadding + TextWidthAllowance));
-        clearSearchWidth = Math.Ceiling(buttonFont.GetTextExtents(
-            Lang.Get("vanillaexpanded:recipebook-clear-search")).Width / scale + TextWidthAllowance);
-        showUncraftableWidth = Math.Ceiling(buttonFont.GetTextExtents(
-            Lang.Get("vanillaexpanded:recipebook-show-uncraftable")).Width / scale + TextWidthAllowance);
-        footerHeight = Math.Max(MinimumFooterHeight, Math.Ceiling(Math.Max(buttonFont.GetFontExtents().Height,
+        double ButtonWidth(string text) => Math.Ceiling(buttonFont.GetTextExtents(text).Width / scale + TextWidthAllowance)
+            + 2 * GuiControlMetrics.TextInset;
+        previousWidth = Math.Max(NavigationWidth, ButtonWidth("<"));
+        autoWidth = Math.Max(AutoWidth, ButtonWidth(Lang.Get("vanillaexpanded:recipebook-auto")));
+        nextWidth = Math.Max(NavigationWidth, ButtonWidth(">"));
+        handbookWidth = Math.Max(HandbookWidth, ButtonWidth(Lang.Get("vanillaexpanded:recipebook-handbook")));
+        clearSearchWidth = ButtonWidth(Lang.Get("vanillaexpanded:recipebook-clear-search"));
+        showUncraftableWidth = ButtonWidth(Lang.Get("vanillaexpanded:recipebook-show-uncraftable"));
+        footerHeight = Math.Max(FooterHeight, Math.Ceiling(Math.Max(buttonFont.GetFontExtents().Height,
             textFont.GetFontExtents().Height) / scale));
-        searchHeight = Math.Max(MinimumSearchHeight, Math.Ceiling(textFont.GetFontExtents().Height / scale + 2 * SearchTextPadding));
-        craftableHeight = Math.Max(MinimumFilterHeight, Math.Ceiling(filterFont.GetFontExtents().Height / scale + 2 * FilterTextPadding));
+        searchHeight = Math.Max(GuiControlMetrics.SearchHeight,
+            Math.Ceiling(textFont.GetFontExtents().Height / scale + 2 * SearchTextPadding));
+        filterHeight = Math.Max(GuiControlMetrics.NativeDropdownHeight, Math.Ceiling(textFont.GetFontExtents().Height / scale));
         tabsHeight = GuiElementIconTabs.TabHeight;
-        categoryTitleHeight = Math.Ceiling(categoryFont.GetFontExtents().Height / scale);
-        double counterWidth = Math.Ceiling(textFont.GetTextExtents("1/1").Width / scale + TextWidthAllowance);
-        double titleWidth = textFont.GetTextExtents(Lang.Get("vanillaexpanded:recipebook-title")).Width / scale;
-        double titleControlsWidth = NativeTitlebarControlsWidth + OptionsTitlebarReserve;
-        double craftableWidth = 2 * ContentInset + craftableHeight + LabelSpacing + filterFont.GetTextExtents(
-            Lang.Get("vanillaexpanded:recipebook-craftable-only")).Width / scale;
-        sortLabelWidth = Math.Ceiling(filterFont.GetTextExtents(Lang.Get("vanillaexpanded:recipebook-sort")).Width / scale + TextWidthAllowance);
-        sortValueWidth = Math.Ceiling(NativeDropdownChromeWidth + session.Sort.Orders
-            .Max(order => filterFont.GetTextExtents(Lang.Get(order.NameKey)).Width / scale));
-        double sortWidth = 2 * ContentInset + sortLabelWidth + LabelSpacing + sortValueWidth;
-        double optionsWidth = OptionsRightInset + GuiElementRecipeBookOptions.MeasurePopupWidth(textFont,
-            Lang.Get("vanillaexpanded:recipebook-remember-open"));
-        double tabsWidth = 2 * DialogPadding + GuiElementIconTabs.MeasureWidth(categories.Length);
+        categoryTitleHeight = Math.Max(HeadingHeight, Math.Ceiling(categoryFont.GetFontExtents().Height / scale));
+        char widestDigit = Enumerable.Range('0', 10).Select(value => (char)value)
+            .MaxBy(value => buttonFont.GetTextExtents(value.ToString()).Width);
+        string digits = new(widestDigit, maximumAlternatives.ToString().Length);
+        counterWidth = Math.Ceiling(buttonFont.GetTextExtents(digits + "/" + digits).Width / scale + TextWidthAllowance);
+        double titleWidth = titleFont.GetTextExtents(Lang.Get("vanillaexpanded:recipebook-title")).Width / scale;
+        double filterWidth = 2 * ContentInset + GuiControlMetrics.CheckboxSize + 2 * LabelSpacing
+            + textFont.GetTextExtents(Lang.Get("vanillaexpanded:recipebook-craftable-only")).Width / scale + TextWidthAllowance;
+        sortValueWidth = GuiElementStyledDropDown.MeasureWidth(
+            session.Sort.Orders.Select(order => Lang.Get(order.NameKey)).ToArray(), sortFont);
+        filterWidth += sortValueWidth;
+        double optionsWidth = OuterPadding + OptionsRightInset - GuiElementRecipeBookOptions.IconSize
+            + GuiElementRecipeBookOptions.MeasurePopupWidth(textFont, Lang.Get("vanillaexpanded:recipebook-remember-open"));
+        double tabsWidth = 2 * OuterPadding + GuiElementIconTabs.MeasureWidth(categories.Length);
         double categoryWidth = 2 * ContentInset
             + categories.Max(code => categoryFont.GetTextExtents(CategoryName(code)).Width / scale + TextWidthAllowance);
-        double viewportWidthReserve = 2 * ContentInset + ScrollbarSpace;
+        double viewportWidthReserve = 2 * ContentInset + 2 * ListBorderWidth + ScrollbarSpace;
         double emptyActionWidth = viewportWidthReserve + Math.Max(clearSearchWidth, showUncraftableWidth);
-        double titleMinimumWidth = GuiStyle.ElementToDialogPadding + titleWidth + LabelSpacing + titleControlsWidth;
-        double footerWidth = 2 * ContentInset + previousWidth + autoWidth + nextWidth
-            + 2 * FooterButtonSpacing + 2 * FooterLabelSpacing + counterWidth + handbookWidth;
+        double titleMinimumWidth = GuiStyle.ElementToDialogPadding + titleWidth + LabelSpacing + OptionsRightInset;
+        double navigationWidth = previousWidth + autoWidth + nextWidth + 2 * FooterButtonSpacing;
+        double footerWidth = 2 * ContentInset + 2 * (Math.Max(navigationWidth, handbookWidth) + FooterLabelSpacing) + counterWidth;
         minimumWidth = Math.Ceiling(new[]
         {
-            tabsWidth, categoryWidth, optionsWidth, sortWidth, emptyActionWidth, craftableWidth, titleMinimumWidth, footerWidth
+            tabsWidth, categoryWidth, optionsWidth, filterWidth, emptyActionWidth, titleMinimumWidth, footerWidth
         }.Max());
         var textUtil = new TextDrawUtil();
         emptyTextHeight = Math.Ceiling(Enum.GetValues<RecipeBookEmptyState>()
             .Where(state => state != RecipeBookEmptyState.None)
             .Max(state => textUtil.GetMultilineTextHeight(textFont, Lang.Get(EmptyMessageKey(state)),
                 (minimumWidth - viewportWidthReserve) * scale)) / scale);
-        minimumHeight = Math.Ceiling(GuiStyle.TitleBarHeight + DialogPadding + tabsHeight + CategoryTitleTopPadding
-            + categoryTitleHeight + RowSpacing + craftableHeight + RowSpacing + craftableHeight + RowSpacing + searchHeight + RowSpacing
-            + Math.Max(GuiElementRecipeBookTiles.TileSize, emptyTextHeight + RowSpacing + footerHeight)
-            + ListFooterSpacing + footerHeight + ContentInset);
+        minimumHeight = Math.Ceiling(TitleHeight + TitleSpacing + tabsHeight + PanelTopPadding
+            + categoryTitleHeight + HeadingSpacing + filterHeight + FilterSpacing + searchHeight + SearchSpacing
+            + 2 * ListBorderWidth + Math.Max(GuiElementRecipeBookTiles.TileSize, emptyTextHeight + RowSpacing + footerHeight)
+            + FooterSpacing + footerHeight + ContentInset);
     }
 
     private bool Follow(bool focusFirstElement)
@@ -557,7 +542,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
             if (!visible && button.HasFocus) button.OnFocusLost();
             button.Enabled = button.Visible = visible;
             if (!visible) continue;
-            button.Bounds.fixedX = viewport.fixedX + (viewport.fixedWidth - button.Bounds.fixedWidth) / 2;
+            button.Bounds.fixedX = viewport.fixedX + (viewport.fixedWidth - button.Bounds.OuterWidth / scale) / 2;
             button.Bounds.fixedY = empty.Bounds.fixedY + textHeight + RowSpacing;
             button.Bounds.MarkDirtyRecursive();
             button.Bounds.CalcWorldBounds();
