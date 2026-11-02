@@ -16,6 +16,7 @@ internal sealed class TextureElement : GuiElement
     private bool disposed;
     private readonly bool guiTexture, premultiplied;
     private readonly float depth;
+    private readonly Size svgSize;
 
     #region Public API
     /// <summary>Gets cached clipping, geometry and opacity.</summary>
@@ -24,8 +25,11 @@ internal sealed class TextureElement : GuiElement
     /// <summary>Creates a passive component with explicit asset ownership and failure isolation.</summary>
     public TextureElement(ICoreClientAPI api, ElementBounds bounds, Action<Exception> failure,
         Func<HudOverlayPreparationContext, string, TextureBinding>? load = null, bool guiTexture = false,
-        float depth = 50, bool premultiplied = false) : base(api, bounds)
+        float depth = 50, bool premultiplied = false, Size? svgSize = null) : base(api, bounds)
     {
+        if (svgSize is { } size && (size.Width <= 0 || size.Height <= 0))
+            throw new ArgumentOutOfRangeException(nameof(svgSize), "SVG raster dimensions must be positive.");
+        this.svgSize = svgSize ?? new Size(64, 64);
         this.load = load ?? LoadTexture;
         this.guiTexture = guiTexture; this.depth = depth; this.premultiplied = premultiplied;
         State = new(failure); draw = DrawTexture;
@@ -77,12 +81,12 @@ internal sealed class TextureElement : GuiElement
         else api.Render.RenderTexture(binding!.Value.Texture.TextureId, target.X, target.Y, target.Width, target.Height, depth, State.Tint(false));
     }
     /// <summary>Rasterizes owned SVGs or borrows engine-cached PNGs with the existing sampling policy.</summary>
-    private static TextureBinding LoadTexture(HudOverlayPreparationContext context, string path)
+    private TextureBinding LoadTexture(HudOverlayPreparationContext context, string path)
     {
         var location = new AssetLocation(Constants.ModId, path);
         if (path.EndsWith(".svg", StringComparison.Ordinal))
         {
-            var owned = context.Api.Gui.LoadSvg(location, 64, 64, 64, 64);
+            var owned = context.Api.Gui.LoadSvg(location, svgSize.Width, svgSize.Height, svgSize.Width, svgSize.Height);
             try { return new(HudOverlayTextureFiltering.Prepare(owned), true); }
             catch { owned.Dispose(); throw; }
         }

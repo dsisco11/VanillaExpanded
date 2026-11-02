@@ -147,7 +147,7 @@ public sealed class LayeredIndicatorsTests
     }
     /// <summary>Production PNG loaders borrow cache wrappers, while each generated glyph is deleted exactly once.</summary>
     [Theory]
-    [InlineData("wetness")] [InlineData("body")] [InlineData("weather")]
+    [InlineData("wetness")] [InlineData("weather")]
     public void ProductionLoadersKeepEngineTextureOwnership(string kind)
     {
         // Arrange
@@ -163,9 +163,6 @@ public sealed class LayeredIndicatorsTests
             case "wetness":
                 var wetness = new PlayerWetnessPresentation(fixture.Measure, fixture.CreateText, loadBackdrop: _ => null);
                 wetness.SetContent(.5f); wetness.Prepare(fixture.Context); presentation = wetness; view = wetness.CreateView(fixture.Context.Api); break;
-            case "body":
-                var body = new BodyTemperatureThermometerPresentation(fixture.Measure, fixture.CreateText, loadBackdrop: _ => null);
-                body.SetContent(new(34, 37, BodyTemperatureRisk.Cold, .25f, 2), true); body.Prepare(fixture.Context); presentation = body; view = body.CreateView(fixture.Context.Api); break;
             default:
                 var weather = new WeatherConditionsPresentation(loadBackdrop: _ => null, hasCompletePack: _ => false);
                 weather.SetContent(new(EnumPrecipitationType.Rain, false)); weather.Prepare(fixture.Context); presentation = weather; view = weather.CreateView(fixture.Context.Api); break;
@@ -269,7 +266,87 @@ public sealed class LayeredIndicatorsTests
             Assert.Equal(new SizeF(fixture.Glyphs[^1].Width, fixture.Glyphs[^1].Height), reading.State.Target.Size);
         }
         Assert.Equal(Math.Abs(direction) == 0 ? 2 : 3, fixture.Bindings.Count);
-        if (direction != 0) Assert.Contains(fixture.Bindings.Keys, path => path.EndsWith(direction > 0 ? "chevron-up.png" : "chevron-down.png"));
+        string[] expectedAssets =
+        [
+            "textures/hud/body-temperature/fill-mask.svg",
+            "textures/hud/body-temperature/outline.svg"
+        ];
+        if (direction != 0)
+            expectedAssets = [.. expectedAssets, $"textures/hud/body-temperature/chevron-{(direction > 0 ? "up" : "down")}.svg"];
+        Assert.Equal(expectedAssets.OrderBy(path => path), fixture.Bindings.Keys.OrderBy(path => path));
+    }
+    /// <summary>The thermometer uses its default SVG loader for selected non-square assets and releases generated textures.</summary>
+    [Theory]
+    [InlineData(-2, "down")]
+    [InlineData(-1, "down")]
+    [InlineData(0, null)]
+    [InlineData(1, "up")]
+    [InlineData(2, "up")]
+    public void ThermometerViewLoadsSelectedSvgAssetsThroughTheDefaultLoaderAndReleasesTextures(int direction, string? chevron)
+    {
+        // Arrange
+        using var fixture = new LayeredIndicatorsFixture();
+        var requests = new List<(string Path, int Width, int Height, int TextureWidth, int TextureHeight)>();
+        var svgTextures = new List<LoadedTexture>();
+        fixture.Resources.Native.Gui
+            .Setup(gui => gui.LoadSvg(It.IsAny<AssetLocation>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int?>()))
+            .Callback<AssetLocation, int, int, int, int, int?>((location, width, height, textureWidth, textureHeight, _) =>
+                requests.Add((location.Path, width, height, textureWidth, textureHeight)))
+            .Returns(() =>
+            {
+                var texture = new LoadedTexture(fixture.Context.Api);
+                svgTextures.Add(texture);
+                return texture;
+            });
+        using var content = new BodyTemperatureThermometerPresentation(
+            measure: fixture.Measure, createText: fixture.CreateText, loadBackdrop: _ => null);
+        content.SetContent(new(34, 37, BodyTemperatureRisk.Cold, .25f, direction), true);
+        content.Prepare(fixture.Context);
+
+        // Act
+        using var composition = new IndicatorComposition(
+            fixture.Context.Api, content.CreateView(fixture.Context.Api), fixture.Context, content.Size);
+
+        // Assert
+        var layeredAssets = requests.Where(request =>
+            request.Path.EndsWith("/fill-mask.svg", StringComparison.Ordinal)
+            || request.Path.EndsWith("/outline.svg", StringComparison.Ordinal)).ToArray();
+        Assert.Equal(2, layeredAssets.Length);
+        string[] expectedLayerPaths =
+        {
+            "textures/hud/body-temperature/fill-mask.svg",
+            "textures/hud/body-temperature/outline.svg"
+        };
+        Assert.Equal(expectedLayerPaths.OrderBy(path => path), layeredAssets.Select(request => request.Path).OrderBy(path => path));
+        var layeredCanvas = Assert.Single(layeredAssets.Select(request => (request.Width, request.Height)).Distinct());
+        Assert.NotEqual(layeredCanvas.Width, layeredCanvas.Height);
+
+        var markerRequests = requests.Where(request => request.Path.Contains("/chevron-", StringComparison.Ordinal)).ToArray();
+        Assert.Equal(Math.Abs(direction), markerRequests.Length);
+        Assert.All(markerRequests, request =>
+        {
+            Assert.EndsWith($"/chevron-{chevron}.svg", request.Path);
+        });
+        if (markerRequests.Length > 0)
+        {
+            var markerCanvas = Assert.Single(markerRequests.Select(request => (request.Width, request.Height)).Distinct());
+            Assert.NotEqual(markerCanvas, layeredCanvas);
+            Assert.NotEqual(markerCanvas.Width, markerCanvas.Height);
+        }
+
+        var expectedPaths = new List<string>(expectedLayerPaths);
+        if (chevron is not null)
+            expectedPaths.AddRange(Enumerable.Repeat(
+                $"textures/hud/body-temperature/chevron-{chevron}.svg", Math.Abs(direction)));
+        Assert.Equal(expectedPaths.OrderBy(path => path), requests.Select(request => request.Path).OrderBy(path => path));
+        Assert.All(requests, request =>
+        {
+            Assert.Equal(request.Width, request.TextureWidth);
+            Assert.Equal(request.Height, request.TextureHeight);
+        });
+        Assert.All(svgTextures, texture => Assert.False(texture.Disposed));
+        composition.Dispose();
+        Assert.All(svgTextures, texture => Assert.True(texture.Disposed));
     }
     /// <summary>Fill-only updates refresh the prepared reveal without dirtying native bounds or regenerating resources.</summary>
     [Fact]

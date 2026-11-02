@@ -36,12 +36,12 @@ internal sealed class ThermometerView : NativeView
         try
         {
             fill = Own(new TextureElement(api, ElementBounds.Fixed(0, 0, HudOverlaySizes.ThermometerWidth, HudOverlaySizes.Small)
-                .WithAlignment(EnumDialogArea.CenterMiddle), _ => { }, load));
+                .WithAlignment(EnumDialogArea.CenterMiddle), _ => { }, load, svgSize: new(56, 96)));
             outline = Own(new TextureElement(api, ElementBounds.Fixed(0, 0, HudOverlaySizes.ThermometerWidth, HudOverlaySizes.Small)
-                .WithAlignment(EnumDialogArea.CenterMiddle), _ => { }, load));
+                .WithAlignment(EnumDialogArea.CenterMiddle), _ => { }, load, svgSize: new(56, 96)));
             for (int index = 0; index < chevrons.Length; index++)
                 chevrons[index] = Own(new TextureElement(api, ElementBounds.Fixed(0, 0, 0, 0)
-                    .WithAlignment(EnumDialogArea.CenterTop), _ => { }, load));
+                    .WithAlignment(EnumDialogArea.CenterTop), _ => { }, load, svgSize: new(32, 16)));
         }
         catch { Dispose(); throw; }
     }
@@ -51,8 +51,8 @@ internal sealed class ThermometerView : NativeView
         ThrowIfDisposed(); scale = context.GuiScale;
         var sample = content.Sample ?? throw new InvalidOperationException("Prepare temperature content before its native view.");
         reading.Prepare(context, content.Reading);
-        fill.Prepare(context, "textures/hud/body-temperature/fill-mask.png");
-        outline.Prepare(context, "textures/hud/body-temperature/outline.png");
+        fill.Prepare(context, "textures/hud/body-temperature/fill-mask.svg");
+        outline.Prepare(context, "textures/hud/body-temperature/outline.svg");
         var color = sample.Risk switch
         {
             BodyTemperatureRisk.Cold or BodyTemperatureRisk.Freezing => (.6f - .35f * sample.FreezingStrength, .85f - .25f * sample.FreezingStrength, 1f),
@@ -64,7 +64,7 @@ internal sealed class ThermometerView : NativeView
         for (int index = 0; index < chevrons.Length; index++)
         {
             chevrons[index].Prepare(context, index < Math.Abs(sample.Trend)
-                ? "textures/hud/body-temperature/chevron-" + (sample.Trend > 0 ? "up" : "down") + ".png" : null);
+                ? "textures/hud/body-temperature/chevron-" + (sample.Trend > 0 ? "up" : "down") + ".svg" : null);
             if (sample.Trend > 0) chevrons[index].State.SetColor(1, .65f, .2f);
             else chevrons[index].State.SetColor(.25f, .6f, 1);
         }

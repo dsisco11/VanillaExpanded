@@ -31,10 +31,10 @@ All in-game verification is deferred until the end of Phase 7, after all impleme
 
 ## Phase 2: Body temperature (4 tasks)
     Keep the fill and outline canvases aligned. Complete both chevron SVGs before switching their shared direction-based loading path.
-    [ ] Convert body-temperature/fill-mask.png to fill-mask.svg, preserving runtime risk tinting and the clipped fill reveal.
-    [ ] Convert body-temperature/outline.png to outline.svg, preserving alignment with the fill mask.
-    [ ] Convert body-temperature/chevron-up.png to chevron-up.svg, preserving upward trend direction, tinting, and repeated-marker layout.
-    [ ] Convert body-temperature/chevron-down.png to chevron-down.svg, preserving downward trend direction, tinting, and repeated-marker layout.
+    [x] Convert body-temperature/fill-mask.png to fill-mask.svg, preserving runtime risk tinting and the clipped fill reveal.
+    [x] Convert body-temperature/outline.png to outline.svg, preserving alignment with the fill mask.
+    [x] Convert body-temperature/chevron-up.png to chevron-up.svg, preserving upward trend direction, tinting, and repeated-marker layout.
+    [x] Convert body-temperature/chevron-down.png to chevron-down.svg, preserving downward trend direction, tinting, and repeated-marker layout.
 
 ## Phase 3: Player wetness (2 tasks)
     Complete both SVGs before switching the shared fill/outline loading path; preserve both drop instances.

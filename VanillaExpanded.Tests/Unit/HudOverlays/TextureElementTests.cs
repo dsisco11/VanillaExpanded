@@ -1,3 +1,4 @@
+using System.Drawing;
 using Moq;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering.Native;
@@ -58,6 +59,60 @@ public sealed class TextureElementTests
         Assert.Empty(fixture.Failures);
         fixture.Gui.Verify(gui => gui.LoadSvg(
             It.Is<AssetLocation>(location => location.Path == svgPath), 64, 64, 64, 64, It.IsAny<int?>()), Times.Once);
+    }
+
+    /// <summary>Non-square SVG canvas dimensions reach rasterization unchanged and an unchanged path reuses its texture.</summary>
+    [Theory]
+    [InlineData(56, 96)]
+    [InlineData(32, 16)]
+    public void SvgRasterizationUsesRequestedCanvasAndCachesUnchangedArtwork(int width, int height)
+    {
+        // Arrange
+        using var fixture = new HudNativeComponentFixture();
+        const string svgPath = "textures/hud/body-temperature/fill-mask.svg";
+        var svgTexture = new LoadedTexture(fixture.Api.Object);
+        fixture.Gui.Setup(gui => gui.LoadSvg(
+               It.IsAny<AssetLocation>(), width, height, width, height, It.IsAny<int?>()))
+            .Returns(svgTexture);
+        var element = new TextureElement(fixture.Api.Object, ElementBounds.Fixed(0, 0, 64, 64),
+            fixture.Failures.Add, svgSize: new Size(width, height));
+
+        // Act
+        element.Prepare(fixture.Context, svgPath);
+        element.Prepare(fixture.Context, svgPath);
+
+        // Assert
+        fixture.Gui.Verify(gui => gui.LoadSvg(
+            It.Is<AssetLocation>(location => location.Path == svgPath),
+            width, height, width, height, It.IsAny<int?>()), Times.Once);
+        Assert.False(svgTexture.Disposed);
+        Assert.Empty(fixture.Failures);
+
+        // Act
+        element.Dispose();
+
+        // Assert
+        Assert.True(svgTexture.Disposed);
+    }
+
+    /// <summary>Each non-positive SVG canvas dimension is rejected before the element can load artwork.</summary>
+    [Theory]
+    [InlineData(0, 96)]
+    [InlineData(-1, 96)]
+    [InlineData(56, 0)]
+    [InlineData(56, -1)]
+    public void SvgRasterizationRejectsNonPositiveCanvasDimensions(int width, int height)
+    {
+        // Arrange
+        using var fixture = new HudNativeComponentFixture();
+
+        // Act
+        var error = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new TextureElement(fixture.Api.Object, ElementBounds.Fixed(0, 0, 64, 64),
+               fixture.Failures.Add, svgSize: new Size(width, height)));
+
+        // Assert
+        Assert.Equal("svgSize", error.ParamName);
     }
     #endregion
 
