@@ -1,6 +1,6 @@
 # Recipe Book visual alignment proposal
 
-**Status:** Approved design, including the two-unit real-preview inset. Implementation and final acceptance are tracked in the linked plan; this proposal defines the target rather than certifying full visual alignment.
+**Status:** Approved design and user-accepted presentation. See [Acceptance and verification](#acceptance-and-verification) for the acceptance scope and [implementation plan](RecipeBookVisualAlignment.todo) for completion tracking.
 
 ## Purpose and design authority
 
@@ -12,8 +12,9 @@ The controlling references are:
 2. The existing feature's ownership, interaction, and persistence contracts in [Recipe Book design](RecipeBook.md).
 3. The user's explicit correction: **retain the current Tools icon**. The mockup contains an outdated Tools silhouette and is not authoritative for that asset.
 4. Shared, opt-in styled controls, including a reusable clearable text input. Recipe Book semantics remain outside those controls.
+5. The approved smaller-tile/brass-button mockup, as specified below. Its schematic recipe artwork is not authoritative for native item rendering.
 
-The mockup labels recipe tiles and controls as placeholders. This proposal therefore distinguishes direct visual alignment from the user-approved adaptations for real recipes, availability information, localization, and additional categories. The decision disposition below identifies the remaining approval and feasibility gates.
+The mockup labels recipe tiles and controls as placeholders. This proposal therefore distinguishes direct visual alignment from the user-approved adaptations for real recipes, availability information, localization, and additional categories. The decision disposition below records approvals and acceptance requirements.
 
 ## Scope and invariants
 
@@ -52,6 +53,7 @@ Dimensions are GUI/design units unless explicitly identified as physical pixels.
 | Sort selector | Native-compatible 30-unit height and popup rows, 12-unit text, compact chevron, and restrained horizontal padding; measure the selected options rather than fixing the width. |
 | Search | 28-unit minimum height, 14-unit text, eight-unit horizontal text inset, and a ten-unit gap below. |
 | Footer | 12-unit regular text, restrained flat controls, eight-unit horizontal button padding, and 12 units of spacing above. |
+| Scrollbar | Ten-unit visual track with a centered six-unit rounded thumb and ten-unit arrow areas at both ends; retain the 12-unit input width. |
 
 These targets must be expressed through shared named dimensions and derived measurements. Composition, minimum-size calculation, popup placement, and tooltip bounds must use the same geometry. Minimum dimensions must grow rather than truncate labels or overlap controls.
 
@@ -77,7 +79,13 @@ The native input's clear-icon reservation remains separate from the editable tex
 | Sort-selector fill / outline / text | `#382f23` / `#74634a` / `#d7c8aa` |
 | Search fill / outline / placeholder | `#30281e` / `#8c795b` / `#a99b80` |
 | List fill / recessed outline | `#352d22` / `#2c251c` |
-| Footer text / control fill / outline | `#c9bba0` / `#51412d` / `#756247` |
+| Scrollbar track / thumb and arrows | `#30291e` / `#8d7957` |
+| Scrollbar hovered / pressed thumb and arrows | `#c8b897` / `#f5d58d` |
+| Button text | `#fff0cc` |
+| Enabled button fill / outline | `#80613d` / `#c29a5b` |
+| Hovered button fill / outline | `#8b693f` / `#e0bc79` |
+| Pressed or active button fill / outline | `#604627` / `#e0bc79` |
+| Disabled button fill / outline | `#3b342b` / `#625747` |
 
 The selected tab has a separate two-unit upper accent and an open bottom edge that joins the panel. Inactive tabs have lower shoulders and a bottom border matching the panel outline. Hover lightens an inactive background and changes its icon tint; hovering a selected tab retains its selected treatment.
 
@@ -92,11 +100,11 @@ The following state treatment is approved for shared controls. It changes appear
 | State | Treatment |
 | --- | --- |
 | Idle | Use the control-specific fill, outline, and text colors in the palette above. |
-| Hover | Outline `#aa8c54`; button and hovered popup-row fill `#51422e`. Search retains its normal fill and typed-text color. |
-| Pressed | Button and clear-control fill `#382f23`; do not move or resize their content. |
+| Hover | Buttons and scrollbar parts use their respective hover palettes above. Other controls use outline `#aa8c54`; hovered popup rows use fill `#51422e`. Search retains its normal fill and typed-text color. |
+| Pressed or active | Buttons and scrollbar parts use their respective pressed palettes above; clear-control fill is `#382f23`. Do not move or resize content. |
 | Opened dropdown | Fill `#51422e` and outline `#aa8c54`; retain normal selected-value text. |
 | Checked checkbox / selected popup indicator | Indicator `#f5d58d`, separate from hover and keyboard focus. |
-| Disabled | Text and icons at 35% opacity with the normal frame; no hover or pressed emphasis. Preserve the existing disabled-input contract. |
+| Disabled | Text and icons at 35% opacity; buttons use the separate muted frame above, while other controls retain their normal frame. No hover or pressed emphasis. Preserve the existing disabled-input contract. |
 | Keyboard focus | Retain native focus appearance and routing, including native text-input highlighting. Do not add a competing custom outline or change control geometry. |
 
 Disabled treatment takes precedence over hover and press. Keyboard focus is independently identifiable while checked or opened. Controls use only states applicable to their native behavior; this specification does not add a text-field press action or change when focus is acquired.
@@ -125,8 +133,11 @@ Use native per-instance font and bounds settings wherever they provide the requi
 | Styled clearable text input | Generalize the existing search subclass into the shared GUI layer; replace its embossed chrome and coordinate the field frame, editable area, clear button, and tooltip. | Editing, text selection, caret, text-change notification, and focus. |
 | Styled dropdown and popup list | Provide rendering adapters for both the closed selector and expanded list, including the compact chevron, backgrounds, outlines, and state presentation. | Selection, opening/closing, keyboard and mouse navigation, scrolling, and callbacks. |
 | Styled checkbox | Replace the embossed frame and checked texture with flat rendering. | Toggle state, mouse/keyboard activation, focus, and callbacks. |
+| Styled scrollbar | Own slim track and rounded thumb; compose native-derived momentary arrow-button subelements with cached state textures, without additional keyboard stops. Map arrow callbacks and drag geometry to the native range. | Scroll range, wheel/keyboard handling, focus, callbacks, and momentary arrow-button state and activation. |
 
 The clearable text input is a general control, not a recipe-search component. Its caller supplies the localized placeholder, clear-tooltip text, font/style inputs, and text-change callback. The component owns the reusable clear-button interaction and tooltip lifecycle; it must not depend on Recipe Book localization keys, catalogue state, filtering, or persistence. Recipe Book composition supplies those labels and connects text changes to the existing search controller.
+
+The [styled scrollbar](../VanillaExpanded/src/Gui/GuiElementStyledScrollbar.cs) is likewise a shared, opt-in GUI element rather than recipe chrome. Its caller supplies bounds, the scroll callback, and a positive finite arrow step in GUI units; native height and scroll-position values retain their physical-pixel units. Recipe Book supplies its row pitch, but the control must not reference recipe geometry or controllers. Keep its rendering, pointer capture, hover/pressed states, range mapping, and texture ownership encapsulated together.
 
 Apply the shared button treatment to footer and empty-state recovery actions. Use the shared checkbox treatment for both Hide uncraftable and the options popup. The options popup keeps its feature-specific preference handling and input precedence.
 
@@ -162,7 +173,7 @@ Place Hide uncraftable on the left and the sort selector on the right of one row
 
 Retain **Hide uncraftable** wording and **Availability** as the initial sort policy. The mockup's Craftable only label and Name selection are sample content, not instructions to change those semantics or defaults.
 
-The row must reserve the measured checkbox, label, selector, and separation space. Long translations must expand minimum width rather than overlap. Preserve search-first keyboard tab order and the filter/sort controller callbacks.
+The row must reserve the measured checkbox, label, selector, and separation space. Long translations must expand minimum width rather than overlap. Clicking the Hide uncraftable label toggles the same checkbox through native input, with one callback and one keyboard focus target. Label hit testing must respect clipping and the checkbox's enabled state without enlarging its 17-unit visual square. Preserve search-first keyboard tab order and the filter/sort controller callbacks.
 
 ### Search and list alignment
 
@@ -186,16 +197,16 @@ Apply the smaller regular font, warm palette, and measured text padding consiste
 
 ## Approved recipe-grid adaptations
 
-These adaptations are approved design directions, not a requirement to reproduce the mockup's placeholder objects. The two-unit preview inset has visual approval.
+These adaptations are approved design directions, not a requirement to reproduce the mockup's placeholder objects. The approved 45-unit tiles retain enlarged real previews; the user's acceptance includes the current native preview treatment.
 
 ### Responsive tiles and spacing
 
-Use fixed 30-by-30-unit square tiles with five-unit inter-column and inter-row gaps. Choose the largest column count that fits the usable width, then center the complete column group. Spare width becomes equal left/right outer space, not larger tiles or larger gaps. There is no fixed baseline column-count target.
+Use fixed 45-by-45-unit square tiles with five-unit inter-column and inter-row gaps. Choose the largest column count that fits the usable width, then center the complete column group. Spare width becomes equal left/right outer space, not larger tiles or larger gaps. There is no fixed baseline column-count target.
 
 ```text
 usable width = list interior minus horizontal padding and scrollbar space
-columns = largest count that fits 30-unit tiles and 5-unit gaps
-group width = columns times 30 plus inter-column gaps
+columns = largest count that fits 45-unit tiles and 5-unit gaps
+group width = columns times 45 plus inter-column gaps
 leading space = (usable width minus group width) divided by two
 assign whole-pixel tile edges without cumulative rounding drift
 derive row pitch, visible rows, and scrolling from that geometry
@@ -207,9 +218,9 @@ This intentionally retains square game tiles instead of the mockup's stretched r
 
 ### Padding and clipping
 
-Use six units of horizontal list padding, while retaining the full-height inner scissor and no reserved vertical padding strip. Center the column group inside that horizontally padded usable area. The first row reaches the inner top edge, and partially scrolled rows remain visible through the list's inner vertical boundaries.
+Use six units of horizontal list padding and two units of leading top space for the recipe content. Center the column group inside the horizontally padded usable area. The top space scrolls with the content; retain the full-height inner scissor so partially scrolled rows remain visible through the list's inner vertical boundaries. Do not reserve a bottom padding strip.
 
-This intentionally differs from the mockup's six-unit vertical padding to preserve the previously requested list-edge behavior. If literal vertical padding is preferred, it requires separate approval and must not reduce the clipping region to the padded area.
+The requested two-unit top space separates the first row from the list frame without reducing the clipping region. Content height, minimum sizing, and keyboard visibility must include this space without adding a trailing scroll gap.
 
 ### Availability, selection, and previews
 
@@ -222,9 +233,13 @@ Use quieter one-unit tile outlines with these separate meanings:
 
 Availability stays on the outer edge. The selection marker leaves that edge and the bottom-right quantity area clear; it must not be confused with partial availability.
 
-Use smaller, centered real item previews with visible breathing room around them and the visually approved two-unit inset. Do not replace previews with category silhouettes or suppress output quantities. Continue to use the native item atlas and the existing preparation/render ownership.
+Use larger, centered real item previews with less empty space between the artwork and tile edges. Use the approved one-unit inset and native atlas rendering scale of 1.5, independent of passive inventory-slot padding. Do not replace previews with category silhouettes or suppress output quantities. Continue to use the native item atlas, native item transforms, and the existing preparation/render ownership.
 
-The scrollbar, quantities, options icon, and native titlebar controls remain present and receive compatible styling where applicable.
+Match the mockup's slim scrollbar independently of the button palette: a dark track, rounded muted-gold thumb, and working arrow buttons at both ends. Each arrow moves one recipe-row pitch and clamps to the native content range. Keep one keyboard focus target, native wheel/keyboard scrolling, and the wider input region. Map thumb dragging and track clicks to that same range inside the space between the arrows; the thumb must reach both ends without covering the arrows. Disable arrows at their respective limits; hide the thumb and disable both arrows when the content fits. Cache the additional textures and dispose them with the owning composer.
+
+Give the thumb and arrows distinct hover and pressed tints without changing their geometry. The thumb retains its pressed tint during a captured drag outside the control. An arrow shows pressed feedback only while the pointer remains over that pressed arrow; leaving and returning must not repeat its action. Mouse release, including outside release, focus loss, disabling, and fitting content clear captured press feedback. Disabled parts never receive hover or pressed emphasis. Rendering state changes must not allocate textures or trigger scrolling.
+
+The quantities, options icon, and native titlebar controls remain present and receive compatible styling where applicable.
 
 ## Outer chrome and integration
 
@@ -253,7 +268,7 @@ Implementation surfaces:
 
 | Surface | Responsibility |
 | --- | --- |
-| [Shared GUI layer](../VanillaExpanded/src/Gui/) | Reusable button, clearable text-input, dropdown/popup-list, and checkbox adapters with shared visual helpers. |
+| [Shared GUI layer](../VanillaExpanded/src/Gui/) | Reusable button, clearable text-input, dropdown/popup-list, checkbox, and scrollbar adapters with shared visual helpers; the scrollbar owns native-derived momentary arrow-button subelements. |
 | [GuiControlVisuals](../VanillaExpanded/src/Gui/GuiControlVisuals.cs) and [RecipeBookVisualMetrics](../VanillaExpanded/src/RecipeBook/RecipeBookVisualMetrics.cs) | Generic palette/drawing/measurement foundations and separate dialog-specific dimensions. |
 | [GuiDialogRecipeBook](../VanillaExpanded/src/RecipeBook/GuiDialogRecipeBook.cs) | Adopt shared controls, supply localized labels and controller callbacks, and compose the shared row, heading, footer groups, measurement, and outer chrome. |
 | [RecipeBookLayout](../VanillaExpanded/src/RecipeBook/RecipeBookLayout.cs) | Preferred dimensions and placement within the existing positioning contract. |
@@ -265,7 +280,9 @@ Implementation surfaces:
 
 ## Acceptance and verification
 
-Functional test success alone does not establish visual alignment. Acceptance requires both reference-based geometry/style checks and comparable in-game images.
+Functional test success alone does not establish rendered appearance. Acceptance combines reference-based geometry/style checks with the user's explicit visual approval. On 2026-11-02 the user confirmed existing approval and waived additional screenshots and live evidence. The recommended live checks below are not completion gates for this work and must not be reported as performed without evidence.
+
+### Automated verification
 
 - Verify target palette values, separate hover/selection states, upper accent, scaled border widths, and stationary category icons.
 - Verify the shared row, font hierarchy, search/list/footer alignment, complete category strip, and centered footer counter.
@@ -273,15 +290,20 @@ Functional test success alone does not establish visual alignment. Acceptance re
 - Verify the clearable text input with caller-supplied labels and callbacks independent of Recipe Book state. Clearing must notify through the normal text-change contract without duplicate notifications.
 - Verify that footer and empty-state buttons and both checkbox locations use the shared treatment, while unrelated dialogs retain their existing controls and appearance.
 - Verify standard and additional category ordering, restored selection identity, long translations, and sufficient minimum dimensions.
-- Verify maximum fitting columns, fixed 30-unit tiles and five-unit gaps, centered groups, whole-pixel edge distribution, scroll preservation, partial-row clipping, and quantity visibility.
+- Verify maximum fitting columns, fixed 45-unit tiles and five-unit gaps, centered groups, whole-pixel edge distribution, scroll preservation, partial-row clipping, and quantity visibility.
 - Preserve native focus, tooltips, mouse/keyboard actions, Fixed/Movable dragging, reopening, and inventory closure behavior.
-- Capture idle, hover, selected, and keyboard-focused states in-game at scales 1, 1.5, and 2, with additional fractional-scale geometry checks.
-- Compare reference and game captures at the same selected category and normalized scale. Use real recipe previews and equivalent interaction states when reviewing intentional placeholder departures.
 - Cover constrained screen space, additional categories, translated labels, dialog recomposition, and texture/resource disposal.
 
 Update [GUI tests](../VanillaExpanded.Tests/Unit/Gui/) and [Recipe Book tests](../VanillaExpanded.Tests/Unit/RecipeBook/) to assert the approved visual requirements, not merely native colors or internally consistent geometry. Keep expected dimensions and colors independently specified so implementation constants cannot make an incorrect appearance pass automatically.
 
-After implementation, update only affected current-state sections of [Recipe Book design](RecipeBook.md). Reassess the completion item in [project.todo](project.todo); do not claim full alignment until visual acceptance is complete.
+After implementation, update only affected current-state sections of [Recipe Book design](RecipeBook.md). Reassess the completion item in [project.todo](project.todo) against the acceptance decision above, distinguishing user approval from independently demonstrated runtime coverage.
+
+### Recommended live validation
+
+- Capture idle, hover, selected, and keyboard-focused states in-game at scales 1, 1.5, and 2, with additional fractional-scale geometry checks.
+- Compare reference and game captures at the same selected category and normalized scale. Use real recipe previews and equivalent interaction states when reviewing intentional placeholder departures.
+- Exercise controls, native positioning and focus, placement, inventory transitions, resizing, reopening, long translations, and constrained screens.
+- Check relevant multiplayer and recipe/modpack compatibility independently of automated fixtures.
 
 ### Evidence baseline and destinations
 
@@ -289,25 +311,28 @@ The source baseline is revision `b7050bd2e2722c29e96cc202bbe54a2dc9ae6e2d`, befo
 
 Preserve the existing Design A reference at `C:\Users\Sisco\.copilot\session-state\d43f7edb-1a48-4194-b923-6ecc0c58fe6d\files\recipe-tab-mockups.html`. Its SHA-256 is `AF3D8D79E59C2FB7321FF76B6FB7D0D4D97DA4F012DD6DFA454A1CF97DF8EDEF`. The current Tools SVG SHA-256 is `38D30686F27E32A9BCB4AA537B8BA9326D477923C42EC2CFEFA5C4496FF5AC41`; the other current category assets also remain authoritative and unchanged.
 
-The retained session checkpoint `023-proposing-recipe-book-visual-a.md` reports 229 passing focused GUI/lifecycle/movable-geometry tests under the IconValidation configuration. This is historical functional evidence, not a new test run, proof of the approved appearance, or confirmation of the currently loaded mod package. Missing evidence includes the shared-control states and extraction, native focus/composition seams, centered 30-unit grid, updated shell geometry, and normalized live captures at the required scales.
+The retained session checkpoint `023-proposing-recipe-book-visual-a.md` reports 229 passing focused GUI/lifecycle/movable-geometry tests under the IconValidation configuration. This is historical functional evidence, not a new test run, proof of rendered appearance, or confirmation of the currently loaded mod package. New verification must cover shared-control states and extraction, native focus/composition seams, the revised centered grid, and updated shell geometry.
 
-The agreed destination for required reference copies, captures, package/version identification, and acceptance results is `C:\Users\Sisco\.copilot\session-state\d43f7edb-1a48-4194-b923-6ecc0c58fe6d\files\recipe-book-visual-alignment`. Create it when evidence is produced; retain that evidence during final cleanup. No acceptance package has been built or identified by Phase 1. Final live evidence must name the tested package and client/API versions rather than infer runtime contents from repository source. No separate implementation diary or audit report is required.
+Retain reference copies, available captures, package/version identification, and acceptance results in the agreed evidence directory: `C:\Users\Sisco\.copilot\session-state\d43f7edb-1a48-4194-b923-6ecc0c58fe6d\files\recipe-book-visual-alignment`. Any live evidence collected should name the tested package and client/API versions rather than infer runtime contents from repository source. No separate implementation diary or audit report is required.
 
 ## Decision disposition
 
 | Decision | Disposition |
 | --- | --- |
-| Grid sizing and spare width | Approved: fixed 30-unit square tiles, five-unit gaps, maximum fitting columns, entire group centered. |
-| List padding and clipping | Approved: six-unit horizontal padding, no reserved vertical strip, full-height inner scissor. |
+| Grid sizing and spare width | Approved: fixed 45-unit square tiles, five-unit gaps, maximum fitting columns, entire group centered. |
+| List padding and clipping | Approved: six-unit horizontal padding, two-unit scrolling top space, no bottom padding, full-height inner scissor. |
 | Availability and selection | Approved: one-unit outer status outlines retaining red/yellow meanings, plus the specified inset top-left gold corner marker. |
-| Real previews | Approved: two-GUI-unit inset, following rendered visual review. |
+| Real previews | Approved: one-GUI-unit inset and native atlas scale of 1.5. |
 | Non-tab control states | Approved as specified above. |
+| Checkbox label activation | Approved: clicking Hide uncraftable toggles the native checkbox without a second keyboard tab stop. |
+| Scrollbar | Approved: independent dark/muted-gold styling, slim rounded thumb, and working end arrows; preserve the native scroll range and one focus target. |
 | Local titlebar/dialog rendering adapters | Permitted subject to Phase 2 native feasibility; no global patching or production reflection. |
 | Focus appearance | Retain native appearance and keyboard routing; no custom focus outline or router. |
 | Button visual state | Approved: a render-only press/active tracker with native activation and callbacks; callers use the shared adapter's active-state API. |
 | Dropdown height | Retain native-compatible 30-unit selector height and popup rows; no compact-height coordinate adapter. |
 | Popup/native composition constraints | Explicit Phase 2 feasibility gates; unresolved restrictions must return for approval before dependent implementation. |
-| Acceptance evidence destination | Approved: the session evidence directory above, retained with required captures and results. |
+| Acceptance evidence destination | Approved: retain available references, packages, results, and approval in the session evidence directory above. |
+| Final acceptance | User-approved under the scope in [Acceptance and verification](#acceptance-and-verification). |
 
 The current Tools icon is **not** an open decision: it must be retained.
 

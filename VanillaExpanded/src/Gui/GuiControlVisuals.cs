@@ -34,9 +34,18 @@ internal static class GuiControlPalette
     internal const int Placeholder = 0xa99b80;
     internal const int ListFill = 0x352d22;
     internal const int ListOutline = 0x2c251c;
-    internal const int ButtonText = 0xc9bba0;
-    internal const int ButtonFill = 0x51412d;
-    internal const int ButtonOutline = 0x756247;
+    internal const int ScrollbarTrack = 0x30291e;
+    internal const int ScrollbarThumb = 0x8d7957;
+    internal const int ScrollbarHover = 0xc8b897;
+    internal const int ScrollbarPressed = 0xf5d58d;
+    internal const int ButtonText = 0xfff0cc;
+    internal const int ButtonFill = 0x80613d;
+    internal const int ButtonOutline = 0xc29a5b;
+    internal const int ButtonHoverFill = 0x8b693f;
+    internal const int ButtonEmphasisOutline = 0xe0bc79;
+    internal const int ButtonPressedFill = 0x604627;
+    internal const int ButtonDisabledFill = 0x3b342b;
+    internal const int ButtonDisabledOutline = 0x625747;
     internal const double DisabledOpacity = 0.35;
 
     internal static double[] Color(int rgb, double opacity = 1)
@@ -73,6 +82,9 @@ internal static class GuiControlMetrics
     internal const double DropdownTextInset = 5;
     internal const double PopupSelectionWidth = 1;
     internal const double ClearStroke = 1.5;
+    internal const double ScrollbarTrackWidth = 10;
+    internal const double ScrollbarThumbWidth = 6;
+    internal const int ScrollbarMinimumThumbPixels = 10;
 
     internal static double MeasureTextWidth(CairoFont font, string text, double inset = TextInset) =>
         Math.Ceiling(font.GetTextExtents(text).Width / GuiElement.scaled(1) + 2 * inset);

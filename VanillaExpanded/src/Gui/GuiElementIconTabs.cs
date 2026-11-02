@@ -37,6 +37,18 @@ internal sealed class GuiElementIconTabs : GuiElement
     internal int activeElement { get; private set; }
     public override bool Focusable => enabled;
 
+    private sealed class PixelClipBounds(ElementBounds viewport) : ElementBounds
+    {
+        private int RasterHeight => Math.Max(1, (int)Math.Round(viewport.OuterHeight, MidpointRounding.AwayFromZero));
+
+        public override double renderX => GuiControlDrawing.RenderOrigin(viewport, RasterHeight).X;
+        public override double renderY => GuiControlDrawing.RenderOrigin(viewport, RasterHeight).Y;
+        public override double InnerWidth => GuiControlDrawing.RenderWidth(viewport);
+        public override double InnerHeight => RasterHeight;
+        public override double OuterWidth => InnerWidth;
+        public override double OuterHeight => InnerHeight;
+    }
+
     internal GuiElementIconTabs(ICoreClientAPI api, GuiTab[] tabs, IReadOnlyList<string> iconNames,
         ElementBounds bounds, Action<int> changed) : base(api, bounds)
     {
@@ -66,8 +78,7 @@ internal sealed class GuiElementIconTabs : GuiElement
         Bounds.WithChild(root);
         Composer = api.Gui.CreateCompo("icon-tabs", root);
         Composer.Tabbable = false;
-        // Include snapped right/bottom edges despite native scissor truncation at fractional scales.
-        Viewport = ElementBounds.Fixed(0, 0, root.fixedWidth + 1 / scaled(1), root.fixedHeight + 1 / scaled(1));
+        Viewport = ElementBounds.Fixed(0, 0, root.fixedWidth, root.fixedHeight);
         content = ElementBounds.Fixed(0, 0, 0, root.fixedHeight);
         var buttonBounds = new ElementBounds[tabs.Length];
         for (int i = 0; i < tabs.Length; i++)
@@ -80,9 +91,12 @@ internal sealed class GuiElementIconTabs : GuiElement
         bool overflow = content.fixedWidth > root.fixedWidth;
         if (overflow)
             Viewport.WithFixedPosition(ArrowWidth + Spacing, 0)
-                .WithFixedWidth(Math.Max(1, root.fixedWidth - 2 * (ArrowWidth + Spacing)) + 1 / scaled(1));
-        Composer.BeginClip(Viewport)
-            .BeginChildElements(content);
+                .WithFixedWidth(Math.Max(1, root.fixedWidth - 2 * (ArrowWidth + Spacing)));
+        // Only scissoring uses snapped bounds; native layout and hit testing retain the logical viewport.
+        Composer.BeginClip(new PixelClipBounds(Viewport))
+            .EndChildElements()
+            .BeginChildElements(Viewport);
+        Composer.BeginChildElements(content);
         buttons = new GuiElementToggleButton[tabs.Length];
         for (int i = 0; i < tabs.Length; i++)
         {
@@ -90,6 +104,7 @@ internal sealed class GuiElementIconTabs : GuiElement
             buttons[i] = new GuiElementIconTab(api, icons[i], CairoFont.WhiteSmallText(),
                 _ => SetValue(index), buttonBounds[i]);
             Composer.AddInteractiveElement(buttons[i], "tab-" + i);
+            buttons[i].InsideClipBounds = Viewport;
         }
         Composer.EndChildElements()
             .EndClip()

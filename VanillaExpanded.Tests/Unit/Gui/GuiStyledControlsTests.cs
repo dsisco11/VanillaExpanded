@@ -27,35 +27,51 @@ public sealed class GuiStyledControlsTests
             ElementBounds.Fixed(10, 10, 180, 28).WithEmptyParent());
         using var composer = f.Compose(button);
         f.Render(button);
-        Assert.Equal(0x51412d, f.Drawn(0).Rgb(2, 2));
-        Assert.Equal(0x756247, f.Drawn(0).Rgb(0, 10));
-        Assert.True(f.Drawn(1).HasColor(0xc9bba0));
+        Assert.Equal(0x80613d, f.Drawn(0).Rgb(2, 2));
+        Assert.Equal(0xc29a5b, f.Drawn(0).Rgb(0, 10));
+        Assert.True(f.Drawn(1).HasColor(0xfff0cc));
         int uploads = f.Uploads;
         f.SetMouse(button.Bounds.absX + 10, button.Bounds.absY + 10);
         f.Render(button);
-        Assert.Equal(0x51422e, f.Drawn(0).Rgb(2, 2));
+        Assert.Equal(0x8b693f, f.Drawn(0).Rgb(2, 2));
+        Assert.Equal(0xe0bc79, f.Drawn(0).Rgb(0, 10));
         var down = f.Mouse(button.Bounds.absX + 10, button.Bounds.absY + 10);
         button.OnMouseDownOnElement(f.Api, down);
         f.Render(button);
-        Assert.Equal(0x382f23, f.Drawn(0).Rgb(2, 2));
+        Assert.Equal(0x604627, f.Drawn(0).Rgb(2, 2));
         Assert.Equal(0, clicks);
         var up = f.Mouse(down.X, down.Y);
         button.OnMouseUpOnElement(f.Api, up);
         Assert.True(up.Handled);
         Assert.Equal(1, clicks);
+        f.Render(button);
+        Assert.Equal(0x8b693f, f.Drawn(0).Rgb(2, 2));
+        Assert.True(f.Drawn(1).HasColor(0xfff0cc));
+        f.SetMouse(-100, -100);
+        f.Render(button);
+        Assert.Equal(0x80613d, f.Drawn(0).Rgb(2, 2));
         button.SetActive(true);
         f.Render(button);
-        Assert.Equal(0x382f23, f.Drawn(0).Rgb(2, 2));
+        Assert.Equal(0x604627, f.Drawn(0).Rgb(2, 2));
         button.SetActive(false);
+        f.Render(button);
+        Assert.Equal(0x80613d, f.Drawn(0).Rgb(2, 2));
         Assert.Equal(uploads, f.Uploads);
+        button.SetActive(true);
         button.Enabled = false;
         f.Render(button);
-        Assert.Equal(0x51412d, f.Drawn(0).Rgb(2, 2));
+        Assert.Equal(0x3b342b, f.Drawn(0).Rgb(2, 2));
+        Assert.Equal(0x625747, f.Drawn(0).Rgb(0, 10));
         Assert.InRange(f.Drawn(1).MaxAlpha, 1, 90);
+        button.OnMouseDownOnElement(f.Api, f.Mouse(down.X, down.Y));
+        button.OnMouseUpOnElement(f.Api, f.Mouse(down.X, down.Y));
+        Assert.Equal(1, clicks);
         button.OnFocusGained();
         button.OnKeyDown(f.Api, new KeyEvent { KeyCode = (int)GlKeys.Enter });
         Assert.Equal(1, clicks);
         button.Enabled = true;
+        f.Render(button);
+        Assert.Equal(0x604627, f.Drawn(0).Rgb(2, 2));
         button.OnKeyDown(f.Api, new KeyEvent { KeyCode = (int)GlKeys.Enter });
         Assert.Equal(2, clicks);
         button.Visible = false;
@@ -350,13 +366,453 @@ public sealed class GuiStyledControlsTests
         composer.AddSmallButton("Native", () => true, ElementBounds.Fixed(0, 0, 100, 30), key: "button")
             .AddSwitch(_ => { }, ElementBounds.Fixed(0, 40, 30, 30), "checkbox")
             .AddTextInput(ElementBounds.Fixed(0, 80, 100, 30), _ => { }, key: "input")
-            .AddDropDown(["a"], ["Alpha"], 0, (_, _) => { }, ElementBounds.Fixed(0, 120, 100, 30), "dropdown");
+            .AddDropDown(["a"], ["Alpha"], 0, (_, _) => { }, ElementBounds.Fixed(0, 120, 100, 30), "dropdown")
+            .AddVerticalScrollbar(_ => { }, ElementBounds.Fixed(0, 160, 12, 100), "scrollbar");
         Assert.IsType<GuiElementTextButton>(composer.GetButton("button"));
         Assert.IsType<GuiElementSwitch>(composer.GetSwitch("checkbox"));
         Assert.IsType<GuiElementTextInput>(composer.GetTextInput("input"));
         Assert.IsType<GuiElementDropDown>(composer.GetDropDown("dropdown"));
+        Assert.IsType<GuiElementScrollbar>(composer.GetScrollbar("scrollbar"));
         Assert.Throws<ArgumentException>(() => new GuiElementStyledDropDown(f.Api, [], [], 0,
             (_, _) => { }, ElementBounds.Fixed(0, 0, 100, 30)));
+    }
+
+    [Theory]
+    [InlineData(.75f)]
+    [InlineData(1f)]
+    [InlineData(1.25f)]
+    [InlineData(1.5f)]
+    [InlineData(1.75f)]
+    [InlineData(2f)]
+    public void CheckboxLabelUsesOneNativeToggleAndFocusTargetAndRespectsDisabledAndClippedInput(float scale)
+    {
+        using var f = new ControlsFixture(scale);
+        using var composer = f.NewComposer();
+        var changes = new List<bool>();
+        var label = ElementBounds.Fixed(35, 10, 140, 17);
+        using var checkbox = new GuiElementStyledCheckbox(f.Api, changes.Add,
+            ElementBounds.Fixed(10, 10, 17, 17), labelBounds: label);
+        composer.AddInteractiveElement(checkbox, "checkbox")
+            .AddStaticText("Caller checkbox label", CairoFont.WhiteSmallText(), label, "label")
+            .Compose(false);
+        Assert.Equal(17 * scale, checkbox.Bounds.InnerWidth, 4);
+        int x = (int)(label.absX + label.OuterWidth / 2);
+        int y = (int)(label.absY + label.OuterHeight / 2);
+        Assert.False(checkbox.Bounds.PointInside(x, y));
+        Click(x, y);
+        Assert.True(checkbox.HasFocus);
+        Assert.True(checkbox.On);
+        Assert.True(Assert.Single(changes));
+        Click(x, y);
+        Assert.False(checkbox.On);
+        Assert.Equal(new[] { true, false }, changes);
+        Click((int)(label.absX + label.OuterWidth + 5), y);
+        Assert.Equal(2, changes.Count);
+        checkbox.Enabled = false;
+        Click(x, y);
+        Assert.False(checkbox.On);
+        Assert.Equal(2, changes.Count);
+        checkbox.Enabled = true;
+        checkbox.InsideClipBounds = checkbox.Bounds;
+        Click(x, y);
+        Assert.False(checkbox.On);
+        Assert.Equal(2, changes.Count);
+        checkbox.InsideClipBounds = null;
+        Assert.True(composer.FocusElement(checkbox.TabIndex));
+        var space = new KeyEvent { KeyCode = (int)GlKeys.Space };
+        composer.OnKeyDown(space, true);
+        Assert.True(space.Handled);
+        Assert.True(checkbox.On);
+        Assert.Equal(new[] { true, false, true }, changes);
+
+        void Click(int mouseX, int mouseY)
+        {
+            composer.OnMouseDown(f.Mouse(mouseX, mouseY));
+            composer.OnMouseUp(f.Mouse(mouseX, mouseY));
+        }
+    }
+
+    [Theory]
+    [InlineData(.75f, 47)]
+    [InlineData(1f, 47)]
+    [InlineData(1.25f, 47)]
+    [InlineData(1.5f, 47)]
+    [InlineData(1.75f, 47)]
+    [InlineData(2f, 47)]
+    [InlineData(.75f, 180)]
+    [InlineData(1f, 180)]
+    [InlineData(1.25f, 180)]
+    [InlineData(1.5f, 180)]
+    [InlineData(1.75f, 180)]
+    [InlineData(2f, 180)]
+    public void ScrollbarArrowsAndInsetThumbShareNativeRangeAndReleaseDragOutside(float scale, double height)
+    {
+        using var f = new ControlsFixture(scale);
+        var changes = new List<float>();
+        using var scrollbar = new GuiElementStyledScrollbar(f.Api, changes.Add,
+            ElementBounds.Fixed(10.37, 12.81, 12, height), arrowStep: 23);
+        scrollbar.Enabled = false;
+        using var composer = f.Compose(scrollbar);
+        float visible = (float)scrollbar.Bounds.InnerHeight;
+        float total = 1000 * scale;
+        float maximum = total - visible;
+        scrollbar.SetHeights(visible, total);
+        scrollbar.Enabled = true;
+        changes.Clear();
+        f.Render(scrollbar);
+        Assert.Equal(4, f.Draws.Length);
+        Assert.Equal((int)Math.Round(10 * scale, MidpointRounding.AwayFromZero), f.Drawn(0).Width);
+        Assert.Equal(0x30291e, f.Drawn(0).Rgb(0, 0));
+        Assert.InRange(f.Drawn(1).MaxAlpha, 1, 90);
+        Assert.True(f.Drawn(2).MaxAlpha > 90);
+        Assert.Equal((int)Math.Round(6 * scale, MidpointRounding.AwayFromZero), f.Drawn(3).Width);
+        Assert.Equal(0x8d7957, f.Drawn(3).Rgb(f.Drawn(3).Width / 2, f.Drawn(3).Height / 2));
+        Assert.True(f.Drawn(3).Pixels[3] < 255);
+        int uploads = f.Uploads;
+        ClickArrow(2);
+        Assert.Equal(23 * scale, scrollbar.CurrentYPosition, 3);
+        Assert.Equal(23 * scale, Assert.Single(changes), 3);
+        ClickArrow(1);
+        Assert.Equal(0, scrollbar.CurrentYPosition);
+        Assert.Equal(2, changes.Count);
+        ClickArrow(1);
+        Assert.Equal(2, changes.Count);
+        Assert.Equal(uploads, f.Uploads);
+
+        f.Render(scrollbar);
+        int trackX = (int)(Convert.ToDouble(f.Draws[0].Arguments[1]) + Convert.ToDouble(f.Draws[0].Arguments[3]) / 2);
+        double trackTop = Convert.ToDouble(f.Draws[1].Arguments[2]) + Convert.ToDouble(f.Draws[1].Arguments[4]);
+        double trackBottom = Convert.ToDouble(f.Draws[2].Arguments[2]);
+        double trackHeight = trackBottom - trackTop;
+        double thumbHeight = Convert.ToDouble(f.Draws[3].Arguments[4]);
+        double availableTravel = trackHeight - thumbHeight;
+        int trackY = (int)(trackTop + .75 * trackHeight);
+        double trackThumbPosition = Math.Clamp(trackY - trackTop - (int)(thumbHeight / 2),
+            0, availableTravel);
+        float expectedTrackPosition = (float)(maximum * trackThumbPosition / availableTravel);
+        composer.OnMouseDown(f.Mouse(trackX, trackY));
+        Assert.Equal(3, changes.Count);
+        Assert.Equal(expectedTrackPosition, scrollbar.CurrentYPosition, 3);
+        Assert.Equal(expectedTrackPosition, changes[^1], 3);
+        composer.OnMouseUp(f.Mouse(trackX, trackY));
+        scrollbar.CurrentYPosition = 0;
+        scrollbar.Bounds.fixedX += 9.37;
+        scrollbar.Bounds.fixedY += 6.81;
+        scrollbar.Bounds.CalcWorldBounds();
+        ClickArrow(2);
+        Assert.Equal(23 * scale, scrollbar.CurrentYPosition, 3);
+        scrollbar.CurrentYPosition = 0;
+        f.Render(scrollbar);
+        var thumb = f.Draws[3];
+        int x = (int)(Convert.ToDouble(thumb.Arguments[1]) + Convert.ToDouble(thumb.Arguments[3]) / 2);
+        int y = (int)(Convert.ToDouble(thumb.Arguments[2]) + Convert.ToDouble(thumb.Arguments[4]) / 2);
+        trackTop = Convert.ToDouble(f.Draws[1].Arguments[2]) + Convert.ToDouble(f.Draws[1].Arguments[4]);
+        trackBottom = Convert.ToDouble(f.Draws[2].Arguments[2]);
+        thumbHeight = Convert.ToDouble(thumb.Arguments[4]);
+        availableTravel = trackBottom - trackTop - thumbHeight;
+        Assert.True(availableTravel > 4);
+        int dragPixels = Math.Max(1, (int)Math.Floor(availableTravel / 4));
+        float expectedDragPosition = (float)(maximum * dragPixels / availableTravel);
+        changes.Clear();
+        composer.OnMouseDown(f.Mouse(x, y));
+        Assert.True(scrollbar.mouseDownOnScrollbarHandle);
+        Assert.Empty(changes);
+        composer.OnMouseMove(f.Mouse(x, y + dragPixels));
+        Assert.Equal(expectedDragPosition, scrollbar.CurrentYPosition, 2);
+        Assert.Equal(expectedDragPosition, Assert.Single(changes), 2);
+        composer.OnMouseMove(f.Mouse(x, y + (int)availableTravel));
+        Assert.Equal(maximum, scrollbar.CurrentYPosition, 3);
+        Assert.Equal(maximum, changes[1], 3);
+        f.Render(scrollbar);
+        double thumbBottom = Convert.ToDouble(f.Draws[3].Arguments[2]) + Convert.ToDouble(f.Draws[3].Arguments[4]);
+        Assert.Equal(Convert.ToDouble(f.Draws[2].Arguments[2]), thumbBottom);
+        Assert.InRange(f.Drawn(2).MaxAlpha, 1, 90);
+        composer.OnMouseUp(f.Mouse(-100, -100));
+        Assert.False(scrollbar.mouseDownOnScrollbarHandle);
+        composer.OnMouseMove(f.Mouse(x, -100));
+        Assert.Equal(maximum, scrollbar.CurrentYPosition, 3);
+
+        float comparisonStart = maximum / 2;
+        scrollbar.CurrentYPosition = comparisonStart;
+        var nativeChanges = new List<float>();
+        using (var nativeScrollbar = new GuiElementScrollbar(f.Api, nativeChanges.Add,
+            ElementBounds.Fixed(50.37, 12.81, 12, height).WithEmptyParent()))
+        {
+            nativeScrollbar.Bounds.CalcWorldBounds();
+            nativeScrollbar.SetHeights(visible, total);
+            nativeScrollbar.CurrentYPosition = comparisonStart;
+            Assert.True(composer.FocusElement(scrollbar.TabIndex));
+            nativeScrollbar.OnFocusGained();
+            changes.Clear();
+            nativeChanges.Clear();
+            composer.OnKeyDown(new KeyEvent { KeyCode = (int)GlKeys.Up }, true);
+            nativeScrollbar.OnKeyDown(f.Api, new KeyEvent { KeyCode = (int)GlKeys.Up });
+            Assert.NotEqual(comparisonStart, scrollbar.CurrentYPosition);
+            Assert.Equal(nativeScrollbar.CurrentYPosition, scrollbar.CurrentYPosition, 3);
+            Assert.Equal(Assert.Single(nativeChanges), Assert.Single(changes), 3);
+
+            float beforeWheel = scrollbar.CurrentYPosition;
+            changes.Clear();
+            nativeChanges.Clear();
+            var wheelEvent = new MouseWheelEventArgs { deltaPrecise = -1 };
+            var nativeWheelEvent = new MouseWheelEventArgs { deltaPrecise = -1 };
+            scrollbar.OnMouseWheel(f.Api, wheelEvent);
+            nativeScrollbar.OnMouseWheel(f.Api, nativeWheelEvent);
+            Assert.True(wheelEvent.IsHandled);
+            Assert.True(nativeWheelEvent.IsHandled);
+            Assert.NotEqual(beforeWheel, scrollbar.CurrentYPosition);
+            Assert.Equal(nativeScrollbar.CurrentYPosition, scrollbar.CurrentYPosition, 3);
+            Assert.Equal(Assert.Single(nativeChanges), Assert.Single(changes), 3);
+        }
+
+        scrollbar.Enabled = false;
+        int callbacks = changes.Count;
+        ClickArrow(1);
+        Assert.Equal(callbacks, changes.Count);
+        scrollbar.Enabled = true;
+        scrollbar.SetHeights(visible, visible);
+        callbacks = changes.Count;
+        f.Render(scrollbar);
+        Assert.Equal(3, f.Draws.Length);
+        Assert.InRange(f.Drawn(1).MaxAlpha, 1, 90);
+        Assert.InRange(f.Drawn(2).MaxAlpha, 1, 90);
+        ClickArrow(2);
+        var wheel = new MouseWheelEventArgs { deltaPrecise = -1 };
+        scrollbar.OnMouseWheel(f.Api, wheel);
+        Assert.False(wheel.IsHandled);
+        Assert.Equal(callbacks, changes.Count);
+        Assert.Equal(0, scrollbar.CurrentYPosition);
+        composer.Dispose();
+        scrollbar.Dispose();
+        Assert.Empty(f.Graphics.Textures);
+
+        void ClickArrow(int drawIndex)
+        {
+            f.Render(scrollbar);
+            var arrow = f.Draws[drawIndex];
+            var mouse = f.Mouse(Convert.ToDouble(arrow.Arguments[1]) + Convert.ToDouble(arrow.Arguments[3]) / 2,
+                Convert.ToDouble(arrow.Arguments[2]) + Convert.ToDouble(arrow.Arguments[4]) / 2);
+            composer.OnMouseDown(mouse);
+            composer.OnMouseUp(mouse);
+        }
+    }
+
+    [Theory]
+    [InlineData(.75f)]
+    [InlineData(1f)]
+    [InlineData(1.25f)]
+    [InlineData(1.5f)]
+    [InlineData(1.75f)]
+    [InlineData(2f)]
+    public void ScrollbarPointerFeedbackTracksCaptureAndCancelsWithoutExtraScrollOrUploads(float scale)
+    {
+        using var f = new ControlsFixture(scale);
+        var changes = new List<float>();
+        using var scrollbar = new GuiElementStyledScrollbar(f.Api, changes.Add,
+            ElementBounds.Fixed(10.37, 12.81, 12, 180), arrowStep: 23);
+        using var composer = f.Compose(scrollbar);
+        float visible = (float)scrollbar.Bounds.InnerHeight;
+        scrollbar.SetHeights(visible, 1000 * scale);
+        int uploads = f.Uploads;
+        foreach (int index in new[] { 1, 2 })
+        {
+            scrollbar.CurrentYPosition = 200 * scale;
+            f.SetMouse(-100, -100);
+            f.Render(scrollbar);
+            int idle = (int)f.Draws[index].Arguments[0];
+            var mouse = PointAt(index);
+            f.Render(scrollbar);
+            int hover = (int)f.Draws[index].Arguments[0];
+            Assert.NotEqual(idle, hover);
+            Assert.True(f.Drawn(index).HasColor(0xc8b897));
+            changes.Clear();
+            composer.OnMouseDown(mouse);
+            Assert.True(mouse.Handled);
+            Assert.Equal((index == 1 ? 177 : 223) * scale, Assert.Single(changes), 3);
+            f.Render(scrollbar);
+            int pressed = (int)f.Draws[index].Arguments[0];
+            Assert.NotEqual(hover, pressed);
+            Assert.NotEqual(idle, pressed);
+            Assert.True(f.Drawn(index).HasColor(0xf5d58d));
+            f.SetMouse(-100, -100);
+            composer.OnMouseMove(f.Mouse(-100, -100));
+            f.Render(scrollbar);
+            Assert.Equal(idle, f.Draws[index].Arguments[0]);
+            f.SetMouse(mouse.X, mouse.Y);
+            f.Render(scrollbar);
+            Assert.Equal(pressed, f.Draws[index].Arguments[0]);
+            f.SetMouse(-100, -100);
+            composer.OnMouseUp(f.Mouse(-100, -100));
+            f.SetMouse(mouse.X, mouse.Y);
+            f.Render(scrollbar);
+            Assert.Equal(hover, f.Draws[index].Arguments[0]);
+            Assert.Single(changes);
+        }
+
+        f.SetMouse(-100, -100);
+        f.Render(scrollbar);
+        int idleThumb = (int)f.Draws[3].Arguments[0];
+        var thumbMouse = PointAt(3);
+        f.Render(scrollbar);
+        int hoverThumb = (int)f.Draws[3].Arguments[0];
+        Assert.NotEqual(idleThumb, hoverThumb);
+        Assert.True(f.Drawn(3).HasColor(0xc8b897));
+        changes.Clear();
+        composer.OnMouseDown(thumbMouse);
+        Assert.Empty(changes);
+        f.Render(scrollbar);
+        int pressedThumb = (int)f.Draws[3].Arguments[0];
+        Assert.NotEqual(hoverThumb, pressedThumb);
+        Assert.True(f.Drawn(3).HasColor(0xf5d58d));
+        f.SetMouse(-100, -100);
+        composer.OnMouseMove(f.Mouse(thumbMouse.X, thumbMouse.Y + 5 * scale));
+        Assert.Single(changes);
+        f.Render(scrollbar);
+        Assert.Equal(pressedThumb, f.Draws[3].Arguments[0]);
+        composer.OnMouseUp(f.Mouse(-100, -100));
+        float releasedPosition = scrollbar.CurrentYPosition;
+        composer.OnMouseMove(f.Mouse(-100, -100));
+        f.Render(scrollbar);
+        Assert.Equal(releasedPosition, scrollbar.CurrentYPosition);
+        Assert.Equal(idleThumb, f.Draws[3].Arguments[0]);
+        Assert.Single(changes);
+
+        thumbMouse = PointAt(3);
+        composer.OnMouseDown(thumbMouse);
+        scrollbar.OnFocusLost();
+        f.Render(scrollbar);
+        Assert.False(scrollbar.mouseDownOnScrollbarHandle);
+        Assert.Equal(hoverThumb, f.Draws[3].Arguments[0]);
+        var downMouse = PointAt(2);
+        composer.OnMouseDown(downMouse);
+        f.Render(scrollbar);
+        Assert.True(f.Drawn(2).HasColor(0xf5d58d));
+        scrollbar.Enabled = false;
+        f.Render(scrollbar);
+        Assert.Equal(3, f.Draws.Length);
+        Assert.InRange(f.Drawn(2).MaxAlpha, 1, 90);
+        scrollbar.Enabled = true;
+        f.Render(scrollbar);
+        Assert.True(f.Drawn(2).HasColor(0xc8b897));
+        Assert.Equal(uploads, f.Uploads);
+        scrollbar.CurrentYPosition = (1000 - 180 - 11) * scale;
+        changes.Clear();
+        composer.OnMouseDown(downMouse);
+        f.Render(scrollbar);
+        Assert.Equal((1000 - 180) * scale, Assert.Single(changes), 3);
+        Assert.InRange(f.Drawn(2).MaxAlpha, 1, 90);
+        composer.OnMouseUp(downMouse);
+
+        scrollbar.CurrentYPosition = 200 * scale;
+        f.Render(scrollbar);
+        thumbMouse = PointAt(3);
+        composer.OnMouseDown(thumbMouse);
+        scrollbar.SetHeights(visible, visible);
+        Assert.False(scrollbar.mouseDownOnScrollbarHandle);
+        scrollbar.SetHeights(visible, 1000 * scale);
+        f.SetMouse(-100, -100);
+        f.Render(scrollbar);
+        Assert.Equal(idleThumb, f.Draws[3].Arguments[0]);
+        composer.Dispose();
+        scrollbar.Dispose();
+        Assert.Empty(f.Graphics.Textures);
+
+        MouseEvent PointAt(int index)
+        {
+            var draw = f.Draws[index];
+            var mouse = f.Mouse(Convert.ToDouble(draw.Arguments[1]) + Convert.ToDouble(draw.Arguments[3]) / 2,
+                Convert.ToDouble(draw.Arguments[2]) + Convert.ToDouble(draw.Arguments[4]) / 2);
+            f.SetMouse(mouse.X, mouse.Y);
+            return mouse;
+        }
+    }
+
+    [Theory]
+    [InlineData(.75f, true)]
+    [InlineData(1f, true)]
+    [InlineData(1.25f, true)]
+    [InlineData(1.5f, true)]
+    [InlineData(1.75f, true)]
+    [InlineData(2f, true)]
+    [InlineData(.75f, false)]
+    [InlineData(1f, false)]
+    [InlineData(1.25f, false)]
+    [InlineData(1.5f, false)]
+    [InlineData(1.75f, false)]
+    [InlineData(2f, false)]
+    public void ArrowButtonsUseNativeMomentaryActivationWithoutExtraFocusOrReleaseCallbacks(float scale, bool pointsUp)
+    {
+        using var f = new ControlsFixture(scale);
+        int callbacks = 0;
+        using var button = new GuiElementStyledArrowButton(f.Api, pointsUp, () => callbacks++,
+            ElementBounds.Fixed(10.37, 12.81, 12, 10));
+        using var composer = f.Compose(button);
+        Assert.False(button.Focusable);
+        int uploads = f.Uploads;
+        f.Render(button);
+        int idle = (int)f.Draws[0].Arguments[0];
+        var mouse = f.Mouse(button.Bounds.absX + button.Bounds.OuterWidth / 2,
+            button.Bounds.absY + button.Bounds.OuterHeight / 2);
+        f.SetMouse(mouse.X, mouse.Y);
+        composer.OnMouseDown(mouse);
+        Assert.True(mouse.Handled);
+        Assert.True(button.On);
+        Assert.Equal(1, callbacks);
+        var repeatedDown = f.Mouse(mouse.X, mouse.Y);
+        composer.OnMouseDown(repeatedDown);
+        Assert.True(repeatedDown.Handled);
+        Assert.True(button.On);
+        Assert.Equal(1, callbacks);
+        f.SetMouse(-100, -100);
+        composer.OnMouseMove(f.Mouse(-100, -100));
+        f.Render(button);
+        Assert.Equal(idle, f.Draws[0].Arguments[0]);
+        Assert.True(button.On);
+        composer.OnMouseUp(f.Mouse(-100, -100));
+        Assert.False(button.On);
+        Assert.Equal(1, callbacks);
+
+        composer.OnMouseDown(f.Mouse(mouse.X, mouse.Y));
+        button.OnFocusLost();
+        Assert.False(button.On);
+        composer.OnMouseUp(f.Mouse(mouse.X, mouse.Y));
+        Assert.Equal(2, callbacks);
+        composer.OnMouseDown(f.Mouse(mouse.X, mouse.Y));
+        button.Enabled = false;
+        Assert.False(button.On);
+        composer.OnMouseDown(f.Mouse(mouse.X, mouse.Y));
+        composer.OnMouseUp(f.Mouse(mouse.X, mouse.Y));
+        Assert.Equal(3, callbacks);
+        button.Enabled = true;
+        f.SetMouse(mouse.X, mouse.Y);
+        f.Render(button);
+        Assert.True(f.Drawn(0).HasColor(0xc8b897));
+        button.InsideClipBounds = ElementBounds.Fixed(500, 500, 10, 10).WithEmptyParent();
+        button.InsideClipBounds.CalcWorldBounds();
+        composer.OnMouseDown(f.Mouse(mouse.X, mouse.Y));
+        Assert.False(button.On);
+        Assert.Equal(3, callbacks);
+        f.Render(button);
+        Assert.Equal(idle, f.Draws[0].Arguments[0]);
+        Assert.Equal(uploads, f.Uploads);
+        composer.Dispose();
+        button.Dispose();
+        Assert.Empty(f.Graphics.Textures);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    public void ScrollbarRejectsNonPositiveOrNonFiniteCallerSteps(double step)
+    {
+        using var f = new ControlsFixture();
+        var error = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new GuiElementStyledScrollbar(f.Api, _ => { }, ElementBounds.Fixed(0, 0, 12, 180), step));
+        Assert.Equal("arrowStep", error.ParamName);
+        Assert.Empty(f.Graphics.Textures);
     }
 
     private sealed record Raster(int Width, int Height, int Stride, byte[] Pixels)

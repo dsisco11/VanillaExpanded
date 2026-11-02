@@ -81,7 +81,7 @@ internal sealed class RecipeBookIconCache(ICoreClientAPI api) : IRenderer
                 preview.SubId = subId;
                 preview.Position = targetAtlas.Positions[subId];
                 preview.ReloadIteration = preview.Position.reloadIteration;
-            }, scale: (float)(2 * GuiElementPassiveItemSlot.unscaledItemSize / GuiElementPassiveItemSlot.unscaledSlotSize));
+            }, scale: RecipeBookTileGeometry.PreviewScale);
         }
         catch
         {

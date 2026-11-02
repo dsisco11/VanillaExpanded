@@ -26,15 +26,19 @@ public sealed class GuiControlVisualsTests
         [GuiControlPalette.DropdownText, 0xd7c8aa], [GuiControlPalette.SearchFill, 0x30281e],
         [GuiControlPalette.SearchOutline, 0x8c795b], [GuiControlPalette.Placeholder, 0xa99b80],
         [GuiControlPalette.ListFill, 0x352d22], [GuiControlPalette.ListOutline, 0x2c251c],
-        [GuiControlPalette.ButtonText, 0xc9bba0], [GuiControlPalette.ButtonFill, 0x51412d],
-        [GuiControlPalette.ButtonOutline, 0x756247]
+        [GuiControlPalette.ScrollbarTrack, 0x30291e], [GuiControlPalette.ScrollbarThumb, 0x8d7957],
+        [GuiControlPalette.ScrollbarHover, 0xc8b897], [GuiControlPalette.ScrollbarPressed, 0xf5d58d],
+        [GuiControlPalette.ButtonText, 0xfff0cc], [GuiControlPalette.ButtonFill, 0x80613d],
+        [GuiControlPalette.ButtonOutline, 0xc29a5b], [GuiControlPalette.ButtonHoverFill, 0x8b693f],
+        [GuiControlPalette.ButtonEmphasisOutline, 0xe0bc79], [GuiControlPalette.ButtonPressedFill, 0x604627],
+        [GuiControlPalette.ButtonDisabledFill, 0x3b342b], [GuiControlPalette.ButtonDisabledOutline, 0x625747]
     }.Select((entry, index) => new object[] { index, entry[0], entry[1] });
 
     [Theory]
     [MemberData(nameof(Palette))]
     public void PaletteMatchesApprovedReferenceAndReturnsIndependentColors(int role, int actual, int expected)
     {
-        Assert.InRange(role, 0, 30);
+        Assert.InRange(role, 0, 39);
         Assert.Equal(expected, actual);
         var color = GuiControlPalette.Color(actual);
         Assert.Equal(((expected >> 16) & 255) / 255d, color[0]);
@@ -95,7 +99,7 @@ public sealed class GuiControlVisualsTests
         Assert.Equal(8d, RecipeBookVisualMetrics.HeadingSpacing);
         Assert.Equal(10d, RecipeBookVisualMetrics.SearchSpacing);
         Assert.Equal(12d, RecipeBookVisualMetrics.FooterSpacing);
-        Assert.Equal(30d, RecipeBookVisualMetrics.TileSize);
+        Assert.Equal(45d, RecipeBookVisualMetrics.TileSize);
         Assert.Equal(5d, RecipeBookVisualMetrics.TileGap);
         Assert.Equal(6d, RecipeBookVisualMetrics.ListHorizontalPadding);
         Assert.Equal(3d, RecipeBookVisualMetrics.SelectionInset);

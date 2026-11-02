@@ -10,8 +10,11 @@ internal sealed class RecipeBookTileGeometry
     internal const double Gap = RecipeBookVisualMetrics.TileGap;
     internal const double Pitch = TileSize + Gap;
     internal const double HorizontalPadding = RecipeBookVisualMetrics.ListHorizontalPadding;
+    internal const double TopPadding = RecipeBookVisualMetrics.ListTopPadding;
     internal const double MinimumWidth = TileSize + 2 * HorizontalPadding;
-    internal const double PreviewInset = 2;
+    internal const double MinimumHeight = TopPadding + TileSize;
+    internal const double PreviewInset = 1;
+    internal const float PreviewScale = 1.5f;
     internal const double QuantityInset = 2;
     internal const float QuantityFontSize = 11;
     internal int Columns { get; }
@@ -26,12 +29,12 @@ internal sealed class RecipeBookTileGeometry
         Leading = HorizontalPadding + (usable - (Columns * Pitch - Gap)) / 2;
     }
 
-    internal double ContentHeight(int count) => count == 0 ? 0 : Math.Ceiling((double)count / Columns) * Pitch - Gap;
+    internal double ContentHeight(int count) => count == 0 ? 0 : TopPadding + Math.Ceiling((double)count / Columns) * Pitch - Gap;
 
     internal void Place(ElementBounds tile, int column, int row, double scroll, double scale)
     {
         double left = Leading + column * Pitch;
-        double top = row * Pitch - scroll;
+        double top = TopPadding + row * Pitch - scroll;
         double x = Math.Round(left * scale, MidpointRounding.AwayFromZero);
         double y = Math.Round(top * scale, MidpointRounding.AwayFromZero);
         tile.WithFixedPosition(x / scale, y / scale).WithFixedSize(

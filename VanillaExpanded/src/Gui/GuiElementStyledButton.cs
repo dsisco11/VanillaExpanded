@@ -12,6 +12,7 @@ internal sealed class GuiElementStyledButton : GuiElementTextButton
     private LoadedTexture idle;
     private LoadedTexture hover;
     private LoadedTexture pressed;
+    private LoadedTexture disabled;
     private bool mousePressed;
     private bool active;
     private bool composed;
@@ -31,6 +32,7 @@ internal sealed class GuiElementStyledButton : GuiElementTextButton
         idle = new(api);
         hover = new(api);
         pressed = new(api);
+        disabled = new(api);
     }
 
     private static (CairoFont, CairoFont) MakeFonts(CairoFont? font)
@@ -74,16 +76,18 @@ internal sealed class GuiElementStyledButton : GuiElementTextButton
         int height = Math.Max(1, (int)Math.Round(Bounds.OuterHeight, MidpointRounding.AwayFromZero));
         GuiControlDrawing.FrameTexture(api, width, height, GuiControlPalette.ButtonFill,
             GuiControlPalette.ButtonOutline, scaled(1), ref idle);
-        GuiControlDrawing.FrameTexture(api, width, height, GuiControlPalette.HoverFill,
-            GuiControlPalette.SelectedOutline, scaled(1), ref hover);
-        GuiControlDrawing.FrameTexture(api, width, height, GuiControlPalette.TabFill,
-            GuiControlPalette.SelectedOutline, scaled(1), ref pressed);
+        GuiControlDrawing.FrameTexture(api, width, height, GuiControlPalette.ButtonHoverFill,
+            GuiControlPalette.ButtonEmphasisOutline, scaled(1), ref hover);
+        GuiControlDrawing.FrameTexture(api, width, height, GuiControlPalette.ButtonPressedFill,
+            GuiControlPalette.ButtonEmphasisOutline, scaled(1), ref pressed);
+        GuiControlDrawing.FrameTexture(api, width, height, GuiControlPalette.ButtonDisabledFill,
+            GuiControlPalette.ButtonDisabledOutline, scaled(1), ref disabled);
     }
 
     public override void RenderInteractiveElements(float deltaTime)
     {
         if (!Visible) return;
-        var texture = !Enabled ? idle : active || mousePressed ? pressed
+        var texture = !Enabled ? disabled : active || mousePressed ? pressed
             : Bounds.PointInside(api.Input.MouseX, api.Input.MouseY) ? hover : idle;
         api.Render.Render2DTexturePremultipliedAlpha(texture.TextureId, Bounds);
         base.RenderInteractiveElements(deltaTime);
@@ -114,6 +118,7 @@ internal sealed class GuiElementStyledButton : GuiElementTextButton
         idle.Dispose();
         hover.Dispose();
         pressed.Dispose();
+        disabled.Dispose();
         base.Dispose();
     }
 }

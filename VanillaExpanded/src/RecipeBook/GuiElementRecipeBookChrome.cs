@@ -94,24 +94,3 @@ internal sealed class GuiElementRecipeBookTitleBar(ICoreClientAPI api, string te
         ctx.Fill();
     }
 }
-
-internal sealed class GuiElementRecipeBookScrollbar(ICoreClientAPI api, Action<float> changed, ElementBounds bounds)
-    : GuiElementScrollbar(api, changed, bounds)
-{
-    public override void ComposeElements(Context ctx, ImageSurface surface)
-    {
-        Bounds.CalcWorldBounds();
-        GuiControlDrawing.Frame(ctx, Bounds.drawX, Bounds.drawY, Bounds.OuterWidth, Bounds.OuterHeight,
-            GuiControlPalette.ListFill, GuiControlPalette.ListOutline, scaled(1));
-        RecomposeHandle();
-    }
-
-    public override void RecomposeHandle()
-    {
-        Bounds.CalcWorldBounds();
-        int stroke = Math.Max(1, GuiControlDrawing.Pixels(GuiControlMetrics.Outline, scaled(1)));
-        GuiControlDrawing.FrameTexture(api, Math.Max(1, (int)Bounds.InnerWidth),
-            Math.Max(stroke, (int)currentHandleHeight), GuiControlPalette.ButtonFill,
-            GuiControlPalette.ButtonOutline, scaled(1), ref handleTexture);
-    }
-}

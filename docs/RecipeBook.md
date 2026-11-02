@@ -131,24 +131,30 @@ Automatic reopening is independent of browsing-state restoration. Disabling reop
 
 ## Controls and layout
 
-The dialog contains category tabs and a framed content panel with the selected category's localized heading, filtering controls, search, a recessed recipe list, and footer controls. Its preferred size is 340 by 420 GUI units; minimum dimensions grow for translated labels, complete tabs, empty-state actions, and the footer. The 36-unit titlebar uses 14-unit bold text, with a 12-unit gap before the tabs and eight-unit outer spacing. Panel content has eight-unit horizontal/bottom padding and 12-unit top spacing.
+The dialog contains category tabs and a framed content panel with the selected category's localized heading, filtering controls, search, a recessed recipe list, and footer controls. Minimum dimensions accommodate translated labels, the complete category strip, empty-state actions, and the footer.
 
-Composition and minimum-size measurement use shared named dimensions for spacing, margins, and control chrome. Minimum width accommodates the complete category strip and localized headings and controls; minimum height reserves room for the heading and empty-state text. GUI-scaled dimensions are distinct from physical-pixel borders and docking gaps. [RecipeBookLayout](../VanillaExpanded/src/RecipeBook/RecipeBookLayout.cs) owns placement and preferred dialog dimensions; the options component owns popup-width measurement.
+Composition and minimum-size measurement use shared named dimensions for spacing, margins, and control chrome. GUI-scaled dimensions are distinct from physical-pixel borders and docking gaps. [RecipeBookLayout](../VanillaExpanded/src/RecipeBook/RecipeBookLayout.cs) owns placement and preferred dialog dimensions; the options component owns popup-width measurement.
 
-The [shared visual helpers](../VanillaExpanded/src/Gui/GuiControlVisuals.cs) expose opt-in palette, frame drawing, control measurement, and host-relative pixel snapping. [Dialog-specific dimensions](../VanillaExpanded/src/RecipeBook/RecipeBookVisualMetrics.cs) govern composition and minimum sizing. [Local chrome adapters](../VanillaExpanded/src/RecipeBook/GuiElementRecipeBookChrome.cs) draw the warm dialog/titlebar gradients, outline, title separator, shadow, recessed list, and scrollbar without changing native positioning or scroll handling.
+The [shared visual helpers](../VanillaExpanded/src/Gui/GuiControlVisuals.cs) expose opt-in palette, frame drawing, control measurement, and host-relative pixel snapping. [Dialog-specific dimensions](../VanillaExpanded/src/RecipeBook/RecipeBookVisualMetrics.cs) govern composition and minimum sizing. [Local chrome adapters](../VanillaExpanded/src/RecipeBook/GuiElementRecipeBookChrome.cs) draw the dialog, titlebar, and recessed list without changing native positioning. The [shared scrollbar](../VanillaExpanded/src/Gui/GuiElementStyledScrollbar.cs) owns scroll-control rendering and maps its pointer interaction to the native scroll range.
 
 Search is the first keyboard tab stop. Native control focus and input routing are preserved, with the category strip acting as one outer tab stop.
 
 ### Shared styled controls
 
-The shared GUI layer provides opt-in native-derived controls. Callers supply labels, fonts, and callbacks; the controls have no filtering, catalogue, localization-key, or persistence dependencies. Recipe Book composition supplies its localized labels and controller callbacks to these adapters for search, sorting, both checkboxes, footer navigation, and empty-state actions.
+The shared GUI layer provides opt-in native-derived controls. Callers supply labels, fonts, bounds, callbacks, and control-specific measurements; the controls have no filtering, catalogue, localization-key, or persistence dependencies. Recipe Book composition supplies its localized labels and controller callbacks to these adapters for search, sorting, both checkboxes, scrolling, footer navigation, and empty-state actions.
 
 | Component | Rendering and ownership |
 | --- | --- |
-| [GuiElementStyledButton](../VanillaExpanded/src/Gui/GuiElementStyledButton.cs) | Native borderless text and activation, with owned flat state backgrounds. A render-only tracker follows native press/release events. Call its active-state setter through the shared type, not the non-virtual native setter through a base reference. |
+| [GuiElementStyledButton](../VanillaExpanded/src/Gui/GuiElementStyledButton.cs) | Native borderless text and activation, with owned brass idle/hover/pressed backgrounds and a separate muted disabled background. A render-only tracker follows native press/release events; disabled appearance takes precedence over hover and active state. Call its active-state setter through the shared type, not the non-virtual native setter through a base reference. |
 | [GuiElementClearableTextInput](../VanillaExpanded/src/Gui/GuiElementClearableTextInput.cs) | Native editing, selection, caret, and focus with a full-field frame, caller-provided placeholder, and owned clear textures and tooltip. Clearing uses the normal text-change callback. Editable bounds account for the native physical-pixel text inset. |
 | [GuiElementStyledDropDown](../VanillaExpanded/src/Gui/GuiElementStyledDropDown.cs) and [GuiElementStyledListMenu](../VanillaExpanded/src/Gui/GuiElementStyledListMenu.cs) | Native single-selection and popup interaction at 30-unit selector/row heights. Styled textures remain separate from native recomposition resources and are supplied during rendering. Cached rendering invalidates for relevant label, geometry, scale, and state changes. Width measurement includes the longest label and arrow reservation. |
-| [GuiElementStyledCheckbox](../VanillaExpanded/src/Gui/GuiElementStyledCheckbox.cs) | Owned flat frame and checked indicator over native toggle interaction, with coordinated 17-unit visual and input bounds. |
+| [GuiElementStyledCheckbox](../VanillaExpanded/src/Gui/GuiElementStyledCheckbox.cs) | Owned 17-unit flat frame and checked indicator over native toggle interaction. Optional caller-supplied label bounds extend hit testing without changing the square, adding a focus target, or bypassing clipping and disabled state. |
+| [GuiElementStyledScrollbar](../VanillaExpanded/src/Gui/GuiElementStyledScrollbar.cs) | Native scroll range, wheel/keyboard handling, and one focus target, with owned track/thumb textures and two owned arrow-button subelements. Caller-supplied bounds, callback, and arrow step keep it independent of the scrolled content. |
+| [GuiElementStyledArrowButton](../VanillaExpanded/src/Gui/GuiElementStyledArrowButton.cs) | Native momentary activation on press, with cached idle/hover/pressed/disabled arrow textures. Owns pointer hit testing and press cancellation without adding a keyboard focus target. |
+
+The shared scrollbar accepts a positive finite arrow step in GUI units; native height and scroll-position values remain in physical pixels. Track clicks and thumb dragging map the space between the arrows to the native range. Arrows disable at their limits; fitting content hides the thumb and disables both arrows.
+
+The scrollbar owns its thumb capture and forwards pointer events and lifecycle changes to its arrow buttons. Each button owns its native momentary press state, hit testing, and cached textures; its callback asks the scrollbar to step. Release, focus loss, disabling, and fitting content cancel presses. The buttons are not registered separately with the composer, preserving a single scrollbar focus target.
 
 ```mermaid
 flowchart LR
@@ -157,6 +163,8 @@ flowchart LR
     Adapter --> Native[Native editing and activation]
     Native --> Callback[Caller callback]
     Adapter --> Visual[Owned state textures and tooltips]
+    Adapter -->|Scrollbar only| Arrows[Owned non-focusable arrow buttons]
+    Arrows --> Native
     Metrics[Shared and dialog measurements] --> Book[Recipe Book composition]
     Book --> Caller
     Book --> Chrome[Local native-compatible chrome]
@@ -166,7 +174,7 @@ Native composition and the adapters' additional resources retain separate owners
 
 ### Category tabs
 
-[GuiElementIconTabs](../VanillaExpanded/src/Gui/GuiElementIconTabs.cs) is a crafting-independent icon tab strip owned by a native child composer. Its 30-unit tabs have four-unit inter-tab gaps and no end spacing; the first tab is flush with the panel edge. [GuiElementIconTab](../VanillaExpanded/src/Gui/GuiElementIconTab.cs) retains native toggle interaction and renders rounded-top folder tabs. Selected tabs are 36 units high with a scaled upper accent and an open bottom edge joining the framed panel; inactive tabs are 32 units high. Idle, hover, and selected states have distinct background and icon tints without changing icon geometry.
+[GuiElementIconTabs](../VanillaExpanded/src/Gui/GuiElementIconTabs.cs) is a crafting-independent icon tab strip owned by a native child composer. Its equal-width tabs have uniform gaps and no end spacing; the first tab is flush with the panel edge. [GuiElementIconTab](../VanillaExpanded/src/Gui/GuiElementIconTab.cs) retains native toggle interaction and renders rounded-top folder tabs. Selected tabs have a raised upper accent and an open bottom edge joining the framed panel; inactive tabs have lower shoulders. Idle, hover, and selected states have distinct background and icon tints without changing icon geometry.
 
 All appears first. Present standard categories follow Construction, Decorative, Mechanics, Terrain, Tools, Clothing, and Items. Additional categories follow those standards, ordered by localized name with an ordinal category-code tie-breaker; Other appears last when present. This presentation order does not change catalogue membership, filtering, or code-based browsing restoration.
 
@@ -176,19 +184,21 @@ Category selection updates its controller and panel heading and resets recipe sc
 
 ### Search, filtering, and options
 
-[GuiElementClearableTextInput](../VanillaExpanded/src/Gui/GuiElementClearableTextInput.cs) reserves an inner-right clear icon outside the native text/caret area. Recipe Book supplies the Search outputs placeholder and clear tooltip. Its clear action uses the normal search callback and preserves input focus. The field uses 14-unit text, a minimum height of 28, and an eight-unit text inset.
+[GuiElementClearableTextInput](../VanillaExpanded/src/Gui/GuiElementClearableTextInput.cs) reserves an inner-right clear icon outside the native text/caret area. Recipe Book supplies the Search outputs placeholder and clear tooltip. Its clear action uses the normal search callback and preserves input focus.
 
-Hide uncraftable and the sort selector share one row below the 11-unit category heading. The 17-unit checkbox and 14-unit label sit on the left; the 30-unit selector with 12-unit text sits on the right. Minimum width includes their measured separation. The selector's tooltip carries the localized Sort by label and ordering explanation rather than a separate visible label row. Both controls bind directly to their feature controllers; Availability remains the initial order. Recomposition synchronizes controls without invoking change handlers.
+Hide uncraftable and the sort selector share one row below the category heading. Clicking either the checkbox or its label toggles the same native control and filter callback. Minimum width includes the checkbox, its label, the selector, and their measured separation. The selector's tooltip carries the localized Sort by label and ordering explanation. Both controls bind directly to their feature controllers; Availability remains the initial order. Recomposition synchronizes controls without invoking change handlers.
 
 [GuiElementRecipeBookOptions](../VanillaExpanded/src/RecipeBook/GuiElementRecipeBookOptions.cs) binds the titlebar's sliders control to the persisted reopening preference. Its dropdown owns its composer and textures, receives input before underlying controls, and dismisses on Escape, outside clicks, or focus loss.
 
-Search, the recessed list frame, and footer actions share horizontal edges. The list reserves its scrollbar internally and starts ten units below search. The footer starts 12 units below the list: Previous, Auto, and Next form a left group with separate hit regions, the real alternative counter is centered, and Handbook is right-aligned. Symmetric width reservations prevent either group from overlapping the counter, including outputs with many alternatives. Footer and recovery buttons use 12-unit regular text and eight-unit horizontal padding.
+Search, the recessed list frame, and footer actions share horizontal edges. The list reserves its scrollbar internally. Below it, Previous, Auto, and Next form a left group with separate hit regions, the alternative counter is centered, and Handbook is right-aligned. Symmetric width reservations prevent either group from overlapping the counter, including outputs with many alternatives.
 
 ### Recipes and handbook
 
-[GuiElementRecipeBookTiles](../VanillaExpanded/src/RecipeBook/GuiElementRecipeBookTiles.cs) uses [shared tile geometry](../VanillaExpanded/src/RecipeBook/RecipeBookTileGeometry.cs) for layout, virtualization, hit testing, previews, quantities, and scrolling. After the dialog reserves scrollbar space, the geometry reserves six units of horizontal padding, fits the maximum number of 30-unit tiles separated by five-unit gaps, and centers the entire column group, including a single column. Tile edges are snapped independently to physical pixels rather than accumulating rounded pitches.
+[GuiElementRecipeBookTiles](../VanillaExpanded/src/RecipeBook/GuiElementRecipeBookTiles.cs) uses [shared tile geometry](../VanillaExpanded/src/RecipeBook/RecipeBookTileGeometry.cs) for layout, virtualization, hit testing, previews, quantities, and scrolling. After the dialog reserves scrollbar space, the geometry reserves six units of horizontal padding, fits the maximum number of 45-unit tiles separated by five-unit gaps, and centers the entire column group, including a single column. Tile edges are snapped independently to physical pixels rather than accumulating rounded pitches.
 
-The viewport reaches the recessed list frame's inner vertical edges without vertical padding; partially scrolled rows remain clipped to those edges. Scroll/scrollbar positions clamp together as membership changes. Recomposition maps the first visible recipe and its within-row offset to the new column count, retaining selection, inspection, and existing tile focus. This transient view anchor does not change the world-local browsing-state format.
+The recipe content starts two GUI units below the viewport's top edge. This leading space scrolls with the content; the full-height viewport clips partially scrolled rows at the list frame's inner edges. Content height, minimum sizing, and keyboard navigation account for the leading space so the first and last recipes remain accessible. Scroll/scrollbar positions clamp together as membership changes. Recomposition maps the first visible recipe and its within-row offset to the new column count, retaining selection, inspection, and existing tile focus. This transient view anchor does not change the world-local browsing-state format.
+
+Recipe Book composes the [shared scrollbar](../VanillaExpanded/src/Gui/GuiElementStyledScrollbar.cs) with the tile container's scroll callback and one recipe-row pitch as its arrow step. The 12-unit input reservation contains the slimmer visual track without changing the list's clipping region or native scroll range.
 
 Recipe activation validates the output and recipe identities retained by the press; removal or rebinding cancels it. Mouse and keyboard activation share the session's placement path.
 
@@ -198,11 +208,11 @@ Handbook resolves the visible selected output through the native `handbook` link
 
 ### Texture ownership and clipping
 
-Category icons use identical integer raster/display sizes and pixel-snapped positions with nearest magnification. Hover and selection change tint without moving or resizing icons. Tab backgrounds share the panel's snapped baseline. Composers dispose their textures when replaced or closed.
+Category icons use identical integer raster/display sizes and pixel-snapped positions with nearest magnification. Hover and selection change tint without moving or resizing icons. Tab textures and their clipping rectangle use a common host-relative physical-pixel coordinate system, while native layout and input use the logical viewport. The tab backgrounds share the panel's snapped baseline. Composers dispose their textures when replaced or closed.
 
-Recipe tile backgrounds, icons, and output counts render inside the shared viewport scissor. Scissor scopes unwind on failure. Tile quads, scissors, and pointer hit regions use matching pixel bounds. The dedicated shader draws flat warm backgrounds and one-unit availability outlines: neutral for available recipes, red for missing ingredients, and yellow for partial availability. Unsupported previews retain their dark disabled treatment. Selection is a separate gold top-left corner, inset three units with eight-unit segments and a one-unit stroke; native keyboard focus remains unchanged.
+Recipe tile backgrounds, icons, and output counts render inside the shared viewport scissor. Scissor scopes unwind on failure. Tile quads, scissors, and pointer hit regions use matching pixel bounds. The dedicated shader draws flat backgrounds and availability outlines: neutral for available recipes, red for missing ingredients, and yellow for partial availability. Unsupported previews use a dark disabled treatment. A separate gold top-left corner indicates selection without obscuring availability or output counts; keyboard focus uses native rendering.
 
-Native-atlas previews are centered inside a two-unit inset. Output counts use 11-unit text anchored two units from the bottom-right, independently of selection and availability. Recipe shader overlays and counts render below dropdowns and tooltips; the native focus overlay retains native depth.
+Shared tile geometry defines the centered preview area, native atlas rendering scale, and bottom-right quantity placement. Native item transforms determine each model's silhouette and proportions. Quantities remain independent of selection and availability. Recipe shader overlays and counts render below dropdowns and tooltips; the native focus overlay retains native depth.
 
 [RecipeBookIconCache](../VanillaExpanded/src/RecipeBook/RecipeBookIconCache.cs) is world-owned. It records missing previews during GUI preparation and submits baking requests in the Before render stage through native `RenderItemStackToAtlas`. The cap of four outstanding requests includes both pending and natively queued work. Native atlas rendering owns framebuffer and shader operations; previews can remain pending for two GUI frames.
 
@@ -218,10 +228,12 @@ Exact names use cloned resolved stacks rendered as literal richtext. Wildcard/ta
 
 ## Verification
 
-[Recipe Book unit tests](../VanillaExpanded.Tests/Unit/RecipeBook/) cover filtering, ordering, allocation, transfer, lifecycle, and rendering. [GUI unit tests](../VanillaExpanded.Tests/Unit/Gui/) cover the shared category tab component. From the repository root:
+[Recipe Book tests](../VanillaExpanded.Tests/Unit/RecipeBook/) cover filtering, ordering, allocation, transfer, lifecycle, responsive geometry, and rendering. [GUI tests](../VanillaExpanded.Tests/Unit/Gui/) independently specify shared-control palette, dimensions, state rendering, native adapter boundaries, and category-tab behavior. These suites include isolated logic tests and composed-control fixtures with mocked client services. From the repository root:
 
 ```powershell
-dotnet test .\VanillaExpanded.Tests\VanillaExpanded.Tests.csproj --no-restore --filter "FullyQualifiedName~RecipeBook|FullyQualifiedName~GuiElementIconTabsTests" --verbosity minimal
+dotnet test .\VanillaExpanded.Tests\VanillaExpanded.Tests.csproj --no-restore --filter "FullyQualifiedName~RecipeBook|FullyQualifiedName~GuiStyledControlsTests|FullyQualifiedName~GuiControlVisualsTests|FullyQualifiedName~GuiControlNativeProbeTests|FullyQualifiedName~GuiElementIconTabsTests" --verbosity minimal
 ```
 
-Native GUI fixtures run without a live game or GPU context. Live-world layout, inventory transitions, multiplayer behavior, and recipe/modpack compatibility require separate in-game validation.
+Native GUI fixtures run without a live game or GPU context. Shader-source assertions and mocked shader uniforms do not prove GPU compilation or rendered appearance. Use the existing Cake pipeline through `.\build.ps1` to validate JSON, publish the mod, and package its shader/assets.
+
+Package-identified captures at equivalent category, scale, and state support reproducible visual comparisons. Live-world layout, inventory transitions, multiplayer behavior, and recipe/modpack compatibility need in-game validation independently of automated fixtures.

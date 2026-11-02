@@ -5,7 +5,7 @@
     ## Goal:
         Align the Recipe Book with Design A using shared, opt-in styled native controls, attached folder tabs, compact composition, and the approved recipe-grid adaptations.
         Preserve the updated Tools icon, native interactions, inventory ownership, placement authority, and existing persistence formats.
-        Phase 1 records the user's design decisions. Later UI work remains unexecuted and requires its applicable feasibility and visual-approval gates.
+        The approved refinements use brass button states, a clickable Hide uncraftable label, and 45-unit tiles. The user confirmed approval of the current presentation on 2026-11-02 and waived additional screenshots and live evidence. Phase 7 records automated verification, documentation, cleanup, and acceptance under that decision.
 
     ## Execution contract:
         Phase source references govern their tasks and subtasks. The complete proposal governs visual targets and exclusions; the design guide governs unchanged feature semantics.
@@ -17,9 +17,9 @@
 
     ## Assumptions and open questions:
         The proposal records approved design directions, including shared reusable controls and retention of the current Tools artwork.
-        Tiles are fixed 30-unit squares with five-unit gaps; fit the maximum column count and center the entire group. Do not distribute spare width into tiles or gaps.
+        Tiles are fixed 45-unit squares with five-unit gaps; fit the maximum column count and center the entire group. Do not distribute spare width into tiles or gaps.
         Horizontal-only list padding, one-unit status outlines, the specified gold top-left selection marker, and non-tab states are approved.
-        The two-GUI-unit real-preview inset has approval following rendered visual review.
+        The current one-GUI-unit preview inset and native atlas scale of 1.5 are user-approved; additional rendered-review evidence is waived.
         Local dialog/titlebar adaptations are permitted subject to Phase 2 native feasibility, not assumed to be technically resolved.
         Retain native focus appearance and Tab/Shift+Tab routing. Do not suppress native highlighting, introduce a custom focus router, or add competing outlines.
         Retain approved native-compatible 30-unit selector height and popup rows. Non-virtual popup recomposition must not revert the styled appearance.
@@ -32,8 +32,8 @@
         Outcome: Implementation can proceed against explicit decisions without treating mockup placeholders or unresolved recommendations as approved behavior.
 
         ☑ Confirm outstanding approvals and record their disposition in the authoritative proposal.
-            ☑ Confirm fixed 30-unit square tiles, five-unit gaps, maximum fitting columns, and centering without spare-width redistribution.
-            ☑ Confirm six-unit horizontal list padding without a reserved vertical padding strip.
+            ☑ Confirm fixed 45-unit square tiles, five-unit gaps, maximum fitting columns, and centering without spare-width redistribution.
+            ☑ Confirm six-unit horizontal list padding and two-unit scrolling top space without reducing the full-height clip.
             ☑ Confirm one-unit availability outlines and choose a distinct gold selection marker that cannot obscure availability or quantities.
             ☑ Confirm the inset-preview direction and arrange visual approval of its exact inset.
             ☑ Confirm the permitted local dialog/titlebar adaptations; leave native feasibility questions explicitly unresolved until Phase 2.
@@ -105,6 +105,7 @@
 
         ☑ Implement the shared styled text-button adapter.
             ☑ Retain native borderless text and interaction rendering; supply flat backgrounds, outlines, and approved state overlays.
+            ☑ Use the approved brass idle/hover/pressed palette and a separate muted disabled frame; disabled state overrides hover and active emphasis.
             ☑ Preserve native click consumption, keyboard activation, active/pressed behavior, enabled/visible state, and text measurement/padding.
             ☑ Use the approved render-only press/active tracker without replacing native activation; expose the typed active-state API required by the non-virtual native setter.
         ☑ Generalize GuiElementRecipeBookSearch into a shared styled clearable text input.
@@ -121,6 +122,12 @@
         ☑ Implement the shared styled checkbox adapter.
             ☑ Draw the flat frame and checked state while retaining native toggling, focus, keyboard/mouse activation, and callbacks.
             ☑ Keep the 17-unit visual checkbox and reliable input bounds coordinated with measurement.
+            ☑ Accept caller-supplied label hit bounds while preserving one native toggle callback, one keyboard stop, disabled state, and clipping.
+        ☑ Implement the shared styled scrollbar adapter.
+            ☑ Encapsulate track/thumb/arrows, cached hover/pressed states, pointer capture, native range mapping, and texture disposal in the shared GUI layer.
+            ☑ Compose owned native-derived momentary arrow buttons for arrow rendering and input; forward lifecycle, clipping, and bounds without adding keyboard focus stops.
+            ☑ Accept caller-provided bounds, scroll callback, and a positive finite GUI-unit arrow step without referencing recipe geometry or controllers.
+            ☑ Exercise non-recipe arrow steps and invalid-step rejection independently of Recipe Book; retain native helper opt-in behavior.
         ☑ Add focused reusable-control tests in the GUI unit-test area.
             ☑ Exercise applicable idle/hover/pressed/disabled/focused/checked/opened states and approved styling.
             ☑ Test clear-input behavior with arbitrary caller labels and callbacks without constructing Recipe Book state.
@@ -128,7 +135,7 @@
             ☑ Cover text/caret/selection geometry, long labels, list recomposition, popup input bounds, fractional scales, and texture/tooltip disposal.
 
         Completion criteria:
-            ☑ All four control types are reusable, opt-in native-derived adapters with no Recipe Book semantic dependencies.
+            ☑ All required shared controls are reusable, opt-in native-derived adapters with no Recipe Book semantic dependencies.
             ☑ Control state and rendering tests pass, including recomposition and clear-input callback guarantees.
             ☑ Existing unrelated consumers remain on their original controls with unchanged appearance and behavior.
 
@@ -176,64 +183,67 @@
         Prerequisites: Phase 5 and explicit Phase 1 approval of grid, padding, availability, and selection choices.
         Sources: Proposal section "Approved recipe-grid adaptations"; the design guide's rendering, interaction, and browsing-state contracts.
         Outcome: Real recipes fill the aligned viewport with coherent responsive geometry and readable independent status, selection, focus, and quantities.
-        Acceptance gate: The two-GUI-unit preview inset has explicit user approval following rendered visual review.
+        Acceptance gate: The user has approved the current 45-unit grid, brass controls, and native preview treatment and waived additional rendered-review evidence. Schematic mockup artwork and unit fixtures do not certify GPU appearance.
 
         ☑ Introduce one shared tile geometry consumed by GuiElementRecipeBookTiles, GuiElementRecipeBookTile, RecipeBookIconRenderer, quantities, and scrolling.
             ☑ Subtract approved horizontal padding and scrollbar space, select the largest fitting column count, and center the complete column group inside the usable width.
-            ☑ Keep tiles fixed at 30 units and gaps fixed at five units; leave equal outer spare space without a fixed baseline column-count target.
+            ☑ Keep tiles fixed at 45 units and gaps fixed at five units; leave equal outer spare space without a fixed baseline column-count target.
             ☑ Center single-column groups too; preserve explicit minimum-size/placement failure if no tile fits instead of shrinking tiles.
             ☑ Assign whole-physical-pixel edges without cumulative drift; derive row pitch, visible rows, icon quads, and hit testing from the same geometry.
-            ☑ Use six-unit horizontal padding, no reserved vertical strip, and clipping to the inner top/bottom edges, including partial rows.
+            ☑ Use six-unit horizontal padding and two-unit scrolling top space; include the top space in content height, minimum sizing, and keyboard visibility while clipping partial rows to the inner top/bottom edges.
             ☑ Preserve selected/inspected recipe identity on resize and restore or clamp scroll through recipe-row position rather than obsolete fixed pitches.
             ☑ Reconcile scrollbar/membership changes and world-local reopened scroll with responsive geometry without adding a persistence format.
+            ☑ Match the independent dark scrollbar track and slim rounded muted-gold thumb; add working end arrows with one-row steps and boundary-disabled states while retaining the wider input region.
+            ☑ Add cached hover and pressed feedback to the thumb and arrows, with disabled precedence and press cancellation on release, focus loss, disabling, or fitting content.
+            ☑ Map thumb dragging and track clicks between the arrow areas to the native content range, preserve wheel/keyboard input and one focus target, and cache/dispose additional textures.
         ☑ Update tile and shader presentation using the approved status/selection treatment.
             ☑ Use warm neutral available outlines, one-unit outer red/yellow availability outlines, and the existing unsupported disabled treatment and warning.
             ☑ Render the approved separate gold selection marker and independent keyboard focus without hiding availability or quantity text.
-            ☑ Center real native-atlas previews using the proposed inset; obtain visual approval of the exact inset before marking presentation accepted.
+            ☑ Center larger real native-atlas previews using the approved one-unit inset and native atlas scale of 1.5; record user approval with additional rendered-review evidence waived.
             ☑ Keep output quantities visible and preserve icon preparation, atlas ownership, overlay depth, scissor unwinding, and reload/disposal behavior.
         ☑ Add geometry, rendering, and interaction regression tests.
             ☑ Test baseline/wider/constrained widths, column thresholds, independently expected tile edges/gaps, partial rows, and fractional scaling.
             ☑ Test resize/membership scroll reconciliation, scrollbar clamping, selected/inspected identity, and cancelled stale tile presses.
+            ☑ Verify arrow callbacks, drag endpoints and outside release, hover/press transitions and cancellation, fitting/disabled content, movement, fractional scales, render-time texture reuse, and scrollbar resource disposal.
             ☑ Test available/missing/partial/unsupported/selected/focused combinations and output counts without conflating selection with availability.
             ☑ Verify mouse and keyboard placement still use live validation and existing controller actions, not displayed eligibility alone.
 
         Completion criteria:
-            ☑ Maximum fitting columns, fixed 30-unit tiles/five-unit gaps, centered groups, and full-height clipping satisfy the approved measurable targets.
-            ☑ All geometry consumers agree after resize and scrolling; real previews, quantities, status, selection, and focus remain legible.
-            ☑ The exact preview inset has visual approval and rendering/interaction tests pass without changed allocation, filtering, or transfer semantics.
+            ☑ Maximum fitting columns, fixed 45-unit tiles/five-unit gaps, centered groups, and full-height clipping satisfy the approved measurable targets.
+            ☑ Geometry consumers agree after resize and scrolling in automated tests; presentation legibility is accepted by the user without additional live evidence.
+            ☑ The revised preview treatment has user approval and rendering/interaction tests pass without changed allocation, filtering, or transfer semantics.
 
     ## Phase 7: Final review, acceptance, and document cleanup:
         Prerequisites: Phases 3 through 6 complete, with all applicable approval and native-feasibility gates resolved.
         Sources: Proposal sections "Acceptance and verification" and "Exclusions"; repository build/test conventions.
-        Outcome: Full alignment is supported by source, test, package, and live-runtime evidence, with accurate permanent documentation and no temporary implementation debris.
+        Outcome: Implementation has source, test, and package verification, user acceptance, accurate permanent documentation, and no temporary implementation debris. Additional live evidence is waived, not claimed.
+        Acceptance gate: The user confirmed existing approval and waived additional screenshots and live evidence on 2026-11-02. Record that scope change instead of claiming the original live matrix was executed.
 
-        ☐ Review proposal coverage and run required regression validation.
-            ☐ Reconcile every proposal requirement against implementation and evidence; distinguish remaining defects, evidence gaps, and explicitly approved scope changes.
-            ☐ Run the focused GUI/Recipe Book suites covering changed surfaces and their dependent lifecycle, rendering, filtering, ordering, allocation, and transfer contracts.
-            ☐ Reuse existing mocks and independently specified visual expectations; do not equate fixture success with GPU/runtime acceptance.
-            ☐ Use the existing Cake/build.ps1 pipeline to validate and package the changed mod and shader/assets, recording the resulting package identity.
-            ☐ Confirm the updated Tools and other category SVG artwork are unchanged, the old search component/temporary wrappers are removed, and unrelated consumers are unaffected.
-        ☐ Collect comparable in-game visual and interaction evidence from the identified package.
-            ☐ Capture idle, hover, selected, and keyboard-focused states at UI scales 1, 1.5, and 2; add fractional-scale geometry checks.
-            ☐ Compare against Design A at the same category, normalized scale, and equivalent interaction states, using real previews and approved placeholder departures.
-            ☐ Exercise closed/open dropdowns, checkbox states, clearable input, footer/recovery buttons, quantities, scrollbar, options, movement, and close controls.
-            ☐ Exercise long translations, additional categories, constrained screen space, recomposition, partial-row scrolling, resizing, reopening, and inventory transitions.
-            ☐ Verify native Fixed/Movable positioning, focus/input routing, Handbook, placement authorization, and relevant multiplayer/modpack compatibility separately from unit fixtures.
-            ☐ Preserve required captures and acceptance decisions; unresolved visual differences or missing live evidence prevent a full-alignment claim.
-        ☐ Update affected permanent documentation and completion tracking.
-            ☐ Update RecipeBook.md's shared-control ownership, current geometry, rendering, and verification sections to describe the implemented design without a changelog.
-            ☐ Repair references to the removed search class and add accurate links to the shared replacement; retain the authoritative proposal and this plan.
-            ☐ Reassess the existing Recipe Book tab-redesign item in project.todo against complete visual acceptance; do not silently certify partial work.
-        ☐ Inventory and remove temporary implementation-support documents and artifacts.
-            ☐ Inventory working notes, interim analyses, handoff drafts, probe documentation, and other temporary documents created during Phases 1 through 6; none are designated for removal at plan creation.
-            ☐ Preserve still-required decisions and evidence in the proposal, permanent guide, tests, or required acceptance-evidence destination before removing temporary documents.
-            ☐ Update references, then remove only identified temporary implementation-support documents and verified obsolete probe/compatibility scaffolding.
-            ☐ Remove task-created temporary validation outputs only after identifying their exact paths and preserving required evidence; do not delete unrelated or user-owned work.
-            ☐ Retain Design A's authoritative reference artifact, the proposal, this plan, permanent project documentation, and required acceptance captures/results.
+        ☑ Review proposal coverage and run required regression validation.
+            ☑ Reconcile every proposal requirement against implementation and evidence; distinguish remaining defects, evidence gaps, and explicitly approved scope changes.
+            ☑ Run the focused GUI/Recipe Book suites covering changed surfaces and their dependent lifecycle, rendering, filtering, ordering, allocation, and transfer contracts.
+            ☑ Reuse existing mocks and independently specified visual expectations; do not equate fixture success with GPU/runtime acceptance.
+            ☑ Use the existing Cake/build.ps1 pipeline to validate and package the changed mod and shader/assets, recording the resulting package identity.
+            ☑ Confirm the updated Tools and other category SVG artwork are unchanged, the old search component/temporary wrappers are removed, and unrelated consumers are unaffected.
+        ☑ Record user acceptance and disposition of the original live-evidence matrix.
+            ☑ Record the waiver of additional idle/hover/selected/focused captures at scales 1, 1.5, and 2 and normalized reference comparisons.
+            ☑ Record the waiver of additional live control, localization, constrained-space, resize/reopen, and inventory-transition evidence.
+            ☑ Record the waiver of additional native positioning, input, Handbook, placement, and multiplayer/modpack compatibility evidence.
+            ☑ Preserve existing captures and the user's acceptance; do not describe waived checks as executed or runtime compatibility as proven.
+        ☑ Update affected permanent documentation and completion tracking.
+            ☑ Update RecipeBook.md's shared-control ownership, current geometry, rendering, and verification sections to describe the implemented design without a changelog.
+            ☑ Repair references to the removed search class and add accurate links to the shared replacement; retain the authoritative proposal and this plan.
+            ☑ Reassess the existing Recipe Book tab-redesign item in project.todo against complete visual acceptance; do not silently certify partial work.
+        ☑ Inventory and remove temporary implementation-support documents and artifacts.
+            ☑ Inventory working notes, interim analyses, handoff drafts, probe documentation, and other temporary documents created during Phases 1 through 6; none are designated for removal at plan creation.
+            ☑ Preserve still-required decisions and evidence in the proposal, permanent guide, tests, or required acceptance-evidence destination before removing temporary documents.
+            ☑ Update references, then remove only identified temporary implementation-support documents and verified obsolete probe/compatibility scaffolding.
+            ☑ Remove task-created temporary validation outputs only after identifying their exact paths and preserving required evidence; do not delete unrelated or user-owned work.
+            ☑ Retain Design A's authoritative reference artifact, the proposal, this plan, permanent project documentation, and required acceptance captures/results.
 
         Completion criteria:
-            ☐ Every in-scope proposal requirement has implementation and appropriate evidence; approved scope changes are explicit and unapproved omissions remain blockers.
-            ☐ Focused tests and package validation pass, and normalized live captures plus interaction checks support the approved appearance.
-            ☐ Shared controls remain reusable and opt-in; no global styling changes, production reflection, new feature semantics, or icon replacements were introduced.
-            ☐ Current-state documentation and completion tracking are accurate; temporary documents/scaffolding are inventoried, required content preserved, obsolete material removed, and references repaired.
-            ☐ User visual acceptance is recorded before declaring full alignment.
+            ☑ Every in-scope proposal requirement has implementation and appropriate evidence; approved scope changes are explicit and unapproved omissions remain blockers.
+            ☑ Focused tests and package validation pass, and user acceptance is recorded with the additional live-evidence requirement explicitly waived.
+            ☑ Shared controls remain reusable and opt-in; no global styling changes, production reflection, new feature semantics, or icon replacements were introduced.
+            ☑ Current-state documentation and completion tracking are accurate; temporary documents/scaffolding are inventoried, required content preserved, obsolete material removed, and references repaired.
+            ☑ User visual acceptance is recorded before declaring full alignment.

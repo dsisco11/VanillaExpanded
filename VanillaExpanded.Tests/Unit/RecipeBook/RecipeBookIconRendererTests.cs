@@ -140,7 +140,7 @@ public sealed class RecipeBookIconRendererTests
         using var tiles = CreateTiles(graphics, session);
         for (int i = 0; i < 10; i++)
         {
-            tiles.Scroll(i * 35);
+            tiles.Scroll(i * 50);
             graphics.Warm(tiles, 3);
             Assert.Equal((i + 1) * 3, graphics.Allocations.Count);
         }
@@ -189,7 +189,7 @@ public sealed class RecipeBookIconRendererTests
         program.VerifySet(value => value.TextureBounds = It.IsAny<System.Numerics.Vector4>(), Times.Never);
         Assert.Empty(graphics.Bakes);
         graphics.Frame(tiles);
-        tiles.Scroll(35);
+        tiles.Scroll(50);
         graphics.Warm(tiles, 2);
         Assert.Equal(4, graphics.Bakes.Count);
         graphics.Complete(graphics.Bakes[0]);
@@ -231,7 +231,7 @@ public sealed class RecipeBookIconRendererTests
         }
         tiles.RenderInteractiveElements(0);
         Assert.Equal(9, graphics.Bakes.Count);
-        tiles.Scroll(35);
+        tiles.Scroll(50);
         graphics.Warm(tiles, 3);
         Assert.Equal(10, graphics.Bakes.Count);
     }
@@ -251,7 +251,7 @@ public sealed class RecipeBookIconRendererTests
         using var tiles = CreateTiles(graphics, session);
         for (int row = 0; row < count / 3; row++)
         {
-            tiles.Scroll(row * 35);
+            tiles.Scroll(row * 50);
             graphics.Warm(tiles, 3);
             Assert.Equal((row + 1) * 3, graphics.Allocations.Count);
         }
@@ -259,7 +259,7 @@ public sealed class RecipeBookIconRendererTests
         Assert.All(graphics.Bakes, bake => Assert.Contains(bake.Id, graphics.Allocations));
         for (int row = count / 3 - 1; row >= 0; row--)
         {
-            tiles.Scroll(row * 35);
+            tiles.Scroll(row * 50);
             graphics.Warm(tiles, 3);
             Assert.Equal(count, graphics.Bakes.Count);
         }
@@ -307,7 +307,7 @@ public sealed class RecipeBookIconRendererTests
         using (var first = CreateTiles(graphics, session)) graphics.Warm(first, 3);
         RuntimeEnv.GUIScale = 1.5f;
         using (var scaled = CreateTiles(graphics, session)) graphics.Warm(scaled, 3);
-        Assert.Equal(new[] { 26, 40 }, graphics.Bakes.Select(bake => bake.Size));
+        Assert.Equal(new[] { 44, 64 }, graphics.Bakes.Select(bake => bake.Size));
         RuntimeEnv.GUIScale = 1;
         using var restored = CreateTiles(graphics, session);
         restored.RenderInteractiveElements(0);
@@ -653,7 +653,7 @@ public sealed class RecipeBookIconRendererTests
         graphics.EndFrame();
         Assert.Single(graphics.Bakes);
         Assert.Single(graphics.Allocations);
-        Assert.NotNull(graphics.Cache.Get(Assert.Single(session.Rows).Recipe, 26, false, out _));
+        Assert.NotNull(graphics.Cache.Get(Assert.Single(session.Rows).Recipe, 44, false, out _));
     }
 
     [Fact]
@@ -886,7 +886,7 @@ public sealed class RecipeBookIconRendererTests
                 Assert.Equal(Enumerable.Range(0, 4).Select(index => index == selected),
                     program.Invocations.Where(call => call.Method.Name == "set_Selected")
                         .Select(call => (bool)call.Arguments[0]));
-                program.VerifySet(value => value.PreviewInset = 2, Times.Once);
+                program.VerifySet(value => value.PreviewInset = 1, Times.Once);
                 var focusCalls = graphics.Render.Invocations.Where(call => call.Method.Name == nameof(IRenderAPI.RenderRectangle)).ToArray();
                 Assert.Equal(focused >= 0 ? 1 : 0, focusCalls.Length);
                 if (focused >= 0)
@@ -946,10 +946,10 @@ public sealed class RecipeBookIconRendererTests
 
     private static GuiElementRecipeBookTiles CreateTiles(RecipeBookRenderFixture graphics, RecipeBookSession session, int rows = 1)
     {
-        var viewport = ElementBounds.Fixed(0, 0, 112, rows * 35 - 5).WithEmptyParent();
+        var viewport = ElementBounds.Fixed(0, 0, 202, rows * 50 - 5).WithEmptyParent();
         viewport.CalcWorldBounds();
         var tiles = new GuiElementRecipeBookTiles(graphics.Api.Object,
-            ElementBounds.Fixed(0, 0, 112, (rows + 1) * 35).WithParent(viewport), viewport, session, _ => { }, (_, _) => { },
+            ElementBounds.Fixed(0, 0, 202, (rows + 1) * 50).WithParent(viewport), viewport, session, _ => { }, (_, _) => { },
             graphics.Cache, graphics.CreateShader);
         tiles.BeforeCalcBounds();
         tiles.Bounds.CalcWorldBounds();

@@ -42,9 +42,10 @@ internal static class RecipeBookVisualMetrics
     internal const double ShadowRadius = 8;
     internal const double ShadowOffset = 5;
     internal const double ShadowOpacity = 0.4;
-    internal const double TileSize = 30;
+    internal const double TileSize = 45;
     internal const double TileGap = 5;
     internal const double ListHorizontalPadding = 6;
+    internal const double ListTopPadding = 2;
     internal const double SelectionInset = 3;
     internal const double SelectionLength = 8;
 }

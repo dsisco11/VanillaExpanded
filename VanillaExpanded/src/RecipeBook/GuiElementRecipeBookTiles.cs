@@ -303,9 +303,10 @@ internal sealed class GuiElementRecipeBookTiles : GuiElementContainer
     {
         focusedIndex = index;
         double top = index / Columns * compositionScale * RowPitch;
+        double bottom = top + compositionScale * RecipeBookTileGeometry.MinimumHeight;
         if (top < scroll) scroll = (float)top;
-        if (top + compositionScale * TileSize > scroll + viewport.InnerHeight)
-            scroll = (float)(top + compositionScale * TileSize - viewport.InnerHeight);
+        if (bottom > scroll + viewport.InnerHeight)
+            scroll = (float)(bottom - viewport.InnerHeight);
         if (scrollbar != null) scrollbar.CurrentYPosition = scroll;
         BindRows();
         changingFocus = true;

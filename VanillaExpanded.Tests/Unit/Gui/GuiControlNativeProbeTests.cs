@@ -36,29 +36,54 @@ public sealed class GuiControlNativeProbeTests : IDisposable
     [Fact]
     public void BorderlessButtonRetainsNativeActivationAndVisibilityWithLocalFlatChrome()
     {
+        // Arrange
         using var graphics = Graphics();
         int clicks = 0;
         using var button = new ButtonProbe(graphics.Api.Object, () => { clicks++; return true; },
             ElementBounds.Fixed(0, 0, 100, 26).WithEmptyParent());
         using var surface = new ImageSurface(Format.Argb32, 200, 80);
         using var ctx = new Context(surface);
+        int untouchedPixel = GuiControlVisualsTests.Pixel(surface, 120, 40);
+
+        // Act
         button.BeforeCalcBounds();
         button.ComposeElements(ctx, surface);
-        Assert.Equal(0x51412d, GuiControlVisualsTests.Pixel(surface, 2, 2));
+
+        // Assert
+        int interiorPixel = GuiControlVisualsTests.Pixel(surface, 2, 2);
+        Assert.NotEqual(untouchedPixel, interiorPixel);
+        Assert.Equal(interiorPixel, GuiControlVisualsTests.Pixel(surface, 90, 20));
+        Assert.Equal(untouchedPixel, GuiControlVisualsTests.Pixel(surface, 120, 40));
+
+        // Act
         var mouse = new MouseEvent(10, 10, EnumMouseButton.Left, 0);
         SetMouse(graphics, 10, 10);
         button.OnMouseDownOnElement(graphics.Api.Object, mouse);
         button.OnMouseUpOnElement(graphics.Api.Object, mouse);
+
+        // Assert
         Assert.Equal(1, clicks);
+
+        // Act
         button.OnFocusGained();
         button.OnKeyDown(graphics.Api.Object, new KeyEvent { KeyCode = (int)GlKeys.Enter });
+
+        // Assert
         Assert.Equal(2, clicks);
+
+        // Act
         button.Enabled = false;
         button.OnKeyDown(graphics.Api.Object, new KeyEvent { KeyCode = (int)GlKeys.Enter });
+
+        // Assert
         Assert.Equal(2, clicks);
+
+        // Act
         button.Visible = false;
         graphics.Render.Invocations.Clear();
         button.RenderInteractiveElements(0);
+
+        // Assert
         Assert.Empty(graphics.Render.Invocations);
     }
 

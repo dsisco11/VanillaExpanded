@@ -218,7 +218,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
             {
                 tiles.ResetScroll();
                 session.CraftableOnly.SetEnabled(enabled);
-            }, craftableBounds), "craftable-only")
+            }, craftableBounds, labelBounds: craftableLabel), "craftable-only")
             .AddStaticText(Lang.Get("vanillaexpanded:recipebook-craftable-only"), MainFont(),
                 craftableLabel, "craftable-label")
             .AddHoverText(Lang.Get("vanillaexpanded:recipebook-craftable-only-hint"), CairoFont.WhiteSmallText(),
@@ -239,7 +239,8 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
             .BeginClip(viewport)
                 .AddInteractiveElement(tiles, "tiles")
             .EndClip()
-            .AddInteractiveElement(new GuiElementRecipeBookScrollbar(capi, tiles.Scroll, scrollBounds), "scroll")
+            .AddInteractiveElement(new GuiElementStyledScrollbar(capi, tiles.Scroll, scrollBounds,
+                RecipeBookTileGeometry.Pitch), "scroll")
             .AddDynamicText("", MainFont().WithOrientation(EnumTextOrientation.Center),
                 ElementBounds.Fixed(viewport.fixedX, viewport.fixedY, viewport.fixedWidth, emptyTextHeight), "empty")
             .AddInteractiveElement(StyledButton(Lang.Get("vanillaexpanded:recipebook-clear-search"), ClearSearch,
@@ -364,7 +365,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
                 (minimumWidth - viewportWidthReserve) * scale)) / scale);
         minimumHeight = Math.Ceiling(TitleHeight + TitleSpacing + tabsHeight + PanelTopPadding
             + categoryTitleHeight + HeadingSpacing + filterHeight + FilterSpacing + searchHeight + SearchSpacing
-            + 2 * ListBorderWidth + Math.Max(GuiElementRecipeBookTiles.TileSize, emptyTextHeight + RowSpacing + footerHeight)
+            + 2 * ListBorderWidth + Math.Max(RecipeBookTileGeometry.MinimumHeight, emptyTextHeight + RowSpacing + footerHeight)
             + FooterSpacing + footerHeight + ContentInset);
     }
 

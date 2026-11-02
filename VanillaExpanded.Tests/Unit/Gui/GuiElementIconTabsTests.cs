@@ -215,11 +215,177 @@ public sealed class GuiElementIconTabsTests
             var selected = backgrounds[8].Arguments;
             Assert.Equal((int)host.renderY + Math.Round(panel.drawY, MidpointRounding.AwayFromZero),
                 (double)selected[2] + (double)selected[4] - stroke);
-            Assert.True((double)selected[2] + (double)selected[4] <=
-                (int)tabs.Viewport!.renderY + tabs.Viewport.OuterHeightInt);
+            Assert.True((double)selected[2] + (double)selected[4] <= NativeScissorRectangle(graphics).Bottom);
             var selectedBounds = tabs.Composer!.GetToggleButton("tab-8").Bounds;
             Assert.Equal((int)host.renderX + Math.Round(selectedBounds.renderX - host.renderX, MidpointRounding.AwayFromZero),
                 (double)selected[1]);
+        }
+    }
+
+    [Theory]
+    [InlineData(.6f, false)]
+    [InlineData(.75f, false)]
+    [InlineData(1f, false)]
+    [InlineData(1.1f, false)]
+    [InlineData(1.25f, false)]
+    [InlineData(1.5f, false)]
+    [InlineData(1.75f, false)]
+    [InlineData(2f, false)]
+    [InlineData(.6f, true)]
+    [InlineData(.75f, true)]
+    [InlineData(1f, true)]
+    [InlineData(1.1f, true)]
+    [InlineData(1.25f, true)]
+    [InlineData(1.5f, true)]
+    [InlineData(1.75f, true)]
+    [InlineData(2f, true)]
+    public void NativeScissorRetainsEverySelectedBorderAcrossFractionalMovementAndScrolling(float scale, bool overflow)
+    {
+        using var graphics = new RecipeBookRenderFixture(scale);
+        Setup(graphics);
+        double callerWidth = overflow ? 180 : 400;
+        using var tabs = Create(graphics, Enumerable.Range(0, 9).Select(i => "Entry " + i).ToArray(),
+            callerWidth, _ => { });
+        var host = ElementBounds.Fixed(100.75, 80.75, 1000, 1000).WithEmptyParent();
+        host.IsDrawingSurface = true;
+        tabs.Bounds.WithParent(host);
+        host.WithChild(tabs.Bounds);
+        host.CalcWorldBounds();
+        Compose(tabs);
+        foreach (double offset in new[] { .1, .3, .5, .7, .75, .9 })
+        {
+            host.fixedX = 100 + offset;
+            host.fixedY = 80 + offset;
+            host.MarkDirtyRecursive();
+            host.CalcWorldBounds();
+            foreach (int selected in new[] { 0, 4, 8 })
+            {
+                tabs.SetValue(selected, false);
+                graphics.Render.Invocations.Clear();
+                tabs.RenderInteractiveElements(0);
+                var (left, top, right, bottom) = NativeScissorRectangle(graphics);
+                var callerBounds = tabs.Bounds;
+                var viewport = tabs.Viewport!;
+                double reservation = overflow ? 20 * scale : 0;
+                double expectedLeft = callerBounds.absX + reservation;
+                double expectedWidth = callerBounds.InnerWidth - 2 * reservation;
+                double expectedHeight = callerBounds.InnerHeight;
+                Assert.Equal(expectedLeft, viewport.absX, 4);
+                Assert.Equal(callerBounds.absY, viewport.absY, 4);
+                Assert.Equal(expectedWidth, viewport.InnerWidth, 4);
+                Assert.Equal(expectedHeight, viewport.InnerHeight, 4);
+                Assert.InRange((double)(right - left), Math.Floor(expectedWidth), Math.Ceiling(expectedWidth));
+                Assert.Equal(Math.Round(expectedHeight, MidpointRounding.AwayFromZero), bottom - top);
+                var background = graphics.Render.Invocations.Where(call =>
+                    call.Method.Name == nameof(IRenderAPI.Render2DTexturePremultipliedAlpha)
+                    && call.Arguments.Count == 7 && (float)call.Arguments[5] == 50).ElementAt(selected).Arguments;
+                Assert.True((double)background[1] >= left, $"Left border clipped at scale {scale}, offset {offset}.");
+                Assert.True((double)background[2] >= top, $"Top border clipped at scale {scale}, offset {offset}.");
+                Assert.True((double)background[1] + (double)background[3] <= right,
+                    $"Right border clipped at scale {scale}, offset {offset}.");
+                Assert.True((double)background[2] + (double)background[4] <= bottom,
+                    $"Bottom border clipped at scale {scale}, offset {offset}.");
+                Assert.Empty(graphics.Clips);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(.6f)]
+    [InlineData(.75f)]
+    [InlineData(1f)]
+    [InlineData(1.1f)]
+    [InlineData(1.25f)]
+    [InlineData(1.5f)]
+    [InlineData(1.75f)]
+    [InlineData(2f)]
+    public void ClippedTabsRejectPointerActivationAndKeyboardWrapRestoresAccessAfterMovement(float scale)
+    {
+        using var graphics = new RecipeBookRenderFixture(scale);
+        Setup(graphics);
+        var changes = new List<int>();
+        using var tabs = Create(graphics, Enumerable.Range(0, 9).Select(i => "Entry " + i).ToArray(), 180, changes.Add);
+        var host = ElementBounds.Fixed(100.75, 80.75, 1000, 1000).WithEmptyParent();
+        host.IsDrawingSurface = true;
+        tabs.Bounds.WithParent(host);
+        host.WithChild(tabs.Bounds);
+        host.CalcWorldBounds();
+        Compose(tabs);
+        double expectedLeft = 0;
+        double expectedRight = 0;
+        foreach (double offset in new[] { .1, .75 })
+        {
+            host.fixedX = 100 + offset;
+            host.fixedY = 80 + offset;
+            host.MarkDirtyRecursive();
+            host.CalcWorldBounds();
+            tabs.SetValue(0, false);
+            changes.Clear();
+            double reservation = 20 * scale;
+            var callerBounds = tabs.Bounds;
+            expectedLeft = callerBounds.absX + reservation;
+            expectedRight = callerBounds.absX + callerBounds.InnerWidth - reservation;
+            var viewport = tabs.Viewport!;
+            Assert.Equal(expectedLeft, viewport.absX, 4);
+            Assert.Equal(callerBounds.absY, viewport.absY, 4);
+            Assert.Equal(expectedRight - expectedLeft, viewport.InnerWidth, 4);
+            Assert.Equal(callerBounds.InnerHeight, viewport.InnerHeight, 4);
+            Assert.NotEqual(Math.Round(expectedRight), expectedRight);
+            AssertClippedClickRejected(left: false);
+            SetMouse(graphics, (expectedLeft + expectedRight) / 2,
+                callerBounds.absY + callerBounds.InnerHeight / 2);
+            var wheel = new MouseWheelEventArgs { deltaPrecise = 1000 };
+            tabs.OnMouseWheel(graphics.Api.Object, wheel);
+            Assert.True(wheel.IsHandled);
+            AssertClippedClickRejected(left: true);
+
+            var last = tabs.Composer!.GetToggleButton("tab-8").Bounds;
+            Click((int)(last.absX + last.OuterWidth / 2), (int)(last.absY + last.OuterHeight / 2));
+            Assert.Equal(8, tabs.activeElement);
+            Assert.Equal(8, Assert.Single(changes));
+            tabs.OnFocusGained();
+            Navigate(GlKeys.Right, 0);
+            Navigate(GlKeys.Left, 8);
+            Assert.Equal(new[] { 8, 0, 8 }, changes);
+            tabs.OnFocusLost();
+            var unfocused = new KeyEvent { KeyCode = (int)GlKeys.Right };
+            tabs.OnKeyDown(graphics.Api.Object, unfocused);
+            Assert.False(unfocused.Handled);
+            Assert.Equal(8, tabs.activeElement);
+            Assert.Equal(new[] { 8, 0, 8 }, changes);
+        }
+
+        void AssertClippedClickRejected(bool left)
+        {
+            var clipped = tabs.Composer!.GetToggleButton("tab-4").Bounds;
+            int x = left ? (int)Math.Ceiling(expectedLeft) - 1
+                : (int)Math.Floor(expectedRight) + 1;
+            int y = (int)(clipped.absY + clipped.OuterHeight / 2);
+            Assert.True(clipped.PointInside(x, y));
+            Assert.True(left ? x < expectedLeft : x >= expectedRight);
+            Assert.False(tabs.Viewport!.PointInside(x, y));
+            Click(x, y);
+            Assert.Empty(changes);
+            Assert.Equal(0, tabs.activeElement);
+        }
+
+        void Click(int x, int y)
+        {
+            SetMouse(graphics, x, y);
+            tabs.OnMouseDownOnElement(graphics.Api.Object, new MouseEvent(x, y, EnumMouseButton.Left, 0));
+            tabs.OnMouseUp(graphics.Api.Object, new MouseEvent(x, y, EnumMouseButton.Left, 0));
+        }
+
+        void Navigate(GlKeys key, int expected)
+        {
+            var args = new KeyEvent { KeyCode = (int)key };
+            tabs.OnKeyDown(graphics.Api.Object, args);
+            Assert.True(args.Handled);
+            Assert.Equal(expected, tabs.activeElement);
+            var selected = tabs.Composer!.GetToggleButton("tab-" + expected).Bounds;
+            var viewport = tabs.Viewport!;
+            Assert.True(selected.absX >= viewport.absX - .001);
+            Assert.True(selected.absX + selected.OuterWidth <= viewport.absX + viewport.InnerWidth + .001);
         }
     }
 
@@ -296,12 +462,13 @@ public sealed class GuiElementIconTabsTests
             call.Method.Name == nameof(IRenderAPI.Render2DTexturePremultipliedAlpha)
             && call.Arguments.Count == 7 && (float)call.Arguments[5] == 50).ToArray();
         Assert.Equal(count, backgrounds.Length);
+        var clip = NativeScissorRectangle(graphics);
         Assert.All(backgrounds, call =>
         {
             double x = (double)call.Arguments[1];
             double right = x + (double)call.Arguments[3];
-            Assert.True(x >= (int)tabs.Viewport!.renderX);
-            Assert.True(right <= (int)tabs.Viewport.renderX + tabs.Viewport.OuterWidthInt);
+            Assert.True(x >= clip.Left);
+            Assert.True(right <= clip.Right);
         });
         Assert.Throws<ArgumentOutOfRangeException>(() => GuiElementIconTabs.MeasureWidth(0));
     }
@@ -461,6 +628,19 @@ public sealed class GuiElementIconTabsTests
         Assert.Throws<ArgumentException>(() => new GuiElementIconTabs(graphics.Api.Object,
             [new GuiTab { Name = "One" }], [], tabs.Bounds, _ => { }));
         Assert.Equal(1, tabs.activeElement);
+    }
+
+    private static (int Left, int Top, int Right, int Bottom) NativeScissorRectangle(RecipeBookRenderFixture graphics)
+    {
+        var call = Assert.Single(graphics.Render.Invocations.Where(value =>
+            value.Method.Name == nameof(IRenderAPI.PushScissor)));
+        var bounds = Assert.IsAssignableFrom<ElementBounds>(call.Arguments[0]);
+        Assert.False((bool)call.Arguments[1]);
+        // Match the installed renderer's non-stacking OpenGL scissor conversion.
+        int left = (int)Math.Round(bounds.renderX);
+        int bottom = graphics.Render.Object.FrameHeight -
+            (int)Math.Round(graphics.Render.Object.FrameHeight - bounds.renderY - bounds.InnerHeight);
+        return (left, bottom - (int)bounds.InnerHeight, left + (int)bounds.InnerWidth, bottom);
     }
 
     private static void Setup(RecipeBookRenderFixture graphics)
