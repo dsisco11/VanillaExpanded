@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <InternalsVisibleTo Include="VanillaExpanded.IntegrationTests" />
   </ItemGroup>
 
   <ItemGroup>
