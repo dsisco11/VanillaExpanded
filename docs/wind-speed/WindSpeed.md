@@ -8,7 +8,24 @@ The wind indicator registers in the bottom-left `player-status` group at order 9
 
 Every 300 ms, the indicator reads the magnitude of native `GetWindSpeedAt(player.Pos.XYZ)`, including local modifiers. Valid samples from the most recent five seconds are averaged before percentage conversion and visibility classification. Startup uses only available samples, so there is no ramp from an invented zero. Samples expire by elapsed client time; repeated refreshes at the same timestamp replace that sample. Missing or nonfinite input clears the average immediately. Player replacement, disabling, death, world exit, and a backwards clock clear the history.
 
-The readout uses the windmill calculation `(int)(100 * speed)`: fractional percentages are truncated and values above 100% remain visible. These are native wind-strength percentages, not physical velocity units. It requires a living local player.
+The readout uses the windmill's whole-percentage convention: fractional percentages are truncated and values above 100% remain visible. These are native wind-strength percentages, not physical velocity units. It requires a living local player.
+
+```mermaid
+flowchart LR
+    Sample["Local wind sample every 300 ms"] --> Average["Rolling five-second mean"]
+    Average --> Percentage["Whole percentage"]
+    Average --> Bands["Visibility bands with hysteresis"]
+    Percentage --> Presentation["Prepared Icon or Text presentation"]
+    Bands --> Presentation
+    Presentation --> View["Native composition"]
+```
+
+For a valid averaged speed:
+
+```text
+percentage = truncate(100 * averaged speed), capped at the integer display limit
+band = classify averaged speed using entry or exit boundaries from the previous band
+```
 
 The bands control calm-wind visibility and transition history; they do not select the displayed percentage. Percentage changes refresh the reading even within the same band.
 
@@ -24,4 +41,4 @@ Values must exceed a boundary to activate or retain that band. Calm, missing, an
 
 Icon mode uses the shared compact icon size and normal HUD text. The reading keeps its prepared font size as GUI scale changes; wider readings expand the footprint. The icon uses `assets/vanillaexpanded/textures/hud/wind-speed/icon.svg`, double-hook line art, below a localized whole-percentage reading such as `65%`. Text mode uses the short name `WIND` above the same reading and loads no icon. Wind strength does not alter the icon's shape.
 
-The controller prepares localized strings and native font measurements. Composer-owned texture and text GuiElements own the rasterized SVG and lettering; text mode registers a name and reading through the shared native text composition. Native bounds position the rows, and fitting and clipping are cached before rendering. Live and source-trace compositions have independent elements and owned textures. Resources are reused across unchanged refreshes and released on style changes, API changes, completed exits, or world exit.
+The controller prepares localized strings and native font measurements. Composer-owned texture and text elements own the rasterized SVG and lettering; text mode registers a name and reading through the shared native text composition. Native bounds position the rows, and fitting and clipping are cached before rendering. The icon follows the shared [native-pixel SVG contract](../hud-overlays/HudOverlays.md#native-pixel-svg-artwork); indicator-size or GUI-scale changes replace it only when its required pixel dimensions change. Live and source-trace compositions have independent elements and owned textures. Resources are reused across unchanged refreshes and released on style changes, API changes, completed exits, or world exit.

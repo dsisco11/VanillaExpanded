@@ -37,6 +37,8 @@ internal sealed class SimpleIndicatorsFixture : IDisposable
     public int Measurements { get; private set; }
     /// <summary>Gets asset keys requested by native texture elements.</summary>
     public List<string> Paths { get; } = new();
+    /// <summary>Gets each load's required SVG canvas; PNG requests carry an empty size.</summary>
+    public List<(string Path, Size SvgSize)> LoadRequests { get; } = new();
     /// <summary>Creates isolated localization and native GUI scale state.</summary>
     public SimpleIndicatorsFixture(float scale = 1)
     {
@@ -115,15 +117,25 @@ internal sealed class SimpleIndicatorsFixture : IDisposable
         Owned.Add(texture); return texture;
     }
     /// <summary>Models owned SVG rasterization and engine-cached borrowed PNG resources.</summary>
-    public TextureBinding Load(HudOverlayPreparationContext context, string path)
+    public TextureBinding Load(HudOverlayPreparationContext context, string path, Size svgSize)
     {
         Paths.Add(path);
-        bool owned = path.EndsWith(".svg");
-        if (!owned && borrowed.TryGetValue(path, out var cached)) return new(cached, false);
-        var texture = new LoadedTexture(context.Api, nextId++, 43, 47) { IgnoreUndisposed = !owned };
+        LoadRequests.Add((path, svgSize));
+        bool owned = path.EndsWith(".svg", StringComparison.Ordinal);
+        if (owned)
+        {
+            Assert.True(svgSize.Width > 0 && svgSize.Height > 0);
+            // Keep the headless texture unbound until a draw test assigns a synthetic identity.
+            var generated = new LoadedTexture(context.Api, 0, svgSize.Width, svgSize.Height);
+            Artwork.Add(generated);
+            return new(generated, true);
+        }
+        Assert.Equal(Size.Empty, svgSize);
+        if (borrowed.TryGetValue(path, out var cached)) return new(cached, false);
+        var texture = new LoadedTexture(context.Api, nextId++, 43, 47) { IgnoreUndisposed = true };
         Artwork.Add(texture);
-        if (!owned) borrowed[path] = texture;
-        return new(texture, owned);
+        borrowed[path] = texture;
+        return new(texture, false);
     }
     /// <summary>Restores borrowed global localization and scale state.</summary>
     public void Dispose()

@@ -1,3 +1,4 @@
+using System.Drawing;
 using Moq;
 using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
@@ -202,27 +203,56 @@ public sealed class ShelterOverlayTests
     [Fact]
     public void IconViewOwnsAndReusesArtworkAcrossPreparation()
     {
+        // Arrange
         using var fixture = new HudNativeComponentFixture();
         var artwork = new List<LoadedTexture>();
-        using var presentation = new ShelterPresentation(load: (context, path) =>
+        var requests = new List<Size>();
+        using var presentation = new ShelterPresentation(load: (context, path, svgSize) =>
         {
             Assert.Equal("textures/hud/shelter.svg", path);
-            var texture = new LoadedTexture(context.Api, 100 + artwork.Count, 40, 40);
+            Assert.True(svgSize.Width > 0 && svgSize.Height > 0);
+            requests.Add(svgSize);
+            var texture = new LoadedTexture(context.Api, 100 + artwork.Count, svgSize.Width, svgSize.Height);
             artwork.Add(texture);
             return new(texture, true);
         }, loadBackdrop: _ => null);
         presentation.Prepare(fixture.Context);
         var first = presentation.CreateView(fixture.Api.Object);
-        using var second = presentation.CreateView(fixture.Api.Object);
+        var second = presentation.CreateView(fixture.Api.Object);
         first.Prepare(fixture.Context);
         first.Prepare(fixture.Context);
         second.Prepare(fixture.Context);
+
+        // Assert
+        Assert.Empty(artwork);
+
+        // Act
+        using var firstComposition = new IndicatorComposition(fixture.Api.Object, first, fixture.Context, presentation.Size);
+        using var secondComposition = new IndicatorComposition(fixture.Api.Object, second, fixture.Context, presentation.Size);
+
+        // Assert
         Assert.Equal(2, artwork.Count);
+        Assert.Equal(2, requests.Count);
+        Assert.Equal(requests, artwork.Select(texture => new Size(texture.Width, texture.Height)));
+        var firstIcon = Assert.IsType<TextureElement>(firstComposition.Composer.GetElement("test:icon"));
+        var secondIcon = Assert.IsType<TextureElement>(secondComposition.Composer.GetElement("test:icon"));
+        Assert.Equal(firstIcon.State.Target.Size, new SizeF(artwork[0].Width, artwork[0].Height));
+        Assert.Equal(secondIcon.State.Target.Size, new SizeF(artwork[1].Width, artwork[1].Height));
         Assert.NotSame(first, second);
-        first.Dispose();
+        Assert.NotSame(artwork[0], artwork[1]);
+
+        // Act
+        firstComposition.Dispose();
+
+        // Assert
         Assert.Equal(0, artwork[0].TextureId);
         Assert.NotEqual(0, artwork[1].TextureId);
-        second.Dispose();
+
+        // Act
+        secondComposition.Dispose();
+
+        // Assert
+        Assert.All(artwork, texture => Assert.True(texture.Disposed));
         Assert.Equal(0, artwork[1].TextureId);
     }
 

@@ -14,11 +14,11 @@ internal sealed class ShelterPresentation : IndicatorPresentation
     private IconReadingContent? content;
     private IHudOverlayIconBackdrop? backdrop;
     private readonly Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?> loadBackdrop;
-    private readonly Func<HudOverlayPreparationContext, string, TextureBinding>? load;
+    private readonly TextureLoader? load;
 
     public ShelterPresentation(Func<HudOverlayPreparationContext, string, SizeF>? measure = null,
         Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? createText = null,
-        Func<HudOverlayPreparationContext, string, TextureBinding>? load = null,
+        TextureLoader? load = null,
         Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null)
         : base(measure: measure, createText: createText)
     {

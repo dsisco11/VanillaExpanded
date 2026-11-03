@@ -96,7 +96,11 @@ public sealed class HudOverlayHostTests : IDisposable
         var weather = new Mock<IHudOverlay>(); var time = new Mock<IHudOverlay>();
         weather.Setup(value => value.CreateView(api.Object, It.IsAny<NativeViewRole>())).Returns(() => new CallbackView(api.Object));
         using var icon = new ApproximateTimePresentation(
-            load: (context, _) => new(new LoadedTexture(context.Api) { TextureId = 1, IgnoreUndisposed = true }, false),
+            load: (context, _, size) =>
+            {
+                Assert.Equal(Size.Empty, size);
+                return new(new LoadedTexture(context.Api) { TextureId = 1, IgnoreUndisposed = true }, false);
+            },
             createFace: (context, _) => new LoadedTexture(context.Api) { TextureId = 20 });
         time.As<INativePresentation>().Setup(value => value.CreateView(api.Object, It.IsAny<NativeViewRole>()))
             .Returns(() => icon.CreateView(api.Object));

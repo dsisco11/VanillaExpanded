@@ -26,7 +26,7 @@ internal sealed class CalendarDatePresentation : InstrumentPresentation
     /// <summary>Accepts CPU metrics and independent native resource factories.</summary>
     public CalendarDatePresentation(Func<HudOverlayPreparationContext, string, SizeF>? measure = null,
         Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? createText = null,
-        Func<HudOverlayPreparationContext, string, TextureBinding>? load = null) : base(measure, createText, load) { }
+        TextureLoader? load = null) : base(measure, createText, load) { }
     /// <summary>Stores the native date without querying the world during presentation.</summary>
     public void SetContent(CalendarDateReading value) => Date = value;
     /// <summary>Prepares localized strings and canvas dimensions before packing.</summary>

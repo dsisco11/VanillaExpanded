@@ -28,7 +28,7 @@ internal sealed class ThermometerView : NativeView
     /// <summary>Creates unique passive native components without sampling temperature or duplicating subscriptions.</summary>
     public ThermometerView(ICoreClientAPI api, BodyTemperatureThermometerPresentation content,
         Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? createText = null,
-        Func<HudOverlayPreparationContext, string, TextureBinding>? load = null) : base(api)
+        TextureLoader? load = null) : base(api)
     {
         this.content = content;
         reading = Own(new TextElement(api, ElementBounds.Fixed(0, 0, 0, 0)
@@ -36,12 +36,12 @@ internal sealed class ThermometerView : NativeView
         try
         {
             fill = Own(new TextureElement(api, ElementBounds.Fixed(0, 0, HudOverlaySizes.ThermometerWidth, HudOverlaySizes.Small)
-                .WithAlignment(EnumDialogArea.CenterMiddle), _ => { }, load, svgSize: new(56, 96)));
+                .WithAlignment(EnumDialogArea.CenterMiddle), _ => { }, load));
             outline = Own(new TextureElement(api, ElementBounds.Fixed(0, 0, HudOverlaySizes.ThermometerWidth, HudOverlaySizes.Small)
-                .WithAlignment(EnumDialogArea.CenterMiddle), _ => { }, load, svgSize: new(56, 96)));
+                .WithAlignment(EnumDialogArea.CenterMiddle), _ => { }, load));
             for (int index = 0; index < chevrons.Length; index++)
                 chevrons[index] = Own(new TextureElement(api, ElementBounds.Fixed(0, 0, 0, 0)
-                    .WithAlignment(EnumDialogArea.CenterTop), _ => { }, load, svgSize: new(32, 16)));
+                    .WithAlignment(EnumDialogArea.CenterTop), _ => { }, load));
         }
         catch { Dispose(); throw; }
     }

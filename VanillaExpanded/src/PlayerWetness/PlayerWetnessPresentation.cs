@@ -13,7 +13,7 @@ namespace VanillaExpanded.PlayerWetness;
 internal sealed class PlayerWetnessPresentation : IndicatorPresentation
 {
     private int percentage;
-    private readonly Func<HudOverlayPreparationContext, string, TextureBinding>? load;
+    private readonly TextureLoader? load;
     private readonly Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?> loadBackdrop;
 
     #region Public API
@@ -26,7 +26,7 @@ internal sealed class PlayerWetnessPresentation : IndicatorPresentation
     /// <summary>Accepts CPU measurements and per-element upload boundaries for headless verification.</summary>
     public PlayerWetnessPresentation(Func<HudOverlayPreparationContext, string, SizeF>? measure = null,
         Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? createText = null,
-        Func<HudOverlayPreparationContext, string, TextureBinding>? load = null,
+        TextureLoader? load = null,
         Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null) : base(measure: measure, createText: createText)
     {
         this.load = load; this.loadBackdrop = loadBackdrop ?? HudOverlayIconBackdrop.Load;

@@ -44,14 +44,14 @@ internal abstract class InstrumentPresentation : IDisposable
     /// <summary>Accepts CPU metrics and independent per-element resource factories.</summary>
     protected InstrumentPresentation(Func<HudOverlayPreparationContext, string, SizeF>? measure = null,
         Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? createText = null,
-        Func<HudOverlayPreparationContext, string, TextureBinding>? load = null)
+        TextureLoader? load = null)
     {
         this.measure = measure; CreateText = createText; Load = load;
     }
     /// <summary>Gets the optional native glyph factory.</summary>
     protected Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? CreateText { get; }
     /// <summary>Gets the optional artwork binding factory.</summary>
-    protected Func<HudOverlayPreparationContext, string, TextureBinding>? Load { get; }
+    protected TextureLoader? Load { get; }
     /// <summary>Gets the prepared compact arrangement.</summary>
     protected IconReadingContent? Compact { get; private set; }
     /// <summary>Prepares the shared text or compact style without allocating GUI resources.</summary>

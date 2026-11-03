@@ -25,7 +25,7 @@ internal sealed class EnvironmentalTemperaturePresentation : InstrumentPresentat
     /// <summary>Accepts per-element glyph, borrowed artwork, liquid and generated-scale factories.</summary>
     public EnvironmentalTemperaturePresentation(Func<HudOverlayPreparationContext, string, SizeF>? measure = null,
         Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? createText = null,
-        Func<HudOverlayPreparationContext, string, TextureBinding>? load = null,
+        TextureLoader? load = null,
         Func<HudOverlayPreparationContext, LoadedTexture>? createTicks = null,
         Func<EnvironmentalTemperatureLiquidMask>? createLiquid = null) : base(measure, createText, load)
     {

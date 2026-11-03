@@ -20,7 +20,7 @@ internal sealed class WeatherView : NativeView
     #region Composition and preparation
     /// <summary>Creates distinct native layer components without loading textures or sampling weather.</summary>
     public WeatherView(ICoreClientAPI api, WeatherConditionsPresentation content,
-        Func<HudOverlayPreparationContext, string, TextureBinding>? load = null) : base(api)
+        TextureLoader? load = null) : base(api)
     {
         this.content = content;
         try

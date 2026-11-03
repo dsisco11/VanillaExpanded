@@ -5,7 +5,9 @@ using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
 using VanillaExpanded.HudOverlays.Rendering.Native;
 using VanillaExpanded.RiftActivity;
+using VanillaExpanded.Shelter;
 using VanillaExpanded.TemporalStorm;
+using VanillaExpanded.WindSpeed;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
@@ -235,18 +237,10 @@ public sealed class SimpleIndicatorsTests
     {
         // Arrange
         using var fixture = new SimpleIndicatorsFixture();
-        var requests = new List<string>();
-        var svgTextures = new List<LoadedTexture>();
-        fixture.Native.Gui
-            .Setup(gui => gui.LoadSvg(It.IsAny<AssetLocation>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int?>()))
-            .Callback<AssetLocation, int, int, int, int, int?>((location, width, height, textureWidth, textureHeight, _) =>
-                requests.Add(location.Path))
-            .Returns(() =>
-            {
-                var texture = new LoadedTexture(fixture.Native.Api.Object) { TextureId = 0 };
-                svgTextures.Add(texture);
-                return texture;
-            });
+        var loader = new SvgRasterizationRecorder();
+        loader.Setup(fixture.Native.Gui, fixture.Native.Api.Object);
+        var requests = loader.Requests;
+        var svgTextures = loader.Textures;
         using var presentation = new RiftActivityPresentation(
             fixture.Measure, fixture.CreateText, loadBackdrop: _ => fixture.Backdrop.Object);
         presentation.SetContent(RiftActivityLevel.Low);
@@ -265,8 +259,10 @@ public sealed class SimpleIndicatorsTests
             // Assert
             Assert.Equal(
                 ["textures/hud/rift-activity/low.svg", "textures/hud/rift-activity/low.svg"],
-                requests);
+                requests.Select(request => request.Path));
             Assert.Equal(2, svgTextures.Count);
+            Assert.Equal(requests.Select(request => (request.Width, request.Height)),
+                svgTextures.Select(texture => (texture.Width, texture.Height)));
             var liveLow = svgTextures[0];
             var sourceLow = svgTextures[1];
             Assert.NotSame(liveLow, sourceLow);
@@ -295,8 +291,10 @@ public sealed class SimpleIndicatorsTests
                 "textures/hud/rift-activity/low.svg",
                 "textures/hud/rift-activity/medium.svg",
                 "textures/hud/rift-activity/medium.svg"
-            ], requests);
+            ], requests.Select(request => request.Path));
             Assert.Equal(4, svgTextures.Count);
+            Assert.Equal(requests.Select(request => (request.Width, request.Height)),
+                svgTextures.Select(texture => (texture.Width, texture.Height)));
             var liveMedium = svgTextures[2];
             var sourceMedium = svgTextures[3];
             Assert.NotSame(liveMedium, sourceMedium);
@@ -325,6 +323,8 @@ public sealed class SimpleIndicatorsTests
             var draw = Assert.Single(fixture.Native.Render.Invocations
                 .Where(call => call.Method.Name == nameof(IRenderAPI.RenderTexture)));
             Assert.Equal(sourceMedium.TextureId, (int)draw.Arguments[0]);
+            Assert.Equal(sourceMedium.Width, Convert.ToDouble(draw.Arguments[3]));
+            Assert.Equal(sourceMedium.Height, Convert.ToDouble(draw.Arguments[4]));
             Assert.Empty(fixture.Native.Failures);
 
             // Act
@@ -411,24 +411,79 @@ public sealed class SimpleIndicatorsTests
             Assert.Empty(fixture.Native.Failures);
         }
     }
+
+    /// <summary>Wind and shelter compact artwork use the production SVG loader at their resolved physical size.</summary>
+    [Theory]
+    [InlineData("wind", "textures/hud/wind-speed/icon.svg")]
+    [InlineData("shelter", "textures/hud/shelter.svg")]
+    public void SimpleIndicatorSvgsUseDefaultNativePixelRasterization(string kind, string expectedPath)
+    {
+        // Arrange
+        using var fixture = new SimpleIndicatorsFixture(1.375f);
+        var loader = new SvgRasterizationRecorder();
+        loader.Setup(fixture.Native.Gui, fixture.Native.Api.Object);
+        IDisposable presentation;
+        INativeView view;
+        SizeF size;
+        switch (kind)
+        {
+            case "wind":
+                var wind = new WindSpeedPresentation(fixture.Measure, fixture.CreateText);
+                wind.SetContent(125);
+                wind.SetStyle(HudIndicatorStyle.Icon);
+                wind.Prepare(fixture.Native.Context);
+                presentation = wind; view = wind.CreateView(fixture.Native.Api.Object); size = wind.Size;
+                break;
+            case "shelter":
+                var shelter = new ShelterPresentation(fixture.Measure, fixture.CreateText, loadBackdrop: _ => null);
+                shelter.SetStyle(HudIndicatorStyle.Icon);
+                shelter.Prepare(fixture.Native.Context);
+                presentation = shelter; view = shelter.CreateView(fixture.Native.Api.Object); size = shelter.Size;
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(kind));
+        }
+
+        // Act
+        using (presentation)
+        using (var composition = new IndicatorComposition(fixture.Native.Api.Object, view, fixture.Native.Context, size))
+        {
+            // Assert
+            var icon = Assert.IsType<TextureElement>(composition.Composer.GetElement("test:icon"));
+            var request = Assert.Single(loader.Requests);
+            var texture = Assert.Single(loader.Textures);
+            Assert.Equal(expectedPath, request.Path);
+            Assert.Equal(request.Width, request.TextureWidth);
+            Assert.Equal(request.Height, request.TextureHeight);
+            Assert.Equal(request.Width, texture.Width);
+            Assert.Equal(request.Height, texture.Height);
+            Assert.Equal(request.Width, icon.State.Target.Width);
+            Assert.Equal(request.Height, icon.State.Target.Height);
+
+            // Act
+            texture.TextureId = 8200;
+            fixture.Native.Render.Invocations.Clear();
+            composition.Composer.Render(0);
+
+            // Assert
+            var draw = Assert.Single(fixture.Native.Render.Invocations.Where(call =>
+                call.Method.Name == nameof(IRenderAPI.RenderTexture) && (int)call.Arguments[0] == texture.TextureId));
+            Assert.Equal(request.Width, Convert.ToDouble(draw.Arguments[3]));
+            Assert.Equal(request.Height, Convert.ToDouble(draw.Arguments[4]));
+            Assert.Empty(fixture.Native.Failures);
+        }
+    }
+
     /// <summary>The default storm SVG route maps all stages, reuses unchanged artwork, and retires each composer's textures independently.</summary>
     [Fact]
     public void StormDefaultSvgLoaderCachesReplacesAndDisposesPerComposer()
     {
         // Arrange
         using var fixture = new SimpleIndicatorsFixture();
-        var requests = new List<string>();
-        var svgTextures = new List<LoadedTexture>();
-        fixture.Native.Gui
-            .Setup(gui => gui.LoadSvg(It.IsAny<AssetLocation>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int?>()))
-            .Callback<AssetLocation, int, int, int, int, int?>((location, width, height, textureWidth, textureHeight, _) =>
-                requests.Add(location.Path))
-            .Returns(() =>
-            {
-                var texture = new LoadedTexture(fixture.Native.Api.Object) { TextureId = 0 };
-                svgTextures.Add(texture);
-                return texture;
-            });
+        var loader = new SvgRasterizationRecorder();
+        loader.Setup(fixture.Native.Gui, fixture.Native.Api.Object);
+        var requests = loader.Requests;
+        var svgTextures = loader.Textures;
         using var presentation = new TemporalStormPresentation(
             fixture.Measure, fixture.CreateText, loadBackdrop: _ => fixture.Backdrop.Object);
         presentation.SetContent(TemporalStormStage.Approaching, .4);
@@ -447,8 +502,10 @@ public sealed class SimpleIndicatorsTests
             // Assert
             Assert.Equal(
                 ["textures/hud/temporal-storm/approaching.svg", "textures/hud/temporal-storm/approaching.svg"],
-                requests);
+                requests.Select(request => request.Path));
             Assert.Equal(2, svgTextures.Count);
+            Assert.Equal(requests.Select(request => (request.Width, request.Height)),
+                svgTextures.Select(texture => (texture.Width, texture.Height)));
             var liveApproaching = svgTextures[0];
             var sourceApproaching = svgTextures[1];
             Assert.NotSame(liveApproaching, sourceApproaching);
@@ -477,8 +534,10 @@ public sealed class SimpleIndicatorsTests
                 "textures/hud/temporal-storm/approaching.svg",
                 "textures/hud/temporal-storm/imminent.svg",
                 "textures/hud/temporal-storm/imminent.svg"
-            ], requests);
+            ], requests.Select(request => request.Path));
             Assert.Equal(4, svgTextures.Count);
+            Assert.Equal(requests.Select(request => (request.Width, request.Height)),
+                svgTextures.Select(texture => (texture.Width, texture.Height)));
             Assert.True(liveApproaching.Disposed);
             Assert.True(sourceApproaching.Disposed);
             var liveImminent = svgTextures[2];
@@ -501,8 +560,10 @@ public sealed class SimpleIndicatorsTests
                 "textures/hud/temporal-storm/imminent.svg",
                 "textures/hud/temporal-storm/active.svg",
                 "textures/hud/temporal-storm/active.svg"
-            ], requests);
+            ], requests.Select(request => request.Path));
             Assert.Equal(6, svgTextures.Count);
+            Assert.Equal(requests.Select(request => (request.Width, request.Height)),
+                svgTextures.Select(texture => (texture.Width, texture.Height)));
             Assert.True(liveImminent.Disposed);
             Assert.True(sourceImminent.Disposed);
             var liveActive = svgTextures[4];

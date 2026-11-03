@@ -12,7 +12,7 @@ namespace VanillaExpanded.BodyTemperature;
 /// <summary>Prepares body-temperature data and native metrics while element resources belong to composers.</summary>
 internal sealed class BodyTemperatureThermometerPresentation : IndicatorPresentation
 {
-    private readonly Func<HudOverlayPreparationContext, string, TextureBinding>? load;
+    private readonly TextureLoader? load;
     private readonly Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?> loadBackdrop;
 
     #region Public API
@@ -31,7 +31,7 @@ internal sealed class BodyTemperatureThermometerPresentation : IndicatorPresenta
     /// <summary>Accepts CPU metrics and per-element resource factories without taking GUI ownership.</summary>
     public BodyTemperatureThermometerPresentation(Func<HudOverlayPreparationContext, string, SizeF>? measure = null,
         Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? createText = null,
-        Func<HudOverlayPreparationContext, string, TextureBinding>? load = null,
+        TextureLoader? load = null,
         Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null) : base(measure: measure, createText: createText)
     {
         this.load = load; this.loadBackdrop = loadBackdrop ?? HudOverlayIconBackdrop.Load;

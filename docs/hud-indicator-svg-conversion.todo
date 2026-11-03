@@ -66,16 +66,16 @@ All in-game verification is deferred until the end of Phase 7, after all impleme
     Prerequisite: Complete phases 1-6.
     Include converted icons and existing calendar-date, environmental-temperature, wind-speed, shelter, and weather composite SVG icons.
     Native pixel size means the dimensions of the rasterized SVG texture, not the SVG's authored canvas dimensions.
-    [ ] Derive each icon instance's final on-screen width and height in physical pixels from resolved layout, indicator size settings, GUI scale, and any additional applicable display scaling.
-    [ ] Define consistent pixel rounding and placement so raster dimensions and destination dimensions agree exactly, including fractional GUI scales.
-    [ ] Rasterize each SVG directly at those final pixel dimensions, preserving its aspect ratio and transparent canvas; remove fixed-size rasterization followed by texture enlargement or reduction.
-    [ ] Draw every rasterized icon at exactly its texture's native pixel width and height (1:1 texel-to-screen-pixel mapping); never rescale the rasterized icon during drawing.
-    [ ] Recompute required raster dimensions after layout, size-setting, GUI-scale, or display-scale changes and replace the texture before drawing at the new size; never stretch an old texture while waiting.
-    [ ] Make texture reuse size-aware so differently sized instances cannot reuse an incorrectly sized raster; avoid rasterizing again when asset identity and required dimensions are unchanged.
-    [ ] Apply the same sizing contract to layered masks, outlines, chevrons, both wetness drops, and full-size or split weather layers; clipping must reveal artwork without rescaling its full raster.
-    [ ] Preserve visibility transitions, tinting, pulse effects, clipping, and alignment without scaling rasterized icons; keep rasterization and resource replacement outside per-frame drawing.
-    [ ] Preserve generated-texture ownership and dispose replaced or retired textures without disrupting other live compositions.
-    [ ] Add focused regression tests verifying requested SVG raster dimensions equal final draw dimensions, size changes trigger correctly sized replacements, unchanged sizes reuse textures, and replacement/teardown release owned resources.
-    [ ] Update affected rendering documentation to describe final-size rasterization and native-pixel drawing.
-    [ ] As the final verification step after all implementation and automated checks, verify all affected indicators in-game at supported indicator sizes and GUI scales, including fractional scales, live size changes, layered icons, split weather fallback layouts, and relevant state/style transitions.
+    [x] Derive each icon instance's final on-screen width and height in physical pixels from resolved layout, indicator size settings, GUI scale, and any additional applicable display scaling.
+    [x] Define consistent pixel rounding and placement so raster dimensions and destination dimensions agree exactly, including fractional GUI scales.
+    [x] Rasterize each SVG directly at those final pixel dimensions, preserving its aspect ratio and transparent canvas; remove fixed-size rasterization followed by texture enlargement or reduction.
+    [x] Draw every rasterized icon at exactly its texture's native pixel width and height (1:1 texel-to-screen-pixel mapping); never rescale the rasterized icon during drawing.
+    [x] Recompute required raster dimensions after layout, size-setting, GUI-scale, or display-scale changes and replace the texture before drawing at the new size; never stretch an old texture while waiting.
+    [x] Make texture reuse size-aware so differently sized instances cannot reuse an incorrectly sized raster; avoid rasterizing again when asset identity and required dimensions are unchanged.
+    [x] Apply the same sizing contract to layered masks, outlines, chevrons, both wetness drops, and full-size or split weather layers; clipping must reveal artwork without rescaling its full raster.
+    [x] Preserve visibility transitions, tinting, pulse effects, clipping, and alignment without scaling rasterized icons; keep rasterization and resource replacement outside per-frame drawing.
+    [x] Preserve generated-texture ownership and dispose replaced or retired textures without disrupting other live compositions.
+    [x] Add focused regression tests verifying requested SVG raster dimensions equal final draw dimensions, size changes trigger correctly sized replacements, unchanged sizes reuse textures, and replacement/teardown release owned resources.
+    [x] Update affected rendering documentation to describe final-size rasterization and native-pixel drawing.
+    [x] As the final verification step after all implementation and automated checks, verify all affected indicators in-game at supported indicator sizes and GUI scales, including fractional scales, live size changes, layered icons, split weather fallback layouts, and relevant state/style transitions.
     Completion: Every non-immersive SVG icon is rasterized for its actual destination size and drawn 1:1, with no upscaling or downscaling of the resulting texture.

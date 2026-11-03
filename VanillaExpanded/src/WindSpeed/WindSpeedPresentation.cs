@@ -14,13 +14,13 @@ internal sealed class WindSpeedPresentation : IndicatorPresentation
 {
     private int percentage;
     private IconReadingContent? content;
-    private readonly Func<HudOverlayPreparationContext, string, TextureBinding>? load;
+    private readonly TextureLoader? load;
 
     #region Public API
     /// <summary>Accepts CPU measurement and element resource factories without retaining their resources.</summary>
     public WindSpeedPresentation(Func<HudOverlayPreparationContext, string, SizeF>? measure = null,
         Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? createText = null,
-        Func<HudOverlayPreparationContext, string, TextureBinding>? load = null) : base(measure: measure, createText: createText)
+        TextureLoader? load = null) : base(measure: measure, createText: createText)
     {
         this.load = load;
     }

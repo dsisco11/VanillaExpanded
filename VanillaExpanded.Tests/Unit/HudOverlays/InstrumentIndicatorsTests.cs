@@ -1,6 +1,7 @@
 using System.Drawing;
 using Moq;
 using VanillaExpanded.ApproximateTime;
+using VanillaExpanded.CalendarDate;
 using VanillaExpanded.EnvironmentalTemperature;
 using VanillaExpanded.HudOverlays.Configuration;
 using VanillaExpanded.HudOverlays.Registration;
@@ -417,6 +418,78 @@ public sealed class InstrumentIndicatorsTests
         Assert.True(Contains(new((float)text.Bounds.renderX, (float)text.Bounds.renderY, (float)text.Bounds.OuterWidth,
             (float)text.Bounds.OuterHeight), text.State.Target));
     }
+
+    /// <summary>Compact instrument SVGs request and draw the resolved physical pixel size through the default loader.</summary>
+    [Theory]
+    [InlineData("time", "textures/hud/approximate-time/afternoon.svg")]
+    [InlineData("temperature", "textures/hud/environmental-temperature/icon.svg")]
+    [InlineData("date", "textures/hud/calendar-date/icon.svg")]
+    public void CompactInstrumentSvgsUseDefaultNativePixelRasterization(string kind, string expectedPath)
+    {
+        // Arrange
+        using var fixture = new InstrumentIndicatorsFixture(1.375f);
+        var loader = new SvgRasterizationRecorder();
+        loader.Setup(fixture.Resources.Native.Gui, fixture.Context.Api);
+        IDisposable presentation;
+        INativeView view;
+        SizeF size;
+        switch (kind)
+        {
+            case "time":
+                var time = new ApproximateTimePresentation(fixture.Resources.Measure, fixture.Resources.CreateText);
+                time.SetContent(ApproximateTimePeriod.Afternoon, .5, actualHour: 16.5);
+                time.SetStyle(EnvironmentalGaugeStyle.Icon);
+                time.Prepare(fixture.Context);
+                presentation = time; view = time.CreateView(fixture.Context.Api); size = time.Size;
+                break;
+            case "temperature":
+                var temperature = new EnvironmentalTemperaturePresentation(fixture.Resources.Measure, fixture.Resources.CreateText);
+                temperature.SetContent(12.4f);
+                temperature.SetStyle(EnvironmentalGaugeStyle.Icon);
+                temperature.Prepare(fixture.Context);
+                presentation = temperature; view = temperature.CreateView(fixture.Context.Api); size = temperature.Size;
+                break;
+            case "date":
+                var date = new CalendarDatePresentation(fixture.Resources.Measure, fixture.Resources.CreateText);
+                date.SetContent(new(14, EnumMonth.October));
+                date.SetStyle(EnvironmentalGaugeStyle.Icon);
+                date.Prepare(fixture.Context);
+                presentation = date; view = date.CreateView(fixture.Context.Api); size = date.Size;
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(kind));
+        }
+
+        // Act
+        using (presentation)
+        using (var composition = new IndicatorComposition(fixture.Context.Api, view, fixture.Context, size))
+        {
+            // Assert
+            var icon = Assert.IsType<TextureElement>(composition.Composer.GetElement("test:icon"));
+            var request = Assert.Single(loader.Requests);
+            var texture = Assert.Single(loader.Textures);
+            Assert.Equal(expectedPath, request.Path);
+            Assert.Equal(request.Width, request.TextureWidth);
+            Assert.Equal(request.Height, request.TextureHeight);
+            Assert.Equal(request.Width, texture.Width);
+            Assert.Equal(request.Height, texture.Height);
+            Assert.Equal(request.Width, icon.State.Target.Width);
+            Assert.Equal(request.Height, icon.State.Target.Height);
+
+            // Act
+            texture.TextureId = 8100;
+            fixture.Resources.Native.Render.Invocations.Clear();
+            composition.Composer.Render(0);
+
+            // Assert
+            var draw = Assert.Single(fixture.Resources.Native.Render.Invocations.Where(call =>
+                call.Method.Name == nameof(IRenderAPI.RenderTexture) && (int)call.Arguments[0] == texture.TextureId));
+            Assert.Equal(request.Width, Convert.ToDouble(draw.Arguments[3]));
+            Assert.Equal(request.Height, Convert.ToDouble(draw.Arguments[4]));
+            Assert.Empty(fixture.Resources.Native.Failures);
+        }
+    }
+
     /// <summary>All custom instrument components forward supplied host clips through native intersecting scissors.</summary>
     [Theory]
     [InlineData("time")] [InlineData("temperature")] [InlineData("date")]

@@ -26,7 +26,7 @@ internal sealed class ApproximateTimePresentation : InstrumentPresentation
     /// <summary>Accepts independent native resource factories for each composition.</summary>
     public ApproximateTimePresentation(Func<HudOverlayPreparationContext, string, SizeF>? measure = null,
         Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? createText = null,
-        Func<HudOverlayPreparationContext, string, TextureBinding>? load = null,
+        TextureLoader? load = null,
         Func<HudOverlayPreparationContext, ApproximateTimeDayPhases, LoadedTexture>? createFace = null) : base(measure, createText, load)
     {
         this.createFace = createFace;

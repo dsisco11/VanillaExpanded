@@ -18,7 +18,7 @@ internal sealed class CalendarView : NativeView
     #region Preparation
     /// <summary>Creates passive components using the complete authored canvas and its registered windows.</summary>
     public CalendarView(ICoreClientAPI api, CalendarDatePresentation content,
-        Func<HudOverlayPreparationContext, string, TextureBinding>? load,
+        TextureLoader? load,
         Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? createText) : base(api)
     {
         this.content = content;

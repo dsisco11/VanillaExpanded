@@ -16,7 +16,7 @@ internal sealed class TemporalStormPresentation : IndicatorPresentation
     private IconReadingContent? content;
     private IHudOverlayIconBackdrop? backdrop;
     private readonly Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?> loadBackdrop;
-    private readonly Func<HudOverlayPreparationContext, string, TextureBinding>? load;
+    private readonly TextureLoader? load;
     private readonly TemporalStormPulse pulse = new();
     private bool pulsing;
     private float alpha = 1;
@@ -26,7 +26,7 @@ internal sealed class TemporalStormPresentation : IndicatorPresentation
     /// <summary>Accepts headless measurement/resource factories while retaining controller data only.</summary>
     public TemporalStormPresentation(Func<HudOverlayPreparationContext, string, SizeF>? measure = null,
         Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? createText = null,
-        Func<HudOverlayPreparationContext, string, TextureBinding>? load = null,
+        TextureLoader? load = null,
         Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null)
         : base(flash: true, measure: measure, createText: createText)
     {

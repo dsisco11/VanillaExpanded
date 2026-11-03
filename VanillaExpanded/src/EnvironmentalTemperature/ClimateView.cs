@@ -21,7 +21,7 @@ internal sealed class ClimateView : NativeView
     #region Preparation
     /// <summary>Creates independent generated ticks, liquid and glyphs while borrowing the authored PNG layers.</summary>
     public ClimateView(ICoreClientAPI api, EnvironmentalTemperaturePresentation content,
-        Func<HudOverlayPreparationContext, string, TextureBinding>? load,
+        TextureLoader? load,
         Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? createText,
         Func<HudOverlayPreparationContext, LoadedTexture>? createTicks,
         Func<EnvironmentalTemperatureLiquidMask>? createLiquid) : base(api)
@@ -38,7 +38,7 @@ internal sealed class ClimateView : NativeView
             empty = Own(new TextureElement(api, ElementBounds.Fill, _ => { }, load, depth: 50.5f));
             liquid = Own(new LiquidElement(api, ElementBounds.Fill, createLiquid));
             ticks = Own(new TextureElement(api, ElementBounds.Fill, _ => { },
-                (context, _) => new((createTicks ?? EnvironmentalTemperatureScaleArtwork.Create)(context), true), depth: 52, premultiplied: true));
+                (context, _, _) => new((createTicks ?? EnvironmentalTemperatureScaleArtwork.Create)(context), true), depth: 52, premultiplied: true));
             for (int index = 0; index < labels.Length; index++)
             {
                 float degree = index == 0 ? -40 : index == 1 ? 0 : 60;

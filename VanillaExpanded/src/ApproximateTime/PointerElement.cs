@@ -11,7 +11,7 @@ namespace VanillaExpanded.ApproximateTime;
 /// <summary>Rotates the clock hand and its shadow around a prepared spindle without arranging components.</summary>
 internal sealed class PointerElement : GuiElement
 {
-    private readonly Func<HudOverlayPreparationContext, string, TextureBinding> load;
+    private readonly TextureLoader load;
     private readonly Action draw;
     private readonly Vec4f tint = new(1, 1, 1, 1), shadow = new(0, 0, 0, 1);
     private TextureBinding? binding;
@@ -25,9 +25,9 @@ internal sealed class PointerElement : GuiElement
     #region Preparation
     /// <summary>Creates a passive pointer with borrowed artwork and independent visual state.</summary>
     public PointerElement(ICoreClientAPI api, ElementBounds bounds,
-        Func<HudOverlayPreparationContext, string, TextureBinding>? load) : base(api, bounds)
+        TextureLoader? load) : base(api, bounds)
     {
-        this.load = load ?? ((context, _) => new(WorkshopGaugeArtwork.Load(context, "clock/layer-1")[0], false));
+        this.load = load ?? ((context, _, _) => new(WorkshopGaugeArtwork.Load(context, "clock/layer-1")[0], false));
         draw = DrawPointer;
     }
     /// <summary>Loads artwork once and updates only the estimated rotation for new readings.</summary>
@@ -36,7 +36,7 @@ internal sealed class PointerElement : GuiElement
         ObjectDisposedException.ThrowIf(disposed, this);
         ArgumentNullException.ThrowIfNull(context);
         if (!ReferenceEquals(api, context.Api)) throw new ArgumentException("A native element cannot change API ownership.", nameof(context));
-        binding ??= load(context, "textures/hud/workshop-gauges/clock/layer-1.png");
+        binding ??= load(context, "textures/hud/workshop-gauges/clock/layer-1.png", Size.Empty);
         degrees = rotation * 180 / MathF.PI;
     }
     /// <summary>Caches full-canvas bounds, spindle and fixed lighting offset after native layout.</summary>

@@ -10,18 +10,23 @@ using Vintagestory.GameContent;
 
 namespace VanillaExpanded.Tests.Unit.HudOverlays;
 
-/// <summary>Provides layered native consumers with deterministic text metrics and tracked borrowed texture bindings.</summary>
+/// <summary>Provides layered native consumers with deterministic metrics and tracked owned SVG rasters.</summary>
 internal sealed class LayeredIndicatorsFixture : IDisposable
 {
     private int nextId = 1000;
+    private readonly Dictionary<string, LoadedTexture> borrowed = new();
 
     #region Public API
     /// <summary>Gets native composition services and localized headless resources.</summary>
     public SimpleIndicatorsFixture Resources { get; }
     /// <summary>Gets the active native preparation context.</summary>
     public HudOverlayPreparationContext Context => Resources.Native.Context;
-    /// <summary>Gets borrowed asset identities selected by the element loaders.</summary>
+    /// <summary>Gets asset identities selected by the element loaders.</summary>
     public Dictionary<string, LoadedTexture> Bindings { get; } = new();
+    /// <summary>Gets every required SVG canvas and its independently owned raster.</summary>
+    public List<(string Path, Size SvgSize, LoadedTexture Texture)> SvgTextures { get; } = new();
+    /// <summary>Gets every texture-loader request, including repeats at new required dimensions.</summary>
+    public List<(string Path, Size SvgSize)> LoadRequests { get; } = new();
     /// <summary>Gets owned glyph resources allocated per native element.</summary>
     public List<LoadedTexture> Glyphs { get; } = new();
     /// <summary>Gets the actual localized glyph values prepared by elements.</summary>
@@ -82,14 +87,24 @@ internal sealed class LayeredIndicatorsFixture : IDisposable
             Math.Max(1, (int)(size.Height * context.GuiScale * fit)));
         Glyphs.Add(texture); return texture;
     }
-    /// <summary>Borrows engine-like cached PNGs and records the selected asset paths.</summary>
-    public TextureBinding Load(HudOverlayPreparationContext context, string path)
+    /// <summary>Creates owned SVG rasters at their requested dimensions and borrows cached PNGs.</summary>
+    public TextureBinding Load(HudOverlayPreparationContext context, string path, Size svgSize)
     {
-        if (!Bindings.TryGetValue(path, out var texture))
+        LoadRequests.Add((path, svgSize));
+        if (path.EndsWith(".svg", StringComparison.Ordinal))
         {
-            texture = new LoadedTexture(context.Api, nextId++, 97, 103) { IgnoreUndisposed = true };
-            Bindings.Add(path, texture);
+            Assert.True(svgSize.Width > 0 && svgSize.Height > 0);
+            // Keep the headless texture unbound until a draw test assigns a synthetic identity.
+            var raster = new LoadedTexture(context.Api, 0, svgSize.Width, svgSize.Height);
+            Bindings[path] = raster;
+            SvgTextures.Add((path, svgSize, raster));
+            return new(raster, true);
         }
+        Assert.Equal(Size.Empty, svgSize);
+        if (borrowed.TryGetValue(path, out var cached)) return new(cached, false);
+        var texture = new LoadedTexture(context.Api, nextId++, 97, 103) { IgnoreUndisposed = true };
+        borrowed.Add(path, texture);
+        Bindings[path] = texture;
         return new(texture, false);
     }
     /// <summary>Records asset-pack detection independently of texture loading.</summary>

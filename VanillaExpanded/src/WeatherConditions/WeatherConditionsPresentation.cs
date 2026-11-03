@@ -17,7 +17,7 @@ internal sealed class WeatherConditionsPresentation : IndicatorPresentation
     private ICoreClientAPI? packApi;
     private bool? complete;
     private readonly Func<HudOverlayPreparationContext, bool> hasCompletePack;
-    private readonly Func<HudOverlayPreparationContext, string, TextureBinding>? load;
+    private readonly TextureLoader? load;
     private readonly Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?> loadBackdrop;
 
     #region Public API
@@ -28,7 +28,7 @@ internal sealed class WeatherConditionsPresentation : IndicatorPresentation
     /// <summary>Accepts CPU measurements, pack availability and per-element resource boundaries.</summary>
     public WeatherConditionsPresentation(Func<HudOverlayPreparationContext, string, SizeF>? measure = null,
         Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? createText = null,
-        Func<HudOverlayPreparationContext, string, TextureBinding>? load = null,
+        TextureLoader? load = null,
         Func<HudOverlayPreparationContext, IHudOverlayIconBackdrop?>? loadBackdrop = null,
         Func<HudOverlayPreparationContext, bool>? hasCompletePack = null) : base(measure: measure, createText: createText)
     {

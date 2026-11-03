@@ -24,7 +24,7 @@ internal sealed class WetnessView : NativeView
     /// <summary>Creates independently owned passive components without sampling or binding feature events.</summary>
     public WetnessView(ICoreClientAPI api, PlayerWetnessPresentation content,
         Func<HudOverlayPreparationContext, string, CairoFont, LoadedTexture>? createText = null,
-        Func<HudOverlayPreparationContext, string, TextureBinding>? load = null) : base(api)
+        TextureLoader? load = null) : base(api)
     {
         this.content = content;
         reading = Own(new TextElement(api, ElementBounds.Fixed(0, 0, 0, HudOverlaySizes.WetnessReadingHeight)

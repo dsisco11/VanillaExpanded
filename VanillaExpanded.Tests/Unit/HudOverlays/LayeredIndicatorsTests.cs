@@ -72,7 +72,7 @@ public sealed class LayeredIndicatorsTests
         {
             var element = Components(composition, kind, style)[0];
             var state = State(element); var target = state.Target;
-            int measurements = fixture.Measurements, glyphs = fixture.Glyphs.Count, textures = fixture.Bindings.Count, checks = fixture.PackChecks;
+            int measurements = fixture.Measurements, glyphs = fixture.Glyphs.Count, textures = fixture.LoadRequests.Count, checks = fixture.PackChecks;
             element.Bounds.fixedWidth += 77; element.Bounds.MarkDirtyRecursive();
             for (int frame = 0; frame < 4; frame++)
             {
@@ -81,47 +81,66 @@ public sealed class LayeredIndicatorsTests
             }
             Assert.Equal(target, state.Target); Assert.False(element.Bounds.Initialized);
             Assert.Equal(measurements, fixture.Measurements); Assert.Equal(glyphs, fixture.Glyphs.Count);
-            Assert.Equal(textures, fixture.Bindings.Count); Assert.Equal(checks, fixture.PackChecks);
+            Assert.Equal(textures, fixture.LoadRequests.Count); Assert.Equal(checks, fixture.PackChecks);
         }
     }
-    /// <summary>Content and style updates preserve controller state and release only the retired composer's owned resources.</summary>
+    /// <summary>Separate compositions own separate SVG rasters and release their resources when retired.</summary>
     [Theory]
     [InlineData("wetness", HudIndicatorStyle.Icon)] [InlineData("wetness", HudIndicatorStyle.Text)]
     [InlineData("body", HudIndicatorStyle.Icon)] [InlineData("body", HudIndicatorStyle.Text)]
     [InlineData("weather", HudIndicatorStyle.Icon)] [InlineData("weather", HudIndicatorStyle.Text)]
-    public void IndependentViewsOwnGlyphsAndBorrowArtworkAcrossUpdatesAndStyles(string kind, HudIndicatorStyle style)
+    public void IndependentViewsOwnGlyphsAndSvgRastersAcrossUpdatesAndStyles(string kind, HudIndicatorStyle style)
     {
+        // Arrange
         using var fixture = new LayeredIndicatorsFixture();
         var (overlay, presentation, prepare, change) = fixture.Create(kind, style);
         using (overlay)
         {
+            // Act
             using var live = Mount(fixture, overlay, presentation);
             int liveCount = fixture.Glyphs.Count;
+            var liveRasters = fixture.SvgTextures.Select(entry => entry.Texture).ToArray();
             using var source = Mount(fixture, overlay, presentation, NativeViewRole.SourceTrace);
             var sourceGlyphs = fixture.Glyphs.Skip(liveCount).ToArray();
+            var sourceRasters = fixture.SvgTextures.Skip(liveRasters.Length).Select(entry => entry.Texture).ToArray();
+
+            // Assert
             Assert.NotSame(Components(live, kind, style)[0], Components(source, kind, style)[0]);
+            Assert.All(liveRasters, texture => Assert.DoesNotContain(texture, sourceRasters));
+
+            // Act
             change(); prepare(); live.Update(fixture.Context);
             int beforeSource = fixture.Glyphs.Count; source.Update(fixture.Context);
             var survivingGlyphs = sourceGlyphs.Concat(fixture.Glyphs.Skip(beforeSource)).Where(glyph => !glyph.Disposed).ToArray();
             live.Dispose();
             source.View.SetOpacity(.5f); source.Composer.Render(0);
+
+            // Assert
             if (kind != "weather" || style == HudIndicatorStyle.Text) Assert.NotEmpty(survivingGlyphs);
             Assert.All(survivingGlyphs, glyph => Assert.False(glyph.Disposed));
+
+            // Act
             var alternate = style == HudIndicatorStyle.Icon ? HudIndicatorStyle.Text : HudIndicatorStyle.Icon;
             presentation.SetStyle(alternate); prepare();
             using var replacement = Mount(fixture, overlay, presentation);
             source.Dispose(); replacement.Composer.Render(0);
             replacement.Dispose();
+
+            // Assert
             Assert.All(fixture.Glyphs, glyph => Assert.True(glyph.Disposed));
-            Assert.All(fixture.Bindings.Values, texture => Assert.False(texture.Disposed));
+            Assert.All(fixture.SvgTextures, raster => Assert.Equal(
+                new Size(raster.SvgSize.Width, raster.SvgSize.Height),
+                new Size(raster.Texture.Width, raster.Texture.Height)));
+            Assert.All(fixture.SvgTextures, raster => Assert.True(raster.Texture.Disposed));
             Assert.Empty(fixture.Resources.Native.Failures);
         }
     }
-    /// <summary>Movement reuses assets and glyphs; scale/context changes replace only glyph resources and native geometry.</summary>
+    /// <summary>Movement reuses rasters, while GUI-scale changes replace SVGs at their new native dimensions.</summary>
     [Theory]
     [InlineData("wetness")] [InlineData("body")] [InlineData("weather")]
     public void MovementAndScaleInvalidateOnlyRequiredWork(string kind)
     {
+        // Arrange
         using var fixture = new LayeredIndicatorsFixture();
         var (overlay, presentation, prepare, _) = fixture.Create(kind, HudIndicatorStyle.Icon);
         using (overlay)
@@ -129,20 +148,37 @@ public sealed class LayeredIndicatorsTests
         {
             var element = Components(composition, kind, HudIndicatorStyle.Icon)[0];
             var initial = State(element).Target;
-            int textures = fixture.Bindings.Count, glyphs = fixture.Glyphs.Count;
+            int textures = fixture.LoadRequests.Count, glyphs = fixture.Glyphs.Count;
+
+            // Act
             composition.Composer.Bounds.fixedX += 17; composition.Composer.Bounds.fixedY += 23;
             composition.Composer.Bounds.MarkDirtyRecursive(); composition.Composer.Bounds.CalcWorldBounds();
             composition.View.LayoutCompleted(new(0, 0, 1800, 1800));
+
+            // Assert
             Assert.Equal(initial.X + 17, State(element).Target.X, 4); Assert.Equal(initial.Y + 23, State(element).Target.Y, 4);
-            Assert.Equal(glyphs, fixture.Glyphs.Count); Assert.Equal(textures, fixture.Bindings.Count);
+            Assert.Equal(glyphs, fixture.Glyphs.Count); Assert.Equal(textures, fixture.LoadRequests.Count);
+
+            // Act
             var beforeScale = State(element).Target;
             Vintagestory.API.Config.RuntimeEnv.GUIScale = 2; prepare(); composition.Update(fixture.Context);
+
+            // Assert
             Assert.Equal(beforeScale.Width * 2, State(element).Target.Width, 3);
-            Assert.Equal(textures, fixture.Bindings.Count);
+            Assert.True(fixture.LoadRequests.Count > textures);
+            Assert.All(fixture.SvgTextures, raster => Assert.Equal(
+                new Size(raster.SvgSize.Width, raster.SvgSize.Height),
+                new Size(raster.Texture.Width, raster.Texture.Height)));
+            int afterScale = fixture.LoadRequests.Count;
             if (glyphs > 0) Assert.All(fixture.Glyphs.Take(glyphs), glyph => Assert.True(glyph.Disposed));
+
+            // Act
             int beforeContext = fixture.Glyphs.Count;
             composition.Update(new(fixture.Context.Api, 2, "fr", 1));
+
+            // Assert
             if (glyphs > 0) Assert.True(fixture.Glyphs.Count > beforeContext);
+            Assert.Equal(afterScale, fixture.LoadRequests.Count);
         }
     }
     /// <summary>Weather fallback SVGs use the default generated-texture loader with per-composition reuse and ownership.</summary>
@@ -151,18 +187,10 @@ public sealed class LayeredIndicatorsTests
     {
         // Arrange
         using var fixture = new LayeredIndicatorsFixture();
-        var requests = new List<string>();
-        var svgTextures = new List<LoadedTexture>();
-        fixture.Resources.Native.Gui
-            .Setup(gui => gui.LoadSvg(It.IsAny<AssetLocation>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int?>()))
-            .Callback<AssetLocation, int, int, int, int, int?>((location, _, _, _, _, _) => requests.Add(location.Path))
-            .Returns(() =>
-            {
-                // A zero texture ID keeps filtering independent of a headless GL context.
-                var texture = new LoadedTexture(fixture.Context.Api);
-                svgTextures.Add(texture);
-                return texture;
-            });
+        var loader = new SvgRasterizationRecorder();
+        loader.Setup(fixture.Resources.Native.Gui, fixture.Context.Api);
+        var requests = loader.Requests;
+        var svgTextures = loader.Textures;
         using var presentation = new WeatherConditionsPresentation(loadBackdrop: _ => null, hasCompletePack: _ => false);
         presentation.SetContent(new(EnumPrecipitationType.Rain, true));
         presentation.Prepare(fixture.Context);
@@ -181,9 +209,19 @@ public sealed class LayeredIndicatorsTests
             "textures/hud/weather/rain.svg", "textures/hud/weather/fog.svg",
             "textures/hud/weather/rain.svg", "textures/hud/weather/fog.svg"
         ];
-        Assert.Equal(initialPaths, requests);
+        Assert.Equal(initialPaths, requests.Select(request => request.Path));
         Assert.Equal(4, svgTextures.Count);
         Assert.Equal(4, svgTextures.Distinct().Count());
+        Assert.All(requests, request =>
+        {
+            Assert.True(request.Width > 0);
+            Assert.True(request.Height > 0);
+            Assert.Equal(request.Width, request.TextureWidth);
+            Assert.Equal(request.Height, request.TextureHeight);
+        });
+        Assert.Equal(requests.Select(request => (request.Width, request.Height)),
+            svgTextures.Select(texture => (texture.Width, texture.Height)));
+        Assert.Single(requests.Select(request => (request.Width, request.Height)).Distinct());
         var firstRain = svgTextures[0];
         var firstFog = svgTextures[1];
         var secondRain = svgTextures[2];
@@ -194,18 +232,20 @@ public sealed class LayeredIndicatorsTests
         secondView.Prepare(fixture.Context);
 
         // Assert
-        Assert.Equal(initialPaths, requests);
+        Assert.Equal(initialPaths, requests.Select(request => request.Path));
         Assert.All(svgTextures, texture => Assert.False(texture.Disposed));
 
         // Assign synthetic IDs after filtering so draw routing can be observed without graphics initialization.
         for (int index = 0; index < svgTextures.Count; index++) svgTextures[index].TextureId = 700 + index;
         fixture.Resources.Native.Render.Invocations.Clear();
         first.Composer.Render(0);
-        Assert.Equal(
-            new[] { firstRain.TextureId, firstFog.TextureId },
-            fixture.Resources.Native.Render.Invocations
-                .Where(call => call.Method.Name == "RenderTexture")
-                .Select(call => (int)call.Arguments[0]));
+        var initialDraws = fixture.Resources.Native.Render.Invocations
+            .Where(call => call.Method.Name == nameof(IRenderAPI.RenderTexture)).ToArray();
+        Assert.Equal(new[] { firstRain.TextureId, firstFog.TextureId }, initialDraws.Select(call => (int)call.Arguments[0]));
+        Assert.Equal(new[] { (double)firstRain.Width, firstFog.Width },
+            initialDraws.Select(call => Convert.ToDouble(call.Arguments[3])));
+        Assert.Equal(new[] { (double)firstRain.Height, firstFog.Height },
+            initialDraws.Select(call => Convert.ToDouble(call.Arguments[4])));
         Assert.Empty(fixture.Resources.Native.Failures);
 
         // Act
@@ -218,7 +258,7 @@ public sealed class LayeredIndicatorsTests
         Assert.False(firstFog.Disposed);
         Assert.False(secondRain.Disposed);
         Assert.False(secondFog.Disposed);
-        Assert.Equal("textures/hud/weather/snow.svg", requests[^1]);
+        Assert.Equal("textures/hud/weather/snow.svg", requests[^1].Path);
         var firstSnow = Assert.IsType<LoadedTexture>(svgTextures[^1]);
         Assert.False(firstSnow.Disposed);
 
@@ -228,7 +268,7 @@ public sealed class LayeredIndicatorsTests
         // Assert
         Assert.True(secondRain.Disposed);
         Assert.False(secondFog.Disposed);
-        Assert.Equal("textures/hud/weather/snow.svg", requests[^1]);
+        Assert.Equal("textures/hud/weather/snow.svg", requests[^1].Path);
         var secondSnow = Assert.IsType<LoadedTexture>(svgTextures[^1]);
         Assert.NotSame(firstSnow, secondSnow);
 
@@ -309,12 +349,19 @@ public sealed class LayeredIndicatorsTests
 
         // Assert
         Assert.Equal(targets, drops.Select(drop => drop.State.Target));
-        fixture.Resources.Native.Render.Invocations.Clear(); composition.Composer.Render(0);
+        var artwork = fixture.SvgTextures.Select(raster => raster.Texture).ToArray();
+        Assert.Equal(4, artwork.Length);
+        for (int index = 0; index < artwork.Length; index++) artwork[index].TextureId = 2000 + index;
+        fixture.Resources.Native.Render.Invocations.Clear();
+        composition.Composer.Render(0);
         var draws = fixture.Resources.Native.Render.Invocations.Where(call => call.Method.Name == "Render2DTexture").ToArray();
         Assert.Equal(4, draws.Length);
-        int fillTexture = fixture.Bindings[expectedAssets[0]].TextureId;
-        int outlineTexture = fixture.Bindings[expectedAssets[1]].TextureId;
-        Assert.Equal(new[] { fillTexture, outlineTexture, fillTexture, outlineTexture }, draws.Select(draw => (int)draw.Arguments[0]));
+        Assert.Equal(artwork.Select(texture => texture.TextureId), draws.Select(draw => (int)draw.Arguments[0]));
+        Assert.Equal(artwork.Select(texture => (double)texture.Width), draws.Select(draw => Convert.ToDouble(draw.Arguments[3])));
+        Assert.Equal(artwork.Select(texture => (double)texture.Height), draws.Select(draw => Convert.ToDouble(draw.Arguments[4])));
+        Assert.Equal((artwork[0].Width, artwork[0].Height), (artwork[1].Width, artwork[1].Height));
+        Assert.Equal((artwork[2].Width, artwork[2].Height), (artwork[3].Width, artwork[3].Height));
+        Assert.True(artwork[0].Width > artwork[2].Width);
         Assert.NotNull(draws[0].Arguments[6]);
         Assert.Null(draws[1].Arguments[6]);
         Assert.NotNull(draws[2].Arguments[6]);
@@ -327,18 +374,10 @@ public sealed class LayeredIndicatorsTests
     {
         // Arrange
         using var fixture = new LayeredIndicatorsFixture();
-        var requests = new List<(string Path, int Width, int Height, int TextureWidth, int TextureHeight)>();
-        var svgTextures = new List<LoadedTexture>();
-        fixture.Resources.Native.Gui
-            .Setup(gui => gui.LoadSvg(It.IsAny<AssetLocation>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int?>()))
-            .Callback<AssetLocation, int, int, int, int, int?>((location, width, height, textureWidth, textureHeight, _) =>
-                requests.Add((location.Path, width, height, textureWidth, textureHeight)))
-            .Returns(() =>
-            {
-                var texture = new LoadedTexture(fixture.Context.Api);
-                svgTextures.Add(texture);
-                return texture;
-            });
+        var loader = new SvgRasterizationRecorder();
+        loader.Setup(fixture.Resources.Native.Gui, fixture.Context.Api);
+        var requests = loader.Requests;
+        var svgTextures = loader.Textures;
         using var content = new PlayerWetnessPresentation(fixture.Measure, fixture.CreateText, loadBackdrop: _ => null);
         content.SetContent(.5f);
         content.Prepare(fixture.Context);
@@ -365,6 +404,8 @@ public sealed class LayeredIndicatorsTests
             Assert.Equal(request.Width, request.TextureWidth);
             Assert.Equal(request.Height, request.TextureHeight);
         });
+        Assert.Equal(requests.Select(request => (request.Width, request.Height)),
+            svgTextures.Select(texture => (texture.Width, texture.Height)));
         fixture.Resources.Native.Render.Verify(
             renderer => renderer.GetOrLoadTexture(It.IsAny<AssetLocation>(), ref It.Ref<LoadedTexture>.IsAny),
             Times.Never);
@@ -419,6 +460,10 @@ public sealed class LayeredIndicatorsTests
         Assert.All(secondTextureIds, textureId => Assert.True(textureId > 0));
         Assert.Equal(secondTextureIds.Length, secondTextureIds.Distinct().Count());
         Assert.Equal(secondTextureIds, draws.Select(draw => (int)draw.Arguments[0]));
+        Assert.Equal(secondTextures.Select(texture => (double)texture.Width),
+            draws.Select(draw => Convert.ToDouble(draw.Arguments[3])));
+        Assert.Equal(secondTextures.Select(texture => (double)texture.Height),
+            draws.Select(draw => Convert.ToDouble(draw.Arguments[4])));
         Assert.Empty(fixture.Resources.Native.Failures);
 
         // Act
@@ -497,18 +542,10 @@ public sealed class LayeredIndicatorsTests
     {
         // Arrange
         using var fixture = new LayeredIndicatorsFixture();
-        var requests = new List<(string Path, int Width, int Height, int TextureWidth, int TextureHeight)>();
-        var svgTextures = new List<LoadedTexture>();
-        fixture.Resources.Native.Gui
-            .Setup(gui => gui.LoadSvg(It.IsAny<AssetLocation>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int?>()))
-            .Callback<AssetLocation, int, int, int, int, int?>((location, width, height, textureWidth, textureHeight, _) =>
-                requests.Add((location.Path, width, height, textureWidth, textureHeight)))
-            .Returns(() =>
-            {
-                var texture = new LoadedTexture(fixture.Context.Api);
-                svgTextures.Add(texture);
-                return texture;
-            });
+        var loader = new SvgRasterizationRecorder();
+        loader.Setup(fixture.Resources.Native.Gui, fixture.Context.Api);
+        var requests = loader.Requests;
+        var svgTextures = loader.Textures;
         using var content = new BodyTemperatureThermometerPresentation(
             measure: fixture.Measure, createText: fixture.CreateText, loadBackdrop: _ => null);
         content.SetContent(new(34, 37, BodyTemperatureRisk.Cold, .25f, direction), true);
@@ -555,20 +592,113 @@ public sealed class LayeredIndicatorsTests
             Assert.Equal(request.Width, request.TextureWidth);
             Assert.Equal(request.Height, request.TextureHeight);
         });
+        Assert.Equal(requests.Select(request => (request.Width, request.Height)),
+            svgTextures.Select(texture => (texture.Width, texture.Height)));
         Assert.All(svgTextures, texture => Assert.False(texture.Disposed));
+        for (int index = 0; index < svgTextures.Count; index++)
+            svgTextures[index].TextureId = 4000 + index;
+        fixture.Resources.Native.Render.Invocations.Clear();
+        composition.Composer.Render(0);
+        var draws = fixture.Resources.Native.Render.Invocations
+            .Where(call => call.Method.Name == nameof(IRenderAPI.RenderTexture)).ToArray();
+        Assert.Equal(svgTextures.Count, draws.Length);
+        foreach (var draw in draws)
+        {
+            var texture = Assert.Single(svgTextures.Where(value => value.TextureId == (int)draw.Arguments[0]));
+            Assert.Equal(texture.Width, Convert.ToDouble(draw.Arguments[3]));
+            Assert.Equal(texture.Height, Convert.ToDouble(draw.Arguments[4]));
+        }
         composition.Dispose();
         Assert.All(svgTextures, texture => Assert.True(texture.Disposed));
+        Assert.Empty(fixture.Resources.Native.Failures);
     }
+
+    /// <summary>Live indicator and GUI scale changes replace the host's default-loaded SVGs at independently resolved native pixels.</summary>
+    [Fact]
+    public void ThermometerHostRerasterizesExactNativePixelsAfterLiveScaleChanges()
+    {
+        // Arrange
+        using var fixture = new LayeredIndicatorsFixture();
+        int configuredSize = 24;
+        var sizeSetting = new HudOverlaySizeSetting(24, () => configuredSize, value => configuredSize = value, () => { });
+        using var host = new HudNativeHostFixture(new HudOverlayMenuSettings(Size: sizeSetting));
+        var loader = new SvgRasterizationRecorder();
+        loader.Setup(host.Components.Gui, host.Components.Api.Object);
+        using var content = new BodyTemperatureThermometerPresentation(
+            measure: fixture.Measure, createText: fixture.CreateText, loadBackdrop: _ => null);
+        content.SetContent(new(34, 37, BodyTemperatureRisk.Cold, .25f), true);
+        content.Prepare(new(host.Components.Api.Object, Vintagestory.API.Config.RuntimeEnv.GUIScale, "en"));
+        host.Native.Setup(native => native.CreateView(host.Components.Api.Object, It.IsAny<NativeViewRole>()))
+            .Returns((ICoreClientAPI api, NativeViewRole _) => content.CreateView(api));
+        host.Size = sizeSetting.Apply(content.Size);
+
+        // Act
+        host.Synchronize();
+
+        // Assert
+        var initial = AssertHostThermometerRasters(host, loader, 8100);
+        Assert.Equal(2, loader.Requests.Count);
+        var initialTextures = initial.Select(item => item.Texture).ToArray();
+
+        // Act
+        sizeSetting.Set(36);
+        content.Prepare(new(host.Components.Api.Object, Vintagestory.API.Config.RuntimeEnv.GUIScale, "en"));
+        host.Size = sizeSetting.Apply(content.Size);
+        host.Synchronize();
+
+        // Assert
+        Assert.All(initialTextures, texture => Assert.True(texture.Disposed));
+        Assert.Equal(4, loader.Requests.Count);
+        var resized = AssertHostThermometerRasters(host, loader, 8200);
+        Assert.All(initial.Zip(resized), pair =>
+        {
+            Assert.Equal(pair.First.Path, pair.Second.Path);
+            Assert.DoesNotContain(pair.Second.Texture, initialTextures);
+            Assert.NotEqual(new Size(pair.First.Texture.Width, pair.First.Texture.Height),
+                new Size(pair.Second.Texture.Width, pair.Second.Texture.Height));
+        });
+        var resizedTextures = resized.Select(item => item.Texture).ToArray();
+
+        // Act
+        Vintagestory.API.Config.RuntimeEnv.GUIScale = 1.25f;
+        content.Prepare(new(host.Components.Api.Object, Vintagestory.API.Config.RuntimeEnv.GUIScale, "en"));
+        host.Size = sizeSetting.Apply(content.Size);
+        host.Synchronize();
+
+        // Assert
+        Assert.All(resizedTextures, texture => Assert.True(texture.Disposed));
+        Assert.Equal(6, loader.Requests.Count);
+        var fractionalScale = AssertHostThermometerRasters(host, loader, 8300);
+        Assert.All(resized.Zip(fractionalScale), pair =>
+        {
+            Assert.Equal(pair.First.Path, pair.Second.Path);
+            Assert.NotEqual(new Size(pair.First.Texture.Width, pair.First.Texture.Height),
+                new Size(pair.Second.Texture.Width, pair.Second.Texture.Height));
+        });
+        var fractionalTextures = fractionalScale.Select(item => item.Texture).ToArray();
+
+        // Act
+        host.Synchronize();
+
+        // Assert
+        Assert.Equal(6, loader.Requests.Count);
+        var unchanged = AssertHostThermometerRasters(host, loader, 8400);
+        Assert.Equal(fractionalTextures, unchanged.Select(item => item.Texture));
+        Assert.All(fractionalTextures, texture => Assert.False(texture.Disposed));
+        Assert.Empty(host.Failures);
+    }
+
     /// <summary>Fill-only updates refresh the prepared reveal without dirtying native bounds or regenerating resources.</summary>
     [Fact]
     public void ThermometerFillChangesClipWithoutLayoutOrGlyphChanges()
     {
+        // Arrange
         using var fixture = new LayeredIndicatorsFixture();
         using var content = new BodyTemperatureThermometerPresentation(fixture.Measure, fixture.CreateText, fixture.Load, _ => null);
         content.SetContent(new(34, 37, BodyTemperatureRisk.Cold, .25f), true); content.Prepare(fixture.Context);
         using var composition = new IndicatorComposition(fixture.Context.Api, content.CreateView(fixture.Context.Api), fixture.Context, content.Size);
         var fill = Assert.IsType<TextureElement>(composition.Composer.GetElement("test:fill"));
-        var target = fill.State.Target; int glyphs = fixture.Glyphs.Count, textures = fixture.Bindings.Count;
+        var target = fill.State.Target; int glyphs = fixture.Glyphs.Count, textures = fixture.LoadRequests.Count;
         var clips = new List<RectangleF>();
         var colors = new List<(float Red, float Green, float Blue, float Alpha)>();
         fixture.Resources.Native.Render.Setup(renderer => renderer.PushScissor(It.IsAny<ElementBounds>(), true))
@@ -576,19 +706,22 @@ public sealed class LayeredIndicatorsTests
         fixture.Resources.Native.Render.Setup(renderer => renderer.RenderTexture(It.IsAny<int>(), It.IsAny<double>(), It.IsAny<double>(),
             It.IsAny<double>(), It.IsAny<double>(), It.IsAny<float>(), It.IsAny<Vec4f>()))
             .Callback<int, double, double, double, double, float, Vec4f>((_, _, _, _, _, _, tint) => colors.Add((tint.X, tint.Y, tint.Z, tint.W)));
+        // Act
         fill.RenderInteractiveElements(0);
         content.SetContent(new(34.01f, 37, BodyTemperatureRisk.Freezing, .75f), true); content.Prepare(fixture.Context);
         composition.View.Prepare(fixture.Context);
         Assert.True(fill.Bounds.Initialized); Assert.True(fill.Bounds.ParentBounds.Initialized);
         composition.View.LayoutCompleted(new(0, 0, 1800, 1800)); fill.RenderInteractiveElements(0);
-        Assert.Equal(target, fill.State.Target); Assert.Equal(glyphs, fixture.Glyphs.Count); Assert.Equal(textures, fixture.Bindings.Count);
+        // Assert
+        Assert.Equal(target, fill.State.Target); Assert.Equal(glyphs, fixture.Glyphs.Count); Assert.Equal(textures, fixture.LoadRequests.Count);
         Assert.True(clips[1].Top < clips[0].Top); Assert.Equal(clips[0].Bottom, clips[1].Bottom, 4);
         Assert.NotEqual(colors[0], colors[1]); Assert.Equal(colors[0].Alpha, colors[1].Alpha);
     }
-    /// <summary>Optional reading and marker strength changes reuse component identities and preserve the stable trend column.</summary>
+    /// <summary>Newly visible marker rows rasterize their required size while unchanged rows reuse the same resources.</summary>
     [Fact]
-    public void BodyOptionalRowsUpdateWithoutReplacingComponentsOrArtwork()
+    public void BodyOptionalRowsUpdateWithoutReplacingComponentsAndRasterizeNewMarkerSizes()
     {
+        // Arrange
         using var fixture = new LayeredIndicatorsFixture();
         using var content = new BodyTemperatureThermometerPresentation(fixture.Measure, fixture.CreateText, fixture.Load, _ => null);
         content.SetContent(new(34, 37, BodyTemperatureRisk.Cold, .25f, 1), true); content.Prepare(fixture.Context);
@@ -596,15 +729,26 @@ public sealed class LayeredIndicatorsTests
         var reading = Assert.IsType<TextElement>(composition.Composer.GetElement("test:reading"));
         var outline = Assert.IsType<TextureElement>(composition.Composer.GetElement("test:outline"));
         var firstSize = content.Size; var firstTarget = outline.State.Target;
-        int assets = fixture.Bindings.Count;
+        int assets = fixture.LoadRequests.Count;
+        // Act
         content.SetContent(new(34, 37, BodyTemperatureRisk.Cold, .25f, 2), true); content.Prepare(fixture.Context); composition.Update(fixture.Context);
+
+        // Assert
         Assert.Equal(firstSize, content.Size); Assert.Equal(firstTarget, outline.State.Target);
-        Assert.Same(reading, composition.Composer.GetElement("test:reading")); Assert.Equal(assets, fixture.Bindings.Count);
+        Assert.Same(reading, composition.Composer.GetElement("test:reading"));
+        Assert.True(fixture.LoadRequests.Count > assets);
+        int markerRasterCount = fixture.LoadRequests.Count;
+        // Act
         content.SetContent(new(34, 37, BodyTemperatureRisk.Cold, .25f, 2), false); content.Prepare(fixture.Context); composition.Update(fixture.Context);
+
+        // Assert
         Assert.Equal(0, reading.State.Target.Height); Assert.All(fixture.Glyphs, glyph => Assert.True(glyph.Disposed));
         Assert.Equal(firstSize.Height, content.Size.Height);
+        // Act
         content.SetContent(new(34, 37, BodyTemperatureRisk.Cold, .25f), false); content.Prepare(fixture.Context); composition.Update(fixture.Context);
-        Assert.True(content.Size.Height < firstSize.Height); Assert.Equal(assets, fixture.Bindings.Count);
+
+        // Assert
+        Assert.True(content.Size.Height < firstSize.Height); Assert.Equal(markerRasterCount, fixture.LoadRequests.Count);
     }
     /// <summary>First host composition and newly visible trend markers keep chevrons outside the temperature reading.</summary>
     [Theory]
@@ -683,6 +827,8 @@ public sealed class LayeredIndicatorsTests
         // Assert
         var layers = Enumerable.Range(0, 3).Select(index => Assert.IsType<TextureElement>(composition.Composer.GetElement("test:layer-" + index))).ToArray();
         Assert.All(layers, layer => Assert.Equal(layers[0].State.Target, layer.State.Target));
+        for (int index = 0; index < fixture.SvgTextures.Count; index++)
+            fixture.SvgTextures[index].Texture.TextureId = 6000 + index;
         composition.View.CollectBackdrops(fixture.Resources.Native.Render.Object); composition.Composer.Render(0);
         Assert.Single(fixture.Resources.Backdrop.Invocations);
         var expected = WeatherConditionsLayers.Select(sample).Select(index => fixture.Bindings["textures/hud/weather/composite/" + WeatherConditionsLayers.Names[index] + ".svg"].TextureId);
@@ -703,7 +849,9 @@ public sealed class LayeredIndicatorsTests
         // Arrange
         using var fixture = new LayeredIndicatorsFixture();
         fixture.CompletePack = complete;
-        using var content = new WeatherConditionsPresentation(load: fixture.Load, loadBackdrop: _ => null, hasCompletePack: fixture.CheckPack);
+        var loader = new SvgRasterizationRecorder();
+        loader.Setup(fixture.Resources.Native.Gui, fixture.Context.Api);
+        using var content = new WeatherConditionsPresentation(loadBackdrop: _ => null, hasCompletePack: fixture.CheckPack);
         content.SetContent(new(EnumPrecipitationType.Rain, true) { ThunderIntensity = 1 });
         // Act
         content.Prepare(fixture.Context);
@@ -713,10 +861,30 @@ public sealed class LayeredIndicatorsTests
         string[] expectedArtwork = complete
             ? ["textures/hud/weather/composite/rain-light.svg", "textures/hud/weather/composite/fog-light.svg", "textures/hud/weather/composite/thunder-light.svg"]
             : ["textures/hud/weather/rain.svg", "textures/hud/weather/fog.svg"];
-        Assert.Equal(expectedArtwork.OrderBy(path => path), fixture.Bindings.Keys.OrderBy(path => path));
+        Assert.Equal(expectedArtwork.OrderBy(path => path), loader.Requests.Select(request => request.Path).OrderBy(path => path));
+        Assert.Equal(loader.Requests.Select(request => (request.Width, request.Height)),
+            loader.Textures.Select(texture => (texture.Width, texture.Height)));
+        Assert.All(loader.Requests, request =>
+        {
+            Assert.Equal(request.Width, request.TextureWidth);
+            Assert.Equal(request.Height, request.TextureHeight);
+        });
+        Assert.Single(loader.Requests.Select(request => (request.Width, request.Height)).Distinct());
+        for (int index = 0; index < loader.Textures.Count; index++)
+            loader.Textures[index].TextureId = 5000 + index;
+        fixture.Resources.Native.Render.Invocations.Clear();
+        composition.Composer.Render(0);
+        var draws = fixture.Resources.Native.Render.Invocations
+            .Where(call => call.Method.Name == nameof(IRenderAPI.RenderTexture)).ToArray();
+        Assert.Equal(loader.Textures.Count, draws.Length);
+        Assert.Equal(loader.Textures.Select(texture => (double)texture.Width),
+            draws.Select(draw => Convert.ToDouble(draw.Arguments[3])));
+        Assert.Equal(loader.Textures.Select(texture => (double)texture.Height),
+            draws.Select(draw => Convert.ToDouble(draw.Arguments[4])));
+        Assert.Empty(fixture.Resources.Native.Failures);
         if (!complete)
         {
-            Assert.DoesNotContain(fixture.Bindings.Keys, path => path.Contains("/composite/"));
+            Assert.DoesNotContain(loader.Requests, request => request.Path.Contains("/composite/"));
             var rain = Assert.IsType<TextureElement>(composition.Composer.GetElement("test:layer-0"));
             var fog = Assert.IsType<TextureElement>(composition.Composer.GetElement("test:layer-1"));
             Assert.Equal(rain.State.Target.Size, fog.State.Target.Size);
@@ -724,9 +892,11 @@ public sealed class LayeredIndicatorsTests
             Assert.True(rain.State.Target.Height < rain.Bounds.ParentBounds.OuterHeight);
         }
         // Act
+        int rasterCount = loader.Requests.Count;
         content.Prepare(fixture.Context); composition.View.Prepare(fixture.Context);
         // Assert
         Assert.Equal(1, fixture.PackChecks);
+        Assert.Equal(rasterCount, loader.Requests.Count);
     }
     /// <summary>Thunder-only data needs a complete pack; inactive weather stays hidden in both styles.</summary>
     [Theory]
@@ -798,6 +968,57 @@ public sealed class LayeredIndicatorsTests
     private static ElementState State(GuiElement element) => element is TextureElement texture ? texture.State : ((TextElement)element).State;
     /// <summary>Captures framebuffer bounds at the moment of a mocked scissor submission.</summary>
     private static RectangleF Rect(ElementBounds bounds) => new((float)bounds.renderX, (float)bounds.renderY, (float)bounds.OuterWidth, (float)bounds.OuterHeight);
+    /// <summary>Checks host-created thermometer rasters against resolved bounds, loader identity and actual native draw calls.</summary>
+    private static (string Path, LoadedTexture Texture)[] AssertHostThermometerRasters(
+        HudNativeHostFixture host, SvgRasterizationRecorder loader, int firstTextureId)
+    {
+        string prefix = host.Registration.Id + ":";
+        string[] paths = ["textures/hud/body-temperature/fill-mask.svg", "textures/hud/body-temperature/outline.svg"];
+        var current = new List<(string Path, TextureElement Element, LoadedTexture Texture, RectangleF Target)>();
+        foreach (string path in paths)
+        {
+            string key = path.EndsWith("/fill-mask.svg", StringComparison.Ordinal) ? "fill" : "outline";
+            var element = Assert.IsType<TextureElement>(host.Host.Composers[host.Group.Id].GetElement(prefix + key));
+            RectangleF expected = ExpectedTruncatedPixelTarget(element.Bounds);
+            int requestIndex = loader.Requests.FindLastIndex(request => request.Path == path);
+            Assert.True(requestIndex >= 0);
+            var request = loader.Requests[requestIndex];
+            var texture = loader.Textures[requestIndex];
+            Assert.Equal(new Size((int)expected.Width, (int)expected.Height), new Size(request.Width, request.Height));
+            Assert.Equal(new Size(request.Width, request.Height), new Size(request.TextureWidth, request.TextureHeight));
+            Assert.Equal(new Size(request.Width, request.Height), new Size(texture.Width, texture.Height));
+            Assert.Equal(expected, element.State.Target);
+            Assert.False(texture.Disposed);
+            texture.TextureId = firstTextureId++;
+            current.Add((path, element, texture, expected));
+        }
+
+        host.Components.Render.Invocations.Clear();
+        host.Render();
+        var draws = host.Components.Render.Invocations
+            .Where(call => call.Method.Name == nameof(IRenderAPI.RenderTexture)).ToArray();
+        Assert.Equal(current.Count, draws.Length);
+        foreach (var item in current)
+        {
+            var draw = Assert.Single(draws.Where(call => (int)call.Arguments[0] == item.Texture.TextureId));
+            Assert.Equal(item.Texture.Width, Convert.ToDouble(draw.Arguments[3]));
+            Assert.Equal(item.Texture.Height, Convert.ToDouble(draw.Arguments[4]));
+            Assert.Equal(item.Target.Width, Convert.ToDouble(draw.Arguments[3]));
+            Assert.Equal(item.Target.Height, Convert.ToDouble(draw.Arguments[4]));
+        }
+        return current.Select(item => (item.Path, item.Texture)).ToArray();
+    }
+
+    /// <summary>Independently truncates native element rectangle edges toward zero.</summary>
+    private static RectangleF ExpectedTruncatedPixelTarget(ElementBounds bounds)
+    {
+        double left = Math.Truncate(bounds.renderX);
+        double top = Math.Truncate(bounds.renderY);
+        double right = Math.Truncate(bounds.renderX + bounds.OuterWidth);
+        double bottom = Math.Truncate(bounds.renderY + bounds.OuterHeight);
+        return new((float)left, (float)top, (float)(right - left), (float)(bottom - top));
+    }
+
     /// <summary>Matches the native ref-wrapper cache-loading boundary.</summary>
     private delegate void TextureLoad(AssetLocation location, ref LoadedTexture texture);
     #endregion

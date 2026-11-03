@@ -19,7 +19,7 @@ internal sealed class ClockView : NativeView
     #region Preparation
     /// <summary>Creates separate composer-owned resources over one controller's sampled solar data.</summary>
     public ClockView(ICoreClientAPI api, ApproximateTimePresentation content,
-        Func<HudOverlayPreparationContext, string, TextureBinding>? load,
+        TextureLoader? load,
         Func<HudOverlayPreparationContext, ApproximateTimeDayPhases, LoadedTexture>? createFace) : base(api)
     {
         this.content = content;

@@ -50,8 +50,9 @@ internal sealed class HudNativeComponentFixture : IDisposable
             Glyphs.Add(texture);
             return texture;
         },
-        (context, _) =>
+        (context, _, svgSize) =>
         {
+            Assert.Equal(Size.Empty, svgSize);
             IconLoads++;
             var texture = new LoadedTexture(context.Api, nextTexture++, 37, 43) { IgnoreUndisposed = !OwnArtwork };
             Artwork.Add(texture);
