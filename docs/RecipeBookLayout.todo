@@ -1,0 +1,168 @@
+# Recipe Book Layout Memoization
+
+Source proposal: the conversation proposal separating attachment validation, cached layout, and position-only Follow. This plan is planning-only; every execution and acceptance task remains unchecked.
+
+## Goal and scope
+
+Memoize the main Recipe Book dialog's measurements and placement so unchanged rendered frames do not search for docking space, recompose controls, or recursively invalidate their bounds. Follow must only apply the desired dialog position, returning immediately when it already matches.
+
+Preserve adaptive Fixed docking, native Movable dragging and position persistence, screen-space failure handling, and the existing recipe browsing and options behavior.
+
+Authoritative proposal requirements:
+
+- Validate attachment independently of movement and layout: a closed inventory, replaced parent composer, or missing crafting grid must retain existing handling.
+- Cache measurements by tile size, GUI scale, and language.
+- Cache placement by window geometry, movement mode, and relevant parent/grid/output geometry.
+- Recompose only when measured content or resulting dimensions change.
+- Use lightweight per-frame input comparison, not a completely event-driven redesign.
+- Movable dragging requires only position updates/clamping. Fixed parent movement can require a new docking side or size; a constant parent-relative offset is not sufficient.
+- Inventory contents and filtering update recipe content without invalidating the shell layout.
+- Verify unchanged frames, translation-only movement, cache invalidation, and native rendering/clipping/hit testing.
+
+Non-goals:
+
+- Optimizing independent tooltip rendering or changing the native controls' own rendering/dragging internals.
+- Changing recipe evaluation, allocation, filtering, sorting, placement authorization, or inventory-transfer behavior.
+- Changing tile-size limits, defaults, persistence, or invalid-input behavior.
+- Adding a global layout registry, persistent layout cache, engine patches, or new user settings.
+- Claiming the entire GUI render path is allocation-free or assigning an unsupported frame-time improvement target.
+- Requiring package/release generation for a code-only layout refactor.
+
+## Assumptions and decisions to verify
+
+- Keep caches owned by one GuiDialogRecipeBook instance; reopening into a new instance builds fresh caches. Do not persist layout snapshots as browsing state.
+- The proposed snapshot comparison may still read current settings and geometry each frame. Such reads are not layout recalculation.
+- Native child bounds derive positions from the root origin. Verify the appropriate native root-position update before removing recursive invalidation; do not assume every derived/custom bound follows this automatically.
+- Confirm the language identity available to the dialog and whether an additional existing notification is needed for translations refreshed without changing that identity. Record the supported invalidation contract rather than silently choosing an incomplete key.
+- Distinguish native control warm-up/dragging and independently updated recipe content from shell-layout work when collecting performance evidence.
+- No temporary intermediate implementation-support documents are known at plan creation.
+
+## Phase 1: Establish cache inputs and native translation safety
+
+Prerequisites: none.
+Outcome: implementation can proceed with a complete dependency contract and a verified root-position update.
+
+    ☐ Read the applicable contributor instructions and the current affected code before implementation.
+        ☐ Follow [.github/copilot-instructions.md](../.github/copilot-instructions.md), and check for more-specific instructions introduced since planning.
+        ☐ Inspect [GuiDialogRecipeBook](../VanillaExpanded/src/RecipeBook/GuiDialogRecipeBook.cs), [RecipeBookLayout](../VanillaExpanded/src/RecipeBook/RecipeBookLayout.cs), and the parent attachment/replacement lifecycle in [RecipeBookIntegration](../VanillaExpanded/src/RecipeBook/RecipeBookIntegration.cs).
+        ☐ Confirm the current tile-setting and options restoration behavior in [GuiElementRecipeBookOptions](../VanillaExpanded/src/RecipeBook/GuiElementRecipeBookOptions.cs).
+    ☐ Establish the input and invalidation contract without changing layout policy.
+        ☐ Enumerate the scalar values and object identities actually used by Fixed and Movable placement, including window size, parent/grid/output extents, scale, movement mode, and manual dialog dimensions.
+        ☐ Distinguish manual x/y movement from size-dependent layout inputs so dragging does not force a placement search or recomposition.
+        ☐ Include relevant object replacement and language changes; preserve attachment failure handling rather than treating a stale composer as a valid cache hit.
+        ☐ Preserve the existing docking search order, physical-pixel docking gap, minimum dimensions, preferred dimensions, clamping, and insufficient-space behavior.
+    ☐ Verify translation-only behavior against the read-only game API.
+        ☐ Inspect native ElementBounds position derivation and GuiElementDialogTitleBar dragging/movement-mode behavior.
+        ☐ Select a root-position update that keeps native coordinate invariants synchronized without recursively dirtying descendants.
+        ☐ Verify representative search, category, recipe tile, scrollbar, footer, titlebar, and options bounds inherit the new origin, including detached/shared bounds used for clipping or hit testing.
+    ☐ Establish proportionate verification support.
+        ☐ Load the test-workflow skill before creating, modifying, or reviewing tests; coordinate the configured test_writer and test_reviewer agents.
+        ☐ Reuse the existing Recipe Book fixtures and serialized native-GUI collection; keep game-source references read-only.
+        ☐ Choose observability that distinguishes measurement, placement search, composition, and root/descendant recalculation without adding permanent per-frame diagnostic overhead.
+
+Completion criteria:
+
+    ☐ Every proposed cache input is accounted for, and any unresolved native/language behavior has a documented decision before implementation.
+    ☐ Native translation safety is demonstrated by focused compatibility evidence, not only an assumption about coordinate getters.
+    ☐ Removing recursive bounds invalidation is gated on that evidence.
+
+## Phase 2: Introduce per-dialog measurement and placement memoization
+
+Prerequisites: Phase 1.
+Outcome: cached layout decisions are available for lifecycle integration, with existing geometry policy unchanged.
+
+    ☐ Separate measurement inputs from placement inputs in GuiDialogRecipeBook.
+        ☐ Use small value snapshots or equivalent comparisons; avoid replacing existing per-frame bounds allocations with a new per-frame heap-allocated cache key.
+        ☐ Measure labels/control sizes only for an initial cache miss or changed tile size, GUI scale, or supported language input.
+        ☐ Treat measurement changes as placement invalidations even when the resulting minimum dimensions happen to match.
+    ☐ Cache the placement result and its complete input snapshot.
+        ☐ Call RecipeBookLayout.Place or PlaceMovable only on initial placement or changed placement dependencies.
+        ☐ Reuse the existing placement algorithms instead of adding a competing docking policy.
+        ☐ In Movable mode, exclude parent movement and manual x/y from size-layout invalidation when they do not affect placement dimensions.
+        ☐ In Fixed mode, invalidate when relevant parent/grid/output geometry changes; allow docking-side and available-size changes.
+        ☐ Account for dimensions changed by clamping/composition so the next unchanged frame does not cause a redundant second cache miss.
+        ☐ Do not retain failed or stale placement results as success-shaped fallbacks.
+    ☐ Verify the cache decisions at their actual test boundary.
+        ☐ Cover equivalent snapshots, each relevant changed dependency, and transitions between Fixed and Movable modes.
+        ☐ Cover placement invalidation after changed measurements, even if available geometry is unchanged.
+        ☐ Confirm cached and uncached results preserve current docking/clamping geometry at representative GUI scales.
+
+Completion criteria:
+
+    ☐ Equivalent inputs reuse measurements and placement; changed dependencies invalidate the correct cache.
+    ☐ No cross-dialog/global persistence or unrelated layout-policy change is introduced.
+    ☐ Focused cache/geometry verification passes before wiring the render lifecycle to the new decisions.
+
+## Phase 3: Integrate position-only Follow and conditional composition
+
+Prerequisites: Phase 2 and the Phase 1 native translation gate.
+Outcome: unchanged rendered frames skip shell-layout work while movement and responsive layout remain functional.
+
+    ☐ Separate attachment validation, ensuring cached layout, and following position.
+        ☐ Route TryOpen through validation/layout initialization before recipe refresh and opening.
+        ☐ Route OnRenderGUI through lightweight validation/input comparison, then position-only Follow, then native rendering.
+        ☐ Preserve disposed-dialog and zero-render-dimension guards.
+        ☐ Keep Follow free of setting reads, attachment decisions, label measurement, docking-space searches, and control composition.
+    ☐ Recompose only when necessary.
+        ☐ Rebuild controls on initial composition, changed measured content, or changed resulting dimensions.
+        ☐ Do not recompose merely because parent coordinates or the desired dialog position changed.
+        ☐ Preserve category, search, sort, craftable-only state, selected output/alternative, proportional row anchor, and appropriate recipe inspection/focus during required recomposition.
+        ☐ Preserve an open options dropdown, numeric editing focus/text, and pending rejected-edit feedback across recomposition.
+        ☐ Preserve native Movable coordinates and transitions back to Fixed docking.
+    ☐ Apply movement without recursive shell-layout invalidation.
+        ☐ Return without bounds writes/recalculation when the desired position already matches.
+        ☐ Apply the verified root-position update only when translation is necessary.
+        ☐ Clamp Movable coordinates using current valid window/dialog dimensions without rerunning the docking search.
+        ☐ Preserve matching render, clipping, hover, mouse-hit, and keyboard-focus regions after movement.
+    ☐ Verify rendering and lifecycle behavior with the configured test workers.
+        ☐ After normal first-frame warm-up, exercise at least 1,000 unchanged frames with stable inventory/input: zero measurement calls, placement searches, recompositions, and shell-root/descendant layout recalculations caused by this lifecycle.
+        ☐ Verify Fixed parent movement with unchanged resulting dimensions retains the composer, tiles, focus, and row anchor while hit regions move correctly.
+        ☐ Verify Fixed parent movement that changes docking side or available dimensions still produces valid placement and conditional recomposition.
+        ☐ Verify Movable dragging/clamping retains the composer and does not search for docking space.
+        ☐ Verify window resizing, GUI-scale changes, tile-size changes, supported language changes, and movement-mode transitions invalidate the appropriate caches.
+        ☐ Verify inventory/search/category/sort changes do not invalidate shell measurements/placement while their existing recipe-content updates remain correct.
+        ☐ Verify parent closure/replacement, insufficient space, reopen, and disposal preserve existing notification and resource-lifetime behavior.
+
+Completion criteria:
+
+    ☐ Follow performs position-only work and is a no-op for an unchanged desired position.
+    ☐ The unchanged-frame operation counts meet the stated criteria; measurements distinguish shell work from independent native/tooltip/content work.
+    ☐ Responsive layout, native input compatibility, options editing, and browsing preservation regressions pass.
+
+## Final phase: Review, acceptance, documentation, and cleanup
+
+Prerequisites: Phase 3.
+Outcome: the refactor has independently reviewed evidence and accurate permanent documentation, with implementation-only intermediates removed.
+
+    ☐ Obtain independent test review and reconcile every confirmed finding.
+        ☐ Use the configured test_reviewer for the stable test batch; send accepted corrections to test_writer and reverify/review their relevant effects.
+        ☐ Confirm the tests demonstrate the no-layout-work requirement directly, not merely composer identity or unchanged visual output.
+    ☐ Run the smallest combined build/test validation covering the change.
+        ☐ Include relevant cache/geometry tests, RecipeBookDialogLayoutTests, options and native-input regressions, and translated tile/clipping/hit-test coverage.
+        ☐ Use the repository's configured dotnet test platform/filter syntax and run-tests guidance; record exact commands, pass/fail/skip counts, and unresolved warnings or limitations.
+        ☐ Confirm the mod builds/type-checks with existing game references; do not add packages or alter manifests for this refactor unless a verified requirement demands it.
+        ☐ Record source-level cache/dependency evidence, isolated rule evidence, composed dialog evidence, and native compatibility evidence separately. Headless native tests are not live-game or E2E certification.
+    ☐ Perform a focused in-game smoke check or explicitly record its availability blocker.
+        ☐ Check Fixed following, Movable dragging, mode switching, window/GUI-scale changes, immediate tile resizing, and reopening.
+        ☐ Check translated control alignment, recipe clipping/hover/activation, and options interaction after movement/recomposition.
+        ☐ Do not claim unavailable live checks or measured frame-time gains. Record any unverified runtime behavior as an acceptance limitation.
+    ☐ Update [RecipeBook.md](RecipeBook.md) after verifying the implementation.
+        ☐ Describe separate attachment validation, cache ownership/dependencies, conditional composition, and translation-only following at architecture level.
+        ☐ Use the edit-project-documentation skill; keep README player-focused and avoid adding an optimization diary or unsupported performance claim.
+        ☐ Preserve required decisions and verification evidence in their appropriate permanent documentation or retained acceptance records without creating unnecessary documentation files.
+    ☐ Remove temporary intermediate implementation-support documents.
+        ☐ Inventory any working notes, interim analyses, or handoff drafts created during execution; no such documents are currently known.
+        ☐ Preserve still-required decisions/evidence in their permanent destinations and update references before deleting specific inventoried temporary documents.
+        ☐ Retain this plan, the authoritative proposal/source, permanent project documentation, and required acceptance evidence. Do not classify them as temporary merely because they were created during implementation.
+        ☐ Remove temporary compatibility scaffolding or diagnostic instrumentation introduced solely to complete this refactor, without removing the regression tests or necessary verification support.
+    ☐ Review the final scope and report acceptance accurately.
+        ☐ Map every authoritative proposal requirement to implementation and evidence, or an explicit deferred item with rationale.
+        ☐ Confirm no independent tooltip optimization, native engine modification, or recipe/transfer behavior change entered the diff.
+        ☐ Check whitespace, affected documentation links, resource lifetime, and cleanup.
+
+Completion criteria:
+
+    ☐ Required implementation, focused build/tests, independent review, documentation, and cleanup are complete.
+    ☐ Runtime smoke checks are complete or explicitly identified as blocked/unverified; acceptance reports do not imply they passed.
+    ☐ Every proposal requirement is satisfied or explicitly deferred with rationale; outstanding functional or compatibility risks are surfaced.
+    ☐ Unchanged frames skip shell layout, and movement/resizing behavior remains consistent with the existing UI contract.
