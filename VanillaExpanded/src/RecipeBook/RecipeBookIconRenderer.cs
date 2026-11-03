@@ -52,7 +52,7 @@ internal sealed class RecipeBookIconRenderer(ICoreClientAPI api, RecipeBookIconC
         {
             if (!tile.IsInViewport) continue;
             var selection = tile.Selection!;
-            int size = RecipeBookTileGeometry.PreviewSize(GuiElement.scaled(1));
+            int size = RecipeBookTileGeometry.PreviewSize(GuiElement.scaled(1), tile.Bounds.fixedWidth);
             var position = cache.Get(selection.Recipe, size, requests < RecipeBookIconCache.BakesPerFrame, out bool queued);
             if (queued) requests++;
             if (position != null) visiblePreviews[selection.Recipe.Id] = position;

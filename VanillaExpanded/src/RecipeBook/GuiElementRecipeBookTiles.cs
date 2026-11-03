@@ -7,8 +7,8 @@ namespace VanillaExpanded.RecipeBook;
 
 internal sealed class GuiElementRecipeBookTiles : GuiElementContainer
 {
-    internal const double TileSize = RecipeBookTileGeometry.TileSize;
-    internal const double RowPitch = RecipeBookTileGeometry.Pitch;
+    internal double TileSize => Geometry.Size;
+    internal double RowPitch => Geometry.RowPitch;
     internal RecipeBookTileGeometry Geometry { get; }
     private readonly RecipeBookSession session;
     private readonly double compositionScale;
@@ -32,13 +32,14 @@ internal sealed class GuiElementRecipeBookTiles : GuiElementContainer
     internal GuiElementRecipeBookTiles(ICoreClientAPI api, ElementBounds bounds, ElementBounds viewport,
         RecipeBookSession session, Action<CraftingRecipeSelection?> inspect, Action<int, bool> activate,
         RecipeBookIconCache cache,
-        Func<IRecipeBookIconShaderProgram>? createShader = null)
+        Func<IRecipeBookIconShaderProgram>? createShader = null,
+        double tileSize = RecipeBookTileGeometry.TileSize)
         : base(api, bounds)
     {
         this.session = session;
         compositionScale = scaled(1);
         this.viewport = viewport;
-        Geometry = new(viewport.fixedWidth);
+        Geometry = new(viewport.fixedWidth, tileSize);
         this.inspect = inspect;
         icons = new(api, cache, createShader);
         Tabbable = true;
@@ -69,7 +70,7 @@ internal sealed class GuiElementRecipeBookTiles : GuiElementContainer
         int index = Math.Min((int)(ScrollPosition / RowPitch) * Columns, Math.Max(0, session.Rows.Length - 1));
         return new(session.Rows.IsEmpty ? null : session.Rows[index].Output.Id, index, ScrollPosition % RowPitch,
             (CurrentTabIndexElement as GuiElementRecipeBookTile)?.Selection?.Output.Id,
-            InspectedRow()?.Output.Id, HasFocus, keyboardFocus);
+            InspectedRow()?.Output.Id, HasFocus, keyboardFocus, RowPitch);
     }
 
     internal void RestoreView(RecipeBookTileView view)
@@ -82,7 +83,7 @@ internal sealed class GuiElementRecipeBookTiles : GuiElementContainer
             return fallback;
         }
         int anchor = Find(view.AnchorOutput, Math.Min(view.AnchorIndex, Math.Max(0, session.Rows.Length - 1)));
-        Scroll((float)(compositionScale * (anchor / Columns * RowPitch + view.RowOffset)));
+        Scroll((float)(compositionScale * (anchor / Columns * RowPitch + view.RowOffset * RowPitch / view.RowPitch)));
         if (view.HasFocus && !session.Rows.IsEmpty)
         {
             // Re-enter through native focus lifecycle so its keyboard-only outline survives recomposition.
@@ -303,7 +304,7 @@ internal sealed class GuiElementRecipeBookTiles : GuiElementContainer
     {
         focusedIndex = index;
         double top = index / Columns * compositionScale * RowPitch;
-        double bottom = top + compositionScale * RecipeBookTileGeometry.MinimumHeight;
+        double bottom = top + compositionScale * (RecipeBookTileGeometry.TopPadding + TileSize);
         if (top < scroll) scroll = (float)top;
         if (bottom > scroll + viewport.InnerHeight)
             scroll = (float)(bottom - viewport.InnerHeight);

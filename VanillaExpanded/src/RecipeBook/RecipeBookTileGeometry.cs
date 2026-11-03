@@ -19,33 +19,40 @@ internal sealed class RecipeBookTileGeometry
     internal const float QuantityFontSize = 11;
     internal int Columns { get; }
     internal double Leading { get; }
+    internal double Size { get; }
+    internal double RowPitch => Size + Gap;
 
-    internal RecipeBookTileGeometry(double viewportWidth)
+    internal RecipeBookTileGeometry(double viewportWidth, double tileSize = TileSize)
     {
-        if (!double.IsFinite(viewportWidth) || viewportWidth < MinimumWidth)
+        if (!double.IsFinite(tileSize) || tileSize < RecipeBookVisualMetrics.MinimumTileSize
+            || tileSize > RecipeBookVisualMetrics.MaximumTileSize)
+            throw new ArgumentOutOfRangeException(nameof(tileSize));
+        Size = tileSize;
+        if (!double.IsFinite(viewportWidth) || viewportWidth < Size + 2 * HorizontalPadding)
             throw new ArgumentOutOfRangeException(nameof(viewportWidth), "The recipe viewport must fit one padded tile.");
         double usable = viewportWidth - 2 * HorizontalPadding;
-        Columns = (int)Math.Floor((usable + Gap) / Pitch);
-        Leading = HorizontalPadding + (usable - (Columns * Pitch - Gap)) / 2;
+        Columns = (int)Math.Floor((usable + Gap) / RowPitch);
+        Leading = HorizontalPadding + (usable - (Columns * RowPitch - Gap)) / 2;
     }
 
-    internal double ContentHeight(int count) => count == 0 ? 0 : TopPadding + Math.Ceiling((double)count / Columns) * Pitch - Gap;
+    internal double ContentHeight(int count) => count == 0 ? 0 : TopPadding + Math.Ceiling((double)count / Columns) * RowPitch - Gap;
 
     internal void Place(ElementBounds tile, int column, int row, double scroll, double scale)
     {
-        double left = Leading + column * Pitch;
-        double top = TopPadding + row * Pitch - scroll;
+        double left = Leading + column * RowPitch;
+        double top = TopPadding + row * RowPitch - scroll;
         double x = Math.Round(left * scale, MidpointRounding.AwayFromZero);
         double y = Math.Round(top * scale, MidpointRounding.AwayFromZero);
         tile.WithFixedPosition(x / scale, y / scale).WithFixedSize(
-            (Math.Round((left + TileSize) * scale, MidpointRounding.AwayFromZero) - x) / scale,
-            (Math.Round((top + TileSize) * scale, MidpointRounding.AwayFromZero) - y) / scale);
+            (Math.Round((left + Size) * scale, MidpointRounding.AwayFromZero) - x) / scale,
+            (Math.Round((top + Size) * scale, MidpointRounding.AwayFromZero) - y) / scale);
     }
 
-    internal static int PreviewSize(double scale) => Math.Max(2,
-        (int)Math.Ceiling((Math.Round(TileSize * scale, MidpointRounding.AwayFromZero)
+    internal static int PreviewSize(double scale, double tileSize = TileSize) => Math.Max(2,
+        (int)Math.Ceiling((Math.Round(tileSize * scale, MidpointRounding.AwayFromZero)
             - 2 * GuiControlDrawing.Pixels(PreviewInset, scale)) / 2) * 2);
 }
 
 internal sealed record RecipeBookTileView(int? AnchorOutput, int AnchorIndex, double RowOffset,
-    int? FocusedOutput, int? InspectedOutput, bool HasFocus, bool KeyboardFocus);
+    int? FocusedOutput, int? InspectedOutput, bool HasFocus, bool KeyboardFocus,
+    double RowPitch = RecipeBookTileGeometry.Pitch);

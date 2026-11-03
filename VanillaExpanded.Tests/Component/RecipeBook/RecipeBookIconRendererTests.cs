@@ -19,6 +19,32 @@ namespace VanillaExpanded.Tests.Component.RecipeBook;
 public sealed class RecipeBookIconRendererTests
 {
     [Theory]
+    [InlineData(30, 1f)]
+    [InlineData(30, 1.5f)]
+    [InlineData(90, 1f)]
+    [InlineData(90, 1.5f)]
+    public void IconPreviewRequestsTrackTheConfiguredTileSize(int tileSize, float scale)
+    {
+        // Arrange
+        using var graphics = new RecipeBookRenderFixture(scale);
+        var f = new AllocationFixture();
+        var recipe = f.Recipe(f.Ingredient(f.Stack(1, "board", 1)));
+        f.Register(recipe);
+        using var session = new RecipeBookSession(f.Catalogue.Build(recipe), f.Allocator,
+            () => f.Snapshot(), (_, _) => throw new InvalidOperationException());
+        session.Refresh();
+        using var tiles = CreateTiles(graphics, session, tileSize: tileSize);
+
+        // Act
+        graphics.Warm(tiles, 4);
+
+        // Assert
+        Assert.Equal(tileSize, tiles.TileSize);
+        Assert.Equal(tileSize + RecipeBookTileGeometry.Gap, tiles.RowPitch);
+        Assert.Equal(RecipeBookTileGeometry.PreviewSize(scale, tileSize), Assert.Single(graphics.Bakes).Size);
+    }
+
+    [Theory]
     [InlineData(1)]
     [InlineData(1.5)]
     [InlineData(2)]

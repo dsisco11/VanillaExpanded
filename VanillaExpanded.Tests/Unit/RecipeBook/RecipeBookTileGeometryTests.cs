@@ -66,4 +66,42 @@ public sealed class RecipeBookTileGeometryTests
     [InlineData(double.PositiveInfinity)]
     public void AViewportThatCannotFitOnePaddedTileFailsExplicitly(double width) =>
         Assert.Throws<ArgumentOutOfRangeException>(() => new RecipeBookTileGeometry(width));
+
+    [Theory]
+    [InlineData(30)]
+    [InlineData(45)]
+    [InlineData(90)]
+    public void ConfiguredTileSizeDrivesLayoutAndPreviewSizing(int tileSize)
+    {
+        // Arrange
+        var geometry = new RecipeBookTileGeometry(tileSize + 12, tileSize);
+        var bounds = ElementBounds.Fixed(0, 0, 0, 0).WithEmptyParent();
+
+        // Act
+        geometry.Place(bounds, 0, 1, 0, 1);
+
+        // Assert
+        Assert.Equal(45, new RecipeBookTileGeometry(57).Size);
+        Assert.Equal(tileSize, geometry.Size);
+        Assert.Equal(tileSize + 5, geometry.RowPitch);
+        Assert.Equal(1, geometry.Columns);
+        Assert.Equal(6, geometry.Leading, 6);
+        Assert.Equal(0, geometry.ContentHeight(0));
+        Assert.Equal(tileSize + 2, geometry.ContentHeight(1), 6);
+        Assert.Equal(2 * tileSize + 7, geometry.ContentHeight(2), 6);
+        Assert.Equal(6, bounds.fixedX, 6);
+        Assert.Equal(tileSize + 7, bounds.fixedY, 6);
+        Assert.Equal(tileSize, bounds.fixedWidth, 6);
+        Assert.Equal(tileSize, bounds.fixedHeight, 6);
+        Assert.Equal(Math.Max(2, (int)Math.Ceiling((tileSize - 2) / 2d) * 2),
+            RecipeBookTileGeometry.PreviewSize(1, tileSize));
+    }
+
+    [Theory]
+    [InlineData(29)]
+    [InlineData(91)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    public void TileSizeOutsideTheSupportedRangeFailsExplicitly(double tileSize) =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => new RecipeBookTileGeometry(200, tileSize));
 }

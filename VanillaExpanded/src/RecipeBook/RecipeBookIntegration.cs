@@ -23,6 +23,18 @@ internal static class RecipeBookDialogPatch
 public sealed class RecipeBookSystem : ModSystem, ILiveConfigurable
 {
     internal const string RememberOpenSetting = "vanillaexpanded-recipebook-remember-open";
+    internal const string TileSizeSetting = "vanillaexpanded-recipebook-tile-size";
+
+    internal static int GetTileSize(ICoreClientAPI api)
+    {
+        int size = api.Settings.Int.Get(TileSizeSetting, (int)RecipeBookVisualMetrics.TileSize);
+        if (size is >= RecipeBookVisualMetrics.MinimumTileSize and <= RecipeBookVisualMetrics.MaximumTileSize)
+            return size;
+        api.Logger.Warning("[VanillaExpanded] Invalid recipe tile size {0}; restoring the default.", size);
+        api.Settings.Int[TileSizeSetting] = (int)RecipeBookVisualMetrics.TileSize;
+        return (int)RecipeBookVisualMetrics.TileSize;
+    }
+
     private const string BookIcon = "vanillaexpanded-recipe-book";
     private ICoreClientAPI? api;
     private IconRendererDelegate? bookIcon;

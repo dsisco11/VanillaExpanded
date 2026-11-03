@@ -51,13 +51,14 @@ internal static int[] States(Mock<IRecipeBookIconShaderProgram> program) => prog
         .Where(call => call.Method.Name == "set_" + nameof(IRecipeBookIconShaderProgram.RecipeState))
         .Select(call => (int)(CraftingTileStatus)call.Arguments[0]).ToArray();
 
-internal static GuiElementRecipeBookTiles CreateTiles(RecipeBookRenderFixture graphics, RecipeBookSession session, int rows = 1)
+internal static GuiElementRecipeBookTiles CreateTiles(RecipeBookRenderFixture graphics, RecipeBookSession session,
+    int rows = 1, double tileSize = RecipeBookTileGeometry.TileSize)
     {
         var viewport = ElementBounds.Fixed(0, 0, 202, rows * 50 - 5).WithEmptyParent();
         viewport.CalcWorldBounds();
         var tiles = new GuiElementRecipeBookTiles(graphics.Api.Object,
             ElementBounds.Fixed(0, 0, 202, (rows + 1) * 50).WithParent(viewport), viewport, session, _ => { }, (_, _) => { },
-            graphics.Cache, graphics.CreateShader);
+            graphics.Cache, graphics.CreateShader, tileSize);
         tiles.BeforeCalcBounds();
         tiles.Bounds.CalcWorldBounds();
         return tiles;

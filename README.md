@@ -34,52 +34,53 @@ Release, close the loot window, change world targets, move out of reach, or disa
 
 AutoLoot is enabled by default. To turn it off or adjust the hold duration, open **Pause menu > Mod Settings > VanillaExpanded > Auto Loot** with ConfigLib installed. For manual configuration, see [Auto Loot settings](#auto-loot-settings).
 
-AutoLoot runs entirely on the client: neither VanillaExpanded nor ConfigLib is required on the server for this feature. ConfigLib is optional for the client-side settings menu. AutoLoot and Auto-Stash can be enabled independently. Transfers use vanilla packets and server authorization; progress completion initiates collection, not a server-confirmed success notification.
+AutoLoot runs entirely on the client: neither VanillaExpanded nor ConfigLib is required on the server for this feature. ConfigLib is optional for the client-side settings menu. AutoLoot and Auto-Stash can be enabled independently. The server still authorizes item transfers; completing the progress indicator does not guarantee that every item was collected.
 
 **Supported targets:** dead, harvested, non-player corpses with the standard game loot window. Modded creatures using the same vanilla harvesting behavior are supported; custom looting systems, attached bags, player corpses, and general containers are not AutoLoot targets.
 
 **If nothing moves:** check that the corpse has been harvested, still contains loot, and its normal loot window is open. Make room in your inventory, stay within interaction range, then release and hold right-click again. AutoLoot makes one collection attempt per hold; it does not keep retrying when your inventory is full.
 
-Compatibility evidence currently covers inspection of the Vintage Story **1.22.7** native protocol and automated tests. In-game acceptance, including unmodified-server gameplay, latency, and simultaneous looters, remains pending; see the [AutoLoot proposal](docs/AutoLootProposal.md).
+AutoLoot has not been verified in game on unmodified servers, under network latency, or with simultaneous looters.
 
 ### Recipe Book
 
-Use the **Recipe Book** button to the left of your crafting-grid output slot to open or close a searchable list of crafting-grid outputs. The button stays visible and pressed while the book is open. Search by item name or item code; hover or keyboard-focus a tile to see a vanilla item-tooltip-styled frame with its centered name, native item description and stats, then a divider above the selected recipe in the game's standard crafting-grid preview, including cycling ingredient choices. Moving the pointer off a tile hides its tooltip even after clicking; keyboard navigation can show it again. Descriptions have 3 GUI-scaled pixels of padding on all sides and use a cloned output preview, including item-specific and behavior-provided details. Beneath the centered grid, a compact `have/need name` summary in smaller text shows allocated coverage for one craft, with short counts in red. Shared ingredients are not double-counted, and tools count only when usable; wildcard/tag choices use a generic "Matching ingredient" label alongside the native cycling preview. Counts refresh with inventory changes. Unsupported recipes show their placement warning instead of unverifiable counts. Use the arrow buttons below the list to cycle alternative recipes for the selected output, or **Auto** to restore automatic selection.
+Open your inventory and click the **Recipe Book** button to the left of the crafting-grid output slot. The menu helps you find recipes and arrange their ingredients; it does not craft or collect the result automatically.
 
-The menu is enabled by default. With ConfigLib installed, use **Pause menu > Mod Settings > VanillaExpanded > Recipe Book** to toggle it, or set `EnableRecipeBook` in `ModConfig/VanillaExpanded.json`. Disabling through ConfigLib immediately closes the menu, hides the book button and deactivates the system. Enabling requires re-entering the world or restarting, including after live deactivation. When disabled at world load, the recipe-book mod system and its GUI patch are not loaded.
+**Browse recipes**
 
-Browse categories using the icons above search; hover an icon to see its name, or navigate the focused row with Left/Right. **All** includes every output, and **Other** groups outputs without a specific category. Outputs can belong to multiple categories, including categories supplied by mods. Search applies within the selected category; switching categories keeps your search text and returns the list to the top. The menu's minimum width accommodates the complete category row.
+- Search by item name or item code. Use the category icons to narrow the list; hover an icon to see its name. **All** shows every output, and **Other** groups outputs without a specific category.
+- Check **Hide uncraftable** to show recipes with enough usable ingredients for one craft. Search and category filters remain active.
+- Choose **Availability** (default) to prioritize supported recipes and uses for items in your crafting grid, or **Name** to browse alphabetically. To find uses for an ingredient, put it in the grid; duplicate stacks and larger quantities do not increase its priority.
+- Changing search, category, Hide uncraftable, or sort returns the list to the top. Use the search field's **x**, **Clear search**, or **Show uncraftable** to relax the corresponding filter without clearing the others.
 
-When search contains text, an **x** clear button appears inside its right edge. Click it to clear only the search and return the list to the top, keeping category, Hide uncraftable, and any pinned recipe unchanged. Focus stays in search for further typing. The button hides when the field is empty.
+**Inspect and place ingredients**
 
-The **Hide uncraftable** checkbox shows only recipes whose required ingredients are fully available for one craft. It combines independently with category and search: toggling it keeps both unchanged, and clearing one filter leaves the others active. Partial, missing, unsupported, and not-yet-evaluated recipes are hidden while it is checked. Changing search, category, or this checkbox returns the list to the top. Resizing keeps the current filters and scroll position; Hide uncraftable resets to unchecked when the menu is closed and reopened.
+Hover or keyboard-focus a tile to see the item's description, recipe, and available/required ingredient counts. Counts update with your inventory. A red border means no required ingredients are available; yellow means some are available. Darkened icons indicate unsupported placement; inspect their tooltips for an explanation.
 
-Use the sort selector beside **Hide uncraftable**, above search, to choose **Availability** or **Name**; hover it for the **Sort by** explanation. Availability is the default: supported recipes come first, with recipes using more distinct ingredients from your crafting grid promoted ahead of the usual craftability/coverage ordering. Name browses outputs alphabetically using localized names, regardless of ingredient availability or grid contents, with deterministic ties. Changing sort returns the list to the top without changing filters, selected output, or pinned recipe. Inventory refreshes retain the usual interaction safety while hovering or pressing a tile; ending interaction restores the selected sort's canonical order.
+- **Click:** place available ingredients for one craft, leaving missing ingredients absent.
+- **Shift-click:** fill ingredient positions as far as available stock and stack limits allow.
+- **Craft afterward:** click the normal crafting result slot.
+- **Previous / Next:** choose and pin an alternative recipe for the selected output. **Auto** restores automatic choice. Hide uncraftable can hide an unavailable pin even if another alternative is craftable; uncheck it to reveal the pin. Selecting another output or changing category clears the pin.
+- **Handbook:** open the selected output's survival handbook page without placing ingredients.
 
-To find uses for ingredients, place them anywhere in the crafting grid while using Availability sorting. Recipes using all distinct grid items rise above those using only some; unrelated recipes remain visible. Stack quantities and duplicate stacks do not add priority, and one recipe position cannot count as using two different ingredients at once. Native item attributes, wildcard/tag restrictions, and usable-tool checks still apply. Auto can choose a more grid-relevant recipe alternative, but explicit pins are never changed. Search, category, and Hide uncraftable still filter the resolved alternative; relevance does not imply craftability. Removing ingredients removes their influence, and an empty grid restores ordinary Availability ordering. Inputs placed through the menu count too; the crafting result slot never does. Live updates preserve scroll, and reopening evaluates the current grid rather than restoring old relevance.
+Ingredients come from your hotbar, backpack storage, and the nine crafting-grid inputs, not cursor-held items, equipment, or remote containers. The book supports the 3x3 crafting grid, not cooking, smithing, knapping, clay forming, or other workstations. Leave room in carried storage for displaced grid contents. Interrupted transfers can leave a partial arrangement; check the grid before trying again.
 
-Empty results explain which restriction to relax. If no recipes in the selected category match your search, **Clear search** removes only the search text. If recipes match but none are currently craftable, **Show uncraftable** unchecks Hide uncraftable, keeping category and search unchanged. With both filters active, search is checked first without the craftable restriction. The message updates as ingredients become available; no clear action is shown for an empty catalogue.
+**Options and reopening**
 
-Inventory changes update results live, including while a tile is hovered, focused, or pressed. Eligible rows stay in place during interaction, but rows that no longer match disappear immediately. If a pressed tile is removed or replaced, release cannot activate its replacement; press again to choose the new row.
+Click the titlebar's **sliders** icon to open **Options**:
 
-Keyboard tab order starts with the search box, followed by the category tabs, Hide uncraftable, and the sort selector. Use the category row's arrow keys to navigate categories, **Enter** or **Space** to toggle the focused checkbox, arrow keys to change the focused sort selector, and arrow keys to navigate focused recipe tiles. **Enter**, **Space**, or **keypad Enter** activates a focused recipe; hold **Shift** for the shift-placement action.
+| Option | Default | Behavior |
+| --- | --- | --- |
+| **Reopen with inventory** | On | Reopen the book with your inventory if it was open when the inventory closed. Turn it off to open the book manually. |
+| **Recipe tile size** | 45 | Enter a whole number from 30 to 90 GUI units. Valid changes resize tiles immediately while keeping your browsing state. Invalid edits restore the last accepted size with an error on Enter or leaving the field. |
 
-- **Click a recipe:** place available ingredients for one craft. Missing ingredients remain absent.
-- **Shift-click a recipe:** fill its ingredient positions as far as available stock and stack limits allow, even if another ingredient is missing.
-- **Craft normally afterward:** click the vanilla crafting result slot. The menu only moves ingredients; it never takes the result or crafts automatically.
-- **Availability:** recipes keep their full-color icons, with a red border flush with the button edge when no required ingredients are available and a yellow border when some but not all required ingredients are available. Recipes with all ingredients available have no availability border. Near-black icons mean placement is unsupported; with Hide uncraftable unchecked, these entries remain searchable and inspectable, and their tooltips explain the limitation.
-- **Alternatives:** the counter below the list shows the selected recipe. Choosing an alternative pins it: Hide uncraftable hides an unavailable pinned recipe even if another alternative for the same output is craftable. Unchecking the checkbox reveals the pin again; use **Auto** on the visible selection to restore automatic choice. Selecting another output or changing category clears the previous pin. Hidden selections have no active footer actions or tooltip.
-- **Handbook:** use the **Handbook** button below the list to open the selected output's native survival handbook page without placing ingredients. The inventory and recipe book stay open behind it. It supports attributed outputs and custom handbook page providers. The button is disabled when there is no visible selection or resolved output preview; it also works through normal keyboard focus and Enter. No new keyboard shortcut is assigned.
+Both options are saved on your client across game sessions. Category, search, sort, and your place in the list are remembered within the current world; Hide uncraftable resets when the book reopens.
 
-Ingredients come from your ordinary hotbar, backpack storage and the nine crafting-grid inputs. The result slot, cursor-held stack, off-hand/equipment, bag-equipping slots and remote containers are excluded. This menu handles the native 3x3 crafting grid, not cooking, smithing, knapping, clay forming or other workstations.
+Click outside Options or press Escape to dismiss the dropdown. Otherwise, Escape or the inventory hotkey closes the inventory and book together; typing in search or tile size suppresses the inventory hotkey. Tab moves between controls, including the dropdown's controls, and arrow keys navigate focused categories, sorting, and recipes. Enter, Space, or keypad Enter activates a focused recipe; hold Shift for the fill action. Opening with the Recipe Book button focuses search; automatic reopening leaves focus with the inventory.
 
-Closing the inventory hides the menu. Escape closes the inventory and its attached menu together; the inventory hotkey does the same unless you are typing in the menu's search field. Click the flat **sliders** icon in the titlebar to open the **Options** dropdown. The **Reopen with inventory** checkbox is enabled by default: the book reopens with the crafting grid if it was open when the inventory closed. This preference is saved on your client across game sessions. Uncheck it to open the book manually each time, or use the book's close button or toggle Recipe Book off to keep it closed. The dropdown stays open when you toggle its checkbox; click outside or press Escape to dismiss it without closing the book. Automatic reopening leaves keyboard focus with the inventory; click search to type. Opening with the Recipe Book button focuses search immediately. Category, search text, sort choice, and scroll position are remembered when reopening regardless of this setting, including reopening with the Recipe Book button. Results are evaluated against the current inventory, and scroll clamps to the available range. Browsing state is cleared on leaving the world; it is not saved across game sessions.
+The book is enabled by default. Toggle it under **Pause menu > Mod Settings > VanillaExpanded > Recipe Book** with ConfigLib, or set `EnableRecipeBook` in `ModConfig/VanillaExpanded.json`. Disabling applies immediately through ConfigLib; enabling requires re-entering the world or restarting.
 
-Placement uses native inventory transfers and server synchronization. Having all ingredients does not guarantee room to rearrange the grid: if displaced contents cannot be safely returned to carried storage, placement is refused without changing the inventory. If a native transfer is interrupted after some moves, those moves may remain; the game reconciles inventory normally. The menu does not roll back or automatically retry the arrangement, drop items to make room, or report server-confirmed batch success.
-
-Dynamic-output recipes use generic previews when the exact result cannot be known beforehand; unsupported semantics and unverified inventory replacements may prevent placement. The catalogue is fixed for the loaded world, while availability updates with inventory changes. Icons are static previews, not animated items. Recipe-family coverage is automated; live acceptance was a representative wooden-planks smoke test, not an exhaustive recipe/modpack or dedicated multiplayer certification.
-
-The provider-based filtering and Hide uncraftable checkbox have automated unit/native-GUI fixture coverage; live-game validation of these additions remains pending. The earlier wooden-planks smoke test does not certify the new filtering controls or inventory-transition behavior. See the [recipe-book implementation guide](docs/RecipeBook.md) for filter ownership and extension boundaries.
+Some recipes use generic output previews or do not support placement. Recipe/modpack and multiplayer compatibility have not been exhaustively verified in game. See the [Recipe Book developer guide](docs/RecipeBook.md) for architecture and maintenance details.
 
 ### Quick Tools
 
@@ -103,7 +104,7 @@ When opening a firepit with a crucible, an Alloy Calculator dialog automatically
 - **See prewarming options** when available lower-temperature fuels can save smelting fuel: the indicator cycles through useful options and the amount of each needed to save at least one item of the selected smelting fuel. Prewarming is not automatic; burn the displayed amount of one option before switching fuel or using **Deposit**, which immediately replaces unsuitable queued fuel.
 - **Deposit button** automatically transfers the required ingredients from your backpack, hotbar, and opened storage containers into the crucible. It first reserves space for each selected ingredient form (such as nuggets and metal bits), then spreads the ingredients evenly across spare slots without mixing incompatible stacks.
 
-The calculator remembers your settings per crucible, so your preferred alloy and ratios are restored when you reopen the dialog (currently not remembered across restarts).
+The calculator remembers your preferred alloy and ratios per crucible when you reopen the dialog, but not across restarts.
 
 ### Animal Sex Indicators
 
@@ -248,17 +249,13 @@ Recipe-toggle changes require a world reload to rebuild the available recipes. `
 
 ## Testing
 
-The project includes unit, component, and native integration suites organized by responsibility within `VanillaExpanded.Tests`.
+Tests are organized by feature in [VanillaExpanded.Tests](VanillaExpanded.Tests/).
 
 ### Test Organization
 
-- **Unit Tests** (`VanillaExpanded.Tests/Unit/`): Fast, isolated tests for individual components
-  - `AutoStashing/`: Tests for item matching, stashable items detection, and timing constants
-  - `EquipLightSource/`: Tests for light source detection logic
-- **Component Tests** (`VanillaExpanded.Tests/Component/`): Composed production collaborators behind mocked external services, including Recipe Book sessions, dialogs, and rendering
-- **Integration Tests** (`VanillaExpanded.Tests/Integration/`): Real native/engine compatibility, including GUI routing and crafting transfers
-
-The E2E category is reserved for complete externally driven workflows; the headless native-transfer fixtures are Integration tests, not E2E coverage.
+- [Unit tests](VanillaExpanded.Tests/Unit/): isolated rules and calculations.
+- [Component tests](VanillaExpanded.Tests/Component/): production components working together with mocked external services.
+- [Integration tests](VanillaExpanded.Tests/Integration/): native game compatibility, including GUI input and crafting transfers.
 
 ### Running Tests
 
@@ -279,15 +276,7 @@ dotnet test --filter "Category=Integration"
 dotnet test --filter "FullyQualifiedName~AutoStashing"
 ```
 
-### Mock Infrastructure
-
-The test project includes reusable mock wrappers in `VanillaExpanded.Tests/Mocks/`:
-
-- `MockItem`: Mock collectible items with configurable IDs and light values
-- `MockInventory`: Mock inventory with slot management
-- `MockPlayer`: Mock player with inventory manager setup
-- `MockClientNetworkChannel`: Captures sent packets for verification
-- `MockServerNetworkChannel`: Simulates server-side packet handling
+When adding tests, reuse the existing [mocks](VanillaExpanded.Tests/Mocks/) and [test support](VanillaExpanded.Tests/TestSupport/). See the [contributor instructions](.github/copilot-instructions.md) for conventions.
 
 ## License
 
@@ -298,4 +287,6 @@ Anego Studios and its affiliates are granted a perpetual, worldwide, non-exclusi
 
 ## Developer documentation
 
-See [item-slot indicator effects](docs/ItemSlotIndicatorEffects.md) for internal registration, shader and geometry contracts, resource ownership, and validation requirements.
+- [Recipe Book](docs/RecipeBook.md): filtering, ordering, UI lifecycle, and rendering.
+- [Alloy Calculator](docs/AlloyCalculator.md): calculation and inventory-transfer design.
+- [Item-slot indicator effects](docs/ItemSlotIndicatorEffects.md): registration, rendering, and resource ownership.

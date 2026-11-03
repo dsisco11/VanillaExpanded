@@ -29,6 +29,8 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
     private readonly CraftingTransferCoordinator coordinator;
     private readonly RecipeBookIconCache icons;
     private double composedScale;
+    private int tileSize = (int)RecipeBookVisualMetrics.TileSize;
+    private int composedTileSize;
     private double minimumWidth;
     private double minimumHeight;
     private double searchHeight;
@@ -93,7 +95,8 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
     public override double DrawOrder => 0.2;
     public override bool PrefersUngrabbedMouse => true;
     public override bool CaptureAllInputs() => Focused && IsOpened()
-        && (SingleComposer?.GetTextInput("search")?.HasFocus ?? false);
+        && ((SingleComposer?.GetTextInput("search")?.HasFocus ?? false)
+            || options?.SizeInput.HasFocus == true);
     public override bool OnEscapePressed()
     {
         if (options?.IsOpened != true) return parent.OnEscapePressed();
@@ -151,6 +154,10 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
     {
         var oldTiles = SingleComposer?.GetElement("tiles") as GuiElementRecipeBookTiles;
         var view = oldTiles?.CaptureView();
+        bool restoreOptions = options?.IsOpened == true;
+        bool restoreSizeFocus = options?.SizeInput.HasFocus == true;
+        string? sizeText = options?.SizeInput.GetText();
+        bool rejectedSizeEdit = options?.RejectedSizeEdit == true;
         double width = bounds.fixedWidth;
         double height = bounds.fixedHeight;
         double contentTop = TitleHeight + TitleSpacing;
@@ -187,7 +194,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         var handbook = ElementBounds.Fixed(content.fixedWidth - handbookWidth, 0, handbookWidth, footerHeight);
         var label = ElementBounds.Fixed((content.fixedWidth - counterWidth) / 2, 0, counterWidth, footerHeight);
         var tiles = new GuiElementRecipeBookTiles(capi, ElementBounds.Fixed(0, 0, viewport.fixedWidth, viewport.fixedHeight).WithParent(viewport),
-            viewport, session, Inspect, Activate, icons);
+            viewport, session, Inspect, Activate, icons, tileSize: tileSize);
         var newTooltip = new GuiElementRecipeBookTooltip(capi);
         var newOptions = new GuiElementRecipeBookOptions(capi, ElementBounds.Fixed(width - OptionsRightInset,
             OptionsIconTop, GuiElementRecipeBookOptions.IconSize, GuiElementRecipeBookOptions.IconSize));
@@ -240,7 +247,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
                 .AddInteractiveElement(tiles, "tiles")
             .EndClip()
             .AddInteractiveElement(new GuiElementStyledScrollbar(capi, tiles.Scroll, scrollBounds,
-                RecipeBookTileGeometry.Pitch), "scroll")
+                tiles.RowPitch), "scroll")
             .AddDynamicText("", MainFont().WithOrientation(EnumTextOrientation.Center),
                 ElementBounds.Fixed(viewport.fixedX, viewport.fixedY, viewport.fixedWidth, emptyTextHeight), "empty")
             .AddInteractiveElement(StyledButton(Lang.Get("vanillaexpanded:recipebook-clear-search"), ClearSearch,
@@ -269,6 +276,11 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         SingleComposer = composer;
         tooltip = newTooltip;
         options = newOptions;
+        if (restoreOptions)
+        {
+            composer.FocusElement(newOptions.TabIndex);
+            newOptions.RestoreMenu(restoreSizeFocus, sizeText, rejectedSizeEdit);
+        }
         composer.GetSwitch("craftable-only").SetValue(session.CraftableOnly.Enabled);
         ((GuiElementIconTabs)composer.GetElement("categories")).SetValue(Array.IndexOf(categories, session.Category), false);
         composer.GetTextInput("search").SetValue(search);
@@ -356,7 +368,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         minimumWidth = Math.Ceiling(new[]
         {
             tabsWidth, categoryWidth, optionsWidth, filterWidth, emptyActionWidth, titleMinimumWidth, footerWidth,
-            viewportWidthReserve + RecipeBookTileGeometry.MinimumWidth
+            viewportWidthReserve + tileSize + 2 * RecipeBookTileGeometry.HorizontalPadding
         }.Max());
         var textUtil = new TextDrawUtil();
         emptyTextHeight = Math.Ceiling(Enum.GetValues<RecipeBookEmptyState>()
@@ -365,7 +377,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
                 (minimumWidth - viewportWidthReserve) * scale)) / scale);
         minimumHeight = Math.Ceiling(TitleHeight + TitleSpacing + tabsHeight + PanelTopPadding
             + categoryTitleHeight + HeadingSpacing + filterHeight + FilterSpacing + searchHeight + SearchSpacing
-            + 2 * ListBorderWidth + Math.Max(RecipeBookTileGeometry.MinimumHeight, emptyTextHeight + RowSpacing + footerHeight)
+            + 2 * ListBorderWidth + Math.Max(RecipeBookTileGeometry.TopPadding + tileSize, emptyTextHeight + RowSpacing + footerHeight)
             + FooterSpacing + footerHeight + ContentInset);
     }
 
@@ -380,7 +392,8 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         var grid = parentComposer.GetElement("craftinggrid")?.Bounds;
         if (grid == null) { CloseWithParent(); return false; }
         var output = parentComposer.GetElement("outputslot").Bounds;
-        if (SingleComposer == null || composedScale != RuntimeEnv.GUIScale) MeasureLayout();
+        tileSize = RecipeBookSystem.GetTileSize(capi);
+        if (SingleComposer == null || composedScale != RuntimeEnv.GUIScale || composedTileSize != tileSize) MeasureLayout();
         var savedPosition = SingleComposer == null ? capi.Gui.GetDialogPosition(ComposerName) : null;
         bool movable = SingleComposer?.GetTitleBar("titlebar").Movable ?? savedPosition != null;
         var next = movable
@@ -396,12 +409,14 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
             return false;
         }
         if (SingleComposer == null || composedScale != RuntimeEnv.GUIScale
+            || composedTileSize != tileSize
             || SingleComposer.Bounds.fixedWidth != next.fixedWidth || SingleComposer.Bounds.fixedHeight != next.fixedHeight)
         {
             if (movable)
                 capi.Gui.SetDialogPosition(ComposerName, new Vec2i((int)next.fixedX, (int)next.fixedY));
             Compose(next, focusFirstElement);
             composedScale = RuntimeEnv.GUIScale;
+            composedTileSize = tileSize;
         }
         else
         {
@@ -444,9 +459,29 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         if (options?.IsOpened == true) tooltip?.Inspect(null);
     }
 
+    public override void OnMouseWheel(MouseWheelEventArgs args)
+    {
+        options?.OnMouseWheel(capi, args);
+        if (!args.IsHandled) base.OnMouseWheel(args);
+    }
+
     public override void OnKeyDown(KeyEvent args)
     {
         if (args.Handled) return;
+        if (options?.IsOpened == true && args.KeyCode == (int)GlKeys.Tab)
+        {
+            options.OnKeyDown(capi, args);
+            if (args.Handled) return;
+            int direction = args.ShiftPressed ? -1 : 1;
+            int count = SingleComposer.MaxTabIndex + 1;
+            for (int offset = 1; offset <= count; offset++)
+            {
+                int index = (options.TabIndex + direction * offset + count) % count;
+                if (!SingleComposer.FocusElement(index)) continue;
+                args.Handled = true;
+                return;
+            }
+        }
         base.OnKeyDown(args);
         if (args.Handled || !IsOpened()) return;
         var hotkey = capi.Input.GetHotKeyByCode(parent.ToggleKeyCombinationCode);

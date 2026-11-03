@@ -53,7 +53,8 @@ internal sealed class MenuFixture : IDisposable
 
     internal MenuFixture(bool enabled = true, float scale = 1, bool longLabels = false, bool includeRecipes = false,
         Dictionary<string, bool>? savedSettings = null,
-        Dictionary<string, Vec2i>? savedPositions = null, Dictionary<string, string>? categoryNames = null)
+        Dictionary<string, Vec2i>? savedPositions = null, Dictionary<string, string>? categoryNames = null,
+        Dictionary<string, int>? savedIntSettings = null)
     {
         graphics = new RecipeBookRenderFixture(scale);
         DialogPositions = savedPositions ?? new();
@@ -65,7 +66,7 @@ internal sealed class MenuFixture : IDisposable
                 if (position == null) DialogPositions.Remove(name);
                 else DialogPositions[name] = new(position.X, position.Y);
             });
-        Lifecycle = new LifecycleFixture(enabled, savedSettings);
+        Lifecycle = new LifecycleFixture(enabled, savedSettings, savedIntSettings);
         var translations = new Mock<ITranslationService>();
         translations.Setup(value => value.Get(It.IsAny<string>(), It.IsAny<object[]>()))
             .Returns((string key, object[] _) => key switch
@@ -90,6 +91,8 @@ internal sealed class MenuFixture : IDisposable
                 "vanillaexpanded:recipebook-toggle" => "Recipe Book",
                 "vanillaexpanded:recipebook-remember-open" => longLabels
                     ? "Automatically reopen the recipe book with the inventory" : "Reopen with inventory",
+                "vanillaexpanded:recipebook-tile-size" => "Tile size",
+                "vanillaexpanded:recipebook-tile-size-invalid" => "Localized invalid tile-size message.",
                 "vanillaexpanded:recipebook-category-all" => longLabels
                     ? "All recipes available in the selected crafting catalogue" : "All",
                 "vanillaexpanded:recipebook-category-other" => "Other",
@@ -413,15 +416,25 @@ internal sealed class LifecycleFixture : IDisposable
     internal int Builds;
     private readonly bool originalEnabled = VanillaExpandedModSystem.Config.EnableRecipeBook;
 
-    internal LifecycleFixture(bool enabled = true, Dictionary<string, bool>? savedSettings = null)
+    internal LifecycleFixture(bool enabled = true, Dictionary<string, bool>? savedSettings = null,
+        Dictionary<string, int>? savedIntSettings = null)
     {
         savedSettings ??= new();
+        savedIntSettings ??= new();
         var boolSettings = new Mock<ISettingsClass<bool>>();
         boolSettings.Setup(value => value.Get(It.IsAny<string>(), It.IsAny<bool>()))
             .Returns((string key, bool defaultValue) => savedSettings.GetValueOrDefault(key, defaultValue));
         boolSettings.SetupSet(value => value[It.IsAny<string>()] = It.IsAny<bool>())
             .Callback((string key, bool value) => savedSettings[key] = value);
-        Api.SetupGet(value => value.Settings).Returns(Mock.Of<ISettings>(value => value.Bool == boolSettings.Object));
+        var intSettings = new Mock<ISettingsClass<int>>();
+        intSettings.Setup(value => value.Get(It.IsAny<string>(), It.IsAny<int>()))
+            .Returns((string key, int defaultValue) => savedIntSettings.GetValueOrDefault(key, defaultValue));
+        intSettings.SetupSet(value => value[It.IsAny<string>()] = It.IsAny<int>())
+            .Callback((string key, int value) => savedIntSettings[key] = value);
+        var settings = new Mock<ISettings>();
+        settings.SetupGet(value => value.Bool).Returns(boolSettings.Object);
+        settings.SetupGet(value => value.Int).Returns(intSettings.Object);
+        Api.SetupGet(value => value.Settings).Returns(settings.Object);
         VanillaExpandedModSystem.Config.EnableRecipeBook = enabled;
         Recipes.Add(F.Recipe(F.Ingredient(F.Stack(1, "a", 1))));
         F.Register(Recipes.ToArray());

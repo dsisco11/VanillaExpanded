@@ -837,6 +837,91 @@ public sealed class RecipeBookDialogNativeInputTests
         }
     }
 
+    [Theory]
+    [InlineData((int)GlKeys.Period, '.', true, false, false)]
+    [InlineData((int)GlKeys.X, 'x', true, false, false)]
+    [InlineData((int)GlKeys.Period, '.', false, false, false)]
+    [InlineData((int)GlKeys.X, 'x', false, false, false)]
+    [InlineData((int)GlKeys.X, 'x', true, true, false)]
+    [InlineData((int)GlKeys.X, 'x', false, true, false)]
+    [InlineData((int)GlKeys.X, 'x', true, false, true)]
+    [InlineData((int)GlKeys.X, 'x', false, false, true)]
+    public void NativeIntegerInputRejectsNonintegerEditsAndRestoresTheLastAcceptedSize(
+        int key, char character, bool commitOnEnter, bool recomposeGeometry, bool recomposeScale)
+    {
+        // Arrange
+        var savedSettings = new Dictionary<string, int> { [RecipeBookSystem.TileSizeSetting] = 57 };
+        using var f = new MenuFixture(savedIntSettings: savedSettings);
+        f.Parent.TryOpen();
+        f.Toggle();
+        var book = Assert.Single(f.Menus);
+        var options = f.OpenOptions(book);
+        FocusSizeInput(f, book, options);
+        options.SizeInput.SetValue("63");
+        var accepted = new KeyEvent { KeyCode = (int)GlKeys.Enter };
+        book.OnKeyDown(accepted);
+        Assert.True(accepted.Handled);
+        Assert.Equal(63, savedSettings[RecipeBookSystem.TileSizeSetting]);
+
+        // A real keypress reaches the native IntMode input; SetValue would bypass its rejected-edit path.
+        // Act
+        var invalidEdit = new KeyEvent { KeyCode = key, KeyChar = character };
+        book.OnKeyPress(invalidEdit);
+        Assert.True(invalidEdit.Handled);
+        Assert.True(options.RejectedSizeEdit);
+        Assert.Equal(63, savedSettings[RecipeBookSystem.TileSizeSetting]);
+
+        // The changed tile size has not reached layout yet; this render must recompose before the
+        // rejected edit is committed. Optional second recompositions cover ordinary layout changes.
+        var previousComposer = book.SingleComposer;
+        book.OnRenderGUI(0);
+        Assert.NotSame(previousComposer, book.SingleComposer);
+        if (recomposeGeometry)
+        {
+            previousComposer = book.SingleComposer;
+            f.ResizePanelSpace(previousComposer.Bounds.fixedWidth + 50, previousComposer.Bounds.fixedHeight - 20);
+            book.TryOpen();
+            Assert.NotSame(previousComposer, book.SingleComposer);
+        }
+        else if (recomposeScale)
+        {
+            previousComposer = book.SingleComposer;
+            RuntimeEnv.GUIScale += 0.25f;
+            book.TryOpen(false);
+            Assert.NotSame(previousComposer, book.SingleComposer);
+        }
+
+        options = Assert.IsType<GuiElementRecipeBookOptions>(book.SingleComposer.GetElement("options"));
+        Assert.True(options.IsOpened);
+        Assert.True(options.SizeInput.HasFocus);
+
+        if (commitOnEnter)
+        {
+            var enter = new KeyEvent { KeyCode = (int)GlKeys.Enter };
+            book.OnKeyDown(enter);
+            Assert.True(enter.Handled);
+            Assert.True(options.IsOpened);
+            Assert.True(options.SizeInput.HasFocus);
+        }
+        else
+        {
+            var search = book.SingleComposer.GetTextInput("search");
+            int x = (int)(search.Bounds.absX + search.Bounds.OuterWidth / 2);
+            int y = (int)(search.Bounds.absY + search.Bounds.OuterHeight / 2);
+            f.SetMouse(x, y);
+            book.OnMouseDown(new MouseEvent(x, y, EnumMouseButton.Left, 0));
+            book.OnMouseUp(new MouseEvent(x, y, EnumMouseButton.Left, 0));
+            Assert.False(options.IsOpened);
+            Assert.True(search.HasFocus);
+        }
+
+        // Assert
+        Assert.Equal("63", options.SizeInput.GetText());
+        Assert.Equal(63, savedSettings[RecipeBookSystem.TileSizeSetting]);
+        f.Lifecycle.Api.Verify(api => api.TriggerIngameError(It.IsAny<object>(),
+            "recipebook-tile-size", "Localized invalid tile-size message."), Times.Once);
+    }
+
     [Fact]
     public void InventoryHotkeyRemainsSearchInputWhileSearchIsFocused()
     {
@@ -923,5 +1008,19 @@ public sealed class RecipeBookDialogNativeInputTests
         book.OnKeyPress(typed);
         Assert.True(typed.Handled);
         Assert.Equal("e", book.SingleComposer.GetTextInput("search").GetText());
+    }
+
+    private static void FocusSizeInput(MenuFixture f, GuiDialogRecipeBook book, GuiElementRecipeBookOptions options)
+    {
+        Mock.Get(f.Lifecycle.Api.Object.Input).SetupGet(value => value.KeyboardKeyStateRaw).Returns(new bool[256]);
+        var bounds = options.SizeInput.Bounds;
+        int x = (int)(bounds.absX + bounds.OuterWidth / 2);
+        int y = (int)(bounds.absY + bounds.OuterHeight / 2);
+        f.SetMouse(x, y);
+        var down = new MouseEvent(x, y, EnumMouseButton.Left, 0);
+        book.OnMouseDown(down);
+        Assert.True(down.Handled);
+        book.OnMouseUp(new MouseEvent(x, y, EnumMouseButton.Left, 0));
+        Assert.True(options.SizeInput.HasFocus);
     }
 }
