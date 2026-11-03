@@ -1,6 +1,6 @@
 # Recipe Book Layout Memoization
 
-Source proposal: the conversation proposal separating attachment validation, cached layout, and position-only Follow. This plan is planning-only; every execution and acceptance task remains unchecked.
+Source proposal: the conversation proposal separating attachment validation, cached layout, and position-only Follow. Completion markers require the selected phase's verification, second review, and independent completion audit.
 
 ## Goal and scope
 
@@ -42,29 +42,70 @@ Non-goals:
 Prerequisites: none.
 Outcome: implementation can proceed with a complete dependency contract and a verified root-position update.
 
-    ☐ Read the applicable contributor instructions and the current affected code before implementation.
-        ☐ Follow [.github/copilot-instructions.md](../.github/copilot-instructions.md), and check for more-specific instructions introduced since planning.
-        ☐ Inspect [GuiDialogRecipeBook](../VanillaExpanded/src/RecipeBook/GuiDialogRecipeBook.cs), [RecipeBookLayout](../VanillaExpanded/src/RecipeBook/RecipeBookLayout.cs), and the parent attachment/replacement lifecycle in [RecipeBookIntegration](../VanillaExpanded/src/RecipeBook/RecipeBookIntegration.cs).
-        ☐ Confirm the current tile-setting and options restoration behavior in [GuiElementRecipeBookOptions](../VanillaExpanded/src/RecipeBook/GuiElementRecipeBookOptions.cs).
-    ☐ Establish the input and invalidation contract without changing layout policy.
-        ☐ Enumerate the scalar values and object identities actually used by Fixed and Movable placement, including window size, parent/grid/output extents, scale, movement mode, and manual dialog dimensions.
-        ☐ Distinguish manual x/y movement from size-dependent layout inputs so dragging does not force a placement search or recomposition.
-        ☐ Include relevant object replacement and language changes; preserve attachment failure handling rather than treating a stale composer as a valid cache hit.
-        ☐ Preserve the existing docking search order, physical-pixel docking gap, minimum dimensions, preferred dimensions, clamping, and insufficient-space behavior.
-    ☐ Verify translation-only behavior against the read-only game API.
-        ☐ Inspect native ElementBounds position derivation and GuiElementDialogTitleBar dragging/movement-mode behavior.
-        ☐ Select a root-position update that keeps native coordinate invariants synchronized without recursively dirtying descendants.
-        ☐ Verify representative search, category, recipe tile, scrollbar, footer, titlebar, and options bounds inherit the new origin, including detached/shared bounds used for clipping or hit testing.
-    ☐ Establish proportionate verification support.
-        ☐ Load the test-workflow skill before creating, modifying, or reviewing tests; coordinate the configured test_writer and test_reviewer agents.
-        ☐ Reuse the existing Recipe Book fixtures and serialized native-GUI collection; keep game-source references read-only.
-        ☐ Choose observability that distinguishes measurement, placement search, composition, and root/descendant recalculation without adding permanent per-frame diagnostic overhead.
+    ☑ Read the applicable contributor instructions and the current affected code before implementation.
+        ☑ Follow [.github/copilot-instructions.md](../.github/copilot-instructions.md), and check for more-specific instructions introduced since planning.
+        ☑ Inspect [GuiDialogRecipeBook](../VanillaExpanded/src/RecipeBook/GuiDialogRecipeBook.cs), [RecipeBookLayout](../VanillaExpanded/src/RecipeBook/RecipeBookLayout.cs), and the parent attachment/replacement lifecycle in [RecipeBookIntegration](../VanillaExpanded/src/RecipeBook/RecipeBookIntegration.cs).
+        ☑ Confirm the current tile-setting and options restoration behavior in [GuiElementRecipeBookOptions](../VanillaExpanded/src/RecipeBook/GuiElementRecipeBookOptions.cs).
+    ☑ Establish the input and invalidation contract without changing layout policy.
+        ☑ Enumerate the scalar values and object identities actually used by Fixed and Movable placement, including window size, parent/grid/output extents, scale, movement mode, and manual dialog dimensions.
+        ☑ Distinguish manual x/y movement from size-dependent layout inputs so dragging does not force a placement search or recomposition.
+        ☑ Include relevant object replacement and language changes; preserve attachment failure handling rather than treating a stale composer as a valid cache hit.
+        ☑ Preserve the existing docking search order, physical-pixel docking gap, minimum dimensions, preferred dimensions, clamping, and insufficient-space behavior.
+    ☑ Verify translation-only behavior against the read-only game API.
+        ☑ Inspect native ElementBounds position derivation and GuiElementDialogTitleBar dragging/movement-mode behavior.
+        ☑ Select a root-position update that keeps native coordinate invariants synchronized without recursively dirtying descendants.
+        ☑ Verify representative search, category, recipe tile, scrollbar, footer, titlebar, and options bounds inherit the new origin, including detached/shared bounds used for clipping or hit testing.
+    ☑ Establish proportionate verification support.
+        ☑ Load the test-workflow skill before creating, modifying, or reviewing tests; coordinate the configured test_writer and test_reviewer agents.
+        ☑ Reuse the existing Recipe Book fixtures and serialized native-GUI collection; keep game-source references read-only.
+        ☑ Choose observability that distinguishes measurement, placement search, composition, and root/descendant recalculation without adding permanent per-frame diagnostic overhead.
 
 Completion criteria:
 
-    ☐ Every proposed cache input is accounted for, and any unresolved native/language behavior has a documented decision before implementation.
-    ☐ Native translation safety is demonstrated by focused compatibility evidence, not only an assumption about coordinate getters.
-    ☐ Removing recursive bounds invalidation is gated on that evidence.
+    ☑ Every proposed cache input is accounted for, and any unresolved native/language behavior has a documented decision before implementation.
+    ☑ Native translation safety is demonstrated by focused compatibility evidence, not only an assumption about coordinate getters.
+    ☑ Removing recursive bounds invalidation is gated on that evidence.
+
+### Phase 1 implementation decisions and evidence
+
+These decisions constrain phases 2 and 3; they do not claim that layout memoization or position-only Follow is already implemented.
+
+Input contract:
+
+| Responsibility | Inputs and identities | Exclusions / behavior |
+| --- | --- | --- |
+| Attachment validity | Parent dialog identity/open state, captured inventory composer identity, current `maininventory` composer identity, current crafting-grid/output controls and bounds | Validate before accepting cached layout. Parent/composer replacement retains existing close/reattach handling, not a stale-result fallback. |
+| Measurements | GUI scale, validated tile size, language inputs below; dialog-local category list and maximum alternative-count digit width, immutable sort labels/providers, and existing control/font metrics | Catalogue-derived inputs are constant for one dialog. Inventory contents, search, selected category, selected recipe, and scroll do not change shell measurement dependencies. |
+| Fixed placement | Window bounds identity and inner width/height; parent bounds identity, `absX`, `absY`, and `OuterWidth`; crafting-grid/output bounds identities and their `absX`, `absY`, `OuterWidth`, `OuterHeight`; current scale and measured minimum width/height | Parent height alone is not read by Place. Retain the six existing search regions, in order: right of inventory, left of inventory, left of grid, right of grid, above grid, below grid. |
+| Movable size placement | Window bounds identity and inner width/height; dialog bounds identity and fixed width/height; current scale, measured minimum width/height, and movement mode | Parent/grid movement does not affect manual sizing. Manual fixed x/y are live positioning inputs, not memoized size-layout inputs. |
+| Position following | Cached Fixed origin, or live Movable fixed x/y clamped using current window/dialog dimensions | Apply no update when coordinates match. Keep the existing window-relative coordinate model, 2-physical-pixel docking gap, preferred 340-by-420 GUI-unit dimensions, minimum sizing, and insufficient-space notification/closure. |
+
+Measurement changes invalidate placement even when computed minimum dimensions are equal. Movement-mode changes invalidate placement. Window replacement must update the root's parent relationship, not merely reuse matching dimensions. After clamping or recomposition, capture effective dialog dimensions so a settled frame does not immediately miss the cache again.
+
+Language decision:
+
+- Track `Lang.CurrentLocale` and `Lang.DefaultLocale`, both selected service identities, each service's line-break behavior, and the reference identity of its public `GetAllEntries()` table. Default-language changes matter because Lang falls back when the current locale lacks a key.
+- Native `TranslationService.Load` and `PreLoad` replace their tables. `GetAllEntries` ensures lazy loading, so `Invalidate` followed by the next snapshot also exposes replacement without changing the locale or service identity. The ordinary loaded lookup returns the existing table without copying/enumerating it.
+- No translation-reload event is exposed by the consulted IClientEventAPI; texture/shader/shape reload events are not translation notifications. No new engine hook is needed for these native reload paths.
+- Arbitrary in-place mutation by a custom translation service or mod is not a guaranteed native reload signal. Do not claim detection of that unsupported mutation protocol. A future extension would need a revision notification or resolved-label comparison; it is not part of this refactor.
+
+Translation decision:
+
+- For an initialized fixed-size root at unchanged GUI scale, dimensions, alignment, padding, and offsets, change its fixed x/y and call only the root's native `CalcWorldBounds`, without `MarkDirtyRecursive`.
+- Native calculation updates the root's scaled origin and skips initialized children. Descendant absolute/render positions inherit the new origin, including control-owned bounds outside the root's ChildBounds list. A genuinely dirty child is still recalculated by the native method.
+- Use this native update rather than manually writing only some absolute-coordinate fields. Recomposition remains necessary when scale/dimensions/layout dependencies change. Native titlebar setup, first-frame clamping, and drag calculations remain independently owned by the native control.
+- [RecipeBookNativeBoundsCompatibilityTests](../VanillaExpanded.Tests/Integration/RecipeBook/RecipeBookNativeBoundsCompatibilityTests.cs) exercise the proposed native operation independently of the still-unmodified Follow path, including composed controls, pixel bounds, clipping, rendering calls, hit regions, retained state, and child calculation counts.
+- [NativeTranslationCacheCompatibilityTests](../VanillaExpanded.Tests/Integration/RecipeBook/NativeTranslationCacheCompatibilityTests.cs) exercise native table identity, invalidation/load/preload replacement, and locale fallback. Both suites are Integration evidence because they characterize native implementation behavior, not merely native value-type construction.
+
+Verification observability for subsequent phases:
+
+- Use test-only, fixture-scoped interception of the mod's MeasureLayout, Place/PlaceMovable, and Compose computation paths when direct invocation counts are required. Keep any interception limited to mod methods, serialized with the existing native-GUI collection, and removed in fixture disposal.
+- Count native root/child calculations with test-only counting bounds; existing mocked GUI composer/resource calls provide supporting composition/resource evidence. Composer identity alone does not prove that measurement or placement was skipped.
+- Do not add permanent production counters or a diagnostic callback on every frame. Complete direct unchanged-frame operation-count assertions when the caches/render lifecycle exist in phase 3; they are not a phase 1 completion claim.
+
+Source evidence: the current linked mod files; read-only native checkout `D:\CODE\VintageStory\vsapi`, specifically ElementBounds position/calculation, GuiElementDialogTitleBar movement, Lang locale/fallback, TranslationService loading, ITranslationService, and IClientEventAPI reload declarations. Executed compatibility tests use installed native assemblies, API assembly version 1.22.0 and Lib assembly version 1.22.7; checkout inspection alone is not installed-runtime proof.
+
+Delegated focused verification: 186 passed, 0 failed, 0 skipped on net10.0 across RecipeBookDialogLayoutTests, RecipeBookTilesGeometryTests, RecipeBookOptionsTests, RecipeBookDialogCleanupTests, RecipeBookSystemLifecycleTests, RecipeBookOpenerStateTests, RecipeBookDialogNativeInputTests, and the two new compatibility suites. After strengthening the translated options-input focus-routing assertion, the affected native bounds suite passed again (4 passed, 0 failed, 0 skipped). Independent test review and the second review are complete, with the focus-routing finding resolved. The fresh independent completion audit confirmed Phase 1 is fully satisfied with no required gaps. This is headless/native compatibility evidence, not in-game visual acceptance or a measured frame-time improvement.
 
 ## Phase 2: Introduce per-dialog measurement and placement memoization
 
