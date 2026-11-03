@@ -29,9 +29,8 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
     private readonly CraftingTransferCoordinator coordinator;
     private readonly RecipeBookIconCache icons;
     private readonly RecipeBookLayoutCache layoutCache;
-    private double composedScale;
+    private GuiBoundsSnapshot composedSize;
     private int tileSize = (int)RecipeBookVisualMetrics.TileSize;
-    private int composedTileSize;
     private double minimumWidth;
     private double minimumHeight;
     private double searchHeight;
@@ -117,6 +116,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
     /// <summary>Restores browsing state, prepares layout, refreshes recipes, and opens with the requested focus.</summary>
     public override bool TryOpen(bool withFocus)
     {
+        if (disposed || ValidateAttachment() is not { } attachment) return false;
         long start = Stopwatch.GetTimestamp();
         if (restoreScroll != null)
         {
@@ -124,7 +124,8 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
             session.SelectCategory(BrowsingState.Category);
             session.Sort.Select(BrowsingState.Sort);
         }
-        if (!Follow(withFocus)) return false;
+        if (EnsureLayout(attachment.Grid, attachment.Output, withFocus) is not { } placement) return false;
+        Follow(placement);
         double composeMs = Stopwatch.GetElapsedTime(start).TotalMilliseconds;
         start = Stopwatch.GetTimestamp();
         Refresh();
@@ -166,6 +167,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
     {
         var oldTiles = SingleComposer?.GetElement("tiles") as GuiElementRecipeBookTiles;
         var view = oldTiles?.CaptureView();
+        int? focusedTabIndex = SingleComposer?.CurrentTabIndexElement?.TabIndex;
         bool restoreOptions = options?.IsOpened == true;
         bool restoreSizeFocus = options?.SizeInput.HasFocus == true;
         string? sizeText = options?.SizeInput.GetText();
@@ -297,12 +299,15 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         ((GuiElementIconTabs)composer.GetElement("categories")).SetValue(Array.IndexOf(categories, session.Category), false);
         composer.GetTextInput("search").SetValue(search);
         tiles.Bind(composer.GetScrollbar("scroll"));
+        if (!restoreOptions && focusFirstElement && focusedTabIndex is int focusIndex)
+            composer.FocusElement(focusIndex);
         if (view != null)
         {
             if (view.HasFocus && focusFirstElement) composer.FocusElement(tiles.TabIndex);
             tiles.RestoreView(view with { HasFocus = view.HasFocus && focusFirstElement });
         }
         UpdateLabels();
+        composedSize = GuiBoundsSnapshot.CaptureFixedSize(bounds);
     }
 
     /// <summary>Resolves the category label, including all/other categories and a code fallback for missing translations.</summary>
@@ -414,62 +419,74 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
     /// <summary>Commits the current composer's effective bounds to the placement cache after composition.</summary>
     internal void AcceptComposedLayout() => layoutCache.AcceptComposedBounds(SingleComposer.Bounds);
 
-    /// <summary>
-    /// Validates the inventory attachment, measures when needed, and calculates placement on every call.
-    /// Recomposes changed layout or updates position with recursive bounds recalculation when retaining controls.
-    /// </summary>
-    private bool Follow(bool focusFirstElement)
+    /// <summary>Returns current crafting bounds or closes the book when the captured inventory attachment is no longer valid.</summary>
+    private (ElementBounds Grid, ElementBounds Output)? ValidateAttachment()
     {
         if (!parent.IsOpened() || !parent.Composers.ContainsKey("maininventory")
             || !ReferenceEquals(parent.Composers["maininventory"], parentComposer))
         {
             CloseWithParent();
-            return false;
+            return null;
         }
         var grid = parentComposer.GetElement("craftinggrid")?.Bounds;
-        if (grid == null) { CloseWithParent(); return false; }
-        var output = parentComposer.GetElement("outputslot").Bounds;
-        tileSize = RecipeBookSystem.GetTileSize(capi);
-        if (SingleComposer == null || composedScale != RuntimeEnv.GUIScale || composedTileSize != tileSize) MeasureLayout();
+        var output = parentComposer.GetElement("outputslot")?.Bounds;
+        if (grid == null || output == null)
+        {
+            CloseWithParent();
+            return null;
+        }
+        return (grid, output);
+    }
+
+    /// <summary>Ensures cached layout, recomposing only changed measurements or dimensions and closing when no placement fits.</summary>
+    private GuiDialogPlacement? EnsureLayout(ElementBounds grid, ElementBounds output, bool focusFirstElement)
+    {
+        bool measurementsChanged = EnsureLayoutMeasurements();
         var savedPosition = SingleComposer == null ? capi.Gui.GetDialogPosition(ComposerName) : null;
         bool movable = SingleComposer?.GetTitleBar("titlebar").Movable ?? savedPosition != null;
-        var next = movable
-            ? RecipeBookLayout.PlaceMovable(SingleComposer?.Bounds
-                ?? ElementBounds.Fixed(savedPosition!.X, savedPosition.Y, RecipeBookLayout.PreferredWidth, RecipeBookLayout.PreferredHeight),
-                capi.Gui.WindowBounds, minimumWidth, minimumHeight)
-            : RecipeBookLayout.Place(parentComposer.Bounds, grid, output, capi.Gui.WindowBounds,
-                minimumWidth, minimumHeight);
-        if (next == null)
+        var dialogBounds = SingleComposer?.Bounds
+            ?? (savedPosition == null ? parentComposer.Bounds
+                : ElementBounds.Fixed(savedPosition.X, savedPosition.Y,
+                    RecipeBookLayout.PreferredWidth, RecipeBookLayout.PreferredHeight));
+        if (EnsureLayoutPlacement(movable, dialogBounds, grid, output) is not { } next)
         {
             Error("vanillaexpanded:recipebook-screen-space");
             CloseWithParent();
-            return false;
+            return null;
         }
-        if (SingleComposer == null || composedScale != RuntimeEnv.GUIScale
-            || composedTileSize != tileSize
-            || SingleComposer.Bounds.fixedWidth != next.fixedWidth || SingleComposer.Bounds.fixedHeight != next.fixedHeight)
+        if (SingleComposer == null || measurementsChanged
+            || composedSize.Width != next.Width || composedSize.Height != next.Height
+            || SingleComposer.Bounds.fixedWidth != next.Width || SingleComposer.Bounds.fixedHeight != next.Height)
         {
             if (movable)
-                capi.Gui.SetDialogPosition(ComposerName, new Vec2i((int)next.fixedX, (int)next.fixedY));
-            Compose(next, focusFirstElement);
-            composedScale = RuntimeEnv.GUIScale;
-            composedTileSize = tileSize;
+                capi.Gui.SetDialogPosition(ComposerName, new Vec2i((int)next.X, (int)next.Y));
+            Compose(next.ToBounds(), focusFirstElement);
+            AcceptComposedLayout();
+            var bounds = SingleComposer.Bounds;
+            return new(next.Window, bounds.fixedX, bounds.fixedY, bounds.fixedWidth, bounds.fixedHeight);
         }
-        else
-        {
-            SingleComposer.Bounds.fixedX = next.fixedX;
-            SingleComposer.Bounds.fixedY = next.fixedY;
-            SingleComposer.Bounds.MarkDirtyRecursive();
-            SingleComposer.Bounds.CalcWorldBounds();
-        }
-        return true;
+        return next;
+    }
+
+    /// <summary>Applies only a changed root position or window parent using native calculation without dirtying descendants.</summary>
+    private void Follow(GuiDialogPlacement placement)
+    {
+        var bounds = SingleComposer.Bounds;
+        if (bounds.fixedX == placement.X && bounds.fixedY == placement.Y
+            && ReferenceEquals(bounds.ParentBounds, placement.Window)) return;
+        bounds.ParentBounds = placement.Window;
+        bounds.fixedX = placement.X;
+        bounds.fixedY = placement.Y;
+        bounds.CalcWorldBounds();
     }
 
     /// <summary>Updates placement and renders the book unless disposed, detached, or the render surface has zero dimensions.</summary>
     public override void OnRenderGUI(float deltaTime)
     {
         if (capi.Render.FrameWidth == 0 || capi.Render.FrameHeight == 0) return;
-        if (disposed || !Follow(Focused)) return;
+        if (disposed || ValidateAttachment() is not { } attachment) return;
+        if (EnsureLayout(attachment.Grid, attachment.Output, Focused) is not { } placement) return;
+        Follow(placement);
         base.OnRenderGUI(deltaTime);
     }
 

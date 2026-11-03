@@ -1,6 +1,8 @@
 using System.Text.Json;
 using Moq;
+using VanillaExpanded.RecipeBook;
 using VanillaExpanded.Tests;
+using VanillaExpanded.Tests.TestSupport.RecipeBook;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -11,6 +13,81 @@ namespace VanillaExpanded.Tests.Integration.RecipeBook;
 [Collection("Recipe book native GUI")]
 public sealed class NativeTranslationCacheCompatibilityTests
 {
+    /// <summary>Verifies the dialog observes native same-locale invalidation and reload table replacements.</summary>
+    [Fact]
+    public void RecipeBookRecomposesAfterNativeSameLocaleTranslationReloads()
+    {
+        // Arrange
+        string originalDefaultLocale = Lang.DefaultLocale;
+        try
+        {
+            using var fixture = new MenuFixture();
+            Lang.DefaultLocale = "en";
+            var entries = JsonSerializer.Deserialize<Dictionary<string, string>>(
+                File.ReadAllText(MenuFixture.GetAssetPath("lang", "en.json")))!;
+            string payload = JsonSerializer.Serialize(entries);
+            var assets = CreateAssetManager(CreateLanguageAsset("en", () => payload, "vanillaexpanded"));
+            Lang.AvailableLanguages.Remove("en");
+            var logger = Mock.Of<ILogger>();
+            Lang.LoadLanguage(logger, assets, "en");
+            var service = Assert.IsType<TranslationService>(Lang.AvailableLanguages["en"]);
+            fixture.Parent.TryOpen();
+            using var calls = new RecipeBookLayoutCallCounter();
+            fixture.Toggle();
+            var book = Assert.Single(fixture.Menus);
+            var initialComposer = book.SingleComposer;
+            var initialTable = service.GetAllEntries();
+            Assert.Equal(1, calls.MeasurementCalls);
+            Assert.Equal(1, calls.FixedCalls);
+            Assert.Equal(1, calls.CompositionCalls);
+
+            // Act: native Invalidate reloads lazily through the same locale and service object.
+            entries["recipebook-title"] = "Recipe Book title after native invalidation reload";
+            payload = JsonSerializer.Serialize(entries);
+            service.Invalidate();
+            book.OnRenderGUI(0);
+
+            // Assert the dialog observes the replaced table and conditionally rebuilds its measured shell once.
+            var invalidatedTable = service.GetAllEntries();
+            Assert.Equal("en", Lang.CurrentLocale);
+            Assert.Same(service, Lang.AvailableLanguages["en"]);
+            Assert.NotSame(initialTable, invalidatedTable);
+            Assert.NotSame(initialComposer, book.SingleComposer);
+            Assert.Equal(2, calls.MeasurementCalls);
+            Assert.Equal(2, calls.FixedCalls);
+            Assert.Equal(2, calls.CompositionCalls);
+
+            // A direct same-locale Lang.LoadLanguage reload also replaces the table without replacing its service.
+            var reloadedComposer = book.SingleComposer;
+            var beforeLoadTable = service.GetAllEntries();
+            entries["recipebook-title"] = "Recipe Book title after same-locale load reload";
+            payload = JsonSerializer.Serialize(entries);
+            Lang.LoadLanguage(logger, assets, "en");
+            book.OnRenderGUI(0);
+
+            // Assert
+            var loadedTable = service.GetAllEntries();
+            Assert.Equal("en", Lang.CurrentLocale);
+            Assert.Same(service, Lang.AvailableLanguages["en"]);
+            Assert.NotSame(beforeLoadTable, loadedTable);
+            Assert.NotSame(reloadedComposer, book.SingleComposer);
+            Assert.Equal(3, calls.MeasurementCalls);
+            Assert.Equal(3, calls.FixedCalls);
+            Assert.Equal(3, calls.CompositionCalls);
+            int settledMeasurements = calls.MeasurementCalls;
+            int settledPlacements = calls.FixedCalls;
+            int settledCompositions = calls.CompositionCalls;
+            book.OnRenderGUI(0);
+            Assert.Equal(settledMeasurements, calls.MeasurementCalls);
+            Assert.Equal(settledPlacements, calls.FixedCalls);
+            Assert.Equal(settledCompositions, calls.CompositionCalls);
+        }
+        finally
+        {
+            Lang.DefaultLocale = originalDefaultLocale;
+        }
+    }
+
     [Fact]
     public void LocaleFallbackAndNativeReloadsReplaceEntryTablesWithoutReplacingServices()
     {
@@ -138,11 +215,12 @@ public sealed class NativeTranslationCacheCompatibilityTests
         return manager.Object;
     }
 
-    private static IAsset CreateLanguageAsset(string language, Func<string> getText)
+    /// <summary>Creates a native localization asset with the requested language and domain identity.</summary>
+    private static IAsset CreateLanguageAsset(string language, Func<string> getText, string domain = "game")
     {
         var asset = new Mock<IAsset>();
         asset.SetupGet(value => value.Name).Returns(language + ".json");
-        asset.SetupGet(value => value.Location).Returns(new AssetLocation("game:lang/" + language + ".json"));
+        asset.SetupGet(value => value.Location).Returns(new AssetLocation(domain + ":lang/" + language + ".json"));
         asset.Setup(value => value.ToText()).Returns(getText);
         return asset.Object;
     }

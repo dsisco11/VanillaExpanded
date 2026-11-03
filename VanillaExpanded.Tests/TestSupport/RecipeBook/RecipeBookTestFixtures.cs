@@ -39,6 +39,7 @@ internal sealed class MenuFixture : IDisposable
     internal readonly List<(IAsset Asset, int X, int Y, int Width, int Height, int SurfaceWidth, int SurfaceHeight, int? Color)> CategoryDraws = new();
     internal int TextureCount => graphics.Textures.Count;
     internal readonly Dictionary<string, Vec2i> DialogPositions;
+    internal IRecipeBookIconShaderProgram CreateIconShader() => graphics.CreateShader();
 
     internal static string GetAssetPath(params string[] assetSegments)
     {

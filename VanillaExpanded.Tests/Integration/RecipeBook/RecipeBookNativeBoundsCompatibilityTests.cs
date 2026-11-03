@@ -14,6 +14,91 @@ namespace VanillaExpanded.Tests.Integration.RecipeBook;
 [Collection("Recipe book native GUI")]
 public sealed class RecipeBookNativeBoundsCompatibilityTests
 {
+    /// <summary>Verifies render-lifecycle Follow translates native hit, render, and scissor regions at fractional scales.</summary>
+    [Theory]
+    [InlineData(1.25f, 13.25, 8.5)]
+    [InlineData(1.75f, 17.5, 9.25)]
+    public void RenderLifecycleTranslationMovesNativeHitRenderAndScissorRegions(
+        float scale, double deltaX, double deltaY)
+    {
+        // Arrange
+        using var f = new MenuFixture(scale: scale, includeRecipes: true);
+        f.Parent.TryOpen();
+        using var calls = new RecipeBookLayoutCallCounter(countBounds: true,
+            createIconShader: f.CreateIconShader);
+        f.Toggle();
+        var book = Assert.Single(f.Menus);
+        var composer = book.SingleComposer;
+        var search = Assert.IsType<GuiElementClearableTextInput>(composer.GetTextInput("search"));
+        var tabs = Assert.IsType<GuiElementIconTabs>(composer.GetElement("categories"));
+        var tab = tabs.Composer!.GetToggleButton("tab-0");
+        var tiles = Assert.IsType<GuiElementRecipeBookTiles>(composer.GetElement("tiles"));
+        var tile = Assert.IsType<GuiElementRecipeBookTile>(tiles.Elements[0]);
+        var scrollbar = Assert.IsType<GuiElementStyledScrollbar>(composer.GetScrollbar("scroll"));
+        book.OnRenderGUI(0);
+        var oldSearchPoint = NearTopLeft(search.FieldBounds);
+        var oldClearPoint = NearTopLeft(search.ClearBounds);
+        var oldTabPoint = NearTopLeft(tab.Bounds);
+        var oldTilePoint = NearTopLeft(tile.PixelBounds);
+        Assert.True(search.IsPositionInside(oldSearchPoint.X, oldSearchPoint.Y));
+        Assert.True(search.ClearBounds.PointInside(oldClearPoint.X, oldClearPoint.Y));
+        Assert.True(tab.IsPositionInside(oldTabPoint.X, oldTabPoint.Y));
+        Assert.True(tile.IsPositionInside(oldTilePoint.X, oldTilePoint.Y));
+        var oldScissor = CaptureScissor(f, tabs);
+        var oldScrollbarDraws = CaptureScrollbarDraws(f, scrollbar);
+        var root = calls.GetRootBounds(book);
+        var child = calls.GetChildBounds(book);
+        int rootCalculations = root.Calculations;
+        int childCalculations = child.Calculations;
+        var parent = f.Parent.Composers["maininventory"].Bounds;
+
+        // Act: move the actual inventory parent, then exercise the dialog's real render lifecycle.
+        parent.fixedX += deltaX;
+        parent.fixedY += deltaY;
+        parent.MarkDirtyRecursive();
+        parent.CalcWorldBounds();
+        book.OnRenderGUI(0);
+
+        // Assert the shell is retained and the native root-only update preserves translated descendants.
+        double pixelDeltaX = deltaX * scale;
+        double pixelDeltaY = deltaY * scale;
+        Assert.Same(composer, book.SingleComposer);
+        Assert.Same(search, book.SingleComposer.GetTextInput("search"));
+        Assert.Same(tabs, book.SingleComposer.GetElement("categories"));
+        Assert.Same(tiles, book.SingleComposer.GetElement("tiles"));
+        Assert.Equal(rootCalculations + 1, root.Calculations);
+        Assert.Equal(childCalculations, child.Calculations);
+        Assert.Equal(1, calls.MeasurementCalls);
+        Assert.Equal(2, calls.FixedCalls);
+        Assert.Equal(1, calls.CompositionCalls);
+
+        var newSearchPoint = Center(search.FieldBounds);
+        var newClearPoint = Center(search.ClearBounds);
+        var newTabPoint = Center(tab.Bounds);
+        var newTilePoint = Center(tile.PixelBounds);
+        Assert.False(search.IsPositionInside(oldSearchPoint.X, oldSearchPoint.Y));
+        Assert.True(search.IsPositionInside(newSearchPoint.X, newSearchPoint.Y));
+        Assert.False(search.ClearBounds.PointInside(oldClearPoint.X, oldClearPoint.Y));
+        Assert.True(search.ClearBounds.PointInside(newClearPoint.X, newClearPoint.Y));
+        Assert.False(tab.IsPositionInside(oldTabPoint.X, oldTabPoint.Y));
+        Assert.True(tab.IsPositionInside(newTabPoint.X, newTabPoint.Y));
+        Assert.False(tile.IsPositionInside(oldTilePoint.X, oldTilePoint.Y));
+        Assert.True(tile.IsPositionInside(newTilePoint.X, newTilePoint.Y));
+
+        var newScissor = CaptureScissor(f, tabs);
+        Assert.Same(oldScissor.Bounds, newScissor.Bounds);
+        Assert.InRange(Math.Abs(newScissor.RenderX - oldScissor.RenderX - pixelDeltaX), 0, 1);
+        Assert.InRange(Math.Abs(newScissor.RenderY - oldScissor.RenderY - pixelDeltaY), 0, 1);
+        var newScrollbarDraws = CaptureScrollbarDraws(f, scrollbar);
+        Assert.NotEmpty(oldScrollbarDraws);
+        Assert.Equal(oldScrollbarDraws.Length, newScrollbarDraws.Length);
+        for (int i = 0; i < oldScrollbarDraws.Length; i++)
+        {
+            Assert.InRange(Math.Abs(newScrollbarDraws[i].X - oldScrollbarDraws[i].X - pixelDeltaX), 0, 1);
+            Assert.InRange(Math.Abs(newScrollbarDraws[i].Y - oldScrollbarDraws[i].Y - pixelDeltaY), 0, 1);
+        }
+    }
+
     [Theory]
     [InlineData(1.25f, 360.25, 21.25)]
     [InlineData(1.75f, 180, 20)]
@@ -101,8 +186,8 @@ public sealed class RecipeBookNativeBoundsCompatibilityTests
         var oldTitlePoint = Center(titlebar.Bounds);
         var oldOptionsPoint = Center(options.Bounds);
         var oldScissor = CaptureScissor(f, tabs);
-        double oldPixelClipX = oldScissor.renderX;
-        double oldPixelClipY = oldScissor.renderY;
+        double oldPixelClipX = oldScissor.RenderX;
+        double oldPixelClipY = oldScissor.RenderY;
         double oldViewportX = tiles.InsideClipBounds!.renderX;
         double oldViewportY = tiles.InsideClipBounds.renderY;
         int textureCount = f.TextureCount;
@@ -180,9 +265,9 @@ public sealed class RecipeBookNativeBoundsCompatibilityTests
 
         // The clipped child composer passes its original pixel-snapped clip to the native renderer.
         var newScissor = CaptureScissor(f, tabs);
-        Assert.Same(oldScissor, newScissor);
-        Assert.InRange(Math.Abs(newScissor.renderX - oldPixelClipX - pixelDeltaX), 0, 1);
-        Assert.InRange(Math.Abs(newScissor.renderY - oldPixelClipY - pixelDeltaY), 0, 1);
+        Assert.Same(oldScissor.Bounds, newScissor.Bounds);
+        Assert.InRange(Math.Abs(newScissor.RenderX - oldPixelClipX - pixelDeltaX), 0, 1);
+        Assert.InRange(Math.Abs(newScissor.RenderY - oldPixelClipY - pixelDeltaY), 0, 1);
         Assert.InRange(Math.Abs(tiles.InsideClipBounds.renderX - oldViewportX - pixelDeltaX), 0, 1);
         Assert.InRange(Math.Abs(tiles.InsideClipBounds.renderY - oldViewportY - pixelDeltaY), 0, 1);
 
@@ -190,7 +275,7 @@ public sealed class RecipeBookNativeBoundsCompatibilityTests
         render.Invocations.Clear();
         tabs.RenderInteractiveElements(0);
         Assert.Contains(render.Invocations, call => call.Method.Name == nameof(IRenderAPI.PushScissor)
-            && ReferenceEquals(call.Arguments[0], newScissor));
+            && ReferenceEquals(call.Arguments[0], newScissor.Bounds));
         render.Invocations.Clear();
         // The icon renderer is covered separately; hide tiles here so this assertion isolates
         // the composed tile viewport's native scissor path without requiring a graphics shader.
@@ -393,13 +478,17 @@ public sealed class RecipeBookNativeBoundsCompatibilityTests
         return Assert.IsType<GuiElementHoverText>(Assert.Single(elements.Values.OfType<GuiElementHoverText>()));
     }
 
-    private static ElementBounds CaptureScissor(MenuFixture f, GuiElementIconTabs tabs)
+    private readonly record struct ScissorSnapshot(ElementBounds Bounds, double RenderX, double RenderY);
+
+    private static ScissorSnapshot CaptureScissor(MenuFixture f, GuiElementIconTabs tabs)
     {
         var render = Mock.Get(f.Lifecycle.Api.Object.Render);
         render.Invocations.Clear();
         tabs.RenderInteractiveElements(0);
-        return Assert.IsAssignableFrom<ElementBounds>(Assert.Single(render.Invocations
-            .Where(call => call.Method.Name == nameof(IRenderAPI.PushScissor))).Arguments[0]);
+        var call = Assert.Single(render.Invocations,
+            invocation => invocation.Method.Name == nameof(IRenderAPI.PushScissor));
+        var bounds = Assert.IsAssignableFrom<ElementBounds>(call.Arguments[0]);
+        return new(bounds, bounds.renderX, bounds.renderY);
     }
 
     private static (double X, double Y)[] CaptureScrollbarDraws(
@@ -419,6 +508,10 @@ public sealed class RecipeBookNativeBoundsCompatibilityTests
 
     private static (int X, int Y) Center(ElementBounds bounds) =>
         ((int)(bounds.absX + bounds.OuterWidth / 2), (int)(bounds.absY + bounds.OuterHeight / 2));
+
+    /// <summary>Returns a point just inside a control's upper-left edge to distinguish small native translations.</summary>
+    private static (int X, int Y) NearTopLeft(ElementBounds bounds) =>
+        ((int)Math.Ceiling(bounds.absX + 1), (int)Math.Ceiling(bounds.absY + 1));
 
     private static void AssertTranslated(BoundsState before, double deltaX, double deltaY,
         bool specialPixelBounds, bool specialRoot)

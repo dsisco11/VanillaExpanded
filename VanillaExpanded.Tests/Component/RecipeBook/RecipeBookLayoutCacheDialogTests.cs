@@ -27,8 +27,8 @@ public sealed class RecipeBookLayoutCacheDialogTests
         var book = Assert.Single(fixture.Menus);
         var composer = book.SingleComposer;
 
-        // Act: invoke the new cache boundary directly; the current render lifecycle remains unchanged.
-        Assert.True(book.EnsureLayoutMeasurements());
+        // Act: opening has already measured once; exercise the cache boundary without repeating work.
+        Assert.False(book.EnsureLayoutMeasurements());
         double initialMinimumHeight = ReadDouble(book, "minimumHeight");
         Assert.False(book.EnsureLayoutMeasurements());
 
@@ -74,7 +74,7 @@ public sealed class RecipeBookLayoutCacheDialogTests
         var book = Assert.Single(fixture.Menus);
 
         // Act
-        Assert.True(book.EnsureLayoutMeasurements());
+        Assert.False(book.EnsureLayoutMeasurements());
         Assert.False(book.EnsureLayoutMeasurements());
         RuntimeEnv.GUIScale = 1.75f;
         bool changedScaleMeasured = book.EnsureLayoutMeasurements();

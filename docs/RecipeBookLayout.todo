@@ -94,7 +94,7 @@ Translation decision:
 - For an initialized fixed-size root at unchanged GUI scale, dimensions, alignment, padding, and offsets, change its fixed x/y and call only the root's native `CalcWorldBounds`, without `MarkDirtyRecursive`.
 - Native calculation updates the root's scaled origin and skips initialized children. Descendant absolute/render positions inherit the new origin, including control-owned bounds outside the root's ChildBounds list. A genuinely dirty child is still recalculated by the native method.
 - Use this native update rather than manually writing only some absolute-coordinate fields. Recomposition remains necessary when scale/dimensions/layout dependencies change. Native titlebar setup, first-frame clamping, and drag calculations remain independently owned by the native control.
-- [RecipeBookNativeBoundsCompatibilityTests](../VanillaExpanded.Tests/Integration/RecipeBook/RecipeBookNativeBoundsCompatibilityTests.cs) exercise the proposed native operation independently of the still-unmodified Follow path, including composed controls, pixel bounds, clipping, rendering calls, hit regions, retained state, and child calculation counts.
+- [RecipeBookNativeBoundsCompatibilityTests](../VanillaExpanded.Tests/Integration/RecipeBook/RecipeBookNativeBoundsCompatibilityTests.cs) exercise native root translation, including composed controls, pixel bounds, clipping, rendering calls, hit regions, retained state, and child calculation counts.
 - [NativeTranslationCacheCompatibilityTests](../VanillaExpanded.Tests/Integration/RecipeBook/NativeTranslationCacheCompatibilityTests.cs) exercise native table identity, invalidation/load/preload replacement, and locale fallback. Both suites are Integration evidence because they characterize native implementation behavior, not merely native value-type construction.
 
 Verification observability for subsequent phases:
@@ -137,7 +137,7 @@ Completion criteria:
 ### Phase 2 implementation and verification
 
 - [RecipeBookLayoutCache](../VanillaExpanded/src/RecipeBook/RecipeBookLayoutCache.cs) owns per-instance measurement and placement snapshots. Keys and placement results are value types; bounds, translation services, and translation tables are compared by reference identity where required. [GuiLanguageInputs](../VanillaExpanded/src/Gui/GuiLanguageInputs.cs) and the [shared layout inputs](../VanillaExpanded/src/Gui/GuiLayoutInputs.cs) provide reusable language/scale snapshots, bounds snapshots, and dialog placement geometry; tile size and docking dependencies remain recipe-specific.
-- [GuiDialogRecipeBook](../VanillaExpanded/src/RecipeBook/GuiDialogRecipeBook.cs) owns the cache and exposes measurement preparation, placement lookup, and composed-bounds acceptance for phase 3. Its TryOpen, Follow, and render lifecycle still use the original path.
+- [GuiDialogRecipeBook](../VanillaExpanded/src/RecipeBook/GuiDialogRecipeBook.cs) owns the cache and exposes measurement preparation, placement lookup, and composed-bounds acceptance for phase 3. At the end of phase 2, its TryOpen, Follow, and render lifecycle still used the original path.
 - Placement lookup returns scalar geometry rather than composer-owned bounds. Materialize bounds only when composition needs them, then accept the actual composed root so replacement and clamped dimensions become the settled inputs. Movable cache hits use live x/y for clamping without rerunning PlaceMovable.
 - Failed measurements or placement clear the corresponding cached success before computation; failed placement remains a failure, including when earlier geometry is restored.
 
@@ -148,36 +148,46 @@ Delegated focused verification: 74 passed, 0 failed, 0 skipped on net10.0 across
 Prerequisites: Phase 2 and the Phase 1 native translation gate.
 Outcome: unchanged rendered frames skip shell-layout work while movement and responsive layout remain functional.
 
-    ☐ Separate attachment validation, ensuring cached layout, and following position.
-        ☐ Route TryOpen through validation/layout initialization before recipe refresh and opening.
-        ☐ Route OnRenderGUI through lightweight validation/input comparison, then position-only Follow, then native rendering.
-        ☐ Preserve disposed-dialog and zero-render-dimension guards.
-        ☐ Keep Follow free of setting reads, attachment decisions, label measurement, docking-space searches, and control composition.
-    ☐ Recompose only when necessary.
-        ☐ Rebuild controls on initial composition, changed measured content, or changed resulting dimensions.
-        ☐ Do not recompose merely because parent coordinates or the desired dialog position changed.
-        ☐ Preserve category, search, sort, craftable-only state, selected output/alternative, proportional row anchor, and appropriate recipe inspection/focus during required recomposition.
-        ☐ Preserve an open options dropdown, numeric editing focus/text, and pending rejected-edit feedback across recomposition.
-        ☐ Preserve native Movable coordinates and transitions back to Fixed docking.
-    ☐ Apply movement without recursive shell-layout invalidation.
-        ☐ Return without bounds writes/recalculation when the desired position already matches.
-        ☐ Apply the verified root-position update only when translation is necessary.
-        ☐ Clamp Movable coordinates using current valid window/dialog dimensions without rerunning the docking search.
-        ☐ Preserve matching render, clipping, hover, mouse-hit, and keyboard-focus regions after movement.
-    ☐ Verify rendering and lifecycle behavior with the configured test workers.
-        ☐ After normal first-frame warm-up, exercise at least 1,000 unchanged frames with stable inventory/input: zero measurement calls, placement searches, recompositions, and shell-root/descendant layout recalculations caused by this lifecycle.
-        ☐ Verify Fixed parent movement with unchanged resulting dimensions retains the composer, tiles, focus, and row anchor while hit regions move correctly.
-        ☐ Verify Fixed parent movement that changes docking side or available dimensions still produces valid placement and conditional recomposition.
-        ☐ Verify Movable dragging/clamping retains the composer and does not search for docking space.
-        ☐ Verify window resizing, GUI-scale changes, tile-size changes, supported language changes, and movement-mode transitions invalidate the appropriate caches.
-        ☐ Verify inventory/search/category/sort changes do not invalidate shell measurements/placement while their existing recipe-content updates remain correct.
-        ☐ Verify parent closure/replacement, insufficient space, reopen, and disposal preserve existing notification and resource-lifetime behavior.
+    ☑ Separate attachment validation, ensuring cached layout, and following position.
+        ☑ Route TryOpen through validation/layout initialization before recipe refresh and opening.
+        ☑ Route OnRenderGUI through lightweight validation/input comparison, then position-only Follow, then native rendering.
+        ☑ Preserve disposed-dialog and zero-render-dimension guards.
+        ☑ Keep Follow free of setting reads, attachment decisions, label measurement, docking-space searches, and control composition.
+    ☑ Recompose only when necessary.
+        ☑ Rebuild controls on initial composition, changed measured content, or changed resulting dimensions.
+        ☑ Do not recompose merely because parent coordinates or the desired dialog position changed.
+        ☑ Preserve category, search, sort, craftable-only state, selected output/alternative, proportional row anchor, and appropriate recipe inspection/focus during required recomposition.
+        ☑ Preserve an open options dropdown, numeric editing focus/text, and pending rejected-edit feedback across recomposition.
+        ☑ Preserve native Movable coordinates and transitions back to Fixed docking.
+    ☑ Apply movement without recursive shell-layout invalidation.
+        ☑ Return without bounds writes/recalculation when the desired position already matches.
+        ☑ Apply the verified root-position update only when translation is necessary.
+        ☑ Clamp Movable coordinates using current valid window/dialog dimensions without rerunning the docking search.
+        ☑ Preserve matching render, clipping, hover, mouse-hit, and keyboard-focus regions after movement.
+    ☑ Verify rendering and lifecycle behavior with the configured test workers.
+        ☑ After normal first-frame warm-up, exercise at least 1,000 unchanged frames with stable inventory/input: zero measurement calls, placement searches, recompositions, and shell-root/descendant layout recalculations caused by this lifecycle.
+        ☑ Verify Fixed parent movement with unchanged resulting dimensions retains the composer, tiles, focus, and row anchor while hit regions move correctly.
+        ☑ Verify Fixed parent movement that changes docking side or available dimensions still produces valid placement and conditional recomposition.
+        ☑ Verify Movable dragging/clamping retains the composer and does not search for docking space.
+        ☑ Verify window resizing, GUI-scale changes, tile-size changes, supported language changes, and movement-mode transitions invalidate the appropriate caches.
+        ☑ Verify inventory/search/category/sort changes do not invalidate shell measurements/placement while their existing recipe-content updates remain correct.
+        ☑ Verify parent closure/replacement, insufficient space, reopen, and disposal preserve existing notification and resource-lifetime behavior.
 
 Completion criteria:
 
-    ☐ Follow performs position-only work and is a no-op for an unchanged desired position.
-    ☐ The unchanged-frame operation counts meet the stated criteria; measurements distinguish shell work from independent native/tooltip/content work.
-    ☐ Responsive layout, native input compatibility, options editing, and browsing preservation regressions pass.
+    ☑ Follow performs position-only work and is a no-op for an unchanged desired position.
+    ☑ The unchanged-frame operation counts meet the stated criteria; measurements distinguish shell work from independent native/tooltip/content work.
+    ☑ Responsive layout, native input compatibility, options editing, and browsing preservation regressions pass.
+
+### Phase 3 implementation and verification
+
+- TryOpen and OnRenderGUI validate the captured inventory attachment before using cached layout. Missing grid/output controls or a replaced/closed parent close the book rather than accepting stale placement.
+- EnsureLayout reuses cached measurements and placement. Composition is conditional on changed measurements or dimensions, including differences from the last composed size and live root size. After composition, effective bounds are committed so the next settled frame is a cache hit.
+- Follow receives placement geometry only. It returns without writes or calculations when position and window parent match; necessary translation or window replacement uses root-only CalcWorldBounds without recursive invalidation.
+- Recomposition retains session state, tile view/inspection, appropriate focused controls, and options editing/rejection state. Native movement-mode switching, dragging, and position persistence remain native-owned.
+- [RecipeBookLayoutLifecycleTests](../VanillaExpanded.Tests/Component/RecipeBook/RecipeBookLayoutLifecycleTests.cs) exercise 1,000 real warmed OnRenderGUI calls in each of Fixed and Movable modes, observing zero measurement, placement, composition, and shell root/representative-child calculations. Native translation, input/clipping, language reload, and existing browsing/lifecycle regressions supply separate compatibility evidence.
+
+Delegated verification: the initial combined regression batch passed 378 tests; after correcting live-versus-composed size handling, the affected combined batch passed 108 tests; after correcting replacement-test composer ownership, the lifecycle suite passed 15 tests. Every run had 0 failures and 0 skips on net10.0. The affected combined build reported 29 nullable/analyzer warnings. Independent test review and the second implementation/requirements review are complete, with the test-resource ownership finding resolved. The fresh independent completion audit confirmed Phase 3 is fully satisfied with no required gaps. These are headless component/native compatibility and operation-count results, not live-game visual acceptance or measured frame-time gains.
 
 ## Final phase: Review, acceptance, documentation, and cleanup
 
