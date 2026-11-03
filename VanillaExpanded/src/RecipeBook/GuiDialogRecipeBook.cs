@@ -28,6 +28,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
     private readonly RecipeBookSession session;
     private readonly CraftingTransferCoordinator coordinator;
     private readonly RecipeBookIconCache icons;
+    private readonly RecipeBookLayoutCache layoutCache;
     private double composedScale;
     private int tileSize = (int)RecipeBookVisualMetrics.TileSize;
     private int composedTileSize;
@@ -59,6 +60,9 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
     internal event Action? CloseRequestedByUser;
     internal RecipeBookBrowsingState BrowsingState { get; private set; }
 
+    /// <summary>
+    /// Creates the inventory-attached browsing session, transfer coordinator, and layout cache, and subscribes to their lifecycle events.
+    /// </summary>
     internal GuiDialogRecipeBook(ICoreClientAPI api, GuiDialog parent, GuiComposer parentComposer,
         CraftingCatalogue catalogue, CraftingAllocator allocator, RecipeBookIconCache icons,
         RecipeBookBrowsingState? browsingState = null) : base(api)
@@ -82,6 +86,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         session = new(catalogue, allocator,
             () => CraftingInventorySnapshot.Capture(api.World.Player, 3, 3, RuntimeEnv.MainThreadId, false),
             coordinator.Execute);
+        layoutCache = new(MeasureLayout);
         BrowsingState = browsingState ?? new();
         search = BrowsingState.Search;
         restoreScroll = BrowsingState.Scroll;
@@ -94,9 +99,11 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
     public override string ToggleKeyCombinationCode => "";
     public override double DrawOrder => 0.2;
     public override bool PrefersUngrabbedMouse => true;
+    /// <summary>Captures keyboard input while the open, focused book is editing search text or tile size.</summary>
     public override bool CaptureAllInputs() => Focused && IsOpened()
         && ((SingleComposer?.GetTextInput("search")?.HasFocus ?? false)
             || options?.SizeInput.HasFocus == true);
+    /// <summary>Closes the options dropdown first; otherwise delegates Escape handling to the parent inventory.</summary>
     public override bool OnEscapePressed()
     {
         if (options?.IsOpened != true) return parent.OnEscapePressed();
@@ -104,8 +111,10 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         return true;
     }
 
+    /// <summary>Opens the recipe book with keyboard focus.</summary>
     public override bool TryOpen() => TryOpen(true);
 
+    /// <summary>Restores browsing state, prepares layout, refreshes recipes, and opens with the requested focus.</summary>
     public override bool TryOpen(bool withFocus)
     {
         long start = Stopwatch.GetTimestamp();
@@ -130,8 +139,10 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         return base.TryOpen(withFocus);
     }
 
+    /// <summary>Queues recipe reevaluation after a native crafting-grid change while the book is open.</summary>
     internal void NativeGridDirty() { if (IsOpened()) coordinator.QueueRefresh(); }
 
+    /// <summary>Reevaluates recipes against inventory contents, reporting and closing on unsupported or stale inventory failures.</summary>
     private void Refresh()
     {
         if (disposed) return;
@@ -150,6 +161,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         }
     }
 
+    /// <summary>Rebuilds controls at the supplied dimensions while preserving the tile view and options editing state.</summary>
     private void Compose(ElementBounds bounds, bool focusFirstElement)
     {
         var oldTiles = SingleComposer?.GetElement("tiles") as GuiElementRecipeBookTiles;
@@ -293,6 +305,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         UpdateLabels();
     }
 
+    /// <summary>Resolves the category label, including all/other categories and a code fallback for missing translations.</summary>
     private static string CategoryName(string? code) => code switch
     {
         null => Lang.Get("vanillaexpanded:recipebook-category-all"),
@@ -309,19 +322,23 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
     private static double ListBorderWidth => Math.Max(1,
         GuiControlDrawing.Pixels(ListOutline, GuiElement.scaled(1))) / GuiElement.scaled(1);
 
+    /// <summary>Creates the font used for the selected category heading.</summary>
     private static CairoFont CategoryTitleFont() => MainFont().WithFontSize(HeadingFontSize)
         .WithColor(GuiControlPalette.Color(GuiControlPalette.Heading));
 
+    /// <summary>Creates the standard text font with the shared GUI size and palette.</summary>
     private static CairoFont MainFont() => CairoFont.WhiteSmallText().WithFontSize(GuiControlMetrics.TextFontSize)
         .WithColor(GuiControlPalette.Color(GuiControlPalette.Text));
 
+    /// <summary>Creates the compact font used for footer labels and button text.</summary>
     private static CairoFont FooterFont() => CairoFont.WhiteSmallText().WithFontSize(GuiControlMetrics.CompactFontSize)
         .WithColor(GuiControlPalette.Color(GuiControlPalette.ButtonText));
 
-    // Native button bounds measure the content box; layout reserves its padded outer width.
+    /// <summary>Creates a footer button by converting its reserved padded width into the native content-box width.</summary>
     private GuiElementStyledButton StyledButton(string text, ActionConsumable clicked, ElementBounds bounds) =>
         new(capi, text, clicked, bounds.WithFixedWidth(bounds.fixedWidth - 2 * GuiControlMetrics.TextInset), FooterFont());
 
+    /// <summary>Measures localized controls and tile geometry to populate control sizes and the dialog's minimum dimensions.</summary>
     private void MeasureLayout()
     {
         double scale = GuiElement.scaled(1);
@@ -330,6 +347,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         var sortFont = FooterFont();
         var titleFont = MainFont().WithWeight(Cairo.FontWeight.Bold);
         var categoryFont = CategoryTitleFont();
+        // Measures padded button width in GUI units, including the text rounding allowance.
         double ButtonWidth(string text) => Math.Ceiling(buttonFont.GetTextExtents(text).Width / scale + TextWidthAllowance)
             + 2 * GuiControlMetrics.TextInset;
         previousWidth = Math.Max(NavigationWidth, ButtonWidth("<"));
@@ -381,6 +399,25 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
             + FooterSpacing + footerHeight + ContentInset);
     }
 
+    /// <summary>Reads the validated tile size and updates cached measurements, returning whether measurement inputs changed.</summary>
+    internal bool EnsureLayoutMeasurements()
+    {
+        tileSize = RecipeBookSystem.GetTileSize(capi);
+        return layoutCache.EnsureMeasurements(RecipeBookMeasurementInputs.Capture(tileSize));
+    }
+
+    /// <summary>Reuses or recalculates placement for the current geometry, returning null when the dialog cannot fit.</summary>
+    internal GuiDialogPlacement? EnsureLayoutPlacement(bool movable, ElementBounds dialogBounds,
+        ElementBounds grid, ElementBounds output) => layoutCache.EnsurePlacement(movable, dialogBounds,
+            parentComposer.Bounds, grid, output, capi.Gui.WindowBounds, minimumWidth, minimumHeight);
+
+    /// <summary>Commits the current composer's effective bounds to the placement cache after composition.</summary>
+    internal void AcceptComposedLayout() => layoutCache.AcceptComposedBounds(SingleComposer.Bounds);
+
+    /// <summary>
+    /// Validates the inventory attachment, measures when needed, and calculates placement on every call.
+    /// Recomposes changed layout or updates position with recursive bounds recalculation when retaining controls.
+    /// </summary>
     private bool Follow(bool focusFirstElement)
     {
         if (!parent.IsOpened() || !parent.Composers.ContainsKey("maininventory")
@@ -428,6 +465,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         return true;
     }
 
+    /// <summary>Updates placement and renders the book unless disposed, detached, or the render surface has zero dimensions.</summary>
     public override void OnRenderGUI(float deltaTime)
     {
         if (capi.Render.FrameWidth == 0 || capi.Render.FrameHeight == 0) return;
@@ -435,6 +473,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         base.OnRenderGUI(deltaTime);
     }
 
+    /// <summary>Routes movement through options first, then updates tile hover and native control handling.</summary>
     public override void OnMouseMove(MouseEvent args)
     {
         options?.OnMouseMove(capi, args);
@@ -443,6 +482,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         base.OnMouseMove(args);
     }
 
+    /// <summary>Prioritizes options clicks, tracks handled presses, and hides recipe tooltips while options have focus.</summary>
     public override void OnMouseDown(MouseEvent args)
     {
         if (args.Handled) return;
@@ -452,6 +492,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         if (options?.HasFocus == true) tooltip?.Inspect(null);
     }
 
+    /// <summary>Forwards releases only for presses handled by the book and suppresses tooltips while options are open.</summary>
     public override void OnMouseUp(MouseEvent args)
     {
         if (!pressedMouseButtons.Remove(args.Button)) return;
@@ -459,12 +500,14 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         if (options?.IsOpened == true) tooltip?.Inspect(null);
     }
 
+    /// <summary>Lets the options dropdown consume scrolling before forwarding it to the underlying controls.</summary>
     public override void OnMouseWheel(MouseWheelEventArgs args)
     {
         options?.OnMouseWheel(capi, args);
         if (!args.IsHandled) base.OnMouseWheel(args);
     }
 
+    /// <summary>Handles options focus traversal, native keyboard input, and the parent inventory's close hotkey.</summary>
     public override void OnKeyDown(KeyEvent args)
     {
         if (args.Handled) return;
@@ -489,6 +532,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
             args.Handled = parent.TryClose();
     }
 
+    /// <summary>Dispatches recipe activation, reports placement rejection, and synchronizes labels with the resulting session state.</summary>
     private void Activate(int output, bool shift)
     {
         var result = session.Activate(output, shift);
@@ -497,6 +541,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         UpdateLabels();
     }
 
+    /// <summary>Cycles through the selected output's recipe alternatives, wrapping in the requested direction.</summary>
     private bool Cycle(int direction)
     {
         if (session.SelectedOutput is not int output) return true;
@@ -508,6 +553,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         return true;
     }
 
+    /// <summary>Opens the selected recipe's preview item in the handbook and focuses the handbook when available.</summary>
     private bool OpenHandbook()
     {
         var stack = session.Rows.FirstOrDefault(row => row.Output.Id == session.SelectedOutput)?.Recipe.GetPreview();
@@ -526,6 +572,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         return true;
     }
 
+    /// <summary>Clears and focuses search when the empty state offers recovery from an unmatched query.</summary>
     private bool ClearSearch()
     {
         if (session.EmptyState != RecipeBookEmptyState.NoSearchMatches) return true;
@@ -535,6 +582,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         return true;
     }
 
+    /// <summary>Disables the craftable-only filter and resets scrolling when no craftable results remain.</summary>
     private bool ShowUncraftable()
     {
         if (session.EmptyState is not (RecipeBookEmptyState.NoCraftableRecipes or RecipeBookEmptyState.NoCraftableSearchMatches))
@@ -545,6 +593,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         return true;
     }
 
+    /// <summary>Maps a supported empty state to its localized message key, rejecting unsupported states.</summary>
     private static string EmptyMessageKey(RecipeBookEmptyState state) => state switch
     {
         RecipeBookEmptyState.NoRecipes => "vanillaexpanded:recipebook-empty",
@@ -554,6 +603,7 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
         _ => throw new ArgumentOutOfRangeException(nameof(state))
     };
 
+    /// <summary>Synchronizes category text, empty-state layout and actions, footer availability, and the alternative counter.</summary>
     private void UpdateLabels()
     {
         if (SingleComposer == null) return;
@@ -601,23 +651,30 @@ internal sealed class GuiDialogRecipeBook : GuiDialog
             $"{selected.Output.Alternatives.IndexOf(selected.Recipe) + 1}/{selected.Output.Alternatives.Length}");
     }
 
+    /// <summary>Updates the recipe hover tooltip, or clears it when no recipe is supplied.</summary>
     private void Inspect(CraftingRecipeSelection? row) => tooltip?.Inspect(row);
 
+    /// <summary>Displays a localized in-game error associated with this recipe book.</summary>
     private void Error(string reason) => capi.TriggerIngameError(this, "recipebook", Lang.Get(reason));
+
+    /// <summary>Notifies listeners of an explicit user close before asking the native dialog to close.</summary>
     private bool CloseByUser()
     {
         if (IsOpened()) CloseRequestedByUser?.Invoke();
         return TryClose();
     }
 
+    /// <summary>Closes and disposes the book when its inventory attachment or world is no longer valid.</summary>
     internal void CloseWithParent() { TryClose(); Dispose(); }
 
+    /// <summary>Runs native close handling and releases the book's resources.</summary>
     public override void OnGuiClosed()
     {
         base.OnGuiClosed();
         Dispose();
     }
 
+    /// <summary>Captures browsing state and releases subscriptions, GUI resources, coordinator, and session exactly once.</summary>
     public override void Dispose()
     {
         if (disposed) return;

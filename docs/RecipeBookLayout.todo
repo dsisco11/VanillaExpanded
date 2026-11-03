@@ -112,27 +112,36 @@ Delegated focused verification: 186 passed, 0 failed, 0 skipped on net10.0 acros
 Prerequisites: Phase 1.
 Outcome: cached layout decisions are available for lifecycle integration, with existing geometry policy unchanged.
 
-    ☐ Separate measurement inputs from placement inputs in GuiDialogRecipeBook.
-        ☐ Use small value snapshots or equivalent comparisons; avoid replacing existing per-frame bounds allocations with a new per-frame heap-allocated cache key.
-        ☐ Measure labels/control sizes only for an initial cache miss or changed tile size, GUI scale, or supported language input.
-        ☐ Treat measurement changes as placement invalidations even when the resulting minimum dimensions happen to match.
-    ☐ Cache the placement result and its complete input snapshot.
-        ☐ Call RecipeBookLayout.Place or PlaceMovable only on initial placement or changed placement dependencies.
-        ☐ Reuse the existing placement algorithms instead of adding a competing docking policy.
-        ☐ In Movable mode, exclude parent movement and manual x/y from size-layout invalidation when they do not affect placement dimensions.
-        ☐ In Fixed mode, invalidate when relevant parent/grid/output geometry changes; allow docking-side and available-size changes.
-        ☐ Account for dimensions changed by clamping/composition so the next unchanged frame does not cause a redundant second cache miss.
-        ☐ Do not retain failed or stale placement results as success-shaped fallbacks.
-    ☐ Verify the cache decisions at their actual test boundary.
-        ☐ Cover equivalent snapshots, each relevant changed dependency, and transitions between Fixed and Movable modes.
-        ☐ Cover placement invalidation after changed measurements, even if available geometry is unchanged.
-        ☐ Confirm cached and uncached results preserve current docking/clamping geometry at representative GUI scales.
+    ☑ Separate measurement inputs from placement inputs in GuiDialogRecipeBook.
+        ☑ Use small value snapshots or equivalent comparisons; avoid replacing existing per-frame bounds allocations with a new per-frame heap-allocated cache key.
+        ☑ Measure labels/control sizes only for an initial cache miss or changed tile size, GUI scale, or supported language input.
+        ☑ Treat measurement changes as placement invalidations even when the resulting minimum dimensions happen to match.
+    ☑ Cache the placement result and its complete input snapshot.
+        ☑ Call RecipeBookLayout.Place or PlaceMovable only on initial placement or changed placement dependencies.
+        ☑ Reuse the existing placement algorithms instead of adding a competing docking policy.
+        ☑ In Movable mode, exclude parent movement and manual x/y from size-layout invalidation when they do not affect placement dimensions.
+        ☑ In Fixed mode, invalidate when relevant parent/grid/output geometry changes; allow docking-side and available-size changes.
+        ☑ Account for dimensions changed by clamping/composition so the next unchanged frame does not cause a redundant second cache miss.
+        ☑ Do not retain failed or stale placement results as success-shaped fallbacks.
+    ☑ Verify the cache decisions at their actual test boundary.
+        ☑ Cover equivalent snapshots, each relevant changed dependency, and transitions between Fixed and Movable modes.
+        ☑ Cover placement invalidation after changed measurements, even if available geometry is unchanged.
+        ☑ Confirm cached and uncached results preserve current docking/clamping geometry at representative GUI scales.
 
 Completion criteria:
 
-    ☐ Equivalent inputs reuse measurements and placement; changed dependencies invalidate the correct cache.
-    ☐ No cross-dialog/global persistence or unrelated layout-policy change is introduced.
-    ☐ Focused cache/geometry verification passes before wiring the render lifecycle to the new decisions.
+    ☑ Equivalent inputs reuse measurements and placement; changed dependencies invalidate the correct cache.
+    ☑ No cross-dialog/global persistence or unrelated layout-policy change is introduced.
+    ☑ Focused cache/geometry verification passes before wiring the render lifecycle to the new decisions.
+
+### Phase 2 implementation and verification
+
+- [RecipeBookLayoutCache](../VanillaExpanded/src/RecipeBook/RecipeBookLayoutCache.cs) owns per-instance measurement and placement snapshots. Keys and placement results are value types; bounds, translation services, and translation tables are compared by reference identity where required. [GuiLanguageInputs](../VanillaExpanded/src/Gui/GuiLanguageInputs.cs) and the [shared layout inputs](../VanillaExpanded/src/Gui/GuiLayoutInputs.cs) provide reusable language/scale snapshots, bounds snapshots, and dialog placement geometry; tile size and docking dependencies remain recipe-specific.
+- [GuiDialogRecipeBook](../VanillaExpanded/src/RecipeBook/GuiDialogRecipeBook.cs) owns the cache and exposes measurement preparation, placement lookup, and composed-bounds acceptance for phase 3. Its TryOpen, Follow, and render lifecycle still use the original path.
+- Placement lookup returns scalar geometry rather than composer-owned bounds. Materialize bounds only when composition needs them, then accept the actual composed root so replacement and clamped dimensions become the settled inputs. Movable cache hits use live x/y for clamping without rerunning PlaceMovable.
+- Failed measurements or placement clear the corresponding cached success before computation; failed placement remains a failure, including when earlier geometry is restored.
+
+Delegated focused verification: 74 passed, 0 failed, 0 skipped on net10.0 across RecipeBookLayoutCacheTests, RecipeBookLayoutCacheDialogTests, RecipeBookLayoutTests, and RecipeBookDialogLayoutTests. After strengthening exception-recovery assertions, the affected cache suite passed again (17 passed, 0 failed, 0 skipped). Independent test review and the second implementation/requirements review are complete; the stale-success exception-coverage finding is resolved. The fresh independent completion audit confirmed Phase 2 is fully satisfied with no required gaps. This verifies cache decisions and geometry, not render-lifecycle integration, unchanged-frame performance, or in-game acceptance.
 
 ## Phase 3: Integrate position-only Follow and conditional composition
 
