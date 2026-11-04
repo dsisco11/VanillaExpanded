@@ -75,10 +75,6 @@ public sealed class RecipeBookIconCacheTests
         session.Refresh();
         var tiles = CreateTiles(graphics, session);
         graphics.Frame(tiles);
-        var program = Assert.Single(graphics.Programs);
-        program.VerifySet(value => value.HasIcon = false, Times.Exactly(3));
-        program.VerifySet(value => value.IconTexture = It.IsAny<int>(), Times.Never);
-        program.VerifySet(value => value.TextureBounds = It.IsAny<System.Numerics.Vector4>(), Times.Never);
         Assert.Empty(graphics.Bakes);
         graphics.Frame(tiles);
         tiles.Scroll(50);
@@ -96,7 +92,7 @@ public sealed class RecipeBookIconCacheTests
     }
 
     [Fact]
-    public void BakingIsLimitedPerFrameAndPendingTilesStillRenderTheirStates()
+    public void BakingBudgetAndPendingAllocationsDoNotDuplicateRequests()
     {
         using var graphics = new RecipeBookRenderFixture();
         var f = new AllocationFixture();
@@ -109,17 +105,15 @@ public sealed class RecipeBookIconCacheTests
         using var tiles = CreateTiles(graphics, session, rows: 3);
         foreach (var (submitted, ready) in new[] { (0, 0), (4, 0), (4, 4), (8, 4), (8, 8), (9, 8), (9, 9) })
         {
-            if (graphics.Programs.Count > 0) graphics.Programs[0].Invocations.Clear();
-            graphics.Render.Invocations.Clear();
-            graphics.Frame(tiles);
+            graphics.BeforeFrame();
+            tiles.RenderInteractiveElements(0);
+            int requestSize = RecipeBookTileGeometry.PreviewSize(GuiElement.scaled(1), tiles.TileSize);
+            int published = session.Rows.Count(row =>
+                graphics.Cache.Get(row.Recipe, requestSize, allowQueue: false, out _) != null);
+            Assert.Equal(ready, published);
+            graphics.EndFrame();
             Assert.Equal(submitted, graphics.Bakes.Count);
             Assert.Equal(submitted, graphics.Allocations.Count);
-            var program = Assert.Single(graphics.Programs);
-            program.VerifySet(value => value.HasIcon = true, Times.Exactly(ready));
-            program.VerifySet(value => value.HasIcon = false, Times.Exactly(9 - ready));
-            Assert.Equal(Enumerable.Repeat(1, 9), States(program));
-            program.Verify(value => value.Use(), Times.Once);
-            Assert.Equal(9, graphics.Render.Invocations.Count(call => call.Method.Name == nameof(IRenderAPI.RenderMesh)));
         }
         tiles.RenderInteractiveElements(0);
         Assert.Equal(9, graphics.Bakes.Count);
@@ -183,7 +177,6 @@ public sealed class RecipeBookIconCacheTests
         reopened.RenderInteractiveElements(0);
         Assert.Equal(3, graphics.Bakes.Count);
         Assert.Equal(3, graphics.Allocations.Count);
-        graphics.Programs[^1].VerifySet(value => value.HasIcon = true, Times.Exactly(3));
     }
 
     [Fact]
@@ -199,7 +192,8 @@ public sealed class RecipeBookIconCacheTests
         using (var first = CreateTiles(graphics, session)) graphics.Warm(first, 3);
         RuntimeEnv.GUIScale = 1.5f;
         using (var scaled = CreateTiles(graphics, session)) graphics.Warm(scaled, 3);
-        Assert.Equal(new[] { 44, 64 }, graphics.Bakes.Select(bake => bake.Size));
+        Assert.Equal(2, graphics.Bakes.Count);
+        Assert.Equal(2, graphics.Allocations.Count);
         RuntimeEnv.GUIScale = 1;
         using var restored = CreateTiles(graphics, session);
         restored.RenderInteractiveElements(0);
@@ -390,22 +384,37 @@ public sealed class RecipeBookIconCacheTests
             () => f.Snapshot(), (_, _) => throw new InvalidOperationException());
         session.Refresh();
         using var tiles = CreateTiles(graphics, session);
+        var entry = Assert.Single(session.Rows).Recipe;
+        int requestSize = RecipeBookTileGeometry.PreviewSize(GuiElement.scaled(1), tiles.TileSize);
         var calls = new List<string>();
+        bool? publishedDuringDraw = null;
         graphics.OnBake = () => calls.Add("submit");
-        graphics.Render.Setup(value => value.RenderMesh(It.IsAny<MeshRef>())).Callback(() => calls.Add("draw"));
-        graphics.Frame(tiles);
+        graphics.Render.Setup(value => value.RenderMesh(It.IsAny<MeshRef>())).Callback(() =>
+        {
+            calls.Add("draw");
+            publishedDuringDraw = graphics.Cache.Get(entry, requestSize, allowQueue: false, out _) != null;
+        });
+        RenderFrame();
         Assert.Equal(new[] { "draw" }, calls);
+        Assert.False(publishedDuringDraw);
         calls.Clear();
-        graphics.Frame(tiles);
+        publishedDuringDraw = null;
+        RenderFrame();
         Assert.Equal(new[] { "submit", "draw" }, calls);
-        Assert.Single(graphics.Programs).VerifySet(value => value.HasIcon = false, Times.Exactly(2));
+        Assert.False(publishedDuringDraw);
         if (!completeOnFrame) graphics.Complete(Assert.Single(graphics.Bakes));
         calls.Clear();
-        graphics.Frame(tiles);
+        publishedDuringDraw = null;
+        RenderFrame();
         Assert.Equal(new[] { "draw" }, calls);
-        Assert.Single(graphics.Programs).VerifySet(value => value.HasIcon = true, Times.Once);
-        graphics.Render.Verify(value => value.GlScissorFlag(It.IsAny<bool>()), Times.Never);
-        graphics.Render.Verify(value => value.GetEngineShader(It.IsAny<EnumShaderProgram>()), Times.Never);
+        Assert.True(publishedDuringDraw);
+
+        void RenderFrame()
+        {
+            graphics.BeforeFrame();
+            tiles.RenderInteractiveElements(0);
+            graphics.EndFrame();
+        }
     }
 
     [Theory]

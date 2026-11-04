@@ -1,5 +1,4 @@
 using Cairo;
-using Moq;
 using VanillaExpanded.RecipeBook;
 using VanillaExpanded.Tests.TestSupport.RecipeBook;
 using Vintagestory.API.Client;
@@ -46,10 +45,6 @@ internal static void AssertPopupDepth()
         Assert.True(popupClip.renderY + popupClip.InnerHeight >= (double)label.Arguments[2] + (double)label.Arguments[4]);
         Assert.Empty(graphics.Clips);
     }
-
-internal static int[] States(Mock<IRecipeBookIconShaderProgram> program) => program.Invocations
-        .Where(call => call.Method.Name == "set_" + nameof(IRecipeBookIconShaderProgram.RecipeState))
-        .Select(call => (int)(CraftingTileStatus)call.Arguments[0]).ToArray();
 
 internal static GuiElementRecipeBookTiles CreateTiles(RecipeBookRenderFixture graphics, RecipeBookSession session,
     int rows = 1, double tileSize = RecipeBookTileGeometry.TileSize)

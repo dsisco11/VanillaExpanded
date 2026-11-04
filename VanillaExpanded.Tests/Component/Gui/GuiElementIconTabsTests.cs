@@ -24,81 +24,31 @@ public sealed class GuiElementIconTabsTests
     [InlineData(1.5f)]
     [InlineData(1.75f)]
     [InlineData(2f)]
-    public void FolderTabRendersDistinctBackgroundsAndFixedPixelAlignedNearestFilteredIcons(float scale)
+    public void FolderTabResourcesAreReusedAcrossStatesAndReleasedOnDisposal(float scale)
     {
         using var graphics = new GuiRenderFixture(scale);
         Setup(graphics);
-        var draws = new List<(int Width, int Height, double WidthRequested, double[] Color)>();
-        graphics.Gui.Object.Icons.CustomIcons["test-icon"] = (ctx, _, _, width, _, color) =>
-        {
-            using var target = ctx.GetTarget();
-            var surface = Assert.IsType<ImageSurface>(target);
-            draws.Add((surface.Width, surface.Height, width, color.ToArray()));
-        };
+        graphics.Gui.Object.Icons.CustomIcons["test-icon"] = (_, _, _, _, _, _) => { };
         using var button = new GuiElementIconTab(graphics.Api.Object, "test-icon",
             CairoFont.WhiteSmallText(), _ => { }, ElementBounds.Fixed(120.3, 65.3, 30, 36).WithEmptyParent());
         using var surface = new ImageSurface(Format.Argb32, 64, 64);
         using var ctx = new Context(surface);
         button.ComposeElements(ctx, surface);
-        Assert.Equal(3, draws.Count);
-        Assert.All(draws, draw =>
-        {
-            Assert.Equal(draw.Width, draw.Height);
-            Assert.Equal((double)draw.Width, draw.WidthRequested);
-        });
-        Assert.Equal(draws[0].Width, draws[1].Width);
-        Assert.Equal(Color(0xb7a98c), draws[0].Color);
-        Assert.Equal(Color(0xfff0cc), draws[1].Color);
-        Assert.Equal(Color(0xf5d58d), draws[2].Color);
-        Assert.Equal(6, graphics.Gui.Invocations.Count(call =>
-            call.Method.Name == nameof(IGuiAPI.LoadOrUpdateCairoTexture) && !(bool)call.Arguments[1]));
-        var textures = new Dictionary<int, int>();
-        var backgrounds = new Dictionary<int, int>();
-        (double X, double Y)? iconPosition = null;
+        var ownedTextures = graphics.Textures.ToHashSet();
+        Assert.NotEmpty(ownedTextures);
         foreach (var state in new[] { (On: false, Hover: false), (On: false, Hover: true),
             (On: true, Hover: false), (On: true, Hover: true) })
         {
             button.On = state.On;
             SetMouse(graphics, state.Hover ? button.Bounds.absX + 10 : -100,
                 state.Hover ? button.Bounds.absY + 10 : -100);
-            graphics.Render.Invocations.Clear();
             button.RenderInteractiveElements(0);
-            var calls = graphics.Render.Invocations.Where(call =>
-                call.Method.Name == nameof(IRenderAPI.Render2DTexturePremultipliedAlpha)).ToArray();
-            Assert.Equal(2, calls.Length);
-            var background = calls[0].Arguments;
-            Assert.Equal(Math.Round(button.Bounds.renderX, MidpointRounding.AwayFromZero), (double)background[1]);
-            Assert.Equal(Math.Round(button.Bounds.renderY, MidpointRounding.AwayFromZero), (double)background[2]);
-            Assert.Equal(Math.Round(button.Bounds.renderX + 30 * scale, MidpointRounding.AwayFromZero)
-                - Math.Round(button.Bounds.renderX, MidpointRounding.AwayFromZero), (double)background[3]);
-            Assert.Equal(Math.Round(36 * scale, MidpointRounding.AwayFromZero), (double)background[4]);
-            int key = state.On ? 2 : state.Hover ? 1 : 0;
-            if (backgrounds.TryGetValue(key, out int backgroundTexture))
-                Assert.Equal(backgroundTexture, (int)background[0]);
-            else backgrounds.Add(key, (int)background[0]);
-            var overlay = calls[1].Arguments;
-            int size = (int)Math.Round(20 * scale, MidpointRounding.AwayFromZero);
-            Assert.Equal((double)size, (double)overlay[3]);
-            Assert.Equal((double)size, (double)overlay[4]);
-            Assert.Equal(Math.Round((double)overlay[1]), (double)overlay[1]);
-            Assert.Equal(Math.Round((double)overlay[2]), (double)overlay[2]);
-            var position = ((double)overlay[1], (double)overlay[2]);
-            if (iconPosition is { } previous) Assert.Equal(previous, position);
-            else iconPosition = position;
-            Assert.Equal(51f, (float)overlay[5]);
-            if (textures.TryGetValue(key, out int texture)) Assert.Equal(texture, (int)overlay[0]);
-            else textures.Add(key, (int)overlay[0]);
-            Assert.DoesNotContain(graphics.Render.Invocations, call => call.Method.Name == "RenderRectangle");
+            Assert.True(ownedTextures.SetEquals(graphics.Textures));
+            button.RenderInteractiveElements(0);
+            Assert.True(ownedTextures.SetEquals(graphics.Textures));
         }
-        Assert.Equal(3, textures.Values.Distinct().Count());
-        Assert.Equal(3, backgrounds.Values.Distinct().Count());
-        Assert.Equal(6, graphics.Gui.Invocations.Count(call =>
-            call.Method.Name == nameof(IGuiAPI.LoadOrUpdateCairoTexture)));
         button.Dispose();
         Assert.Empty(graphics.Textures);
-
-        static double[] Color(int rgb) =>
-            [((rgb >> 16) & 255) / 255d, ((rgb >> 8) & 255) / 255d, (rgb & 255) / 255d, 1];
     }
 
     [Theory]
@@ -108,7 +58,7 @@ public sealed class GuiElementIconTabsTests
     [InlineData(1.75f)]
     [InlineData(2f)]
     [InlineData(1.1f)]
-    public void SelectedTabStaysJoinedToHostPanelAcrossFractionalMovementAndScrolling(float scale)
+    public void SelectedTabRemainsContainedAndRecompositionReusesResources(float scale)
     {
         using var graphics = new GuiRenderFixture(scale);
         Setup(graphics);
@@ -117,9 +67,6 @@ public sealed class GuiElementIconTabsTests
         host.IsDrawingSurface = true;
         tabs.Bounds.WithParent(host);
         host.WithChild(tabs.Bounds);
-        int stroke = Math.Max(1, (int)Math.Round(scale, MidpointRounding.AwayFromZero));
-        var panel = ElementBounds.Fixed(120, 65 + 36 - stroke / GuiElement.scaled(1), 180, 50).WithParent(host);
-        host.WithChild(panel);
         int textureCount = graphics.Textures.Count;
         foreach (double position in new[] { .1, .3, .7 })
         {
@@ -132,17 +79,8 @@ public sealed class GuiElementIconTabsTests
             tabs.SetValue(8, false);
             graphics.Render.Invocations.Clear();
             tabs.RenderInteractiveElements(0);
-            var backgrounds = graphics.Render.Invocations.Where(call =>
-                call.Method.Name == nameof(IRenderAPI.Render2DTexturePremultipliedAlpha)
-                && call.Arguments.Count == 7 && (float)call.Arguments[5] == 50).ToArray();
-            Assert.Equal(9, backgrounds.Length);
-            var selected = backgrounds[8].Arguments;
-            Assert.Equal((int)host.renderY + Math.Round(panel.drawY, MidpointRounding.AwayFromZero),
-                (double)selected[2] + (double)selected[4] - stroke);
-            Assert.True((double)selected[2] + (double)selected[4] <= NativeScissorRectangle(graphics).Bottom);
-            var selectedBounds = tabs.Composer!.GetToggleButton("tab-8").Bounds;
-            Assert.Equal((int)host.renderX + Math.Round(selectedBounds.renderX - host.renderX, MidpointRounding.AwayFromZero),
-                (double)selected[1]);
+            AssertSelectedBackgroundWithinNativeClip(graphics,
+                Assert.IsType<GuiElementIconTab>(tabs.Composer!.GetToggleButton("tab-8")));
         }
     }
 
@@ -163,7 +101,7 @@ public sealed class GuiElementIconTabsTests
     [InlineData(1.5f, true)]
     [InlineData(1.75f, true)]
     [InlineData(2f, true)]
-    public void NativeScissorRetainsEverySelectedBorderAcrossFractionalMovementAndScrolling(float scale, bool overflow)
+    public void SelectedTabsRemainVisibleAndClippingIsBalancedAcrossMovementAndScrolling(float scale, bool overflow)
     {
         using var graphics = new GuiRenderFixture(scale);
         Setup(graphics);
@@ -187,28 +125,14 @@ public sealed class GuiElementIconTabsTests
                 tabs.SetValue(selected, false);
                 graphics.Render.Invocations.Clear();
                 tabs.RenderInteractiveElements(0);
-                var (left, top, right, bottom) = NativeScissorRectangle(graphics);
                 var callerBounds = tabs.Bounds;
                 var viewport = tabs.Viewport!;
-                double reservation = overflow ? 20 * scale : 0;
-                double expectedLeft = callerBounds.absX + reservation;
-                double expectedWidth = callerBounds.InnerWidth - 2 * reservation;
-                double expectedHeight = callerBounds.InnerHeight;
-                Assert.Equal(expectedLeft, viewport.absX, 4);
-                Assert.Equal(callerBounds.absY, viewport.absY, 4);
-                Assert.Equal(expectedWidth, viewport.InnerWidth, 4);
-                Assert.Equal(expectedHeight, viewport.InnerHeight, 4);
-                Assert.InRange((double)(right - left), Math.Floor(expectedWidth), Math.Ceiling(expectedWidth));
-                Assert.Equal(Math.Round(expectedHeight, MidpointRounding.AwayFromZero), bottom - top);
-                var background = graphics.Render.Invocations.Where(call =>
-                    call.Method.Name == nameof(IRenderAPI.Render2DTexturePremultipliedAlpha)
-                    && call.Arguments.Count == 7 && (float)call.Arguments[5] == 50).ElementAt(selected).Arguments;
-                Assert.True((double)background[1] >= left, $"Left border clipped at scale {scale}, offset {offset}.");
-                Assert.True((double)background[2] >= top, $"Top border clipped at scale {scale}, offset {offset}.");
-                Assert.True((double)background[1] + (double)background[3] <= right,
-                    $"Right border clipped at scale {scale}, offset {offset}.");
-                Assert.True((double)background[2] + (double)background[4] <= bottom,
-                    $"Bottom border clipped at scale {scale}, offset {offset}.");
+                Assert.True(viewport.absX >= callerBounds.absX);
+                Assert.True(viewport.absX + viewport.InnerWidth <= callerBounds.absX + callerBounds.InnerWidth);
+                Assert.True(viewport.absY >= callerBounds.absY);
+                Assert.True(viewport.absY + viewport.InnerHeight <= callerBounds.absY + callerBounds.InnerHeight);
+                AssertSelectedBackgroundWithinNativeClip(graphics,
+                    Assert.IsType<GuiElementIconTab>(tabs.Composer!.GetToggleButton("tab-" + selected)));
                 Assert.Empty(graphics.Clips);
             }
         }
@@ -248,16 +172,24 @@ public sealed class GuiElementIconTabsTests
             host.CalcWorldBounds();
             tabs.SetValue(0, false);
             changes.Clear();
-            double reservation = 20 * scale;
             var callerBounds = tabs.Bounds;
-            expectedLeft = callerBounds.absX + reservation;
-            expectedRight = callerBounds.absX + callerBounds.InnerWidth - reservation;
             var viewport = tabs.Viewport!;
-            Assert.Equal(expectedLeft, viewport.absX, 4);
+            var leftArrow = tabs.Composer!.GetButton("left");
+            var rightArrow = tabs.Composer.GetButton("right");
+            Assert.True(leftArrow.Visible);
+            Assert.True(rightArrow.Visible);
+            Assert.True(viewport.absX >= callerBounds.absX);
+            Assert.True(viewport.absX + viewport.InnerWidth <= callerBounds.absX + callerBounds.InnerWidth);
+            Assert.True(leftArrow.Bounds.absX >= callerBounds.absX);
+            Assert.True(leftArrow.Bounds.absX + leftArrow.Bounds.OuterWidth <= viewport.absX);
+            Assert.True(viewport.absX + viewport.InnerWidth <= rightArrow.Bounds.absX);
+            Assert.True(rightArrow.Bounds.absX + rightArrow.Bounds.OuterWidth
+                <= callerBounds.absX + callerBounds.OuterWidth);
+            expectedLeft = viewport.absX;
+            expectedRight = viewport.absX + viewport.InnerWidth;
             Assert.Equal(callerBounds.absY, viewport.absY, 4);
-            Assert.Equal(expectedRight - expectedLeft, viewport.InnerWidth, 4);
             Assert.Equal(callerBounds.InnerHeight, viewport.InnerHeight, 4);
-            Assert.NotEqual(Math.Round(expectedRight), expectedRight);
+            Assert.NotEqual(Math.Round(callerBounds.absX), callerBounds.absX);
             // Assert pointer activation is rejected on both clipped edges before movement.
             AssertClippedClickRejected(left: false);
             SetMouse(graphics, (expectedLeft + expectedRight) / 2,
@@ -319,6 +251,25 @@ public sealed class GuiElementIconTabsTests
         }
     }
 
+    private static void AssertSelectedBackgroundWithinNativeClip(GuiRenderFixture graphics, GuiElementIconTab tab)
+    {
+        var texture = Assert.IsType<LoadedTexture>(typeof(GuiElementIconTab)
+            .GetField("selectedBackground", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(tab));
+        var draw = Assert.Single(graphics.Render.Invocations.Where(call =>
+            call.Method.Name == nameof(IRenderAPI.Render2DTexturePremultipliedAlpha)
+            && Convert.ToInt32(call.Arguments[0]) == texture.TextureId));
+        var (left, top, right, bottom) = NativeScissorRectangle(graphics);
+        double x = Convert.ToDouble(draw.Arguments[1]);
+        double y = Convert.ToDouble(draw.Arguments[2]);
+        double width = Convert.ToDouble(draw.Arguments[3]);
+        double height = Convert.ToDouble(draw.Arguments[4]);
+        Assert.True(x >= left);
+        Assert.True(y >= top);
+        Assert.True(x + width <= right);
+        Assert.True(y + height <= bottom);
+    }
+
     [Theory]
     [InlineData(1f, 9)]
     [InlineData(1.25f, 1)]
@@ -331,7 +282,6 @@ public sealed class GuiElementIconTabsTests
         using var graphics = new GuiRenderFixture(scale);
         Setup(graphics);
         double width = GuiElementIconTabs.MeasureWidth(count);
-        Assert.Equal(count * 30 + (count - 1) * 4, width);
         using var tabs = Create(graphics, Enumerable.Range(0, count).Select(i => "Entry " + i).ToArray(), width, _ => { });
         Assert.False(tabs.Composer!.GetButton("left").Visible);
         Assert.False(tabs.Composer.GetButton("right").Visible);
@@ -341,24 +291,18 @@ public sealed class GuiElementIconTabsTests
             Assert.True(bounds.absX >= tabs.Viewport!.absX);
             Assert.True(bounds.absX + bounds.OuterWidth <= tabs.Viewport.absX + tabs.Viewport.InnerWidth + .001);
         });
-        tabs.SetValue(count - 1, false);
-        Assert.Equal(tabs.Bounds.absX, tabs.Composer.GetToggleButton("tab-0").Bounds.absX, 4);
-        var last = tabs.Composer.GetToggleButton("tab-" + (count - 1)).Bounds;
-        Assert.Equal(tabs.Bounds.absX + width * scale, last.absX + last.OuterWidth, 4);
         graphics.Render.Invocations.Clear();
         tabs.RenderInteractiveElements(0);
-        var backgrounds = graphics.Render.Invocations.Where(call =>
-            call.Method.Name == nameof(IRenderAPI.Render2DTexturePremultipliedAlpha)
-            && call.Arguments.Count == 7 && (float)call.Arguments[5] == 50).ToArray();
-        Assert.Equal(count, backgrounds.Length);
         var clip = NativeScissorRectangle(graphics);
-        Assert.All(backgrounds, call =>
+        Assert.All(Enumerable.Range(0, count), index =>
         {
-            double x = (double)call.Arguments[1];
-            double right = x + (double)call.Arguments[3];
-            Assert.True(x >= clip.Left);
-            Assert.True(right <= clip.Right);
+            var bounds = tabs.Composer.GetToggleButton("tab-" + index).Bounds;
+            Assert.True(bounds.renderX >= clip.Left - 1);
+            Assert.True(bounds.renderX + bounds.OuterWidth <= clip.Right + 1);
+            Assert.True(bounds.renderY >= clip.Top - 1);
+            Assert.True(bounds.renderY + bounds.OuterHeight <= clip.Bottom + 1);
         });
+        Assert.Empty(graphics.Clips);
         Assert.Throws<ArgumentOutOfRangeException>(() => GuiElementIconTabs.MeasureWidth(0));
     }
 

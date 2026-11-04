@@ -27,7 +27,7 @@ public sealed class RecipeBookTilesGeometryTests
     [InlineData(1.25f, 95)]
     [InlineData(1.5f, 95)]
     [InlineData(2f, 95)]
-    public void TopPaddingRejectsClicksAndNavigationAndScrollKeepFirstAndLastRecipesAccessible(float scale, double height)
+    public void PaddingRejectsClicksAndScrollingKeepsFirstAndLastRecipesAccessible(float scale, double height)
     {
         using var graphics = new RecipeBookRenderFixture(scale);
         Mock.Get(graphics.Api.Object.Input).SetupGet(value => value.KeyboardKeyStateRaw).Returns(new bool[256]);
@@ -47,7 +47,6 @@ public sealed class RecipeBookTilesGeometryTests
         tiles.BeforeCalcBounds();
         tiles.Bounds.CalcWorldBounds();
         var first = Assert.IsType<GuiElementRecipeBookTile>(tiles.Elements[0]);
-        Assert.Equal(Math.Round(2d * scale, MidpointRounding.AwayFromZero), first.PixelBounds.renderY);
         int x = (int)first.PixelBounds.renderX + 2;
         Click(x, 0);
         Assert.Empty(actions);
@@ -59,9 +58,11 @@ public sealed class RecipeBookTilesGeometryTests
         for (int row = 1; row < 6; row++) Navigate(GlKeys.Down, row * 2);
         for (int row = 4; row >= 0; row--) Navigate(GlKeys.Up, row * 2);
         Assert.Equal(0, tiles.ScrollPosition);
-        Assert.Equal(Math.Round(2d * scale, MidpointRounding.AwayFromZero), first.PixelBounds.renderY);
         tiles.Scroll(float.MaxValue);
-        Assert.Equal(297 - height, tiles.ScrollPosition, 3);
+        double endScroll = tiles.ScrollPosition;
+        Assert.True(endScroll > 0);
+        tiles.Scroll(float.MaxValue);
+        Assert.Equal(endScroll, tiles.ScrollPosition, 3);
         var last = tiles.Elements.Cast<GuiElementRecipeBookTile>()
             .Single(tile => tile.Selection?.Output.Id == session.Rows[^1].Output.Id);
         Assert.True(last.IsInViewport);
@@ -117,15 +118,21 @@ public sealed class RecipeBookTilesGeometryTests
         int y = (int)(original.InsideClipBounds.renderY + 5 * scale);
         original.UpdateHover(x, y);
         var view = original.CaptureView();
-        Assert.Equal(session.Rows[9].Output.Id, view.AnchorOutput);
         Assert.Equal(view.AnchorOutput, view.InspectedOutput);
-        Assert.Equal(7, view.RowOffset, 4);
         anchor.OnMouseDownOnElement(graphics.Api.Object, new MouseEvent(x, y, EnumMouseButton.Left, 0));
         Assert.True(anchor.Pressed);
         original.Dispose();
         using var wider = Create(257);
         wider.RestoreView(view);
-        Assert.Equal(57, wider.ScrollPosition, 4);
+        var widerView = wider.CaptureView();
+        var restoredAnchor = Assert.Single(wider.Elements.Cast<GuiElementRecipeBookTile>()
+            .Where(tile => tile.Selection?.Output.Id == view.AnchorOutput));
+        var visibleTiles = wider.Elements.Cast<GuiElementRecipeBookTile>()
+            .Where(tile => tile.Selection != null && tile.IsInViewport).ToArray();
+        Assert.NotEmpty(visibleTiles);
+        Assert.Contains(restoredAnchor, visibleTiles);
+        Assert.Equal(visibleTiles.Min(tile => tile.Bounds.renderY), restoredAnchor.Bounds.renderY, 3);
+        Assert.Equal(view.RowOffset / view.RowPitch, widerView.RowOffset / widerView.RowPitch, 4);
         Assert.Equal(session.Rows[40].Output.Id, session.SelectedOutput);
         Assert.Equal(view.InspectedOutput, inspected!.Output.Id);
         Assert.All(wider.Elements.Cast<GuiElementRecipeBookTile>(), tile => Assert.False(tile.Pressed));
@@ -143,24 +150,16 @@ public sealed class RecipeBookTilesGeometryTests
         Assert.Equal(focusView.FocusedOutput,
             Assert.IsType<GuiElementRecipeBookTile>(narrower.CurrentTabIndexElement).Selection!.Output.Id);
         Assert.Equal(focusView.InspectedOutput, inspected!.Output.Id);
-        graphics.Render.Invocations.Clear();
-        narrower.RenderInteractiveElements(0);
-        var outlines = graphics.Render.Invocations.Where(call => call.Method.Name == nameof(IRenderAPI.RenderRectangle)).ToArray();
-        Assert.Equal(keyboard ? 1 : 0, outlines.Length);
-        if (keyboard)
-        {
-            var bounds = narrower.CurrentTabIndexElement.Bounds;
-            var outline = Assert.Single(outlines);
-            Assert.Equal((int)bounds.renderX, Convert.ToInt32(outline.Arguments[0]));
-            Assert.Equal((int)bounds.renderY, Convert.ToInt32(outline.Arguments[1]));
-            Assert.Equal(800f, Convert.ToSingle(outline.Arguments[2]));
-            Assert.Equal(bounds.OuterWidthInt, Convert.ToInt32(outline.Arguments[3]));
-            Assert.Equal(bounds.OuterHeightInt, Convert.ToInt32(outline.Arguments[4]));
-        }
+        Assert.Equal(focusView.KeyboardFocus, narrower.CaptureView().KeyboardFocus);
         narrower.OnFocusLost();
         Assert.Null(inspected);
         narrower.Scroll(float.MaxValue);
-        Assert.Equal((2 + 45 * 50 - 5) - 95, narrower.ScrollPosition, 3);
+        double endScroll = narrower.ScrollPosition;
+        Assert.True(endScroll > 0);
+        narrower.Scroll(float.MaxValue);
+        Assert.Equal(endScroll, narrower.ScrollPosition, 3);
+        Assert.Contains(narrower.Elements.Cast<GuiElementRecipeBookTile>(), tile =>
+            tile.Selection?.Output.Id == session.Rows[^1].Output.Id && tile.IsInViewport);
         session.Search("no matches");
         Assert.Equal(0, narrower.ScrollPosition);
         Assert.Null(inspected);

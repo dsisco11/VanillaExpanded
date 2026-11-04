@@ -33,11 +33,9 @@ public sealed class AutoLootConfigurationTests
         Assert.Equal(0.1f, range.GetProperty("step").GetSingle());
         JsonElement heading = document.RootElement.GetProperty("formatting").EnumerateArray().Single(entry =>
             entry.GetProperty("title").GetString() == "vanillaexpanded:config-section-auto-loot");
-        float weight = heading.GetProperty("weight").GetSingle();
         foreach (JsonElement setting in new[] { enabled, delay })
         {
             Assert.True(setting.GetProperty("clientSide").GetBoolean());
-            Assert.InRange(setting.GetProperty("weight").GetSingle(), weight + 0.01f, 1.99f);
             foreach (string field in new[] { "ingui", "comment" })
             {
                 AssertLocalized(setting.GetProperty(field).GetString()!, language);

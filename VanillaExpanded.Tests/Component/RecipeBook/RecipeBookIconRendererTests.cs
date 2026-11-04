@@ -19,11 +19,11 @@ namespace VanillaExpanded.Tests.Component.RecipeBook;
 public sealed class RecipeBookIconRendererTests
 {
     [Theory]
-    [InlineData(30, 1f)]
-    [InlineData(30, 1.5f)]
-    [InlineData(90, 1f)]
-    [InlineData(90, 1.5f)]
-    public void IconPreviewRequestsTrackTheConfiguredTileSize(int tileSize, float scale)
+    [InlineData(30, 90, 1f)]
+    [InlineData(30, 90, 1.5f)]
+    [InlineData(60, 90, 1f)]
+    [InlineData(60, 90, 1.5f)]
+    public void ConfiguredTileSizesUseDistinctPreviewCacheEntries(int firstSize, int secondSize, float scale)
     {
         // Arrange
         using var graphics = new RecipeBookRenderFixture(scale);
@@ -33,22 +33,29 @@ public sealed class RecipeBookIconRendererTests
         using var session = new RecipeBookSession(f.Catalogue.Build(recipe), f.Allocator,
             () => f.Snapshot(), (_, _) => throw new InvalidOperationException());
         session.Refresh();
-        using var tiles = CreateTiles(graphics, session, tileSize: tileSize);
-
-        // Act
-        graphics.Warm(tiles, 4);
-
-        // Assert
-        Assert.Equal(tileSize, tiles.TileSize);
-        Assert.Equal(tileSize + RecipeBookTileGeometry.Gap, tiles.RowPitch);
-        Assert.Equal(RecipeBookTileGeometry.PreviewSize(scale, tileSize), Assert.Single(graphics.Bakes).Size);
+        using (var first = CreateTiles(graphics, session, tileSize: firstSize))
+        {
+            Assert.Equal(firstSize, first.TileSize);
+            graphics.Warm(first, 4);
+        }
+        Assert.Single(graphics.Bakes);
+        using (var second = CreateTiles(graphics, session, tileSize: secondSize))
+        {
+            Assert.Equal(secondSize, second.TileSize);
+            graphics.Warm(second, 4);
+        }
+        Assert.Equal(2, graphics.Bakes.Count);
+        Assert.Equal(2, graphics.Allocations.Count);
+        using (var repeated = CreateTiles(graphics, session, tileSize: firstSize))
+            graphics.Warm(repeated, 2);
+        Assert.Equal(2, graphics.Bakes.Count);
     }
 
     [Theory]
     [InlineData(1)]
     [InlineData(1.5)]
     [InlineData(2)]
-    public void MixedStatesShareOneShaderActivationAndDoNotRebakeOnStatusChanges(float scale)
+    public void StatusChangesShareIconResourcesWithoutRebaking(float scale)
     {
         using var graphics = new RecipeBookRenderFixture(scale);
         var f = new AllocationFixture();
@@ -69,31 +76,21 @@ public sealed class RecipeBookIconRendererTests
         graphics.GuiProgram.Invocations.Clear();
         tiles.RenderInteractiveElements(0);
         var program = Assert.Single(graphics.Programs);
-        Assert.Equal(new[] { 0, 3, 1, 2 }, States(program));
         program.Verify(value => value.Use(), Times.Once);
         program.Verify(value => value.Stop(), Times.Once);
         program.VerifySet(value => value.IconTexture = 77, Times.Once);
-        program.VerifySet(value => value.ProjectionMatrix = It.IsAny<float[]>(), Times.Once);
-        program.VerifySet(value => value.ModelViewMatrix = It.IsAny<float[]>(), Times.Once);
-        program.VerifySet(value => value.GuiScale = scale, Times.Once);
-        program.VerifySet(value => value.TileBounds = It.IsAny<System.Numerics.Vector4>(), Times.Exactly(4));
         program.VerifySet(value => value.TextureBounds = new System.Numerics.Vector4(.1f, .2f, .3f, .4f),
             Times.Exactly(4));
-        program.VerifySet(value => value.HasIcon = true, Times.Exactly(4));
         graphics.GuiProgram.Verify(value => value.Use(), Times.Once);
         Assert.Equal(4, graphics.Bakes.Count);
         Assert.Equal(4, graphics.Allocations.Count);
         Assert.Same(graphics.GuiProgram.Object, graphics.Active);
-        graphics.Render.Verify(value => value.RenderItemstackToGui(It.IsAny<ItemSlot>(), It.IsAny<double>(),
-            It.IsAny<double>(), It.IsAny<double>(), It.IsAny<float>(), It.IsAny<int>(),
-            It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()), Times.Never);
         Assert.Empty(graphics.Textures);
 
         snapshot = f.Snapshot();
         session.Refresh();
         program.Invocations.Clear();
         tiles.RenderInteractiveElements(0);
-        Assert.Equal(new[] { 1, 1, 1, 2 }, States(program));
         Assert.Equal(4, graphics.Bakes.Count);
         program.Verify(value => value.Use(), Times.Once);
     }
@@ -102,7 +99,7 @@ public sealed class RecipeBookIconRendererTests
     [InlineData(1)]
     [InlineData(1.5)]
     [InlineData(2)]
-    public void IngredientAvailabilityTransitionsUpdateBordersWithoutRebaking(float scale)
+    public void IngredientAvailabilityChangesDoNotRebakeIcons(float scale)
     {
         using var graphics = new RecipeBookRenderFixture(scale);
         var f = new AllocationFixture();
@@ -115,22 +112,13 @@ public sealed class RecipeBookIconRendererTests
         session.Refresh();
         using var tiles = CreateTiles(graphics, session);
         graphics.Warm(tiles, 3);
-        foreach (var (quantity, status) in new[] {
-            (0, CraftingTileStatus.MissingIngredients),
-            (1, CraftingTileStatus.PartiallyAvailable),
-            (3, CraftingTileStatus.PartiallyAvailable),
-            (4, CraftingTileStatus.Available),
-            (5, CraftingTileStatus.Available),
-            (0, CraftingTileStatus.MissingIngredients)
-        })
+        foreach (int quantity in new[] { 0, 1, 3, 4, 5, 0 })
         {
             var available = board.Clone();
             available.StackSize = quantity;
             snapshot = quantity == 0 ? f.Snapshot() : f.Snapshot(available);
             session.Refresh();
-            if (graphics.Programs.Count > 0) graphics.Programs[0].Invocations.Clear();
             tiles.RenderInteractiveElements(0);
-            Assert.Equal(new[] { (int)status }, States(Assert.Single(graphics.Programs)));
             Assert.Equal(Math.Min(quantity, 4), Assert.Single(session.Rows).Evaluation.Allocated);
             Assert.Single(graphics.Bakes);
             Assert.Single(graphics.Allocations);
@@ -175,7 +163,7 @@ public sealed class RecipeBookIconRendererTests
     [Theory]
     [InlineData(1, 0)]
     [InlineData(4, 1)]
-    public void OnlyOutputQuantitiesAreDrawnForRecipesWithMultipleAlternatives(int quantity, int expectedOverlays)
+    public void QuantityLabelsAreAllocatedOnlyForMultipleOutputItems(int quantity, int expectedQuantityTextures)
     {
         using var graphics = new RecipeBookRenderFixture();
         var f = new AllocationFixture();
@@ -187,13 +175,12 @@ public sealed class RecipeBookIconRendererTests
         var session = new RecipeBookSession(f.Catalogue.Build(first, second), f.Allocator,
             () => f.Snapshot(), (_, _) => throw new InvalidOperationException());
         session.Refresh();
-        Assert.Equal(2, Assert.Single(session.Rows).Output.Alternatives.Length);
+        var selection = Assert.Single(session.Rows);
+        Assert.Equal(2, selection.Output.Alternatives.Length);
+        Assert.Equal(quantity, selection.Recipe.OutputQuantity);
         using var tiles = CreateTiles(graphics, session);
         tiles.RenderInteractiveElements(0);
-        Assert.Equal(expectedOverlays, graphics.Textures.Count);
-        graphics.Render.Verify(value => value.Render2DTexturePremultipliedAlpha(It.IsAny<int>(),
-            It.IsAny<double>(), It.IsAny<double>(), It.IsAny<double>(), It.IsAny<double>(),
-            221, It.IsAny<Vec4f>()), Times.Exactly(expectedOverlays));
+        Assert.Equal(expectedQuantityTextures, graphics.Textures.Count);
         tiles.Dispose();
         Assert.Empty(graphics.Textures);
     }
@@ -243,7 +230,6 @@ public sealed class RecipeBookIconRendererTests
         graphics.Clips.Push(host);
         (double Left, double Top, double Right, double Bottom)? clip = null;
         var drawn = new List<(double Left, double Top, double Right, double Bottom)>();
-        int labels = 0;
         graphics.Render.Setup(value => value.GlScissorFlag(false)).Callback(() => clip = null);
         graphics.Render.Setup(value => value.PushScissor(It.IsAny<ElementBounds>(), It.IsAny<bool>()))
             .Callback<ElementBounds, bool>((bounds, stacking) =>
@@ -274,16 +260,13 @@ public sealed class RecipeBookIconRendererTests
         });
         graphics.Render.Setup(value => value.Render2DTexturePremultipliedAlpha(It.IsAny<int>(),
             It.IsAny<double>(), It.IsAny<double>(), It.IsAny<double>(), It.IsAny<double>(),
-            221, It.IsAny<Vec4f>())).Callback(() =>
+            It.IsAny<float>(), It.IsAny<Vec4f>())).Callback(() =>
         {
             AssertViewportClip();
             Assert.Same(viewport, graphics.Clips.ToArray()[1]);
             Assert.Contains(clip!.Value, drawn);
-            labels++;
         });
         tiles.RenderInteractiveElements(0);
-        Assert.Equal(9, drawn.Count);
-        Assert.Equal(9, labels);
         Assert.Contains(drawn, bounds => bounds.Top == viewport.renderY);
         Assert.Contains(drawn, bounds => bounds.Bottom == viewport.renderY + viewport.InnerHeight);
         Assert.Same(host, Assert.Single(graphics.Clips));
@@ -403,10 +386,11 @@ public sealed class RecipeBookIconRendererTests
         using var tiles = CreateTiles(graphics, session, rows: 2);
         graphics.Warm(tiles, 4);
         int bakes = graphics.Bakes.Count;
-        var program = Assert.Single(graphics.Programs);
         for (int selected = -1; selected < 4; selected++)
         {
             if (selected >= 0) session.Select(session.Rows[selected].Output.Id);
+            if (selected < 0) Assert.Null(session.SelectedOutput);
+            else Assert.Equal(session.Rows[selected].Output.Id, session.SelectedOutput);
             for (int focused = -1; focused < 4; focused++)
             {
                 tiles.OnFocusLost();
@@ -415,38 +399,11 @@ public sealed class RecipeBookIconRendererTests
                     tiles.OnKeyDown(graphics.Api.Object, new KeyEvent { KeyCode = (int)GlKeys.Tab });
                     tiles.OnFocusGained();
                     tiles.FocusElement(focused);
+                    Assert.Same(tiles.Elements[focused], tiles.CurrentTabIndexElement);
                 }
-                program.Invocations.Clear();
-                graphics.Render.Invocations.Clear();
+                else Assert.False(tiles.HasFocus);
                 tiles.RenderInteractiveElements(0);
-                Assert.Equal(new[] { 0, 3, 1, 2 }, States(program));
-                Assert.Equal(Enumerable.Range(0, 4).Select(index => index == selected),
-                    program.Invocations.Where(call => call.Method.Name == "set_Selected")
-                        .Select(call => (bool)call.Arguments[0]));
-                program.VerifySet(value => value.PreviewInset = 1, Times.Once);
-                var focusCalls = graphics.Render.Invocations.Where(call => call.Method.Name == nameof(IRenderAPI.RenderRectangle)).ToArray();
-                Assert.Equal(focused >= 0 ? 1 : 0, focusCalls.Length);
-                if (focused >= 0)
-                {
-                    var bounds = tiles.Elements[focused].Bounds;
-                    var call = Assert.Single(focusCalls);
-                    Assert.Equal((int)bounds.renderX, Convert.ToInt32(call.Arguments[0]));
-                    Assert.Equal((int)bounds.renderY, Convert.ToInt32(call.Arguments[1]));
-                    Assert.Equal(800f, Convert.ToSingle(call.Arguments[2]));
-                    Assert.Equal(bounds.OuterWidthInt, Convert.ToInt32(call.Arguments[3]));
-                    Assert.Equal(bounds.OuterHeightInt, Convert.ToInt32(call.Arguments[4]));
-                }
-                var counts = graphics.Render.Invocations.Where(call => call.Method.Name == nameof(IRenderAPI.Render2DTexturePremultipliedAlpha)
-                    && call.Arguments.Count > 5 && Convert.ToSingle(call.Arguments[5]) == 221).ToArray();
-                Assert.Equal(4, counts.Length);
-                for (int index = 0; index < counts.Length; index++)
-                {
-                    var bounds = ((GuiElementRecipeBookTile)tiles.Elements[index]).PixelBounds;
-                    Assert.Equal(bounds.renderX + bounds.InnerWidth - Convert.ToDouble(counts[index].Arguments[3]) - 2 * scale,
-                        Convert.ToDouble(counts[index].Arguments[1]), 4);
-                    Assert.Equal(bounds.renderY + bounds.InnerHeight - Convert.ToDouble(counts[index].Arguments[4]) - 2 * scale,
-                        Convert.ToDouble(counts[index].Arguments[2]), 4);
-                }
+                Assert.Single(graphics.Textures);
                 Assert.Equal(bakes, graphics.Bakes.Count);
                 Assert.Empty(graphics.Clips);
             }

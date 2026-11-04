@@ -134,15 +134,17 @@ Scope and constraints:
         justified behavior, and obsolete theory rows/helpers are removed where redundant.
 
 ## Phase 3: Complete the presentation-policy cleanup
-    Prerequisite: Phase 1 inventory; may proceed alongside Phase 2 in disjoint files.
-    [ ] Resolve remaining presentation assertions found beyond the 18-method inventory.
-    [ ] Reassess palette/constants-only tests and mixed font/metrics tests, including
-        [RecipeBookVisualMetricsTests](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookVisualMetricsTests.cs).
-    [ ] Replace decorative positioning assertions only where a genuine functional
+    Prerequisite: [Phase 1 inventory](CairoTestInventory.md); may proceed alongside
+    Phase 2 in disjoint files.
+    [x] Resolve remaining presentation assertions found beyond the 18-method inventory.
+    [x] Reassess palette/constants-only tests and mixed font/metrics tests, including
+        the pre-cleanup `RecipeBookVisualMetricsTests` disposition in the
+        [Phase 1 inventory](CairoTestInventory.md#1-gui-drawing-controls-and-tabs).
+    [x] Replace decorative positioning assertions only where a genuine functional
         requirement exists; otherwise remove them rather than inventing a substitute.
-    [ ] Preserve functional geometry tests for hit testing, clipping, reachability,
+    [x] Preserve functional geometry tests for hit testing, clipping, reachability,
         scrolling, and viewport behavior without pinning incidental styling choices.
-    [ ] Remove unused raster capture, pixel sampling, appearance-only test probes,
+    [x] Remove unused raster capture, pixel sampling, appearance-only test probes,
         and dependencies that no longer serve retained coverage.
     Completion:
         No unapproved presentation contracts remain in the reviewed scope, whether

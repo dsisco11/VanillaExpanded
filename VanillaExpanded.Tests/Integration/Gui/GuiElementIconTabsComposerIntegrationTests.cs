@@ -36,13 +36,13 @@ public sealed class GuiElementIconTabsComposerIntegrationTests
         var second = composer.GetToggleButton("tab-1");
         Assert.Equal("", first.GetText());
         Assert.Equal("", second.GetText());
-        Assert.Equal(first.Bounds.OuterWidth, second.Bounds.OuterWidth);
-        Assert.Equal(GuiElementIconTabs.TabSize * scale, first.Bounds.OuterWidth, 4);
-        Assert.Equal(tabs.Bounds.absX, first.Bounds.absX, 4);
-        Assert.Equal(first.Bounds.absX + first.Bounds.OuterWidth + 4 * scale, second.Bounds.absX, 4);
-        Assert.Equal(tabs.Bounds.absY + tabs.Bounds.InnerHeight,
-            first.Bounds.absY + first.Bounds.OuterHeight, 4);
-        Assert.Equal(GuiElementIconTabs.TabHeight * scale, first.Bounds.OuterHeight, 4);
+        var viewport = tabs.Viewport!;
+        Assert.True(first.Bounds.absX >= viewport.absX);
+        Assert.True(first.Bounds.absX + first.Bounds.OuterWidth <= viewport.absX + viewport.InnerWidth);
+        Assert.True(first.Bounds.absY >= viewport.absY);
+        Assert.True(first.Bounds.absY + first.Bounds.OuterHeight <= viewport.absY + viewport.InnerHeight);
+        Assert.True(second.Bounds.absX >= viewport.absX);
+        Assert.True(second.Bounds.absX + second.Bounds.OuterWidth <= viewport.absX + viewport.InnerWidth);
         Assert.Equal("A much longer localized name", tabs.Hints[1].GetText());
         int textureCount = graphics.Textures.Count;
         Assert.True(textureCount > 0);

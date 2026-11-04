@@ -154,6 +154,8 @@ public sealed class RecipeBookLayoutLifecycleTests
         int rootCalculations = root.Calculations;
         int childCalculations = child.Calculations;
         var parent = fixture.Parent.Composers["maininventory"].Bounds;
+        double parentXBefore = parent.absX;
+        double composerXBefore = composer.Bounds.absX;
 
         // Act
         parent.fixedX += 20;
@@ -171,7 +173,7 @@ public sealed class RecipeBookLayoutLifecycleTests
         Assert.Equal(1, calls.MeasurementCalls);
         Assert.Equal(2, calls.FixedCalls);
         Assert.Equal(1, calls.CompositionCalls);
-        Assert.Equal(parent.absX + parent.OuterWidth + 2, composer.Bounds.absX, 4);
+        Assert.Equal(parent.absX - parentXBefore, composer.Bounds.absX - composerXBefore, 4);
     }
 
     /// <summary>Verifies parent-space and window changes invalidate placement, while a same-sized window replacement follows natively.</summary>

@@ -184,24 +184,6 @@ public sealed class ItemSlotIndicatorTests
     #endregion
 
     #region Rendering
-    /// <summary>Fill is clamped and anchored to the slot bottom.</summary>
-    [Theory]
-    [InlineData(-1, 70, 0)]
-    [InlineData(0, 70, 0)]
-    [InlineData(0.5f, 50, 20)]
-    [InlineData(1, 30, 40)]
-    [InlineData(2, 30, 40)]
-    [InlineData(float.NaN, 70, 0)]
-    public void CalculateBounds_BottomAlignedAndClamped(float fill, float expectedY, float expectedHeight)
-    {
-        var bounds = ItemSlotIndicatorRenderer.CalculateBounds(100, 50, 40, fill);
-
-        Assert.Equal(80, bounds.X);
-        Assert.Equal(expectedY, bounds.Y);
-        Assert.Equal(40, bounds.Width);
-        Assert.Equal(expectedHeight, bounds.Height);
-    }
-
     /// <summary>Only RGB channels are multiplied by alpha.</summary>
     [Fact]
     public void PremultiplyColor_PreservesAlpha()

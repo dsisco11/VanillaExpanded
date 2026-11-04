@@ -36,7 +36,6 @@ public sealed class RecipeBookConfigContractTests
         Assert.True(toggle.GetProperty("clientSide").GetBoolean());
         var heading = document.RootElement.GetProperty("formatting").EnumerateArray().Single(entry =>
             entry.GetProperty("title").GetString() == "vanillaexpanded:config-section-recipe-book");
-        Assert.InRange(toggle.GetProperty("weight").GetDouble(), heading.GetProperty("weight").GetDouble(), 4.99);
         foreach (string key in new[] { toggle.GetProperty("ingui").GetString()!,
             toggle.GetProperty("comment").GetString()!, heading.GetProperty("title").GetString()! })
             Assert.False(string.IsNullOrWhiteSpace(language.RootElement.GetProperty(key.Split(':')[1]).GetString()));

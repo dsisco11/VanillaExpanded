@@ -1,6 +1,5 @@
 using System.Reflection;
 using System.Text;
-using Cairo;
 using Moq;
 using VanillaExpanded.Tests.Mocks;
 using VanillaExpanded.ModSystems;
@@ -78,13 +77,6 @@ public sealed class RecipeBookTooltipCompositionTests
         var text = content.Components.OfType<RichTextComponent>()
             .Where(component => component is not ClearFloatTextComponent).ToArray();
         Assert.Equal(new[] { "3/4", name, "2/2", stick.GetName() }, text.Select(component => component.DisplayText));
-        Assert.Equal(GuiStyle.ErrorTextColor, text[0].Font.Color);
-        Assert.Equal(CairoFont.WhiteSmallText().Color, text[2].Font.Color);
-        Assert.All(text, component =>
-        {
-            Assert.Equal(CairoFont.WhiteDetailText().UnscaledFontsize, component.Font.UnscaledFontsize);
-            Assert.True(component.Font.UnscaledFontsize < CairoFont.WhiteSmallText().UnscaledFontsize);
-        });
         Assert.True(text[1].Lines.Length > 1);
         Assert.True(text[0].BoundsPerLine.Min(bounds => bounds.Y) >=
             grid.BoundsPerLine.Max(bounds => bounds.Y + bounds.Height));
@@ -95,7 +87,7 @@ public sealed class RecipeBookTooltipCompositionTests
             Assert.True(bounds.X >= 0);
             Assert.True(bounds.X + bounds.Width <= content.Bounds.InnerWidth + .001);
             Assert.True(content.Bounds.absY + bounds.Y + bounds.Height <=
-                popup.Bounds.absY + popup.Bounds.InnerHeight + popup.Bounds.fixedPaddingY * scale + .001);
+                popup.Bounds.absY + popup.Bounds.OuterHeight + .001);
         });
 
         board.StackSize = 4;
@@ -103,9 +95,8 @@ public sealed class RecipeBookTooltipCompositionTests
         Assert.NotSame(popup, tooltip.Popup);
         Assert.Equal(shown, f.TextureCount);
         popup = tooltip.Popup!;
-        var fullCount = Assert.Single(popup.GetRichtext("recipe").Components.OfType<RichTextComponent>(),
+        Assert.Single(popup.GetRichtext("recipe").Components.OfType<RichTextComponent>(),
             component => component.DisplayText == "4/4");
-        Assert.Equal(CairoFont.WhiteSmallText().Color, fullCount.Font.Color);
 
         board.StackSize = 64;
         session.Refresh();
@@ -115,9 +106,8 @@ public sealed class RecipeBookTooltipCompositionTests
         inventory[0].Itemstack = null;
         session.Refresh();
         Assert.NotSame(popup, tooltip.Popup);
-        var emptyCount = Assert.Single(tooltip.Popup!.GetRichtext("recipe").Components.OfType<RichTextComponent>(),
+        Assert.Single(tooltip.Popup!.GetRichtext("recipe").Components.OfType<RichTextComponent>(),
             component => component.DisplayText == "0/4");
-        Assert.Equal(GuiStyle.ErrorTextColor, emptyCount.Font.Color);
         Assert.Equal(shown, f.TextureCount);
         tooltip.Dispose();
         Assert.Equal(baseline, f.TextureCount);
@@ -151,7 +141,7 @@ public sealed class RecipeBookTooltipCompositionTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void RecipeTooltipOmitsEmptyDescriptionAndDividerWithoutLosingPreview(bool hasOutput)
+    public void RecipeTooltipOmitsEmptyDescriptionWithoutLosingPreview(bool hasOutput)
     {
         using var f = new MenuFixture(includeRecipes: true);
         f.Parent.TryOpen();
@@ -174,7 +164,6 @@ public sealed class RecipeBookTooltipCompositionTests
         Assert.Single(popup.GetRichtext("title").Components);
         Assert.Null(popup.GetElement("description"));
         Assert.Single(content.Components.OfType<SlideshowGridRecipeTextComponent>());
-        Assert.Null(popup.GetElement("divider"));
         item.Verify(value => value.GetHeldItemInfo(It.IsAny<ItemSlot>(), It.IsAny<StringBuilder>(),
             It.IsAny<IWorldAccessor>(), false), hasOutput ? Times.Once() : Times.Never());
     }

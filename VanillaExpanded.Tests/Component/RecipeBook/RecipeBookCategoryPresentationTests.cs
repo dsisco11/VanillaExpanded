@@ -1,8 +1,4 @@
 using System.Reflection;
-using System.Text;
-using Cairo;
-using Moq;
-using VanillaExpanded.Tests.Mocks;
 using VanillaExpanded.ModSystems;
 using VanillaExpanded.RecipeBook;
 using VanillaExpanded.Tests.TestSupport.Gui;
@@ -14,7 +10,6 @@ using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.Client.NoObf;
 using Vintagestory.Common;
-using Vintagestory.GameContent;
 using VanillaExpanded.Tests;
 using VanillaExpanded.Tests.TestSupport.Configuration;
 using static VanillaExpanded.Tests.TestSupport.RecipeBook.RecipeBookLifecycleTestsTestSupport;
@@ -51,38 +46,31 @@ public sealed class RecipeBookCategoryPresentationTests
         var session = (RecipeBookSession)typeof(GuiDialogRecipeBook).GetField("session",
             BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
         var tabs = GetCategoryTabs(menu.SingleComposer);
-        Assert.Equal(new[] { "All", "tools", "mod:" + excluded }, tabs.tabs.Select(tab => tab.Name));
+        Assert.Equal(3, tabs.tabs.Length);
+        AssertCategoryPresentation(menu, null, "All");
+        AssertCategoryPresentation(menu, "tools", "tools");
+        AssertCategoryPresentation(menu, "mod:" + excluded, "mod:" + excluded);
         Assert.Equal(3, session.Rows.Length);
         Assert.Contains(session.Rows, row => row.Recipe.Recipe == excludedOnly);
-        tabs.SetValue(1);
+        tabs.SetValue(GetCategoryIndex(menu, "tools"));
         Assert.Same(overlapping, Assert.Single(session.Rows).Recipe.Recipe);
-        tabs.SetValue(2);
+        tabs.SetValue(GetCategoryIndex(menu, "mod:" + excluded));
         Assert.Same(custom, Assert.Single(session.Rows).Recipe.Recipe);
-        tabs.SetValue(0);
+        tabs.SetValue(GetCategoryIndex(menu, null));
         menu.SingleComposer.GetTextInput("search").SetValue(excludedOnly.Output.Code!.ToString());
         Assert.Same(excludedOnly, Assert.Single(session.Rows).Recipe.Recipe);
     }
 
-    [Theory]
-    [InlineData(1f)]
-    [InlineData(1.5f)]
-    [InlineData(2f)]
-    public void CategoryPresentationUsesStandardOrderThenLocalizedAdditionsAndRestoresCode(float scale)
+    [Fact]
+    public void SelectedCategoryCodeAndSearchSurviveResizeAndReopen()
     {
-        var names = new Dictionary<string, string>
+        var categoryNames = new Dictionary<string, string>
         {
-            ["tabname-construction"] = "Zulu construction",
-            ["tabname-decorative"] = "Yankee decorative",
-            ["tabname-mechanics"] = "Xray mechanics",
-            ["tabname-terrain"] = "Whiskey terrain",
-            ["tabname-tools"] = "Victor tools",
-            ["tabname-clothing"] = "Uniform clothing",
-            ["tabname-items"] = "Tango items",
-            ["tabname-mod:z"] = "Aardvark addition",
-            ["tabname-mod:a"] = "Shared name",
-            ["tabname-mod:b"] = "shared name"
+            ["tabname-mod:a"] = "Shared label",
+            ["tabname-mod:z"] = "Shared label",
+            ["tabname-mod:b"] = "Selected before"
         };
-        using var f = new MenuFixture(scale: scale, includeRecipes: true, categoryNames: names);
+        using var f = new MenuFixture(includeRecipes: true, categoryNames: categoryNames);
         var recipe = Assert.Single(f.Lifecycle.Recipes);
         recipe.Output!.ResolvedItemStack!.Collectible.CreativeInventoryTabs =
             ["mod:z", "items", "clothing", "tools", "terrain", "mechanics", "decorative", "construction", "mod:b", "mod:a"];
@@ -95,49 +83,78 @@ public sealed class RecipeBookCategoryPresentationTests
         int baseline = f.TextureCount;
         f.Toggle();
         var menu = Assert.Single(f.Menus);
-        var tabs = GetCategoryTabs(menu.SingleComposer);
-        Assert.Equal(new[] { "All", "Zulu construction", "Yankee decorative", "Xray mechanics",
-            "Whiskey terrain", "Victor tools", "Uniform clothing", "Tango items",
-            "Aardvark addition", "Shared name", "shared name", "Other" }, tabs.tabs.Select(tab => tab.Name));
         var session = (RecipeBookSession)typeof(GuiDialogRecipeBook).GetField("session",
             BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
-        Assert.Equal(2, session.Rows.Length);
-        for (int index = 1; index <= 10; index++)
-        {
-            tabs.SetValue(index);
-            Assert.Same(recipe, Assert.Single(session.Rows).Recipe.Recipe);
-        }
+        var tabs = GetCategoryTabs(menu.SingleComposer);
+        AssertCategoryPresentation(menu, "mod:a", "Shared label");
+        AssertCategoryPresentation(menu, "mod:z", "Shared label");
+        Assert.Equal(2, tabs.tabs.Count(tab => tab.Name == "Shared label"));
+        int firstDuplicateIndex = GetCategoryIndex(menu, "mod:a");
+        tabs.SetValue(firstDuplicateIndex);
+        Assert.Equal("mod:a", session.Category);
+        Assert.Equal(firstDuplicateIndex, tabs.activeElement);
+        Assert.Equal("Shared label", menu.SingleComposer.GetDynamicText("category-title").GetText());
+        Assert.Same(recipe, Assert.Single(session.Rows).Recipe.Recipe);
+        int secondDuplicateIndex = GetCategoryIndex(menu, "mod:z");
+        tabs.SetValue(secondDuplicateIndex);
+        Assert.Equal("mod:z", session.Category);
+        Assert.Equal(secondDuplicateIndex, tabs.activeElement);
+        Assert.Equal("Shared label", menu.SingleComposer.GetDynamicText("category-title").GetText());
+        Assert.Same(recipe, Assert.Single(session.Rows).Recipe.Recipe);
+        int categoryIndex = GetCategoryIndex(menu, "mod:b");
+        tabs.SetValue(categoryIndex);
         Assert.Equal("mod:b", session.Category);
-        Assert.Equal("shared name", menu.SingleComposer.GetDynamicText("category-title").GetText());
-        Assert.Equal("shared name", tabs.Hints[10].GetText());
-        tabs.SetValue(11);
-        Assert.Same(other, Assert.Single(session.Rows).Recipe.Recipe);
-        tabs.SetValue(10);
+        Assert.Equal("Selected before", menu.SingleComposer.GetDynamicText("category-title").GetText());
+        Assert.Same(recipe, Assert.Single(session.Rows).Recipe.Recipe);
         menu.SingleComposer.GetTextInput("search").SetValue(" output ");
         var oldComposer = menu.SingleComposer;
         f.ResizePanelSpace(oldComposer.Bounds.fixedWidth + 20, oldComposer.Bounds.fixedHeight - 20);
         menu.TryOpen();
         Assert.NotSame(oldComposer, menu.SingleComposer);
-        Assert.Equal(10, GetCategoryTabs(menu.SingleComposer).activeElement);
+        Assert.Equal(GetCategoryIndex(menu, "mod:b"), GetCategoryTabs(menu.SingleComposer).activeElement);
         Assert.Equal("mod:b", session.Category);
+        AssertCategoryPresentation(menu, "mod:b", "Selected before");
+        Assert.Equal("Selected before", menu.SingleComposer.GetDynamicText("category-title").GetText());
         f.Parent.TryClose();
         Assert.Equal(baseline, f.TextureCount);
-        names["tabname-mod:b"] = "Aardvark custom";
-        names["tabname-mod:z"] = "Zulu custom";
+        categoryNames["tabname-mod:a"] = "Alpha revised";
+        categoryNames["tabname-mod:z"] = "Zulu revised";
+        categoryNames["tabname-mod:b"] = "Selected after";
         f.Parent.TryOpen();
         var reopened = Assert.Single(f.Menus);
         Assert.NotSame(menu, reopened);
-        tabs = GetCategoryTabs(reopened.SingleComposer);
-        Assert.Equal(new[] { "Aardvark custom", "Shared name", "Zulu custom", "Other" },
-            tabs.tabs.Skip(8).Select(tab => tab.Name));
-        Assert.Equal(8, tabs.activeElement);
         var restored = (RecipeBookSession)typeof(GuiDialogRecipeBook).GetField("session",
             BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(reopened)!;
         Assert.Equal("mod:b", restored.Category);
+        AssertCategoryPresentation(reopened, "mod:a", "Alpha revised");
+        AssertCategoryPresentation(reopened, "mod:z", "Zulu revised");
+        AssertCategoryPresentation(reopened, "mod:b", "Selected after");
+        Assert.Equal("Selected after", reopened.SingleComposer.GetDynamicText("category-title").GetText());
+        Assert.Equal(GetCategoryIndex(reopened, "mod:b"),
+            GetCategoryTabs(reopened.SingleComposer).activeElement);
         Assert.Same(recipe, Assert.Single(restored.Rows).Recipe.Recipe);
         Assert.Equal(" output ", reopened.SingleComposer.GetTextInput("search").GetText());
-        Assert.Equal("Aardvark custom", reopened.SingleComposer.GetDynamicText("category-title").GetText());
         f.Parent.TryClose();
         Assert.Equal(baseline, f.TextureCount);
+    }
+
+    private static string?[] GetCategories(GuiDialogRecipeBook book) =>
+        (string?[])typeof(GuiDialogRecipeBook)
+            .GetField("categories", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(book)!;
+
+    private static int GetCategoryIndex(GuiDialogRecipeBook book, string? code)
+    {
+        int index = Array.IndexOf(GetCategories(book), code);
+        Assert.True(index >= 0);
+        return index;
+    }
+
+    private static void AssertCategoryPresentation(GuiDialogRecipeBook book, string? code, string label)
+    {
+        int index = GetCategoryIndex(book, code);
+        var tabs = GetCategoryTabs(book.SingleComposer);
+        var tab = Assert.Single(tabs.tabs, candidate => candidate.DataInt == index);
+        Assert.Equal(label, tab.Name);
+        Assert.Equal(label, tabs.Hints[index].GetText());
     }
 }

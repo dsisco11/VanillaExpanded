@@ -65,12 +65,12 @@ public sealed class RecipeBookOptionsTests
         var book = Assert.Single(f.Menus);
         book.SingleComposer.GetTextInput("search").SetValue("retained search");
         var options = f.OpenOptions(book);
+        AssertPopupContained(options.PopupBounds, book.SingleComposer.Bounds,
+            f.Lifecycle.Api.Object.Gui.WindowBounds);
         Assert.True(options.IsOpened);
         Assert.True(options.HasFocus);
         Assert.True(book.Focused);
         Assert.True(options.Checkbox.On);
-        Assert.InRange(options.PopupBounds.absX, book.SingleComposer.Bounds.absX, options.Bounds.absX);
-        Assert.InRange(System.Math.Abs(options.PopupBounds.absY - options.Bounds.absY - options.Bounds.OuterHeight), 0, 1);
         var enter = new KeyEvent { KeyCode = (int)GlKeys.Enter };
         book.OnKeyDown(enter);
         Assert.True(enter.Handled);
@@ -89,6 +89,8 @@ public sealed class RecipeBookOptionsTests
         book = Assert.Single(f.Menus);
         Assert.Equal("retained search", book.SingleComposer.GetTextInput("search").GetText());
         var secondOptions = f.OpenOptions(book);
+        AssertPopupContained(secondOptions.PopupBounds, book.SingleComposer.Bounds,
+            f.Lifecycle.Api.Object.Gui.WindowBounds);
         Assert.False(secondOptions.Checkbox.On);
         f.ToggleReopenOption(book);
         Assert.True(secondOptions.Checkbox.On);
@@ -142,7 +144,6 @@ public sealed class RecipeBookOptionsTests
             f.Toggle();
             var book = Assert.Single(f.Menus);
             var oldTiles = Assert.IsType<GuiElementRecipeBookTiles>(book.SingleComposer.GetElement("tiles"));
-            Assert.Equal(45, oldTiles.TileSize);
             var session = (RecipeBookSession)typeof(GuiDialogRecipeBook).GetField("session",
                 BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(book)!;
             book.SingleComposer.GetTextInput("search").SetValue("OUTPUT");
@@ -156,7 +157,7 @@ public sealed class RecipeBookOptionsTests
 
             var options = f.OpenOptions(book);
             FocusSizeInput(f, book, options);
-            Assert.Equal("45", options.SizeInput.GetText());
+            Assert.Equal(oldTiles.TileSize.ToString(), options.SizeInput.GetText());
 
             // Act
             options.SizeInput.SetValue(text);
@@ -168,7 +169,6 @@ public sealed class RecipeBookOptionsTests
             var resizedOptions = Assert.IsType<GuiElementRecipeBookOptions>(book.SingleComposer.GetElement("options"));
             Assert.NotSame(oldTiles, resizedTiles);
             Assert.Equal(expectedSize, resizedTiles.TileSize);
-            Assert.Equal(expectedSize + RecipeBookTileGeometry.Gap, resizedTiles.RowPitch);
             Assert.Equal("OUTPUT", book.SingleComposer.GetTextInput("search").GetText());
             Assert.Equal(CraftingCatalogue.OtherCategory, session.Category);
             Assert.Equal("name", session.Sort.Selected.Id);
@@ -211,12 +211,10 @@ public sealed class RecipeBookOptionsTests
             BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(book)!;
         var oldTiles = Assert.IsType<GuiElementRecipeBookTiles>(book.SingleComposer.GetElement("tiles"));
         Assert.Equal(90, oldTiles.TileSize);
-        double oldRowPitch = oldTiles.RowPitch;
         int selectedOutput = session.Rows[20].Output.Id;
         session.Select(selectedOutput);
         oldTiles.Scroll(80);
         var before = oldTiles.CaptureView();
-        Assert.Equal(80, before.RowOffset, 4);
         Assert.Equal(session.Rows[0].Output.Id, before.AnchorOutput);
         AssertPartiallyVisible(Assert.Single(oldTiles.Elements.Cast<GuiElementRecipeBookTile>(),
             tile => tile.Selection?.Output.Id == before.AnchorOutput), oldTiles.InsideClipBounds);
@@ -232,7 +230,9 @@ public sealed class RecipeBookOptionsTests
         var resizedTiles = Assert.IsType<GuiElementRecipeBookTiles>(book.SingleComposer.GetElement("tiles"));
         var resizedOptions = Assert.IsType<GuiElementRecipeBookOptions>(book.SingleComposer.GetElement("options"));
         Assert.Equal(30, resizedTiles.TileSize);
-        Assert.Equal(80d * resizedTiles.RowPitch / oldRowPitch, resizedTiles.ScrollPosition, 4);
+        var after = resizedTiles.CaptureView();
+        Assert.Equal(before.AnchorOutput, after.AnchorOutput);
+        Assert.Equal(before.RowOffset / before.RowPitch, after.RowOffset / after.RowPitch, 4);
         var retainedAnchor = Assert.Single(resizedTiles.Elements.Cast<GuiElementRecipeBookTile>(),
             tile => tile.Selection?.Output.Id == before.AnchorOutput);
         AssertPartiallyVisible(retainedAnchor, resizedTiles.InsideClipBounds);
@@ -251,6 +251,7 @@ public sealed class RecipeBookOptionsTests
             Assert.True(bottom > viewport.renderY);
             Assert.True(bottom < viewport.renderY + viewport.InnerHeight);
         }
+
     }
 
     [Theory]
@@ -490,6 +491,18 @@ public sealed class RecipeBookOptionsTests
         else f.Parent.TryClose();
         Assert.False(options.IsOpened);
         Assert.Empty(f.Menus);
+    }
+
+    private static void AssertPopupContained(ElementBounds popup, ElementBounds dialog, ElementBounds window)
+    {
+        Assert.True(popup.absX >= dialog.absX);
+        Assert.True(popup.absY >= dialog.absY);
+        Assert.True(popup.absX + popup.OuterWidth <= dialog.absX + dialog.OuterWidth);
+        Assert.True(popup.absY + popup.OuterHeight <= dialog.absY + dialog.OuterHeight);
+        Assert.True(popup.absX >= window.absX);
+        Assert.True(popup.absY >= window.absY);
+        Assert.True(popup.absX + popup.OuterWidth <= window.absX + window.OuterWidth);
+        Assert.True(popup.absY + popup.OuterHeight <= window.absY + window.OuterHeight);
     }
 
     private static void FocusSizeInput(MenuFixture f, GuiDialogRecipeBook book, GuiElementRecipeBookOptions options)

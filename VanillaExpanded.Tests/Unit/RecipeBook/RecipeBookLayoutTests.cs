@@ -60,7 +60,10 @@ public sealed class RecipeBookLayoutTests
         var grid = Calculated(ElementBounds.Fixed(300, 70, 150, 200).WithParent(parent));
         var right = RecipeBookLayout.Place(parent, grid, grid, window, 200, 164)!;
         right.CalcWorldBounds();
-        Assert.Equal(2, right.absX - parent.absX - parent.OuterWidth, 4);
+        Assert.True(right.absX >= parent.absX + parent.OuterWidth);
+        Assert.True(right.absX >= grid.absX + grid.OuterWidth
+            || right.absY >= grid.absY + grid.OuterHeight
+            || right.absY + right.OuterHeight <= grid.absY);
         double before = right.absX;
         parent.fixedX += 20;
         parent.MarkDirtyRecursive();
@@ -69,13 +72,16 @@ public sealed class RecipeBookLayoutTests
         var moved = RecipeBookLayout.Place(parent, grid, grid, window, 200, 164)!;
         moved.CalcWorldBounds();
         Assert.Equal(before + 20 * uiScale, moved.absX, 4);
-        Assert.Equal(2, moved.absX - parent.absX - parent.OuterWidth, 4);
+        Assert.True(moved.absX >= parent.absX + parent.OuterWidth);
         parent.fixedX = 650;
         parent.MarkDirtyRecursive();
         parent.CalcWorldBounds();
         var left = RecipeBookLayout.Place(parent, grid, grid, window, 200, 164)!;
         left.CalcWorldBounds();
-        Assert.Equal(2, parent.absX - left.absX - left.OuterWidth, 4);
+        Assert.True(left.absX + left.OuterWidth <= parent.absX);
+        Assert.True(left.absX + left.OuterWidth <= grid.absX
+            || left.absY >= grid.absY + grid.OuterHeight
+            || left.absY + left.OuterHeight <= grid.absY);
         var tiny = Calculated(ElementBounds.Fixed(0, 0, 100, 100).WithEmptyParent());
         Assert.Null(RecipeBookLayout.Place(tiny, tiny, tiny, tiny, 200, 164));
     }

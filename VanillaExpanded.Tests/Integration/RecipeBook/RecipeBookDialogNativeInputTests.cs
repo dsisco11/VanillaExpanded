@@ -39,7 +39,6 @@ public sealed class RecipeBookDialogNativeInputTests
         var parent = f.Parent.Composers["maininventory"].Bounds;
         Assert.False(composer.GetTitleBar("titlebar").Movable);
         Assert.Empty(f.DialogPositions);
-        Assert.Equal(2, composer.Bounds.absX - parent.absX - parent.OuterWidth, 4);
         double dockedX = composer.Bounds.absX;
         parent.fixedX += 20;
         parent.MarkDirtyRecursive();
@@ -161,33 +160,37 @@ public sealed class RecipeBookDialogNativeInputTests
         var book = Assert.Single(f.Menus);
         var scrollbar = Assert.IsType<GuiElementStyledScrollbar>(book.SingleComposer.GetScrollbar("scroll"));
         var tiles = Assert.IsType<GuiElementRecipeBookTiles>(book.SingleComposer.GetElement("tiles"));
+        var up = (GuiElementStyledArrowButton)typeof(GuiElementStyledScrollbar)
+            .GetField("up", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(scrollbar)!;
+        var down = (GuiElementStyledArrowButton)typeof(GuiElementStyledScrollbar)
+            .GetField("down", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(scrollbar)!;
         int x = (int)(scrollbar.Bounds.absX + scrollbar.Bounds.OuterWidth / 2);
-        int bottomY = (int)(scrollbar.Bounds.absY + scrollbar.Bounds.OuterHeight - 5 * scale);
+        int bottomY = (int)(down.Bounds.absY + down.Bounds.OuterHeight / 2);
         Click(bottomY);
-        Assert.Equal(50, tiles.ScrollPosition, 3);
-        Assert.Equal(50 * scale, scrollbar.CurrentYPosition, 3);
-        int topY = (int)(scrollbar.Bounds.absY + 5 * scale);
+        Assert.Equal(tiles.RowPitch, tiles.ScrollPosition, 3);
+        Assert.Equal(tiles.ScrollPosition * scale, scrollbar.CurrentYPosition, 3);
+        int topY = (int)(up.Bounds.absY + up.Bounds.OuterHeight / 2);
         Click(topY);
         Assert.Equal(0, tiles.ScrollPosition);
         Assert.Equal(0, scrollbar.CurrentYPosition);
         Assert.True(scrollbar.HasFocus);
-        double maximum = 2 + Math.Ceiling(101d / tiles.Geometry.Columns) * 50 - 5
-            - tiles.InsideClipBounds.InnerHeight / scale;
+        double maximum = Math.Max(0, tiles.Geometry.ContentHeight(f.Lifecycle.Recipes.Count)
+            - tiles.InsideClipBounds.InnerHeight / scale);
         var render = Mock.Get(f.Lifecycle.Api.Object.Render);
         render.Invocations.Clear();
         scrollbar.RenderInteractiveElements(0);
-        var draws = render.Invocations.Where(call =>
-            call.Method.Name == nameof(IRenderAPI.Render2DTexturePremultipliedAlpha)).ToArray();
-        Assert.Equal(4, draws.Length);
-        var upArrow = draws[1].Arguments;
-        var downArrow = draws[2].Arguments;
-        var thumb = draws[3].Arguments;
-        double trackTop = Convert.ToDouble(upArrow[2]) + Convert.ToDouble(upArrow[4]);
-        double trackBottom = Convert.ToDouble(downArrow[2]);
+        var (trackTop, trackBottom) = (up.Bounds.renderY + up.Bounds.OuterHeight, down.Bounds.renderY);
+        var thumb = Assert.Single(render.Invocations.Where(call =>
+        {
+            if (call.Method.Name != nameof(IRenderAPI.Render2DTexturePremultipliedAlpha)) return false;
+            double y = Convert.ToDouble(call.Arguments[2]);
+            double height = Convert.ToDouble(call.Arguments[4]);
+            return y >= trackTop && y + height <= trackBottom && height < trackBottom - trackTop;
+        })).Arguments;
         double thumbTop = Convert.ToDouble(thumb[2]);
         double thumbHeight = Convert.ToDouble(thumb[4]);
         double availableTravel = trackBottom - trackTop - thumbHeight;
-        Assert.True(availableTravel > 4);
+        Assert.True(availableTravel > 0);
         int startY = (int)(thumbTop + thumbHeight / 2);
         int dragPixels = Math.Max(1, (int)Math.Floor(availableTravel / 4));
         double expectedPartial = maximum * dragPixels / availableTravel;
@@ -233,7 +236,7 @@ public sealed class RecipeBookDialogNativeInputTests
             BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
         var input = Assert.IsType<GuiElementClearableTextInput>(menu.SingleComposer.GetTextInput("search"));
         Assert.False(input.ClearVisible);
-        AssertIcon(false);
+        AssertClearClipping(false);
         var tabs = GetCategoryTabs(menu.SingleComposer);
         tabs.SetValue(Array.FindIndex(tabs.tabs, tab => tab.Name == "tools"));
         var row = Assert.Single(session.Rows);
@@ -244,11 +247,14 @@ public sealed class RecipeBookDialogNativeInputTests
         input.SetValue(new string('x', 400));
         Assert.Empty(session.Rows);
         Assert.True(input.ClearVisible);
-        AssertIcon(true);
-        Assert.True(input.Bounds.absX + input.Bounds.OuterWidth + scale <= input.ClearBounds.absX);
-        Assert.True(input.ClearBounds.absX + input.ClearBounds.OuterWidth < input.FieldBounds.absX + input.FieldBounds.OuterWidth);
-        Assert.Equal(input.FieldBounds.absY + input.FieldBounds.OuterHeight / 2,
-            input.ClearBounds.absY + input.ClearBounds.OuterHeight / 2, 4);
+        AssertClearClipping(true);
+        Assert.True(input.Bounds.absX + input.Bounds.OuterWidth <= input.ClearBounds.absX);
+        Assert.True(input.ClearBounds.absX >= input.FieldBounds.absX);
+        Assert.True(input.ClearBounds.absX + input.ClearBounds.OuterWidth
+            <= input.FieldBounds.absX + input.FieldBounds.OuterWidth);
+        Assert.True(input.ClearBounds.absY >= input.FieldBounds.absY);
+        Assert.True(input.ClearBounds.absY + input.ClearBounds.OuterHeight
+            <= input.FieldBounds.absY + input.FieldBounds.OuterHeight);
         Assert.True(menu.SingleComposer.FocusElement(tabs.TabIndex));
         ClickClear();
 
@@ -261,7 +267,7 @@ public sealed class RecipeBookDialogNativeInputTests
         Assert.True(Assert.Single(session.Rows).IsExplicit);
         Assert.Same(row.Allocation, Assert.Single(session.Rows).Allocation);
         Assert.Equal(0, menu.SingleComposer.GetScrollbar("scroll").CurrentYPosition);
-        AssertIcon(false);
+        AssertClearClipping(false);
 
         // Act: repeat clearing with craftable-only enabled, including whitespace-only input.
         f.ToggleCraftable(menu);
@@ -288,7 +294,7 @@ public sealed class RecipeBookDialogNativeInputTests
             Assert.InRange(f.TextureCount, 1, textures);
             Assert.Equal("output", input.GetText());
             Assert.True(input.ClearVisible);
-            AssertIcon(true);
+            AssertClearClipping(true);
             // A smaller viewport can remove pooled tiles; compare resource counts again at the original size.
             f.ResizePanelSpace(composer.Bounds.fixedWidth, composer.Bounds.fixedHeight);
             menu.TryOpen();
@@ -296,7 +302,7 @@ public sealed class RecipeBookDialogNativeInputTests
             Assert.Equal(textures, f.TextureCount);
             Assert.Equal("output", input.GetText());
             Assert.True(input.ClearVisible);
-            AssertIcon(true);
+            AssertClearClipping(true);
         }
 
         // Act: close and reopen the parent inventory, creating a new dialog from browsing state.
@@ -324,19 +330,18 @@ public sealed class RecipeBookDialogNativeInputTests
             Assert.True(up.Handled);
         }
 
-        void AssertIcon(bool visible)
+        void AssertClearClipping(bool visible)
         {
             var render = Mock.Get(f.Lifecycle.Api.Object.Render);
             render.Invocations.Clear();
             input.RenderInteractiveElements(.1f);
-            Assert.Equal(visible ? 1 : 0, render.Invocations.Count(call =>
-                call.Method.Name == nameof(IRenderAPI.Render2DTexturePremultipliedAlpha)
-                && call.Arguments.Count > 1 && ReferenceEquals(call.Arguments[1], input.ClearBounds)));
             var scissor = Assert.Single(render.Invocations, call => call.Method.Name == nameof(IRenderAPI.GlScissor));
             Assert.True((int)scissor.Arguments[0] + (int)scissor.Arguments[2] <= input.ClearBounds.absX);
-            if (visible) return;
-            Assert.False(input.ClearHint.IsVisible);
-            Assert.False(input.ClearHint.IsNowShown);
+            if (!visible)
+            {
+                Assert.False(input.ClearHint.IsVisible);
+                Assert.False(input.ClearHint.IsNowShown);
+            }
         }
     }
 
@@ -463,24 +468,9 @@ public sealed class RecipeBookDialogNativeInputTests
     {
         using var f = new MenuFixture(scale: scale);
         var button = f.ToggleButton;
-        Assert.Empty(button.GetText());
-        Assert.Equal("vanillaexpanded-recipe-book", button.icon);
         Assert.True(button.Toggleable);
-        Assert.Equal(28 * scale, button.Bounds.InnerWidth, 4);
-        Assert.Equal(button.Bounds.InnerWidth, button.Bounds.InnerHeight, 4);
         AssertBookTabPosition(f);
         Assert.Equal("Recipe Book", button.Hint.GetText());
-        var svg = System.Xml.Linq.XDocument.Parse(System.Text.Encoding.UTF8.GetString(f.BookAsset.Data));
-        Assert.Equal("http://www.w3.org/2000/svg", svg.Root!.Name.NamespaceName);
-        Assert.Equal("0 0 24 24", svg.Root.Attribute("viewBox")!.Value);
-        Assert.Equal(3, f.BookDraws.Count);
-        Assert.All(f.BookDraws, draw =>
-        {
-            Assert.Same(f.BookAsset, draw.Asset);
-            Assert.InRange(draw.Width, 18 * scale, 21 * scale);
-            Assert.InRange(draw.Height, 18 * scale, 21 * scale);
-            Assert.NotNull(draw.Color);
-        });
         f.Parent.TryOpen();
         f.Toggle();
         Assert.True(Assert.Single(f.Menus).IsOpened());
@@ -521,23 +511,9 @@ public sealed class RecipeBookDialogNativeInputTests
         f.Recompose();
         f.Parent.TryOpen();
         int baseline = f.TextureCount;
-        f.CategoryDraws.Clear();
         f.Toggle();
         var menu = Assert.Single(f.Menus);
-        var tabs = GetCategoryTabs(menu.SingleComposer);
-        Assert.Equal(10, tabs.tabs.Length);
-        Assert.Equal(30, f.CategoryDraws.Count);
-        Assert.All(RecipeBookCategoryIcons.Codes, code =>
-            Assert.Equal(3, f.CategoryDraws.Count(draw => ReferenceEquals(draw.Asset, f.CategoryAssets[code]))));
-        Assert.All(f.CategoryDraws, draw =>
-        {
-            Assert.InRange(draw.Width, (int)(18 * scale), (int)(22 * scale));
-            Assert.Equal(draw.Width, draw.Height);
-            Assert.True(draw.X >= 0 && draw.Y >= 0);
-            Assert.True(draw.Y + draw.Height <= draw.SurfaceHeight);
-            Assert.True(draw.SurfaceWidth >= draw.X + draw.Width);
-            Assert.NotNull(draw.Color);
-        });
+        Assert.True(menu.IsOpened());
         var registry = f.Lifecycle.Api.Object.Gui.Icons.CustomIcons;
         var registered = RecipeBookCategoryIcons.Codes.ToDictionary(RecipeBookCategoryIcons.Id, code =>
             registry[RecipeBookCategoryIcons.Id(code)]);

@@ -146,7 +146,7 @@ public sealed class GuiControlNativeProbeTests: IDisposable
     }
 
     [Fact]
-    public void NativeComposerRetainsSingleStripFocusOutlineAndTabRouting()
+    public void NativeComposerRetainsTabRouting()
     {
         using var graphics = Graphics();
         using var composer = Composer(graphics, ElementBounds.Fixed(0, 0, 300, 150).WithEmptyParent());
@@ -159,10 +159,6 @@ public sealed class GuiControlNativeProbeTests: IDisposable
         Assert.True(composer.FocusElement(0));
         composer.OnKeyDown(new KeyEvent { KeyCode = (int)GlKeys.Tab }, true);
         Assert.Same(strip, composer.CurrentTabIndexElement);
-        graphics.Render.Invocations.Clear();
-        composer.Render(0);
-        var outlines = graphics.Render.Invocations.Where(call => call.Method.Name == "RenderRectangle").ToArray();
-        Assert.Single(outlines);
         composer.OnKeyDown(new KeyEvent { KeyCode = (int)GlKeys.Tab, ShiftPressed = true }, true);
         Assert.Same(first, composer.CurrentTabIndexElement);
     }

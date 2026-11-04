@@ -127,11 +127,14 @@ public sealed class RecipeBookNativeTooltipIntegrationTests
         var titleElement = popup.GetRichtext("title");
         var title = Assert.IsType<RichTextComponent>(Assert.Single(titleElement.Components));
         Assert.True(title.Lines.Length > 1);
-        Assert.Equal(EnumTextOrientation.Center, title.Font.Orientation);
-        Assert.All(title.Lines, line => Assert.Equal(content.Bounds.InnerWidth / 2,
-            line.Bounds.X + (line.LeftSpace + line.RightSpace + line.Bounds.Width) / 2, precision: 6));
         var grid = Assert.Single(content.Components.OfType<SlideshowGridRecipeTextComponent>());
-        Assert.Equal(content.Bounds.InnerWidth / 2, grid.BoundsPerLine[0].X + 126 * scale / 2, precision: 6);
+        Assert.All(title.BoundsPerLine, line =>
+        {
+            Assert.True(line.X >= 0);
+            Assert.True(line.X + line.Width <= titleElement.Bounds.InnerWidth + .001);
+        });
+        Assert.True(grid.BoundsPerLine[0].X >= 0);
+        Assert.True(grid.BoundsPerLine[0].X + grid.BoundsPerLine[0].Width <= content.Bounds.InnerWidth + .001);
         Assert.True(titleElement.Bounds.absY + title.BoundsPerLine.Max(bounds => bounds.Y + bounds.Height) <=
             content.Bounds.absY + grid.BoundsPerLine[0].Y);
     }
@@ -183,32 +186,25 @@ public sealed class RecipeBookNativeTooltipIntegrationTests
         var title = Assert.IsType<RichTextComponent>(Assert.Single(titleElement.Components));
         var description = popup.GetRichtext("description");
         var panel = description.Bounds.ParentBounds;
-        Assert.NotSame(popup.Bounds, panel);
-        Assert.Same(popup.Bounds, panel.ParentBounds);
-        Assert.Equal(3 * scale, description.Bounds.absX - panel.absX, precision: 6);
-        Assert.Equal(3 * scale, description.Bounds.absY - panel.absY, precision: 6);
-        Assert.Equal(3 * scale, panel.absX + panel.OuterWidth -
-            description.Bounds.absX - description.Bounds.OuterWidth, precision: 6);
-        Assert.Equal(3 * scale, panel.absY + panel.OuterHeight -
-            description.Bounds.absY - description.Bounds.OuterHeight, precision: 6);
-        Assert.Equal(content.Bounds.InnerWidth, panel.OuterWidth, precision: 6);
+        AssertContained(panel, popup.Bounds);
+        AssertContained(description.Bounds, panel);
         var text = description.Components.OfType<RichTextComponent>()
             .Where(component => component is not ClearFloatTextComponent).ToArray();
         Assert.Contains(text, component => component.Lines.Length > 1);
         Assert.Contains(text, component => component.DisplayText.Contains("Durability:"));
         var custom = Assert.Single(text, component => component.DisplayText.Contains("Custom stat: 12"));
-        Assert.Equal(new double[] { 1, 0, 0 }, custom.Font.Color.Take(3));
         Assert.DoesNotContain(text, component => component.DisplayText.Contains("<font"));
-        Assert.All(text, component => Assert.Equal(EnumTextOrientation.Left, component.Font.Orientation));
-        var divider = Assert.IsType<GuiElementInset>(popup.GetElement("divider"));
         var grid = Assert.Single(content.Components.OfType<SlideshowGridRecipeTextComponent>());
         Assert.True(titleElement.Bounds.absY + title.BoundsPerLine.Max(bounds => bounds.Y + bounds.Height) <= panel.absY);
         Assert.True(description.Bounds.absY + text.SelectMany(component => component.BoundsPerLine)
-            .Max(bounds => bounds.Y + bounds.Height) < divider.Bounds.absY);
-        Assert.True(divider.Bounds.absY + divider.Bounds.OuterHeight <
-            content.Bounds.absY + grid.BoundsPerLine[0].Y);
-        Assert.Equal(content.Bounds.absX, divider.Bounds.absX, precision: 6);
-        Assert.Equal(content.Bounds.InnerWidth, divider.Bounds.OuterWidth, precision: 6);
+            .Max(bounds => bounds.Y + bounds.Height) <= content.Bounds.absY + grid.BoundsPerLine[0].Y);
+        Assert.All(text.SelectMany(component => component.BoundsPerLine), bounds =>
+        {
+            Assert.True(bounds.X >= 0);
+            Assert.True(bounds.X + bounds.Width <= description.Bounds.InnerWidth + .001);
+            Assert.True(bounds.Y >= 0);
+            Assert.True(bounds.Y + bounds.Height <= description.Bounds.InnerHeight + .001);
+        });
         Assert.NotNull(describedSlot);
         var describedStack = Assert.IsType<ItemStack>(describedSlot.Itemstack);
         Assert.NotSame(output, describedStack);
@@ -256,5 +252,13 @@ public sealed class RecipeBookNativeTooltipIntegrationTests
         Assert.Equal(new[] { "board-oak", "board-pine" }, choices.Order().ToArray());
         Assert.Equal(EnumRecipeMatchType.Wildcard, ingredient.MatchingType);
         Assert.Equal("board-*", ingredient.Code!.Path);
+    }
+
+    private static void AssertContained(ElementBounds content, ElementBounds container)
+    {
+        Assert.True(content.absX >= container.absX - 0.001);
+        Assert.True(content.absY >= container.absY - 0.001);
+        Assert.True(content.absX + content.OuterWidth <= container.absX + container.OuterWidth + 0.001);
+        Assert.True(content.absY + content.OuterHeight <= container.absY + container.OuterHeight + 0.001);
     }
 }

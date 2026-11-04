@@ -187,7 +187,6 @@ public sealed class RecipeBookDialogFeedbackTests
         void AssertState(string message, string? action)
         {
             Assert.Equal(message, menu.SingleComposer.GetDynamicText("empty").GetText());
-            AssertEmptyStateCentered(menu);
             foreach (string key in new[] { "clear-search", "show-uncraftable" })
             {
                 var button = menu.SingleComposer.GetButton(key);

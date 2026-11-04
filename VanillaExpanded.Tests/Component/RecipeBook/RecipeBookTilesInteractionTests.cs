@@ -219,7 +219,7 @@ public sealed class RecipeBookTilesInteractionTests
             row => inspected = row, (_, _) => { }, icons);
         PrepareTiles(tiles);
         var pool = tiles.Elements.ToArray();
-        Assert.Equal(6, pool.Length);
+        Assert.True(pool.Length > 0 && pool.Length < session.Rows.Length);
         Assert.All(pool, tile =>
         {
             Assert.IsAssignableFrom<GuiElementTextButton>(tile);
@@ -233,7 +233,9 @@ public sealed class RecipeBookTilesInteractionTests
             Assert.True(tab.Handled);
             Assert.Equal(session.Rows[i].Output.Id, inspected!.Output.Id);
             var focused = tiles.CurrentTabIndexElement;
-            Assert.InRange(focused.Bounds.absY, viewport.absY, viewport.absY + viewport.InnerHeight - 45);
+            Assert.True(focused.Bounds.absY >= viewport.absY);
+            Assert.True(focused.Bounds.absY + focused.Bounds.OuterHeight
+                <= viewport.absY + viewport.InnerHeight + .001);
         }
         for (int i = 29; i >= 0; i--)
         {

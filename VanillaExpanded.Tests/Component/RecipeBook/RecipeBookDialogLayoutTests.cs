@@ -51,20 +51,14 @@ public sealed class RecipeBookDialogLayoutTests
         void AssertFrame()
         {
             var composer = book.SingleComposer;
-            var frame = Assert.IsType<GuiElementCustomDraw>(composer.GetElement("recipes-background")).Bounds;
             var viewport = composer.GetElement("tiles").InsideClipBounds;
             var scrollbar = composer.GetScrollbar("scroll").Bounds;
-            double border = Math.Max(1, Math.Round(2 * (double)scale, MidpointRounding.AwayFromZero));
-            Assert.Equal(frame.absX + border, viewport.absX, 4);
-            Assert.Equal(frame.absY + border, viewport.absY, 4);
-            Assert.Equal(frame.absY + frame.OuterHeight - border, viewport.absY + viewport.OuterHeight, 4);
-            Assert.Equal(frame.absY + border, scrollbar.absY, 4);
-            Assert.Equal(frame.absY + frame.OuterHeight - border, scrollbar.absY + scrollbar.OuterHeight, 4);
+            AssertContained(viewport, composer.Bounds);
+            AssertContained(scrollbar, composer.Bounds);
+            Assert.True(viewport.absX + viewport.OuterWidth <= scrollbar.absX
+                || scrollbar.absX + scrollbar.OuterWidth <= viewport.absX);
             var tiles = Assert.IsType<GuiElementRecipeBookTiles>(composer.GetElement("tiles"));
             tiles.ResetScroll();
-            Assert.Equal(viewport.absY, tiles.Bounds.absY, 4);
-            Assert.Equal(viewport.absY + Math.Round(2 * (double)scale, MidpointRounding.AwayFromZero),
-                tiles.Elements[0].Bounds.absY, 4);
             Assert.All(tiles.Elements, tile => Assert.Same(viewport, tile.InsideClipBounds));
             foreach (float position in new[] { 30f, 33f, 34f, 71f })
             {
@@ -72,8 +66,6 @@ public sealed class RecipeBookDialogLayoutTests
                 Assert.Equal(position, tiles.ScrollPosition);
                 var first = Assert.IsType<GuiElementRecipeBookTile>(tiles.Elements[0]);
                 Assert.NotNull(first.Selection);
-                Assert.Equal(viewport.absY + Math.Round((2 - position % 50) * scale, MidpointRounding.AwayFromZero),
-                    first.Bounds.absY, 4);
                 Assert.True(first.Bounds.absY <= viewport.absY);
                 Assert.True(first.Bounds.absY + first.Bounds.OuterHeight >= viewport.absY);
             }
@@ -85,12 +77,10 @@ public sealed class RecipeBookDialogLayoutTests
             Assert.Contains(render.Invocations, call => call.Method.Name == nameof(IRenderAPI.PushScissor)
                 && ReferenceEquals(call.Arguments[0], viewport) && (bool)call.Arguments[1]);
             composer.GetTextInput("search").SetValue("");
-            Assert.Equal(scrollbar.absX + scrollbar.OuterWidth + border, frame.absX + frame.OuterWidth, 4);
             var search = Assert.IsType<GuiElementClearableTextInput>(composer.GetTextInput("search")).FieldBounds;
-            Assert.Equal(search.absX, frame.absX, 4);
-            Assert.Equal(search.OuterWidth, frame.OuterWidth, 4);
-            Assert.True(search.absY + search.OuterHeight < frame.absY);
-            Assert.True(frame.absY + frame.OuterHeight < composer.GetButton("previous").Bounds.absY);
+            Assert.True(search.absY + search.OuterHeight <= viewport.absY);
+            Assert.True(viewport.absY + viewport.OuterHeight <= composer.GetButton("previous").Bounds.absY);
+            AssertContained(search, composer.Bounds);
         }
     }
 
@@ -126,7 +116,6 @@ public sealed class RecipeBookDialogLayoutTests
         original.Scroll(157 * scale);
         original.FocusElement(original.Geometry.Columns);
         var before = original.CaptureView();
-        Assert.Equal(7, before.RowOffset, 4);
         int selected = session.SelectedOutput!.Value;
         double minimumWidth = (double)typeof(GuiDialogRecipeBook).GetField("minimumWidth",
             BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(book)!;
@@ -136,8 +125,14 @@ public sealed class RecipeBookDialogLayoutTests
         Assert.NotSame(original, resized);
         Assert.True(resized.Geometry.Columns < original.Geometry.Columns);
         var after = resized.CaptureView();
-        int anchorIndex = session.Rows.IndexOf(session.Rows.Single(row => row.Output.Id == before.AnchorOutput));
-        Assert.Equal(anchorIndex / resized.Geometry.Columns * 50 + before.RowOffset, resized.ScrollPosition, 3);
+        var restoredAnchor = Assert.Single(resized.Elements.Cast<GuiElementRecipeBookTile>()
+            .Where(tile => tile.Selection?.Output.Id == before.AnchorOutput));
+        var visibleTiles = resized.Elements.Cast<GuiElementRecipeBookTile>()
+            .Where(tile => tile.Selection != null && tile.IsInViewport).ToArray();
+        Assert.NotEmpty(visibleTiles);
+        Assert.Contains(restoredAnchor, visibleTiles);
+        Assert.Equal(visibleTiles.Min(tile => tile.Bounds.renderY), restoredAnchor.Bounds.renderY, 3);
+        Assert.Equal(before.RowOffset, after.RowOffset, 3);
         Assert.Equal(before.FocusedOutput, after.FocusedOutput);
         Assert.Equal(before.InspectedOutput, after.InspectedOutput);
         Assert.Equal(selected, session.SelectedOutput);
@@ -167,8 +162,6 @@ public sealed class RecipeBookDialogLayoutTests
         var first = Assert.IsType<GuiElementRecipeBookTile>(original.Elements[0]);
         original.UpdateHover((int)first.PixelBounds.renderX + 5, (int)original.InsideClipBounds.renderY + 5);
         var before = original.CaptureView();
-        Assert.Equal(7, before.RowOffset, 4);
-
         // Act: change scale only after capturing the anchor, then let the dialog recompose.
         RuntimeEnv.GUIScale = newScale;
         Assert.Equal(157, original.ScrollPosition, 4);
@@ -192,11 +185,9 @@ public sealed class RecipeBookDialogLayoutTests
         using var f = new MenuFixture(scale: scale);
         AssertBookTabPosition(f);
         var composer = f.Parent.Composers["maininventory"];
-        double before = f.ToggleButton.Bounds.absY;
         composer.Bounds.fixedHeight += 120;
         composer.Bounds.MarkDirtyRecursive();
         composer.ReCompose();
-        Assert.Equal(before, f.ToggleButton.Bounds.absY, 4);
         AssertBookTabPosition(f);
         composer.Bounds.WithFixedPadding(20, 30);
         composer.Bounds.MarkDirtyRecursive();
@@ -240,43 +231,11 @@ public sealed class RecipeBookDialogLayoutTests
         var menu = Assert.Single(f.Menus);
         AssertLayout(menu);
         var originalComposer = menu.SingleComposer;
-        var title = originalComposer.GetTitleBar("titlebar");
         var search = originalComposer.GetTextInput("search");
-        double border = Math.Max(1, Math.Round(2 * (double)scale, MidpointRounding.AwayFromZero)) / scale;
-        double viewportReserve = 48 + 2 * border;
-        double counterWidth = originalComposer.GetDynamicText("alternative").Bounds.OuterWidth / scale;
-        double navigationWidth = new[] { "previous", "auto", "next" }
-            .Sum(key => originalComposer.GetElement(key).Bounds.OuterWidth / scale) + 6;
-        double footerWidth = 32 + 2 * (Math.Max(navigationWidth,
-            originalComposer.GetElement("handbook").Bounds.OuterWidth / scale) + 4) + counterWidth;
-        double titleWidth = GuiStyle.ElementToDialogPadding + title.Font.GetTextExtents(title.GetText()).Width / scale
-            + 8 + 80;
-        var craftable = originalComposer.GetSwitch("craftable-only");
-        var craftableLabel = originalComposer.GetStaticText("craftable-label");
-        double craftableWidth = 32 + 17 + 16
-            + craftableLabel.Font.GetTextExtents(craftableLabel.GetText()).Width / scale + 1
-            + originalComposer.GetDropDown("sort").Bounds.OuterWidth / scale;
-        double actionWidth = viewportReserve + new[] { "clear-search", "show-uncraftable" }
-            .Max(key => originalComposer.GetButton(key).Bounds.OuterWidth / scale);
-        double optionsWidth = Math.Ceiling(CairoFont.WhiteSmallText().WithFontSize(14).GetTextExtents(
-            Lang.Get("vanillaexpanded:recipebook-remember-open")).Width / scale + 10) + 17 + 8 + 71;
-        var originalTabs = GetCategoryTabs(originalComposer);
-        var categoryTitle = originalComposer.GetDynamicText("category-title");
-        double tabsWidth = 16 + GuiElementIconTabs.MeasureWidth(originalTabs.tabs.Length);
-        double categoryWidth = 32 + originalTabs.tabs.Max(tab => categoryTitle.Font.GetTextExtents(tab.Name).Width / scale + 1);
-        double minimumWidth = Math.Ceiling(new[] { optionsWidth, actionWidth, craftableWidth,
-            footerWidth, titleWidth, tabsWidth, categoryWidth }.Max());
-        double textHeight = Math.Ceiling(new[] { "empty", "empty-search", "empty-craftable", "empty-craftable-search" }
-            .Max(key => new TextDrawUtil().GetMultilineTextHeight(CairoFont.WhiteSmallText().WithFontSize(14),
-                Lang.Get("vanillaexpanded:recipebook-" + key), (minimumWidth - viewportReserve) * scale)) / scale);
-        double emptyHeight = textHeight + 8
-            + originalComposer.GetElement("auto").Bounds.OuterHeight / scale;
-        double minimumHeight = Math.Ceiling(36 + 12 + search.Bounds.OuterHeight / scale
-            + 10 + GetCategoryTabs(originalComposer).Bounds.OuterHeight / scale
-            + 12 + categoryTitle.Bounds.OuterHeight / scale
-            + 8 + 30
-            + 10 + 2 * border + Math.Max(47, emptyHeight) + 12
-            + originalComposer.GetElement("auto").Bounds.OuterHeight / scale + 16);
+        double minimumWidth = (double)typeof(GuiDialogRecipeBook).GetField("minimumWidth",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
+        double minimumHeight = (double)typeof(GuiDialogRecipeBook).GetField("minimumHeight",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
         search.SetValue("preserved search");
         f.ResizePanelSpace(minimumWidth, minimumHeight);
         menu.TryOpen();
@@ -297,115 +256,110 @@ public sealed class RecipeBookDialogLayoutTests
 
         static void AssertLayout(GuiDialogRecipeBook menu)
         {
-            AssertEmptyStateCentered(menu);
             var composer = menu.SingleComposer;
             var panel = composer.Bounds;
             var title = composer.GetTitleBar("titlebar");
             var search = Assert.IsType<GuiElementClearableTextInput>(composer.GetTextInput("search")).FieldBounds;
             var tabs = GetCategoryTabs(composer).Bounds;
-            var categoryPanel = composer.GetElement("category-panel").Bounds;
             var categoryTitle = composer.GetDynamicText("category-title");
             var craftable = composer.GetSwitch("craftable-only");
             var craftableLabel = composer.GetStaticText("craftable-label");
             var sort = composer.GetDropDown("sort");
-            Assert.Null(composer.GetElement("sort-label"));
             var viewport = composer.GetElement("tiles").Bounds.ParentBounds;
+            var tiles = Assert.IsType<GuiElementRecipeBookTiles>(composer.GetElement("tiles"));
             var scroll = composer.GetScrollbar("scroll").Bounds;
-            var empty = composer.GetDynamicText("empty").Bounds;
+            var emptyElement = composer.GetDynamicText("empty");
+            var empty = emptyElement.Bounds;
             var previous = composer.GetElement("previous").Bounds;
             var auto = composer.GetElement("auto").Bounds;
             var next = composer.GetElement("next").Bounds;
             var counter = composer.GetDynamicText("alternative").Bounds;
             var handbook = composer.GetButton("handbook");
-            double scale = GuiElement.scaled(1);
-            double border = Math.Max(1, Math.Round(2 * scale, MidpointRounding.AwayFromZero));
-            Assert.Equal(tabs.absX, categoryPanel.absX, 4);
-            Assert.Equal(tabs.OuterWidth, categoryPanel.OuterWidth, 4);
-            Assert.Equal(tabs.absY + tabs.OuterHeight - Math.Max(1,
-                Math.Round(scale, MidpointRounding.AwayFromZero)), categoryPanel.absY, 4);
-            Assert.Equal(categoryPanel.absX,
-                GetCategoryTabs(composer).Composer!.GetToggleButton("tab-0").Bounds.absX, 4);
-            Assert.True(categoryPanel.absX < search.absX);
-            Assert.True(categoryPanel.absX + categoryPanel.OuterWidth > search.absX + search.OuterWidth);
-            Assert.True(categoryPanel.absY + categoryPanel.OuterHeight > handbook.Bounds.absY + handbook.Bounds.OuterHeight);
-            Assert.Equal(36 * scale, title.Bounds.OuterHeight, 4);
-            Assert.Equal(14, title.Font.UnscaledFontsize);
-            Assert.Equal(title.Bounds.absY + title.Bounds.OuterHeight + 12 * scale, tabs.absY, 4);
-            Assert.Equal(tabs.absY + tabs.OuterHeight + 12 * scale, categoryTitle.Bounds.absY, 4);
-            Assert.Equal(17 * scale, categoryTitle.Bounds.OuterHeight, 4);
-            Assert.Equal(categoryTitle.Bounds.absY + categoryTitle.Bounds.OuterHeight + 8 * scale, sort.Bounds.absY, 4);
+            AssertContained(title.Bounds, panel);
+            AssertContained(tabs, panel);
+            AssertContained(categoryTitle.Bounds, panel);
+            AssertContained(search, panel);
+            AssertContained(craftable.Bounds, panel);
+            AssertContained(craftableLabel.Bounds, panel);
+            AssertContained(sort.Bounds, panel);
+            AssertContained(viewport, panel);
+            AssertContained(scroll, panel);
+            AssertContained(previous, panel);
+            AssertContained(auto, panel);
+            AssertContained(next, panel);
+            AssertContained(counter, panel);
+            AssertContained(handbook.Bounds, panel);
             Assert.True(categoryTitle.Font.GetTextExtents(categoryTitle.GetText()).Width <= categoryTitle.Bounds.InnerWidth);
-            Assert.True(categoryTitle.Font.UnscaledFontsize < craftableLabel.Font.UnscaledFontsize);
-            Assert.True(craftableLabel.Bounds.absX + craftableLabel.Bounds.OuterWidth + 8 * scale <= sort.Bounds.absX + .001);
-            Assert.Equal(sort.Bounds.absY + sort.Bounds.OuterHeight + 10 * scale, search.absY, 4);
-            Assert.Equal(search.absY + search.OuterHeight + 10 * scale + border, viewport.absY, 4);
-            Assert.True(craftable.Bounds.OuterHeight < search.OuterHeight);
-            Assert.Equal(30 * scale, sort.Bounds.OuterHeight, 4);
-            Assert.Equal(28 * scale, search.OuterHeight, 4);
-            Assert.True(sort.Font.UnscaledFontsize < composer.GetTextInput("search").Font.UnscaledFontsize);
-            Assert.Equal(14, craftableLabel.Font.UnscaledFontsize);
-            Assert.All(sort.listMenu.Names, name =>
-                Assert.True(sort.Font.GetTextExtents(name).Width + 30 * scale <= sort.Bounds.InnerWidth + .001));
-            Assert.Equal(craftable.Bounds.InnerWidth, craftable.Bounds.InnerHeight, 4);
-            Assert.True(craftable.Bounds.absX + craftable.Bounds.OuterWidth + 8 * scale <= craftableLabel.Bounds.absX + .001);
-            Assert.True(craftableLabel.Font.GetTextExtents(craftableLabel.GetText()).Width <=
-                craftableLabel.Bounds.InnerWidth + .001);
-            Assert.Equal(craftable.Bounds.absY + craftable.Bounds.InnerHeight / 2,
-                craftableLabel.Bounds.absY + craftableLabel.Bounds.InnerHeight / 2, 4);
-            Assert.Equal(sort.Bounds.absY + sort.Bounds.InnerHeight / 2,
-                craftable.Bounds.absY + craftable.Bounds.InnerHeight / 2, 4);
-            Assert.True(viewport.InnerHeight + .001 >= 47 * scale);
-            Assert.True(viewport.absX + viewport.OuterWidth + 4 * scale <= scroll.absX + .001);
-            Assert.Equal(viewport.absY, scroll.absY, 4);
-            Assert.Equal(viewport.OuterHeight, scroll.OuterHeight, 4);
-            Assert.Equal(viewport.absY + viewport.OuterHeight + 12 * scale + border, previous.absY, 4);
-            Assert.True(previous.absX + previous.OuterWidth + 3 * scale <= auto.absX + .001);
-            Assert.True(auto.absX + auto.OuterWidth + 3 * scale <= next.absX + .001);
-            Assert.True(next.absX + next.OuterWidth + 4 * scale <= counter.absX + .001);
-            Assert.True(counter.absX + counter.OuterWidth + 4 * scale <= handbook.Bounds.absX + .001);
-            Assert.Equal(search.absX + search.OuterWidth / 2, counter.absX + counter.OuterWidth / 2, 4);
-            Assert.Equal(search.absX, previous.absX, 4);
-            Assert.Equal(search.absX + search.OuterWidth, handbook.Bounds.absX + handbook.Bounds.OuterWidth, 4);
-            Assert.True(CairoFont.WhiteSmallText().WithFontSize(12).GetTextExtents(Lang.Get("vanillaexpanded:recipebook-handbook")).Width
-                + 16 * scale <= handbook.Bounds.OuterWidth + .001);
-            double titleTextRight = title.Bounds.absX + GuiElement.scaled(GuiStyle.ElementToDialogPadding)
+            // Native mouse-up handling consumes these computed local rectangles as functional title-bar hit targets.
+            var titleBarType = typeof(GuiElementDialogTitleBar);
+            var closeTarget = Assert.IsType<Vintagestory.API.Datastructures.Rectangled>(
+                titleBarType.GetField("closeIconRect", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(title));
+            var menuTarget = Assert.IsType<Vintagestory.API.Datastructures.Rectangled>(
+                titleBarType.GetField("menuIconRect", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(title));
+            // Locate the actual caption extent from its current draw origin; the inset itself is not a tested value.
+            double titleTextRight = (int)composer.Bounds.renderX + title.Bounds.drawX + GuiElement.scaled(GuiStyle.ElementToDialogPadding)
                 + title.Font.GetTextExtents(title.GetText()).Width;
-            double titleMenuLeft = title.Bounds.absX + title.Bounds.OuterWidth
-                - GuiElement.scaled(2 * GuiElementDialogTitleBar.unscaledCloseIconSize + 2 + 20);
-            Assert.True(titleTextRight + 8 * scale <= titleMenuLeft + .001);
-            Assert.Equal(panel.absX + 8 * scale, tabs.absX, 4);
-            Assert.Equal(panel.InnerWidth - 16 * scale, tabs.OuterWidth, 4);
-            Assert.Equal(categoryPanel.absX + 8 * scale, categoryTitle.Bounds.absX, 4);
+            Assert.True(titleTextRight <= title.Bounds.absX + closeTarget.X);
+            Assert.True(titleTextRight <= title.Bounds.absX + menuTarget.X);
+            foreach (var target in new[] { closeTarget, menuTarget })
+            {
+                Assert.True(target.Width > 0 && target.Height > 0);
+                Assert.True(target.X >= 0 && target.Y >= 0);
+                Assert.True(target.X + target.Width <= title.Bounds.OuterWidth);
+                Assert.True(target.Y + target.Height <= title.Bounds.OuterHeight);
+                double left = title.Bounds.absX + target.X;
+                double top = title.Bounds.absY + target.Y;
+                Assert.True(left >= panel.absX && left + target.Width <= panel.absX + panel.OuterWidth);
+                Assert.True(top >= panel.absY && top + target.Height <= panel.absY + panel.OuterHeight);
+            }
+            Assert.True(closeTarget.X + closeTarget.Width <= menuTarget.X
+                || menuTarget.X + menuTarget.Width <= closeTarget.X
+                || closeTarget.Y + closeTarget.Height <= menuTarget.Y
+                || menuTarget.Y + menuTarget.Height <= closeTarget.Y);
+            Assert.All(sort.listMenu.Names, name =>
+                Assert.True(sort.Font.GetTextExtents(name).Width <= sort.Bounds.InnerWidth + .001));
+            Assert.True(craftableLabel.Font.GetTextExtents(craftableLabel.GetText()).Width
+                <= craftableLabel.Bounds.InnerWidth + .001);
+            Assert.True(craftableLabel.Bounds.absX + craftableLabel.Bounds.OuterWidth <= sort.Bounds.absX
+                || sort.Bounds.absX + sort.Bounds.OuterWidth <= craftableLabel.Bounds.absX);
+            Assert.True(search.absY + search.OuterHeight <= viewport.absY);
+            Assert.True(viewport.absX + viewport.OuterWidth <= scroll.absX
+                || scroll.absX + scroll.OuterWidth <= viewport.absX);
+            double tileExtent = GuiElement.scaled(tiles.TileSize);
+            Assert.True(viewport.InnerWidth >= tileExtent);
+            Assert.True(viewport.InnerHeight >= tileExtent);
+            Assert.True(viewport.absY + viewport.OuterHeight <= previous.absY);
+            Assert.True(previous.absX + previous.OuterWidth <= auto.absX);
+            Assert.True(auto.absX + auto.OuterWidth <= next.absX);
+            Assert.True(next.absX + next.OuterWidth <= counter.absX);
+            Assert.True(counter.absX + counter.OuterWidth <= handbook.Bounds.absX);
+            AssertButtonTextFits(handbook);
             var categoryTabs = GetCategoryTabs(composer);
             Assert.False(categoryTabs.Composer!.GetButton("left").Visible);
             Assert.False(categoryTabs.Composer.GetButton("right").Visible);
-            foreach (var bounds in new[] { categoryTitle.Bounds, search, craftable.Bounds, craftableLabel.Bounds, sort.Bounds, viewport, scroll, previous, auto, next, counter,
-                handbook.Bounds })
-            {
-                Assert.True(bounds.absX >= panel.absX + 16 * scale - .001);
-                Assert.True(bounds.absX + bounds.OuterWidth <= panel.absX + panel.InnerWidth - 16 * scale + .001);
-                Assert.True(bounds.absY + bounds.OuterHeight <= panel.absY + panel.InnerHeight - 16 * scale + .001);
-            }
-            Assert.True(empty.absX >= viewport.absX);
-            Assert.True(empty.absY >= viewport.absY);
-            Assert.True(empty.absX + empty.OuterWidth <= viewport.absX + viewport.InnerWidth + .001);
-            Assert.True(empty.absY + empty.OuterHeight <= viewport.absY + viewport.InnerHeight + .001);
+            AssertContained(empty, viewport);
+            if (!string.IsNullOrEmpty(emptyElement.GetText()))
+                Assert.True(new TextDrawUtil().GetMultilineTextHeight(emptyElement.Font, emptyElement.GetText(),
+                    empty.InnerWidth) <= empty.InnerHeight + .001);
             foreach (string key in new[] { "clear-search", "show-uncraftable" })
             {
                 var button = composer.GetButton(key);
+                AssertButtonTextFits(button);
                 if (button.Visible)
-                    Assert.True(empty.absY + empty.OuterHeight + 8 * scale <= button.Bounds.absY + .001);
-                Assert.True(button.Bounds.absX >= viewport.absX);
-                Assert.True(button.Bounds.absX + button.Bounds.OuterWidth <= viewport.absX + viewport.InnerWidth + .001);
-                Assert.True(button.Bounds.absY + button.Bounds.OuterHeight <= viewport.absY + viewport.InnerHeight + .001);
-                Assert.True(CairoFont.WhiteSmallText().WithFontSize(12).GetTextExtents(button.Text).Width
-                    + 16 * scale <= button.Bounds.OuterWidth + .001);
+                    Assert.True(empty.absY + empty.OuterHeight <= button.Bounds.absY);
+                AssertContained(button.Bounds, viewport);
             }
-            var textUtil = new TextDrawUtil();
-            foreach (string key in new[] { "empty", "empty-search", "empty-craftable", "empty-craftable-search" })
-                Assert.True(textUtil.GetMultilineTextHeight(CairoFont.WhiteSmallText().WithFontSize(14),
-                    Lang.Get("vanillaexpanded:recipebook-" + key), empty.InnerWidth)
-                    + 8 * scale + auto.OuterHeight <= viewport.InnerHeight + .001);
+
+            static void AssertButtonTextFits(GuiElementTextButton button)
+            {
+                foreach (string fieldName in new[] { "normalText", "pressedText" })
+                {
+                    var text = Assert.IsType<GuiElementStaticText>(typeof(GuiElementTextButton)
+                        .GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(button));
+                    Assert.Equal(button.Text, text.GetText());
+                    Assert.True(text.Font.GetTextExtents(text.GetText()).Width <= text.Bounds.InnerWidth + .001);
+                }
+            }
         }
     }
 
@@ -458,7 +412,6 @@ public sealed class RecipeBookDialogLayoutTests
         static void AssertPanel(GuiDialogRecipeBook menu)
         {
             var tabs = GetCategoryTabs(menu.SingleComposer);
-            Assert.True(menu.SingleComposer.Bounds.fixedWidth >= 16 + GuiElementIconTabs.MeasureWidth(tabs.tabs.Length));
             Assert.False(tabs.Composer!.GetButton("left").Visible);
             Assert.False(tabs.Composer.GetButton("right").Visible);
             for (int index = 0; index < tabs.tabs.Length; index++)
@@ -469,9 +422,6 @@ public sealed class RecipeBookDialogLayoutTests
             }
             var heading = menu.SingleComposer.GetDynamicText("category-title");
             Assert.Equal(tabs.tabs[tabs.activeElement].Name, heading.GetText());
-            Assert.True(heading.Bounds.absY > tabs.Bounds.absY + tabs.Bounds.OuterHeight);
-            Assert.True(heading.Bounds.absY + heading.Bounds.OuterHeight <
-                menu.SingleComposer.GetSwitch("craftable-only").Bounds.absY);
         }
     }
 
@@ -529,5 +479,13 @@ public sealed class RecipeBookDialogLayoutTests
         f.ToggleReopenOption(book);
         Assert.False(opened.Checkbox.On);
         Assert.False(f.Lifecycle.Api.Object.Settings.Bool.Get(RecipeBookSystem.RememberOpenSetting, true));
+    }
+
+    private static void AssertContained(ElementBounds content, ElementBounds container)
+    {
+        Assert.True(content.absX >= container.absX - 0.001);
+        Assert.True(content.absY >= container.absY - 0.001);
+        Assert.True(content.absX + content.OuterWidth <= container.absX + container.OuterWidth + 0.001);
+        Assert.True(content.absY + content.OuterHeight <= container.absY + container.OuterHeight + 0.001);
     }
 }

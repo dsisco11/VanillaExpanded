@@ -48,7 +48,7 @@ public sealed class RecipeBookLayoutCacheTests
         Assert.Same(geometry.Window, firstRoot.ParentBounds);
         firstRoot.CalcWorldBounds();
         secondRoot.CalcWorldBounds();
-        Assert.Equal(2, firstRoot.absX - geometry.Parent.absX - geometry.Parent.OuterWidth, 5);
+        Assert.True(firstRoot.absX >= geometry.Parent.absX + geometry.Parent.OuterWidth);
         Assert.Equal(placement.X, secondRoot.fixedX);
         Assert.Equal(placement.Y, secondRoot.fixedY);
     }

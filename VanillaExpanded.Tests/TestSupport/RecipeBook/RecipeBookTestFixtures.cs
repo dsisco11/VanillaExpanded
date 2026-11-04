@@ -31,11 +31,6 @@ internal sealed class MenuFixture : IDisposable
     internal IEnumerable<GuiDialogRecipeBook> Menus => loaded.OfType<GuiDialogRecipeBook>();
     internal GuiElementRecipeBookButton ToggleButton =>
         (GuiElementRecipeBookButton)Parent.Composers["maininventory"].GetToggleButton("vanillaexpanded-crafting-toggle");
-    internal readonly IAsset BookAsset;
-    internal readonly IAsset OptionsAsset;
-    internal readonly List<(IAsset Asset, int Width, int Height, int? Color)> BookDraws = new();
-    internal readonly Dictionary<string, IAsset> CategoryAssets = new();
-    internal readonly List<(IAsset Asset, int X, int Y, int Width, int Height, int SurfaceWidth, int SurfaceHeight, int? Color)> CategoryDraws = new();
     internal int TextureCount => graphics.Textures.Count;
     internal readonly Dictionary<string, Vec2i> DialogPositions;
     internal IRecipeBookIconShaderProgram CreateIconShader() => graphics.CreateShader();
@@ -114,31 +109,22 @@ internal sealed class MenuFixture : IDisposable
         api.SetupGet(value => value.ClassRegistry).Returns(registry.Object);
         var assets = new Mock<IAssetManager>();
         assets.Setup(value => value.Get(It.IsAny<AssetLocation>()))
-            .Returns(Mock.Of<IAsset>(value => value.Data == Array.Empty<byte>()));
+                .Returns(Mock.Of<IAsset>(value => value.Data == Array.Empty<byte>()));
         byte[] svg = File.ReadAllBytes(GetAssetPath("textures", "gui", "recipe-book.svg"));
-        BookAsset = Mock.Of<IAsset>(value => value.Data == svg);
+        IAsset bookAsset = Mock.Of<IAsset>(value => value.Data == svg);
         assets.Setup(value => value.Get(new AssetLocation("vanillaexpanded:textures/gui/recipe-book.svg")))
-            .Returns(BookAsset);
+                .Returns(bookAsset);
         byte[] optionsSvg = File.ReadAllBytes(GetAssetPath("textures", "gui", "recipe-book-options.svg"));
-        OptionsAsset = Mock.Of<IAsset>(value => value.Data == optionsSvg);
+        IAsset optionsAsset = Mock.Of<IAsset>(value => value.Data == optionsSvg);
         assets.Setup(value => value.Get(new AssetLocation("vanillaexpanded:textures/gui/recipe-book-options.svg")))
-            .Returns(OptionsAsset);
+                .Returns(optionsAsset);
         foreach (string code in RecipeBookCategoryIcons.Codes)
         {
-            byte[] categorySvg = File.ReadAllBytes(GetAssetPath("textures", "gui", "recipe-book-categories", code + ".svg"));
-            var asset = Mock.Of<IAsset>(value => value.Data == categorySvg);
-            CategoryAssets.Add(code, asset);
-            assets.Setup(value => value.Get(RecipeBookCategoryIcons.Asset(code))).Returns(asset);
+                byte[] categorySvg = File.ReadAllBytes(GetAssetPath("textures", "gui", "recipe-book-categories", code + ".svg"));
+                var asset = Mock.Of<IAsset>(value => value.Data == categorySvg);
+                assets.Setup(value => value.Get(RecipeBookCategoryIcons.Asset(code))).Returns(asset);
         }
         api.SetupGet(value => value.Assets).Returns(assets.Object);
-        graphics.Gui.Setup(value => value.DrawSvg(It.IsAny<IAsset>(), It.IsAny<ImageSurface>(),
-                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int?>()))
-            .Callback<IAsset, ImageSurface, int, int, int, int, int?>((asset, surface, x, y, width, height, color) =>
-            {
-                if (ReferenceEquals(asset, BookAsset)) BookDraws.Add((asset, width, height, color));
-                else if (!ReferenceEquals(asset, OptionsAsset))
-                    CategoryDraws.Add((asset, x, y, width, height, surface.Width, surface.Height, color));
-            });
         graphics.Render.Setup(value => value.BitmapCreateFromPng(It.IsAny<byte[]>()))
             .Returns(() => new BitmapExternal(2, 2));
         graphics.Gui.SetupGet(value => value.Icons).Returns(new IconUtil(api.Object));

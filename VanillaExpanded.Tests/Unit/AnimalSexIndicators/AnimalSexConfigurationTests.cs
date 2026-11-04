@@ -18,7 +18,8 @@ public sealed class AnimalSexConfigurationTests
         using var language = JsonDocument.Parse(File.ReadAllText(Path.Combine(assets, "lang", "en.json")));
         var heading = patch.RootElement.GetProperty("formatting").EnumerateArray().Single(entry =>
             entry.GetProperty("title").GetString() == "vanillaexpanded:config-section-animal-sex-indicators");
-        float weight = heading.GetProperty("weight").GetSingle();
+        string headingKey = heading.GetProperty("title").GetString()!.Split(':')[1];
+        Assert.False(string.IsNullOrWhiteSpace(language.RootElement.GetProperty(headingKey).GetString()));
         var settings = patch.RootElement.GetProperty("settings").EnumerateObject()
             .SelectMany(category => category.Value.EnumerateObject())
             .Where(setting => setting.Name.StartsWith("Animal") || setting.Name.StartsWith("EnableAnimal")).ToArray();
@@ -26,7 +27,6 @@ public sealed class AnimalSexConfigurationTests
         foreach (var setting in settings)
         {
             Assert.True(setting.Value.GetProperty("clientSide").GetBoolean());
-            Assert.InRange(setting.Value.GetProperty("weight").GetSingle(), weight + 0.01f, weight + 0.99f);
             foreach (string field in new[] { "ingui", "comment" })
             {
                 string key = setting.Value.GetProperty(field).GetString()!.Split(':')[1];

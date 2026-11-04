@@ -13,42 +13,19 @@ namespace VanillaExpanded.Tests.Unit.Gui;
 [Collection("Recipe book native GUI")]
 public sealed class GuiControlVisualsTests
 {
-    public static IEnumerable<object[]> Palette => new object[][]
-    {
-        [GuiControlPalette.DialogTop, 0x4b4030], [GuiControlPalette.DialogBottom, 0x3b3226],
-        [GuiControlPalette.DialogOutline, 0x817159], [GuiControlPalette.TitleTop, 0x65553e],
-        [GuiControlPalette.TitleBottom, 0x4a3c2c], [GuiControlPalette.TitleSeparator, 0x2a221a],
-        [GuiControlPalette.Text, 0xe8ddc5], [GuiControlPalette.PanelFill, 0x51432f],
-        [GuiControlPalette.PanelOutline, 0x887453], [GuiControlPalette.TabFill, 0x382f23],
-        [GuiControlPalette.TabOutline, 0x766349], [GuiControlPalette.HoverFill, 0x51422e],
-        [GuiControlPalette.Icon, 0xb7a98c], [GuiControlPalette.HoverIcon, 0xfff0cc],
-        [GuiControlPalette.SelectedIcon, 0xf5d58d], [GuiControlPalette.SelectedOutline, 0xaa8c54],
-        [GuiControlPalette.SelectedAccent, 0xd3b46f], [GuiControlPalette.Heading, 0xc8b897],
-        [GuiControlPalette.CheckboxFill, 0x30291e], [GuiControlPalette.CheckboxOutline, 0x948366],
-        [GuiControlPalette.DropdownFill, 0x382f23], [GuiControlPalette.DropdownOutline, 0x74634a],
-        [GuiControlPalette.DropdownText, 0xd7c8aa], [GuiControlPalette.SearchFill, 0x30281e],
-        [GuiControlPalette.SearchOutline, 0x8c795b], [GuiControlPalette.Placeholder, 0xa99b80],
-        [GuiControlPalette.ListFill, 0x352d22], [GuiControlPalette.ListOutline, 0x2c251c],
-        [GuiControlPalette.ScrollbarTrack, 0x30291e], [GuiControlPalette.ScrollbarThumb, 0x8d7957],
-        [GuiControlPalette.ScrollbarHover, 0xc8b897], [GuiControlPalette.ScrollbarPressed, 0xf5d58d],
-        [GuiControlPalette.ButtonText, 0xfff0cc], [GuiControlPalette.ButtonFill, 0x80613d],
-        [GuiControlPalette.ButtonOutline, 0xc29a5b], [GuiControlPalette.ButtonHoverFill, 0x8b693f],
-        [GuiControlPalette.ButtonEmphasisOutline, 0xe0bc79], [GuiControlPalette.ButtonPressedFill, 0x604627],
-        [GuiControlPalette.ButtonDisabledFill, 0x3b342b], [GuiControlPalette.ButtonDisabledOutline, 0x625747]
-    }.Select((entry, index) => new object[] { index, entry[0], entry[1] });
-
     [Theory]
-    [MemberData(nameof(Palette))]
-    public void PaletteMatchesApprovedReferenceAndReturnsIndependentColors(int role, int actual, int expected)
+    [InlineData(0x123456, 0.25, 18 / 255d, 52 / 255d, 86 / 255d)]
+    [InlineData(0xabcdef, 1, 171 / 255d, 205 / 255d, 239 / 255d)]
+    public void ColorConversionUsesCallerValueAndReturnsIndependentChannels(
+        int rgb, double opacity, double red, double green, double blue)
     {
-        Assert.InRange(role, 0, 39);
-        Assert.Equal(expected, actual);
-        var color = GuiControlPalette.Color(actual);
-        Assert.Equal(((expected >> 16) & 255) / 255d, color[0]);
-        Assert.Equal(((expected >> 8) & 255) / 255d, color[1]);
-        Assert.Equal((expected & 255) / 255d, color[2]);
-        color[0] = 0;
-        Assert.Equal(((expected >> 16) & 255) / 255d, GuiControlPalette.Color(actual)[0]);
+        var expected = new[] { red, green, blue, opacity };
+        var first = GuiControlPalette.Color(rgb, opacity);
+        Assert.Equal(expected, first);
+        first[0] = 0;
+        var second = GuiControlPalette.Color(rgb, opacity);
+        Assert.NotSame(first, second);
+        Assert.Equal(expected, second);
     }
 
     [Fact]

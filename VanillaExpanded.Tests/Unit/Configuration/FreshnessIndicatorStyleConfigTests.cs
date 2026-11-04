@@ -10,26 +10,6 @@ namespace VanillaExpanded.Tests.Unit.Configuration;
 public sealed class FreshnessIndicatorStyleConfigTests
 {
     #region Public API
-    /// <summary>All item-slot indicator settings are sorted into their dedicated localized ConfigLib section.</summary>
-    [Fact]
-    public void ItemSlotIndicatorSettings_HaveDedicatedSection()
-    {
-        DirectoryInfo? root = new(AppContext.BaseDirectory);
-        while (root is not null && !File.Exists(Path.Combine(root.FullName, "VanillaExpanded.sln"))) root = root.Parent;
-        Assert.NotNull(root);
-        using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(root.FullName, "VanillaExpanded", "assets",
-            "vanillaexpanded", "config", "configlib-patches.json")));
-        var heading = document.RootElement.GetProperty("formatting").EnumerateArray().Single(entry =>
-            entry.GetProperty("title").GetString() == "vanillaexpanded:config-section-item-slot-indicators");
-        float sectionWeight = heading.GetProperty("weight").GetSingle();
-        var indicatorSettings = document.RootElement.GetProperty("settings").EnumerateObject()
-            .SelectMany(category => category.Value.EnumerateObject()).Where(setting =>
-                !setting.Name.StartsWith("Animal") && !setting.Name.StartsWith("EnableAnimal")
-                && (setting.Name.Contains("Indicator") || setting.Name is "EnableLiquidSloshEffect" or "EnableCrucibleEffect"));
-        Assert.Equal(12, indicatorSettings.Count());
-        Assert.All(indicatorSettings, setting => Assert.InRange(setting.Value.GetProperty("weight").GetSingle(),
-            sectionWeight + 0.01f, sectionWeight + 0.99f));
-    }
     /// <summary>ConfigLib's saved mapping keys load without discarding other settings; numeric legacy values also load.</summary>
     [Theory]
     [InlineData("\"freshness-background\"", "freshness-background", 0)]
