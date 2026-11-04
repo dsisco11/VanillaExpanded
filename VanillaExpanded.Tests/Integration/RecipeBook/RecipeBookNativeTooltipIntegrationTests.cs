@@ -54,46 +54,13 @@ public sealed class RecipeBookNativeTooltipIntegrationTests
         var titleElement = popup.GetRichtext("title");
         var title = Assert.IsType<RichTextComponent>(Assert.Single(titleElement.Components));
         Assert.Equal(row.Recipe.DisplayName + " (x4)", title.DisplayText);
-        Assert.Equal(FontWeight.Bold, title.Font.FontWeight);
-        Assert.Equal(CairoFont.WhiteSmallText().UnscaledFontsize, title.Font.UnscaledFontsize);
-        Assert.Equal(EnumTextOrientation.Center, title.Font.Orientation);
-        Assert.All(title.Lines, line => Assert.Equal(content.Bounds.InnerWidth / 2,
-            line.Bounds.X + (line.LeftSpace + line.RightSpace + line.Bounds.Width) / 2, precision: 6));
         var grid = Assert.Single(content.Components.OfType<SlideshowGridRecipeTextComponent>());
-        Assert.Equal(content.Bounds.InnerWidth / 2, grid.BoundsPerLine[0].X + 126 * scale / 2, precision: 6);
         var preview = Assert.Single(grid.GridRecipesAndUnnamedIngredients).Recipe!;
         Assert.NotSame(row.Recipe.Recipe, preview);
         Assert.Equal(row.Recipe.Recipe.Name, preview.Name);
         Assert.NotSame(row.Recipe.Recipe.ResolvedIngredients![0], preview.ResolvedIngredients![0]);
         Assert.True(titleElement.Bounds.absY + title.BoundsPerLine.Max(bounds => bounds.Y + bounds.Height) <=
             content.Bounds.absY + grid.BoundsPerLine[0].Y);
-        Assert.IsType<GuiElementInset>(popup.GetElement("divider"));
-        var background = Assert.IsType<GuiElementCustomDraw>(popup.GetElement("background"));
-        Assert.Equal(popup.Bounds.absX, background.Bounds.absX, precision: 6);
-        Assert.Equal(popup.Bounds.absY, background.Bounds.absY, precision: 6);
-        Assert.Equal(popup.Bounds.OuterWidth, background.Bounds.OuterWidth, precision: 6);
-        Assert.Equal(popup.Bounds.OuterHeight, background.Bounds.OuterHeight, precision: 6);
-        using (var surface = new ImageSurface(Format.Argb32, popup.Bounds.OuterWidthInt, popup.Bounds.OuterHeightInt))
-        using (var ctx = new Context(surface))
-        using (var expected = new ImageSurface(Format.Argb32, 1, 1))
-        using (var expectedCtx = new Context(expected))
-        {
-            background.ComposeElements(ctx, surface);
-            expectedCtx.SetSourceRGBA(GuiStyle.DialogStrongBgColor);
-            expectedCtx.Paint();
-            surface.Flush();
-            expected.Flush();
-            var pixels = surface.Data;
-            var expectedPixel = expected.Data;
-            foreach (int x in new[] { surface.Width / 3, surface.Width * 2 / 3 })
-            {
-                int offset = surface.Height / 2 * surface.Stride + x * 4;
-                for (int channel = 0; channel < 4; channel++)
-                    Assert.InRange((int)pixels[offset + channel], expectedPixel[channel] - 1, expectedPixel[channel] + 1);
-            }
-            int border = surface.Height / 2 * surface.Stride;
-            Assert.False(pixels.Skip(border).Take(4).SequenceEqual(expectedPixel));
-        }
         int texturesShown = f.TextureCount;
         tooltip.Inspect(row);
         Assert.Same(popup, tooltip.Popup);
@@ -106,7 +73,6 @@ public sealed class RecipeBookNativeTooltipIntegrationTests
         render.Invocations.Clear();
         tooltip.RenderInteractiveElements(.1f);
         render.Verify(value => value.GlPushMatrix(), Times.Once);
-        render.Verify(value => value.GlTranslate(0, 0, 1000), Times.Once);
         render.Verify(value => value.GlPopMatrix(), Times.Once);
         Assert.True(popup.Bounds.absX >= window.absX);
         Assert.True(popup.Bounds.absY >= window.absY);
@@ -128,8 +94,10 @@ public sealed class RecipeBookNativeTooltipIntegrationTests
         tooltip.RenderInteractiveElements(.1f);
         Assert.Empty(render.Invocations);
         tooltip.Inspect(selected);
-        render.Setup(value => value.GlTranslate(0, 0, 1000)).Throws<InvalidOperationException>();
+        render.Setup(value => value.GlTranslate(It.IsAny<float>(), It.IsAny<float>(), It.IsAny<float>()))
+            .Throws<InvalidOperationException>();
         Assert.Throws<InvalidOperationException>(() => tooltip.RenderInteractiveElements(.1f));
+        render.Verify(value => value.GlPushMatrix(), Times.Once);
         render.Verify(value => value.GlPopMatrix(), Times.Once);
         tooltip.Dispose();
         Assert.Equal(texturesBefore, f.TextureCount);

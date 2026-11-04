@@ -33,7 +33,6 @@ internal sealed class MenuFixture : IDisposable
         (GuiElementRecipeBookButton)Parent.Composers["maininventory"].GetToggleButton("vanillaexpanded-crafting-toggle");
     internal readonly IAsset BookAsset;
     internal readonly IAsset OptionsAsset;
-    internal readonly List<(int Width, int Height, int SurfaceWidth, int SurfaceHeight, int? Color)> OptionsDraws = new();
     internal readonly List<(IAsset Asset, int Width, int Height, int? Color)> BookDraws = new();
     internal readonly Dictionary<string, IAsset> CategoryAssets = new();
     internal readonly List<(IAsset Asset, int X, int Y, int Width, int Height, int SurfaceWidth, int SurfaceHeight, int? Color)> CategoryDraws = new();
@@ -137,9 +136,8 @@ internal sealed class MenuFixture : IDisposable
             .Callback<IAsset, ImageSurface, int, int, int, int, int?>((asset, surface, x, y, width, height, color) =>
             {
                 if (ReferenceEquals(asset, BookAsset)) BookDraws.Add((asset, width, height, color));
-                else if (ReferenceEquals(asset, OptionsAsset))
-                    OptionsDraws.Add((width, height, surface.Width, surface.Height, color));
-                else CategoryDraws.Add((asset, x, y, width, height, surface.Width, surface.Height, color));
+                else if (!ReferenceEquals(asset, OptionsAsset))
+                    CategoryDraws.Add((asset, x, y, width, height, surface.Width, surface.Height, color));
             });
         graphics.Render.Setup(value => value.BitmapCreateFromPng(It.IsAny<byte[]>()))
             .Returns(() => new BitmapExternal(2, 2));

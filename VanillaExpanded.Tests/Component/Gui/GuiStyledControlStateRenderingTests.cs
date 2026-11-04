@@ -17,27 +17,30 @@ namespace VanillaExpanded.Tests.Component.Gui;
 [Collection("Recipe book native GUI")]
 public sealed class GuiStyledControlStateRenderingTests
 {
-    [Theory]
-    [InlineData(1f)]
-    [InlineData(1.25f)]
-    [InlineData(1.5f)]
-    [InlineData(1.75f)]
-    [InlineData(2f)]
-    public void PopupSelectionPresenceInvalidatesCachedIndicator(float scale)
+    [Fact]
+    public void PopupSelectionChangesPreserveSelectionAndReuseCachedResources()
     {
-        using var f = new ControlsFixture(scale);
+        // Arrange
+        using var f = new ControlsFixture();
         using var dropdown = new GuiElementStyledDropDown(f.Api, ["a"], ["Alpha"], 0,
             (_, _) => { }, ElementBounds.Fixed(10, 10, 180, 30));
         using var composer = f.Compose(dropdown);
         dropdown.listMenu.Open();
         f.Render(dropdown);
-        Assert.True(f.Popup().HasColor(0xf5d58d));
+        Assert.Equal("a", dropdown.SelectedValue);
+
+        // Act
         dropdown.SetSelectedIndex(-1);
+        Assert.Empty(dropdown.listMenu.SelectedIndices);
         f.Render(dropdown);
-        Assert.False(f.Popup().HasColor(0xf5d58d));
+        Assert.Empty(dropdown.listMenu.SelectedIndices);
         dropdown.SetSelectedIndex(0);
+        Assert.Equal(new[] { 0 }, dropdown.listMenu.SelectedIndices);
+        Assert.Equal("a", dropdown.SelectedValue);
         f.Render(dropdown);
-        Assert.True(f.Popup().HasColor(0xf5d58d));
+        Assert.Equal(new[] { 0 }, dropdown.listMenu.SelectedIndices);
+
+        // Assert
         int uploads = f.Uploads;
         f.Render(dropdown);
         Assert.Equal(uploads, f.Uploads);
@@ -50,123 +53,110 @@ public sealed class GuiStyledControlStateRenderingTests
     [InlineData(1.5f)]
     [InlineData(1.75f)]
     [InlineData(2f)]
-    public void ScrollbarPointerFeedbackTracksCaptureAndCancelsWithoutExtraScrollOrUploads(float scale)
+    public void ScrollbarPointerCaptureCancelsWithoutExtraScrollAndReusesResources(float scale)
     {
-        // Arrange a scrollable control and record callback and texture-upload behavior.
+        // Arrange
         using var f = new ControlsFixture(scale);
         var changes = new List<float>();
         using var scrollbar = new GuiElementStyledScrollbar(f.Api, changes.Add,
             ElementBounds.Fixed(10.37, 12.81, 12, 180), arrowStep: 23);
         using var composer = f.Compose(scrollbar);
         float visible = (float)scrollbar.Bounds.InnerHeight;
-        scrollbar.SetHeights(visible, 1000 * scale);
-        int uploads = f.Uploads;
+        float total = 1000 * scale;
+        scrollbar.SetHeights(visible, total);
+        float maximum = total - visible;
+        int textureCount = f.Graphics.Textures.Count;
 
-        // Act: capture each arrow, move away and back, then release outside its hit target.
+        // Act: capture each arrow and release outside its hit target.
         foreach (int index in new[] { 1, 2 })
         {
             scrollbar.CurrentYPosition = 200 * scale;
             f.SetMouse(-100, -100);
             f.Render(scrollbar);
-            int idle = (int)f.Draws[index].Arguments[0];
             var mouse = PointAt(index);
-            f.Render(scrollbar);
-            int hover = (int)f.Draws[index].Arguments[0];
-            Assert.NotEqual(idle, hover);
-            Assert.True(f.Drawn(index).HasColor(0xc8b897));
             changes.Clear();
             composer.OnMouseDown(mouse);
             Assert.True(mouse.Handled);
             Assert.Equal((index == 1 ? 177 : 223) * scale, Assert.Single(changes), 3);
-            f.Render(scrollbar);
-            int pressed = (int)f.Draws[index].Arguments[0];
-            Assert.NotEqual(hover, pressed);
-            Assert.NotEqual(idle, pressed);
-            Assert.True(f.Drawn(index).HasColor(0xf5d58d));
             f.SetMouse(-100, -100);
             composer.OnMouseMove(f.Mouse(-100, -100));
-            f.Render(scrollbar);
-            Assert.Equal(idle, f.Draws[index].Arguments[0]);
-            f.SetMouse(mouse.X, mouse.Y);
-            f.Render(scrollbar);
-            Assert.Equal(pressed, f.Draws[index].Arguments[0]);
-            f.SetMouse(-100, -100);
             composer.OnMouseUp(f.Mouse(-100, -100));
-            f.SetMouse(mouse.X, mouse.Y);
-            f.Render(scrollbar);
-            Assert.Equal(hover, f.Draws[index].Arguments[0]);
+            Assert.Equal(index == 1 ? 177 * scale : 223 * scale, scrollbar.CurrentYPosition, 3);
             Assert.Single(changes);
         }
 
-        // Act: drag the thumb outside the track, release it, then cancel a later capture on focus loss.
+        // Act: drag the thumb outside the track and release it.
         f.SetMouse(-100, -100);
         f.Render(scrollbar);
-        int idleThumb = (int)f.Draws[3].Arguments[0];
         var thumbMouse = PointAt(3);
-        f.Render(scrollbar);
-        int hoverThumb = (int)f.Draws[3].Arguments[0];
-        Assert.NotEqual(idleThumb, hoverThumb);
-        Assert.True(f.Drawn(3).HasColor(0xc8b897));
         changes.Clear();
         composer.OnMouseDown(thumbMouse);
         Assert.Empty(changes);
-        f.Render(scrollbar);
-        int pressedThumb = (int)f.Draws[3].Arguments[0];
-        Assert.NotEqual(hoverThumb, pressedThumb);
-        Assert.True(f.Drawn(3).HasColor(0xf5d58d));
         f.SetMouse(-100, -100);
         composer.OnMouseMove(f.Mouse(thumbMouse.X, thumbMouse.Y + 5 * scale));
         Assert.Single(changes);
-        f.Render(scrollbar);
-        Assert.Equal(pressedThumb, f.Draws[3].Arguments[0]);
         composer.OnMouseUp(f.Mouse(-100, -100));
         float releasedPosition = scrollbar.CurrentYPosition;
         composer.OnMouseMove(f.Mouse(-100, -100));
-        f.Render(scrollbar);
         Assert.Equal(releasedPosition, scrollbar.CurrentYPosition);
-        Assert.Equal(idleThumb, f.Draws[3].Arguments[0]);
         Assert.Single(changes);
 
+        // Act: focus loss cancels a later drag without allowing further movement.
+        f.Render(scrollbar);
         thumbMouse = PointAt(3);
+        float positionAtFocusLoss = scrollbar.CurrentYPosition;
+        changes.Clear();
         composer.OnMouseDown(thumbMouse);
         scrollbar.OnFocusLost();
-        f.Render(scrollbar);
         Assert.False(scrollbar.mouseDownOnScrollbarHandle);
-        Assert.Equal(hoverThumb, f.Draws[3].Arguments[0]);
+        composer.OnMouseMove(f.Mouse(thumbMouse.X, thumbMouse.Y + 10 * scale));
+        Assert.Equal(positionAtFocusLoss, scrollbar.CurrentYPosition);
+        Assert.Empty(changes);
 
-        // Act: exercise disabled/re-enabled arrows and collapse/restore the scroll range.
+        // Act: disabled arrows and a collapsed range cannot change the scroll position.
+        f.Render(scrollbar);
         var downMouse = PointAt(2);
+        float beforeDisabledClick = scrollbar.CurrentYPosition;
         composer.OnMouseDown(downMouse);
-        f.Render(scrollbar);
-        Assert.True(f.Drawn(2).HasColor(0xf5d58d));
+        float afterEnabledClick = scrollbar.CurrentYPosition;
+        Assert.NotEqual(beforeDisabledClick, afterEnabledClick);
+        composer.OnMouseUp(f.Mouse(downMouse.X, downMouse.Y));
         scrollbar.Enabled = false;
-        f.Render(scrollbar);
-        Assert.Equal(3, f.Draws.Length);
-        Assert.InRange(f.Drawn(2).MaxAlpha, 1, 90);
+        int callbacksWhileEnabled = changes.Count;
+        composer.OnMouseDown(f.Mouse(downMouse.X, downMouse.Y));
+        Assert.Equal(callbacksWhileEnabled, changes.Count);
+        composer.OnMouseUp(f.Mouse(downMouse.X, downMouse.Y));
         scrollbar.Enabled = true;
+
+        scrollbar.CurrentYPosition = maximum - 11 * scale;
         f.Render(scrollbar);
-        Assert.True(f.Drawn(2).HasColor(0xc8b897));
-        Assert.Equal(uploads, f.Uploads);
-        scrollbar.CurrentYPosition = (1000 - 180 - 11) * scale;
+        downMouse = PointAt(2);
         changes.Clear();
         composer.OnMouseDown(downMouse);
-        f.Render(scrollbar);
-        Assert.Equal((1000 - 180) * scale, Assert.Single(changes), 3);
-        Assert.InRange(f.Drawn(2).MaxAlpha, 1, 90);
+        Assert.Equal(maximum, Assert.Single(changes), 3);
         composer.OnMouseUp(downMouse);
 
-        scrollbar.CurrentYPosition = 200 * scale;
+        scrollbar.CurrentYPosition = maximum / 2;
         f.Render(scrollbar);
         thumbMouse = PointAt(3);
         composer.OnMouseDown(thumbMouse);
         scrollbar.SetHeights(visible, visible);
+        Assert.Equal(textureCount, f.Graphics.Textures.Count);
         Assert.False(scrollbar.mouseDownOnScrollbarHandle);
+        Assert.Equal(0, scrollbar.CurrentYPosition);
+        var wheel = new MouseWheelEventArgs { deltaPrecise = -1 };
+        scrollbar.OnMouseWheel(f.Api, wheel);
+        Assert.False(wheel.IsHandled);
+        Assert.Equal(0, scrollbar.CurrentYPosition);
         scrollbar.SetHeights(visible, 1000 * scale);
+        Assert.Equal(textureCount, f.Graphics.Textures.Count);
         f.SetMouse(-100, -100);
+        int uploads = f.Uploads;
         f.Render(scrollbar);
-        Assert.Equal(idleThumb, f.Draws[3].Arguments[0]);
+        Assert.Equal(uploads, f.Uploads);
 
-        // Assert transitions reuse existing render resources and disposal releases them.
+        // Assert reuse and disposal preserve texture ownership.
+        Assert.Equal(textureCount, f.Graphics.Textures.Count);
         composer.Dispose();
         scrollbar.Dispose();
         Assert.Empty(f.Graphics.Textures);

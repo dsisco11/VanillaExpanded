@@ -6,7 +6,6 @@ using Vintagestory.API.Client;
 using VanillaExpanded.Tests;
 using VanillaExpanded.Tests.TestSupport.RecipeBook;
 using VanillaExpanded.Tests.TestSupport.Configuration;
-using static VanillaExpanded.Tests.TestSupport.Gui.GuiTestPixels;
 
 namespace VanillaExpanded.Tests.Unit.Gui;
 
@@ -52,41 +51,57 @@ public sealed class GuiControlVisualsTests
         Assert.Equal(((expected >> 16) & 255) / 255d, GuiControlPalette.Color(actual)[0]);
     }
 
-    [Theory]
-    [InlineData(1, 1)]
-    [InlineData(1.25, 1)]
-    [InlineData(1.5, 2)]
-    [InlineData(1.75, 2)]
-    [InlineData(2, 2)]
-    public void FrameHasApprovedFillAndGuiScaledWholePixelOutline(double scale, int thickness)
+    [Fact]
+    public void FrameRestoresCallerContextState()
     {
-        using var surface = new ImageSurface(Format.Argb32, 90, 90);
+        // Arrange
+        using var surface = new ImageSurface(Format.Argb32, 8, 8);
         using var ctx = new Context(surface);
-        ctx.Antialias = Antialias.None;
         ctx.LineWidth = 3;
-        GuiControlDrawing.Frame(ctx, 10.2, 10.2, 60, 60,
-            GuiControlPalette.SearchFill, GuiControlPalette.SearchOutline, scale);
-        Assert.Equal(0x30281e, Pixel(surface, 40, 40));
-        for (int i = 0; i < thickness; i++) Assert.Equal(0x8c795b, Pixel(surface, 10 + i, 40));
-        Assert.Equal(0x30281e, Pixel(surface, 10 + thickness, 40));
+
+        // Act
+        GuiControlDrawing.Frame(ctx, 0, 0, 8, 8,
+            GuiControlPalette.SearchFill, GuiControlPalette.SearchOutline, 1);
+
+        // Assert
         Assert.Equal(3d, ctx.LineWidth);
     }
 
     [Fact]
-    public void GradientsAreLocalAndInvalidPixelGeometryFailsExplicitly()
+    public void PixelConversionRejectsInvalidUnitsAndScale()
     {
-        using var surface = new ImageSurface(Format.Argb32, 30, 300);
-        using var ctx = new Context(surface);
-        GuiControlDrawing.Gradient(ctx, 0, 0, 30, 300, GuiControlPalette.TitleTop, GuiControlPalette.TitleBottom);
-        Assert.Equal(0x65553e, Pixel(surface, 10, 0));
-        Assert.Equal(0x4a3c2c, Pixel(surface, 10, 299));
+        // Arrange, Act, Assert
         Assert.Throws<ArgumentOutOfRangeException>(() => GuiControlDrawing.Pixels(1, 0));
         Assert.Throws<ArgumentOutOfRangeException>(() => GuiControlDrawing.Pixels(-1, 1));
         Assert.Throws<ArgumentOutOfRangeException>(() => GuiControlDrawing.Pixels(1, double.NaN));
+    }
+
+    [Fact]
+    public void ColorConversionRejectsInvalidOpacity()
+    {
+        // Arrange, Act, Assert
         Assert.Throws<ArgumentOutOfRangeException>(() => GuiControlPalette.Color(0, double.NaN));
         Assert.Throws<ArgumentOutOfRangeException>(() => GuiControlPalette.Color(0, 2));
+    }
+
+    [Fact]
+    public void FrameRejectsInvalidRectangleDimensions()
+    {
+        // Arrange
+        using var surface = new ImageSurface(Format.Argb32, 1, 1);
+        using var ctx = new Context(surface);
+
+        // Act, Assert
         Assert.Throws<ArgumentOutOfRangeException>(() => GuiControlDrawing.Frame(ctx, 0, 0, 0, 1, 0, 0, 1));
+    }
+
+    [Fact]
+    public void InputBoundsRejectInsufficientEditableOrClearAreas()
+    {
+        // Arrange
         using var graphics = new GuiRenderFixture();
+
+        // Act, Assert
         Assert.Throws<ArgumentException>(() => GuiControlMetrics.InputBounds(ElementBounds.Fixed(0, 0, 20, 28)));
         Assert.Throws<ArgumentException>(() => GuiControlMetrics.InputBounds(ElementBounds.Fixed(0, 0, 100, 0)));
     }

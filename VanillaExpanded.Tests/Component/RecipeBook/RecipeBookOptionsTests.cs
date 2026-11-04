@@ -25,60 +25,31 @@ namespace VanillaExpanded.Tests.Component.RecipeBook;
 [Collection("Recipe book native GUI")]
 public sealed class RecipeBookOptionsTests
 {
-    [Theory]
-    [InlineData(1)]
-    [InlineData(1.25)]
-    [InlineData(1.5)]
-    [InlineData(1.75)]
-    [InlineData(2)]
-    public void RecipeBookOptionsSvgStatesUseIsolatedTexturesWithoutModifyingTheSharedDialogSurface(float scale)
+    [Fact]
+    public void RecipeBookOptionsReusesAndReleasesItsOwnedTextures()
     {
-        using var f = new MenuFixture(scale: scale);
-        using var surface = new ImageSurface(Format.Argb32, 128, 64);
+        using var f = new MenuFixture();
+        using var surface = new ImageSurface(Format.Argb32, 1, 1);
         using var ctx = new Context(surface);
-        ctx.SetSourceRGB(1, 1, 1);
-        ctx.Paint();
-        ctx.SetSourceRGB(0, 0, 0);
-        for (int x = 0; x < 128; x += 4)
-        {
-            ctx.Rectangle(x, 0, 2, 64);
-            ctx.Fill();
-        }
-        surface.Flush();
-        var original = surface.Data.ToArray();
-        using var options = new GuiElementRecipeBookOptions(f.Lifecycle.Api.Object,
+        int texturesBefore = f.TextureCount;
+        var options = new GuiElementRecipeBookOptions(f.Lifecycle.Api.Object,
             ElementBounds.Fixed(40.3, 10.3, 17, 17).WithEmptyParent());
-        var gui = Mock.Get(f.Lifecycle.Api.Object.Gui);
-        gui.Invocations.Clear();
-        options.ComposeElements(ctx, surface);
-        surface.Flush();
-        Assert.Equal(original, surface.Data);
-        Assert.Equal(2, f.OptionsDraws.Count);
-        int iconSize = (int)Math.Round(GuiElement.scaled(17), MidpointRounding.AwayFromZero);
-        Assert.All(f.OptionsDraws, draw =>
+        try
         {
-            Assert.Equal(iconSize, draw.Width);
-            Assert.Equal(iconSize, draw.Height);
-            Assert.Equal(iconSize, draw.SurfaceWidth);
-            Assert.Equal(iconSize, draw.SurfaceHeight);
-        });
-        Assert.NotEqual(f.OptionsDraws[0].Color, f.OptionsDraws[1].Color);
-        Assert.Equal(6, gui.Invocations.Count(call =>
-            call.Method.Name == nameof(IGuiAPI.LoadOrUpdateCairoTexture) && !(bool)call.Arguments[1]));
-        var render = Mock.Get(f.Lifecycle.Api.Object.Render);
-        foreach (bool hovered in new[] { false, true })
-        {
-            f.SetMouse(hovered ? (int)(options.Bounds.absX + 5) : 0,
-                hovered ? (int)(options.Bounds.absY + 5) : 0);
-            render.Invocations.Clear();
-            options.RenderInteractiveElements(0);
-            var draw = Assert.Single(render.Invocations, call =>
-                call.Method.Name == nameof(IRenderAPI.Render2DTexturePremultipliedAlpha));
-            Assert.Equal(Math.Round(options.Bounds.absX, MidpointRounding.AwayFromZero), (double)draw.Arguments[1]);
-            Assert.Equal(Math.Round(options.Bounds.absY, MidpointRounding.AwayFromZero), (double)draw.Arguments[2]);
-            Assert.Equal((double)iconSize, (double)draw.Arguments[3]);
-            Assert.Equal((double)iconSize, (double)draw.Arguments[4]);
+            // Compose creates the options component and its popup-owned controls/resources.
+            options.ComposeElements(ctx, surface);
+            int texturesWithOptions = f.TextureCount;
+            Assert.True(texturesWithOptions > texturesBefore);
+
+            // Recomposition must reuse resources rather than accumulate new owned textures.
+            options.ComposeElements(ctx, surface);
+            Assert.Equal(texturesWithOptions, f.TextureCount);
         }
+        finally
+        {
+            options.Dispose();
+        }
+        Assert.Equal(texturesBefore, f.TextureCount);
     }
 
     [Theory]

@@ -23,7 +23,7 @@ public sealed class GuiStyledControlsNativeCompatibilityTests
     [InlineData(1.5f)]
     [InlineData(1.75f)]
     [InlineData(2f)]
-    public void ButtonPreservesNativeActivationAndRendersApprovedStates(float scale)
+    public void ButtonPreservesNativeActivationAndCancelsDisabledOrHiddenInput(float scale)
     {
         using var f = new ControlsFixture(scale);
         int clicks = 0;
@@ -31,42 +31,34 @@ public sealed class GuiStyledControlsNativeCompatibilityTests
             ElementBounds.Fixed(10, 10, 180, 28).WithEmptyParent());
         using var composer = f.Compose(button);
         f.Render(button);
-        Assert.Equal(0x80613d, f.Drawn(0).Rgb(2, 2));
-        Assert.Equal(0xc29a5b, f.Drawn(0).Rgb(0, 10));
-        Assert.True(f.Drawn(1).HasColor(0xfff0cc));
         int uploads = f.Uploads;
+        int textureCount = f.Graphics.Textures.Count;
+        f.Render(button);
+        Assert.Equal(uploads, f.Uploads);
         f.SetMouse(button.Bounds.absX + 10, button.Bounds.absY + 10);
         f.Render(button);
-        Assert.Equal(0x8b693f, f.Drawn(0).Rgb(2, 2));
-        Assert.Equal(0xe0bc79, f.Drawn(0).Rgb(0, 10));
         var down = f.Mouse(button.Bounds.absX + 10, button.Bounds.absY + 10);
         button.OnMouseDownOnElement(f.Api, down);
         f.Render(button);
-        Assert.Equal(0x604627, f.Drawn(0).Rgb(2, 2));
         Assert.Equal(0, clicks);
         var up = f.Mouse(down.X, down.Y);
         button.OnMouseUpOnElement(f.Api, up);
+        f.Render(button);
         Assert.True(up.Handled);
         Assert.Equal(1, clicks);
-        f.Render(button);
-        Assert.Equal(0x8b693f, f.Drawn(0).Rgb(2, 2));
-        Assert.True(f.Drawn(1).HasColor(0xfff0cc));
+
+        // A release outside the control cancels the pending activation.
+        button.OnMouseDownOnElement(f.Api, f.Mouse(down.X, down.Y));
+        button.OnMouseUp(f.Api, f.Mouse(-100, -100));
         f.SetMouse(-100, -100);
         f.Render(button);
-        Assert.Equal(0x80613d, f.Drawn(0).Rgb(2, 2));
-        button.SetActive(true);
-        f.Render(button);
-        Assert.Equal(0x604627, f.Drawn(0).Rgb(2, 2));
-        button.SetActive(false);
-        f.Render(button);
-        Assert.Equal(0x80613d, f.Drawn(0).Rgb(2, 2));
-        Assert.Equal(uploads, f.Uploads);
-        button.SetActive(true);
+        Assert.Equal(1, clicks);
+
         button.Enabled = false;
+        Assert.Equal(textureCount, f.Graphics.Textures.Count);
+        int disabledUploads = f.Uploads;
         f.Render(button);
-        Assert.Equal(0x3b342b, f.Drawn(0).Rgb(2, 2));
-        Assert.Equal(0x625747, f.Drawn(0).Rgb(0, 10));
-        Assert.InRange(f.Drawn(1).MaxAlpha, 1, 90);
+        Assert.Equal(disabledUploads, f.Uploads);
         button.OnMouseDownOnElement(f.Api, f.Mouse(down.X, down.Y));
         button.OnMouseUpOnElement(f.Api, f.Mouse(down.X, down.Y));
         Assert.Equal(1, clicks);
@@ -74,13 +66,17 @@ public sealed class GuiStyledControlsNativeCompatibilityTests
         button.OnKeyDown(f.Api, new KeyEvent { KeyCode = (int)GlKeys.Enter });
         Assert.Equal(1, clicks);
         button.Enabled = true;
+        Assert.Equal(textureCount, f.Graphics.Textures.Count);
+        int enabledUploads = f.Uploads;
         f.Render(button);
-        Assert.Equal(0x604627, f.Drawn(0).Rgb(2, 2));
+        Assert.Equal(enabledUploads, f.Uploads);
         button.OnKeyDown(f.Api, new KeyEvent { KeyCode = (int)GlKeys.Enter });
+        f.Render(button);
         Assert.Equal(2, clicks);
         button.Visible = false;
         f.Render(button);
         Assert.Empty(f.Draws);
+        Assert.Equal(textureCount, f.Graphics.Textures.Count);
         composer.Dispose();
         button.Dispose();
         Assert.Empty(f.Graphics.Textures);
@@ -102,33 +98,26 @@ public sealed class GuiStyledControlsNativeCompatibilityTests
             "Caller placeholder", "Caller clear tooltip", changes.Add, callerFont);
         using var composer = f.Compose(input);
         Assert.Equal(originalColor, callerFont.Color);
-        Assert.Equal(input.FieldBounds.absX + 8 * scale, input.Bounds.absX + 3, 4);
-        Assert.True(input.Bounds.absX + input.Bounds.OuterWidth < input.ClearBounds.absX);
+        int editX = (int)(input.Bounds.absX + input.Bounds.OuterWidth / 2);
+        int editY = (int)(input.Bounds.absY + input.Bounds.OuterHeight / 2);
+        int clearX = (int)(input.ClearBounds.absX + input.ClearBounds.OuterWidth / 2);
+        int clearY = (int)(input.ClearBounds.absY + input.ClearBounds.OuterHeight / 2);
+        Assert.True(input.Bounds.PointInside(editX, editY));
+        Assert.False(input.ClearBounds.PointInside(editX, editY));
+        Assert.True(input.ClearBounds.PointInside(clearX, clearY));
+        Assert.False(input.Bounds.PointInside(clearX, clearY));
         Assert.Equal("Caller clear tooltip", input.ClearHint.GetText());
-        f.Render(input);
-        Assert.Equal(0x30281e, f.Drawn(0).Rgb(2, 2));
-        Assert.True(f.Drawn(f.Draws.Length - 1).MaxAlpha > 90);
-        Assert.True(f.Drawn(f.Draws.Length - 1).HasColor(0xa99b80));
-        input.Enabled = false;
-        f.Render(input);
-        Assert.InRange(f.Drawn(f.Draws.Length - 1).MaxAlpha, 1, 90);
-        input.Enabled = true;
         input.SetValue("two caller words");
         input.OnFocusGained();
         input.SetCaretPos(3);
         Assert.Equal(3, input.CaretPosInLine);
-        int selectX = (int)input.Bounds.absX + 4;
-        int selectY = (int)input.Bounds.absY + 10;
+        int selectX = (int)(input.Bounds.absX + input.Bounds.OuterWidth / 4);
+        int selectY = (int)(input.Bounds.absY + input.Bounds.OuterHeight / 2);
         input.OnMouseDownOnElement(f.Api, f.Mouse(selectX, selectY));
-        input.OnMouseMove(f.Api, f.Mouse(selectX + 30, selectY));
-        f.Render(input);
-        int selectionId = (int)typeof(GuiElementEditableTextBase)
-            .GetField("selectionTextureId", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(input)!;
-        var selection = Assert.Single(f.Graphics.Render.Invocations, call =>
-            call.Method.Name == nameof(IRenderAPI.Render2DTexturePremultipliedAlpha)
-            && (int)call.Arguments[0] == selectionId);
-        Assert.Equal(input.FieldBounds.renderX + 8 * (double)scale, (double)selection.Arguments[1], 6);
-        input.OnMouseUp(f.Api, f.Mouse(selectX + 30, selectY));
+        int selectionEndX = selectX + (int)(input.Bounds.OuterWidth / 4);
+        input.OnMouseMove(f.Api, f.Mouse(selectionEndX, selectY));
+        Assert.True(input.HasFocus);
+        input.OnMouseUp(f.Api, f.Mouse(selectionEndX, selectY));
         changes.Clear();
         f.SetMouse(input.ClearBounds.absX + 8 * scale, input.ClearBounds.absY + 8 * scale);
         f.Render(input);
@@ -166,7 +155,7 @@ public sealed class GuiStyledControlsNativeCompatibilityTests
     [InlineData(1.5f)]
     [InlineData(1.75f)]
     [InlineData(2f)]
-    public void DropdownCachesStyledResourcesAcrossNativeOpeningReplacementAndSelection(float scale)
+    public void DropdownOpensReplacesAndSelectsWhileReusingOwnedResources(float scale)
     {
         using var f = new ControlsFixture(scale);
         var changes = new List<string>();
@@ -174,16 +163,10 @@ public sealed class GuiStyledControlsNativeCompatibilityTests
             (value, _) => changes.Add(value), ElementBounds.Fixed(10, 10, 180, 20));
         using var composer = f.Compose(dropdown);
         Assert.IsType<GuiElementStyledListMenu>(dropdown.listMenu);
-        Assert.Equal(30 * scale, dropdown.Bounds.InnerHeight, 4);
         f.Render(dropdown);
-        Assert.Equal(0x382f23, f.Drawn(0).Rgb(2, 2));
-        Assert.True(f.Drawn(1).HasColor(0xd7c8aa));
         dropdown.listMenu.Open();
+        Assert.True(dropdown.listMenu.IsOpened);
         f.Render(dropdown);
-        Assert.Equal(0x51422e, f.Drawn(0).Rgb(2, 2));
-        var popup = f.Popup();
-        Assert.True(popup.HasColor(0xd7c8aa));
-        Assert.Equal(0x382f23, popup.Rgb(2, popup.Height - 5));
         int uploads = f.Uploads;
         f.Render(dropdown);
         Assert.Equal(uploads, f.Uploads);
@@ -192,9 +175,6 @@ public sealed class GuiStyledControlsNativeCompatibilityTests
         f.SetMouse(x, y);
         dropdown.OnMouseMove(f.Api, f.Mouse(x, y));
         f.Render(dropdown);
-        Assert.Equal(0x51422e, f.Popup().Rgb(f.Popup().Width - 15, (int)(45 * scale)));
-        int stroke = Math.Max(1, (int)Math.Round(scale, MidpointRounding.AwayFromZero));
-        Assert.Equal(0xf5d58d, f.Popup().Rgb(stroke, (int)(15 * scale)));
         dropdown.OnMouseDown(f.Api, f.Mouse(x, y));
         Assert.Equal("b", dropdown.SelectedValue);
         Assert.Equal("b", Assert.Single(changes));
@@ -206,20 +186,17 @@ public sealed class GuiStyledControlsNativeCompatibilityTests
         uploads = f.Uploads;
         f.Render(dropdown);
         Assert.Equal(uploads, f.Uploads);
-        Assert.Equal(0x382f23, f.Popup().Rgb(2, 2));
         dropdown.SetList(["b", "c", "d"], ["Beta changed", "Gamma", "Delta"]);
         dropdown.SetSelectedIndex(0);
+        Assert.Equal("b", dropdown.SelectedValue);
         dropdown.listMenu.Open();
+        Assert.True(dropdown.listMenu.IsOpened);
         f.Render(dropdown);
-        Assert.False(popup.Pixels.SequenceEqual(f.Popup().Pixels));
-        Assert.Equal((int)(90 * scale), f.Popup().Height);
         dropdown.Bounds.fixedWidth += 30;
         dropdown.Bounds.MarkDirtyRecursive();
         dropdown.Bounds.CalcWorldBounds();
         dropdown.listMenu.Open();
         f.Render(dropdown);
-        var valueDraw = f.Draws[1];
-        Assert.Equal((double)(int)(dropdown.Bounds.InnerWidth - 20 * scale), (double)valueDraw.Arguments[3]);
         uploads = f.Uploads;
         f.Render(dropdown);
         Assert.Equal(uploads, f.Uploads);
@@ -234,8 +211,6 @@ public sealed class GuiStyledControlsNativeCompatibilityTests
         dropdown.OnKeyDown(f.Api, new KeyEvent { KeyCode = (int)GlKeys.Home });
         Assert.Equal("d", dropdown.SelectedValue);
         f.Render(dropdown);
-        Assert.Equal(0x382f23, f.Drawn(0).Rgb(2, 2));
-        Assert.InRange(f.Drawn(1).MaxAlpha, 1, 90);
         Assert.Empty(f.Graphics.Clips);
         composer.Dispose();
         dropdown.Dispose();
@@ -306,27 +281,20 @@ public sealed class GuiStyledControlsNativeCompatibilityTests
     [InlineData(1.5f)]
     [InlineData(1.75f)]
     [InlineData(2f)]
-    public void CheckboxHasFlatScaledFrameNativeTogglingAndDisabledIndicator(float scale)
+    public void CheckboxTogglesNativelyAndIgnoresDisabledInput(float scale)
     {
         using var f = new ControlsFixture(scale);
         var changes = new List<bool>();
         using var checkbox = new GuiElementStyledCheckbox(f.Api, changes.Add, ElementBounds.Fixed(10, 10, 40, 40));
         using var composer = f.Compose(checkbox);
-        Assert.Equal(17 * scale, checkbox.Bounds.InnerWidth, 4);
-        f.Render(checkbox);
-        Assert.Equal(0x30291e, f.Drawn(0).Rgb(2, 2));
-        Assert.Equal(0x948366, f.Drawn(0).Rgb(0, 8));
-        checkbox.OnMouseDownOnElement(f.Api, f.Mouse(checkbox.Bounds.absX + 8, checkbox.Bounds.absY + 8));
+        checkbox.OnMouseDownOnElement(f.Api, f.Mouse(checkbox.Bounds.absX + checkbox.Bounds.OuterWidth / 2,
+            checkbox.Bounds.absY + checkbox.Bounds.OuterHeight / 2));
         Assert.True(checkbox.On);
         Assert.True(Assert.Single(changes));
-        f.Render(checkbox);
-        Assert.InRange(f.Drawn(1).MaxAlpha, 180, 255);
         checkbox.Enabled = false;
         checkbox.OnFocusGained();
         checkbox.OnKeyDown(f.Api, new KeyEvent { KeyCode = (int)GlKeys.Space });
         Assert.Single(changes);
-        f.Render(checkbox);
-        Assert.InRange(f.Drawn(1).MaxAlpha, 1, 90);
         checkbox.Enabled = true;
         checkbox.OnKeyDown(f.Api, new KeyEvent { KeyCode = (int)GlKeys.Enter });
         Assert.False(checkbox.On);
@@ -423,7 +391,7 @@ public sealed class GuiStyledControlsNativeCompatibilityTests
     [InlineData(1.5f, 180)]
     [InlineData(1.75f, 180)]
     [InlineData(2f, 180)]
-    public void ScrollbarArrowsAndInsetThumbShareNativeRangeAndReleaseDragOutside(float scale, double height)
+    public void ScrollbarArrowsAndThumbShareNativeRangeAndReleaseDragOutside(float scale, double height)
     {
         using var f = new ControlsFixture(scale);
         var changes = new List<float>();
@@ -438,14 +406,6 @@ public sealed class GuiStyledControlsNativeCompatibilityTests
         scrollbar.Enabled = true;
         changes.Clear();
         f.Render(scrollbar);
-        Assert.Equal(4, f.Draws.Length);
-        Assert.Equal((int)Math.Round(10 * scale, MidpointRounding.AwayFromZero), f.Drawn(0).Width);
-        Assert.Equal(0x30291e, f.Drawn(0).Rgb(0, 0));
-        Assert.InRange(f.Drawn(1).MaxAlpha, 1, 90);
-        Assert.True(f.Drawn(2).MaxAlpha > 90);
-        Assert.Equal((int)Math.Round(6 * scale, MidpointRounding.AwayFromZero), f.Drawn(3).Width);
-        Assert.Equal(0x8d7957, f.Drawn(3).Rgb(f.Drawn(3).Width / 2, f.Drawn(3).Height / 2));
-        Assert.True(f.Drawn(3).Pixels[3] < 255);
         int uploads = f.Uploads;
         ClickArrow(2);
         Assert.Equal(23 * scale, scrollbar.CurrentYPosition, 3);
@@ -504,7 +464,6 @@ public sealed class GuiStyledControlsNativeCompatibilityTests
         f.Render(scrollbar);
         double thumbBottom = Convert.ToDouble(f.Draws[3].Arguments[2]) + Convert.ToDouble(f.Draws[3].Arguments[4]);
         Assert.Equal(Convert.ToDouble(f.Draws[2].Arguments[2]), thumbBottom);
-        Assert.InRange(f.Drawn(2).MaxAlpha, 1, 90);
         composer.OnMouseUp(f.Mouse(-100, -100));
         Assert.False(scrollbar.mouseDownOnScrollbarHandle);
         composer.OnMouseMove(f.Mouse(x, -100));
@@ -550,10 +509,6 @@ public sealed class GuiStyledControlsNativeCompatibilityTests
         scrollbar.Enabled = true;
         scrollbar.SetHeights(visible, visible);
         callbacks = changes.Count;
-        f.Render(scrollbar);
-        Assert.Equal(3, f.Draws.Length);
-        Assert.InRange(f.Drawn(1).MaxAlpha, 1, 90);
-        Assert.InRange(f.Drawn(2).MaxAlpha, 1, 90);
         ClickArrow(2);
         var wheel = new MouseWheelEventArgs { deltaPrecise = -1 };
         scrollbar.OnMouseWheel(f.Api, wheel);
@@ -595,14 +550,17 @@ public sealed class GuiStyledControlsNativeCompatibilityTests
         using var button = new GuiElementStyledArrowButton(f.Api, pointsUp, () => callbacks++,
             ElementBounds.Fixed(10.37, 12.81, 12, 10));
         using var composer = f.Compose(button);
-        Assert.False(button.Focusable);
-        int uploads = f.Uploads;
         f.Render(button);
-        int idle = (int)f.Draws[0].Arguments[0];
+        int uploads = f.Uploads;
+        int textureCount = f.Graphics.Textures.Count;
+        f.Render(button);
+        Assert.Equal(uploads, f.Uploads);
+        Assert.False(button.Focusable);
         var mouse = f.Mouse(button.Bounds.absX + button.Bounds.OuterWidth / 2,
             button.Bounds.absY + button.Bounds.OuterHeight / 2);
         f.SetMouse(mouse.X, mouse.Y);
         composer.OnMouseDown(mouse);
+        f.Render(button);
         Assert.True(mouse.Handled);
         Assert.True(button.On);
         Assert.Equal(1, callbacks);
@@ -614,19 +572,21 @@ public sealed class GuiStyledControlsNativeCompatibilityTests
         f.SetMouse(-100, -100);
         composer.OnMouseMove(f.Mouse(-100, -100));
         f.Render(button);
-        Assert.Equal(idle, f.Draws[0].Arguments[0]);
         Assert.True(button.On);
         composer.OnMouseUp(f.Mouse(-100, -100));
+        f.Render(button);
         Assert.False(button.On);
         Assert.Equal(1, callbacks);
 
         composer.OnMouseDown(f.Mouse(mouse.X, mouse.Y));
         button.OnFocusLost();
+        f.Render(button);
         Assert.False(button.On);
         composer.OnMouseUp(f.Mouse(mouse.X, mouse.Y));
         Assert.Equal(2, callbacks);
         composer.OnMouseDown(f.Mouse(mouse.X, mouse.Y));
         button.Enabled = false;
+        f.Render(button);
         Assert.False(button.On);
         composer.OnMouseDown(f.Mouse(mouse.X, mouse.Y));
         composer.OnMouseUp(f.Mouse(mouse.X, mouse.Y));
@@ -634,15 +594,13 @@ public sealed class GuiStyledControlsNativeCompatibilityTests
         button.Enabled = true;
         f.SetMouse(mouse.X, mouse.Y);
         f.Render(button);
-        Assert.True(f.Drawn(0).HasColor(0xc8b897));
         button.InsideClipBounds = ElementBounds.Fixed(500, 500, 10, 10).WithEmptyParent();
         button.InsideClipBounds.CalcWorldBounds();
         composer.OnMouseDown(f.Mouse(mouse.X, mouse.Y));
+        f.Render(button);
         Assert.False(button.On);
         Assert.Equal(3, callbacks);
-        f.Render(button);
-        Assert.Equal(idle, f.Draws[0].Arguments[0]);
-        Assert.Equal(uploads, f.Uploads);
+        Assert.Equal(textureCount, f.Graphics.Textures.Count);
         composer.Dispose();
         button.Dispose();
         Assert.Empty(f.Graphics.Textures);

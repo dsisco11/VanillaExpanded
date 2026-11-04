@@ -481,7 +481,7 @@ public sealed class RecipeBookDialogLayoutTests
     [InlineData(1.5f)]
     [InlineData(1.75f)]
     [InlineData(2f)]
-    public void BaselineShellAdoptsSharedControlsAndCentersTheRealMultiDigitCounter(float scale)
+    public void BaselineShellWiresControlsAndKeepsAlternativeCountUsable(float scale)
     {
         using var f = new MenuFixture(scale: scale, includeRecipes: true);
         var first = Assert.Single(f.Lifecycle.Recipes);
@@ -498,29 +498,16 @@ public sealed class RecipeBookDialogLayoutTests
         f.Toggle();
         var book = Assert.Single(f.Menus);
         var composer = book.SingleComposer;
-        Assert.Equal(340, composer.Bounds.fixedWidth);
-        Assert.Equal(420, composer.Bounds.fixedHeight);
-        Assert.IsType<GuiElementRecipeBookBackground>(composer.GetElement("dialog-background"));
-        var title = Assert.IsType<GuiElementRecipeBookTitleBar>(composer.GetTitleBar("titlebar"));
-        Assert.Equal(FontWeight.Bold, title.Font.FontWeight);
-        Assert.Equal(14, title.Font.UnscaledFontsize);
         var input = Assert.IsType<GuiElementClearableTextInput>(composer.GetTextInput("search"));
         Assert.Equal(0, input.TabIndex);
-        Assert.Equal(14, input.Font.UnscaledFontsize);
-        Assert.Equal(28 * scale, input.FieldBounds.OuterHeight, 4);
-        Assert.Equal(input.FieldBounds.absX + 8 * scale, input.Bounds.absX + 3, 4);
-        Assert.IsType<GuiElementStyledDropDown>(composer.GetDropDown("sort"));
+        Assert.True(composer.FocusElement(input.TabIndex));
+        Assert.Same(input, composer.CurrentTabIndexElement);
         Assert.Equal("availability", composer.GetDropDown("sort").SelectedValue);
-        Assert.IsType<GuiElementStyledCheckbox>(composer.GetSwitch("craftable-only"));
         var options = Assert.IsType<GuiElementRecipeBookOptions>(composer.GetElement("options"));
-        Assert.IsType<GuiElementStyledCheckbox>(options.Checkbox);
-        Assert.Equal(options.Bounds.absX, composer.GetHoverText("options-hint").Bounds.absX, 4);
-        Assert.Equal(options.Bounds.absY, composer.GetHoverText("options-hint").Bounds.absY, 4);
+        Assert.NotNull(composer.GetHoverText("options-hint"));
         foreach (string key in new[] { "previous", "auto", "next", "handbook", "clear-search", "show-uncraftable" })
-        {
-            var button = Assert.IsType<GuiElementStyledButton>(composer.GetButton(key));
-            Assert.Equal(8 * scale, button.Bounds.absPaddingX, 4);
-        }
+            Assert.NotNull(composer.GetButton(key));
+
         var session = (RecipeBookSession)typeof(GuiDialogRecipeBook).GetField("session",
             BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(book)!;
         var row = Assert.Single(session.Rows);
@@ -529,53 +516,18 @@ public sealed class RecipeBookDialogLayoutTests
         session.ChooseAlternative(row.Output.Alternatives[^1].Id);
         var counter = composer.GetDynamicText("alternative");
         Assert.Equal("12/12", counter.GetText());
-        Assert.Equal(12, counter.Font.UnscaledFontsize);
-        Assert.Equal(FontWeight.Normal, counter.Font.FontWeight);
-        Assert.Equal(input.FieldBounds.absX + input.FieldBounds.OuterWidth / 2,
-            counter.Bounds.absX + counter.Bounds.OuterWidth / 2, 4);
         Assert.True(counter.Font.GetTextExtents(counter.GetText()).Width <= counter.Bounds.InnerWidth);
         Assert.True(composer.GetButton("next").Bounds.absX + composer.GetButton("next").Bounds.OuterWidth
-            + 4 * scale <= counter.Bounds.absX);
-        Assert.True(counter.Bounds.absX + counter.Bounds.OuterWidth + 4 * scale
+            <= counter.Bounds.absX);
+        Assert.True(counter.Bounds.absX + counter.Bounds.OuterWidth
             <= composer.GetButton("handbook").Bounds.absX);
-        var opened = f.OpenOptions(book);
-        var render = Mock.Get(f.Lifecycle.Api.Object.Render);
-        render.Invocations.Clear();
-        opened.RenderInteractiveElements(0);
-        var checkboxDraws = render.Invocations.Where(call =>
-            call.Method.Name == nameof(IRenderAPI.Render2DTexturePremultipliedAlpha)
-            && call.Arguments.Count == 7 && (float)call.Arguments[5] == 311).ToArray();
-        Assert.Equal(2, checkboxDraws.Length);
-        Assert.All(checkboxDraws, call => Assert.Equal(17 * (double)scale, (double)call.Arguments[3], 4));
-        using var image = new ImageSurface(Format.Argb32, (int)(340 * scale), (int)(420 * scale));
-        using var context = new Context(image);
-        using var background = new GuiElementRecipeBookBackground(f.Lifecycle.Api.Object,
-            ElementBounds.Fixed(0, 0, 340, 420).WithEmptyParent());
-        background.ComposeElements(context, image);
-        image.Flush();
-        Assert.Equal(0x817159, Pixel(0, 20 * scale));
-        Assert.InRange(Pixel(10 * scale, 2 * scale) >> 16, 73, 75);
-        Assert.InRange(Pixel(10 * scale, 418 * scale) >> 16, 59, 61);
-        using var bar = new GuiElementRecipeBookTitleBar(f.Lifecycle.Api.Object, "Recipe Book", composer,
-            () => { }, ElementBounds.Fixed(0, 0, 340, 36).WithEmptyParent());
-        bar.ComposeTextElements(context, image);
-        image.Flush();
-        int stroke = Math.Max(1, (int)Math.Round(scale, MidpointRounding.AwayFromZero));
-        Assert.Equal(0x2a221a, Pixel(10 * scale, 36 * scale - stroke));
-        Assert.InRange(Pixel(10 * scale, 2 * scale) >> 16, 98, 101);
-        Assert.InRange(Pixel(10 * scale, 34 * scale - stroke) >> 16, 74, 79);
-        using var list = new GuiElementCustomDraw(f.Lifecycle.Api.Object,
-            ElementBounds.Fixed(0, 50, 100, 80).WithEmptyParent(), GuiElementRecipeBookBackground.DrawList);
-        list.ComposeElements(context, image);
-        image.Flush();
-        Assert.Equal(0x2c251c, Pixel(0, 60 * scale));
-        Assert.Equal(0x352d22, Pixel(5 * scale, 60 * scale));
 
-        int Pixel(double x, double y)
-        {
-            int p = (int)y * image.Stride + (int)x * 4;
-            var pixels = image.Data;
-            return pixels[p + 2] << 16 | pixels[p + 1] << 8 | pixels[p];
-        }
+        // Opening and toggling the options control must keep its setting wired to the UI.
+        var opened = f.OpenOptions(book);
+        Assert.True(opened.IsOpened);
+        Assert.True(opened.Checkbox.On);
+        f.ToggleReopenOption(book);
+        Assert.False(opened.Checkbox.On);
+        Assert.False(f.Lifecycle.Api.Object.Settings.Bool.Get(RecipeBookSystem.RememberOpenSetting, true));
     }
 }

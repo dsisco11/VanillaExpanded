@@ -102,6 +102,4 @@ internal static (int Left, int Top, int Right, int Bottom) NativeScissorRectangl
         tabs.ComposeElements(ctx, surface);
     }
 
-    internal delegate void Upload(ImageSurface image, bool linear, ref LoadedTexture texture);
-
 }
