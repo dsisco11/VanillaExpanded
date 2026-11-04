@@ -17,7 +17,6 @@ using Vintagestory.Common;
 using Vintagestory.GameContent;
 using System.Collections.Immutable;
 using VanillaExpanded.Tests;
-using VanillaExpanded.Tests.TestSupport.Configuration;
 using static VanillaExpanded.Tests.TestSupport.RecipeBook.RecipeBookLifecycleTestsTestSupport;
 using static VanillaExpanded.Tests.TestSupport.RecipeBook.RecipeFilterSetTestsTestSupport;
 

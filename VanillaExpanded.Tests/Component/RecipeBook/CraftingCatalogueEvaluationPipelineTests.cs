@@ -8,7 +8,6 @@ using Vintagestory.Client.NoObf;
 using VanillaExpanded.Tests;
 using VanillaExpanded.Tests.TestSupport.Gui;
 using VanillaExpanded.Tests.TestSupport.RecipeBook;
-using VanillaExpanded.Tests.TestSupport.Configuration;
 using static VanillaExpanded.Tests.TestSupport.RecipeBook.CraftingAllocationTestsTestSupport;
 
 namespace VanillaExpanded.Tests.Component.RecipeBook;

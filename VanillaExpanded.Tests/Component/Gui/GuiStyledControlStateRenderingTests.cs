@@ -8,7 +8,6 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using VanillaExpanded.Tests;
 using VanillaExpanded.Tests.TestSupport.RecipeBook;
-using VanillaExpanded.Tests.TestSupport.Configuration;
 using static VanillaExpanded.Tests.TestSupport.Gui.GuiStyledControlsTestsTestSupport;
 
 namespace VanillaExpanded.Tests.Component.Gui;

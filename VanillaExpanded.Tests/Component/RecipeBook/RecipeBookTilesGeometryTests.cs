@@ -8,7 +8,6 @@ using Vintagestory.API.Common;
 using Xunit;
 using VanillaExpanded.Tests;
 using VanillaExpanded.Tests.TestSupport.RecipeBook;
-using VanillaExpanded.Tests.TestSupport.Configuration;
 
 namespace VanillaExpanded.Tests.Component.RecipeBook;
 

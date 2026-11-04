@@ -341,6 +341,11 @@ boundedness, and discontinuity reset. Numerical invariants are not pixel excepti
 
 ### Palettes, colors, configuration, and functional exclusions
 
+Subsequent decision (2026-11-04): the user retired the shipped-asset contract
+tests during filesystem-IO cleanup. The configuration-asset preservation
+obligations below are historical, not requirements to restore those tests.
+Runtime configuration behavior and serialization tests remain in scope.
+
 | File / method; source lines | Decision and behavioral owner |
 | --- | --- |
 | [CrucibleParticlePaletteTests](../VanillaExpanded.Tests/Unit/CrucibleIndicators/CrucibleParticlePaletteTests.cs): `MissingClient_UsesNeutralMetalColors`; 42-54 | P: selected fallback RGB palette. |
@@ -349,7 +354,7 @@ boundedness, and discontinuity reset. Numerical invariants are not pixel excepti
 | [FoodContainerParticlePaletteTests](../VanillaExpanded.Tests/Unit/FoodContainerIndicators/FoodContainerParticlePaletteTests.cs): `PortionedFoodWithoutMealInterface_UsesItsOwnColors`; 17-28; `Ingredients_SupplyStablePaletteUntilTheirIdentityChanges`; 33-64 | F: source selection, supplied-value decoding, invalidation, no vessel sampling. |
 | [LiquidContainerParticleColorTests](../VanillaExpanded.Tests/Unit/LiquidContainerIndicators/LiquidContainerParticleColorTests.cs): `BakedParticleTextureUsesAtlasAverage`; 16-32; `MaterialReplacementRefreshesCachedTint`; 37-56 | F: mock decoding, source selection, material replacement, caching; no actual pixel readback. |
 | [AnimalSexDistanceFadeTests](../VanillaExpanded.Tests/Unit/AnimalSexIndicators/AnimalSexDistanceFadeTests.cs): `FadeReachesZeroAtEightBlocks`; 17-19 | M: remove near-opacity plateau/intermediate curve; preserve suppression at/beyond configured range at eligibility boundary. |
-| [AnimalSexConfigurationTests](../VanillaExpanded.Tests/Unit/AnimalSexIndicators/AnimalSexConfigurationTests.cs): `AnimalControlsHaveDedicatedSection`; 11-33 | M: remove presentation-order weights; preserve client ownership, setting coverage, localization. |
+| Historical `Unit/AnimalSexIndicators/AnimalSexConfigurationTests.cs`: `AnimalControlsHaveDedicatedSection`; 11-33 | M at Phase 1: remove presentation-order weights; preserve client ownership, setting coverage, localization. The suite was subsequently removed by the filesystem-IO decision above. |
 | [AutoLootConfigurationTests](../VanillaExpanded.Tests/Unit/AutoLoot/AutoLootConfigurationTests.cs): `Settings_AreLocalGroupedLocalizedAndMatchPersistedDefaults`; 17-49 | M: remove ordering weights; preserve persisted defaults, valid behavioral delay range, client ownership, localization. |
 | [FreshnessIndicatorStyleConfigTests](../VanillaExpanded.Tests/Unit/Configuration/FreshnessIndicatorStyleConfigTests.cs): `ItemSlotIndicatorSettings_HaveDedicatedSection`; 15-31 | P: section placement/weight. Declaration coverage already belongs to `ConfigLibIntegrationTests.ConfigLibAsset_DeclaresEveryConfigProperty` (17-47). |
 | [RecipeBookConfigContractTests](../VanillaExpanded.Tests/Unit/Configuration/RecipeBookConfigContractTests.cs): `RecipeBookToggle_IsClientSideLocalizedAndMatchesTheConfigDefault`; 29-42 | M: remove ordering weight; preserve default agreement, client ownership, localization. |

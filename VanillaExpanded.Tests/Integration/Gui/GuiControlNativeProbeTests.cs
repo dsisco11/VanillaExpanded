@@ -9,7 +9,6 @@ using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using VanillaExpanded.Tests;
 using VanillaExpanded.Tests.TestSupport.RecipeBook;
-using VanillaExpanded.Tests.TestSupport.Configuration;
 
 namespace VanillaExpanded.Tests.Integration.Gui;
 

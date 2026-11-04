@@ -1,4 +1,3 @@
-using System.Text.Json;
 using VanillaExpanded.ItemSlotIndicators;
 using VanillaExpanded.ModSystems;
 using Vintagestory.API.Datastructures;
@@ -65,25 +64,5 @@ public sealed class FreshnessIndicatorStyleConfigTests
         Assert.Equal((ItemSlotIndicatorRenderingStyle)style, config.FreshnessRenderingStyle);
     }
 
-    /// <summary>All mapped options and their default carry localized labels alongside a localized behavioral description.</summary>
-    [Fact]
-    public void Asset_DeclaresLocalizedMappedChoices()
-    {
-        DirectoryInfo? root = new(AppContext.BaseDirectory);
-        while (root is not null && !File.Exists(Path.Combine(root.FullName, "VanillaExpanded.sln"))) root = root.Parent;
-        Assert.NotNull(root);
-        string assets = Path.Combine(root.FullName, "VanillaExpanded", "assets", "vanillaexpanded");
-        using var patches = JsonDocument.Parse(File.ReadAllText(Path.Combine(assets, "config", "configlib-patches.json")));
-        using var language = JsonDocument.Parse(File.ReadAllText(Path.Combine(assets, "lang", "en.json")));
-        var setting = patches.RootElement.GetProperty("settings").GetProperty("integer")
-            .GetProperty(nameof(VanillaExpandedConfig.PerishableItemFreshnessIndicatorStyle));
-        var mapping = setting.GetProperty("mapping");
-        Assert.Equal(new[] { 0, 1, 2 }, mapping.EnumerateObject().Select(option => option.Value.GetInt32()).Order());
-        Assert.Equal(0, mapping.GetProperty(setting.GetProperty("default").GetString()!).GetInt32());
-        Assert.True(setting.GetProperty("clientSide").GetBoolean());
-        foreach (string key in mapping.EnumerateObject().Select(option => "vanillaexpanded:mappingkey-" + option.Name)
-            .Concat(new[] { setting.GetProperty("ingui").GetString()!, setting.GetProperty("comment").GetString()! }))
-            Assert.False(string.IsNullOrWhiteSpace(language.RootElement.GetProperty(key.Split(':')[1]).GetString()));
-    }
     #endregion
 }

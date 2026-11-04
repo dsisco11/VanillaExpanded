@@ -5,19 +5,6 @@ namespace VanillaExpanded.Tests.RadialMenu;
 /// <summary>Checks generic menu geometry and exactly-once interaction independently of inventory.</summary>
 public sealed class RadialMenuTests
 {
-    [Fact]
-    public void RingModeUsesEngineSupportedIntegerUniform()
-    {
-        string shaderRoot = Path.Combine(AppContext.BaseDirectory, "Mods", "mod", "assets", "vanillaexpanded", "shaders");
-        if (!Directory.Exists(shaderRoot)) return;
-        foreach (string path in new[] { Path.Combine(shaderRoot, "radial_menu.vsh"), Path.Combine(shaderRoot, "radial_menu.fsh") })
-        {
-            string source = File.ReadAllText(path);
-            Assert.Contains("uniform int ringMode;", source);
-            Assert.DoesNotContain("uniform bool", source);
-        }
-    }
-
     #region Geometry
     /// <summary>Checks center, ring gap, wedge boundaries, and the fixed clockwise orientation.</summary>
     [Fact]
@@ -548,7 +535,6 @@ public sealed class RadialMenuTests
     }
     #endregion
 }
-
 
 
 

@@ -23,8 +23,10 @@ public sealed class NativeTranslationCacheCompatibilityTests
         {
             using var fixture = new MenuFixture();
             Lang.DefaultLocale = "en";
-            var entries = JsonSerializer.Deserialize<Dictionary<string, string>>(
-                File.ReadAllText(MenuFixture.GetAssetPath("lang", "en.json")))!;
+            var entries = new Dictionary<string, string>
+            {
+                ["recipebook-title"] = "Recipe Book"
+            };
             string payload = JsonSerializer.Serialize(entries);
             var assets = CreateAssetManager(CreateLanguageAsset("en", () => payload, "vanillaexpanded"));
             Lang.AvailableLanguages.Remove("en");
@@ -97,7 +99,6 @@ public sealed class NativeTranslationCacheCompatibilityTests
         var originalEnglish = Lang.AvailableLanguages.GetValueOrDefault("en");
         var originalCurrent = Lang.AvailableLanguages.GetValueOrDefault("zz");
         var originalAlternateDefault = Lang.AvailableLanguages.GetValueOrDefault("de");
-        string? temporaryAssets = null;
 
         try
         {
@@ -165,28 +166,6 @@ public sealed class NativeTranslationCacheCompatibilityTests
             Assert.Equal("current-v3", Lang.Get("probe"));
             Assert.Equal(EnumLinebreakBehavior.AfterCharacter, current.LineBreakBehavior);
 
-            // An explicit native PreLoad also replaces the table on the same locale service.
-            temporaryAssets = Path.Combine(Path.GetTempPath(), "VanillaExpanded-Lang-" + Guid.NewGuid().ToString("N"));
-            string languageDirectory = Path.Combine(temporaryAssets, "game", "lang");
-            Directory.CreateDirectory(languageDirectory);
-            var preloadedEntries = new Dictionary<string, string> { ["probe"] = "preloaded-v1" };
-            string currentFile = Path.Combine(languageDirectory, "zz.json");
-            File.WriteAllText(currentFile, JsonSerializer.Serialize(preloadedEntries));
-            current.PreLoad(temporaryAssets);
-            var preloadedTable = current.GetAllEntries();
-            Assert.Same(current, Lang.AvailableLanguages["zz"]);
-            Assert.NotSame(loadedTable, preloadedTable);
-            Assert.Equal("preloaded-v1", Lang.Get("probe"));
-
-            preloadedEntries["probe"] = "preloaded-v2";
-            File.WriteAllText(currentFile, JsonSerializer.Serialize(preloadedEntries));
-            current.PreLoad(temporaryAssets);
-            var refreshedPreloadTable = current.GetAllEntries();
-            Assert.Same(current, Lang.AvailableLanguages["zz"]);
-            Assert.NotSame(preloadedTable, refreshedPreloadTable);
-            Assert.Equal("preloaded-v2", Lang.Get("probe"));
-            Assert.Equal(EnumLinebreakBehavior.AfterCharacter, current.LineBreakBehavior);
-
             // The default locale is a separate measurement input because missing current entries fall back to it.
             Lang.DefaultLocale = "de";
             Assert.Same(alternateDefault, Lang.AvailableLanguages["de"]);
@@ -195,8 +174,6 @@ public sealed class NativeTranslationCacheCompatibilityTests
         }
         finally
         {
-            if (temporaryAssets != null && Directory.Exists(temporaryAssets))
-                Directory.Delete(temporaryAssets, recursive: true);
             RestoreLanguage("en", originalEnglish);
             RestoreLanguage("zz", originalCurrent);
             RestoreLanguage("de", originalAlternateDefault);

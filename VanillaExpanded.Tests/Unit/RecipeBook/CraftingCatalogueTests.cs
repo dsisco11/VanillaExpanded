@@ -5,7 +5,6 @@ using Vintagestory.API.Common;
 using VanillaExpanded.Tests;
 using VanillaExpanded.Tests.TestSupport.Gui;
 using VanillaExpanded.Tests.TestSupport.RecipeBook;
-using VanillaExpanded.Tests.TestSupport.Configuration;
 
 namespace VanillaExpanded.Tests.Unit.RecipeBook;
 

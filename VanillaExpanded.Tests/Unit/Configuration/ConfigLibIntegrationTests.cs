@@ -1,9 +1,5 @@
 using VanillaExpanded.ModSystems;
 using VanillaExpanded.Tests;
-using static VanillaExpanded.Tests.TestSupport.Configuration.ConfigurationTestSupport;
-
-using System.Reflection;
-using System.Text.Json;
 
 using Vintagestory.API.Datastructures;
 
@@ -12,41 +8,6 @@ namespace VanillaExpanded.Tests.Unit.Configuration;
 [Trait(TestCategories.TraitName, TestCategories.Unit)]
 public class ConfigLibIntegrationTests
 {
-
-    [Fact]
-    public void ConfigLibAsset_DeclaresEveryConfigProperty()
-    {
-        string repositoryRoot = FindRepositoryRoot();
-        string assetPath = Path.Combine(
-            repositoryRoot,
-            "VanillaExpanded",
-            "assets",
-            "vanillaexpanded",
-            "config",
-            "configlib-patches.json");
-
-        using JsonDocument document = JsonDocument.Parse(File.ReadAllText(assetPath));
-        JsonElement settings = document.RootElement.GetProperty("settings");
-        var declaredSettings = new Dictionary<string, string>();
-
-        foreach (JsonProperty category in settings.EnumerateObject())
-        {
-            foreach (JsonProperty setting in category.Value.EnumerateObject())
-            {
-                declaredSettings.Add(setting.Name, setting.Value.GetProperty("code").GetString()!);
-            }
-        }
-
-        string[] configProperties = typeof(VanillaExpandedConfig)
-            .GetProperties(BindingFlags.Instance | BindingFlags.Public)
-            .Select(property => property.Name)
-            .Order()
-            .ToArray();
-
-        Assert.Equal(configProperties, declaredSettings.Keys.Order());
-        Assert.All(declaredSettings, setting => Assert.Equal(setting.Key, setting.Value));
-    }
-
     [Fact]
     public void ApplyConfigLibSettings_RemovedQuickToolsToggle_IsIgnored()
     {

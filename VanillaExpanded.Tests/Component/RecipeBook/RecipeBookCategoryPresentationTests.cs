@@ -11,7 +11,6 @@ using Vintagestory.API.MathTools;
 using Vintagestory.Client.NoObf;
 using Vintagestory.Common;
 using VanillaExpanded.Tests;
-using VanillaExpanded.Tests.TestSupport.Configuration;
 using static VanillaExpanded.Tests.TestSupport.RecipeBook.RecipeBookLifecycleTestsTestSupport;
 
 namespace VanillaExpanded.Tests.Component.RecipeBook;
