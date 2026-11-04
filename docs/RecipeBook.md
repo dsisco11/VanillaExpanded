@@ -171,17 +171,19 @@ flowchart LR
 
 ```text
 on open or a valid render frame:
-    validate the inventory attachment
+    if the inventory attachment is invalid: close and stop
     reuse or recompute measurements and placement
-    if no placement fits: report insufficient space and close
-    if measurements or dimensions changed:
+    if no placement fits: report insufficient space, close, and stop
+    if controls are missing or measurements or dimensions changed:
         rebuild controls and record their effective bounds
     if position or window parent changed:
         update the root position using native bounds calculation
     continue opening or native rendering
 ```
 
-Composition occurs initially or when measured content or dimensions change. Comparing both the last composed size and live root size prevents externally changed root dimensions or clamping from leaving controls with stale geometry. Recomposition retains session criteria and selection, proportional row anchor, recipe inspection, appropriate control focus, and an open options dropdown's text, editing focus, and rejected-edit feedback. Replaced composers release their resources.
+Composition occurs initially or when measured content or dimensions change. Both the last composed size and live root size are checked so clamping or externally changed dimensions cannot leave controls with stale geometry. Effective composed bounds are recorded for later frames; this feedback does not restart the current layout pass.
+
+Recomposition keeps the existing session and preserves the [recipe view state](#recipes-and-handbook), control focus, and options editing state, including rejected-edit feedback. Replaced composers release their resources. [Dialog replacement](#dialog-lifecycle-and-state) instead restores browsing state into a fresh session.
 
 Fixed parent movement can invalidate docking and choose another side or size, but does not itself require recomposition. Movable cache hits clamp live manual coordinates without another size-placement calculation. Native titlebar mode switching, dragging, and position persistence remain native-owned.
 
@@ -284,6 +286,6 @@ Recipe Book tests are separated by their exercised boundary: [Unit](../VanillaEx
 dotnet test .\VanillaExpanded.Tests\VanillaExpanded.Tests.csproj --no-restore --filter "FullyQualifiedName~.RecipeBook.|FullyQualifiedName~.Gui.|FullyQualifiedName~RecipeBookConfigContractTests" --verbosity minimal
 ```
 
-Native GUI fixtures run without a live game or GPU context. Mocked shader tests cover renderer submission and state management, not GPU compilation or rendered appearance. One-time GPU acceptance is separate evidence, not a permanent regression suite. Use the existing Cake pipeline through `.\build.ps1` to validate JSON, publish the mod, and package its shader/assets.
+Native GUI fixtures run without a live game or GPU context. Mocked shader tests cover renderer submission and state management, not GPU compilation or rendered appearance. Those properties require separate live-game validation. Use the existing Cake pipeline through `.\build.ps1` to validate JSON, publish the mod, and package its shader/assets.
 
 Package-identified captures at equivalent category, scale, and state support reproducible visual comparisons. Live-world layout, inventory transitions, multiplayer behavior, and recipe/modpack compatibility need in-game validation independently of automated fixtures.
