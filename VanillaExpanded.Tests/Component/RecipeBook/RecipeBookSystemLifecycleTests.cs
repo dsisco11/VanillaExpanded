@@ -60,25 +60,30 @@ public sealed class RecipeBookSystemLifecycleTests
     public void DisabledAtWorldLoadDoesNotLoadSystemAndEnablingWaitsForReload()
     {
         // Arrange a world whose system was never started because the feature was disabled at load.
-        using var f = new MenuFixture(false);
-        Assert.False(f.Lifecycle.Loaded);
-        Assert.False(f.Lifecycle.System.ShouldLoad(EnumAppSide.Server));
-        Assert.Null(f.Lifecycle.System.Catalogue);
-        Assert.Null(f.Lifecycle.System.IconCache);
-        Assert.Equal(0, f.Lifecycle.Builds);
-        Assert.Null(f.Parent.Composers["maininventory"].GetElement("vanillaexpanded-crafting-toggle"));
-        f.Lifecycle.Events.VerifyAdd(value => value.LevelFinalize += It.IsAny<Action>(), Times.Never);
-        f.Lifecycle.Events.VerifyAdd(value => value.LeaveWorld += It.IsAny<Action>(), Times.Never);
-        f.Parent.TryOpen();
+        using var scope = new NativeScope();
+        using var f = new LifecycleFixture(false);
+        using var parent = new ParentDialog(f.Api.Object);
+        using var composer = (GuiComposer)Activator.CreateInstance(typeof(GuiComposer),
+            BindingFlags.Instance | BindingFlags.NonPublic, null,
+            new object[] { f.Api.Object, ElementBounds.Fixed(0, 0, 1920, 1080).WithEmptyParent(), "disabled-inventory" },
+            null)!;
+        Assert.False(f.Loaded);
+        Assert.False(f.System.ShouldLoad(EnumAppSide.Server));
+        Assert.Null(f.System.Catalogue);
+        Assert.Null(f.System.IconCache);
+        Assert.Equal(0, f.Builds);
+        f.System.Attach(parent, composer);
+        Assert.Null(composer.GetElement("vanillaexpanded-crafting-toggle"));
+        f.Events.VerifyAdd(value => value.LevelFinalize += It.IsAny<Action>(), Times.Never);
+        f.Events.VerifyAdd(value => value.LeaveWorld += It.IsAny<Action>(), Times.Never);
 
         // Act: enabling the setting mid-world cannot retroactively load or compose the system.
-        f.SetEnabled(true);
-        f.Lifecycle.FinalizeWorld();
-        f.Recompose();
-        Assert.Equal(0, f.Lifecycle.Builds);
-        Assert.Null(f.Lifecycle.System.Catalogue);
-        Assert.Null(f.Parent.Composers["maininventory"].GetElement("vanillaexpanded-crafting-toggle"));
-        Assert.Empty(f.Menus);
+        VanillaExpandedModSystem.Config.EnableRecipeBook = true;
+        f.FinalizeWorld();
+        f.System.Attach(parent, composer);
+        Assert.Equal(0, f.Builds);
+        Assert.Null(f.System.Catalogue);
+        Assert.Null(composer.GetElement("vanillaexpanded-crafting-toggle"));
 
         // Act: represent a world reload with a newly constructed system.
         using var reloaded = new LifecycleFixture();

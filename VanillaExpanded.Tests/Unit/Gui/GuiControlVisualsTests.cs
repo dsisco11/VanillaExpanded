@@ -65,8 +65,8 @@ public sealed class GuiControlVisualsTests
     public void FrameRejectsInvalidRectangleDimensions()
     {
         // Arrange
-        using var surface = new ImageSurface(Format.Argb32, 1, 1);
-        using var ctx = new Context(surface);
+        // Frame validates dimensions before accessing the context, so Cairo setup is unnecessary.
+        Context ctx = null!;
 
         // Act, Assert
         Assert.Throws<ArgumentOutOfRangeException>(() => GuiControlDrawing.Frame(ctx, 0, 0, 0, 1, 0, 0, 1));

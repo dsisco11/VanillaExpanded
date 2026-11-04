@@ -28,28 +28,80 @@ public sealed class RecipeBookOptionsTests
     [Fact]
     public void RecipeBookOptionsReusesAndReleasesItsOwnedTextures()
     {
-        using var f = new MenuFixture();
-        using var surface = new ImageSurface(Format.Argb32, 1, 1);
-        using var ctx = new Context(surface);
-        int texturesBefore = f.TextureCount;
-        var options = new GuiElementRecipeBookOptions(f.Lifecycle.Api.Object,
-            ElementBounds.Fixed(40.3, 10.3, 17, 17).WithEmptyParent());
+        using var scope = new NativeScope();
+        using var f = new GuiRenderFixture();
+        var originalLocale = Lang.CurrentLocale;
+        var originalEnglish = Lang.AvailableLanguages.GetValueOrDefault("en");
         try
         {
-            // Compose creates the options component and its popup-owned controls/resources.
-            options.ComposeElements(ctx, surface);
-            int texturesWithOptions = f.TextureCount;
-            Assert.True(texturesWithOptions > texturesBefore);
+            // Arrange only the services required by the real options control and its owned popup resources.
+            var translations = new Mock<ITranslationService>();
+            translations.Setup(value => value.Get(It.IsAny<string>(), It.IsAny<object[]>()))
+                .Returns((string key, object[] _) => key);
+            Lang.AvailableLanguages["en"] = translations.Object;
+            Lang.ChangeLanguage("en");
 
-            // Recomposition must reuse resources rather than accumulate new owned textures.
-            options.ComposeElements(ctx, surface);
-            Assert.Equal(texturesWithOptions, f.TextureCount);
+            var boolSettings = new Mock<ISettingsClass<bool>>();
+            boolSettings.Setup(value => value.Get(It.IsAny<string>(), It.IsAny<bool>()))
+                .Returns((string _, bool defaultValue) => defaultValue);
+            var intSettings = new Mock<ISettingsClass<int>>();
+            intSettings.Setup(value => value.Get(It.IsAny<string>(), It.IsAny<int>()))
+                .Returns((string _, int defaultValue) => defaultValue);
+            var settings = new Mock<ISettings>();
+            settings.SetupGet(value => value.Bool).Returns(boolSettings.Object);
+            settings.SetupGet(value => value.Int).Returns(intSettings.Object);
+            f.Api.SetupGet(value => value.Settings).Returns(settings.Object);
+
+            byte[] optionsSvg = Encoding.UTF8.GetBytes(
+                """<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1" viewBox="0 0 1 1"><path d="M0 0h1v1H0z"/></svg>""");
+            var asset = Mock.Of<IAsset>(value => value.Data == optionsSvg);
+            var assets = new Mock<IAssetManager>();
+            assets.Setup(value => value.Get(new AssetLocation("vanillaexpanded:textures/gui/recipe-book-options.svg")))
+                .Returns(asset);
+            f.Api.SetupGet(value => value.Assets).Returns(assets.Object);
+            f.Gui.SetupGet(value => value.Icons).Returns(new IconUtil(f.Api.Object));
+            f.Gui.Setup(value => value.CreateCompo(It.IsAny<string>(), It.IsAny<ElementBounds>()))
+                .Returns((string name, ElementBounds bounds) =>
+                    (GuiComposer)Activator.CreateInstance(typeof(GuiComposer),
+                        BindingFlags.Instance | BindingFlags.NonPublic, null,
+                        new object[] { f.Api.Object, bounds, name }, null)!);
+            f.Render.Setup(value => value.BitmapCreateFromPng(It.IsAny<byte[]>()))
+                .Returns(() => new BitmapExternal(2, 2));
+
+            using var surface = new ImageSurface(Format.Argb32, 1, 1);
+            using var ctx = new Context(surface);
+            int texturesBefore = f.Textures.Count;
+            var options = new GuiElementRecipeBookOptions(f.Api.Object,
+                ElementBounds.Fixed(40.3, 10.3, 17, 17).WithEmptyParent());
+            try
+            {
+                // Act: compose the real options component and its popup-owned controls/resources.
+                options.ComposeElements(ctx, surface);
+                int texturesWithOptions = f.Textures.Count;
+
+                // Assert resources were allocated by composition.
+                Assert.True(texturesWithOptions > texturesBefore);
+
+                // Act: recompose without replacing the options component.
+                options.ComposeElements(ctx, surface);
+
+                // Assert recomposition reuses resources rather than accumulating new owned textures.
+                Assert.Equal(texturesWithOptions, f.Textures.Count);
+            }
+            finally
+            {
+                options.Dispose();
+            }
+
+            // Assert disposal releases every texture owned by the options component.
+            Assert.Equal(texturesBefore, f.Textures.Count);
         }
         finally
         {
-            options.Dispose();
+            if (originalEnglish == null) Lang.AvailableLanguages.Remove("en");
+            else Lang.AvailableLanguages["en"] = originalEnglish;
+            Lang.ChangeLanguage(originalLocale);
         }
-        Assert.Equal(texturesBefore, f.TextureCount);
     }
 
     [Theory]

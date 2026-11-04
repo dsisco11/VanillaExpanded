@@ -152,22 +152,25 @@ Scope and constraints:
 
 ## Phase 4: Decouple retained behavior from native Cairo
     Prerequisite: assertion dispositions for each affected batch.
-    [ ] Replace broad menu/composer fixtures with focused fixtures for session state,
+    Native dependency decision: [Phase 4 residuals](CairoTestInventory.md#7-phase-4-native-dependency-decision).
+    The user approved focused native behavioral residuals, not pixel/presentation
+    exceptions or an optional native-backed test lane.
+    [x] Replace broad menu/composer fixtures with focused fixtures for session state,
         filtering, selection, options persistence, lifecycle, and cache policy.
-    [ ] Reuse existing RecipeBookSession, RecipeBookLayout, RecipeBookLayoutCache,
+    [x] Reuse existing RecipeBookSession, RecipeBookLayout, RecipeBookLayoutCache,
         and RecipeBookIconCache boundaries before introducing new abstractions.
-    [ ] Remove real TextTextureUtil, font creation, and eager composition from fixtures
+    [x] Remove real TextTextureUtil, font creation, and eager composition from fixtures
         whose remaining behavioral contracts do not require them.
-    [ ] Drive icon scheduling, request budgets, completion, reload, and disposal through
+    [x] Drive icon scheduling, request budgets, completion, reload, and disposal through
         mocked atlas/render boundaries without unrelated text or tile composition.
-    [ ] Evaluate separating measured text inputs from layout arithmetic where necessary;
+    [x] Evaluate separating measured text inputs from layout arithmetic where necessary;
         keep real font handling in production and avoid hardcoded fake production metrics.
-    [ ] Assess remaining real-control input/composition tests individually. Preserve
+    [x] Assess remaining real-control input/composition tests individually. Preserve
         functional wiring coverage rather than replacing every real collaborator
         with a mock and claiming equivalent verification.
-    [ ] Do not bypass static initialization, fabricate uninitialized engine objects,
+    [x] Do not bypass static initialization, fabricate uninitialized engine objects,
         patch native calls globally, or silently swallow library-loading errors.
-    [ ] Record each residual Cairo dependency with its retained behavioral purpose.
+    [x] Record each residual Cairo dependency with its retained behavioral purpose.
         Obtain a decision on unresolved cases before retiring meaningful coverage
         or introducing an optional native-backed suite.
     Completion:

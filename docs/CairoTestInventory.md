@@ -2,6 +2,8 @@
 
 This is the decision record for [cleanup Phase 1](CairoTestCleanup.todo).
 It records work for later phases; it does not authorize or claim test removal.
+Sections 1-6 retain the historical Phase 1 inventory. Section 7 records the
+subsequent Phase 4 native-dependency decision against the retained tests.
 
 ## Policy and interpretation
 
@@ -501,8 +503,8 @@ SkiaSharp is separate (test project 31-34, 92); the menu bitmap factory at
 144-145 is a potential Skia path, not Cairo evidence.
 
 The [CI workflow](../.github/workflows/build.yml) runs unfiltered tests on Linux.
-There is no established category-based Cairo-free lane. No permanent native
-exception or separate lane is approved by this inventory.
+There is no established category-based Cairo-free lane. At Phase 1, no native
+exception or separate lane was approved; see section 7 for the later decision.
 
 ## 6. Handoff and Phase 1 traceability
 
@@ -526,3 +528,85 @@ callbacks, editing, focus, disabled/hidden behavior, state persistence, actual
 hit/scissor agreement, reachability/limits, stale-press cancellation, scheduling,
 reload generations, ownership/disposal, non-mutation, and failure restoration.
 Do not treat a reduced test count as evidence that those obligations are met.
+
+## 7. Phase 4 native dependency decision
+
+On 2026-11-04, the user selected: "Approve focused native behavioral residuals;
+document each dependency and purpose." This approval applies to the actual
+engine/control, measured-text, resource-ownership, and drawing-context contracts
+below. It does not permit pixel-output or presentation-only assertions, approve
+an optional native-backed suite, or make test category a capability selector.
+These tests remain part of the existing test selection.
+
+The table identifies current test methods by suite. "All tests" includes each
+fact/theory in that suite, not shared helpers or unrelated managed suites.
+The historical method dispositions in sections 1-2 continue to define the
+behavior to preserve, not appearance baselines.
+
+### Approved residuals
+
+| Current test scope | Native entry | Retained behavioral purpose |
+| --- | --- | --- |
+| [GuiControlVisualsTests](../VanillaExpanded.Tests/Unit/Gui/GuiControlVisualsTests.cs): `FrameRestoresCallerContextState` only | Real `ImageSurface`/`Context`, then `GuiControlDrawing.Frame` | Verify restoration of the caller's actual Cairo context state. Invalid-input and color-conversion tests do not require drawing resources. |
+| [GuiElementIconTabsTests](../VanillaExpanded.Tests/Component/Gui/GuiElementIconTabsTests.cs): all tests | Real tab fonts, child composer, hints, and tab texture generation | Native selection/input/focus, clipped hit routing, selected-tab containment, overflow/reachability, host-clip restoration, and resource reuse/disposal. `MeasureWidth` arithmetic alone is not the reason for this exception. |
+| [GuiStyledControlStateRenderingTests](../VanillaExpanded.Tests/Component/Gui/GuiStyledControlStateRenderingTests.cs): both tests | `ControlsFixture.Compose` and real styled controls | Actual dropdown selection transitions and scrollbar capture/cancellation, with stable resources and cleanup. |
+| [GuiStyledControlsNativeCompatibilityTests](../VanillaExpanded.Tests/Integration/Gui/GuiStyledControlsNativeCompatibilityTests.cs): all tests | Native/styled control constructors, fonts, editing measurement, and composition | Verify opt-in control wiring, caller labels, activation, editing, callbacks, tab/focus routing, scrolling, clipped hit targets, and resource ownership. |
+| [GuiControlNativeProbeTests](../VanillaExpanded.Tests/Integration/Gui/GuiControlNativeProbeTests.cs): all tests | Real engine controls, fonts, scratch contexts, and composer composition | Actual native button/input/list/tab/title behavior, including editing, drag persistence, close, focus, and hit-region agreement. |
+| [GuiElementIconTabsComposerIntegrationTests](../VanillaExpanded.Tests/Integration/Gui/GuiElementIconTabsComposerIntegrationTests.cs): its single test | Native composer and tab composition | Composer/bounds ownership, recomposition stability, and child texture disposal. |
+| [RecipeBookBrowsingRestorationTests](../VanillaExpanded.Tests/Component/RecipeBook/RecipeBookBrowsingRestorationTests.cs): all tests | Enabled `MenuFixture`, opener and real dialog composition | Restoration through actual parent/menu opening, closure, failed opening, and composer replacement, including control state and current inventory. |
+| [RecipeBookCategoryPresentationTests](../VanillaExpanded.Tests/Component/RecipeBook/RecipeBookCategoryPresentationTests.cs): both tests | Enabled `MenuFixture`, category tabs and localized heading composition | Actual category-code routing despite excluded/duplicate labels, localized hints/headings, and selection/search retention through resize/reopen. |
+| [RecipeBookDialogFeedbackTests](../VanillaExpanded.Tests/Component/RecipeBook/RecipeBookDialogFeedbackTests.cs): all tests | Real menu, footer/search/filter controls, and tooltip composition | Actual feedback actions, filter/control wiring, live-inventory refresh, disabled actions, hint hit regions, tooltip focus dismissal, and alternative-count content. |
+| [RecipeBookDialogLayoutTests](../VanillaExpanded.Tests/Component/RecipeBook/RecipeBookDialogLayoutTests.cs): all tests | Dialog font/text measurement and real composer/control construction | Measured label fit, usable/nonoverlapping controls, native viewport/hit/scissor agreement, and focus/row-anchor restoration across layout changes. |
+| [RecipeBookHandbookActionTests](../VanillaExpanded.Tests/Component/RecipeBook/RecipeBookHandbookActionTests.cs): both tests | Real menu and handbook control | Actual button callback/error wiring and disabled state for unresolved output previews. |
+| [RecipeBookLayoutCacheDialogTests](../VanillaExpanded.Tests/Component/RecipeBook/RecipeBookLayoutCacheDialogTests.cs): both tests | `GuiDialogRecipeBook.MeasureLayout` and actual dialog composition | Verify the dialog hands validated settings/live scale to its cache and accepts actual composed bounds. The separate cache tests cover arithmetic/invalidation without these fonts. |
+| [RecipeBookLayoutLifecycleTests](../VanillaExpanded.Tests/Component/RecipeBook/RecipeBookLayoutLifecycleTests.cs): all tests | Real dialog measurements, composer, options popup, and render lifecycle | Actual compositor reuse/invalidation, moved hit regions, view/focus continuity, attachment failure, insufficient-space closure, and rejected-input feedback across recomposition. |
+| [RecipeBookOpenerStateTests](../VanillaExpanded.Tests/Component/RecipeBook/RecipeBookOpenerStateTests.cs): all tests | Font-backed opener and attached dialog composition | Actual opener press/release/cancellation, failed-open usability, and open-state synchronization. |
+| [RecipeBookOptionsTests](../VanillaExpanded.Tests/Component/RecipeBook/RecipeBookOptionsTests.cs): all tests | Real options fonts/SVG/context and popup composition; real menu for interaction cases | Options-owned texture lifetime and actual keyboard/mouse/wheel/focus routing, validation feedback, setting persistence/application, anchor retention, and parent-close cleanup. The texture-only case uses focused GUI services, not a world/menu fixture. |
+| [RecipeBookSearchClearTests](../VanillaExpanded.Tests/Component/RecipeBook/RecipeBookSearchClearTests.cs): its single test | Real menu/search input composition | Verify clear activation requires an uninterrupted left-button gesture on the actual input control. |
+| [RecipeBookSessionOwnershipTests](../VanillaExpanded.Tests/Component/RecipeBook/RecipeBookSessionOwnershipTests.cs): `SessionFilterRegistrationsSurviveRecompositionAndAreReleasedWithTheDialog` only | Real dialog composer replacement | Prove dialog-owned filter registrations survive recomposition and are released with the dialog. Independent session ownership remains tested without a menu. |
+| [RecipeBookSystemLifecycleTests](../VanillaExpanded.Tests/Component/RecipeBook/RecipeBookSystemLifecycleTests.cs): `DisablingLiveDisposesSystemAndBlocksReactivationUntilReload`, `UnrelatedConfigReloadKeepsEnabledSystemAndExistingMenu`, `WorldCleanupDetachesRestorationAndInvalidatesQueuedRecomposition` only | Enabled `MenuFixture`, actual menu attachment/recomposition | Live system/menu disposal, preservation on unrelated reload, and cancellation of queued restoration/recomposition. Disabled-startup and world-cache policy tests use focused lifecycle setup. |
+| [RecipeBookDialogCleanupTests](../VanillaExpanded.Tests/Component/RecipeBook/RecipeBookDialogCleanupTests.cs): `NativeTilesFitAndClipVisibleIconsAndDisposeTheirTexturesAndSubscriptions` only | Real tile construction and drawing/composition resources | Actual tile clipping, shader restoration, request bounds, resource reuse/release, and callback detachment. Queued inventory-work cleanup uses an owned uncomposed composer. |
+| [RecipeBookIconCacheTests](../VanillaExpanded.Tests/Component/RecipeBook/RecipeBookIconCacheTests.cs): `ScrollingRetainsRecentPreviewsAndReloadsRebuildOwnedResources`, `DisposedTileRetainsDeferredIconCompletionUntilWorldCacheDisposal`, `ClosingAndReopeningTheMenuReusesTheWorldsBakedIcons`, `AtlasSubmissionsRunBeforeGuiDrawingAndPublishOnlyOnNativeCompletion` only | Real tile consumer constructors create fonts; renderer may generate quantity labels | Preserve the tile-to-cache boundary: viewport-driven requests, renderer ownership/reload, consumer disposal before deferred completion, reuse across consumers, and actual submission/draw ordering. Other cache-policy tests request entries directly without tile/text composition. |
+| [RecipeBookIconRendererTests](../VanillaExpanded.Tests/Component/RecipeBook/RecipeBookIconRendererTests.cs): all tests | Real tiles create fonts; renderer generates real quantity-label textures for outputs greater than one | Actual tile-to-renderer/cache handoff, size/status/selection mapping, independent quantity-resource lifetime, viewport/tile clipping, and shader/scissor/resource restoration on failures. No font or shader appearance values are approved. |
+| [RecipeBookTilesGeometryTests](../VanillaExpanded.Tests/Component/RecipeBook/RecipeBookTilesGeometryTests.cs): all tests | Real tile constructors create fonts | Actual native button hit regions, first/last item reachability, partial-row clipping, anchor/inspection/focus restoration, and held-press cancellation. |
+| [RecipeBookTilesInteractionTests](../VanillaExpanded.Tests/Component/RecipeBook/RecipeBookTilesInteractionTests.cs): all tests | Real tile constructors create fonts | Actual native container/button rebinding, virtualization, focus/hover recovery, clipped clicks, scroll limits, and stale-press rejection. |
+| [RecipeBookTooltipCompositionTests](../VanillaExpanded.Tests/Component/RecipeBook/RecipeBookTooltipCompositionTests.cs): all tests | Real menu, tooltip fonts, rich text/native grid composition | Measured/wrapped summary fit and refresh, warning/description content, and safe preview/grid construction with unresolved or absent output. |
+| [RecipeBookDialogNativeInputTests](../VanillaExpanded.Tests/Integration/RecipeBook/RecipeBookDialogNativeInputTests.cs): all tests | Real menu/composer and native controls | Actual native drag/movement, search editing, category/sort/checkbox/options input, scrolling, focus/tab/hotkey routing, SVG registration, and texture lifetimes. |
+| [RecipeBookTileNativeInputTests](../VanillaExpanded.Tests/Integration/RecipeBook/RecipeBookTileNativeInputTests.cs): both tests | Real tiles and native scrollbar/control construction | Actual mouse/keyboard/shift activation, focus visibility, and refresh deferral. |
+| [RecipeBookNativeBoundsCompatibilityTests](../VanillaExpanded.Tests/Integration/RecipeBook/RecipeBookNativeBoundsCompatibilityTests.cs): first three tests only | Real menu/options popup composition | Native hit/render/scissor translation and retained focus without unnecessary recomposition. `NativeRootCalculationLeavesInitializedChildrenAloneAndRepairsAnExplicitlyDirtyChild` uses bounds only and is not a native-Cairo exception. |
+| [RecipeBookNativeTooltipIntegrationTests](../VanillaExpanded.Tests/Integration/RecipeBook/RecipeBookNativeTooltipIntegrationTests.cs): all tests | Real native tooltip fonts, rich text and recipe-grid composition | Native tooltip content/choice resolution, measured wrapping/containment, and replacement-preview ownership. |
+| [RecipeBookNativePopupLayeringTests](../VanillaExpanded.Tests/Integration/RecipeBook/RecipeBookNativePopupLayeringTests.cs): its single test | Real dropdown popup and quantity-label textures | Verify relative popup occlusion and balanced clipping against actual quantity labels, not absolute drawing-depth constants. |
+| [RecipeBookHandbookIntegrationTests](../VanillaExpanded.Tests/Integration/RecipeBook/RecipeBookHandbookIntegrationTests.cs): its single test | Real menu/handbook button | Native mouse/keyboard activation of the selected output's handbook page without crafting placement. |
+| [NativeTranslationCacheCompatibilityTests](../VanillaExpanded.Tests/Integration/RecipeBook/NativeTranslationCacheCompatibilityTests.cs): `RecipeBookRecomposesAfterNativeSameLocaleTranslationReloads` only | Actual dialog remeasurement/recomposition after translation reload | Prove same-locale native translation reload invalidates the real dialog while retaining browsing state. The independent translation-service test does not require Cairo. |
+
+### Boundary decisions
+
+- Retain `RecipeBookSession`, `RecipeBookLayout`, `RecipeBookLayoutCache`, and
+  `RecipeBookIconCache` as the managed policy boundaries. Cache request budgets,
+  generations, completion/retry, size keys, and world-cache disposal do not need
+  tile consumers merely to request an icon.
+- Constructing an uncomposed `GuiComposer` normally is sufficient for disabled
+  attachment and queued-work cleanup. `CreateEmpty` is not a managed replacement:
+  it invokes real composition.
+- `GuiRenderFixture.TextTexture` is lazy. Access still returns the real engine
+  service; generation remains native. Its managed constructor alone was not a
+  Cairo entry in the first place.
+- Tile buttons inherit the engine's text-button implementation, whose normal
+  constructor requires fonts. Replacing that control merely to remove constructor
+  font initialization would change the native input/focus boundary being tested.
+  The approved tile-consumer cases retain that dependency explicitly.
+- Layout arithmetic and cache invalidation already accept measured dimensions
+  or a measurement callback. Injecting pretend text metrics into dialog-fit
+  tests would not verify real localized text containment; production keeps its
+  real font and multiline measurement paths. No new measurement abstraction is
+  needed for the managed layout/cache coverage.
+- Imports, Cairo types in mocked method signatures, managed texture wrappers,
+  GUI-scale/thread scopes, native bounds arithmetic, and inventory/network
+  interoperability are not independently evidence of native Cairo execution.
+  The approval does not extend to other methods merely sharing a file, fixture
+  type, or test category.
+
+This decision does not claim Cairo elimination. Dependency/CI alignment belongs
+to Phase 5; clean-process dependency checks and Windows/Linux execution belong
+to Phase 6. Retained native behavioral coverage still needs a resolvable Cairo
+library in the environments that execute it.

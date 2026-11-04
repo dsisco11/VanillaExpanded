@@ -1,15 +1,12 @@
-using Cairo;
 using Moq;
 using VanillaExpanded.RecipeBook;
 using VanillaExpanded.Tests.TestSupport.Gui;
 using VanillaExpanded.Tests.TestSupport.RecipeBook;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
-using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.Client.NoObf;
 using VanillaExpanded.Tests;
-using VanillaExpanded.Tests.TestSupport.Configuration;
 using static VanillaExpanded.Tests.TestSupport.RecipeBook.RecipeBookIconRendererTestsTestSupport;
 
 namespace VanillaExpanded.Tests.Component.RecipeBook;
@@ -63,30 +60,58 @@ public sealed class RecipeBookIconCacheTests
     }
 
     [Fact]
-    public void DeferredPreviewsSurviveMenuClosureAndAreReleasedAtWorldExit()
+    public void WorldExitReleasesDeferredIconCompletions()
     {
+        // Arrange pending atlas work without constructing a tile or a text resource.
         using var graphics = new RecipeBookRenderFixture { CompleteOnFrame = false };
         var f = new AllocationFixture();
         var recipes = Enumerable.Range(1, 9)
             .Select(id => f.Recipe(f.Ingredient(f.Stack(id, "input-" + id, 1)))).ToArray();
         f.Register(recipes);
-        var session = new RecipeBookSession(f.Catalogue.Build(recipes), f.Allocator,
+        var entries = f.Catalogue.Build(recipes).Recipes;
+        foreach (var entry in entries)
+            graphics.Cache.Get(entry, 46, allowQueue: true, out _);
+
+        // Act: submit the outstanding work, then dispose its world-owned cache before callbacks arrive.
+        graphics.BeforeFrame();
+        Assert.Equal(4, graphics.Bakes.Count);
+        graphics.Cache.Dispose();
+
+        // Assert deferred atlas callbacks release allocations instead of publishing orphaned entries.
+        foreach (var bake in graphics.Bakes) graphics.Complete(bake);
+        Assert.Empty(graphics.Allocations);
+    }
+
+    [Fact]
+    public void DisposedTileRetainsDeferredIconCompletionUntilWorldCacheDisposal()
+    {
+        // Arrange
+        // A real tile consumer whose atlas callback remains deferred after the tile is disposed.
+        using var graphics = new RecipeBookRenderFixture { CompleteOnFrame = false };
+        var f = new AllocationFixture();
+        var recipe = f.Recipe(f.Ingredient(f.Stack(1, "input", 1)));
+        f.Register(recipe);
+        var catalogue = f.Catalogue.Build(recipe);
+        var entry = Assert.Single(catalogue.Recipes);
+        var session = new RecipeBookSession(catalogue, f.Allocator,
             () => f.Snapshot(), (_, _) => throw new InvalidOperationException());
         session.Refresh();
-        var tiles = CreateTiles(graphics, session);
-        graphics.Frame(tiles);
-        Assert.Empty(graphics.Bakes);
-        graphics.Frame(tiles);
-        tiles.Scroll(50);
-        graphics.Warm(tiles, 2);
-        Assert.Equal(4, graphics.Bakes.Count);
-        graphics.Complete(graphics.Bakes[0]);
-        Assert.Single(graphics.Allocations);
-        graphics.Warm(tiles, 2);
+        using var tiles = CreateTiles(graphics, session);
+        int previewSize = RecipeBookTileGeometry.PreviewSize(GuiElement.scaled(1), tiles.TileSize);
+        tiles.RenderInteractiveElements(0);
+        graphics.BeforeFrame();
+        Assert.Single(graphics.Bakes);
+
+        // Act
+        // Close the tile consumer while the world-owned icon cache remains alive, then complete atlas work.
         tiles.Dispose();
-        Assert.Equal(5, graphics.Bakes.Count);
-        foreach (var bake in graphics.Bakes.Skip(1)) graphics.Complete(bake);
-        Assert.Equal(5, graphics.Allocations.Count);
+        foreach (var bake in graphics.Bakes) graphics.Complete(bake);
+
+        // Assert
+        // The cache retains the published allocation until its own world-lifetime disposal.
+        Assert.Single(graphics.Allocations);
+        Assert.NotNull(graphics.Cache.Get(entry, previewSize, allowQueue: false, out bool queued));
+        Assert.False(queued);
         graphics.Cache.Dispose();
         Assert.Empty(graphics.Allocations);
     }
@@ -94,63 +119,82 @@ public sealed class RecipeBookIconCacheTests
     [Fact]
     public void BakingBudgetAndPendingAllocationsDoNotDuplicateRequests()
     {
-        using var graphics = new RecipeBookRenderFixture();
+        using var graphics = new RecipeBookRenderFixture { CompleteOnFrame = true };
         var f = new AllocationFixture();
         var recipes = Enumerable.Range(1, 10)
             .Select(id => f.Recipe(f.Ingredient(f.Stack(id, "input-" + id, 1)))).ToArray();
         f.Register(recipes);
-        var session = new RecipeBookSession(f.Catalogue.Build(recipes), f.Allocator,
-            () => f.Snapshot(), (_, _) => throw new InvalidOperationException());
-        session.Refresh();
-        using var tiles = CreateTiles(graphics, session, rows: 3);
-        foreach (var (submitted, ready) in new[] { (0, 0), (4, 0), (4, 4), (8, 4), (8, 8), (9, 8), (9, 9) })
+        var entries = f.Catalogue.Build(recipes).Recipes;
+        // Arrange ten distinct keys so more than one bounded request batch is required.
+        int ready = 0;
+        while (ready < entries.Length)
         {
+            // Act: repeatedly request every entry while the current batch is outstanding.
+            int queued = 0;
+            foreach (var entry in entries)
+            {
+                graphics.Cache.Get(entry, 46, allowQueue: true, out bool wasQueued);
+                if (wasQueued) queued++;
+            }
+            int expectedBatch = Math.Min(RecipeBookIconCache.BakesPerFrame, entries.Length - ready);
+            Assert.Equal(expectedBatch, queued);
+
+            // Act: submit the outstanding batch and observe its completion.
             graphics.BeforeFrame();
-            tiles.RenderInteractiveElements(0);
-            int requestSize = RecipeBookTileGeometry.PreviewSize(GuiElement.scaled(1), tiles.TileSize);
-            int published = session.Rows.Count(row =>
-                graphics.Cache.Get(row.Recipe, requestSize, allowQueue: false, out _) != null);
-            Assert.Equal(ready, published);
+            Assert.Equal(ready + expectedBatch, graphics.Bakes.Count);
+            foreach (var entry in entries)
+            {
+                graphics.Cache.Get(entry, 46, allowQueue: true, out bool wasQueued);
+                Assert.False(wasQueued);
+            }
             graphics.EndFrame();
-            Assert.Equal(submitted, graphics.Bakes.Count);
-            Assert.Equal(submitted, graphics.Allocations.Count);
+
+            ready += expectedBatch;
+            Assert.Equal(ready, graphics.Allocations.Count);
+            Assert.Equal(ready, entries.Count(entry =>
+                graphics.Cache.Get(entry, 46, allowQueue: false, out _) != null));
         }
-        tiles.RenderInteractiveElements(0);
-        Assert.Equal(9, graphics.Bakes.Count);
-        tiles.Scroll(50);
-        graphics.Warm(tiles, 3);
-        Assert.Equal(10, graphics.Bakes.Count);
     }
 
     [Fact]
-    public void AllVisitedPreviewsSurviveLongScrollsAndReturns()
+    public void AllRequestedPreviewsRemainCachedAfterLargeBatchesAndReturns()
     {
         using var graphics = new RecipeBookRenderFixture();
         var f = new AllocationFixture();
-        const int count = 300;
+        const int count = 40;
+        // Arrange enough distinct entries to exercise several cache request batches.
         var recipes = Enumerable.Range(1, count)
             .Select(id => f.Recipe(f.Ingredient(f.Stack(id, "input-" + id, 1)))).ToArray();
         f.Register(recipes);
-        var session = new RecipeBookSession(f.Catalogue.Build(recipes), f.Allocator,
-            () => f.Snapshot(), (_, _) => throw new InvalidOperationException());
-        session.Refresh();
-        using var tiles = CreateTiles(graphics, session);
-        for (int row = 0; row < count / 3; row++)
+        var entries = f.Catalogue.Build(recipes).Recipes;
+
+        // Act: request every entry over multiple bounded atlas submissions.
+        int ready = 0;
+        while (ready < count)
         {
-            tiles.Scroll(row * 50);
-            graphics.Warm(tiles, 3);
-            Assert.Equal((row + 1) * 3, graphics.Allocations.Count);
+            foreach (var entry in entries)
+                graphics.Cache.Get(entry, 46, allowQueue: true, out _);
+            int expectedReady = Math.Min(ready + RecipeBookIconCache.BakesPerFrame, count);
+
+            // Act: submit one bounded batch.
+            graphics.BeforeFrame();
+            Assert.Equal(expectedReady, graphics.Bakes.Count);
+            graphics.EndFrame();
+            ready = expectedReady;
+
+            // Assert only completed submissions own atlas allocations.
+            Assert.Equal(ready, graphics.Allocations.Count);
+        }
+
+        // Act: revisit every previously requested entry without allowing new submissions.
+        foreach (var entry in entries)
+        {
+            Assert.NotNull(graphics.Cache.Get(entry, 46, allowQueue: false, out bool queued));
+            Assert.False(queued);
         }
         Assert.Equal(count, graphics.Bakes.Count);
-        Assert.All(graphics.Bakes, bake => Assert.Contains(bake.Id, graphics.Allocations));
-        for (int row = count / 3 - 1; row >= 0; row--)
-        {
-            tiles.Scroll(row * 50);
-            graphics.Warm(tiles, 3);
-            Assert.Equal(count, graphics.Bakes.Count);
-        }
-        tiles.Dispose();
-        Assert.Equal(count, graphics.Allocations.Count);
+
+        // Assert cache disposal remains the sole owner that releases the published allocations.
         graphics.Cache.Dispose();
         Assert.Empty(graphics.Allocations);
     }
@@ -180,23 +224,38 @@ public sealed class RecipeBookIconCacheTests
     }
 
     [Fact]
-    public void GuiScaleChangesRetainBothSizesAndReturningToTheOldScaleDoesNotRebake()
+    public void DistinctPreviewSizesRetainSeparateCacheEntriesAndReusePriorSizes()
     {
         using var graphics = new RecipeBookRenderFixture();
         var f = new AllocationFixture();
         var recipe = f.Recipe(f.Ingredient(f.Stack(1, "board", 1)));
         f.Register(recipe);
-        var session = new RecipeBookSession(f.Catalogue.Build(recipe), f.Allocator,
-            () => f.Snapshot(), (_, _) => throw new InvalidOperationException());
-        session.Refresh();
-        using (var first = CreateTiles(graphics, session)) graphics.Warm(first, 3);
-        RuntimeEnv.GUIScale = 1.5f;
-        using (var scaled = CreateTiles(graphics, session)) graphics.Warm(scaled, 3);
+        var entry = Assert.Single(f.Catalogue.Build(recipe).Recipes);
+
+        // Arrange two caller-selected size keys.
+        // Act: request and complete each size independently.
+        Assert.Null(graphics.Cache.Get(entry, 31, allowQueue: true, out bool firstQueued));
+        Assert.True(firstQueued);
+        graphics.BeforeFrame();
+        graphics.EndFrame();
+        var first = graphics.Cache.Get(entry, 31, allowQueue: false, out _);
+        Assert.NotNull(first);
+
+        Assert.Null(graphics.Cache.Get(entry, 59, allowQueue: true, out bool secondQueued));
+        Assert.True(secondQueued);
+        graphics.BeforeFrame();
+        graphics.EndFrame();
+        var second = graphics.Cache.Get(entry, 59, allowQueue: false, out _);
+        Assert.NotNull(second);
+
+        // Assert distinct size keys remain independently addressable, and revisiting either does not rebake.
         Assert.Equal(2, graphics.Bakes.Count);
         Assert.Equal(2, graphics.Allocations.Count);
-        RuntimeEnv.GUIScale = 1;
-        using var restored = CreateTiles(graphics, session);
-        restored.RenderInteractiveElements(0);
+        Assert.NotSame(first, second);
+        Assert.Same(first, graphics.Cache.Get(entry, 31, allowQueue: true, out bool queued));
+        Assert.False(queued);
+        Assert.Same(second, graphics.Cache.Get(entry, 59, allowQueue: true, out queued));
+        Assert.False(queued);
         Assert.Equal(2, graphics.Bakes.Count);
         Assert.Equal(2, graphics.Allocations.Count);
     }
@@ -210,31 +269,36 @@ public sealed class RecipeBookIconCacheTests
         var recipes = Enumerable.Range(1, 6)
             .Select(id => f.Recipe(f.Ingredient(f.Stack(id, "input-" + id, 1)))).ToArray();
         f.Register(recipes);
-        var session = new RecipeBookSession(f.Catalogue.Build(recipes), f.Allocator,
-            () => f.Snapshot(), (_, _) => throw new InvalidOperationException());
-        session.Refresh();
-        using var tiles = CreateTiles(graphics, session, rows: 2);
-        graphics.Warm(tiles, 2);
+        var entries = f.Catalogue.Build(recipes).Recipes;
+
+        // Arrange a pending first batch directly at the cache boundary.
+        foreach (var entry in entries)
+            graphics.Cache.Get(entry, 46, allowQueue: true, out _);
+        graphics.BeforeFrame();
         Assert.Equal(4, graphics.Bakes.Count);
 
         // Act: invalidate that request generation, then fill a fresh batch after atlas reload.
         graphics.Events.Raise(value => value.ReloadTextures += null);
-        graphics.Warm(tiles, 2);
+        foreach (var entry in entries)
+            graphics.Cache.Get(entry, 46, allowQueue: true, out _);
+        graphics.BeforeFrame();
         Assert.Equal(8, graphics.Bakes.Count);
 
         // Assert late callbacks from the old generation cannot allocate slots or free new capacity.
         foreach (var bake in graphics.Bakes.Take(4)) graphics.Complete(bake);
         Assert.Empty(graphics.Allocations);
-        graphics.Frame(tiles);
+        foreach (var entry in entries)
+            graphics.Cache.Get(entry, 46, allowQueue: true, out _);
+        graphics.BeforeFrame();
         Assert.Equal(8, graphics.Bakes.Count);
 
         // Act: complete a current-generation request and verify its released slot can be reused.
         graphics.Complete(graphics.Bakes[4]);
-        graphics.Warm(tiles, 2);
+        foreach (var entry in entries)
+            graphics.Cache.Get(entry, 46, allowQueue: true, out _);
+        graphics.BeforeFrame();
         Assert.Equal(9, graphics.Bakes.Count);
-
-        // Act: dispose both cache consumers before the remaining current-generation callbacks arrive.
-        tiles.Dispose();
+        // Act: dispose the cache before remaining current-generation callbacks arrive.
         graphics.Cache.Dispose();
         foreach (var bake in graphics.Bakes.Skip(5)) graphics.Complete(bake);
 
@@ -249,65 +313,66 @@ public sealed class RecipeBookIconCacheTests
         var f = new AllocationFixture();
         var recipe = f.Recipe(f.Ingredient(f.Stack(1, "board", 1)));
         f.Register(recipe);
-        var session = new RecipeBookSession(f.Catalogue.Build(recipe), f.Allocator,
-            () => f.Snapshot(), (_, _) => throw new InvalidOperationException());
-        session.Refresh();
-        using var tiles = CreateTiles(graphics, session);
-        graphics.Warm(tiles, 3);
+        var entry = Assert.Single(f.Catalogue.Build(recipe).Recipes);
+
+        // Arrange a completed allocation and replace its atlas position with a foreign owner.
+        Assert.Null(graphics.Cache.Get(entry, 46, allowQueue: true, out bool queued));
+        Assert.True(queued);
+        graphics.BeforeFrame();
+        graphics.EndFrame();
         int foreignId = Assert.Single(graphics.Allocations);
         graphics.ReplaceAtlasPosition(foreignId);
+
+        // Act: reload and request the same cache entry again.
         graphics.Events.Raise(value => value.ReloadTextures += null);
         Assert.Contains(foreignId, graphics.Allocations);
-        graphics.Warm(tiles, 3);
+        Assert.Null(graphics.Cache.Get(entry, 46, allowQueue: true, out queued));
+        Assert.True(queued);
+        graphics.BeforeFrame();
+        graphics.EndFrame();
         Assert.Equal(2, graphics.Allocations.Count);
-        tiles.Dispose();
         graphics.Cache.Dispose();
+        // Assert cleanup releases only the cache-owned replacement allocation.
         Assert.Equal(foreignId, Assert.Single(graphics.Allocations));
     }
 
     [Fact]
-    public void NativeSubmissionFailurePropagatesWithoutTouchingGuiStateAndCanRetry()
+    public void AtlasSubmissionFailurePropagatesWithoutChangingGuiStateAndAllowsRetry()
     {
-        // Arrange a render request whose native submission fails on every attempt.
+        // Arrange a cache-owned request whose mocked atlas submission fails once.
         using var graphics = new RecipeBookRenderFixture();
         var f = new AllocationFixture();
         var recipe = f.Recipe(f.Ingredient(f.Stack(1, "board", 1)));
         f.Register(recipe);
-        var session = new RecipeBookSession(f.Catalogue.Build(recipe), f.Allocator,
-            () => f.Snapshot(), (_, _) => throw new InvalidOperationException());
-        session.Refresh();
-        using var tiles = CreateTiles(graphics, session);
+        var entry = Assert.Single(f.Catalogue.Build(recipe).Recipes);
         var clip = ElementBounds.Fixed(0, 0, 144, 48);
         graphics.Clips.Push(clip);
         int attempts = 0;
         graphics.OnBake = () =>
         {
             attempts++;
-            throw new InvalidOperationException("submission failed");
+            if (attempts == 1) throw new InvalidOperationException("submission failed");
         };
 
-        // Act: retry submission twice while the injected boundary failure remains active.
-        tiles.RenderInteractiveElements(0);
+        // Act: submit the queued request and then explicitly queue its failed entry again.
+        Assert.Null(graphics.Cache.Get(entry, 46, allowQueue: true, out bool queued));
+        Assert.True(queued);
         Assert.Throws<InvalidOperationException>(() => graphics.BeforeFrame());
-        tiles.RenderInteractiveElements(0);
-        Assert.Throws<InvalidOperationException>(() => graphics.BeforeFrame());
+        Assert.Same(clip, Assert.Single(graphics.Clips));
+        graphics.Render.Verify(value => value.GlScissorFlag(It.IsAny<bool>()), Times.Never);
+        Assert.Null(graphics.Cache.Get(entry, 46, allowQueue: true, out queued));
+        Assert.True(queued);
+        graphics.BeforeFrame();
+        Assert.Empty(graphics.Allocations);
+        graphics.EndFrame();
 
-        // Assert failure leaves the GUI scissor and atlas allocation state untouched.
+        // Assert the retry was submitted and published after the original failure.
         Assert.Equal(2, attempts);
         Assert.Same(clip, Assert.Single(graphics.Clips));
         graphics.Render.Verify(value => value.GlScissorFlag(It.IsAny<bool>()), Times.Never);
-        Assert.Empty(graphics.Allocations);
-
-        // Act: remove the failure and retry the still-pending request.
-        graphics.OnBake = null;
-        tiles.RenderInteractiveElements(0);
-        graphics.BeforeFrame();
-        graphics.EndFrame();
         Assert.Single(graphics.Bakes);
         Assert.Single(graphics.Allocations);
-
-        // Assert the successful retry now has a cache entry for the displayed recipe.
-        Assert.NotNull(graphics.Cache.Get(Assert.Single(session.Rows).Recipe, 44, false, out _));
+        Assert.NotNull(graphics.Cache.Get(entry, 46, false, out _));
     }
 
     [Fact]

@@ -23,10 +23,12 @@ internal class GuiRenderFixture : IDisposable
     internal IShaderProgram? Active;
     private readonly float oldScale = RuntimeEnv.GUIScale;
     private readonly int oldThread = RuntimeEnv.MainThreadId;
+    private readonly Lazy<TextTextureUtil> textTexture;
     private int nextTexture;
 
     internal GuiRenderFixture(float scale = 1)
     {
+        textTexture = new(() => new TextTextureUtil(Api.Object));
         RuntimeEnv.GUIScale = scale;
         RuntimeEnv.MainThreadId = Environment.CurrentManagedThreadId;
         Api.SetupGet(value => value.Gui).Returns(Gui.Object);
@@ -34,7 +36,7 @@ internal class GuiRenderFixture : IDisposable
         Api.SetupGet(value => value.Event).Returns(Events.Object);
         Api.SetupGet(value => value.Input).Returns(Mock.Of<IInputAPI>());
         Api.SetupGet(value => value.Logger).Returns(Mock.Of<ILogger>());
-        Gui.SetupGet(value => value.TextTexture).Returns(new TextTextureUtil(Api.Object));
+        Gui.SetupGet(value => value.TextTexture).Returns(() => textTexture.Value);
         Gui.Setup(value => value.LoadOrUpdateCairoTexture(It.IsAny<ImageSurface>(), It.IsAny<bool>(),
             ref It.Ref<LoadedTexture>.IsAny)).Callback(new Upload((ImageSurface image, bool linear, ref LoadedTexture texture) =>
         {

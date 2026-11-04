@@ -123,7 +123,10 @@ public sealed class RecipeBookDialogCleanupTests
         grid.Open(f.F.Player);
         manager.Inventories.Add(grid.InventoryID, grid);
         using var parent = new ParentDialog(f.Api.Object);
-        using var composer = GuiComposer.CreateEmpty(f.Api.Object);
+        using var composer = (GuiComposer)Activator.CreateInstance(typeof(GuiComposer),
+            BindingFlags.Instance | BindingFlags.NonPublic, null,
+            new object[] { f.Api.Object, ElementBounds.Fixed(0, 0, 1920, 1080).WithEmptyParent(), "cleanup-inventory" },
+            null)!;
         for (int cycle = 0; cycle < 5; cycle++)
         {
             if (f.System.Catalogue == null) f.FinalizeWorld();
