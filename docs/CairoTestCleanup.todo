@@ -22,19 +22,23 @@ Scope and constraints:
 
 ## Phase 1: Confirm policy boundaries and inventory
     Prerequisite: none.
-    [ ] Confirm and document any allowed exceptions to the user's policies against
+    Policy confirmed by the user: no pixel-output or presentation-only exceptions,
+    including whole-buffer non-modification. Functional geometry is permitted when
+    tied to hit testing, clipping, viewport containment, reachability, and scroll limits.
+    Decision record: [CairoTestInventory](CairoTestInventory.md).
+    [x] Confirm and document any allowed exceptions to the user's policies against
         pixel-output and presentation-detail assertions before retaining such tests.
-        The exact exception rules have not yet been established in this discussion.
-    [ ] Inventory assertions across the test project, including shared assertion
+        No exceptions are approved.
+    [x] Inventory assertions across the test project, including shared assertion
         helpers, captured textures, surface buffers, sampled channels, and alpha.
-    [ ] Include non-pixel presentation assertions: palette values, font sizes,
+    [x] Include non-pixel presentation assertions: palette values, font sizes,
         decorative spacing, exact styling dimensions, and rendering command values.
-    [ ] Classify each suspect assertion as presentation-only, meaningful behavior,
+    [x] Classify each suspect assertion as presentation-only, meaningful behavior,
         or a mixed/ambiguous contract; resolve ambiguous cases against requirements.
-    [ ] Trace native Cairo entry points separately from assertion policy: font
+    [x] Trace native Cairo entry points separately from assertion policy: font
         initialization, text measurement, real composition, text texture generation,
         and fixtures that initialize these incidentally.
-    [ ] Record decisions by test method and shared fixture, including behavior to
+    [x] Record decisions by test method and shared fixture, including behavior to
         preserve and any approved exception. Do not use test category as a proxy
         for native dependencies.
     Completion:
