@@ -14,6 +14,7 @@ using static VanillaExpanded.Tests.TestSupport.Gui.GuiElementIconTabsTestsTestSu
 namespace VanillaExpanded.Tests.Integration.Gui;
 
 [Trait(TestCategories.TraitName, TestCategories.Integration)]
+[Trait(TestCapabilities.TraitName, TestCapabilities.Cairo)]
 [Collection("Recipe book native GUI")]
 public sealed class GuiElementIconTabsComposerIntegrationTests
 {

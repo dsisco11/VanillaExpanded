@@ -21,6 +21,7 @@ using static VanillaExpanded.Tests.TestSupport.RecipeBook.RecipeBookLifecycleTes
 namespace VanillaExpanded.Tests.Component.RecipeBook;
 
 [Trait(TestCategories.TraitName, TestCategories.Component)]
+[Trait(TestCapabilities.TraitName, TestCapabilities.Cairo)]
 [Collection("Recipe book native GUI")]
 public sealed class RecipeBookOptionsTests
 {
@@ -64,9 +65,6 @@ public sealed class RecipeBookOptionsTests
                     (GuiComposer)Activator.CreateInstance(typeof(GuiComposer),
                         BindingFlags.Instance | BindingFlags.NonPublic, null,
                         new object[] { f.Api.Object, bounds, name }, null)!);
-            f.Render.Setup(value => value.BitmapCreateFromPng(It.IsAny<byte[]>()))
-                .Returns(() => new BitmapExternal(2, 2));
-
             using var surface = new ImageSurface(Format.Argb32, 1, 1);
             using var ctx = new Context(surface);
             int texturesBefore = f.Textures.Count;

@@ -13,6 +13,7 @@ using static VanillaExpanded.Tests.TestSupport.Gui.GuiStyledControlsTestsTestSup
 namespace VanillaExpanded.Tests.Component.Gui;
 
 [Trait(TestCategories.TraitName, TestCategories.Component)]
+[Trait(TestCapabilities.TraitName, TestCapabilities.Cairo)]
 [Collection("Recipe book native GUI")]
 public sealed class GuiStyledControlStateRenderingTests
 {

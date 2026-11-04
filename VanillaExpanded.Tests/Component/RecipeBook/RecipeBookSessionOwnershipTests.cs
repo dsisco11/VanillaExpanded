@@ -27,6 +27,7 @@ namespace VanillaExpanded.Tests.Component.RecipeBook;
 public sealed class RecipeBookSessionOwnershipTests
 {
     [Fact]
+    [Trait(TestCapabilities.TraitName, TestCapabilities.Cairo)]
     public void SessionFilterRegistrationsSurviveRecompositionAndAreReleasedWithTheDialog()
     {
         using var f = new MenuFixture(includeRecipes: true);

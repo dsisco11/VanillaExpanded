@@ -96,6 +96,7 @@ public sealed class RecipeBookSystemLifecycleTests
     }
 
     [Theory]
+    [Trait(TestCapabilities.TraitName, TestCapabilities.Cairo)]
     [InlineData(false)]
     [InlineData(true)]
     public void DisablingLiveDisposesSystemAndBlocksReactivationUntilReload(bool queuedRestore)
@@ -138,6 +139,7 @@ public sealed class RecipeBookSystemLifecycleTests
     }
 
     [Fact]
+    [Trait(TestCapabilities.TraitName, TestCapabilities.Cairo)]
     public void UnrelatedConfigReloadKeepsEnabledSystemAndExistingMenu()
     {
         using var f = new MenuFixture();
@@ -169,6 +171,7 @@ public sealed class RecipeBookSystemLifecycleTests
     }
 
     [Theory]
+    [Trait(TestCapabilities.TraitName, TestCapabilities.Cairo)]
     [InlineData(false)]
     [InlineData(true)]
     public void WorldCleanupDetachesRestorationAndInvalidatesQueuedRecomposition(bool dispose)

@@ -15,6 +15,7 @@ public sealed class NativeTranslationCacheCompatibilityTests
 {
     /// <summary>Verifies the dialog observes native same-locale invalidation and reload table replacements.</summary>
     [Fact]
+    [Trait(TestCapabilities.TraitName, TestCapabilities.Cairo)]
     public void RecipeBookRecomposesAfterNativeSameLocaleTranslationReloads()
     {
         // Arrange

@@ -178,19 +178,19 @@ Scope and constraints:
         dependency is explicit and approved, not merely inherited from old fixtures.
 
 ## Phase 5: Align configuration, CI, and documentation
-    Prerequisite: Phase 4 dependency outcomes.
-    [ ] Distinguish native libcairo removal from managed cairo-sharp reference removal.
+    Prerequisite: [Phase 4 dependency outcomes](CairoTestInventory.md#7-phase-4-native-dependency-decision).
+    [x] Distinguish native libcairo removal from managed cairo-sharp reference removal.
         Keep assembly references still required by engine signatures or production types.
-    [ ] Remove obsolete native test-copy items and fixture dependencies only after
+    [x] Remove obsolete native test-copy items and fixture dependencies only after
         proving no retained tests require them. Check SkiaSharp separately.
-    [ ] Keep Unit/Component/Integration classification based on actual test boundaries;
+    [x] Keep Unit/Component/Integration classification based on actual test boundaries;
         preserve required GUI serialization and teardown safeguards.
-    [ ] If exceptions are approved, use an explicit capability selector independent
+    [x] If exceptions are approved, use an explicit capability selector independent
         of test category, and ensure the exceptional tests actually run in CI.
         Do not silently skip failed tests or treat missing libraries as success.
-    [ ] Update the existing build/test workflow to exercise the intended dependency-free
+    [x] Update the existing build/test workflow to exercise the intended dependency-free
         scope and any explicitly approved residual scope without hiding coverage loss.
-    [ ] Update directly related test guidance and commands to state the presentation
+    [x] Update directly related test guidance and commands to state the presentation
         policy, approved exceptions, and the final native dependency requirements.
     Completion:
         Project configuration, CI selection, and documentation match the retained

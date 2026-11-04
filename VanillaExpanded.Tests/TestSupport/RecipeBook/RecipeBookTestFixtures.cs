@@ -113,8 +113,6 @@ internal sealed class MenuFixture : IDisposable
                 assets.Setup(value => value.Get(RecipeBookCategoryIcons.Asset(code))).Returns(asset);
         }
         api.SetupGet(value => value.Assets).Returns(assets.Object);
-        graphics.Render.Setup(value => value.BitmapCreateFromPng(It.IsAny<byte[]>()))
-            .Returns(() => new BitmapExternal(2, 2));
         graphics.Gui.SetupGet(value => value.Icons).Returns(new IconUtil(api.Object));
         graphics.Gui.SetupGet(value => value.LoadedGuis).Returns(loaded);
         graphics.Gui.Setup(value => value.RegisterDialog(It.IsAny<GuiDialog[]>()))

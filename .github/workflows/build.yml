@@ -59,8 +59,18 @@ jobs:
     - name: Build
       run: dotnet build --configuration Release --no-restore
 
-    - name: Test
-      run: dotnet test --configuration Release --no-build --verbosity normal
+    - name: Test managed scope
+      run: >-
+        dotnet test --configuration Release --no-build --verbosity normal
+        --filter "RequiresNative!=Cairo"
+        -- RunConfiguration.TreatNoTestsAsError=true
+
+    - name: Test approved native scope
+      run: >-
+        dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj
+        --configuration Release --no-build --verbosity normal
+        --filter "RequiresNative=Cairo"
+        -- RunConfiguration.TreatNoTestsAsError=true
 
     - name: Get mod info
       id: modinfo

@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Cairo;
 using Moq;
 using Vintagestory.API.Client;
@@ -9,7 +10,17 @@ using Vintagestory.Client.NoObf;
 namespace VanillaExpanded.Tests.TestSupport.Gui;
 
 [CollectionDefinition("Recipe book native GUI", DisableParallelization = true)]
-public sealed class CraftingGuiCollection;
+public sealed class CraftingGuiCollection : ICollectionFixture<CraftingGuiCollection.CairoResolverBootstrapFixture>
+{
+    public sealed class CairoResolverBootstrapFixture
+    {
+        public CairoResolverBootstrapFixture()
+        {
+            // Install cairo-sharp's resolver without calling a native Cairo entry point.
+            RuntimeHelpers.RunClassConstructor(typeof(CairoAPI).TypeHandle);
+        }
+    }
+}
 
 internal class GuiRenderFixture : IDisposable
 {

@@ -552,7 +552,7 @@ behavior to preserve, not appearance baselines.
 
 | Current test scope | Native entry | Retained behavioral purpose |
 | --- | --- | --- |
-| [GuiControlVisualsTests](../VanillaExpanded.Tests/Unit/Gui/GuiControlVisualsTests.cs): `FrameRestoresCallerContextState` only | Real `ImageSurface`/`Context`, then `GuiControlDrawing.Frame` | Verify restoration of the caller's actual Cairo context state. Invalid-input and color-conversion tests do not require drawing resources. |
+| [GuiControlContextStateIntegrationTests](../VanillaExpanded.Tests/Integration/Gui/GuiControlContextStateIntegrationTests.cs): `FrameRestoresCallerContextState` | Real `ImageSurface`/`Context`, then `GuiControlDrawing.Frame` | Verify restoration of the caller's actual Cairo context state. Invalid-input and color-conversion tests remain in the managed `GuiControlVisualsTests` suite. |
 | [GuiElementIconTabsTests](../VanillaExpanded.Tests/Component/Gui/GuiElementIconTabsTests.cs): all tests | Real tab fonts, child composer, hints, and tab texture generation | Native selection/input/focus, clipped hit routing, selected-tab containment, overflow/reachability, host-clip restoration, and resource reuse/disposal. `MeasureWidth` arithmetic alone is not the reason for this exception. |
 | [GuiStyledControlStateRenderingTests](../VanillaExpanded.Tests/Component/Gui/GuiStyledControlStateRenderingTests.cs): both tests | `ControlsFixture.Compose` and real styled controls | Actual dropdown selection transitions and scrollbar capture/cancellation, with stable resources and cleanup. |
 | [GuiStyledControlsNativeCompatibilityTests](../VanillaExpanded.Tests/Integration/Gui/GuiStyledControlsNativeCompatibilityTests.cs): all tests | Native/styled control constructors, fonts, editing measurement, and composition | Verify opt-in control wiring, caller labels, activation, editing, callbacks, tab/focus routing, scrolling, clipped hit targets, and resource ownership. |
@@ -589,7 +589,9 @@ behavior to preserve, not appearance baselines.
 - Retain `RecipeBookSession`, `RecipeBookLayout`, `RecipeBookLayoutCache`, and
   `RecipeBookIconCache` as the managed policy boundaries. Cache request budgets,
   generations, completion/retry, size keys, and world-cache disposal do not need
-  tile consumers merely to request an icon.
+  tile consumers merely to request an icon. Their focused tests are in
+  [RecipeBookIconCachePolicyTests](../VanillaExpanded.Tests/Unit/RecipeBook/RecipeBookIconCachePolicyTests.cs);
+  the four real tile-consumer methods remain in the component suite.
 - Constructing an uncomposed `GuiComposer` normally is sufficient for disabled
   attachment and queued-work cleanup. `CreateEmpty` is not a managed replacement:
   it invokes real composition.
@@ -611,7 +613,18 @@ behavior to preserve, not appearance baselines.
   The approval does not extend to other methods merely sharing a file, fixture
   type, or test category.
 
-This decision does not claim Cairo elimination. Dependency/CI alignment belongs
-to Phase 5; clean-process dependency checks and Windows/Linux execution belong
-to Phase 6. Retained native behavioral coverage still needs a resolvable Cairo
-library in the environments that execute it.
+This decision does not claim Cairo elimination. The native scopes above use
+the independent `RequiresNative=Cairo` capability. Skia was assessed separately:
+the styled checkbox overrides the engine's pattern-backed switch composition;
+the number input uses Cairo embossing, and the list menus are not multiselect.
+The custom dialog background and SVG delegates calling mocked `DrawSvg` do not
+reach the engine's bitmap-backed pattern helpers. The unused bitmap factory
+setups were removed rather than treating a lazy `BitmapExternal` constructor
+as evidence of executed Skia work. No retained test declares a Skia requirement.
+See the [test guidance](../README.md#native-dependencies-and-assertion-policy)
+for selection and platform setup. Native cases remain mandatory in CI.
+
+Clean-process dependency checks and Windows/Linux execution belong to Phase 6.
+Retained native behavioral coverage still needs resolvable libraries in the
+environments that execute it; declared capability selection is not runtime
+proof that the complementary scope cannot load native graphics libraries.

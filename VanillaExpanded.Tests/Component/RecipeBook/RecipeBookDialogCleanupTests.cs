@@ -25,6 +25,7 @@ namespace VanillaExpanded.Tests.Component.RecipeBook;
 public sealed class RecipeBookDialogCleanupTests
 {
     [Theory]
+    [Trait(TestCapabilities.TraitName, TestCapabilities.Cairo)]
     [InlineData(0.75f)]
     [InlineData(1f)]
     [InlineData(1.5f)]

@@ -21,6 +21,7 @@ using static VanillaExpanded.Tests.TestSupport.RecipeBook.RecipeBookLifecycleTes
 namespace VanillaExpanded.Tests.Component.RecipeBook;
 
 [Trait(TestCategories.TraitName, TestCategories.Component)]
+[Trait(TestCapabilities.TraitName, TestCapabilities.Cairo)]
 [Collection("Recipe book native GUI")]
 public sealed class RecipeBookBrowsingRestorationTests
 {

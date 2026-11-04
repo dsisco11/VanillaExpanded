@@ -16,6 +16,7 @@ using static VanillaExpanded.Tests.TestSupport.RecipeBook.RecipeBookInteractionT
 namespace VanillaExpanded.Tests.Integration.RecipeBook;
 
 [Trait(TestCategories.TraitName, TestCategories.Integration)]
+[Trait(TestCapabilities.TraitName, TestCapabilities.Cairo)]
 [Collection("Recipe book native GUI")]
 public sealed class RecipeBookTileNativeInputTests
 {

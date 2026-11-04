@@ -13,6 +13,7 @@ using VanillaExpanded.Tests.TestSupport.RecipeBook;
 namespace VanillaExpanded.Tests.Integration.Gui;
 
 [Trait(TestCategories.TraitName, TestCategories.Integration)]
+[Trait(TestCapabilities.TraitName, TestCapabilities.Cairo)]
 [Collection("Recipe book native GUI")]
 public sealed class GuiControlNativeProbeTests: IDisposable
 {

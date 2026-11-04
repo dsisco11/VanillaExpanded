@@ -269,14 +269,54 @@ dotnet test --filter "Category=Unit"
 # Run only component tests
 dotnet test --filter "Category=Component"
 
-# Run only native integration tests
+# Run only integration tests
 dotnet test --filter "Category=Integration"
+
+# Run tests without declared native graphics requirements
+dotnet test --filter "RequiresNative!=Cairo"
+
+# Run approved native graphics tests
+dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --filter "RequiresNative=Cairo"
 
 # Run tests for a specific feature
 dotnet test --filter "FullyQualifiedName~AutoStashing"
 ```
 
 When adding tests, reuse the existing [mocks](VanillaExpanded.Tests/Mocks/) and [test support](VanillaExpanded.Tests/TestSupport/). See the [contributor instructions](.github/copilot-instructions.md) for conventions.
+
+### Native dependencies and assertion policy
+
+Use .NET 10 and set `VINTAGE_STORY` to the matching game installation.
+Test categories describe boundaries, not native dependencies. The independent
+`RequiresNative=Cairo` trait declares the approved Cairo requirement.
+Use [TestCapabilities](VanillaExpanded.Tests/TestCapabilities.cs)
+constants and annotate individual methods in mixed managed/native suites.
+Native graphics cases currently reside in the main test project; the separate
+integration-test project runs with the managed selection.
+
+The managed `cairo-sharp` assembly remains required by engine signatures;
+removing native execution does not make that reference obsolete. The retained
+test paths do not construct Skia bitmaps, so they have no declared native Skia
+requirement. Game references can still bring in the managed `SkiaSharp` assembly
+transitively; its presence alone does not require the native Skia library.
+On Windows, the test project copies `libcairo-2.dll` from the game
+installation for approved native tests. On Linux, provide Cairo/fontconfig and
+fonts in the host environment. Shared GUI test setup initializes the game's
+Cairo resolver, which maps `libcairo-2` to `libcairo.so.2` on Linux, without
+eagerly loading native libraries for managed tests. No library-name symlink is
+needed. The [CI workflow](.github/workflows/build.yml) does not install graphics
+packages or create library aliases. Both selections remain required steps,
+failing on test errors or empty selections rather than skipping unavailable
+native coverage.
+
+Do not assert rendered pixel data or incidental appearance, including palette,
+font, decorative positioning, or equivalent drawing-command baselines.
+Functional hit regions, clipping, reachability, scrolling, state restoration,
+and ownership remain valid contracts. Approved native behavioral exceptions
+and their purposes are recorded in the [dependency inventory](docs/CairoTestInventory.md#7-phase-4-native-dependency-decision).
+These exceptions do not permit presentation assertions. Test fixtures use
+in-memory inputs rather than reading repository assets; the shipped-asset checks
+were retired explicitly.
 
 ## License
 

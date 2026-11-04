@@ -16,6 +16,7 @@ public sealed class RecipeBookNativeBoundsCompatibilityTests
 {
     /// <summary>Verifies render-lifecycle Follow translates native hit, render, and scissor regions at fractional scales.</summary>
     [Theory]
+    [Trait(TestCapabilities.TraitName, TestCapabilities.Cairo)]
     [InlineData(1.25f, 13.25, 8.5)]
     [InlineData(1.75f, 17.5, 9.25)]
     public void RenderLifecycleTranslationMovesNativeHitRenderAndScissorRegions(
@@ -100,6 +101,7 @@ public sealed class RecipeBookNativeBoundsCompatibilityTests
     }
 
     [Theory]
+    [Trait(TestCapabilities.TraitName, TestCapabilities.Cairo)]
     [InlineData(1.25f, 360.25, 21.25)]
     [InlineData(1.75f, 180, 20)]
     public void RootOnlyPositionUpdateTranslatesComposedNativeControlsWithoutRecomposition(
@@ -328,6 +330,7 @@ public sealed class RecipeBookNativeBoundsCompatibilityTests
     }
 
     [Fact]
+    [Trait(TestCapabilities.TraitName, TestCapabilities.Cairo)]
     public void RootOnlyPositionUpdateTranslatesOpenOptionsPopupAndRetainsNativeFocus()
     {
         // Arrange

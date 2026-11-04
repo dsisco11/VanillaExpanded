@@ -12,6 +12,7 @@ using VanillaExpanded.Tests.TestSupport.RecipeBook;
 namespace VanillaExpanded.Tests.Component.RecipeBook;
 
 [Trait(TestCategories.TraitName, TestCategories.Component)]
+[Trait(TestCapabilities.TraitName, TestCapabilities.Cairo)]
 [Collection("Recipe book native GUI")]
 public sealed class RecipeBookTilesGeometryTests
 {
