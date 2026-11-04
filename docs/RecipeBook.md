@@ -140,6 +140,55 @@ The [shared visual helpers](../VanillaExpanded/src/Gui/GuiControlVisuals.cs) exp
 
 Search is the first keyboard tab stop. Native control focus and input routing are preserved, with the category strip acting as one outer tab stop.
 
+### Cached shell layout
+
+The dialog separates attachment validation, cached layout decisions, composition, and position following. Opening initializes layout before refreshing recipes; rendered frames compare current inputs before native rendering. A disposed dialog or zero-sized render surface skips the render lifecycle. A closed inventory, replaced inventory composer, or missing crafting controls closes the book instead of accepting cached geometry.
+
+[RecipeBookLayoutCache](../VanillaExpanded/src/RecipeBook/RecipeBookLayoutCache.cs) belongs to one dialog. It remembers successful measurement inputs and placement geometry, not browsing state or composer-owned mutable bounds. Reopening into a new dialog builds fresh caches. [Shared GUI snapshots](../VanillaExpanded/src/Gui/GuiLayoutInputs.cs) provide scale/language inputs, captured bounds, and value-based placement; tile size and docking dependencies remain recipe-specific.
+
+| Cached decision | Dependencies |
+| --- | --- |
+| Measurements | Validated tile size, GUI scale, and current/default language snapshots. Catalogue-derived categories and digit width, plus shared font/control definitions, are stable within the dialog. |
+| Fixed placement | Window identity and inner dimensions; inventory bounds identity, absolute position, and outer width; crafting grid/output bounds identities and outer rectangles; movement mode, GUI scale, and measured minimum dimensions. |
+| Movable size placement | Window identity and inner dimensions; dialog bounds identity and fixed dimensions; movement mode, GUI scale, and measured minimum dimensions. Parent/grid movement and manual x/y are excluded. |
+
+[Language snapshots](../VanillaExpanded/src/Gui/GuiLanguageInputs.cs) track locale, translation service identity, entry-table identity, and line-breaking behavior for both selected and fallback languages. Native reloads replace the entry table, including after lazy invalidation, so same-locale reloads invalidate measurements. Arbitrary in-place mutation of a third-party translation table has no guaranteed invalidation signal.
+
+Changed measurements invalidate placement even when the resulting minimum dimensions stay equal. Placement reuses the existing docking/clamping policy; failures do not retain an earlier success as a fallback. Inventory contents, search, category, sort, and selection update recipe content without invalidating shell measurements or placement.
+
+```mermaid
+flowchart LR
+    Dialog[Dialog lifecycle] --> Attachment[Validate inventory attachment]
+    Attachment --> Cache[Per-dialog layout cache]
+    Cache --> Geometry[Value placement]
+    Geometry --> Changed{Measurements or size changed?}
+    Changed -->|Yes| Composition[Recompose controls]
+    Composition -->|Effective root dimensions| Cache
+    Composition --> Follow[Position-only following]
+    Changed -->|No| Follow
+    Follow --> Continue[Continue opening or rendering]
+```
+
+```text
+on open or a valid render frame:
+    validate the inventory attachment
+    reuse or recompute measurements and placement
+    if no placement fits: report insufficient space and close
+    if measurements or dimensions changed:
+        rebuild controls and record their effective bounds
+    if position or window parent changed:
+        update the root position using native bounds calculation
+    continue opening or native rendering
+```
+
+Composition occurs initially or when measured content or dimensions change. Comparing both the last composed size and live root size prevents externally changed root dimensions or clamping from leaving controls with stale geometry. Recomposition retains session criteria and selection, proportional row anchor, recipe inspection, appropriate control focus, and an open options dropdown's text, editing focus, and rejected-edit feedback. Replaced composers release their resources.
+
+Fixed parent movement can invalidate docking and choose another side or size, but does not itself require recomposition. Movable cache hits clamp live manual coordinates without another size-placement calculation. Native titlebar mode switching, dragging, and position persistence remain native-owned.
+
+Position-only following returns without writes or calculation when coordinates and the window parent already match. Necessary movement updates only the root and calls native `CalcWorldBounds` without recursively marking descendants dirty. Initialized children retain local geometry and derive their absolute/render positions from the root, including detached control-owned bounds used for clipping and hit testing. Window replacement updates the root's parent relationship.
+
+This memoizes shell layout, not all GUI work. Native controls may calculate their own bounds during initialization or dragging; content updates and tooltip rendering have separate lifecycles.
+
 ### Shared styled controls
 
 The shared GUI layer provides opt-in native-derived controls. Callers supply labels, fonts, bounds, callbacks, and control-specific measurements; the controls have no filtering, catalogue, localization-key, or persistence dependencies. Recipe Book composition supplies its localized labels and controller callbacks to these adapters for search, sorting, both checkboxes, scrolling, footer navigation, and empty-state actions.

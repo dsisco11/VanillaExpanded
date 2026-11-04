@@ -569,20 +569,27 @@ public sealed class RecipeBookLayoutLifecycleTests
         int placements = calls.FixedCalls;
         int compositions = calls.CompositionCalls;
 
-        // Act
-        book.OnRenderGUI(0);
+        try
+        {
+            // Act
+            book.OnRenderGUI(0);
 
-        // Assert
-        Assert.Equal(0, disposed);
-        Assert.DoesNotContain(render.Invocations, invocation =>
-            invocation.Method.Name is nameof(IRenderAPI.Render2DTexture)
-                or nameof(IRenderAPI.Render2DTexturePremultipliedAlpha));
-        Assert.Equal(measurements, calls.MeasurementCalls);
-        Assert.Equal(placements, calls.FixedCalls);
-        Assert.Equal(compositions, calls.CompositionCalls);
+            // Assert
+            Assert.Equal(0, disposed);
+            Assert.DoesNotContain(render.Invocations, invocation =>
+                invocation.Method.Name is nameof(IRenderAPI.Render2DTexture)
+                    or nameof(IRenderAPI.Render2DTexturePremultipliedAlpha));
+            Assert.Equal(measurements, calls.MeasurementCalls);
+            Assert.Equal(placements, calls.FixedCalls);
+            Assert.Equal(compositions, calls.CompositionCalls);
+        }
+        finally
+        {
+            // Parent.Dispose owns the attached composer, so restore it even when the zero-surface assertions fail.
+            fixture.Parent.Composers["maininventory"] = composer;
+        }
 
-        // Restore the parent attachment, then make the nonzero window too small for the cached minimum.
-        fixture.Parent.Composers["maininventory"] = composer;
+        // Make the nonzero window too small for the cached minimum after restoring the parent attachment.
         render.SetupGet(api => api.FrameWidth).Returns(() => fixture.Lifecycle.Api.Object.Gui.WindowBounds.OuterWidthInt);
         var window = fixture.Lifecycle.Api.Object.Gui.WindowBounds;
         window.fixedWidth = 100;
