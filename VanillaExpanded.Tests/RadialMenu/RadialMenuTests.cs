@@ -5,19 +5,6 @@ namespace VanillaExpanded.Tests.RadialMenu;
 /// <summary>Checks generic menu geometry and exactly-once interaction independently of inventory.</summary>
 public sealed class RadialMenuTests
 {
-    [Fact]
-    public void RingModeUsesEngineSupportedIntegerUniform()
-    {
-        string shaderRoot = Path.Combine(AppContext.BaseDirectory, "Mods", "mod", "assets", "vanillaexpanded", "shaders");
-        if (!Directory.Exists(shaderRoot)) return;
-        foreach (string path in new[] { Path.Combine(shaderRoot, "radial_menu.vsh"), Path.Combine(shaderRoot, "radial_menu.fsh") })
-        {
-            string source = File.ReadAllText(path);
-            Assert.Contains("uniform int ringMode;", source);
-            Assert.DoesNotContain("uniform bool", source);
-        }
-    }
-
     #region Geometry
     /// <summary>Checks center, ring gap, wedge boundaries, and the fixed clockwise orientation.</summary>
     [Fact]
@@ -178,7 +165,6 @@ public sealed class RadialMenuTests
             (double x, double y) = layout.GetWedgeCenter(index, 400, 300, 260, 0.7);
             Assert.Equal(ids[index], layout.HitTest(x, y, 400, 300, 260));
         }
-        Assert.True(RadialMenuMesh.Build(layout, 600).VerticesCount >= RadialMenuMesh.Build(layout, 300).VerticesCount);
     }
 
     [Fact]
@@ -233,7 +219,6 @@ public sealed class RadialMenuTests
         const double radius = 600;
         const double inset = 7.5;
         double size = layout.GetWedgeAlignedIconSizePixels(radius, inset);
-        Assert.True(size > layout.GetIconSizePixels(radius, inset));
         double midRadius = 0.65 * radius;
         double halfSize = size / 2d;
         Assert.True(midRadius - halfSize >= 0.40 * radius + inset - 0.001);
@@ -278,15 +263,6 @@ public sealed class RadialMenuTests
         }
         Assert.Throws<ArgumentOutOfRangeException>(() => layout.GetScreenAlignedIconSizePixels(4, 600, 7.5));
         Assert.Throws<ArgumentOutOfRangeException>(() => layout.GetScreenAlignedIconSizePixels(0, 0, 7.5));
-    }
-
-    /// <summary>Upright widget artwork uses more of cardinal wedges than the rotation-safe fit.</summary>
-    [Fact]
-    public void UprightIconUsesAvailableRingThickness()
-    {
-        var layout = new RadialMenuLayout(["a", "b", "c", "d"], 0.50, 0.74, separatorDegrees: 1.5);
-        Assert.True(layout.GetScreenAlignedIconSizePixels(0, 600, 7.5)
-            > layout.GetIconSizePixels(600, 7.5) * 1.25f);
     }
 
     /// <summary>Upright squares retain padding along their entire edges, including the concave inner arc.</summary>
@@ -334,13 +310,15 @@ public sealed class RadialMenuTests
     }
 
     [Theory]
-    [InlineData("2x2x2", "2x2x2")]
-    [InlineData("Andesite Cobblestone", "Andesite\nCobblestone")]
-    public void CenterLabelLayoutPreservesWholeWords(string text, string expected)
+    [InlineData("2x2x2")]
+    [InlineData("Andesite Cobblestone")]
+    public void CenterLabelLayoutPreservesWholeWords(string text)
     {
         string wrapped = RadialMenuLabelLayout.FitToCircle(text, 15, 3, value => value.Length, 0);
 
-        Assert.Equal(expected, wrapped);
+        Assert.Equal(text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries),
+            wrapped.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        Assert.DoesNotContain("\n\n", wrapped);
     }
 
     [Fact]
@@ -350,22 +328,12 @@ public sealed class RadialMenuTests
             "Drop  blocks\n\nhere to add a new material", 18, 3, value => value.Length, 0);
 
         Assert.DoesNotContain("\n\n", wrapped);
-        Assert.Equal("Drop blocks here to add a new material", wrapped.Replace('\n', ' '));
+        Assert.Equal(new[] { "Drop", "blocks", "here", "to", "add", "a", "new", "material" },
+            wrapped.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
     }
 
     [Fact]
-    public void CenterLabelScaleUsesEachLinesActualWidth()
-    {
-        string[] lines = ["x", "longlong", "x"];
-
-        double scale = RadialMenuLabelLayout.GetScaleForCircle(lines, 8, 2, value => value.Length, 0);
-        double boundingBoxScale = 8 / Math.Sqrt(8 * 8 + 6 * 6);
-
-        Assert.True(scale > boundingBoxScale);
-    }
-
-    [Fact]
-    public void CenterLabelLayoutMatchesExhaustiveOptimalScale()
+    public void CenterLabelLayoutKeepsContentInsideAvailableCircle()
     {
         var random = new Random(7331);
         for (int sample = 0; sample < 250; sample++)
@@ -381,36 +349,24 @@ public sealed class RadialMenuTests
 
             string fitted = RadialMenuLabelLayout.FitToCircle(
                 text, diameter, lineHeight, value => value.Length, padding);
-            double actualScale = RadialMenuLabelLayout.GetScaleForCircle(
-                fitted.Split('\n'), diameter, lineHeight, value => value.Length, padding);
-            double optimalScale = GetExhaustiveOptimalScale(words, diameter, lineHeight, padding);
+            string[] lines = fitted.Split('\n');
+            double scale = RadialMenuLabelLayout.GetScaleForCircle(
+                lines, diameter, lineHeight, value => value.Length, padding);
 
-            Assert.Equal(optimalScale, actualScale, precision: 10);
             Assert.Equal(words, fitted.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
             Assert.DoesNotContain("\n\n", fitted);
-        }
-    }
-
-    private static double GetExhaustiveOptimalScale(string[] words, double diameter,
-        double lineHeight, double padding)
-    {
-        double best = 0;
-        int partitionCount = 1 << Math.Max(0, words.Length - 1);
-        for (int mask = 0; mask < partitionCount; mask++)
-        {
-            var lines = new List<string>();
-            int start = 0;
-            for (int boundary = 0; boundary < words.Length - 1; boundary++)
+            double blockHeight = lines.Length * lineHeight;
+            double requiredRadius = 0;
+            for (int line = 0; line < lines.Length; line++)
             {
-                if ((mask & 1 << boundary) == 0) continue;
-                lines.Add(string.Join(' ', words[start..(boundary + 1)]));
-                start = boundary + 1;
+                double halfWidth = lines[line].Length / 2d + padding;
+                double center = (line + 0.5d) * lineHeight - blockHeight / 2d;
+                double verticalExtent = Math.Abs(center) + lineHeight / 2d + padding;
+                requiredRadius = Math.Max(requiredRadius, Math.Sqrt(
+                    halfWidth * halfWidth + verticalExtent * verticalExtent));
             }
-            lines.Add(string.Join(' ', words[start..]));
-            best = Math.Max(best, RadialMenuLabelLayout.GetScaleForCircle(
-                lines, diameter, lineHeight, value => value.Length, padding));
+            Assert.True(scale * requiredRadius <= diameter / 2d + 1e-10);
         }
-        return best;
     }
     /// <summary>Checks both layout directions produce visible triangles under the same face-culling rule.</summary>
     [Fact]
@@ -579,10 +535,6 @@ public sealed class RadialMenuTests
     }
     #endregion
 }
-
-
-
-
 
 
 

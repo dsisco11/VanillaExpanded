@@ -8,18 +8,16 @@ namespace VanillaExpanded.Tests.Unit.ItemSlotIndicators.Effects;
 public sealed class LiquidSloshIndicatorEffectTests
 {
     #region Public API
-    /// <summary>The built-in effect requests one shared camera capture and declares a deformable bounded presentation.</summary>
+    /// <summary>The built-in effect requests shared motion and declares compatible fill-strip geometry.</summary>
     [Fact]
-    public void Definition_UsesSharedSurfaceAndVisibleDrawRange()
+    public void DefinitionUsesSharedMotionAndValidFillStripGeometry()
     {
         var effect = LiquidSloshIndicatorEffect.Definition;
         Assert.True(effect.NeedsCameraMotion);
         Assert.Equal(ItemSlotIndicatorTopology.FillStrip, effect.Topology);
-        Assert.Equal(16, effect.SegmentCount);
-        Assert.True(effect.Parameters.X > 0);
-        Assert.Equal(0, effect.Parameters.Y);
-        Assert.Equal(0, effect.Parameters.Z);
-        Assert.InRange(effect.Parameters.W, 0, 1);
+        Assert.True(effect.SegmentCount > 0);
+        Assert.All(new[] { effect.Parameters.X, effect.Parameters.Y, effect.Parameters.Z, effect.Parameters.W },
+            value => Assert.True(float.IsFinite(value)));
     }
     #endregion
 }

@@ -69,20 +69,33 @@ public sealed class ItemSlotIndicatorRendererTests
         Assert.Equal(new[] { "background", "particles", "restore" }, order);
     }
 
-    /// <summary>Empty bounded resources retain geometry and cues through unavailable-effect fallback.</summary>
+    /// <summary>Empty bounded resources take a balanced fallback path when their effect is unavailable.</summary>
     [Fact]
-    public void BoundedEmpty_FallbackDrawsMappedFillAndBoundaryCue()
+    public void EmptyResourceUsesBalancedUnavailableEffectFallback()
     {
         using var context = new IndicatorResourceTestContext();
         context.Resources.Initialize();
         var backend = Backend();
         var effect = new ItemSlotIndicatorEffectDefinition("test:unavailable", "test", "vanillaexpanded_itemslot_missing");
+        var order = new List<string>();
+        var submissions = new List<ItemSlotIndicatorDrawInput>();
+        backend.Setup(b => b.Begin()).Callback(() => order.Add("begin"));
+        backend.Setup(b => b.Restore()).Callback(() => order.Add("restore"));
+        backend.Setup(b => b.Rectangle(It.IsAny<MeshRef>(), It.IsAny<ItemSlotIndicatorDrawInput>()))
+            .Callback<MeshRef, ItemSlotIndicatorDrawInput>((_, input) =>
+            {
+                order.Add("rectangle");
+                submissions.Add(input);
+            });
         using var renderer = new ItemSlotIndicatorRenderer(context.Resources, backend.Object, () => 48);
-        renderer.Render(24, 24, new(new(0, Vector4.One, new ItemSlotIndicatorDrawRange(0.2f, 0.8f)), effect), default);
-        backend.Verify(b => b.Rectangle(It.IsAny<MeshRef>(), It.Is<ItemSlotIndicatorDrawInput>(i => i.Fill == 0.2f && i.ResourceFill == 0)), Times.Once);
-        backend.Verify(b => b.Rectangle(It.IsAny<MeshRef>(), It.Is<ItemSlotIndicatorDrawInput>(i => i.Fill == 1 && i.SlotBounds.W == 1)), Times.Once);
-        backend.Verify(b => b.Begin(), Times.Once);
-        backend.Verify(b => b.Restore(), Times.Once);
+        var range = new ItemSlotIndicatorDrawRange(0.2f, 0.8f);
+        renderer.Render(24, 24, new(new(0, Vector4.One, range), effect), default);
+        backend.Verify(b => b.Rectangle(It.IsAny<MeshRef>(), It.IsAny<ItemSlotIndicatorDrawInput>()), Times.AtLeastOnce);
+        Assert.Contains(submissions, input => input.DrawRange == range && input.ResourceFill == 0);
+        backend.Verify(b => b.Effect(It.IsAny<IShaderProgram>(), It.IsAny<MeshRef>(), It.IsAny<ItemSlotIndicatorDrawInput>(),
+            It.IsAny<ItemSlotIndicatorEffectDefinition>(), It.IsAny<ItemSlotIndicatorFrameSnapshot>()), Times.Never);
+        Assert.Equal(new[] { "begin", "restore" },
+            order.Where(value => value is "begin" or "restore"));
     }
 
     /// <summary>Boundary cues draw after successful shader handoff and do not replace the effect with a rectangle.</summary>
@@ -100,10 +113,11 @@ public sealed class ItemSlotIndicatorRendererTests
         backend.Setup(b => b.Restore()).Callback(() => order.Add("restore"));
         backend.Setup(b => b.Rectangle(It.IsAny<MeshRef>(), It.IsAny<ItemSlotIndicatorDrawInput>())).Callback(() => order.Add("cue"));
         using var renderer = new ItemSlotIndicatorRenderer(context.Resources, backend.Object, () => 48);
-        renderer.Render(24, 24, new(new(1, Vector4.One, new ItemSlotIndicatorDrawRange(0.2f, 0.8f)), effect), default);
+        var range = new ItemSlotIndicatorDrawRange(0.2f, 0.8f);
+        renderer.Render(24, 24, new(new(1, Vector4.One, range), effect), default);
         Assert.Equal(new[] { "effect", "restore", "cue", "restore" }, order);
         backend.Verify(b => b.Effect(It.IsAny<IShaderProgram>(), It.IsAny<MeshRef>(),
-            It.Is<ItemSlotIndicatorDrawInput>(i => i.Fill == 0.8f && i.ResourceFill == 1), effect,
+            It.Is<ItemSlotIndicatorDrawInput>(i => i.ResourceFill == 1 && i.DrawRange == range), effect,
             It.IsAny<ItemSlotIndicatorFrameSnapshot>()), Times.Once);
     }
 

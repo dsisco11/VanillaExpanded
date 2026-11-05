@@ -1,0 +1,427 @@
+using System.Reflection;
+using Cairo;
+using Moq;
+using VanillaExpanded.Gui;
+using VanillaExpanded.Tests.TestSupport.Gui;
+using Vintagestory.API.Client;
+using Vintagestory.API.Common;
+using Vintagestory.API.Config;
+using Vintagestory.API.MathTools;
+using VanillaExpanded.Tests;
+using VanillaExpanded.Tests.TestSupport.RecipeBook;
+using static VanillaExpanded.Tests.TestSupport.Gui.GuiElementIconTabsTestsTestSupport;
+
+namespace VanillaExpanded.Tests.Component.Gui;
+
+[Trait(TestCategories.TraitName, TestCategories.Component)]
+[Trait(TestCapabilities.TraitName, TestCapabilities.Cairo)]
+[Collection("Recipe book native GUI")]
+public sealed class GuiElementIconTabsTests
+{
+    [Theory]
+    [InlineData(1f)]
+    [InlineData(1.25f)]
+    [InlineData(1.5f)]
+    [InlineData(1.75f)]
+    [InlineData(2f)]
+    public void FolderTabResourcesAreReusedAcrossStatesAndReleasedOnDisposal(float scale)
+    {
+        using var graphics = new GuiRenderFixture(scale);
+        Setup(graphics);
+        graphics.Gui.Object.Icons.CustomIcons["test-icon"] = (_, _, _, _, _, _) => { };
+        using var button = new GuiElementIconTab(graphics.Api.Object, "test-icon",
+            CairoFont.WhiteSmallText(), _ => { }, ElementBounds.Fixed(120.3, 65.3, 30, 36).WithEmptyParent());
+        using var surface = new ImageSurface(Format.Argb32, 64, 64);
+        using var ctx = new Context(surface);
+        button.ComposeElements(ctx, surface);
+        var ownedTextures = graphics.Textures.ToHashSet();
+        Assert.NotEmpty(ownedTextures);
+        foreach (var state in new[] { (On: false, Hover: false), (On: false, Hover: true),
+            (On: true, Hover: false), (On: true, Hover: true) })
+        {
+            button.On = state.On;
+            SetMouse(graphics, state.Hover ? button.Bounds.absX + 10 : -100,
+                state.Hover ? button.Bounds.absY + 10 : -100);
+            button.RenderInteractiveElements(0);
+            Assert.True(ownedTextures.SetEquals(graphics.Textures));
+            button.RenderInteractiveElements(0);
+            Assert.True(ownedTextures.SetEquals(graphics.Textures));
+        }
+        button.Dispose();
+        Assert.Empty(graphics.Textures);
+    }
+
+    [Theory]
+    [InlineData(1f)]
+    [InlineData(1.25f)]
+    [InlineData(1.5f)]
+    [InlineData(1.75f)]
+    [InlineData(2f)]
+    [InlineData(1.1f)]
+    public void SelectedTabRemainsContainedAndRecompositionReusesResources(float scale)
+    {
+        using var graphics = new GuiRenderFixture(scale);
+        Setup(graphics);
+        using var tabs = Create(graphics, Enumerable.Range(0, 9).Select(i => "Entry " + i).ToArray(), 180, _ => { });
+        var host = ElementBounds.Fixed(100.3, 80.3, 1000, 1000).WithEmptyParent();
+        host.IsDrawingSurface = true;
+        tabs.Bounds.WithParent(host);
+        host.WithChild(tabs.Bounds);
+        int textureCount = graphics.Textures.Count;
+        foreach (double position in new[] { .1, .3, .7 })
+        {
+            host.fixedX = 100 + position;
+            host.fixedY = 80 + position;
+            host.MarkDirtyRecursive();
+            host.CalcWorldBounds();
+            Compose(tabs);
+            Assert.Equal(textureCount, graphics.Textures.Count);
+            tabs.SetValue(8, false);
+            graphics.Render.Invocations.Clear();
+            tabs.RenderInteractiveElements(0);
+            AssertSelectedBackgroundWithinNativeClip(graphics,
+                Assert.IsType<GuiElementIconTab>(tabs.Composer!.GetToggleButton("tab-8")));
+        }
+    }
+
+    [Theory]
+    [InlineData(.6f, false)]
+    [InlineData(.75f, false)]
+    [InlineData(1f, false)]
+    [InlineData(1.1f, false)]
+    [InlineData(1.25f, false)]
+    [InlineData(1.5f, false)]
+    [InlineData(1.75f, false)]
+    [InlineData(2f, false)]
+    [InlineData(.6f, true)]
+    [InlineData(.75f, true)]
+    [InlineData(1f, true)]
+    [InlineData(1.1f, true)]
+    [InlineData(1.25f, true)]
+    [InlineData(1.5f, true)]
+    [InlineData(1.75f, true)]
+    [InlineData(2f, true)]
+    public void SelectedTabsRemainVisibleAndClippingIsBalancedAcrossMovementAndScrolling(float scale, bool overflow)
+    {
+        using var graphics = new GuiRenderFixture(scale);
+        Setup(graphics);
+        double callerWidth = overflow ? 180 : 400;
+        using var tabs = Create(graphics, Enumerable.Range(0, 9).Select(i => "Entry " + i).ToArray(),
+            callerWidth, _ => { });
+        var host = ElementBounds.Fixed(100.75, 80.75, 1000, 1000).WithEmptyParent();
+        host.IsDrawingSurface = true;
+        tabs.Bounds.WithParent(host);
+        host.WithChild(tabs.Bounds);
+        host.CalcWorldBounds();
+        Compose(tabs);
+        foreach (double offset in new[] { .1, .3, .5, .7, .75, .9 })
+        {
+            host.fixedX = 100 + offset;
+            host.fixedY = 80 + offset;
+            host.MarkDirtyRecursive();
+            host.CalcWorldBounds();
+            foreach (int selected in new[] { 0, 4, 8 })
+            {
+                tabs.SetValue(selected, false);
+                graphics.Render.Invocations.Clear();
+                tabs.RenderInteractiveElements(0);
+                var callerBounds = tabs.Bounds;
+                var viewport = tabs.Viewport!;
+                Assert.True(viewport.absX >= callerBounds.absX);
+                Assert.True(viewport.absX + viewport.InnerWidth <= callerBounds.absX + callerBounds.InnerWidth);
+                Assert.True(viewport.absY >= callerBounds.absY);
+                Assert.True(viewport.absY + viewport.InnerHeight <= callerBounds.absY + callerBounds.InnerHeight);
+                AssertSelectedBackgroundWithinNativeClip(graphics,
+                    Assert.IsType<GuiElementIconTab>(tabs.Composer!.GetToggleButton("tab-" + selected)));
+                Assert.Empty(graphics.Clips);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(.6f)]
+    [InlineData(.75f)]
+    [InlineData(1f)]
+    [InlineData(1.1f)]
+    [InlineData(1.25f)]
+    [InlineData(1.5f)]
+    [InlineData(1.75f)]
+    [InlineData(2f)]
+    public void ClippedTabsRejectPointerActivationAndKeyboardWrapRestoresAccessAfterMovement(float scale)
+    {
+        // Arrange nine tabs in a clipped host where the outer tabs extend beyond the input viewport.
+        using var graphics = new GuiRenderFixture(scale);
+        Setup(graphics);
+        var changes = new List<int>();
+        using var tabs = Create(graphics, Enumerable.Range(0, 9).Select(i => "Entry " + i).ToArray(), 180, changes.Add);
+        var host = ElementBounds.Fixed(100.75, 80.75, 1000, 1000).WithEmptyParent();
+        host.IsDrawingSurface = true;
+        tabs.Bounds.WithParent(host);
+        host.WithChild(tabs.Bounds);
+        host.CalcWorldBounds();
+        Compose(tabs);
+        double expectedLeft = 0;
+        double expectedRight = 0;
+
+        // Act: move the host at fractional offsets, reject clipped input, scroll, and wrap keyboard focus.
+        foreach (double offset in new[] { .1, .75 })
+        {
+            host.fixedX = 100 + offset;
+            host.fixedY = 80 + offset;
+            host.MarkDirtyRecursive();
+            host.CalcWorldBounds();
+            tabs.SetValue(0, false);
+            changes.Clear();
+            var callerBounds = tabs.Bounds;
+            var viewport = tabs.Viewport!;
+            var leftArrow = tabs.Composer!.GetButton("left");
+            var rightArrow = tabs.Composer.GetButton("right");
+            Assert.True(leftArrow.Visible);
+            Assert.True(rightArrow.Visible);
+            Assert.True(viewport.absX >= callerBounds.absX);
+            Assert.True(viewport.absX + viewport.InnerWidth <= callerBounds.absX + callerBounds.InnerWidth);
+            Assert.True(leftArrow.Bounds.absX >= callerBounds.absX);
+            Assert.True(leftArrow.Bounds.absX + leftArrow.Bounds.OuterWidth <= viewport.absX);
+            Assert.True(viewport.absX + viewport.InnerWidth <= rightArrow.Bounds.absX);
+            Assert.True(rightArrow.Bounds.absX + rightArrow.Bounds.OuterWidth
+                <= callerBounds.absX + callerBounds.OuterWidth);
+            expectedLeft = viewport.absX;
+            expectedRight = viewport.absX + viewport.InnerWidth;
+            Assert.Equal(callerBounds.absY, viewport.absY, 4);
+            Assert.Equal(callerBounds.InnerHeight, viewport.InnerHeight, 4);
+            Assert.NotEqual(Math.Round(callerBounds.absX), callerBounds.absX);
+            // Assert pointer activation is rejected on both clipped edges before movement.
+            AssertClippedClickRejected(left: false);
+            SetMouse(graphics, (expectedLeft + expectedRight) / 2,
+                callerBounds.absY + callerBounds.InnerHeight / 2);
+            var wheel = new MouseWheelEventArgs { deltaPrecise = 1000 };
+            tabs.OnMouseWheel(graphics.Api.Object, wheel);
+            Assert.True(wheel.IsHandled);
+            // Assert the clipped edge remains inert after scrolling; activate the last visible tab.
+            AssertClippedClickRejected(left: true);
+
+            var last = tabs.Composer!.GetToggleButton("tab-8").Bounds;
+            Click((int)(last.absX + last.OuterWidth / 2), (int)(last.absY + last.OuterHeight / 2));
+            Assert.Equal(8, tabs.activeElement);
+            Assert.Equal(8, Assert.Single(changes));
+            tabs.OnFocusGained();
+            Navigate(GlKeys.Right, 0);
+            Navigate(GlKeys.Left, 8);
+            // Assert keyboard traversal returns to the moved tab and ignores input after focus loss.
+            Assert.Equal(new[] { 8, 0, 8 }, changes);
+            tabs.OnFocusLost();
+            var unfocused = new KeyEvent { KeyCode = (int)GlKeys.Right };
+            tabs.OnKeyDown(graphics.Api.Object, unfocused);
+            Assert.False(unfocused.Handled);
+            Assert.Equal(8, tabs.activeElement);
+            Assert.Equal(new[] { 8, 0, 8 }, changes);
+        }
+
+        void AssertClippedClickRejected(bool left)
+        {
+            var clipped = tabs.Composer!.GetToggleButton("tab-4").Bounds;
+            int x = left ? (int)Math.Ceiling(expectedLeft) - 1
+                : (int)Math.Floor(expectedRight) + 1;
+            int y = (int)(clipped.absY + clipped.OuterHeight / 2);
+            Assert.True(clipped.PointInside(x, y));
+            Assert.True(left ? x < expectedLeft : x >= expectedRight);
+            Assert.False(tabs.Viewport!.PointInside(x, y));
+            Click(x, y);
+            Assert.Empty(changes);
+            Assert.Equal(0, tabs.activeElement);
+        }
+
+        void Click(int x, int y)
+        {
+            SetMouse(graphics, x, y);
+            tabs.OnMouseDownOnElement(graphics.Api.Object, new MouseEvent(x, y, EnumMouseButton.Left, 0));
+            tabs.OnMouseUp(graphics.Api.Object, new MouseEvent(x, y, EnumMouseButton.Left, 0));
+        }
+
+        void Navigate(GlKeys key, int expected)
+        {
+            var args = new KeyEvent { KeyCode = (int)key };
+            tabs.OnKeyDown(graphics.Api.Object, args);
+            Assert.True(args.Handled);
+            Assert.Equal(expected, tabs.activeElement);
+            var selected = tabs.Composer!.GetToggleButton("tab-" + expected).Bounds;
+            var viewport = tabs.Viewport!;
+            Assert.True(selected.absX >= viewport.absX - .001);
+            Assert.True(selected.absX + selected.OuterWidth <= viewport.absX + viewport.InnerWidth + .001);
+        }
+    }
+
+    private static void AssertSelectedBackgroundWithinNativeClip(GuiRenderFixture graphics, GuiElementIconTab tab)
+    {
+        var texture = Assert.IsType<LoadedTexture>(typeof(GuiElementIconTab)
+            .GetField("selectedBackground", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(tab));
+        var draw = Assert.Single(graphics.Render.Invocations.Where(call =>
+            call.Method.Name == nameof(IRenderAPI.Render2DTexturePremultipliedAlpha)
+            && Convert.ToInt32(call.Arguments[0]) == texture.TextureId));
+        var (left, top, right, bottom) = NativeScissorRectangle(graphics);
+        double x = Convert.ToDouble(draw.Arguments[1]);
+        double y = Convert.ToDouble(draw.Arguments[2]);
+        double width = Convert.ToDouble(draw.Arguments[3]);
+        double height = Convert.ToDouble(draw.Arguments[4]);
+        Assert.True(x >= left);
+        Assert.True(y >= top);
+        Assert.True(x + width <= right);
+        Assert.True(y + height <= bottom);
+    }
+
+    [Theory]
+    [InlineData(1f, 9)]
+    [InlineData(1.25f, 1)]
+    [InlineData(1.25f, 10)]
+    [InlineData(1.5f, 18)]
+    [InlineData(1.75f, 9)]
+    [InlineData(2f, 10)]
+    public void MeasuredWidthShowsEveryTabWithoutScrollingOrArrows(float scale, int count)
+    {
+        using var graphics = new GuiRenderFixture(scale);
+        Setup(graphics);
+        double width = GuiElementIconTabs.MeasureWidth(count);
+        using var tabs = Create(graphics, Enumerable.Range(0, count).Select(i => "Entry " + i).ToArray(), width, _ => { });
+        Assert.False(tabs.Composer!.GetButton("left").Visible);
+        Assert.False(tabs.Composer.GetButton("right").Visible);
+        Assert.All(Enumerable.Range(0, count), index =>
+        {
+            var bounds = tabs.Composer.GetToggleButton("tab-" + index).Bounds;
+            Assert.True(bounds.absX >= tabs.Viewport!.absX);
+            Assert.True(bounds.absX + bounds.OuterWidth <= tabs.Viewport.absX + tabs.Viewport.InnerWidth + .001);
+        });
+        graphics.Render.Invocations.Clear();
+        tabs.RenderInteractiveElements(0);
+        var clip = NativeScissorRectangle(graphics);
+        Assert.All(Enumerable.Range(0, count), index =>
+        {
+            var bounds = tabs.Composer.GetToggleButton("tab-" + index).Bounds;
+            Assert.True(bounds.renderX >= clip.Left - 1);
+            Assert.True(bounds.renderX + bounds.OuterWidth <= clip.Right + 1);
+            Assert.True(bounds.renderY >= clip.Top - 1);
+            Assert.True(bounds.renderY + bounds.OuterHeight <= clip.Bottom + 1);
+        });
+        Assert.Empty(graphics.Clips);
+        Assert.Throws<ArgumentOutOfRangeException>(() => GuiElementIconTabs.MeasureWidth(0));
+    }
+
+    [Theory]
+    [InlineData(1f)]
+    [InlineData(1.5f)]
+    [InlineData(2f)]
+    public void SelectionKeyboardWrapAndWheelScrollingUseNativeBoundsAndClipHitTesting(float scale)
+    {
+        using var graphics = new GuiRenderFixture(scale);
+        Setup(graphics);
+        var changes = new List<int>();
+        using var tabs = Create(graphics, Enumerable.Range(0, 9).Select(i => "Entry " + i).ToArray(), 180, changes.Add);
+        tabs.SetValue(8);
+        Assert.Equal(8, Assert.Single(changes));
+        AssertSelectedVisible();
+        tabs.SetValue(0, false);
+        Assert.Single(changes);
+        AssertSelectedVisible();
+        tabs.SetValue(3, false);
+        Compose(tabs);
+        AssertSelectedVisible();
+        tabs.SetValue(0, false);
+        tabs.OnFocusGained();
+        var left = new KeyEvent { KeyCode = (int)GlKeys.Left };
+        tabs.OnKeyDown(graphics.Api.Object, left);
+        Assert.True(left.Handled);
+        Assert.Equal(8, tabs.activeElement);
+        AssertSelectedVisible();
+        var right = new KeyEvent { KeyCode = (int)GlKeys.Right };
+        tabs.OnKeyDown(graphics.Api.Object, right);
+        Assert.True(right.Handled);
+        Assert.Equal(0, tabs.activeElement);
+        AssertSelectedVisible();
+        SetMouse(graphics, tabs.Viewport!.absX + 1, tabs.Viewport.absY + 10 * scale);
+        var wheel = new MouseWheelEventArgs { deltaPrecise = 1000 };
+        tabs.OnMouseWheel(graphics.Api.Object, wheel);
+        Assert.Equal(0, tabs.activeElement);
+        Assert.True(tabs.Composer!.GetToggleButton("tab-0").Bounds.absX < tabs.Viewport.absX);
+        int count = changes.Count;
+        double beforeArrow = tabs.Composer.GetToggleButton("tab-0").Bounds.absX;
+        tabs.OnMouseDownOnElement(graphics.Api.Object,
+            new MouseEvent((int)tabs.Bounds.absX + 1, (int)tabs.Bounds.absY + 10, EnumMouseButton.Left, 0));
+        Assert.Equal(count, changes.Count);
+        tabs.OnMouseUp(graphics.Api.Object,
+            new MouseEvent((int)tabs.Bounds.absX + 1, (int)tabs.Bounds.absY + 10, EnumMouseButton.Left, 0));
+        Assert.True(tabs.Composer.GetToggleButton("tab-0").Bounds.absX > beforeArrow);
+        tabs.SetValue(0, false);
+        tabs.Enabled = false;
+        graphics.Render.Invocations.Clear();
+        tabs.RenderInteractiveElements(0);
+        tabs.OnMouseDownOnElement(graphics.Api.Object, new MouseEvent(10, 10, EnumMouseButton.Left, 0));
+        tabs.OnKeyDown(graphics.Api.Object, new KeyEvent { KeyCode = (int)GlKeys.Right });
+        Assert.Empty(graphics.Render.Invocations);
+        Assert.Equal(0, tabs.activeElement);
+        Assert.Equal(count, changes.Count);
+
+        void AssertSelectedVisible()
+        {
+            var bounds = tabs.Composer!.GetToggleButton("tab-" + tabs.activeElement).Bounds;
+            Assert.True(bounds.absX >= tabs.Viewport!.absX - .001);
+            Assert.True(bounds.absX + bounds.OuterWidth <= tabs.Viewport.absX + tabs.Viewport.InnerWidth + .001);
+        }
+    }
+
+    [Fact]
+    public void PointerAndKeyboardHintsUseTabNamesAndAreOutsideTheClipAndDismissOffThePanel()
+    {
+        string originalLocale = Lang.CurrentLocale;
+        var originalEnglish = Lang.AvailableLanguages.GetValueOrDefault("en");
+        Lang.AvailableLanguages["en"] = Mock.Of<ITranslationService>();
+        Lang.ChangeLanguage("en");
+        try { AssertHints(); }
+        finally
+        {
+            if (originalEnglish == null) Lang.AvailableLanguages.Remove("en");
+            else Lang.AvailableLanguages["en"] = originalEnglish;
+            Lang.ChangeLanguage(originalLocale);
+        }
+    }
+
+    [Fact]
+    public void NativeCompositionRestoresTheHostClipWhenRenderingFails()
+    {
+        using var graphics = new GuiRenderFixture();
+        Setup(graphics);
+        using var tabs = Create(graphics, ["One", "Two"], 150, _ => { });
+        var host = ElementBounds.Fixed(0, 0, 1000, 1000).WithEmptyParent();
+        graphics.Clips.Push(host);
+        graphics.Render.Setup(value => value.Render2DTexturePremultipliedAlpha(It.IsAny<int>(),
+            It.IsAny<double>(), It.IsAny<double>(), It.IsAny<double>(), It.IsAny<double>(),
+            It.IsAny<float>(), It.IsAny<Vec4f>()))
+            .Callback(() =>
+            {
+                if (graphics.Clips.Count > 1) throw new InvalidOperationException("Native tab rendering failed.");
+            });
+        Assert.Throws<InvalidOperationException>(() => tabs.RenderInteractiveElements(0));
+        Assert.Same(host, Assert.Single(graphics.Clips));
+    }
+
+    [Fact]
+    public void IconClickSelectsAndInvalidSelectionsAndDescriptionsFailExplicitly()
+    {
+        using var graphics = new GuiRenderFixture();
+        Setup(graphics);
+        var changes = new List<int>();
+        using var tabs = Create(graphics, ["One", "Two", "Three"], 500, changes.Add);
+        var bounds = tabs.Composer!.GetToggleButton("tab-1").Bounds;
+        var args = new MouseEvent((int)bounds.absX + 14, (int)bounds.absY + 13, EnumMouseButton.Left, 0);
+        tabs.OnMouseDownOnElement(graphics.Api.Object, args);
+        Assert.True(args.Handled);
+        Assert.Equal(1, tabs.activeElement);
+        Assert.Equal(1, Assert.Single(changes));
+        tabs.OnMouseDownOnElement(graphics.Api.Object, new MouseEvent(args.X, args.Y, EnumMouseButton.Left, 0));
+        Assert.Equal(new[] { 1, 1 }, changes);
+        Assert.Throws<ArgumentOutOfRangeException>(() => tabs.SetValue(-1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => tabs.SetValue(3));
+        Assert.Throws<ArgumentException>(() => new GuiElementIconTabs(graphics.Api.Object,
+            [new GuiTab { Name = "One" }], [], tabs.Bounds, _ => { }));
+        Assert.Equal(1, tabs.activeElement);
+    }
+}

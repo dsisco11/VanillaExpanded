@@ -1,5 +1,3 @@
-using VanillaExpanded.Tests.IntegrationHarness;
-
 namespace VanillaExpanded.IntegrationTests.AutoStashing;
 
 /// <summary>Owns the dedicated process lifetime of irreversible reverse patches and ordinary production dispatch patches.</summary>

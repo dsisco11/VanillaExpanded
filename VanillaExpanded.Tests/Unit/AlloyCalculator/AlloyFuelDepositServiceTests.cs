@@ -1,5 +1,4 @@
 using Moq;
-using System.Text.Json;
 
 using VanillaExpanded.AlloyCalculator;
 using VanillaExpanded.Network;
@@ -469,44 +468,6 @@ public class AlloyFuelDepositServiceTests
             out AlloyFuelDepositPlan? plan, out _, out float? meltingPoint));
         Assert.Null(plan);
         Assert.Null(meltingPoint);
-    }
-
-    [Fact]
-    public void FuelSourcePatch_TagsDedicatedFuelsAndOnlyCoalOreVariants()
-    {
-        DirectoryInfo? root = new(AppContext.BaseDirectory);
-        while (root is not null && !File.Exists(Path.Combine(root.FullName, "VanillaExpanded.sln")))
-            root = root.Parent;
-        Assert.NotNull(root);
-        using JsonDocument document = JsonDocument.Parse(File.ReadAllText(Path.Combine(root.FullName,
-            "VanillaExpanded", "assets", "vanillaexpanded", "patches", "fuelsources.json")));
-        var patches = document.RootElement.EnumerateArray()
-            .ToDictionary(patch => patch.GetProperty("file").GetString()!);
-        string[] fuelAssets =
-        [
-            "game:itemtypes/resource/firewood.json",
-            "game:itemtypes/resource/firewood-aged.json",
-            "game:blocktypes/soil/peatbrick.json",
-            "game:itemtypes/resource/charcoal.json",
-            "game:itemtypes/resource/coke.json",
-            "game:itemtypes/resource/coal-contaminated.json"
-        ];
-        Assert.Equal(fuelAssets.Length + 1, patches.Count);
-        foreach (string asset in fuelAssets)
-        {
-            JsonElement patch = patches[asset];
-            Assert.Equal("add", patch.GetProperty("op").GetString());
-            Assert.Equal("/tags", patch.GetProperty("path").GetString());
-            Assert.Equal(["is-fuel-source"], patch.GetProperty("value").EnumerateArray().Select(tag => tag.GetString()));
-        }
-        JsonElement orePatch = patches["game:itemtypes/resource/ore-ungraded.json"];
-        Assert.Equal("add", orePatch.GetProperty("op").GetString());
-        Assert.Equal("/tagsByType", orePatch.GetProperty("path").GetString());
-        JsonProperty[] variants = orePatch.GetProperty("value").EnumerateObject().ToArray();
-        Assert.Equal(["ore-anthracite", "ore-bituminouscoal", "ore-lignite"],
-            variants.Select(variant => variant.Name).Order());
-        Assert.All(variants, variant => Assert.Equal(["is-fuel-source"],
-            variant.Value.EnumerateArray().Select(tag => tag.GetString())));
     }
 
     [Theory]

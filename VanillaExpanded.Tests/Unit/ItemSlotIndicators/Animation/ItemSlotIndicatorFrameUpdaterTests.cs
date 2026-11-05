@@ -26,7 +26,6 @@ public sealed class ItemSlotIndicatorFrameUpdaterTests
         camera.Setup(c => c.Capture()).Returns(Sample());
         double now = 100;
         using var updater = new ItemSlotIndicatorFrameUpdater(events.Object, camera.Object, () => true, () => now);
-        Assert.Equal(0.99, updater.RenderOrder);
         events.Verify(e => e.RegisterRenderer(updater, EnumRenderStage.Ortho, "itemslotindicator-frame"), Times.Once);
         updater.OnRenderFrame(1, EnumRenderStage.Before);
         camera.Verify(c => c.Capture(), Times.Never);

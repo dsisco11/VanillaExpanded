@@ -5,6 +5,52 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Launch Client (No Capture, No VanillaExpanded)",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "${env:VINTAGE_STORY}/Vintagestory.exe",
+            "preLaunchTask": "tail-clientlog-start",
+            "postDebugTask": "stop-and-scan-clientlog",
+            "env": {
+                "VGE_DATA_PATH": "${config:vsmod.debugGame.dataPath}"
+            },
+            "args": [
+                "--openWorld", "TestWorld",
+                "--tracelog",
+                "--dataPath",
+                "${config:vsmod.debugGame.dataPath}"
+            ],
+            "cwd": "${env:VINTAGE_STORY}",
+            "console": "internalConsole",
+            "internalConsoleOptions": "neverOpen",
+            "stopAtEntry": false
+        },
+        {
+            "name": "Launch Client (No Capture)",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "${env:VINTAGE_STORY}/Vintagestory.exe",
+            "preLaunchTask": "build-and-tail",
+            "postDebugTask": "stop-and-scan-clientlog",
+            "env": {
+                "VGE_DATA_PATH": "${config:vsmod.debugGame.dataPath}"
+            },
+            "args": [
+                "--openWorld", "TestWorld",
+                "--tracelog",
+                "--dataPath",
+                "${config:vsmod.debugGame.dataPath}",
+                "--addModPath",
+                "${config:vsmod.projectFolder}/bin/Debug/Mods",
+                "--addOrigin",
+                "${config:vsmod.projectFolder}/assets"
+            ],
+            "cwd": "${env:VINTAGE_STORY}",
+            "console": "internalConsole",
+            "internalConsoleOptions": "neverOpen",
+            "stopAtEntry": false
+        },
+        {
             "name": "Launch Client",
             "type": "coreclr",
             "request": "launch",

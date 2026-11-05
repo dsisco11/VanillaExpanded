@@ -1,0 +1,53 @@
+namespace VanillaExpanded.RecipeBook;
+
+internal static class RecipeBookVisualMetrics
+{
+    internal const double PreferredWidth = 340;
+    internal const double PreferredHeight = 420;
+    internal const double TitleHeight = 36;
+    internal const float TitleFontSize = 14;
+    internal const double TitleSpacing = 12;
+    internal const double OuterPadding = 8;
+    internal const double PanelPadding = 8;
+    internal const double PanelTopPadding = 12;
+    internal const float HeadingFontSize = 11;
+    internal const double HeadingHeight = 17;
+    internal const double HeadingSpacing = 8;
+    internal const double FilterSpacing = 10;
+    internal const double SearchSpacing = 10;
+    internal const double FooterSpacing = 12;
+    internal const double LabelSpacing = 8;
+    internal const double FooterButtonSpacing = 3;
+    internal const double FooterLabelSpacing = 4;
+    internal const double FooterHeight = 24;
+    internal const double NavigationWidth = 24;
+    internal const double AutoWidth = 46;
+    internal const double HandbookWidth = 70;
+    internal const double ScrollbarWidth = 12;
+    internal const double ScrollbarSpacing = 4;
+    internal const double ListOutline = 2;
+    internal const double OptionsIconSize = 17;
+    internal const double OptionsIconSpacing = 11;
+    internal const double OptionsIconTop = 7;
+    internal const double PopupPadding = 5;
+    internal const double PopupHeight = 30;
+    internal const float PopupDepth = 310;
+    internal const int HintWidth = 300;
+    internal const double NativeTitleRightSpacing = 20;
+    internal const double NativeCloseRightInset = 12;
+    internal const double NativeCloseTop = 7;
+    internal const double NativeMenuTop = 8;
+    internal const double NativeMenuExpansion = 2;
+    internal const double NativeCrossStroke = 2;
+    internal const double ShadowRadius = 8;
+    internal const double ShadowOffset = 5;
+    internal const double ShadowOpacity = 0.4;
+    internal const double TileSize = 45;
+    internal const int MinimumTileSize = 30;
+    internal const int MaximumTileSize = 90;
+    internal const double TileGap = 5;
+    internal const double ListHorizontalPadding = 6;
+    internal const double ListTopPadding = 2;
+    internal const double SelectionInset = 3;
+    internal const double SelectionLength = 8;
+}

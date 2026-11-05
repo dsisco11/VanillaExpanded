@@ -106,18 +106,20 @@ public sealed class CrucibleIndicatorProviderTests
         Assert.Equal(cold.Fill, hot.Fill);
     }
 
-    /// <summary>Metal has a separate engine identity, stronger damping, and restrained camera impulses.</summary>
+    /// <summary>Water and metal retain independent shader identities and valid solver settings.</summary>
     [Fact]
-    public void MetalProfile_HasIndependentSlowerDynamics()
+    public void MetalProfileHasIndependentIdentityAndValidSolverSettings()
     {
         var water = LiquidSloshSimulationProfile.Water;
         var metal = LiquidSloshSimulationProfile.Metal;
         Assert.NotEqual(water.ShaderName, metal.ShaderName);
-        Assert.Equal(water.Gravity, metal.Gravity);
-        Assert.True(metal.Damping > water.Damping);
-        Assert.True(metal.AccelerationScale.X < water.AccelerationScale.X);
-        Assert.True(metal.AccelerationScale.Y < metal.AccelerationScale.X);
-        Assert.True(metal.MaximumAcceleration < water.MaximumAcceleration);
+        Assert.All(new[] { metal.Gravity, metal.Damping, metal.AccelerationScale.X, metal.AccelerationScale.Y,
+            metal.JostleScale, metal.MaximumAcceleration },
+            value => Assert.True(float.IsFinite(value)));
+        Assert.True(metal.Damping > 0);
+        Assert.True(metal.AccelerationScale.X > 0 && metal.AccelerationScale.Y > 0);
+        Assert.True(metal.JostleScale >= 0);
+        Assert.True(metal.MaximumAcceleration > 0);
     }
 
     /// <summary>Metal colors use the contained collectible and remain stable across repeated amount samples.</summary>

@@ -1,0 +1,219 @@
+# Cairo Dependency and Presentation Assertion Cleanup
+
+Purpose:
+    Remove tests of incidental presentation details and eliminate unnecessary
+    native Cairo dependencies while preserving meaningful behavioral coverage.
+    This is an implementation task list, not a claim that the cleanup is complete.
+
+Scope and constraints:
+    - Review VanillaExpanded.Tests, its shared fixtures, necessary production
+      seams, dependency configuration, CI, and directly related documentation.
+    - Do not preserve an assertion merely because it already exists.
+    - Do not replace pixel assertions with equivalent checks of style constants,
+      drawing commands, decorative coordinates, or internal implementation details.
+    - Preserve activation, selection, callbacks, focus, scrolling, state restoration,
+      input routing, clipping correctness, and resource ownership where applicable.
+    - Distinguish decorative geometry from functional geometry such as hit targets,
+      reachable controls, viewport containment, and scroll limits.
+    - Keep game reference sources read-only. Avoid production rendering changes
+      unless a small, justified seam is necessary for behavioral testing.
+    - Prefer eliminating native Cairo from all retained tests. Do not assume a
+      permanent Cairo-backed test lane is required.
+
+## Phase 1: Confirm policy boundaries and inventory
+    Prerequisite: none.
+    Policy confirmed by the user: no pixel-output or presentation-only exceptions,
+    including whole-buffer non-modification. Functional geometry is permitted when
+    tied to hit testing, clipping, viewport containment, reachability, and scroll limits.
+    Decision record: [CairoTestInventory](CairoTestInventory.md).
+    [x] Confirm and document any allowed exceptions to the user's policies against
+        pixel-output and presentation-detail assertions before retaining such tests.
+        No exceptions are approved.
+    [x] Inventory assertions across the test project, including shared assertion
+        helpers, captured textures, surface buffers, sampled channels, and alpha.
+    [x] Include non-pixel presentation assertions: palette values, font sizes,
+        decorative spacing, exact styling dimensions, and rendering command values.
+    [x] Classify each suspect assertion as presentation-only, meaningful behavior,
+        or a mixed/ambiguous contract; resolve ambiguous cases against requirements.
+    [x] Trace native Cairo entry points separately from assertion policy: font
+        initialization, text measurement, real composition, text texture generation,
+        and fixtures that initialize these incidentally.
+    [x] Record decisions by test method and shared fixture, including behavior to
+        preserve and any approved exception. Do not use test category as a proxy
+        for native dependencies.
+    Completion:
+        Every identified assertion has a disposition and behavioral coverage owner.
+        The earlier inventory of 18 methods / 87 declared cases is a starting point,
+        not an exhaustive inventory of presentation assertions or Cairo dependencies.
+
+## Phase 2: Remove known Cairo pixel assertions without losing behavior
+    Prerequisite: [Phase 1 decisions](CairoTestInventory.md) for each affected batch.
+    Apply these tasks to the named methods in the linked files. Remove assertions
+    that are presentation-only; preserve or relocate independent behavioral checks.
+    Delete whole tests only when no justified contract remains, subject to approved
+    exceptions. Rename retained tests to describe their remaining behavior.
+
+    Unit:
+    [x] [GuiControlVisualsTests](../VanillaExpanded.Tests/Unit/Gui/GuiControlVisualsTests.cs):
+        FrameHasApprovedFillAndGuiScaledWholePixelOutline.
+        Remove exact fill/outline and rasterized stroke checks.
+    [x] [GuiControlVisualsTests](../VanillaExpanded.Tests/Unit/Gui/GuiControlVisualsTests.cs):
+        GradientsAreLocalAndInvalidPixelGeometryFailsExplicitly.
+        Remove gradient endpoint checks; reassess and retain justified input-validation
+        coverage independently of surface creation.
+
+    Component GUI:
+    [x] [GuiElementIconTabsTests](../VanillaExpanded.Tests/Component/Gui/GuiElementIconTabsTests.cs):
+        FolderTabRasterHasRoundedShouldersAndOpensIntoTheMatchingPanel.
+        Remove shoulder, fill, accent, outline, and panel-edge pixel expectations.
+    [x] [GuiStyledControlStateRenderingTests](../VanillaExpanded.Tests/Component/Gui/GuiStyledControlStateRenderingTests.cs):
+        PopupSelectionPresenceInvalidatesCachedIndicator.
+        Remove selection-color searches; retain only justified selection/cache behavior.
+    [x] [GuiStyledControlStateRenderingTests](../VanillaExpanded.Tests/Component/Gui/GuiStyledControlStateRenderingTests.cs):
+        ScrollbarPointerFeedbackTracksCaptureAndCancelsWithoutExtraScrollOrUploads.
+        Remove hover/pressed colors and disabled-alpha checks; preserve capture,
+        cancellation, scrolling, and justified resource-lifecycle checks.
+
+    Component Recipe Book:
+    [x] [RecipeBookDialogLayoutTests](../VanillaExpanded.Tests/Component/RecipeBook/RecipeBookDialogLayoutTests.cs):
+        BaselineShellAdoptsSharedControlsAndCentersTheRealMultiDigitCounter.
+        Remove shell colors, gradients, separators, and decorative placement checks.
+        Preserve independently justified functional layout and control wiring.
+    [x] [RecipeBookOptionsTests](../VanillaExpanded.Tests/Component/RecipeBook/RecipeBookOptionsTests.cs):
+        RecipeBookOptionsSvgStatesUseIsolatedTexturesWithoutModifyingTheSharedDialogSurface.
+        Whole-buffer non-modification is not an approved exception.
+        Replace only with meaningful isolation/ownership coverage.
+
+    Integration styled controls:
+    [x] [GuiStyledControlsNativeCompatibilityTests](../VanillaExpanded.Tests/Integration/Gui/GuiStyledControlsNativeCompatibilityTests.cs):
+        ButtonPreservesNativeActivationAndRendersApprovedStates.
+        Remove state colors and text-alpha checks; preserve activation and disabled behavior.
+    [x] [GuiStyledControlsNativeCompatibilityTests](../VanillaExpanded.Tests/Integration/Gui/GuiStyledControlsNativeCompatibilityTests.cs):
+        ClearableInputUsesCallerLabelsAndNotifiesExactlyOnceWithNativeGeometry.
+        Remove fill, placeholder color/opacity, and decorative inset checks; preserve
+        editing, clear notification, focus, and functional hit geometry.
+    [x] [GuiStyledControlsNativeCompatibilityTests](../VanillaExpanded.Tests/Integration/Gui/GuiStyledControlsNativeCompatibilityTests.cs):
+        DropdownCachesStyledResourcesAcrossNativeOpeningReplacementAndSelection.
+        Remove field/popup colors, selection pixels, alpha, and buffer comparisons;
+        preserve opening, replacement, selection, and resource ownership behavior.
+    [x] [GuiStyledControlsNativeCompatibilityTests](../VanillaExpanded.Tests/Integration/Gui/GuiStyledControlsNativeCompatibilityTests.cs):
+        CheckboxHasFlatScaledFrameNativeTogglingAndDisabledIndicator.
+        Remove frame colors and indicator alpha; preserve toggling and disabled behavior.
+    [x] [GuiStyledControlsNativeCompatibilityTests](../VanillaExpanded.Tests/Integration/Gui/GuiStyledControlsNativeCompatibilityTests.cs):
+        ScrollbarArrowsAndInsetThumbShareNativeRangeAndReleaseDragOutside.
+        Remove track/thumb colors, corner transparency, and arrow alpha; preserve
+        range handling, dragging, boundary behavior, and release outside the control.
+    [x] [GuiStyledControlsNativeCompatibilityTests](../VanillaExpanded.Tests/Integration/Gui/GuiStyledControlsNativeCompatibilityTests.cs):
+        ArrowButtonsUseNativeMomentaryActivationWithoutExtraFocusOrReleaseCallbacks.
+        Remove hover-color checks; preserve momentary activation, focus, and callback semantics.
+
+    Integration native probes:
+    [x] [GuiControlNativeProbeTests](../VanillaExpanded.Tests/Integration/Gui/GuiControlNativeProbeTests.cs):
+        BorderlessButtonRetainsNativeActivationAndVisibilityWithLocalFlatChrome.
+        Remove painted/untouched sample comparisons; preserve activation and visibility behavior.
+    [x] [GuiControlNativeProbeTests](../VanillaExpanded.Tests/Integration/Gui/GuiControlNativeProbeTests.cs):
+        InputChromeAndCallerPlaceholderUseEightUnitInsetWithoutEngineFieldAccess.
+        Remove placeholder RGB and decorative inset checks; identify any independent
+        input/placeholder behavior worth preserving.
+    [x] [GuiControlNativeProbeTests](../VanillaExpanded.Tests/Integration/Gui/GuiControlNativeProbeTests.cs):
+        PopupRestylesAfterNativeOpenSelectionAndListReplacementWithoutChangingRowGeometry.
+        Remove popup fill/style checks; preserve open, selection, list replacement,
+        and functional hit-testing coverage.
+    [x] [GuiControlNativeProbeTests](../VanillaExpanded.Tests/Integration/Gui/GuiControlNativeProbeTests.cs):
+        TitleChromeCanBeOverpaintedLocallyWhileNativeDragPositionAndCloseRemainAuthoritative.
+        Remove title-gradient samples; preserve drag, position persistence, and close behavior.
+
+    Integration tooltip:
+    [x] [RecipeBookNativeTooltipIntegrationTests](../VanillaExpanded.Tests/Integration/RecipeBook/RecipeBookNativeTooltipIntegrationTests.cs):
+        RecipeTooltipUsesNativeSelectedGridWithTitleAndReleasesReplacedPreviews.
+        Remove background/border RGBA comparisons; preserve selected recipe content,
+        meaningful tooltip behavior, and replacement cleanup.
+
+    Completion:
+        Known pixel assertions are removed; no exceptions are approved. Mixed tests retain
+        justified behavior, and obsolete theory rows/helpers are removed where redundant.
+
+## Phase 3: Complete the presentation-policy cleanup
+    Prerequisite: [Phase 1 inventory](CairoTestInventory.md); may proceed alongside
+    Phase 2 in disjoint files.
+    [x] Resolve remaining presentation assertions found beyond the 18-method inventory.
+    [x] Reassess palette/constants-only tests and mixed font/metrics tests, including
+        the pre-cleanup `RecipeBookVisualMetricsTests` disposition in the
+        [Phase 1 inventory](CairoTestInventory.md#1-gui-drawing-controls-and-tabs).
+    [x] Replace decorative positioning assertions only where a genuine functional
+        requirement exists; otherwise remove them rather than inventing a substitute.
+    [x] Preserve functional geometry tests for hit testing, clipping, reachability,
+        scrolling, and viewport behavior without pinning incidental styling choices.
+    [x] Remove unused raster capture, pixel sampling, appearance-only test probes,
+        and dependencies that no longer serve retained coverage.
+    Completion:
+        No unapproved presentation contracts remain in the reviewed scope, whether
+        expressed as pixel bytes, constants, commands, or decorative geometry.
+
+## Phase 4: Decouple retained behavior from native Cairo
+    Prerequisite: assertion dispositions for each affected batch.
+    Native dependency decision: [Phase 4 residuals](CairoTestInventory.md#7-phase-4-native-dependency-decision).
+    The user approved focused native behavioral residuals, not pixel/presentation
+    exceptions or an optional native-backed test lane.
+    [x] Replace broad menu/composer fixtures with focused fixtures for session state,
+        filtering, selection, options persistence, lifecycle, and cache policy.
+    [x] Reuse existing RecipeBookSession, RecipeBookLayout, RecipeBookLayoutCache,
+        and RecipeBookIconCache boundaries before introducing new abstractions.
+    [x] Remove real TextTextureUtil, font creation, and eager composition from fixtures
+        whose remaining behavioral contracts do not require them.
+    [x] Drive icon scheduling, request budgets, completion, reload, and disposal through
+        mocked atlas/render boundaries without unrelated text or tile composition.
+    [x] Evaluate separating measured text inputs from layout arithmetic where necessary;
+        keep real font handling in production and avoid hardcoded fake production metrics.
+    [x] Assess remaining real-control input/composition tests individually. Preserve
+        functional wiring coverage rather than replacing every real collaborator
+        with a mock and claiming equivalent verification.
+    [x] Do not bypass static initialization, fabricate uninitialized engine objects,
+        patch native calls globally, or silently swallow library-loading errors.
+    [x] Record each residual Cairo dependency with its retained behavioral purpose.
+        Obtain a decision on unresolved cases before retiring meaningful coverage
+        or introducing an optional native-backed suite.
+    Completion:
+        Retained managed tests do not reach native Cairo. Any unavoidable residual
+        dependency is explicit and approved, not merely inherited from old fixtures.
+
+## Phase 5: Align configuration, CI, and documentation
+    Prerequisite: [Phase 4 dependency outcomes](CairoTestInventory.md#7-phase-4-native-dependency-decision).
+    [x] Distinguish native libcairo removal from managed cairo-sharp reference removal.
+        Keep assembly references still required by engine signatures or production types.
+    [x] Remove obsolete native test-copy items and fixture dependencies only after
+        proving no retained tests require them. Check SkiaSharp separately.
+    [x] Keep Unit/Component/Integration classification based on actual test boundaries;
+        preserve required GUI serialization and teardown safeguards.
+    [x] If exceptions are approved, use an explicit capability selector independent
+        of test category, and ensure the exceptional tests actually run in CI.
+        Do not silently skip failed tests or treat missing libraries as success.
+    [x] Update the existing build/test workflow to exercise the intended dependency-free
+        scope and any explicitly approved residual scope without hiding coverage loss.
+    [x] Update directly related test guidance and commands to state the presentation
+        policy, approved exceptions, and the final native dependency requirements.
+    Completion:
+        Project configuration, CI selection, and documentation match the retained
+        contracts and do not imply that Category=Unit guarantees Cairo independence.
+
+## Phase 6: Verify behavior and dependency elimination
+    Prerequisite: coherent implementation batches from Phases 2-5.
+    [ ] Follow the configured test workflow for test writing and independent review;
+        reconcile coverage losses and policy exceptions before marking work complete.
+    [ ] Run focused changed suites first, then the intended complete test scope.
+    [ ] Verify native Cairo independence in a clean process/environment where the
+        library cannot be resolved, including through bundled or system search paths.
+        Merely deleting the test-output copy or observing a green filtered run is insufficient.
+    [ ] Exercise Windows and Linux test paths relevant to the CI failure.
+    [ ] Confirm the validation environment actually executes the retained tests;
+        report discovery counts, approved removals, skips, and residual dependencies.
+    [ ] Check that activation, callbacks, focus, scrolling, restoration, functional
+        geometry, event unsubscription, and resource cleanup retain appropriate coverage.
+    [ ] Search for residual unapproved pixel/presentation assertions, including indirect
+        helper calls, and resolve any remaining native-loading paths.
+    [ ] Build/type-check the mod and tests using existing tooling; validate any changed
+        production seams without changing game rendering behavior.
+    Final completion:
+        Presentation-policy cleanup is independently reviewed. Native Cairo is absent
+        from all retained tests, or every remaining requirement is explicitly approved
+        and verified. No coverage reduction is concealed by filtering or fallback behavior.

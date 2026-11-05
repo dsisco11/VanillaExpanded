@@ -9,15 +9,15 @@ using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
 using Vintagestory.GameContent;
 
-namespace VanillaExpanded.Tests.IntegrationHarness;
+namespace VanillaExpanded.IntegrationTests.AutoStashing;
 
-/// <summary>Runs production Harmony patches only when explicitly invoked by the separate integration test assembly.</summary>
+/// <summary>Runs production Harmony patches in the dedicated isolated integration-test host.</summary>
 /// <remarks>The reverse-patched stub is process-local and intentionally confined to that integration host's lifetime.</remarks>
-public static class EngineDispatchHarness
+internal static class EngineDispatchHarness
 {
-    #region Public API
+    #region Entry point
     /// <summary>Installs actual production patches, exercises engine entries, and removes ordinary owners even after assertion failure.</summary>
-    public static void RunIsolatedDispatchChecks()
+    internal static void RunIsolatedDispatchChecks()
     {
         const string owner = "vanillaexpanded.tests.engine-dispatch";
         var harmony = new Harmony(owner);

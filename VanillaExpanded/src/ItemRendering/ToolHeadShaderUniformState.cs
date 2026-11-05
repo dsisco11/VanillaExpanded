@@ -33,7 +33,7 @@ internal sealed class ToolHeadShaderUniformState : IDisposable
     {
         return new(shader, (name, count, integer) =>
         {
-            int location = render.GetUniformLocation(shader.ProgramId, name);
+            int location = render.GetUniformLocation(shader.PassId, name);
             var values = new float[count];
             if (location < 0) return values; // Engine metadata also includes uniforms optimized out by the linker.
             if (integer)
@@ -46,14 +46,14 @@ internal sealed class ToolHeadShaderUniformState : IDisposable
             return values;
         }, (name, integer, values) =>
         {
-            int location = render.GetUniformLocation(shader.ProgramId, name);
+            int location = render.GetUniformLocation(shader.PassId, name);
             if (location < 0) return;
-            if (integer) GL.Uniform1(location, (int)values[0]);
-            else if (values.Length == 16) GL.UniformMatrix4(location, 1, false, values);
-            else if (values.Length == 4) GL.Uniform4(location, values[0], values[1], values[2], values[3]);
-            else if (values.Length == 3) GL.Uniform3(location, values[0], values[1], values[2]);
-            else if (values.Length == 2) GL.Uniform2(location, values[0], values[1]);
-            else GL.Uniform1(location, values[0]);
+            if (integer) shader.Uniform(name, (int)values[0]);
+            else if (values.Length == 16) shader.UniformMatrix(name, values);
+            else if (values.Length == 4) shader.Uniform(name, values[0], values[1], values[2], values[3]);
+            else if (values.Length == 3) shader.Uniform(name, values[0], values[1], values[2]);
+            else if (values.Length == 2) shader.Uniform(name, values[0], values[1]);
+            else shader.Uniform(name, values[0]);
         });
     }
 

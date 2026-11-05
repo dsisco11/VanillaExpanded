@@ -34,13 +34,53 @@ Release, close the loot window, change world targets, move out of reach, or disa
 
 AutoLoot is enabled by default. To turn it off or adjust the hold duration, open **Pause menu > Mod Settings > VanillaExpanded > Auto Loot** with ConfigLib installed. For manual configuration, see [Auto Loot settings](#auto-loot-settings).
 
-AutoLoot runs entirely on the client: neither VanillaExpanded nor ConfigLib is required on the server for this feature. ConfigLib is optional for the client-side settings menu. AutoLoot and Auto-Stash can be enabled independently. Transfers use vanilla packets and server authorization; progress completion initiates collection, not a server-confirmed success notification.
+AutoLoot runs entirely on the client: neither VanillaExpanded nor ConfigLib is required on the server for this feature. ConfigLib is optional for the client-side settings menu. AutoLoot and Auto-Stash can be enabled independently. The server still authorizes item transfers; completing the progress indicator does not guarantee that every item was collected.
 
 **Supported targets:** dead, harvested, non-player corpses with the standard game loot window. Modded creatures using the same vanilla harvesting behavior are supported; custom looting systems, attached bags, player corpses, and general containers are not AutoLoot targets.
 
 **If nothing moves:** check that the corpse has been harvested, still contains loot, and its normal loot window is open. Make room in your inventory, stay within interaction range, then release and hold right-click again. AutoLoot makes one collection attempt per hold; it does not keep retrying when your inventory is full.
 
-Compatibility evidence currently covers inspection of the Vintage Story **1.22.7** native protocol and automated tests. In-game acceptance, including unmodified-server gameplay, latency, and simultaneous looters, remains pending; see the [AutoLoot proposal](docs/AutoLootProposal.md).
+AutoLoot has not been verified in game on unmodified servers, under network latency, or with simultaneous looters.
+
+### Recipe Book
+
+Open your inventory and click the **Recipe Book** button to the left of the crafting-grid output slot. The menu helps you find recipes and arrange their ingredients; it does not craft or collect the result automatically.
+
+**Browse recipes**
+
+- Search by item name or item code. Use the category icons to narrow the list; hover an icon to see its name. **All** shows every output, and **Other** groups outputs without a specific category.
+- Check **Hide uncraftable** to show recipes with enough usable ingredients for one craft. Search and category filters remain active.
+- Choose **Availability** (default) to prioritize supported recipes and uses for items in your crafting grid, or **Name** to browse alphabetically. To find uses for an ingredient, put it in the grid; duplicate stacks and larger quantities do not increase its priority.
+- Changing search, category, Hide uncraftable, or sort returns the list to the top. Use the search field's **x**, **Clear search**, or **Show uncraftable** to relax the corresponding filter without clearing the others.
+
+**Inspect and place ingredients**
+
+Hover or keyboard-focus a tile to see the item's description, recipe, and available/required ingredient counts. Counts update with your inventory. A red border means no required ingredients are available; yellow means some are available. Darkened icons indicate unsupported placement; inspect their tooltips for an explanation.
+
+- **Click:** place available ingredients for one craft, leaving missing ingredients absent.
+- **Shift-click:** fill ingredient positions as far as available stock and stack limits allow.
+- **Craft afterward:** click the normal crafting result slot.
+- **Previous / Next:** choose and pin an alternative recipe for the selected output. **Auto** restores automatic choice. Hide uncraftable can hide an unavailable pin even if another alternative is craftable; uncheck it to reveal the pin. Selecting another output or changing category clears the pin.
+- **Handbook:** open the selected output's survival handbook page without placing ingredients.
+
+Ingredients come from your hotbar, backpack storage, and the nine crafting-grid inputs, not cursor-held items, equipment, or remote containers. The book supports the 3x3 crafting grid, not cooking, smithing, knapping, clay forming, or other workstations. Leave room in carried storage for displaced grid contents. Interrupted transfers can leave a partial arrangement; check the grid before trying again.
+
+**Options and reopening**
+
+Click the titlebar's **sliders** icon to open **Options**:
+
+| Option | Default | Behavior |
+| --- | --- | --- |
+| **Reopen with inventory** | On | Reopen the book with your inventory if it was open when the inventory closed. Turn it off to open the book manually. |
+| **Recipe tile size** | 45 | Enter a whole number from 30 to 90 GUI units. Valid changes resize tiles immediately while keeping your browsing state. Invalid edits restore the last accepted size with an error on Enter or leaving the field. |
+
+Both options are saved on your client across game sessions. Category, search, sort, and your place in the list are remembered within the current world; Hide uncraftable resets when the book reopens.
+
+Click outside Options or press Escape to dismiss the dropdown. Otherwise, Escape or the inventory hotkey closes the inventory and book together; typing in search or tile size suppresses the inventory hotkey. Tab moves between controls, including the dropdown's controls, and arrow keys navigate focused categories, sorting, and recipes. Enter, Space, or keypad Enter activates a focused recipe; hold Shift for the fill action. Opening with the Recipe Book button focuses search; automatic reopening leaves focus with the inventory.
+
+The book is enabled by default. Toggle it under **Pause menu > Mod Settings > VanillaExpanded > Recipe Book** with ConfigLib, or set `EnableRecipeBook` in `ModConfig/VanillaExpanded.json`. Disabling applies immediately through ConfigLib; enabling requires re-entering the world or restarting.
+
+Some recipes use generic output previews or do not support placement. Recipe/modpack and multiplayer compatibility have not been exhaustively verified in game. See the [Recipe Book developer guide](docs/RecipeBook.md) for architecture and maintenance details.
 
 ### Quick Tools
 
@@ -64,7 +104,7 @@ When opening a firepit with a crucible, an Alloy Calculator dialog automatically
 - **See prewarming options** when available lower-temperature fuels can save smelting fuel: the indicator cycles through useful options and the amount of each needed to save at least one item of the selected smelting fuel. Prewarming is not automatic; burn the displayed amount of one option before switching fuel or using **Deposit**, which immediately replaces unsuitable queued fuel.
 - **Deposit button** automatically transfers the required ingredients from your backpack, hotbar, and opened storage containers into the crucible. It first reserves space for each selected ingredient form (such as nuggets and metal bits), then spreads the ingredients evenly across spare slots without mixing incompatible stacks.
 
-The calculator remembers your settings per crucible, so your preferred alloy and ratios are restored when you reopen the dialog (currently not remembered across restarts).
+The calculator remembers your preferred alloy and ratios per crucible when you reopen the dialog, but not across restarts.
 
 ### Animal Sex Indicators
 
@@ -138,6 +178,12 @@ There is no AutoLoot layering option: its progress always renders above dialogs,
 | `EnableAlloyCalculator`       | `true`  | `true`, `false` | Enable the alloy calculator GUI for crucibles.                                                                                         |
 | `DisableAlloyCalculatorPatch` | `false` | `true`, `false` | Disable firepit GUI detection for the alloy calculator. Requires a world reload or restart; prevents automatic opening while disabled. |
 
+#### Recipe Book
+
+| Setting              | Default | Range / choices | Description |
+| -------------------- | ------- | --------------- | ----------- |
+| `EnableRecipeBook` | `true` | `true`, `false` | Enable the client-side recipe book. Disabling applies immediately; enabling requires a world reload or restart. |
+
 #### Gameplay
 
 | Setting                             | Default | Range / choices | Description                                                                                                 |
@@ -203,15 +249,15 @@ Recipe-toggle changes require a world reload to rebuild the available recipes. `
 
 ## Testing
 
-The project includes comprehensive unit and end-to-end tests organized by namespace within `VanillaExpanded.Tests`.
+Tests are organized by feature in [VanillaExpanded.Tests](VanillaExpanded.Tests/).
+Use .NET 10 and set `VINTAGE_STORY` to the matching VintageStory client
+installation.
 
 ### Test Organization
 
-- **Unit Tests** (`VanillaExpanded.Tests/Unit/`): Fast, isolated tests for individual components
-  - `AutoStashing/`: Tests for item matching, stashable items detection, and timing constants
-  - `EquipLightSource/`: Tests for light source detection logic
-- **E2E Tests** (`VanillaExpanded.Tests/E2E/`): Integration tests for system interactions
-  - `AutoStashing/`: Tests for network packet handling and client-server communication
+- [Unit tests](VanillaExpanded.Tests/Unit/): isolated rules and calculations.
+- [Component tests](VanillaExpanded.Tests/Component/): production components working together with mocked external services.
+- [Integration tests](VanillaExpanded.Tests/Integration/): native game compatibility, including GUI input and crafting transfers.
 
 ### Running Tests
 
@@ -222,22 +268,34 @@ dotnet test
 # Run only unit tests (fast feedback)
 dotnet test --filter "Category=Unit"
 
-# Run only E2E tests (integration validation)
-dotnet test --filter "Category=E2E"
+# Run only component tests
+dotnet test --filter "Category=Component"
+
+# Run only integration tests
+dotnet test --filter "Category=Integration"
+
+# Run tests without declared native graphics requirements
+dotnet test --filter "RequiresNative!=Cairo"
+
+# Run tests requiring native graphics
+dotnet test VanillaExpanded.Tests/VanillaExpanded.Tests.csproj --filter "RequiresNative=Cairo"
 
 # Run tests for a specific feature
 dotnet test --filter "FullyQualifiedName~AutoStashing"
 ```
 
-### Mock Infrastructure
+When adding tests, reuse the existing [mocks](VanillaExpanded.Tests/Mocks/) and [test support](VanillaExpanded.Tests/TestSupport/). See the [contributor instructions](.github/copilot-instructions.md) for conventions.
 
-The test project includes reusable mock wrappers in `VanillaExpanded.Tests/Mocks/`:
+### Native dependencies and assertion policy
 
-- `MockItem`: Mock collectible items with configurable IDs and light values
-- `MockInventory`: Mock inventory with slot management
-- `MockPlayer`: Mock player with inventory manager setup
-- `MockClientNetworkChannel`: Captures sent packets for verification
-- `MockServerNetworkChannel`: Simulates server-side packet handling
+GUI tests require native graphics libraries. On Windows, the test project copies
+Cairo from the game installation. On Linux, Cairo, fontconfig, and fonts must be
+available in the host environment. The `RequiresNative` filters select native
+dependencies independently of test categories.
+
+Tests verify behavior rather than rendered pixels or incidental appearance.
+See the [dependency inventory](docs/CairoTestInventory.md#7-phase-4-native-dependency-decision)
+for native test boundaries and detailed assertion rules.
 
 ## License
 
@@ -248,4 +306,6 @@ Anego Studios and its affiliates are granted a perpetual, worldwide, non-exclusi
 
 ## Developer documentation
 
-See [item-slot indicator effects](docs/ItemSlotIndicatorEffects.md) for internal registration, shader and geometry contracts, resource ownership, and validation requirements.
+- [Recipe Book](docs/RecipeBook.md): filtering, ordering, UI lifecycle, and rendering.
+- [Alloy Calculator](docs/AlloyCalculator.md): calculation and inventory-transfer design.
+- [Item-slot indicator effects](docs/ItemSlotIndicatorEffects.md): registration, rendering, and resource ownership.

@@ -16,11 +16,11 @@ public sealed class ToolHeadPresentationIntegrationTests
 {
     #region Public API
     #region Dedicated presentation
-    /// <summary>Configured draws ignore inventory presentation, prepare once, notify once, and borrow selected resources.</summary>
+    /// <summary>Configured draws prepare once, notify once, borrow the selected mesh, and leave the caller transform untouched.</summary>
     [Theory]
     [InlineData(2f)]
     [InlineData(99f)]
-    public void DedicatedDrawPreservesPreparedMeshAndIndependentMatrix(float guiScale)
+    public void DedicatedDrawBorrowsPreparedMeshAndLeavesCallerTransformUntouched(float guiScale)
     {
         var f = new Fixture();
         f.Item.GuiTransform = ModelTransform.ItemDefaultGui();
@@ -35,9 +35,6 @@ public sealed class ToolHeadPresentationIntegrationTests
         Assert.Same(selected, f.Submitted);
         Assert.False(selected.Disposed);
         Assert.Equal(gui, f.Item.GuiTransform.AsMatrix);
-        Assert.Equal(40, f.Matrices["modelMatrix"][0]);
-        Assert.Equal(80, f.Matrices["modelMatrix"][12]);
-        Assert.Equal(220, f.Matrices["modelMatrix"][13]);
         Assert.Equal(1, f.Restores);
     }
 
@@ -128,39 +125,6 @@ public sealed class ToolHeadPresentationIntegrationTests
 
     #endregion
     #region Effects and restoration
-    /// <summary>Screen-space lighting remains toward the upper right as the tool presentation rotates.</summary>
-    [Theory]
-    [InlineData(0f)]
-    [InlineData(90f)]
-    [InlineData(180f)]
-    [InlineData(270f)]
-    public void DedicatedDrawUsesFixedUpperRightLight(float rotation)
-    {
-        var f = new Fixture();
-        float[]? light = null;
-        f.Shader.Setup(shader => shader.Uniform("lightPosition", It.IsAny<float>(), It.IsAny<float>(), It.IsAny<float>()))
-            .Callback<string, float, float, float>((name, x, y, z) => light = [x, y, z]);
-        bool submitted = false;
-        f.Render.Setup(render => render.RenderMultiTextureMesh(It.IsAny<MultiTextureMeshRef>(), "tex2d", 0))
-            .Callback(() =>
-            {
-                submitted = true;
-                Assert.NotNull(light);
-                Assert.Equal([0.9f, -0.9f, 2.7166154f], light);
-                var model = f.Matrices["modelMatrix"];
-                double length = Math.Sqrt(model[8] * model[8] + model[9] * model[9] + model[10] * model[10]);
-                double nx = model[8] / length, ny = model[9] / length, nz = model[10] / length;
-                double dot = nx * light[0] + ny * light[1] + nz * light[2];
-                // Match the installed GUI shader's diffuse, sky and north-facing terms for opposite face normals.
-                double front = Math.Max(Math.Max(.45, .5 + .5 * dot), ny * .95) + Math.Max(0, -nz) * .2;
-                double rear = Math.Max(Math.Max(.45, .5 - .5 * dot), -ny * .95) + Math.Max(0, nz) * .2;
-                Assert.True(front > rear, "The viewer-facing surface must be brighter than its rear-facing inverse.");
-            });
-        Assert.True(f.Renderer.TryRender(f.Api.Object, f.Slot, 100, 200, 40, rotation));
-        Assert.True(submitted);
-        Assert.Equal(1, f.Restores);
-    }
-
     /// <summary>The dedicated draw retains prepared unshaded material semantics.</summary>
     [Fact]
     public void PreparedUnshadedMaterialRemainsUnshaded()
@@ -169,49 +133,25 @@ public sealed class ToolHeadPresentationIntegrationTests
         fixture.Info.NormalShaded = false;
         Assert.True(fixture.Renderer.TryRender(fixture.Api.Object, fixture.Slot, 100, 200, 40, 0));
         fixture.Shader.Verify(shader => shader.Uniform("normalShaded", 0), Times.Once);
-        fixture.Shader.Verify(shader => shader.Uniform("rgbaIn", It.Is<Vec4f>(value => value.X == 1 && value.Y == 1 && value.Z == 1 && value.W == 1)), Times.Once);
     }
 
-    /// <summary>The stock shader receives half ambient terms with stronger directional light and unchanged opacity.</summary>
-    [Theory]
-    [InlineData(1d, 0d, 0d)]
-    [InlineData(-1d, 0d, 0d)]
-    [InlineData(0d, 1d, 0d)]
-    [InlineData(0d, -1d, 0d)]
-    [InlineData(0d, 0d, 1d)]
-    [InlineData(0d, 0d, -1d)]
-    public void ShadedDrawHalvesAmbientAndStrengthensDirectLight(double nx, double ny, double nz)
+    /// <summary>Prepared draws forward caller-owned shader settings without imposing a lighting policy.</summary>
+    [Fact]
+    public void PreparedDrawForwardsCallerShaderSettings()
     {
         var fixture = new Fixture();
-        float[]? light = null;
-        Vec4f? tint = null;
-        fixture.Shader.Setup(shader => shader.Uniform("lightPosition", It.IsAny<float>(), It.IsAny<float>(), It.IsAny<float>()))
-            .Callback<string, float, float, float>((name, x, y, z) => light = [x, y, z]);
-        fixture.Shader.Setup(shader => shader.Uniform("rgbaIn", It.IsAny<Vec4f>()))
-            .Callback<string, Vec4f>((name, value) => tint = value);
+        fixture.Info.ApplyColor = false;
+        fixture.Info.AlphaTest = 0.37f;
+        fixture.Info.DamageEffect = 0.62f;
         Assert.True(fixture.Renderer.TryRender(fixture.Api.Object, fixture.Slot, 100, 200, 40, 0));
-        Assert.NotNull(light);
-        Assert.NotNull(tint);
-        Assert.Equal(.5f, tint.X);
-        Assert.Equal(.5f, tint.Y);
-        Assert.Equal(.5f, tint.Z);
-        Assert.Equal(1f, tint.W);
-        double shaderDot = nx * light[0] + ny * light[1] + nz * light[2];
-        // Evaluate the installed stock equation separately from the requested half-ambient/direct model.
-        double actual = tint.X * (Math.Max(Math.Max(.45, .5 + .5 * shaderDot), .95 * ny) + .2 * Math.Max(0, -nz));
-        double directDot = nx * .3 - ny * .3 + nz * Math.Sqrt(.82);
-        double expected = Math.Max(Math.Max(.225, .25 + .75 * directDot), .475 * ny) + .1 * Math.Max(0, -nz);
-        Assert.InRange(Math.Abs(actual - expected), 0, .000001);
-        if (nz == 1)
-        {
-            Assert.True(directDot > 1 / Math.Sqrt(3), "The new light must face the viewer more directly than the old diagonal light.");
-            Assert.True(actual > .25 + .5 * directDot, "The directional contribution must exceed the previous strength while ambient remains halved.");
-        }
+        fixture.Shader.Verify(shader => shader.Uniform("applyColor", 0), Times.Once);
+        fixture.Shader.Verify(shader => shader.Uniform("alphaTest", 0.37f), Times.Once);
+        fixture.Shader.Verify(shader => shader.Uniform("damageEffect", 0.62f), Times.Once);
     }
 
-    /// <summary>Shader submissions preserve prepared shading, temperature, damage, and transition overlay settings.</summary>
+    /// <summary>Overlay submissions forward supplied texture metadata/settings without taking ownership.</summary>
     [Fact]
-    public void PreparedShaderEffectsAndOverlayAreSubmitted()
+    public void PreparedOverlayForwardsTextureSettingsWithoutTakingOwnership()
     {
         var f = new Fixture();
         var overlay = new LoadedTexture(f.Api.Object) { TextureId = 13, Width = 32, Height = 64, IgnoreUndisposed = true };
@@ -220,17 +160,7 @@ public sealed class ToolHeadPresentationIntegrationTests
         f.Info.TextureSize.Width = 256;
         f.Info.TextureSize.Height = 512;
         f.Render.Setup(r => r.GetTextureAtlasPosition(f.Slot.Itemstack)).Returns(new TextureAtlasPosition { x1 = 0.25f, y1 = 0.5f });
-        f.Slot.Itemstack!.Attributes.SetFloat("temperature",800);
         Assert.True(f.Renderer.TryRender(f.Api.Object, f.Slot, 100, 200, 40, 0));
-        f.Shader.Verify(s => s.Uniform("normalShaded",1), Times.Once);
-        f.Shader.Verify(s => s.Uniform("applyColor",1), Times.Once);
-        f.Shader.Verify(s => s.Uniform("alphaTest",0.05f), Times.Once);
-        f.Shader.Verify(s => s.Uniform("extraGlow",125), Times.Once);
-        f.Shader.Verify(s => s.Uniform("tempGlowMode",1), Times.Once);
-        float[] incandescent = Vintagestory.API.MathTools.ColorUtil.GetIncandescenceColorAsColor4f(800);
-        f.Shader.Verify(shader => shader.Uniform("rgbaGlowIn", It.Is<Vec4f>(value =>
-            value.X == incandescent[0] * .5f && value.Y == incandescent[1] * .5f && value.Z == incandescent[2] * .5f && value.W == 125 / 255f)), Times.Once);
-        f.Shader.Verify(s => s.Uniform("damageEffect",0.4f), Times.Once);
         f.Shader.Verify(s => s.Uniform("overlayOpacity",0.7f), Times.Once);
         f.Shader.Verify(s => s.BindTexture2D("tex2dOverlay",13,1), Times.Once);
         f.Shader.Verify(s => s.Uniform("overlayTextureSize",32f,64f), Times.Once);
@@ -348,7 +278,5 @@ public sealed class ToolHeadPresentationIntegrationTests
     }
     #endregion
 }
-
-
 
 

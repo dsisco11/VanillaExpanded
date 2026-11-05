@@ -146,7 +146,8 @@ public class SpawnDecalRenderer : IRenderer
         );
 
         using var renderState = new SpawnDecalRenderState(rapi);
-        bool debugGroupPushed = TryPushGlDebugGroup("VanillaExpanded: SpawnDecalRenderer");
+        // Enable both debug-group calls only when needed for graphics capture.
+        // bool debugGroupPushed = TryPushGlDebugGroup("VanillaExpanded: SpawnDecalRenderer");
         IStandardShaderProgram? shader = null;
         try
         {
@@ -178,7 +179,7 @@ public class SpawnDecalRenderer : IRenderer
                 shader.ExtraGlow = 0;
                 shader.Stop();
             }
-            if (debugGroupPushed) TryPopGlDebugGroup();
+            // if (debugGroupPushed) TryPopGlDebugGroup();
         }
     }
 

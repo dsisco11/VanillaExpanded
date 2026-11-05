@@ -61,6 +61,15 @@
         "default": true,
         "weight": 4.1
       },
+      "EnableRecipeBook": {
+        "code": "EnableRecipeBook",
+        "name": "EnableRecipeBook",
+        "ingui": "vanillaexpanded:config-enable-recipe-book",
+        "comment": "vanillaexpanded:config-enable-recipe-book-tooltip",
+        "default": true,
+        "weight": 4.6,
+        "clientSide": true
+      },
       "DisableAlloyCalculatorPatch": {
         "code": "DisableAlloyCalculatorPatch",
         "name": "DisableAlloyCalculatorPatch",
@@ -472,6 +481,11 @@
       "type": "separator",
       "title": "vanillaexpanded:config-section-alloy-calculator",
       "weight": 4
+    },
+    {
+      "type": "separator",
+      "title": "vanillaexpanded:config-section-recipe-book",
+      "weight": 4.5
     },
     {
       "type": "separator",
