@@ -39,5 +39,12 @@ public sealed class ToolHeadPresentationMatrixTests
         var item = new Item { Attributes = new JsonObject(new JObject { ["ve-item-icon-properties"] = JObject.Parse(json) }) };
         return new ToolHeadPresentationResolver((_, reason) => Assert.Fail(reason)).Resolve(item).Properties!;
     }
+    /// <summary>Transforms a point using column-vector indexing rather than production matrix helpers.</summary>
+    private static void AssertPoint(float[] m, float x, float y, float z, float ex, float ey, float ez)
+    {
+        Assert.InRange(Math.Abs(ex - (m[0] * x + m[4] * y + m[8] * z + m[12])), 0, .001f);
+        Assert.InRange(Math.Abs(ey - (m[1] * x + m[5] * y + m[9] * z + m[13])), 0, .001f);
+        Assert.InRange(Math.Abs(ez - (m[2] * x + m[6] * y + m[10] * z + m[14])), 0, .001f);
+    }
     #endregion
 }
